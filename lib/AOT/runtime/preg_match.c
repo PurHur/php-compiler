@@ -15,15 +15,57 @@
 typedef struct __hashtable__ __hashtable__;
 typedef struct __string__ __string__;
  
-/* PHP PREG_* codes (subset). */
+/* PHP PREG_* codes (subset; see ext/pcre/php_pcre.c). */
 #define PHPC_PREG_NO_ERROR 0
+#define PHPC_PREG_INTERNAL_ERROR 1
+#define PHPC_PREG_BACKTRACK_LIMIT_ERROR 2
+#define PHPC_PREG_RECURSION_LIMIT_ERROR 3
+#define PHPC_PREG_BAD_UTF8_ERROR 4
+#define PHPC_PREG_BAD_UTF8_OFFSET_ERROR 5
 #define PHPC_PREG_BAD_REGEX 6
- 
+#define PHPC_PREG_JIT_STACKLIMIT_ERROR 7
+
 static int phpc_preg_last_error = PHPC_PREG_NO_ERROR;
- 
+
+extern __string__ *__string__init(long long size, const char *value);
+
+static const char *phpc_preg_error_msg(int code)
+{
+    switch (code) {
+    case PHPC_PREG_NO_ERROR:
+        return "No error";
+    case PHPC_PREG_INTERNAL_ERROR:
+        return "Internal error";
+    case PHPC_PREG_BAD_UTF8_ERROR:
+        return "Malformed UTF-8 characters, possibly incorrectly encoded";
+    case PHPC_PREG_BAD_UTF8_OFFSET_ERROR:
+        return "The offset did not correspond to the beginning of a valid UTF-8 code point";
+    case PHPC_PREG_BACKTRACK_LIMIT_ERROR:
+        return "Backtrack limit exhausted";
+    case PHPC_PREG_RECURSION_LIMIT_ERROR:
+        return "Recursion limit exhausted";
+    case PHPC_PREG_JIT_STACKLIMIT_ERROR:
+        return "JIT stack limit exhausted";
+    default:
+        return "Unknown error";
+    }
+}
+
 int64_t __compiler_preg_last_error(void)
 {
     return (int64_t) phpc_preg_last_error;
+}
+
+__string__ *__compiler_preg_last_error_msg(void)
+{
+    const char *msg = phpc_preg_error_msg(phpc_preg_last_error);
+    size_t len = 0;
+
+    while (msg[len] != '\0') {
+        len++;
+    }
+
+    return __string__init((long long) len, msg);
 }
  
 int64_t __compiler_preg_match(__string__ *pattern, __string__ *subject)

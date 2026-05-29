@@ -13,6 +13,38 @@ final class VmPreg
 {
     public const MAX_PATTERN_BYTES = 4096;
 
+    /** Last PREG_* code from VM preg_* (Zend ext/pcre/php_pcre.c). */
+    private static int $lastError = 0;
+
+    public static function lastError(): int
+    {
+        return self::$lastError;
+    }
+
+    public static function lastErrorMsg(): string
+    {
+        return self::errorMsgForCode(self::$lastError);
+    }
+
+    public static function errorMsgForCode(int $code): string
+    {
+        return match ($code) {
+            0 => 'No error',
+            1 => 'Internal error',
+            4 => 'Malformed UTF-8 characters, possibly incorrectly encoded',
+            5 => 'The offset did not correspond to the beginning of a valid UTF-8 code point',
+            2 => 'Backtrack limit exhausted',
+            3 => 'Recursion limit exhausted',
+            7 => 'JIT stack limit exhausted',
+            default => 'Unknown error',
+        };
+    }
+
+    private static function syncLastErrorFromHost(): void
+    {
+        self::$lastError = \preg_last_error();
+    }
+
     /**
      * @param-out array $matches
      */
@@ -33,7 +65,10 @@ final class VmPreg
             throw new \LogicException('preg_match() offset is not supported in this compiler build');
         }
 
-        return \preg_match($pattern, $subject, $matches);
+        $result = \preg_match($pattern, $subject, $matches);
+        self::syncLastErrorFromHost();
+
+        return $result;
     }
 
     /**
@@ -56,7 +91,10 @@ final class VmPreg
             throw new \LogicException('preg_match_all() offset is not supported in this compiler build');
         }
 
-        return \preg_match_all($pattern, $subject, $matches);
+        $result = \preg_match_all($pattern, $subject, $matches);
+        self::syncLastErrorFromHost();
+
+        return $result;
     }
 
     public static function pregReplace(string $pattern, string $replacement, string $subject) {
@@ -65,6 +103,7 @@ final class VmPreg
         }
 
         $result = \preg_replace($pattern, $replacement, $subject);
+        self::syncLastErrorFromHost();
         if (null === $result) {
             return false;
         }
@@ -104,6 +143,7 @@ final class VmPreg
         }
 
         $result = \preg_split($pattern, $subject);
+        self::syncLastErrorFromHost();
         if (false === $result) {
             return false;
         }
