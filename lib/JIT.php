@@ -3803,6 +3803,12 @@ class JIT {
         if (isset($this->context->functions[$lc])) {
             return;
         }
+        // Inventory compile_driver already require_once's Compiler.php — avoid O(module×func) scan (#2967).
+        if ($this->shouldUseM3InventoryEmitDriver()) {
+            $this->compileM3EmitTuCompilerMethodFromCompilerPhpFile($methodLc, $logical, $lc);
+
+            return;
+        }
         foreach ($this->context->runtime->modules as $module) {
             foreach ($module->getFunctions() as $func) {
                 if (!$func instanceof CoreFunc\PHP) {
@@ -3816,6 +3822,12 @@ class JIT {
                 return;
             }
         }
+        $this->compileM3EmitTuCompilerMethodFromCompilerPhpFile($methodLc, $logical, $lc);
+    }
+
+    /** Lower Compiler spine method from lib/Compiler.php (inventory argv driver avoids module scan, #2967). */
+    private function compileM3EmitTuCompilerMethodFromCompilerPhpFile(string $methodLc, string $logical, string $lc): void
+    {
         $compilerPath = dirname(__DIR__).'/Compiler.php';
         if (!is_file($compilerPath)) {
             return;
@@ -3882,16 +3894,17 @@ class JIT {
         if (isset($this->context->functions[$lc])) {
             return;
         }
-        if (
-            $this->shouldUseM3InventoryEmitDriver()
-            && in_array($methodLc, ['parse', 'compileemitsmoke'], true)
-        ) {
-            unset(
-                $this->context->functions[$lc],
-                $this->context->functionReturnType[$lc],
-                $this->context->functionProxies[$lc]
-            );
-            $this->compileM3EmitTuRuntimeMethodFromRuntimePhpFile($methodLc, $logical, $lc);
+        if ($this->shouldUseM3InventoryEmitDriver()) {
+            // Never scan O(modules×funcs) on inventory links (#2967). parse/compileEmitSmoke from
+            // Runtime.php; ctor/init* use native M3 via compileBlock / ensureM3EmitTuRuntimeInitSpineSymbols.
+            if (in_array($methodLc, ['parse', 'compileemitsmoke'], true)) {
+                unset(
+                    $this->context->functions[$lc],
+                    $this->context->functionReturnType[$lc],
+                    $this->context->functionProxies[$lc]
+                );
+                $this->compileM3EmitTuRuntimeMethodFromRuntimePhpFile($methodLc, $logical, $lc);
+            }
 
             return;
         }
