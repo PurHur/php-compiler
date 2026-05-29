@@ -22,6 +22,9 @@ final class BootstrapCompileSmokeM3Emit
 
     private static int $seq = 0;
 
+    /** @var array<string, true> */
+    private static array $runtimeSpineStubbed = [];
+
     /** M3 emit TU {main}: argv `-o OUT SOURCE` (preferred) or env PHP_COMPILER_M3_* (#1937, #2697, #2866). */
     public static function emitMainEntry(Context $context, string $logPrefix): void
     {
@@ -481,7 +484,8 @@ final class BootstrapCompileSmokeM3Emit
             $context->builder->positionAtEnd($tailBb);
             $phi = $context->builder->phi($objPtr);
             $phi->addIncoming($objPtr->constNull(), $failBb);
-            $phi->addIncoming($block, $compileBb);
+            // compileBb branches via record/afterRecord, not directly to tail (#3023).
+            $phi->addIncoming($block, $afterRecordBb);
 
             return $phi;
         }
@@ -653,14 +657,17 @@ final class BootstrapCompileSmokeM3Emit
         $mangled = self::mangleLogicalFunction($logical);
         $existing = $context->module->getNamedFunction($mangled);
         if (null !== $existing) {
+            if (self::shouldEmitRuntimeSpineDiagnosticStub($methodLc)) {
+                self::emitRuntimeSpineStub($context, $existing, $returnTypeName, $mangled);
+            }
+
             return $existing;
         }
         $params = [];
         foreach ($paramTypeNames as $typeName) {
             $params[] = $context->getTypeFromString($typeName);
         }
-
-        return $context->module->addFunction(
+        $fn = $context->module->addFunction(
             $mangled,
             $context->context->functionType(
                 $context->getTypeFromString($returnTypeName),
@@ -668,5 +675,39 @@ final class BootstrapCompileSmokeM3Emit
                 ...$params
             )
         );
+        if (self::shouldEmitRuntimeSpineDiagnosticStub($methodLc)) {
+            self::emitRuntimeSpineStub($context, $fn, $returnTypeName, $mangled);
+        }
+
+        return $fn;
+    }
+
+    /** M3 emit bridge-only Runtime helpers — no CFG call sites (#3037, #3023). */
+    private static function shouldEmitRuntimeSpineDiagnosticStub(string $methodLc): bool
+    {
+        return in_array($methodLc, ['peeklastparsefailure', 'noteparsecompilenullforscript'], true);
+    }
+
+    private static function emitRuntimeSpineStub(
+        Context $context,
+        \PHPLLVM\Value\Function_ $fn,
+        string $returnTypeName,
+        string $mangled
+    ): void {
+        if (isset(self::$runtimeSpineStubbed[$mangled])) {
+            return;
+        }
+        self::$runtimeSpineStubbed[$mangled] = true;
+        $entry = $fn->appendBasicBlock('diag_stub');
+        $saved = $context->builder;
+        $context->builder = $context->context->builderCreate();
+        $context->builder->positionAtEnd($entry);
+        if ('void' === $returnTypeName) {
+            $context->builder->returnVoid();
+        } else {
+            $retType = $context->getTypeFromString($returnTypeName);
+            $context->builder->returnValue($retType->constNull());
+        }
+        $context->builder = $saved;
     }
 }
