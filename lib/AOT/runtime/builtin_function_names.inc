@@ -74,6 +74,8 @@ static const char *phpc_builtin_functions[] = {
     "dirname",
     "doubleval",
     "enum_exists",
+    "error_clear_last",
+    "error_get_last",
     "exp",
     "explode",
     "extract",

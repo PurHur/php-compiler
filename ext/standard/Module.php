@@ -322,6 +322,8 @@ class Module extends ModuleAbstract
             new trigger_error_(),
             new set_error_handler_(),
             new restore_error_handler_(),
+            new error_get_last(),
+            new error_clear_last(),
             new phpc_deploy_path(),
             new compiler_is_superglobal_name(),
             new extract_(),

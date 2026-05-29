@@ -138,6 +138,8 @@ final class SelfHostBuiltinPolicy
         'get_class' => 'array', 'get_parent_class' => 'array', 'is_a' => 'array', 'is_subclass_of' => 'array',
         'class_implements' => 'array',
         'trigger_error' => 'array',
+        'error_get_last' => 'array',
+        'error_clear_last' => 'array',
         'ini_set' => 'array', 'ini_get' => 'array',
     ];
 
