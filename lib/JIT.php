@@ -293,6 +293,17 @@ class JIT {
             || ($this->shouldUseM3CompileDriverMainNative() && $this->shouldUseEmitHelperLinkStubs());
     }
 
+    /** M5 vendor argv compile: emit-helper spine real-lowers parse/compile/standalone (#3036). */
+    private function shouldUseVendorPrelinkObjectEmit(): bool
+    {
+        if (!$this->shouldUseVendorPrelinkJitStubs()) {
+            return false;
+        }
+        $keep = getenv('PHP_COMPILER_KEEP_OBJECT_FILE');
+
+        return '1' === $keep || 'true' === strtolower((string) $keep);
+    }
+
     private function shouldSkipExternalClassBodyLowering(int $classId): bool
     {
         if ($this->shouldUseSelfHostJitStubs()
@@ -1268,7 +1279,10 @@ class JIT {
         }
         if (!$this->shouldUseM3CompileDriverRealLowering()) {
             if ($this->shouldUseM3EmitTuEmitHelperSpineRealLowering()) {
-                static $emitHelperSpineReal = ['parse', 'compileemitsmoke'];
+                $emitHelperSpineReal = ['parse', 'compileemitsmoke'];
+                if ($this->shouldUseVendorPrelinkObjectEmit()) {
+                    $emitHelperSpineReal = ['parse', 'compile', 'standalone'];
+                }
 
                 return !in_array($methodLc, $emitHelperSpineReal, true);
             }
