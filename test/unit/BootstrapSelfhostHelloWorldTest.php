@@ -411,6 +411,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
     {
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-probe.sh');
         $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER', $script);
+        $this->assertStringContainsString('default_inventory_emit_driver=1', $script);
         $this->assertStringContainsString('inventory compile_driver', $script);
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertStringContainsString('shouldUseM3InventoryEmitDriver', $jit);

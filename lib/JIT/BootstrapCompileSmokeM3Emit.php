@@ -476,12 +476,15 @@ final class BootstrapCompileSmokeM3Emit
             );
             $context->builder->branch($afterRecordBb);
             $context->builder->positionAtEnd($afterRecordBb);
+            $afterPhi = $context->builder->phi($objPtr);
+            $afterPhi->addIncoming($objPtr->constNull(), $recordBb);
+            $afterPhi->addIncoming($block, $compileBb);
             $context->builder->branch($tailBb);
 
             $context->builder->positionAtEnd($tailBb);
             $phi = $context->builder->phi($objPtr);
             $phi->addIncoming($objPtr->constNull(), $failBb);
-            $phi->addIncoming($block, $compileBb);
+            $phi->addIncoming($afterPhi, $afterRecordBb);
 
             return $phi;
         }

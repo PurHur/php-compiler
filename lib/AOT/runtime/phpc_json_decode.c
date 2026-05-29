@@ -539,9 +539,35 @@ static int phpc_json_parse_top(phpc_json_ctx *ctx, __value__ *out)
     return 0;
 }
 
+static const char *phpc_json_error_msg(int code)
+{
+    switch (code) {
+    case PHPC_JSON_ERROR_NONE:
+        return "No error";
+    case PHPC_JSON_ERROR_DEPTH:
+        return "Maximum stack depth exceeded";
+    case PHPC_JSON_ERROR_SYNTAX:
+        return "Syntax error";
+    default:
+        return "Unknown error";
+    }
+}
+
 int64_t __compiler_json_last_error(void)
 {
     return (int64_t) phpc_json_last_error;
+}
+
+__string__ *__compiler_json_last_error_msg(void)
+{
+    const char *msg = phpc_json_error_msg(phpc_json_last_error);
+    size_t len = 0;
+
+    while (msg[len] != '\0') {
+        len++;
+    }
+
+    return __string__init((long long) len, msg);
 }
 
 void __compiler_json_decode(__string__ *json, __value__ *out)

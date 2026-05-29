@@ -141,6 +141,72 @@ final class VmReflection
         return $class->usedTraits;
     }
 
+    /**
+     * class_implements() operand — string or object; optional autoload (#3099).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(class_implements)
+     */
+    public static function resolveClassForClassImplements(Context $ctx, Variable $arg, bool $autoload): ?ClassEntry
+    {
+        return self::resolveClassForClassUses($ctx, $arg, $autoload);
+    }
+
+    /**
+     * @return array<string, string> interface name => interface name (Zend class_implements map)
+     */
+    public static function classImplementsMap(ClassEntry $entry, Context $ctx): array
+    {
+        if ($entry->isTrait) {
+            return [];
+        }
+
+        $result = [];
+        if ($entry->isInterface) {
+            self::addInterfaceAndParents($entry, $ctx, $result);
+
+            return $result;
+        }
+
+        foreach ($entry->interfaces as $ifaceLc) {
+            if (!isset($ctx->classes[$ifaceLc])) {
+                continue;
+            }
+            self::addInterfaceAndParents($ctx->classes[$ifaceLc], $ctx, $result);
+        }
+
+        return $result;
+    }
+
+    /** @param array<string, string> $result */
+    private static function addInterfaceAndParents(ClassEntry $iface, Context $ctx, array &$result): void
+    {
+        if (!$iface->isInterface) {
+            return;
+        }
+        $name = $iface->name;
+        $result[$name] = $name;
+        foreach ($iface->interfaces as $parentLc) {
+            if (!isset($ctx->classes[$parentLc])) {
+                continue;
+            }
+            self::addInterfaceAndParents($ctx->classes[$parentLc], $ctx, $result);
+        }
+    }
+
+    public static function classImplementsArray(ClassEntry $entry, Context $ctx): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (self::classImplementsMap($entry, $ctx) as $ifaceName) {
+            $value = new Variable();
+            $value->string($ifaceName);
+            $ht->add($ifaceName, $value);
+        }
+
+        return $result;
+    }
+
     public static function classUsesArray(ClassEntry $class): Variable
     {
         $result = new Variable();
