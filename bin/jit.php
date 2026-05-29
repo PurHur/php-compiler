@@ -55,7 +55,7 @@ function run(string $filename, string $code, array $options): void
     $block = $runtime->parseAndCompile($code, $filename);
     if (null !== $block && Block::requiresVmLowering($block)) {
         // JIT EH IR may verify (TryCatchJitCompileTest) but MCJIT execute segfaults (#2114).
-        // Generators (`yield`) are VM-only until LLVM coroutine lowering lands (issue #167).
+        // Generators in the script entry block still use VM; nested generator bodies use MCJIT resume (#3074).
         // Fall back to VM semantics rather than producing silent miscompiles or hard crashes.
     } else {
         $runtime->jit($block);

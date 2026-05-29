@@ -12,6 +12,7 @@ namespace PHPCompiler\JIT\Builtin\Type;
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\Builtin\Refcount;
 use PHPCompiler\JIT\Builtin\Type;
 use PHPCompiler\JIT\HashTableHelper;
@@ -983,6 +984,9 @@ class Object_ extends Type {
         if ('closure' === $lcname) {
             // Invoke metadata for indirect holders (array elements, properties; issue #72).
             $this->defineProperty($id, '__closure_target', Variable::TYPE_STRING);
+        }
+        if ('generator' === $lcname) {
+            $this->defineProperty($id, GeneratorHelper::TARGET_PROPERTY, Variable::TYPE_STRING);
         }
         if ('splobjectstorage' === $lcname) {
             $this->splObjectStorageClassId = $id;

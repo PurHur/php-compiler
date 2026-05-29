@@ -14,6 +14,7 @@ final class GeneratorJITTest extends BaseTest
     public static function providePHPTests(): \Generator
     {
         foreach ([
+            'generator_jit.phpt',
             'generator_basic.phpt',
             'generator_nested.phpt',
             'generator_yield_from_array.phpt',
