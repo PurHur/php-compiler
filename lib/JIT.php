@@ -63,12 +63,14 @@ class JIT {
 
     public function compile(Block $block): PHPLLVM\Value {
         JIT\Progress::noteFunction('jit_compile_begin');
-        if (
-            $this->shouldUseM3EmitTuNativeBridge()
-            && $this->isM3EmitTuScriptMain($block)
-            && !($this->shouldUseM3InventoryEmitDriver() && $this->isM3CompileDriverBundleScriptMain($block))
-        ) {
-            $this->m3EmitTuMainBlock = $block;
+        if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
+            // Inventory emit-helper reuses thin TU spine (#3070); argv-only inventory keeps compile_driver {main}.
+            $inventoryEmitHelper = $this->shouldUseM3InventoryEmitDriver()
+                && $this->isM3CompileDriverBundleScriptMain($block)
+                && $this->shouldUseEmitHelperLinkStubs();
+            if ($inventoryEmitHelper || !$this->shouldUseM3InventoryEmitDriver() || !$this->isM3CompileDriverBundleScriptMain($block)) {
+                $this->m3EmitTuMainBlock = $block;
+            }
         }
         if (
             $this->isM4BinCompileScriptMain($block)
@@ -600,6 +602,12 @@ class JIT {
             return true;
         }
         if (str_ends_with($lower, '\\runtime::loadcoremodules')) {
+            return true;
+        }
+        if (str_ends_with($lower, '\\runtime::noteparsecompilenullforscript')) {
+            return true;
+        }
+        if (str_ends_with($lower, '\\runtime::peeklastparsefailure')) {
             return true;
         }
         if (str_ends_with($lower, '\\runtime::__destruct')) {
@@ -2139,6 +2147,8 @@ class JIT {
             'parseandcompile',
             'parseandcompileemitsmoke',
             'parseandcompilefile',
+            'noteparsecompilenullforscript',
+            'peeklastparsefailure',
             'standalone',
             'loadjit',
             'jitcompileblock',
@@ -2693,14 +2703,16 @@ class JIT {
         if (!$this->m3EmitTuRuntimeSpineLowered) {
             $this->m3EmitTuRuntimeSpineLowered = true;
             $sidecar = $this->isM3EmitTuTrivialEchoSidecarActive();
+            $inventoryEmit = $this->shouldUseM3InventoryEmitForCompileDriverBlock($block);
             foreach (['parse', 'compileemitsmoke', 'standalone'] as $methodLc) {
-                if ('standalone' === $methodLc && $sidecar) {
+                if ('standalone' === $methodLc && ($sidecar || $inventoryEmit)) {
                     continue;
                 }
                 $this->compileM3EmitTuRuntimeMethodFromQueue($methodLc);
             }
             $this->runQueue();
-            $this->compileM3EmitTuRuntimeSpineDecls();
+            $stubBlock = $this->m3EmitTuMainBlock ?? $this->m3CompileDriverMainBlock ?? $block;
+            $this->compileM3EmitTuRuntimeSpineDecls($stubBlock);
         }
         $i64 = $this->context->getTypeFromString('int64');
         $func = $this->context->module->addFunction(
@@ -3013,6 +3025,8 @@ class JIT {
             'initparsepipeline',
             'initcompiler',
             'loadcoremodules',
+            'noteparsecompilenullforscript',
+            'peeklastparsefailure',
         ] as $methodLc) {
             $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
         }
@@ -3043,7 +3057,7 @@ class JIT {
         if (!isset($this->context->functions[$emitSmokeLc])) {
             $this->compileM3EmitTuRuntimeMethodFromModules('parseandcompileemitsmoke');
         }
-        foreach (['compileemitsmoke'] as $methodLc) {
+        foreach (['compileemitsmoke', 'noteparsecompilenullforscript', 'peeklastparsefailure'] as $methodLc) {
             $runtimeLc = strtolower('PHPCompiler\\Runtime::'.$methodLc);
             if (!isset($this->context->functions[$runtimeLc])) {
                 $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
@@ -3063,15 +3077,12 @@ class JIT {
         foreach (['initparsepipeline', 'loadcoremodules'] as $methodLc) {
             $logical = 'PHPCompiler\\Runtime::'.$methodLc;
             $lc = strtolower($logical);
-            if ($this->shouldUseM3InventoryEmitDriver() && !$this->shouldUseEmitHelperLinkStubs()) {
+            if ($this->shouldUseM3InventoryEmitDriver()) {
                 unset($this->context->functions[$lc], $this->context->functionReturnType[$lc], $this->context->functionProxies[$lc]);
             } elseif (!isset($this->context->functions[$lc])) {
                 $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
             }
-            if (
-                (!$this->shouldUseM3InventoryEmitDriver() || $this->shouldUseEmitHelperLinkStubs())
-                && isset($this->context->functions[$lc])
-            ) {
+            if (!$this->shouldUseM3InventoryEmitDriver() && isset($this->context->functions[$lc])) {
                 continue;
             }
             if ('initparsepipeline' === $methodLc) {
