@@ -311,8 +311,21 @@ function syntaxRowDefinitions(): array
             'construct' => 'By-reference parameters (`function f(&$x)`)',
             'opcodes' => ['TYPE_ARG_RECV', 'TYPE_ARG_SEND'],
             'issue' => 140,
-            'notes' => ['VM TYPE_INDIRECT; JIT aliases caller __value__* via paramByRef (#3161)'],
+            'notes' => [
+                'VM TYPE_INDIRECT; JIT aliases caller __value__* via paramByRef (#3161)',
+                'Return-by-ref `function &f()` + `$x = &f()` on VM (#3414)',
+            ],
             'probe' => 'function inc(&$n) { $n++; } $x = 1; inc($x); echo $x;',
+        ],
+        [
+            'id' => 'return_by_ref',
+            'construct' => 'Return-by-reference (`function &f()` / `$x = &f()`)',
+            'opcodes' => ['TYPE_RETURN', 'TYPE_FUNCCALL_EXEC_RETURN', 'TYPE_ASSIGN_REF'],
+            'issue' => 3414,
+            'jit' => false,
+            'aot' => false,
+            'notes' => ['VM propagates reference cells via FLAG_RETURNS_REF; JIT deferred (#3161)'],
+            'probe' => 'function &c() { static $n = 0; return $n; } $r = &c(); $r = 5; echo c();',
         ],
         [
             'id' => 'static_property_fetch',
