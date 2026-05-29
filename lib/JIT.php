@@ -5416,7 +5416,8 @@ class JIT {
                     }
                     $closureObj = JIT\ClosureHelper::allocateClosureObject(
                         $this->context,
-                        $callProxy
+                        $callProxy,
+                        $internalName
                     );
                     $this->assignOperand($block->getOperand($op->arg1), $closureObj, true);
                     break;
@@ -5430,18 +5431,17 @@ class JIT {
                         $lcname = strtolower($nameOp->value);
                         $this->context->scope->toCall = $this->context->resolveFunctionProxy($lcname);
                     } else {
+                        $nameVar = $this->context->getVariableFromOp($nameOp);
+                        $closureCall = JIT\ClosureHelper::resolveCall($this->context, $nameVar);
+                        if (null !== $closureCall) {
+                            $this->context->scope->toCall = $closureCall;
+                            $this->context->scope->args = [];
+                            break;
+                        }
                         if (null !== $nameOp->type && Type::TYPE_OBJECT === $nameOp->type->type) {
-                            $calleeVar = $this->context->getVariableFromOp($nameOp);
-                            $closureCall = JIT\ClosureHelper::resolveCall($calleeVar);
-                            if (null !== $closureCall) {
-                                $this->context->scope->toCall = $closureCall;
-                                $this->context->scope->args = [];
-                                break;
-                            }
                             $this->initJitMethodCall($block, $nameOp, '__invoke');
                             break;
                         }
-                        $nameVar = $this->context->getVariableFromOp($nameOp);
                         $nameSlot = $block->slotForOperand($nameOp);
                         if (null !== $nameSlot) {
                             $this->foldCompileTimeStringFromSlot($block, $nameSlot, $nameVar);
@@ -7487,7 +7487,7 @@ class JIT {
     {
         if ('__invoke' === strtolower($methodName)) {
             $receiver = $this->context->getVariableFromOp($receiverOp);
-            $closureCall = JIT\ClosureHelper::resolveCall($receiver);
+            $closureCall = JIT\ClosureHelper::resolveCall($this->context, $receiver);
             if (null !== $closureCall) {
                 $this->context->scope->toCall = $closureCall;
                 $this->context->scope->args = [];

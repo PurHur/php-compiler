@@ -6,15 +6,19 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
 use PHPCompiler\JIT\Call\ClosureWithCaptures;
+use PHPCompiler\JIT\Call\RuntimeIndirectClosureCall;
+use PHPLLVM\Value;
 
 /**
  * JIT lowering for anonymous closures, including use() by-value captures (issue #72).
  *
- * Compiles the closure CFG as a native function and wraps the result in a Closure
- * object whose {@see Variable::$closureCall} proxy handles direct / __invoke calls.
+ * Direct calls use {@see Variable::$closureCall}. Indirect holders (array elements,
+ * properties) resolve via {@see TARGET_PROPERTY} on the Closure object.
  */
 final class ClosureHelper
 {
+    public const TARGET_PROPERTY = '__closure_target';
+
     private static int $counter = 0;
 
     public static function nextInternalName(): string
@@ -22,20 +26,65 @@ final class ClosureHelper
         return '{closure}_'.(++self::$counter);
     }
 
-    public static function resolveCall(Variable $receiver): ?Call
+    public static function resolveCall(Context $context, Variable $receiver): ?Call
     {
-        return $receiver->closureCall;
+        if (null !== $receiver->closureCall) {
+            return $receiver->closureCall;
+        }
+
+        return self::resolveIndirectCall($context, $receiver);
     }
 
-    public static function allocateClosureObject(Context $context, Call $callProxy): Variable
+    public static function allocateClosureObject(Context $context, Call $callProxy, string $internalName): Variable
     {
         $classId = $context->type->object->lookup('Closure');
         $obj = $context->type->object->allocate($classId);
         $context->type->object->markObjectConstructed($obj);
+        self::storeTargetName($context, $obj, $internalName);
         $var = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
         $var->closureCall = $callProxy;
 
         return $var;
+    }
+
+    /**
+     * @return array<string, Call>
+     */
+    public static function closureCandidates(Context $context): array
+    {
+        $out = [];
+        foreach ($context->functionProxies as $lc => $proxy) {
+            if (str_starts_with($lc, '{closure}_')) {
+                $out[$lc] = $proxy;
+            }
+        }
+        ksort($out);
+
+        return $out;
+    }
+
+    public static function loadObjectFromCallable(Context $context, Variable $callable): Value
+    {
+        if (Variable::TYPE_OBJECT === $callable->type) {
+            return $context->helper->loadValue($callable);
+        }
+        if (Variable::TYPE_VALUE === $callable->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::valuePtrFromVariable($context, $callable)
+            );
+        }
+
+        throw new \LogicException('Closure invoke requires an object callable');
+    }
+
+    public static function loadClassId(Context $context, Value $obj): Value
+    {
+        $map = $context->structFieldMap['__object__'];
+
+        return $context->builder->load(
+            $context->builder->structGep($obj, $map['class_id'])
+        );
     }
 
     /**
@@ -121,5 +170,42 @@ final class ClosureHelper
         }
 
         return new ClosureWithCaptures($inner, $captures);
+    }
+
+    private static function resolveIndirectCall(Context $context, Variable $receiver): ?Call
+    {
+        if (Variable::TYPE_STRING === $receiver->type) {
+            return null;
+        }
+        if (Variable::TYPE_VALUE === $receiver->type && null !== $receiver->compileTimeString) {
+            return null;
+        }
+        if (Variable::TYPE_OBJECT !== $receiver->type && Variable::TYPE_VALUE !== $receiver->type) {
+            return null;
+        }
+        $candidates = self::closureCandidates($context);
+        if ([] === $candidates) {
+            return null;
+        }
+        $classId = $context->type->object->lookup('Closure');
+
+        return new RuntimeIndirectClosureCall($receiver, $candidates, $classId);
+    }
+
+    private static function storeTargetName(Context $context, Value $obj, string $internalName): void
+    {
+        $targetStr = new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $context->builder->load($context->constantStringFromString(strtolower($internalName)))
+        );
+        $targetStr->addref();
+        $context->type->object->storeInstanceProperty(
+            $obj,
+            'Closure',
+            self::TARGET_PROPERTY,
+            $targetStr
+        );
     }
 }
