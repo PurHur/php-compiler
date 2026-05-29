@@ -304,6 +304,49 @@ class Context {
 
         return $prev;
     }
+
+    /**
+     * Visit variables that act as GC roots (globals, stack, statics, etc.).
+     *
+     * @param callable(Variable): void $visitVar
+     */
+    public function visitGcRoots(callable $visitVar): void
+    {
+        foreach ($this->constants as $constant) {
+            $visitVar($constant);
+        }
+        foreach ($this->globalVars as $global) {
+            $visitVar($global);
+        }
+        foreach ($this->superglobalVars as $superglobal) {
+            $visitVar($superglobal);
+        }
+        foreach ($this->functionStaticVars as $static) {
+            $visitVar($static);
+        }
+        foreach ($this->foreachIterators as $iterator) {
+            $visitVar($iterator);
+        }
+        if (null !== $this->pendingException) {
+            $visitVar($this->pendingException);
+        }
+        if (null !== $this->pendingReturnValue) {
+            $visitVar($this->pendingReturnValue);
+        }
+        foreach ($this->classes as $class) {
+            foreach ($class->staticProperties as $storage) {
+                $visitVar($storage);
+            }
+            foreach ($class->constants as $constant) {
+                $visitVar($constant);
+            }
+        }
+        $stack = $this->runStack;
+        while (null !== $stack) {
+            CycleCollector::markFrameRoots($stack->frame, $visitVar);
+            $stack = $stack->prev;
+        }
+    }
 }
 
 class RunStackEntry {

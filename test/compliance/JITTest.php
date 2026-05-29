@@ -41,6 +41,10 @@ class JITTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'class_alias')) {
                 continue;
             }
+            // gc_collect_cycles() is VM-only (#3113).
+            if (str_contains($name, 'gc_collect_cycles')) {
+                continue;
+            }
             yield $name => $case;
         }
     }

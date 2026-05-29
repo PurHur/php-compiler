@@ -41,6 +41,27 @@ class ObjectEntry {
             $var->objectPropertyName = $property->name;
             $this->properties[$property->name] = $var;
         }
+        ObjectRegistry::register($this);
+    }
+
+    /** @return list<Variable> */
+    public function instancePropertyVariables(): array
+    {
+        return array_values($this->properties);
+    }
+
+    /** Break property edges and detach generator/closure state after cycle collection (#3113). */
+    public function destroyForGc(): void
+    {
+        foreach ($this->properties as $prop) {
+            if (Variable::TYPE_INDIRECT === $prop->type) {
+                $prop->resolveIndirect()->null();
+            } else {
+                $prop->null();
+            }
+        }
+        $this->generatorState = null;
+        $this->closureState = null;
     }
 
     public function getProperty(string $name): Variable {
