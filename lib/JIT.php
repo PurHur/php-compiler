@@ -5273,37 +5273,35 @@ class JIT {
                 case OpCode::TYPE_NULLSAFE:
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
+                    $nullsafeResult = $block->getOperand($op->arg1);
+                    $this->context->coalesceAssignTargets[$nullsafeResult] = true;
                     $receiver = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $valuePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $receiver);
-                    $typeByte = $this->context->builder->load(
-                        $this->context->builder->structGep(
-                            $valuePtr,
-                            $this->context->structFieldMap['__value__']['type']
-                        )
-                    );
-                    $i8 = $this->context->getTypeFromString('int8');
-                    $isNull = $this->context->builder->icmp(
-                        \PHPLLVM\Builder::INT_EQ,
-                        $typeByte,
-                        $i8->constInt(JIT\Variable::TYPE_NULL, false)
-                    );
-                    $nullBb = JIT\NullsafeHelper::compileBranch($this, $func, $op->block1);
-                    $fetchBb = JIT\NullsafeHelper::compileBranch($this, $func, $op->block2);
+                    $isNull = JIT\NullsafeHelper::isReceiverNull($this, $receiver);
+                    // Mirror ?? lowering: branchIf targets entry blocks; merge from branch tails (#3219).
+                    $nullTail = JIT\NullsafeHelper::compileBranch($this, $func, $op->block1);
+                    $fetchTail = JIT\NullsafeHelper::compileBranch($this, $func, $op->block2);
+                    $nullEntry = $this->context->scope->blockStorage[$op->block1];
+                    $fetchEntry = $this->context->scope->blockStorage[$op->block2];
                     $builder->positionAtEnd($branchBlock);
-                    if ($this->shouldFreeDeadVariablesBeforeBranch()) {
-                        $this->context->freeDeadVariables($func, $branchBlock, $block);
-                    }
-                    $builder->branchIf($isNull, $nullBb, $fetchBb);
+                    // Do not free php-cfg "dead" operands here; ?-> temps are used on branch/merge blocks (#3219).
+                    $builder->branchIf($isNull, $nullEntry, $fetchEntry);
                     if (null !== $op->block3) {
                         $mergeBb = JIT\BasicBlockHelper::append($this->context, 'nullsafe_merge');
-                        $builder->positionAtEnd($nullBb);
-                        $builder->branch($mergeBb);
-                        $builder->positionAtEnd($fetchBb);
-                        $builder->branch($mergeBb);
+                        $builder->positionAtEnd($nullTail);
+                        if (null === $nullTail->getTerminator()) {
+                            $builder->branch($mergeBb);
+                        }
+                        $builder->positionAtEnd($fetchTail);
+                        if (null === $fetchTail->getTerminator()) {
+                            $builder->branch($mergeBb);
+                        }
                         $builder->positionAtEnd($mergeBb);
+                        $merged = $this->compileBlockInternal($func, $op->block3, null, $mergeBb, ...$args);
+                        unset($this->context->coalesceAssignTargets[$nullsafeResult]);
 
-                        return $this->compileBlockInternal($func, $op->block3, null, $mergeBb, ...$args);
+                        return $merged;
                     }
+                    unset($this->context->coalesceAssignTargets[$nullsafeResult]);
 
                     return $origBasicBlock;
                 case OpCode::TYPE_JUMPIF:
@@ -5770,21 +5768,31 @@ class JIT {
                     $propName = $name instanceof Operand\Literal ? $name->value : null;
                     $declaringClass = $this->resolvePropertyDeclaringClass($obj, $block, $propName);
                     $receiver = $this->loadPropertyFetchReceiver($obj);
+                    $forceBranchMerge = $this->context->coalesceAssignTargets->contains($result);
                     if ($name instanceof Operand\Literal) {
                         $fetched = $this->context->type->object->propertyFetch(
                             $receiver,
                             $declaringClass,
                             $name->value
                         );
-                        $this->context->scope->variables[$result] = $fetched;
+                        if ($forceBranchMerge) {
+                            $this->assignOperand($result, $fetched, true);
+                        } else {
+                            $this->context->scope->variables[$result] = $fetched;
+                        }
                         $this->applyExternalPropertyResultType($result, $declaringClass, $name->value);
                     } else {
                         $nameVar = $this->context->getVariableFromOp($name);
-                        $this->context->scope->variables[$result] = $this->context->type->object->propertyFetchDynamic(
+                        $fetched = $this->context->type->object->propertyFetchDynamic(
                             $receiver,
                             $declaringClass,
                             $nameVar
                         );
+                        if ($forceBranchMerge) {
+                            $this->assignOperand($result, $fetched, true);
+                        } else {
+                            $this->context->scope->variables[$result] = $fetched;
+                        }
                     }
                     break;
                 default:
@@ -6666,7 +6674,7 @@ class JIT {
                             $result->value
                         );
                     }
-                    $this->copyObjectPropertyBacking($result, $value);
+                    $this->maybeCopyObjectPropertyBacking($result, $value, $force);
                     if (null === $result->objectPropertySlot) {
                         $result->addref();
                     }
@@ -6680,7 +6688,7 @@ class JIT {
                 $toStore,
                 $result->value
             );
-            $this->copyObjectPropertyBacking($result, $value);
+            $this->maybeCopyObjectPropertyBacking($result, $value, $force);
             if (null === $result->objectPropertySlot) {
                 $result->addref();
             }
@@ -6918,7 +6926,7 @@ class JIT {
             );
             $result->free();
             $this->context->builder->store($ht, $result->value);
-            $this->copyObjectPropertyBacking($result, $value);
+            $this->maybeCopyObjectPropertyBacking($result, $value, $force);
             if (null === $result->objectPropertySlot) {
                 $result->addref();
             }
@@ -7271,6 +7279,21 @@ class JIT {
     }
 
     /** Keep borrowed object-property hashtable metadata on locals ($cfg = $this->config, #848). */
+    private function maybeCopyObjectPropertyBacking(Variable $dest, Variable $src, bool $force): void
+    {
+        // Branch-merge assigns (?-> / ??) must read the unified __value__ slot at the merge block (#3219).
+        if ($force) {
+            $dest->objectPropertySlot = null;
+            $dest->objectPropertyType = null;
+            $dest->objectPropertyReceiver = null;
+            $dest->objectPropertyName = null;
+            $dest->objectPropertyClassName = null;
+
+            return;
+        }
+        $this->copyObjectPropertyBacking($dest, $src);
+    }
+
     private function copyObjectPropertyBacking(Variable $dest, Variable $src): void
     {
         $dest->objectPropertySlot = $src->objectPropertySlot;
