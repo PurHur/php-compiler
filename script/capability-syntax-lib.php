@@ -157,9 +157,9 @@ function syntaxRowDefinitions(): array
             'issue' => 72,
             'aot' => false,
             'notes' => [
-                'VM via ClosureState + __invoke; use() by-value on VM (#3081)',
-                'JIT ClosureHelper lowers TYPE_CLOSURE without use() (#3081); use (&$x) deferred',
-                'Bootstrap / self-host AOT stubs null',
+                'VM via ClosureState + __invoke; use() by-value (#3081); array_map callbacks (#3086)',
+                'JIT ClosureHelper: TYPE_CLOSURE + use() by-value IR (#3092); indirect $arr[0]() via __closure_target (#3092)',
+                'use (&$x) JIT deferred; bootstrap / self-host AOT stubs null; MCJIT execute probe-dependent',
             ],
             'probe' => '$f = function ($x) { return $x + 1; }; echo $f(2);',
         ],
@@ -169,7 +169,7 @@ function syntaxRowDefinitions(): array
             'opcodes' => ['TYPE_CLOSURE'],
             'issue' => 142,
             'aot' => false,
-            'notes' => ['Same lowering as closures (#72); JIT without use() (#3081)'],
+            'notes' => ['Same lowering as closures (#72); JIT mirrors closure path (#3092)'],
             'probe' => '$f = fn ($x) => $x + 1; echo $f(2);',
         ],
         [
