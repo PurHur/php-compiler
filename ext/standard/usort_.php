@@ -36,14 +36,6 @@ final class usort_ extends Internal
             throw new \LogicException('usort() first argument must be an array in this compiler build');
         }
         $callback = $frame->calledArgs[1]->resolveIndirect();
-        if (!UsortCallbackPolicy::isVmSupportedType($callback->type)) {
-            throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
-        }
-        $name = $callback->toString();
-        if (!UsortCallbackPolicy::isVmSupportedName($name)) {
-            throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
-        }
-        $compare = VmInternalCompare::resolveStringCallback($name);
         $ht = $array->toArray();
         if ($ht->getNumElements() < 2) {
             if (null !== $frame->returnVar) {
@@ -58,7 +50,26 @@ final class usort_ extends Internal
             $copy->copyFrom($value);
             $values[] = $copy;
         }
-        VmInternalCompare::sortVariableValues($values, $compare);
+        if (VmClosureCall::isClosure($callback)) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException('usort() requires VM context in this compiler build');
+            }
+            VmClosureCall::sortVariableValues(
+                $frame->vmContext,
+                $values,
+                VmClosureCall::resolve($callback)
+            );
+        } else {
+            if (!UsortCallbackPolicy::isVmSupportedType($callback->type)) {
+                throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
+            }
+            $name = $callback->toString();
+            if (!UsortCallbackPolicy::isVmSupportedName($name)) {
+                throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
+            }
+            $compare = VmInternalCompare::resolveStringCallback($name);
+            VmInternalCompare::sortVariableValues($values, $compare);
+        }
         $ht->replacePackedValues($values);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);

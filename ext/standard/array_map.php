@@ -51,6 +51,19 @@ final class array_map extends Internal
 
             return;
         }
+        if (VmClosureCall::isClosure($callback)) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException('array_map() requires VM context in this compiler build');
+            }
+            $closure = VmClosureCall::resolve($callback);
+            foreach ($src->iterateKeyed(true) as [$key, $value]) {
+                $mapped = VmClosureCall::invokeOne($frame->vmContext, $closure, $value);
+                self::appendKeyed($out, $key, $mapped);
+            }
+            $frame->returnVar->array($out);
+
+            return;
+        }
         if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
             throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
         }

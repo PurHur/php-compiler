@@ -51,9 +51,24 @@ final class array_filter extends Internal
             return;
         }
         $callback = $frame->calledArgs[1]->resolveIndirect();
+        if (VmClosureCall::isClosure($callback)) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException('array_filter() requires VM context in this compiler build');
+            }
+            $closure = VmClosureCall::resolve($callback);
+            foreach ($src->iterateKeyed(true) as [$key, $value]) {
+                $keep = VmClosureCall::invokeOne($frame->vmContext, $closure, $value);
+                if (boolval::isTruthy($keep)) {
+                    array_map::appendKeyedCopy($out, $key, $value);
+                }
+            }
+            $frame->returnVar->array($out);
+
+            return;
+        }
         if (Variable::TYPE_STRING !== $callback->type) {
             throw new \LogicException(
-                'array_filter() callback must be a string builtin name in this compiler build'
+                'array_filter() callback must be a string builtin name or closure in this compiler build'
             );
         }
         $fn = VmInternalCall::resolveStringCallback($callback->toString());
