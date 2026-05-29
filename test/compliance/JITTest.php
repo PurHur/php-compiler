@@ -65,6 +65,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'json_validate')) {
                 continue;
             }
+            // Nested break/continue levels use php-cfg goto labels; VM-only until JIT (#3405).
+            if (str_contains($name, 'break2_') || str_contains($name, 'continue2_')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
