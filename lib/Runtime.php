@@ -25,6 +25,8 @@ use PHPCompiler\VM\Context as VMContext;
 use PHPCompiler\VM\ObjectRegistry;
 use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\Ast\GroupUseStripper;
+use PHPCompiler\Ast\SealedClassAnnotator;
+use PHPCompiler\Ast\SealedClassPreprocessor;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Lint\LintCompiler;
 use PHPCompiler\VM\ShutdownQueue;
@@ -46,6 +48,7 @@ class Runtime {
     private ?JIT $jit = null;
     public array $modules = [];
     public int $mode;
+    private SealedClassAnnotator $sealedClassAnnotator;
     public ?string $debugFile = null;
 
     public TypeReconstructor $typeReconstructor;
@@ -72,6 +75,8 @@ class Runtime {
         $astTraverser->addVisitor(new GroupUseStripper());
         $this->abstractEnumMarker = new Ast\AbstractEnumMarker();
         $astTraverser->addVisitor($this->abstractEnumMarker);
+        $this->sealedClassAnnotator = new SealedClassAnnotator();
+        $astTraverser->addVisitor($this->sealedClassAnnotator);
         $this->parser = new Parser(
             (new ParserFactory)->create(ParserFactory::ONLY_PHP7),
             $astTraverser
@@ -199,6 +204,9 @@ class Runtime {
 
     public function preprocessSourceForParse(string $code): array
     {
+        $sealedPreprocessor = new SealedClassPreprocessor();
+        [$code, $permitsByLine] = $sealedPreprocessor->preprocess($code);
+        $this->sealedClassAnnotator->setPermitsByLine($permitsByLine);
         [$code] = (new SourcePreprocessor\PropertyHooks())->process($code);
         $code = SwitchCommaCaseRewriter::rewrite($code);
         $code = GenericArrayTypeSourceRewriter::rewrite($code);

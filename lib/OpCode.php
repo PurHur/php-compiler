@@ -173,6 +173,10 @@ class OpCode {
 
     /** @var list<string> */
     public array $classImplements = [];
+    /** Sealed type: permitted child class names (lowercase FQCN); empty = none (#3322). */
+    public bool $isSealed = false;
+    /** @var list<string> */
+    public array $sealedPermits = [];
     /** Declared PHP 8 attribute class names on class/method (#1936). */
     public array $attributeNames = [];
     /** @var list<\PHPCompiler\Compiler\AttributeEntry> attribute metadata incl. ctor args (#3206, #3800). */

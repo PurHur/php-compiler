@@ -1426,6 +1426,7 @@ class Compiler {
         );
         AttributeNames::assertNoDuplicates(AttributeNames::fromOp($iface));
         $return->classImplements = $this->interfaceNamesFromOperands($iface->extends);
+        $this->applySealedMetadataFromOp($iface, $return);
         $return->block1 = $this->compileClassBody(
             $iface->stmts,
             OpCode::TYPE_DECLARE_INTERFACE,
@@ -1590,6 +1591,7 @@ class Compiler {
             VM\StringableSupport::assertConcreteClassImplements($class, $className);
         }
         $this->assignAttributeMetadata($return, $class);
+        $this->applySealedMetadataFromOp($class, $return);
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($class->flags);
         if ($return->classIsAbstract) {
             $name = $this->staticNameFromOperand($class->name);
@@ -1621,6 +1623,16 @@ class Compiler {
             }
         }
         return $return;
+    }
+
+    protected function applySealedMetadataFromOp(Op $op, OpCode $opcode): void
+    {
+        if (!$op->hasAttribute('compilerSealed')) {
+            return;
+        }
+        $opcode->isSealed = true;
+        $permits = $op->getAttribute('compilerSealedPermits');
+        $opcode->sealedPermits = \is_array($permits) ? $permits : [];
     }
 
     /**

@@ -1480,6 +1480,10 @@ restart:
                     $ifaceEntry = new VM\ClassEntry($name);
                     $ifaceEntry->isInterface = true;
                     $ifaceEntry->interfaces = $op->classImplements;
+                    if ($op->isSealed) {
+                        $ifaceEntry->sealed = true;
+                        $ifaceEntry->sealedPermits = $this->normalizeSealedPermits($name, $op->sealedPermits);
+                    }
                     if (null !== $op->block1) {
                         self::defineClass($ifaceEntry, $op->block1);
                     }
@@ -1549,6 +1553,11 @@ restart:
                     if (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
                         $classEntry->readonly = (bool) $frame->block->constants[$op->arg3]->toInt();
                     }
+                    if ($op->isSealed) {
+                        $classEntry->sealed = true;
+                        $classEntry->sealedPermits = $this->normalizeSealedPermits($name, $op->sealedPermits);
+                    }
+                    $this->assertAllowedBySealedParents($name, $classEntry->parentLc, $classEntry->interfaces);
                     $classEntry->attributeNames = $op->attributeNames;
                     $classEntry->isAbstract = $op->classIsAbstract;
                     $classEntry->allowsDynamicProperties = AttributeNames::hasAllowDynamicProperties(
@@ -3403,6 +3412,57 @@ restart:
                 if (!isset($entry->constants[$name])) {
                     $entry->constants[$name] = $value;
                 }
+            }
+        }
+    }
+
+    /**
+     * @param list<string> $rawPermits lowercase names from source (possibly unqualified)
+     *
+     * @return list<string>
+     */
+    protected function normalizeSealedPermits(string $sealedName, array $rawPermits): array
+    {
+        $sealedLc = strtolower(ltrim($sealedName, '\\'));
+        $ns = '';
+        if (false !== ($pos = strrpos($sealedLc, '\\'))) {
+            $ns = substr($sealedLc, 0, $pos + 1);
+        }
+        $out = [];
+        foreach ($rawPermits as $p) {
+            $p = strtolower(ltrim($p, '\\'));
+            if (str_contains($p, '\\')) {
+                $out[] = $p;
+            } else {
+                $out[] = $ns.$p;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<string> $implements lowercase interface names
+     */
+    protected function assertAllowedBySealedParents(string $childName, ?string $parentLc, array $implements): void
+    {
+        $childLc = strtolower(ltrim($childName, '\\'));
+        if (null !== $parentLc && isset($this->context->classes[$parentLc])) {
+            $parent = $this->context->classes[$parentLc];
+            if ($parent->sealed && !VM\ClassSealed::childMayInherit($childLc, $parent->sealedPermits)) {
+                $msg = [] === $parent->sealedPermits
+                    ? VM\ClassSealed::cannotExtendMessage($childName, $parent->name)
+                    : VM\ClassSealed::notInPermitsListMessage($childName, $parent->name);
+                throw new \LogicException($msg);
+            }
+        }
+        foreach ($implements as $ifaceLc) {
+            if (!isset($this->context->classes[$ifaceLc])) {
+                continue;
+            }
+            $iface = $this->context->classes[$ifaceLc];
+            if ($iface->sealed && !VM\ClassSealed::childMayInherit($childLc, $iface->sealedPermits)) {
+                throw new \LogicException(VM\ClassSealed::cannotImplementMessage($childName, $iface->name));
             }
         }
     }
