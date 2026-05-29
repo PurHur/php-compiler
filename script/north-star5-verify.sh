@@ -115,9 +115,9 @@ ns5_print_summary() {
   echo "  Spine: ${spine_ratio} (Phase A inventory SSOT)"
   echo "  Vendor prelink: ${vendor_ok}/3 object_ok (php-cfg, php-types, php-llvm prelinked .o)"
   if [[ "${NS5_NO_ZEND}" -eq 1 ]]; then
-    echo "  Cold boot: compiled driver only (no Zend gen-0; BOOTSTRAP_M5_NO_ZEND=1, #3053)"
+    echo "  Cold boot: prelinked/bootstrap-gen0/bin-compile-aot when build/ empty (BOOTSTRAP_M5_NO_ZEND=1, #3053)"
   else
-    echo "  Cold boot: Zend gen-0 allowed (use --zend-gen0 to force this; target is no Zend, #3053)"
+    echo "  Cold boot: Zend gen-0 allowed (--zend-gen0; target is prelinked gen-0 + vendor .o, #3053)"
   fi
   echo "north-star5-verify: Next — shrink self-host stubs; link spine + prelinked .o; retire vendor/autoload (#1416)"
 }
