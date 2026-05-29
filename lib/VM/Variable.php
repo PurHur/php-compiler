@@ -28,6 +28,8 @@ final class Variable {
     const TYPE_STRING_OFFSET = 8;
     /** Zend enum case object for E::Case fetches (#3420, #3554). */
     const TYPE_ENUM_CASE = 9;
+    /** Writable ArrayAccess dimension ($obj[$key] assignment, #3331). */
+    const TYPE_ARRAYACCESS_OFFSET = 10;
 
 
     const NUMERIC = self::TYPE_INTEGER | self::TYPE_FLOAT;
@@ -49,6 +51,7 @@ final class Variable {
     private int $stringOffsetIndex;
     private ?ErrorReporter $stringOffsetReporter = null;
     private ?string $stringOffsetFile = null;
+    private ArrayAccessDimension $arrayAccessDimension;
 
 
     public int $next = -1;
@@ -180,6 +183,8 @@ final class Variable {
                 return (int) $this->string;
             case self::TYPE_OBJECT:
                 return $this->objectToScalarString($vm, 'int')->toInt($vm);
+            case self::TYPE_ARRAYACCESS_OFFSET:
+                return $this->arrayAccessDimension->read()->toInt($vm);
         }
         throw new \LogicException("Cannot convert type {$this->type} to int");
     }
@@ -382,6 +387,8 @@ final class Variable {
                 return $var->bool ? '1' : '';
             case self::TYPE_STRING_OFFSET:
                 return $var->readStringOffset();
+            case self::TYPE_ARRAYACCESS_OFFSET:
+                return $var->arrayAccessDimension->read()->toString();
             case self::TYPE_NULL:
             case self::TYPE_UNDEFINED:
                 return '';
@@ -459,6 +466,14 @@ final class Variable {
         unset($this->stringOffsetIndex);
         unset($this->stringOffsetReporter);
         unset($this->stringOffsetFile);
+        unset($this->arrayAccessDimension);
+    }
+
+    public function arrayAccessDimension(ArrayAccessDimension $dimension): void
+    {
+        $this->reset();
+        $this->type = self::TYPE_ARRAYACCESS_OFFSET;
+        $this->arrayAccessDimension = $dimension;
     }
 
     public function stringOffset(
@@ -529,6 +544,11 @@ final class Variable {
         TypedPropertyCheck::assertReadable($var);
         if ($this->type === self::TYPE_STRING_OFFSET) {
             $this->writeStringOffset($var);
+
+            return;
+        }
+        if ($this->type === self::TYPE_ARRAYACCESS_OFFSET) {
+            $this->arrayAccessDimension->write($var);
 
             return;
         }

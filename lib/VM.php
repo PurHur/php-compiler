@@ -175,6 +175,31 @@ class VM {
         return $this->invokePhpFunction($func, $thisVar, ...$extraArgs);
     }
 
+    public function objectImplementsArrayAccess(ObjectEntry $object): bool
+    {
+        return VM\InterfaceCheck::entryImplements($object->class, 'arrayaccess', $this->context);
+    }
+
+    public function invokeArrayAccessOffsetGet(ObjectEntry $object, Variable $key): Variable
+    {
+        return $this->invokeInstanceMethod($object, 'offsetGet', $key);
+    }
+
+    public function invokeArrayAccessOffsetSet(ObjectEntry $object, Variable $key, Variable $value): void
+    {
+        $this->invokeInstanceMethod($object, 'offsetSet', $key, $value);
+    }
+
+    public function invokeArrayAccessOffsetExists(ObjectEntry $object, Variable $key): bool
+    {
+        return $this->invokeInstanceMethod($object, 'offsetExists', $key)->toBool();
+    }
+
+    public function invokeArrayAccessOffsetUnset(ObjectEntry $object, Variable $key): void
+    {
+        $this->invokeInstanceMethod($object, 'offsetUnset', $key);
+    }
+
     /**
      * isset($obj->prop) — Zend zend_std_has_property / __isset parity (#3298).
      */
@@ -660,6 +685,18 @@ restart:
                             );
                         }
                         $arg1->indirect($table->findVariable($arg3, $forWrite));
+                    } elseif (
+                        Variable::TYPE_OBJECT === $container->type
+                        && $this->objectImplementsArrayAccess($container->toObject())
+                    ) {
+                        $object = $container->toObject();
+                        if ($forWrite) {
+                            $dim = new Variable();
+                            $dim->arrayAccessDimension(new VM\ArrayAccessDimension($this, $object, $arg3));
+                            $arg1->indirect($dim);
+                        } else {
+                            $arg1->copyFrom($this->invokeArrayAccessOffsetGet($object, $arg3));
+                        }
                     } else {
                         throw new \LogicException('Illegal offset');
                     }
@@ -1143,7 +1180,12 @@ restart:
                     $container = $frame->scope[$op->arg2]->resolveIndirect();
                     $key = $frame->scope[$op->arg3];
                     if (Variable::TYPE_OBJECT === $container->type) {
-                        $this->unsetObjectProperty($container->toObject(), $key->toString());
+                        $object = $container->toObject();
+                        if ($this->objectImplementsArrayAccess($object)) {
+                            $this->invokeArrayAccessOffsetUnset($object, $key);
+                            break;
+                        }
+                        $this->unsetObjectProperty($object, $key->toString());
                         break;
                     }
                     if (Variable::TYPE_ARRAY === $container->type) {
@@ -1593,10 +1635,17 @@ restart:
                             break;
                         }
                         if (Variable::TYPE_OBJECT === $container->type) {
+                            $object = $container->toObject();
+                            if ($this->objectImplementsArrayAccess($object)) {
+                                $dst->bool($this->invokeArrayAccessOffsetExists(
+                                    $object,
+                                    $frame->scope[$op->arg3]
+                                ));
+                                break;
+                            }
                             $propName = $frame->scope[$op->arg3]->toString();
-                            $propertyObject = $container->toObject();
-                            VM\LazyObjectSupport::ensureInitialized($this, $propertyObject);
-                            $dst->bool($this->objectPropertyIsSet($propertyObject, $propName));
+                            VM\LazyObjectSupport::ensureInitialized($this, $object);
+                            $dst->bool($this->objectPropertyIsSet($object, $propName));
                             break;
                         }
                         $dst->bool(false);

@@ -363,6 +363,9 @@ class Compiler {
 
                 return;
             }
+            if ('mixed' === strtolower($returnType->name)) {
+                return;
+            }
             $mapped = Variable::mapFromType(Type::fromDecl($returnType->name));
             if (Variable::TYPE_UNDEFINED !== $mapped) {
                 $block->returnTypeConstraint = $mapped;
