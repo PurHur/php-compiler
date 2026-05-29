@@ -10,8 +10,8 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Construct | VM | JIT | AOT | Issue | Notes |
 |-----------|:--:|:---:|:---:|-------|-------|
 | `class` / `new` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
-| Anonymous class `new class { }` | yes | yes | yes | [#1233](https://github.com/PurHur/php-compiler/issues/1233) | php-cfg inline Stmt\Class_ in parseExpr_New; synthetic AnonymousClass@line name |
-| Enum declarations `enum Foo: string { case Bar = 'x'; }` | yes | yes | no | [#1356](https://github.com/PurHur/php-compiler/issues/1356) | Backed enum cases as class constants; `Foo::Bar` const-like fetch; `enum_exists` registry |
+| Anonymous class `new class { }` | yes | yes | no | [#1233](https://github.com/PurHur/php-compiler/issues/1233) | php-cfg inline Stmt\Class_ in parseExpr_New; synthetic AnonymousClass@line name |
+| Enum declarations `enum Foo: string { case Bar = 'x'; }` | yes | yes | yes | [#1356](https://github.com/PurHur/php-compiler/issues/1356) | Backed enum cases as class constants; `Foo::Bar` const-like fetch; `enum_exists` registry; `implements` metadata (#2299); static methods (#2299) |
 | Instance methods (`ClassMethod` / `Expr_MethodCall`) | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | MiniWebApp `$router->dispatch()` (#2059); compliance PHPT; bootstrap AOT |
 | Static methods on user classes (`Expr_StaticCall`) | yes | yes | yes | [#2209](https://github.com/PurHur/php-compiler/issues/2209) | Public static methods without $this; `Router::fromConfig()` factory (#2059); Late static `static::method()` tracked separately (#1231) |
 | Constructors (`__construct`) | yes | yes | yes | [#145](https://github.com/PurHur/php-compiler/issues/145) | Router `__construct(array $config)` (#2059); compliance PHPT; bootstrap AOT |
@@ -24,8 +24,8 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Native user-class link (`phpc build --project`) | yes | yes | yes | [#764](https://github.com/PurHur/php-compiler/issues/764) | AOT link yes (#568 closed); native execute ✅ (#764 closed); compliance PHPT; bootstrap AOT |
 | `instanceof` | yes | yes | yes | [#138](https://github.com/PurHur/php-compiler/issues/138) | compliance PHPT; bootstrap AOT |
 | `match` expression | yes | yes | yes | [#143](https://github.com/PurHur/php-compiler/issues/143) | Lowered in php-cfg to === / jump-if / assign (#143); Wave-3 literal-arm subset (#2398); acceptance PHPT (#2428); compliance PHPT; bootstrap AOT |
-| Arrow functions `fn () =>` | no | no | no | [#142](https://github.com/PurHur/php-compiler/issues/142) | compliance PHPT |
-| Generators (`yield` / `foreach`) | yes | partial | no | [#167](https://github.com/PurHur/php-compiler/issues/167) | VM works; JIT falls back to VM in `bin/jit.php`; AOT lowering blocked (#167). |
+| Arrow functions `fn () =>` | yes | yes | yes | [#142](https://github.com/PurHur/php-compiler/issues/142) | compliance PHPT |
+| Generators (`yield` / `foreach`) | yes | no | no | [#167](https://github.com/PurHur/php-compiler/issues/167) | VM-only; `yield from` deferred (#167); compliance PHPT; VM-only lowering |
 | `ClassName::class` / `static::class` | yes | yes | yes | [#740](https://github.com/PurHur/php-compiler/issues/740) | Compile-time class name string; related to __CLASS__ (#199); compliance PHPT; bootstrap AOT |
 | Class member constants `public` / `private` / `protected const` | yes | yes | yes | [#2199](https://github.com/PurHur/php-compiler/issues/2199) | MiniWebApp `Router::DEFAULT_CONTACT_NAME_MAX` (#2059); compliance PHPT; bootstrap AOT |
 | Late static binding `static::method()` / `static::class` | yes | yes | yes | [#1231](https://github.com/PurHur/php-compiler/issues/1231) | VM/JIT called-class propagation; parent::method() and static:: LSB (#1858) |
@@ -49,7 +49,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | `use function` / `use const` imports | yes | yes | yes | [#2325](https://github.com/PurHur/php-compiler/issues/2325) | php-cfg resolves imported names at parse time; no Stmt_Use lowering required |
 | Namespace group use (`use Foo\{Bar, Baz}`) | yes | yes | yes | [#2443](https://github.com/PurHur/php-compiler/issues/2443) | PhpParser Stmt_GroupUse; NameResolver registers aliases; GroupUseStripper before PHPCfg |
 | `never` return type | yes | yes | yes | [#1358](https://github.com/PurHur/php-compiler/issues/1358) | php-cfg Op\Type\Never_; any `return` in body is a compile error; normal completion via throw/exit |
-| Intersection types (`A&B`) | yes | yes | no | [#1357](https://github.com/PurHur/php-compiler/issues/1357) | php-cfg Op\Type\Intersection; VM checks object implements each interface at call |
+| Intersection types (`A&B`) | yes | yes | yes | [#1357](https://github.com/PurHur/php-compiler/issues/1357) | php-cfg Op\Type\Intersection; VM checks object implements each interface at call |
 | `trait` declarations with method bodies | yes | yes | yes | [#2312](https://github.com/PurHur/php-compiler/issues/2312) | VM registers traits in class table with isTrait; trait use in classes is #144; interface_exists/trait_exists distinguish from class_exists |
 | Simple `use Trait;` in class body | yes | no | no | [#2314](https://github.com/PurHur/php-compiler/issues/2314) | php-cfg-trait-use.patch; VM merges trait methods into class; TraitUseAdaptation (alias/insteadof) is #144; VM-only lowering |
 | Array/argument unpack `...$x` | yes | yes | yes | [#1361](https://github.com/PurHur/php-compiler/issues/1361) | php-cfg spread.patch (#141); VM HashTable::spreadFrom; JIT HashTableHelper::spreadInto + mergeCallArgEntries; compliance PHPT |

@@ -1686,39 +1686,9 @@ class Compiler {
         }
         switch (get_class($expr)) {
             case Op\Expr\ArrowFunction::class:
-                // Vendor-prelink bundles (M5 cold-boot) include php-cfg code containing arrow functions.
-                // Full arrow-function semantics are closure-like and not supported yet; for compile-only
-                // vendor object generation, lower to a null placeholder to produce the .o artifact.
-                if ('1' !== (string) getenv('PHP_COMPILER_VENDOR_PRELINK') && '1' !== (string) getenv('PHP_COMPILER_SELFHOST_AOT')) {
-                    $this->throwCompileLogic("Unsupported expression: " . $expr->getType());
-                }
-
-                $resultSlot = $this->compileOperand($expr->result, $block, false);
-                $nullSlot = $this->compileOperand(new Operand\Literal(null), $block, true);
-
-                return [new OpCode(
-                    OpCode::TYPE_ASSIGN,
-                    $resultSlot,
-                    $resultSlot,
-                    $nullSlot
-                )];
+                return $this->compileAnonymousFunctionExpr($expr, $block);
             case Op\Expr\Closure::class:
-                // Vendor-prelink bundles (M5 cold-boot) include php-llvm which still contains closures.
-                // For the vendor-prelink compile-only path, lower closures to a null placeholder so we
-                // can produce the .o artifact without needing full closure/runtime support yet.
-                if ('1' !== (string) getenv('PHP_COMPILER_VENDOR_PRELINK') && '1' !== (string) getenv('PHP_COMPILER_SELFHOST_AOT')) {
-                    $this->throwCompileLogic("Unsupported expression: " . $expr->getType());
-                }
-
-                $resultSlot = $this->compileOperand($expr->result, $block, false);
-                $nullSlot = $this->compileOperand(new Operand\Literal(null), $block, true);
-
-                return [new OpCode(
-                    OpCode::TYPE_ASSIGN,
-                    $resultSlot,
-                    $resultSlot,
-                    $nullSlot
-                )];
+                return $this->compileAnonymousFunctionExpr($expr, $block);
             case Op\Expr\Assertion::class:
                 if ($expr->result instanceof Operand\Literal) {
                     //short circuit
@@ -2029,15 +1999,46 @@ class Compiler {
                     null,
                     $this->compileOperand($expr->expr, $block, true),
                 )];
-            case Op\Expr\Closure::class:
-                // Bootstrap-oriented stub: allow compiling vendor code containing closures (e.g. php-llvm prelink).
-                // Full closure runtime semantics are not implemented yet; the VM/JIT lower this opcode to null.
-                return [new OpCode(
-                    OpCode::TYPE_CLOSURE,
-                    $this->compileOperand($expr->result, $block, false),
-                )];
         }
         $this->throwCompileLogic("Unsupported expression: " . $expr->getType());
+    }
+
+    /**
+     * @param Op\Expr\ArrowFunction|Op\Expr\Closure $expr
+     *
+     * @return OpCode[]
+     */
+    protected function compileAnonymousFunctionExpr($expr, Block $block): array
+    {
+        if ($this->shouldStubClosureForBootstrap()) {
+            $resultSlot = $this->compileOperand($expr->result, $block, false);
+            $nullSlot = $this->compileOperand(new Operand\Literal(null), $block, true);
+
+            return [new OpCode(
+                OpCode::TYPE_ASSIGN,
+                $resultSlot,
+                $resultSlot,
+                $nullSlot
+            )];
+        }
+        if ($expr instanceof Op\Expr\Closure && [] !== $expr->useVars) {
+            $this->throwCompileLogic('Closure use() captures are not supported yet (issue #72)');
+        }
+        $func = $expr->func;
+        $funcBlock = $this->compileCfgBlock($func->cfg, $func->params, $func);
+        $op = new OpCode(
+            OpCode::TYPE_CLOSURE,
+            $this->compileOperand($expr->result, $block, false),
+        );
+        $op->block1 = $funcBlock;
+
+        return [$op];
+    }
+
+    protected function shouldStubClosureForBootstrap(): bool
+    {
+        return '1' === (string) getenv('PHP_COMPILER_VENDOR_PRELINK')
+            || '1' === (string) getenv('PHP_COMPILER_SELFHOST_AOT');
     }
 
     protected function markFunctionGenerator(Block $block): void
@@ -3271,12 +3272,22 @@ class Compiler {
             if ($this->operandDerivesFromNew($child->expr, $block)) {
                 return true;
             }
+            if ($this->operandDerivesFromClosure($child->expr)) {
+                return true;
+            }
             if ($this->operandHasObjectType($child->expr)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    protected function operandDerivesFromClosure(Operand $operand): bool
+    {
+        $root = $this->unwrapOperandChain($operand);
+
+        return $root instanceof Op\Expr\Closure || $root instanceof Op\Expr\ArrowFunction;
     }
 
     protected function operandsReferToSameVariable(Operand $a, Operand $b): bool
