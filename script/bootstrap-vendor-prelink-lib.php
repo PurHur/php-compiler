@@ -431,20 +431,12 @@ function bootstrapVendorPrelinkCompilePackages(
             fwrite(STDOUT, "OK {$package} → {$objectRel}\n");
             continue;
         }
-        // Emit-helper standalone may write object bytes to -o without .o suffix (#3036).
+        // Native argv / emit-helper may write object bytes to -o without separate .o suffix (#3036).
         if (0 === $code && !is_file($objectCandidate) && is_file($buildBase)) {
             copy($buildBase, $objectAbs);
             $manifest['packages'][$package]['status'] = 'object_ok';
             $manifest['packages'][$package]['blocker'] = null;
             fwrite(STDOUT, "OK {$package} → {$objectRel} (native compile)\n");
-            continue;
-        }
-        // Native argv driver copies link-time vendor sidecar to -o path (not .o); treat as object (#3036).
-        if (0 === $code && !is_file($objectCandidate) && is_file($buildBase)) {
-            copy($buildBase, $objectAbs);
-            $manifest['packages'][$package]['status'] = 'object_ok';
-            $manifest['packages'][$package]['blocker'] = null;
-            fwrite(STDOUT, "OK {$package} → {$objectRel} (native argv compile)\n");
             continue;
         }
 
