@@ -53,6 +53,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gc_collect_cycles')) {
                 continue;
             }
+            // count() on Countable objects is VM-only until JIT object dispatch (#3364).
+            if (str_contains($name, 'countable')) {
+                continue;
+            }
             // array_walk_recursive() is VM-only until recursive LLVM walk (#3111).
             if (str_contains($name, 'array_walk_recursive')) {
                 continue;

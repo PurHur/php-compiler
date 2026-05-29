@@ -33,12 +33,21 @@ final class BuiltinClasses
     public static function register(Context $ctx): void
     {
         self::registerStdClass($ctx);
+        self::registerCountable($ctx);
         self::registerWeakReference($ctx);
         self::registerWeakMap($ctx);
         self::registerReflection($ctx);
         self::registerDateTime($ctx);
         GeneratorState::register($ctx);
         ClosureState::register($ctx);
+    }
+
+    /** Zend zend_interfaces.c — Countable interface (#3364). */
+    private static function registerCountable(Context $ctx): void
+    {
+        $entry = new ClassEntry('Countable');
+        $entry->isInterface = true;
+        $ctx->classes['countable'] = $entry;
     }
 
     private static function registerStdClass(Context $ctx): void
