@@ -6556,6 +6556,10 @@ class JIT {
                 case OpCode::TYPE_CONST_FETCH:
                 case OpCode::TYPE_CLASS_CONST_FETCH:
                 case OpCode::TYPE_INIT_ARRAY:
+                case OpCode::TYPE_NEW:
+                case OpCode::TYPE_ARG_SEND:
+                case OpCode::TYPE_FUNCCALL_EXEC_NORETURN:
+                case OpCode::TYPE_FUNCCALL_EXEC_RETURN:
                     // Default property values are initialized in __object__ allocation.
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:

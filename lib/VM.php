@@ -1483,6 +1483,7 @@ restart:
                         throw new \LogicException("Cannot instantiate interface $name");
                     }
                     $object = new ObjectEntry($class);
+                    $this->initInstancePropertyDefaults($object);
                     $result->object($object);
                     $frame->call = $object->constructor;
                     $frame->callArgs = [$result];
@@ -3283,9 +3284,25 @@ restart:
     protected function defineClass(ClassEntry $entry, Block $block): void {
         $frame = $block->getFrame($this->context);
         $ownMethods = $this->classBodyOwnMethodNames($block, $frame);
+        $pendingNewDefaultOps = [];
         foreach ($block->opCodes as $op) {
-            if ($this->isClassBodyDefaultInitOpcode($op->type)) {
+            if ([] !== $pendingNewDefaultOps) {
+                if (OpCode::TYPE_DECLARE_PROPERTY === $op->type || OpCode::TYPE_DECLARE_STATIC_PROPERTY === $op->type) {
+                    $this->finalizePendingNewPropertyDefault($frame, $block, $entry, $op, $pendingNewDefaultOps);
+                    $pendingNewDefaultOps = [];
+
+                    continue;
+                } else {
+                    $pendingNewDefaultOps[] = $op;
+
+                    continue;
+                }
+            } elseif ($this->isClassBodyDefaultInitOpcode($op->type)) {
                 $this->executeClassBodyDefaultInitOpcode($frame, $op);
+
+                continue;
+            } elseif (OpCode::TYPE_NEW === $op->type) {
+                $pendingNewDefaultOps[] = $op;
 
                 continue;
             }
@@ -3381,6 +3398,9 @@ restart:
                     );
             }
         }
+        if ([] !== $pendingNewDefaultOps) {
+            throw new \LogicException('Unterminated property default `new` initializer in class body');
+        }
         foreach ($entry->properties as $prop) {
             $this->linkPropertyHooks($entry, $prop);
         }
@@ -3401,6 +3421,85 @@ restart:
             return $value;
         }
         throw new \LogicException('Class constant value must be a compile-time constant');
+    }
+
+    /**
+     * @param list<OpCode> $pendingNewDefaultOps
+     */
+    private function finalizePendingNewPropertyDefault(
+        Frame $frame,
+        Block $block,
+        ClassEntry $entry,
+        OpCode $declareOp,
+        array $pendingNewDefaultOps
+    ): void {
+        $resultSlot = null;
+        foreach ($pendingNewDefaultOps as $initOp) {
+            if (OpCode::TYPE_NEW === $initOp->type) {
+                $resultSlot = $initOp->arg1;
+                break;
+            }
+        }
+        if (null === $resultSlot) {
+            throw new \LogicException('Property default `new` initializer missing TYPE_NEW');
+        }
+
+        if (OpCode::TYPE_DECLARE_STATIC_PROPERTY === $declareOp->type) {
+            $value = $this->executePropertyDefaultInitBlock(
+                $block->fragmentForOpcodes($pendingNewDefaultOps),
+                $resultSlot
+            );
+            $name = strtolower($frame->scope[$declareOp->arg1]->toString());
+            $storage = clone $frame->scope[$declareOp->arg3];
+            $storage->copyFrom($value);
+            $entry->staticProperties[$name] = $storage;
+
+            return;
+        }
+
+        $property = new VM\ClassProperty(
+            $frame->scope[$declareOp->arg1]->toString(),
+            null,
+            $frame->scope[$declareOp->arg3],
+            $declareOp->propertyReadonly
+        );
+        $property->defaultInitBlock = $block->fragmentForOpcodes($pendingNewDefaultOps);
+        $property->defaultInitResultSlot = $resultSlot;
+        $entry->properties[] = $property;
+    }
+
+    public function initInstancePropertyDefaults(ObjectEntry $object): void
+    {
+        foreach ($object->class->properties as $property) {
+            if (!$property->hasRuntimeDefaultInit()) {
+                continue;
+            }
+            assert(null !== $property->defaultInitBlock);
+            assert(null !== $property->defaultInitResultSlot);
+            $value = $this->executePropertyDefaultInitBlock(
+                $property->defaultInitBlock,
+                $property->defaultInitResultSlot
+            );
+            $slot = $object->getProperty($property->name);
+            $slot->copyFrom($value);
+            $strict = false;
+            TypeCheck::coercePropertyWrite($slot, $strict);
+        }
+    }
+
+    private function executePropertyDefaultInitBlock(Block $initBlock, int $resultSlot): Variable
+    {
+        $initFrame = $initBlock->getFrame($this->context);
+        $this->context->push($initFrame);
+        $status = $this->runFrames();
+        if (self::SUCCESS !== $status) {
+            throw new \LogicException('Property default `new` initializer failed');
+        }
+        if (!isset($initFrame->scope[$resultSlot])) {
+            throw new \LogicException('Property default `new` initializer missing result slot');
+        }
+
+        return $initFrame->scope[$resultSlot]->resolveIndirect();
     }
 
     private function isClassBodyDefaultInitOpcode(int $type): bool
