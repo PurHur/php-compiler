@@ -6,10 +6,10 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #1858 */
+/** @covers issue #3093 */
 final class ParentStaticScopeTest extends TestCase
 {
-    public function testParentClassConstantRejectedAtRuntime(): void
+    public function testParentClassConstantInInstanceMethod(): void
     {
         $bin = realpath(__DIR__ . '/../../bin/vm.php');
         $this->assertNotFalse($bin);
@@ -24,7 +24,31 @@ class B extends A {
 (new B())->f();
 PHP;
         $combined = $this->runVm($bin, $code);
-        $this->assertStringContainsString('parent::class is not supported', $combined);
+        $this->assertStringContainsString('A', $combined);
+        $this->assertStringNotContainsString('not supported', $combined);
+    }
+
+    public function testParentStaticPropertyFetchAndAssign(): void
+    {
+        $bin = realpath(__DIR__ . '/../../bin/vm.php');
+        $this->assertNotFalse($bin);
+        $code = <<<'PHP'
+<?php
+class A {
+    public static $x = 1;
+}
+class B extends A {
+    public function f(): void {
+        echo parent::$x;
+        parent::$x = 2;
+        echo parent::$x;
+    }
+}
+(new B())->f();
+PHP;
+        $combined = $this->runVm($bin, $code);
+        $this->assertStringContainsString('12', $combined);
+        $this->assertStringNotContainsString('not supported', $combined);
     }
 
     private function runVm(string $bin, string $code): string
