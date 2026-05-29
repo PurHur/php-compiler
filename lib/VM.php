@@ -89,6 +89,30 @@ class VM {
     }
 
     /**
+     * Invoke a closure from a VM builtin (isolated run stack; issue #72).
+     */
+    public function invokeClosure(ClosureState $closureState, Variable ...$args): Variable
+    {
+        $savedStack = $this->context->swapRunStack(null);
+        try {
+            $child = $closureState->func->getFrame($this->context, null);
+            $this->bindClosureCallCaptures($child, $closureState);
+            $child->calledArgs = $args;
+            $out = new Variable();
+            $child->returnVar = $out;
+            $this->context->push($child);
+            $result = $this->runFrames();
+            if (self::SUCCESS !== $result) {
+                throw new \LogicException('Closure invocation failed in this compiler build');
+            }
+
+            return $out->resolveIndirect();
+        } finally {
+            $this->context->swapRunStack($savedStack);
+        }
+    }
+
+    /**
      * Compile and execute a PHP file once (require_once semantics for manifest includes / PSR-4).
      */
     public function executeCompileUnit(string $path): void
