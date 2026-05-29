@@ -140,6 +140,8 @@ putenv('PHP_COMPILER_SELFHOST_AOT=0');
 putenv('PHP_COMPILER_VENDOR_PRELINK=1');
 putenv('PHP_COMPILER_KEEP_OBJECT_FILE=1');
 
+bootstrapVendorPrelinkEnsureDriverSidecars($root);
+
 $compileInvoker = bootstrapVendorPrelinkResolveCompileInvoker($root);
 if (
     'zend' === $compileInvoker['mode']
