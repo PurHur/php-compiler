@@ -1,5 +1,7 @@
 # Self-host bootstrap roadmap
 
+**Gen-0 without Zend:** `BOOTSTRAP_M5_NO_ZEND=1 make bootstrap-selfhost-link` installs `prelinked/bootstrap-gen0/bin-compile-aot` and links `compiler_minimal` without `php bin/compile.php` ([#3053](https://github.com/PurHur/php-compiler/issues/3053)).
+
 **Project north star:** The **compiler fully compiles itself** — native AOT from `lib/` (no `vendor/` at cold boot), then compiles PHP and rebuilds the next compiler revision without Zend. **M2 spine:** **726** / **726** literal `require_once` (**726/726**) with real **`bin/vm.php`** (`src/cli_driver.php` literal; `src/cli.php` via `cli_spine_shim`; `lib/VM/HashTable.php` promoted — [#2543](https://github.com/PurHur/php-compiler/issues/2543)) ([#2134](https://github.com/PurHur/php-compiler/issues/2134); `php script/bootstrap-spine-count.php`). **Living tracker:** [#1492](https://github.com/PurHur/php-compiler/issues/1492) (was [#1056](https://github.com/PurHur/php-compiler/issues/1056)) · **re-root doc:** [self-host-target.md](self-host-target.md) · **generation ladder:** [bootstrap-generations.md](bootstrap-generations.md) · public status: [development-status § North star](https://purhur.github.io/php-compiler/development-status.html#north-star-self-host). Parent tracking: [#78](https://github.com/PurHur/php-compiler/issues/78) (roadmap), [#212](https://github.com/PurHur/php-compiler/issues/212) (closed umbrella).
 
 ## Current gates

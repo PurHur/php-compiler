@@ -175,7 +175,7 @@ class Context {
     public function __construct(Runtime $runtime, int $loadType) {
         $this->runtime = $runtime;
         $this->scope = new Scope;
-        $this->tryCatch = new TryCatchState();
+        $this->tryCatch = TryCatchState::create();
         $this->coalesceAssignTargets = new \SplObjectStorage();
         $this->loadType = $loadType;
         $this->llvm = PHPLLVM\Chooser::choose();

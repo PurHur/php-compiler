@@ -127,6 +127,7 @@ bootstrap_list_native_compile_drivers() {
   printf '%s\n' \
     "${root}/build/bin-compile-aot-inventory" \
     "${root}/build/bin-compile-aot" \
+    "${root}/prelinked/bootstrap-gen0/bin-compile-aot" \
     "${root}/build/selfhost-compile-driver" \
     "${root}/build/selfhost-native-compile-driver"
 }
@@ -136,6 +137,12 @@ bootstrap_resolve_compile_driver() {
   if [[ -z "${root}" ]]; then
     echo "bootstrap-resolve-compile-invoke: ROOT unset" >&2
     return 1
+  fi
+
+  if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" ]]; then
+    # shellcheck source=bootstrap-gen0-seed.sh
+    source "$(dirname "$0")/bootstrap-gen0-seed.sh"
+    bootstrap_gen0_seed_install || true
   fi
 
   if [[ "${BOOTSTRAP_GEN0_ZEND_ONLY:-0}" == "1" ]]; then
@@ -272,6 +279,11 @@ bootstrap_compile_invoke() {
   fi
   if [[ "${BOOTSTRAP_NO_ZEND_FALLBACK:-0}" == "1" ]]; then
     echo "bootstrap-compile-invoke: compiled driver(s) failed; BOOTSTRAP_NO_ZEND_FALLBACK=1 — no Zend fallback" >&2
+    return "${last_code}"
+  fi
+
+  if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" ]]; then
+    echo "bootstrap-compile-invoke: compiled driver(s) failed; BOOTSTRAP_M5_NO_ZEND=1 — no Zend fallback (#3053)" >&2
     return "${last_code}"
   fi
 

@@ -1,0 +1,16 @@
+{
+    "schema": 1,
+    "description": "Gen-0 committed native compile driver for Zend-free cold bootstrap (#3053). Built with LLVM 9 via make bootstrap-selfhost-driver-smoke on master.",
+    "artifacts": {
+        "bin-compile-aot": {
+            "path": "prelinked/bootstrap-gen0/bin-compile-aot",
+            "bytes": 432064,
+            "sha256": "f088a214322b823ddcbca48072fec2974c088849de95bbcda5caaea63d276ea3"
+        },
+        "m3_bin_compile_aot_blob": {
+            "path": "prelinked/bootstrap-gen0/.m3_bin_compile_aot_blob",
+            "bytes": 432064,
+            "sha256": "f088a214322b823ddcbca48072fec2974c088849de95bbcda5caaea63d276ea3"
+        }
+    }
+}
