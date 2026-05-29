@@ -27,6 +27,7 @@ final class Linker
         __DIR__.'/runtime/phpc_metaphone.c',
         __DIR__.'/runtime/phpc_str_getcsv.c',
         __DIR__.'/runtime/phpc_uniqid.c',
+        __DIR__.'/runtime/phpc_strtok.c',
         __DIR__.'/runtime/password_crypto.c',
         __DIR__.'/runtime/crc32.c',
         __DIR__.'/runtime/strtr.c',
