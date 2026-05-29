@@ -48,7 +48,7 @@
         <p class="section-intro" style="margin-top: 0.5rem">
           Real gaps toward the
           <a href="https://github.com/PurHur/php-compiler/issues/1492">self-host north star (#1492)</a>.
-          Updated 29 May 2026 (<code>master</code> @ 03c44c5f; LLVM&nbsp;9).
+          Updated 29 May 2026 (<code>master</code> @ b1f6ca07; LLVM&nbsp;9).
           VM, examples, and wave-3 language/stdlib batches are largely done; this page lists what is
           <strong>not</strong> implemented yet for compiling the compiler without Zend.
         </p>
@@ -69,17 +69,17 @@
               <tr>
                 <td><strong>M3</strong> native compile</td>
                 <td>Native <code>bin/compile.php</code> emit; grow <code>Compiler::compileCfgBlock</code> in emit TU (smoke strict <code>emit_path=native</code> ✅; <code>compileEmitSmoke</code> routes via Compiler ([#2667](https://github.com/PurHur/php-compiler/pull/2667)))</td>
-                <td><a href="https://github.com/PurHur/php-compiler/issues/1937">#1937</a>, <a href="https://github.com/PurHur/php-compiler/issues/1402">#1402</a></td>
+                <td><a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a>, <a href="https://github.com/PurHur/php-compiler/issues/3024">#3024</a></td>
               </tr>
               <tr>
                 <td><strong>M4</strong> bootstrap loop</td>
-                <td>Gen-2→gen-3 spine <strong>726/726</strong> recompile ✅ (<code>make bootstrap-loop-gen2-recompile-spine</code>, native argv <code>-o</code>, no Zend on compile). Full revision: inventory argv driver compiles <code>bin/compile.php</code> → gen-3 ✅ (<code>make bootstrap-selfhost-full-revision-probe</code>, <a href="https://github.com/PurHur/php-compiler/issues/2880">#2880</a>, <a href="https://github.com/PurHur/php-compiler/issues/3046">#3046</a>)</td>
-                <td><a href="https://github.com/PurHur/php-compiler/issues/1498">#1498</a></td>
+                <td>Gen-2→gen-3 spine <strong>726/726</strong> recompile ✅ (<code>make bootstrap-loop-gen2-recompile-spine</code>, native argv <code>-o</code>, no Zend on compile). Full revision: inventory argv driver compiles <code>bin/compile.php</code> → gen-3 ✅ (<code>make bootstrap-selfhost-full-revision-probe</code>, [#3058](https://github.com/PurHur/php-compiler/pull/3058))</td>
+                <td><a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a></td>
               </tr>
               <tr>
                 <td><strong>M5</strong> full self-host</td>
-                <td>Vendor prelink <strong>3/3</strong> <code>object_ok</code> ✅; committed <code>.o</code> cold boot without <code>vendor/</code> ✅. Still open: default bootstrap uses Zend for <code>bin/compile.php</code> when <code>build/</code> is empty; compiled <code>bin/vm.php</code> path</td>
-                <td><a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a>, <a href="https://github.com/PurHur/php-compiler/issues/1416">#1416</a></td>
+                <td>Vendor prelink <strong>3/3</strong> <code>object_ok</code> ✅; committed <code>.o</code> cold boot without <code>vendor/</code> ✅; gen-0 seed avoids Zend on empty <code>build/</code> ✅ ([#3059](https://github.com/PurHur/php-compiler/pull/3059), [#3060](https://github.com/PurHur/php-compiler/pull/3060)). Still open: compiled <code>bin/vm.php</code> path and retiring Zend assumptions across all bootstrap entrypoints</td>
+                <td><a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a></td>
               </tr>
             </tbody>
           </table>
@@ -112,12 +112,12 @@
               <tr>
                 <td><code>Compiler::compileCfgBlock</code> (+ callees)</td>
                 <td class="status-wip">Curated in emit TU</td>
-                <td>Compile-chain allowlist grows incrementally; full spine still LLVM 9–sensitive ([#2540](https://github.com/PurHur/php-compiler/issues/2540))</td>
+                <td>Compile-chain allowlist grows incrementally; full spine still LLVM 9–sensitive (track: <a href="https://github.com/PurHur/php-compiler/issues/3024">#3024</a>)</td>
               </tr>
               <tr>
                 <td>Native <code>bin/compile.php</code> emit</td>
                 <td class="status-no">Blocked</td>
-                <td><code>parseAndCompile returned null</code> on production driver ([#2633](https://github.com/PurHur/php-compiler/issues/2633))</td>
+                <td>Production driver emit still incomplete (track: <a href="https://github.com/PurHur/php-compiler/issues/3024">#3024</a>)</td>
               </tr>
               <tr>
                 <td>PHPCfg property typing (<code>Script</code>, <code>Func</code>)</td>
@@ -198,7 +198,7 @@
                 <td>Try / catch / finally</td>
                 <td class="status-wip">Partial</td>
                 <td class="status-no">Unwind incomplete</td>
-                <td><a href="https://github.com/PurHur/php-compiler/issues/57">#57</a></td>
+                <td><a href="https://github.com/PurHur/php-compiler/issues/2114">#2114</a></td>
               </tr>
               <tr>
                 <td>Closures / arrow functions</td>
@@ -222,13 +222,13 @@
                 <td>Namespaces + full <code>lib/</code> bundle</td>
                 <td class="status-wip">Growing</td>
                 <td class="status-wip">Self-host</td>
-                <td><a href="https://github.com/PurHur/php-compiler/issues/84">#84</a></td>
+                <td><a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a></td>
               </tr>
               <tr>
                 <td>External JIT object properties</td>
                 <td>—</td>
                 <td class="status-no">Stubbed</td>
-                <td><a href="https://github.com/PurHur/php-compiler/issues/828">#828</a></td>
+                <td><a href="https://github.com/PurHur/php-compiler/issues/58">#58</a></td>
               </tr>
             </tbody>
           </table>
@@ -249,13 +249,13 @@
             <tbody>
               <tr>
                 <td>Prelinked php-cfg / php-types / php-llvm (no Composer at cold boot)</td>
-                <td class="status-wip">In progress</td>
-                <td><a href="https://github.com/PurHur/php-compiler/issues/1416">#1416</a></td>
+                <td class="status-yes">Done</td>
+                <td><a href="https://github.com/PurHur/php-compiler/pull/3036">#3036</a>, <a href="https://github.com/PurHur/php-compiler/pull/3050">#3050</a></td>
               </tr>
               <tr>
                 <td>Attributes reflection in JIT/AOT</td>
                 <td class="status-wip">VM v1 only</td>
-                <td><a href="https://github.com/PurHur/php-compiler/issues/1936">#1936</a></td>
+                <td><a href="https://github.com/PurHur/php-compiler/issues/2467">#2467</a></td>
               </tr>
             </tbody>
           </table>
