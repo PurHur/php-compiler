@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 # Resolve gen-0 AOT link invoker: compiled driver when present, else Zend php bin/compile.php (#2842, #2894).
 #
+# Native resolution order (first executable wins):
+#   1. build/bin-compile-aot-inventory — inventory argv driver (full spine / M4; sole candidate when BOOTSTRAP_USE_INVENTORY_DRIVER=1)
+#   2. build/bin-compile-aot — gen-0 seed (prelinked/bootstrap-gen0) or driver-smoke output
+#   3. build/selfhost-native-compile-driver — M3 emit-helper alias
+#   4. build/selfhost-helloworld-compile — helloworld compile probe output
+#   5. build/selfhost-compile-driver — optional M5 host-linked bin/compile.php
+#
+# Zend php bin/compile.php only when BOOTSTRAP_GEN0_ZEND_ONLY=1, or no native artifact and
+# BOOTSTRAP_ALLOW_GEN0_ZEND=1 (default). Log lines say "(gen-0 compiled)" vs "(gen-0 Zend)".
+#
 # Usage (from another bootstrap script after setting ROOT):
 #   # shellcheck source=bootstrap-resolve-compile-invoke.sh
 #   source "$(dirname "$0")/bootstrap-resolve-compile-invoke.sh"
@@ -9,7 +19,9 @@
 #
 # Opt-out / bisect:
 #   BOOTSTRAP_GEN0_ZEND_ONLY=1  — always php bin/compile.php (requires php on PATH)
+#   BOOTSTRAP_ALLOW_GEN0_ZEND=0 — refuse Zend when no native driver (empty build/)
 #   BOOTSTRAP_M5_NO_ZEND=1       — refuse Zend fallback (implies BOOTSTRAP_NO_ZEND_FALLBACK=1)
+#   BOOTSTRAP_USE_INVENTORY_DRIVER=1 — inventory argv driver only (#2894)
 set -euo pipefail
 
 BOOTSTRAP_COMPILE_DRIVER_MODE=""
@@ -123,14 +135,17 @@ bootstrap_list_native_compile_drivers() {
     return 1
   fi
 
-  # If a fully compiled `bin/compile.php` exists, always prefer it for gen-0 bootstrap work (#2894).
-  # Keep older driver names as fallbacks for bisection.
+  if [[ "${BOOTSTRAP_USE_INVENTORY_DRIVER:-0}" == "1" ]]; then
+    printf '%s\n' "${root}/build/bin-compile-aot-inventory"
+    return 0
+  fi
+
   printf '%s\n' \
     "${root}/build/bin-compile-aot-inventory" \
     "${root}/build/bin-compile-aot" \
-    "${root}/prelinked/bootstrap-gen0/bin-compile-aot" \
-    "${root}/build/selfhost-compile-driver" \
-    "${root}/build/selfhost-native-compile-driver"
+    "${root}/build/selfhost-native-compile-driver" \
+    "${root}/build/selfhost-helloworld-compile" \
+    "${root}/build/selfhost-compile-driver"
 }
 
 bootstrap_resolve_compile_driver() {
@@ -155,7 +170,7 @@ bootstrap_resolve_compile_driver() {
     fi
   done < <(bootstrap_list_native_compile_drivers)
 
-  if command -v php >/dev/null 2>&1; then
+  if [[ "${BOOTSTRAP_ALLOW_GEN0_ZEND:-1}" == "1" ]] && command -v php >/dev/null 2>&1; then
     BOOTSTRAP_COMPILE_DRIVER_MODE=zend
     BOOTSTRAP_COMPILE_DRIVER="${root}/bin/compile.php"
     return 0
@@ -226,7 +241,7 @@ bootstrap_compile_invoke() {
     attempted_native=1
     BOOTSTRAP_COMPILE_DRIVER="${native_candidate}"
     printf '%s' "compile_invoke:${BOOTSTRAP_COMPILE_DRIVER}" > "${PHP_COMPILER_JIT_PHASE_FILE}" 2>/dev/null || true
-    echo "bootstrap-compile-invoke: ${BOOTSTRAP_COMPILE_DRIVER} -o ${out} ${entry} (#2842)" >&2
+    echo "bootstrap-compile-invoke: ${BOOTSTRAP_COMPILE_DRIVER} -o ${out} ${entry} (gen-0 compiled)" >&2
     rm -f "${out}"
     local invoke_out=""
     set +e
@@ -279,6 +294,11 @@ bootstrap_compile_invoke() {
 
   if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" ]]; then
     echo "bootstrap-compile-invoke: compiled driver(s) failed; BOOTSTRAP_M5_NO_ZEND=1 — no Zend fallback (#3053)" >&2
+    return "${last_code}"
+  fi
+
+  if [[ "${BOOTSTRAP_ALLOW_GEN0_ZEND:-1}" != "1" ]]; then
+    echo "bootstrap-compile-invoke: compiled driver(s) failed; BOOTSTRAP_ALLOW_GEN0_ZEND=0 — no Zend fallback (#2894)" >&2
     return "${last_code}"
   fi
 
