@@ -260,6 +260,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'class_parents_get_class_vars')) {
                 continue;
             }
+            // __callStatic is VM-only until JIT static magic dispatch (#3273).
+            if (str_contains($name, 'magic_call_static')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
