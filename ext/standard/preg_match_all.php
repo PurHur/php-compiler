@@ -26,9 +26,6 @@ final class preg_match_all extends Internal
         if ($argc < 2 || $argc > 5) {
             throw new \LogicException('preg_match_all() requires 2 to 5 arguments in this compiler build');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         if ($argc >= 3) {
             throw new \LogicException(
                 'preg_match_all() with $matches by-reference is not supported in VM in this compiler build (issue #107)'
@@ -42,6 +39,9 @@ final class preg_match_all extends Internal
 
         $result = VmPreg::pregMatchAll($patternVar->toString(), $subjectVar->toString());
 
+        if (null === $frame->returnVar) {
+            return;
+        }
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {

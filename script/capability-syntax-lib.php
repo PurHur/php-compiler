@@ -157,9 +157,9 @@ function syntaxRowDefinitions(): array
             'issue' => 72,
             'aot' => false,
             'notes' => [
-                'VM via ClosureState + __invoke; use() by-value (#3081); array_map callbacks (#3086)',
-                'JIT ClosureHelper: TYPE_CLOSURE + use() by-value IR (#3092); indirect $arr[0]() via __closure_target (#3092)',
-                'use (&$x) JIT deferred; bootstrap / self-host AOT stubs null; MCJIT execute probe-dependent',
+                'VM ClosureState + __invoke; use() by-value and by-ref (#3081, #3108); array_map/filter/usort callbacks (#3086)',
+                'JIT ClosureHelper: TYPE_CLOSURE + use() value/ref IR (#3092, #3108); indirect $arr[0]() via __closure_target (#3089, #3092)',
+                'bootstrap / self-host AOT stubs null; bin/jit.php MCJIT execute still probe-dependent (#98)',
             ],
             'probe' => '$f = function ($x) { return $x + 1; }; echo $f(2);',
         ],
@@ -169,7 +169,7 @@ function syntaxRowDefinitions(): array
             'opcodes' => ['TYPE_CLOSURE'],
             'issue' => 142,
             'aot' => false,
-            'notes' => ['Same lowering as closures (#72); JIT mirrors closure path (#3092)'],
+            'notes' => ['Desugars to TYPE_CLOSURE (#142); VM + JIT same as closures (#3092, #3108)'],
             'probe' => '$f = fn ($x) => $x + 1; echo $f(2);',
         ],
         [
@@ -446,8 +446,8 @@ function syntaxRowDefinitions(): array
             'issue' => 57,
             'notes' => [
                 'throw lowering #195; php-cfg TryCatch overlay (#2084); VM TYPE_TRY/CATCH/THROW/FINALLY',
-                'VM finally-before-catch on throw + normal completion (#3081); TryCatchComplianceTest + try_*.phpt',
-                'JIT EH shares Block::requiresVmLowering gate (#2114)',
+                'VM finally-before-catch + return-through-finally (#3081, #3106); TryCatchComplianceTest (10 tests)',
+                'JIT TryCatchHelper IR verify (#3107); bin/jit.php VM fallback via requiresVmLowering (#2114); MCJIT execute unsafe',
             ],
             'probe' => 'class E {} try { throw new E(); } catch (E $e) { echo "ok"; }',
         ],

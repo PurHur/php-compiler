@@ -10,31 +10,31 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** preg_last_error() — VM via host PCRE; JIT/AOT via __compiler_preg_last_error (issue #1181). */
-final class preg_last_error_ extends Internal
+/** preg_last_error_msg() — VM via host PCRE; JIT/AOT via __compiler_preg_last_error_msg (issue #3110). */
+final class preg_last_error_msg_ extends Internal
 {
     public function __construct()
     {
-        parent::__construct('preg_last_error');
+        parent::__construct('preg_last_error_msg');
     }
 
     public function execute(Frame $frame): void
     {
         if (0 !== \count($frame->calledArgs)) {
-            throw new \LogicException('preg_last_error() takes no arguments');
+            throw new \LogicException('preg_last_error_msg() takes no arguments');
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(VmPreg::lastError());
+        $frame->returnVar->string(VmPreg::lastErrorMsg());
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
         if (0 !== \count($args)) {
-            throw new \LogicException('preg_last_error() takes no arguments');
+            throw new \LogicException('preg_last_error_msg() takes no arguments');
         }
 
-        return JitPregLastError::invoke($context);
+        return JitPregLastErrorMsg::invoke($context);
     }
 }

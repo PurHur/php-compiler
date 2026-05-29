@@ -151,6 +151,7 @@ final class SelfHostBuiltinPolicy
         'preg_split' => 'preg',
         'preg_quote' => 'preg',
         'preg_last_error' => 'preg',
+        'preg_last_error_msg' => 'preg',
     ];
 
     /** @var array<string, string> */
@@ -160,6 +161,7 @@ final class SelfHostBuiltinPolicy
     private const CATEGORY_JSON = [
         'json_encode' => 'json',
         'json_decode' => 'json',
+        'json_validate' => 'json',
         'json_last_error' => 'json',
         'serialize' => 'json',
         'unserialize' => 'json',

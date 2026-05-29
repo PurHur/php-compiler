@@ -66,8 +66,15 @@ class ObjectEntry {
 
     public function getProperty(string $name): Variable {
         if (!isset($this->properties[$name])) {
-            throw new \LogicException("Undefined property access");
+            if (!$this->class->allowsDynamicProperties) {
+                throw new \LogicException("Undefined property access");
+            }
+            $var = new Variable(Variable::TYPE_NULL);
+            $var->objectPropertyOwner = $this;
+            $var->objectPropertyName = $name;
+            $this->properties[$name] = $var;
         }
+
         return $this->properties[$name];
     }
 

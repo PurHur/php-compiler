@@ -142,32 +142,35 @@ Full matrices (auto-generated): [`docs/capabilities.md`](docs/capabilities.md) (
 **Language & OOP (typical app code)**
 
 - Classes, `new`, interfaces, `instanceof`, constructors, visibility, promoted properties, `readonly` classes
-- Instance and static methods, `parent::`, late static binding, magic constants (`__DIR__`, `__FILE__`, `__CLASS__`, …)
+- Instance and static methods, `parent::class` / `parent::$prop`, late static binding, magic constants
 - Namespaces, `use function` / `use const`, group `use`
-- `match`, scalar `declare(strict_types=1)`, union/intersection types (intersection AOT-limited)
-- `try` / `catch` / `throw` on VM (compliance-tested); multi-type `catch`
-- Attributes — reflection read path (`getAttributes()`, name only; no `newInstance()` on attributes)
-- Generators (`yield`, `yield from`) — **VM only**; JIT runs generator scripts on VM fallback
-- Enums (backed), traits (simple `use Trait;` — VM-first for some trait paths)
+- `match`, scalar `declare(strict_types=1)`, union types; intersection types with AOT call-site checks ([#3103](https://github.com/PurHur/php-compiler/pull/3103))
+- **Closures** and **arrow functions** on VM and JIT (LLVM IR): `use ($var)` by-value and by-ref ([#3108](https://github.com/PurHur/php-compiler/pull/3108)), indirect `$arr[0]()` invoke ([#3092](https://github.com/PurHur/php-compiler/pull/3092))
+- **`try` / `catch` / `finally`** on VM including return-through-finally ([#3106](https://github.com/PurHur/php-compiler/pull/3106)); JIT EH IR verified ([#3107](https://github.com/PurHur/php-compiler/pull/3107)) — `bin/jit.php` still VM-fallback for EH scripts
+- **Generators** (`yield`, keyed yield, `yield from`) on VM; JIT/AOT use VM fallback ([#3085](https://github.com/PurHur/php-compiler/pull/3085))
+- Backed enums on VM (php-cfg patch + compliance) ([#3091](https://github.com/PurHur/php-compiler/pull/3091)); traits — simple `use Trait;`
+- Attributes — reflection read path (`getAttributes()`, name only)
 
 **Web & deployment**
 
 - CGI-style superglobals (`$_GET`, `$_POST`, `$_SERVER`, `$_FILES`, `$_COOKIE`, `$_SESSION`)
 - `phpc serve` dev server and `phpc serve --aot` for prebuilt binaries
-- Sessions, multipart uploads, JSON APIs — see examples **005–007**
+- Sessions, multipart uploads, JSON APIs — examples **005–007**
 - `phpc build`, `phpc deploy`, `phpc.json` project manifests
 - Reference **003-MiniWebApp**: router, templates, forms, native AOT execute on supported routes
 
-**Standard library**
+**Standard library (May 2026 wave)**
 
-- Large builtin surface for strings, arrays, JSON, hashing, `preg_*`, filesystem, streams — see matrix (~200+ functions with VM/JIT/AOT columns)
-- Wave 3 tracked batch: **12/12** language + **13/13** stdlib items closed on master (May 2026)
-- Callback builtins (`array_map`, etc.): string/function name callees; **closures in callbacks still deferred**
+- **321** builtins in the auto-generated matrix — strings, arrays, JSON, `preg_*`, filesystem, streams
+- Recent VM additions: `class_uses`, `class_alias`, `get_debug_type`, `iterator_to_array`, `array_chunk` (preserve keys), `settype`, `array_replace_recursive`, `json_validate`, `preg_last_error_msg`, `fdiv`, **DateTime** / **DateTimeZone** OOP ([#3104](https://github.com/PurHur/php-compiler/pull/3104))
+- **`array_map` / `array_filter` / `usort`** accept **closure** callbacks on VM ([#3086](https://github.com/PurHur/php-compiler/pull/3086))
+- Wave 3 tracked batch: **12/12** language + **13/13** stdlib items closed; ongoing stdlib work in [#1380](https://github.com/PurHur/php-compiler/issues/1380) follow-ups
 
 **Tooling**
 
 - `phpc lint` — scan trees for unsupported syntax before compile
 - `phpc doctor` — environment and example gate probes
+- Native vendor invoker surfaces `parseAndCompile` failure text ([#3084](https://github.com/PurHur/php-compiler/pull/3084))
 - Local/Docker CI: `phpc test`, `phpc test --fast`
 
 ### Known limitations
@@ -176,12 +179,13 @@ Full matrices (auto-generated): [`docs/capabilities.md`](docs/capabilities.md) (
 
 | Area | VM | JIT / AOT | Notes |
 |------|:--:|:---------:|-------|
-| `try` / `catch` / `finally` | Partial | Unwind incomplete | `finally` and post-catch edge cases; JIT EH not production-safe ([#2114](https://github.com/PurHur/php-compiler/issues/2114)) |
-| Closures / arrow `fn () =>` | No / limited | Not lowered | Not in v1.0 app path; bootstrap may stub to `null` for self-host link ([#72](https://github.com/PurHur/php-compiler/issues/72), [#142](https://github.com/PurHur/php-compiler/issues/142)) |
-| Generators (`yield`) | Yes | No native | JIT/AOT skip or VM-fallback ([#167](https://github.com/PurHur/php-compiler/issues/167)) |
-| By-ref parameters | VM | No JIT | [#140](https://github.com/PurHur/php-compiler/issues/140) |
-| Enums in AOT | VM/JIT | No | [#1356](https://github.com/PurHur/php-compiler/issues/1356) |
+| `try` / `catch` / `finally` | Yes (compliance) | JIT IR only; execute → VM | MCJIT EH unsafe ([#2114](https://github.com/PurHur/php-compiler/issues/2114)); `bin/jit.php` uses `requiresVmLowering` |
+| Closures / arrow `fn () =>` | Yes | JIT IR verify | Self-host / bootstrap may stub `null`; `bin/jit.php` MCJIT execute still flaky ([#98](https://github.com/PurHur/php-compiler/issues/98), [#72](https://github.com/PurHur/php-compiler/issues/72)) |
+| Generators (`yield`) | Yes | VM fallback | Native JIT/AOT lowering open ([#167](https://github.com/PurHur/php-compiler/issues/167), [#3074](https://github.com/PurHur/php-compiler/issues/3074)) |
+| By-ref **parameters** (`function f(&$x)`) | Yes | No JIT | Distinct from closure `use (&$x)` ([#140](https://github.com/PurHur/php-compiler/issues/140)) |
+| Enums in AOT | VM/JIT | No | [#1356](https://github.com/PurHur/php-compiler/issues/1356), [#3076](https://github.com/PurHur/php-compiler/issues/3076) |
 | Full trait adaptation (`insteadof` / `as`) | Partial | Gaps | [#144](https://github.com/PurHur/php-compiler/issues/144) |
+| Fibers | No | No | [#3130](https://github.com/PurHur/php-compiler/issues/3130) |
 
 **Runtime & platform**
 
@@ -197,9 +201,10 @@ Full matrices (auto-generated): [`docs/capabilities.md`](docs/capabilities.md) (
 |-----------|--------|
 | M0–M1 bundled compiler smoke | ✅ |
 | M2 spine **726/726** + `bin/vm.php` in link | ✅ |
+| M3 HelloWorld + **inventory emit** strict native | ✅ ([#3070](https://github.com/PurHur/php-compiler/pull/3070)) |
 | M4 gen-2→gen-3 without Zend on compile | ✅ |
 | M5 vendor prelink + Zend-free gen-0 seed | 🚧 ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
-| Full Zend-free cold boot on empty `build/` | 🚧 |
+| Native `bin/compile.php` inventory path (no thin TU) | 🚧 ([#3024](https://github.com/PurHur/php-compiler/issues/3024)) |
 
 **What we do not target in v1.0**
 

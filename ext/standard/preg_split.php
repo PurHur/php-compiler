@@ -29,9 +29,6 @@ final class preg_split extends Internal
                 'preg_split() requires two or three arguments in this compiler build'
             );
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (3 === $argc) {
             throw new \LogicException(
                 'preg_split() limit is not supported in VM in this compiler build (issue #1178)'
@@ -45,6 +42,9 @@ final class preg_split extends Internal
             );
         }
         $parts = VmPreg::pregSplit($pattern, $subjectVar->toString());
+        if (null === $frame->returnVar) {
+            return;
+        }
         if (false === $parts) {
             $frame->returnVar->bool(false);
 

@@ -28,9 +28,6 @@ final class preg_replace extends Internal
                 'preg_replace() requires exactly three arguments in this compiler build'
             );
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_replace() pattern');
         $replacement = VmReflection::stringArg($frame->calledArgs[1], 'preg_replace() replacement');
         $subjectVar = $frame->calledArgs[2]->resolveIndirect();
@@ -40,6 +37,9 @@ final class preg_replace extends Internal
             );
         }
         $result = VmPreg::pregReplace($pattern, $replacement, $subjectVar->toString());
+        if (null === $frame->returnVar) {
+            return;
+        }
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {

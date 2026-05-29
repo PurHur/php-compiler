@@ -77,6 +77,18 @@ final class StringPregMatch
             throw new \LogicException('__compiler_preg_replace_callback missing after bitcode link');
         }
         $context->registerFunction('__compiler_preg_replace_callback', $fnReplaceCallback);
+
+        $fnLastError = $context->module->getNamedFunction('__compiler_preg_last_error');
+        if (null === $fnLastError) {
+            throw new \LogicException('__compiler_preg_last_error missing after bitcode link');
+        }
+        $context->registerFunction('__compiler_preg_last_error', $fnLastError);
+
+        $fnLastErrorMsg = $context->module->getNamedFunction('__compiler_preg_last_error_msg');
+        if (null === $fnLastErrorMsg) {
+            throw new \LogicException('__compiler_preg_last_error_msg missing after bitcode link');
+        }
+        $context->registerFunction('__compiler_preg_last_error_msg', $fnLastErrorMsg);
     }
 
     private static function ensureBitcode(): string

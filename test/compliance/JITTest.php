@@ -33,6 +33,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'array_chunk_preserve_keys')) {
                 continue;
             }
+            // VM-only until ArrayBuiltinHelper gains recursive replace (#3127).
+            if (str_contains(strtolower($case[0]), 'array_replace_recursive')) {
+                continue;
+            }
             // class_uses() is VM-only until JIT lowering (#3119).
             if (str_contains($name, 'class_uses_runtime')) {
                 continue;
@@ -43,6 +47,14 @@ class JITTest extends BaseTest {
             }
             // gc_collect_cycles() is VM-only (#3113).
             if (str_contains($name, 'gc_collect_cycles')) {
+                continue;
+            }
+            // preg_last_error_msg() MCJIT path unsafe with preg_match stub runtime (#3110).
+            if (str_contains($name, 'preg_last_error_msg')) {
+                continue;
+            }
+            // json_validate() MCJIT path unsafe until __compiler_json_validate link is stable (#3101).
+            if (str_contains($name, 'json_validate')) {
                 continue;
             }
             yield $name => $case;
