@@ -2538,6 +2538,89 @@ final class VmString
         return self::byteSlice($base, 0, $baseLen - $extLen - 1);
     }
 
+    /** Source string for strtok() continuation (ext/standard/string.c; issue #3201). */
+    private static ?string $strtokString = null;
+
+    private static int $strtokLast = 0;
+
+    /**
+     * strtok() — tokenize with re-entrant static state (php-src ext/standard/string.c).
+     *
+     * @return string|false
+     */
+    public static function strtok(string $str, ?string $tok = null): string|false
+    {
+        if (null !== $tok) {
+            self::$strtokString = $str;
+            self::$strtokLast = 0;
+            $delimiter = $tok;
+        } else {
+            if (null === self::$strtokString) {
+                return false;
+            }
+            $delimiter = $str;
+        }
+
+        $len = self::byteLength(self::$strtokString);
+        $p = self::$strtokLast;
+        if ($p >= $len) {
+            self::strtokReset();
+
+            return false;
+        }
+
+        $table = array_fill(0, 256, false);
+        $delLen = self::byteLength($delimiter);
+        for ($i = 0; $i < $delLen; ++$i) {
+            $table[self::byteOrd($delimiter[$i])] = true;
+        }
+
+        $skipped = 0;
+        while ($p < $len && $table[self::byteOrd(self::$strtokString[$p])]) {
+            ++$p;
+            ++$skipped;
+            if ($p >= $len) {
+                self::strtokReset();
+
+                return false;
+            }
+        }
+
+        while (++$p < $len) {
+            if ($table[self::byteOrd(self::$strtokString[$p])]) {
+                $token = self::byteSlice(
+                    self::$strtokString,
+                    self::$strtokLast + $skipped,
+                    $p - self::$strtokLast - $skipped
+                );
+                self::$strtokLast = $p + 1;
+
+                return $token;
+            }
+        }
+
+        if ($p > self::$strtokLast) {
+            $token = self::byteSlice(
+                self::$strtokString,
+                self::$strtokLast + $skipped,
+                $p - self::$strtokLast - $skipped
+            );
+            self::strtokReset();
+
+            return $token;
+        }
+
+        self::strtokReset();
+
+        return false;
+    }
+
+    private static function strtokReset(): void
+    {
+        self::$strtokString = null;
+        self::$strtokLast = 0;
+    }
+
     private static function byteOrd(string $byte): int
     {
         return ord($byte);

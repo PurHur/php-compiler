@@ -356,6 +356,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/session_start.php',
         'ext/standard/VmSplAutoload.php',
         'ext/standard/uasort_.php',
+        'ext/standard/uksort_.php',
         'ext/standard/usort_.php',
     ];
 
