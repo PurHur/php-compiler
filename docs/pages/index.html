@@ -3,18 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="php-compiler — compile PHP to native binaries with VM, LLVM JIT, and AOT.">
-  <title>A compiler for PHP in PHP that compiles itself</title>
+  <meta name="description" content="php-compiler — compile PHP to native binaries with VM, LLVM 9 JIT, and AOT. v1.0 stable line: web-capable PHP subset, phpc CLI, examples 000–009.">
+  <title>php-compiler — compile PHP to native binaries</title>
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="php-compiler">
-  <meta property="og:title" content="A compiler for PHP in PHP that compiles itself">
-  <meta property="og:description" content="php-compiler — compile PHP to native binaries with VM, LLVM JIT, and AOT.">
+  <meta property="og:title" content="php-compiler — compile PHP to native binaries">
+  <meta property="og:description" content="CFG-based PHP compiler: VM, LLVM 9 JIT, and AOT executables without Zend at runtime. v1.0 stable subset for CLI and CGI web apps.">
   <meta property="og:url" content="https://purhur.github.io/php-compiler/docs/pages/index.html">
   <meta property="og:image" content="https://purhur.github.io/php-compiler/docs/pages/img/og-card.svg">
   <meta property="og:image:alt" content="php-compiler logo">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="A compiler for PHP in PHP that compiles itself">
-  <meta name="twitter:description" content="php-compiler — compile PHP to native binaries with VM, LLVM JIT, and AOT.">
+  <meta name="twitter:title" content="php-compiler — compile PHP to native binaries">
+  <meta name="twitter:description" content="VM, LLVM JIT, and AOT for a web-capable PHP subset. Ship native binaries with phpc build.">
   <meta name="twitter:image" content="https://purhur.github.io/php-compiler/docs/pages/img/og-card.svg">
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='55' rx='42' ry='32' fill='%23777BB4'/><ellipse cx='50' cy='48' rx='38' ry='28' fill='%234F5B93'/><circle cx='35' cy='42' r='4' fill='%231a1a2e'/><circle cx='65' cy='42' r='4' fill='%231a1a2e'/></svg>">
@@ -33,10 +33,12 @@
       </a>
       <nav class="nav" aria-label="Primary">
         <a href="#demo">Try it</a>
-        <a href="#overview">Overview</a>
+        <a href="#about">About</a>
+        <a href="#phpc">phpc</a>
+        <a href="#capabilities">Capabilities</a>
+        <a href="#self-host">Self-host</a>
         <a href="missing-implementation.html">Gaps</a>
         <a href="capability-comparison.html">PHP compare</a>
-        <a href="development-status.html">Status</a>
         <a href="https://github.com/PurHur/php-compiler">GitHub</a>
       </nav>
     </div>
@@ -44,37 +46,45 @@
 
   <div id="top" class="hero">
     <div>
-      <span class="badge badge--live">Demo-ready</span>
+      <span class="badge badge--live">v1.0 stable</span>
       <span class="badge">May 2026</span>
+      <span class="badge">LLVM 9</span>
       <h1>Compile PHP to native binaries</h1>
       <p class="lead">
-        <strong>php-compiler</strong> parses PHP to a CFG, runs a VM, JIT-compiles with LLVM&nbsp;9,
-        and links <strong>AOT executables</strong> for CLI and web — deployed apps need no Zend at runtime.
-        Active work: <strong>self-host</strong> — the compiler compiling its own <code>lib/</code>
-        ([#1492](https://github.com/PurHur/php-compiler/issues/1492)).
+        <strong>php-compiler</strong> is a CFG-based compiler with a bytecode <strong>VM</strong>,
+        <strong>LLVM&nbsp;9 JIT</strong>, and <strong>AOT</strong> linking. Ship CLI tools and small web apps
+        that run <strong>without Zend PHP at runtime</strong> after <code>phpc build</code> or <code>phpc deploy</code>.
       </p>
+      <div class="callout callout--stable">
+        <strong>Stable line (2026).</strong>
+        First maintained stable release: demo-ready VM + AOT for a web-capable PHP subset,
+        examples <strong>000–009</strong>, and an experimental self-host path.
+        Not full Zend PHP —
+        <a href="missing-implementation.html">see what’s missing</a>.
+      </div>
       <div class="hero-badges">
         <span class="badge badge--live">VM + JIT + AOT</span>
-        <span class="badge badge--live">Wave 3 · 12 + 13 closed</span>
-        <span class="badge badge--live">M2 spine 726/726 ✅</span>
-        <span class="badge badge--live">M3 strict native emit ✅</span>
-        <span class="badge badge--live">M4 gen-3 spine ✅</span>
-        <span class="badge badge--live">M5 vendor 3/3 ✅</span>
+        <span class="badge badge--live">Wave 3 · 12 + 13</span>
+        <span class="badge badge--live">Spine 726/726</span>
+        <span class="badge badge--live">M4 gen-3 loop</span>
+        <span class="badge badge--wip">M5 self-host</span>
       </div>
       <div class="hero-actions">
         <a class="btn btn--primary" href="#demo">Try in 5 minutes</a>
-        <a class="btn btn--ghost" href="missing-implementation.html">What’s missing</a>
-        <a class="btn btn--ghost" href="https://github.com/PurHur/php-compiler">GitHub</a>
+        <a class="btn btn--ghost" href="https://github.com/PurHur/php-compiler/releases/tag/v1.0.0">Release v1.0.0</a>
+        <a class="btn btn--ghost" href="https://github.com/PurHur/php-compiler">Clone on GitHub</a>
       </div>
     </div>
-    <div class="code-window" aria-label="Example usage">
+    <div class="code-window" aria-label="Quick start">
       <div class="code-window__bar">
         <span class="code-window__dot"></span>
         <span class="code-window__dot"></span>
         <span class="code-window__dot"></span>
         <span class="code-window__title">quick-start.sh</span>
       </div>
-      <pre><code>composer install
+      <pre><code>git clone https://github.com/PurHur/php-compiler.git
+cd php-compiler
+composer install
 ./phpc test --fast
 ./phpc build -o /tmp/hello examples/000-HelloWorld/example.php
 ./phpc serve examples/003-MiniWebApp</code></pre>
@@ -82,17 +92,81 @@
   </div>
 
   <main>
+    <section id="lineage" class="reveal">
+      <h2>Lineage &amp; disclaimer</h2>
+      <p class="section-intro">
+        This project continues a research compiler originally written in PHP. Credit the idea to the original author;
+        this fork is a separate continuation under MIT.
+      </p>
+      <div class="table-wrap">
+        <table class="lineage-table">
+          <tbody>
+            <tr>
+              <td>Original project</td>
+              <td><a href="https://github.com/ircmaxell/php-compiler">ircmaxell/php-compiler</a></td>
+            </tr>
+            <tr>
+              <td>Original author</td>
+              <td><a href="https://github.com/ircmaxell">Anthony Ferrara</a> (<code>ircmaxell</code>) — MIT © 2019</td>
+            </tr>
+            <tr>
+              <td>This fork</td>
+              <td><a href="https://github.com/PurHur/php-compiler">PurHur/php-compiler</a> — LLVM JIT/AOT, <code>phpc</code> CLI, web examples, self-host ladder</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="section-intro" style="margin-top: 1rem; margin-bottom: 0;">
+        The <em>concept</em> of a PHP-in-PHP compiler with VM, JIT, and native compilation comes from Anthony Ferrara’s work.
+        It is not an official release from the original author unless stated otherwise.
+      </p>
+    </section>
+
+    <section id="about" class="reveal">
+      <h2>What is php-compiler?</h2>
+      <p class="section-intro">
+        Most PHP runs on <strong>Zend</strong> (opcode VM in C). php-compiler parses with
+        <a href="https://github.com/ircmaxell/php-cfg">php-cfg</a>, lowers to internal opcodes, then executes via one of three backends.
+      </p>
+      <div class="backend-grid">
+        <article class="backend-card">
+          <h4>VM</h4>
+          <p><code>phpc run</code> · <code>bin/vm.php</code></p>
+          <p>Reference interpreter — broadest coverage, slowest. Default for dev and compliance.</p>
+        </article>
+        <article class="backend-card">
+          <h4>JIT</h4>
+          <p><code>bin/jit.php</code></p>
+          <p>LLVM MCJIT — compile at startup, run native code. Some CFGs fall back to VM.</p>
+        </article>
+        <article class="backend-card">
+          <h4>AOT</h4>
+          <p><code>phpc build</code> · <code>bin/compile.php</code></p>
+          <p>Standalone executable — no PHP installed on the server at runtime.</p>
+        </article>
+      </div>
+      <pre class="flow-diagram" aria-hidden="true">PHP source → php-cfg CFG → Compiler opcodes → VM | LLVM JIT | LLVM AOT link → native binary</pre>
+      <p class="section-intro" style="margin-top: 1rem;">
+        Targets a <strong>deliberate PHP&nbsp;8 subset</strong> for CLI and CGI-style web apps (superglobals, routing, templates, sessions, uploads, JSON).
+        Examples under <code>examples/</code> are <strong>integration test fixtures</strong>, not a separate product.
+        Active research: <a href="https://github.com/PurHur/php-compiler/issues/1492">self-host</a> — the compiler compiling its own <code>lib/</code> without Zend in the bootstrap loop.
+      </p>
+    </section>
+
     <section id="demo" class="reveal">
       <h2>Try it in five minutes</h2>
       <p class="section-intro">
-        Linux, PHP&nbsp;8.1+, Composer. Full script:
+        Needs PHP&nbsp;8.1+, Composer. LLVM&nbsp;9 only for <code>build</code>, JIT, and full CI (not for <code>phpc test --fast</code>).
+        Full walkthrough:
         <a href="https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md">GETTING-STARTED.md</a>.
       </p>
       <div class="demo-grid">
         <article class="demo-card">
           <span class="demo-card__step">1</span>
-          <h3>Fast smoke</h3>
-          <pre><code>composer install
+          <h3>Clone &amp; smoke</h3>
+          <pre><code>git clone https://github.com/PurHur/php-compiler.git
+cd php-compiler
+composer install
 ./phpc test --fast</code></pre>
         </article>
         <article class="demo-card">
@@ -101,51 +175,199 @@
           <pre><code>./phpc build -o /tmp/hello \
   examples/000-HelloWorld/example.php
 /tmp/hello</code></pre>
+          <p>Standalone executable — no <code>php</code> at runtime.</p>
         </article>
         <article class="demo-card">
           <span class="demo-card__step">3</span>
-          <h3>Web app</h3>
+          <h3>Web app (VM)</h3>
           <pre><code>./phpc serve examples/003-MiniWebApp</code></pre>
+          <p>Open <code>http://127.0.0.1:8080/</code> — router, templates, JSON API.</p>
+        </article>
+        <article class="demo-card demo-card--optional">
+          <span class="demo-card__step">4</span>
+          <h3>Self-host smoke</h3>
+          <pre><code>script/apply-patches.sh
+make bootstrap-selfhost-link</code></pre>
+          <p>Expect <code>compiler_minimal bundle OK</code> (experimental).</p>
         </article>
       </div>
       <p class="demo-disclaimer">
-        Subset compiler, not full Zend PHP. Examples are CI fixtures; north star is self-host.
+        <strong>Subset compiler</strong> — not full Zend PHP. Use <code>phpc lint</code> before shipping your own code.
       </p>
     </section>
 
-    <section id="overview" class="reveal">
-      <h2>Overview</h2>
-      <div class="dual-track">
-        <article class="track-panel track-panel--selfhost">
-          <h3>North star — Self-host</h3>
-          <p>Native binary from <code>lib/</code> compiles PHP and rebuilds the next compiler without Zend.</p>
-          <p><strong>Now:</strong> M0–M2 ✅ · spine <strong>726/726</strong> · M3 smoke emit <strong>native</strong> ✅ · M4 full revision ✅ · M5 vendor prelink <strong>3/3</strong> ✅ · Zend-free gen-0 seed ✅ · remaining: native <code>bin/compile.php</code> inventory path (<a href="https://github.com/PurHur/php-compiler/issues/3024">#3024</a>)</p>
-          <p><a href="development-status.html">Status</a> · <a href="missing-implementation.html">Gap tables</a> · <a href="capability-comparison.html">PHP vs us</a> · <a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a></p>
+    <section id="phpc" class="reveal">
+      <h2>The <code>phpc</code> CLI</h2>
+      <p class="section-intro">
+        Unified developer interface (<code>./phpc</code> → <code>bin/phpc.php</code>).
+        Legacy <code>bin/vm.php</code>, <code>bin/jit.php</code>, and <code>bin/compile.php</code> still work.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Command</th>
+              <th>Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>phpc run</code></td><td>Run on the VM; <code>-q</code> / <code>-p</code> for CGI-style superglobals</td></tr>
+            <tr><td><code>phpc serve</code></td><td>Dev HTTP server (VM); <code>phpc serve --aot</code> for a prebuilt binary</td></tr>
+            <tr><td><code>phpc build</code></td><td>AOT compile; <code>--project</code> uses <code>phpc.json</code></td></tr>
+            <tr><td><code>phpc deploy</code></td><td>Package binary + <code>public/</code> into a deploy tree</td></tr>
+            <tr><td><code>phpc lint</code></td><td>Report unsupported syntax in a file or tree</td></tr>
+            <tr><td><code>phpc test</code></td><td>CI locally; <code>--fast</code> = VM/compliance only (no LLVM)</td></tr>
+            <tr><td><code>phpc init</code></td><td>Scaffold <code>phpc.json</code> (<code>miniwebapp</code>, <code>sessionsweb</code>, <code>fileupload</code> profiles)</td></tr>
+            <tr><td><code>phpc doctor</code></td><td>Environment and example gate probes</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top: 1rem;">
+        <a href="https://github.com/PurHur/php-compiler/blob/master/docs/phpc-json.md">phpc.json reference</a> ·
+        <a href="https://github.com/PurHur/php-compiler/blob/master/docs/deploy-web-aot.md">AOT deploy guide</a>
+      </p>
+    </section>
+
+    <section id="examples" class="reveal">
+      <h2>Example applications</h2>
+      <p class="section-intro">
+        Reference apps in <code>examples/</code> prove VM, AOT link, native execute, and deploy paths.
+        <a href="https://github.com/PurHur/php-compiler/blob/master/examples/README.md">examples/README.md</a>
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Example</th>
+              <th>Highlights</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>000–002</td><td>CLI hello, simple web, CGI query params</td></tr>
+            <tr><td><a href="https://github.com/PurHur/php-compiler/tree/master/examples/003-MiniWebApp">003-MiniWebApp</a></td><td>Router, templates, contact form, JSON API — <strong>AOT execute green</strong></td></tr>
+            <tr><td>004-ApiJson</td><td>JSON API</td></tr>
+            <tr><td>005-SessionsWeb</td><td><code>session_start</code>, flash messages</td></tr>
+            <tr><td>006-FileUploadWeb</td><td>Multipart <code>$_FILES</code></td></tr>
+            <tr><td>007-ThrowsWeb</td><td>Caught exceptions in forms</td></tr>
+            <tr><td>008-SelfHostProbe</td><td>Self-host presenter probe</td></tr>
+            <tr><td>009-FastCGIWeb</td><td>FastCGI-oriented layout</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <pre class="flow-diagram" style="margin-top: 1rem;">make web-smoke          # lint + VM smoke
+make examples-aot-smoke # AOT link + execute (LLVM required)
+make examples-web-smoke # phpc serve + HTTP curls</pre>
+    </section>
+
+    <section id="capabilities" class="reveal">
+      <h2>Capabilities &amp; limitations</h2>
+      <p class="section-intro">
+        Not a drop-in Zend replacement. Capabilities differ by backend — VM is broadest; AOT is strictest.
+        <a href="capability-comparison.html">Full PHP vs us comparison</a> ·
+        <a href="missing-implementation.html">Gap tables</a>.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Column</th>
+              <th>Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>VM</strong></td><td><code>phpc run</code> — broadest language coverage</td></tr>
+            <tr><td><strong>JIT</strong></td><td><code>bin/jit.php</code> — native MCJIT; some CFGs use VM fallback</td></tr>
+            <tr><td><strong>AOT</strong></td><td><code>phpc build</code> — standalone binary; many constructs blocked at link</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="feature-columns">
+        <article class="feature-panel">
+          <h4>v1.0 supports well</h4>
+          <ul>
+            <li>Classes, interfaces, <code>match</code>, namespaces, magic constants</li>
+            <li><code>try</code> / <code>catch</code> on VM; multi-type catch</li>
+            <li>CGI superglobals, sessions, uploads, <code>phpc deploy</code></li>
+            <li>~200+ builtins (strings, arrays, JSON, <code>preg_*</code>, filesystem)</li>
+            <li>Wave 3 batch: <strong>12/12</strong> language + <strong>13/13</strong> stdlib tracked items</li>
+            <li>Generators — <strong>VM only</strong></li>
+          </ul>
         </article>
-        <article class="track-panel track-panel--web">
-          <h3>Example tests</h3>
-          <p>MiniWebApp through FastCGIWeb — VM + AOT regression in CI.</p>
-          <p><strong>Now:</strong> VM ✅ · AOT link/execute ✅ for the curated web subset.</p>
+        <article class="feature-panel">
+          <h4>Known gaps (summary)</h4>
+          <ul>
+            <li><code>try</code> / <code>finally</code> — partial VM; JIT unwind incomplete (<a href="https://github.com/PurHur/php-compiler/issues/2114">#2114</a>)</li>
+            <li>Closures / <code>fn () =&gt;</code> — not in v1.0 app path (<a href="https://github.com/PurHur/php-compiler/issues/72">#72</a>, <a href="https://github.com/PurHur/php-compiler/issues/142">#142</a>)</li>
+            <li>Native <code>yield</code> in JIT/AOT — VM fallback (<a href="https://github.com/PurHur/php-compiler/issues/167">#167</a>)</li>
+            <li>No Composer autoload at AOT runtime; no arbitrary <code>ext-*</code></li>
+            <li>Not targeting Laravel, Symfony, WordPress, or full framework stacks</li>
+          </ul>
         </article>
       </div>
+
+      <div class="table-wrap" style="margin-top: 1.25rem;">
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>VM</th>
+              <th>JIT / AOT</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Try / catch / finally</td>
+              <td class="status-wip">Partial</td>
+              <td class="status-no">Unwind incomplete</td>
+            </tr>
+            <tr>
+              <td>Closures / arrow functions</td>
+              <td class="status-no">Limited</td>
+              <td class="status-no">Not lowered</td>
+            </tr>
+            <tr>
+              <td>Generators (<code>yield</code>)</td>
+              <td class="status-yes">Yes</td>
+              <td class="status-no">No native</td>
+            </tr>
+            <tr>
+              <td>Enums in AOT</td>
+              <td class="status-yes">VM/JIT</td>
+              <td class="status-no">No</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top: 1rem;">
+        <a class="btn btn--ghost" href="missing-implementation.html">Full gap tables →</a>
+        <a class="btn btn--ghost" href="capability-comparison.html">PHP capability comparison →</a>
+      </p>
     </section>
 
     <section id="progress" class="reveal">
-      <h2>Progress</h2>
+      <h2>Self-host progress</h2>
       <div class="overall-progress">
         <div class="overall-progress__label">
-          <span>Toward self-hosting</span>
+          <span>Toward full self-host (M5)</span>
           <span class="overall-progress__pct">~85%</span>
         </div>
-        <div class="progress-track" role="progressbar" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100">
+        <div class="progress-track" role="progressbar" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100" aria-label="Self-host progress approximately 85 percent">
           <div class="progress-fill" data-width="85" style="width: 0"></div>
         </div>
         <p class="overall-progress__note">
-          On <code>master</code> @ 6f03eb43 (LLVM 9): spine <strong>726/726</strong>; gen-2→gen-3 recompile without Zend on the compile step;
-          full revision <code>bin/compile.php</code> probe ✅ ([#3058](https://github.com/PurHur/php-compiler/pull/3058));
-          vendor prelink <strong>3/3</strong> <code>object_ok</code> ✅ ([#3036](https://github.com/PurHur/php-compiler/pull/3036), [#3050](https://github.com/PurHur/php-compiler/pull/3050));
-          Zend-free gen-0 seed ✅ ([#3059](https://github.com/PurHur/php-compiler/pull/3059), [#3060](https://github.com/PurHur/php-compiler/pull/3060)).
-          Next: native <code>bin/compile.php</code> inventory path (no emit-helper TU) → full CLI parity (<a href="https://github.com/PurHur/php-compiler/issues/3024">#3024</a>).
+          <code>master</code> @ <a href="https://github.com/PurHur/php-compiler/commit/84cd4246">84cd4246</a> (May 2026, LLVM 9):
+          spine <strong>726/726</strong>;
+          gen-2→gen-3 recompile without Zend on compile ✅
+          (<a href="https://github.com/PurHur/php-compiler/pull/2697">#2697</a>);
+          full revision <code>bin/compile.php</code> probe ✅
+          (<a href="https://github.com/PurHur/php-compiler/pull/3058">#3058</a>);
+          vendor prelink <strong>3/3</strong> <code>object_ok</code> ✅
+          (<a href="https://github.com/PurHur/php-compiler/pull/3036">#3036</a>, <a href="https://github.com/PurHur/php-compiler/pull/3050">#3050</a>);
+          Zend-free gen-0 seed ✅
+          (<a href="https://github.com/PurHur/php-compiler/pull/3059">#3059</a>, <a href="https://github.com/PurHur/php-compiler/pull/3060">#3060</a>).
+          Next: native <code>bin/compile.php</code> inventory path → full CLI parity
+          (<a href="https://github.com/PurHur/php-compiler/issues/3024">#3024</a>).
           Presenter: <code>make north-star5-verify</code>.
         </p>
       </div>
@@ -153,36 +375,96 @@
 
     <section id="self-host" class="reveal">
       <h2>Self-host milestones</h2>
-      <ol class="ladder" aria-label="Self-host milestones">
-        <li class="is-done"><span class="ladder__marker" aria-hidden="true">✓</span><h4>M0–M1</h4><p>Minimal + compiler-shaped bundles.</p></li>
-        <li class="is-done"><span class="ladder__marker" aria-hidden="true">✓</span><h4>M2</h4><p>Spine <strong>726/726</strong> — Phase A inventory complete ([#2868](https://github.com/PurHur/php-compiler/issues/2868), [#2652](https://github.com/PurHur/php-compiler/issues/2652)).</p></li>
-        <li class="is-wip"><span class="ladder__marker" aria-hidden="true">3</span><h4>M3</h4><p>Smoke <strong>native emit</strong> ✅; emit TU grows Compiler spine ([#2667](https://github.com/PurHur/php-compiler/pull/2667)); remaining: native <code>bin/compile.php</code> inventory path (<a href="https://github.com/PurHur/php-compiler/issues/3024">#3024</a>).</p></li>
-        <li class="is-done"><span class="ladder__marker" aria-hidden="true">✓</span><h4>M4</h4><p>Gen-2→gen-3 spine <strong>726/726</strong> ✅; full revision <code>bin/compile.php</code> probe ✅ ([#3058](https://github.com/PurHur/php-compiler/pull/3058)).</p></li>
-        <li class="is-wip"><span class="ladder__marker" aria-hidden="true">5</span><h4>M5</h4><p>Vendor prelink <strong>3/3</strong> ✅ ([#3036](https://github.com/PurHur/php-compiler/pull/3036), [#3050](https://github.com/PurHur/php-compiler/pull/3050)); Zend-free gen-0 seed ✅ ([#3059](https://github.com/PurHur/php-compiler/pull/3059), [#3060](https://github.com/PurHur/php-compiler/pull/3060)); remaining: compiled <code>bin/vm.php</code> path + bootstrap parity (<a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a>).</p></li>
-      </ol>
-      <p style="margin-top: 1rem">
-        <a class="btn btn--ghost" href="missing-implementation.html">See missing implementation tables →</a>
+      <p class="section-intro">
+        Experimental path: compiler compiling its own <code>lib/</code> tree.
+        Tracker <a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a>.
+        <a href="development-status.html">Short status page</a>.
       </p>
+      <ol class="ladder" aria-label="Self-host milestones">
+        <li class="is-done">
+          <span class="ladder__marker" aria-hidden="true">✓</span>
+          <h4>M0–M1</h4>
+          <p>Minimal + compiler-shaped bundles; compile-smoke AOT echo.</p>
+        </li>
+        <li class="is-done">
+          <span class="ladder__marker" aria-hidden="true">✓</span>
+          <h4>M2</h4>
+          <p>Spine <strong>726/726</strong> native link with real <code>bin/vm.php</code>
+            (<a href="https://github.com/PurHur/php-compiler/issues/2868">#2868</a>,
+            <a href="https://github.com/PurHur/php-compiler/issues/2652">#2652</a>).</p>
+        </li>
+        <li class="is-wip">
+          <span class="ladder__marker" aria-hidden="true">3</span>
+          <h4>M3</h4>
+          <p>Smoke <strong>native emit</strong> ✅; remaining: production <code>bin/compile.php</code> inventory path
+            (<a href="https://github.com/PurHur/php-compiler/issues/3024">#3024</a>,
+            <a href="https://github.com/PurHur/php-compiler/issues/1937">#1937</a>).</p>
+        </li>
+        <li class="is-done">
+          <span class="ladder__marker" aria-hidden="true">✓</span>
+          <h4>M4</h4>
+          <p>Gen-2→gen-3 spine <strong>726/726</strong> without Zend on compile; full revision probe ✅
+            (<a href="https://github.com/PurHur/php-compiler/pull/3058">#3058</a>).</p>
+        </li>
+        <li class="is-wip">
+          <span class="ladder__marker" aria-hidden="true">5</span>
+          <h4>M5</h4>
+          <p>Vendor prelink <strong>3/3</strong> ✅; committed <code>.o</code> cold boot ✅; Zend still default for empty <code>build/</code> —
+            compiled <code>bin/vm.php</code> path + full bootstrap parity open
+            (<a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a>).</p>
+        </li>
+      </ol>
+    </section>
+
+    <section id="install" class="reveal">
+      <h2>Installation</h2>
+      <div class="dual-track">
+        <article class="track-panel track-panel--web">
+          <h3>Host (daily dev)</h3>
+          <p>PHP 8.1+ (8.2 recommended), Composer, LLVM 9 for JIT/AOT (bundled via <code>script/install-llvm9.sh</code>).</p>
+          <pre><code>composer install
+script/apply-patches.sh
+./script/install-llvm9.sh  # optional until build/CI</code></pre>
+        </article>
+        <article class="track-panel track-panel--selfhost">
+          <h3>Docker only</h3>
+          <p>Image <code>php-compiler:22.04-dev</code> — full CI without host PHP/LLVM.</p>
+          <pre><code>make docker-build-22
+make test</code></pre>
+          <p>Harness hosts: <code>make test-harness</code> or <code>./script/docker-ci-local.sh</code>.</p>
+        </article>
+      </div>
     </section>
 
     <section id="contribute" class="reveal">
       <h2>Get involved</h2>
-      <p>We do not accept GitHub issues or pull requests without prior coordination. Contact maintainers on other channels first; align with the AI-agent workflow before investing time here. Forks are welcome.</p>
+      <p class="section-intro">
+        We do not accept drive-by GitHub issues or pull requests without prior coordination.
+        Contact maintainers on other channels first; align with the AI-agent workflow before investing time here.
+        Forks are welcome under MIT.
+      </p>
       <div class="hero-actions">
         <a class="btn btn--primary" href="https://github.com/PurHur/php-compiler/blob/master/CONTRIBUTING.md">Contributing policy</a>
-        <a class="btn btn--ghost" href="https://github.com/PurHur/php-compiler">Repository</a>
+        <a class="btn btn--ghost" href="https://github.com/PurHur/php-compiler/blob/master/README.md">README on GitHub</a>
+        <a class="btn btn--ghost" href="development-status.html">Development status</a>
       </div>
     </section>
   </main>
 
   <footer class="site-footer">
-    <p><a href="https://github.com/PurHur/php-compiler">PurHur/php-compiler</a> · MIT</p>
+    <p>
+      <a href="https://github.com/PurHur/php-compiler">PurHur/php-compiler</a> ·
+      <a href="https://github.com/PurHur/php-compiler/releases/tag/v1.0.0">v1.0.0</a> ·
+      MIT ·
+      <a href="https://github.com/ircmaxell/php-compiler">Original ircmaxell/php-compiler</a>
+    </p>
     <p>
       <a href="development-status.html">Status</a> ·
       <a href="missing-implementation.html">Gaps</a> ·
       <a href="capability-comparison.html">PHP compare</a> ·
       <a href="https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md">Getting started</a>
     </p>
+    <p class="footer-meta">Site: docs/pages/ · Updated May 2026 · <code>master</code> @ 84cd4246</p>
   </footer>
 
   <script src="js/main.js" defer></script>
