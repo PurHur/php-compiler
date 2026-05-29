@@ -133,6 +133,15 @@ final class ClosureHelper
         return $src;
     }
 
+    /** Alias a closure capture slot to live enclosing {@see __value__*} storage (issue #72). */
+    public static function bindCaptureSlotByReference(
+        Context $context,
+        Variable $captureSlot,
+        Variable $captureArg
+    ): void {
+        $captureSlot->valueBoxAliasPtr = JitValueBox::valuePtrFromVariable($context, $captureArg);
+    }
+
     /**
      * @param list<array{name: string, slot: int, byRef: bool}> $captureSpecs
      *

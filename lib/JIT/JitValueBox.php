@@ -73,6 +73,9 @@ final class JitValueBox
      */
     public static function valuePtrFromVariable(Context $context, Variable $var): Value
     {
+        if (null !== $var->valueBoxAliasPtr) {
+            return self::normalizeValuePtr($context, $var->valueBoxAliasPtr);
+        }
         if (self::isValueOperand($var) && Variable::TYPE_VALUE !== $var->type) {
             $valueType = $context->getTypeFromString('__value__');
             $storage = BasicBlockHelper::entryAlloca($context, $valueType);

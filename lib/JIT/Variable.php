@@ -122,6 +122,9 @@ final class Variable {
     /** Native call proxy when this object is a JIT-lowered closure (#72). */
     public ?Call $closureCall = null;
 
+    /** Live {@see __value__*} for closure use (&$var) capture slots (issue #72). */
+    public ?\PHPLLVM\Value $valueBoxAliasPtr = null;
+
     private static int $lvalueCounter = 0;
     public int $nextFreeElement = 0;
 
