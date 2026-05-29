@@ -48,7 +48,7 @@
         <p class="section-intro" style="margin-top: 0.5rem">
           Real gaps toward the
           <a href="https://github.com/PurHur/php-compiler/issues/1492">self-host north star (#1492)</a>.
-          Updated 28 May 2026 (<code>master</code> @ 6d225e5b; LLVM&nbsp;9).
+          Updated 29 May 2026 (<code>master</code> @ 03c44c5f; LLVM&nbsp;9).
           VM, examples, and wave-3 language/stdlib batches are largely done; this page lists what is
           <strong>not</strong> implemented yet for compiling the compiler without Zend.
         </p>
@@ -73,12 +73,12 @@
               </tr>
               <tr>
                 <td><strong>M4</strong> bootstrap loop</td>
-                <td>Changed-tree rebuild (gen-3 compiles a different revision); gen-2→gen-3 spine <strong>726/726</strong> recompile ✅ via <code>make bootstrap-loop-gen2-recompile-spine</code>; full revision probe still flakey / can segfault 139 (<code>make bootstrap-selfhost-full-revision-probe</code>, <a href="https://github.com/PurHur/php-compiler/issues/2880">#2880</a>, <a href="https://github.com/PurHur/php-compiler/issues/2967">#2967</a>)</td>
+                <td>Gen-2→gen-3 spine <strong>726/726</strong> recompile ✅ (<code>make bootstrap-loop-gen2-recompile-spine</code>, native argv <code>-o</code>, no Zend on compile). Full revision: inventory argv driver compiles <code>bin/compile.php</code> → gen-3 ✅ (<code>make bootstrap-selfhost-full-revision-probe</code>, <a href="https://github.com/PurHur/php-compiler/issues/2880">#2880</a>, <a href="https://github.com/PurHur/php-compiler/issues/3046">#3046</a>)</td>
                 <td><a href="https://github.com/PurHur/php-compiler/issues/1498">#1498</a></td>
               </tr>
               <tr>
                 <td><strong>M5</strong> full self-host</td>
-                <td>Compiled <code>bin/compile.php</code> / <code>bin/vm.php</code>; no <code>vendor/</code> cold boot</td>
+                <td>Vendor prelink <strong>3/3</strong> <code>object_ok</code> ✅; committed <code>.o</code> cold boot without <code>vendor/</code> ✅. Still open: default bootstrap uses Zend for <code>bin/compile.php</code> when <code>build/</code> is empty; compiled <code>bin/vm.php</code> path</td>
                 <td><a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a>, <a href="https://github.com/PurHur/php-compiler/issues/1416">#1416</a></td>
               </tr>
             </tbody>

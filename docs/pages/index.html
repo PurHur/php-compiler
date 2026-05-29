@@ -56,8 +56,10 @@
       <div class="hero-badges">
         <span class="badge badge--live">VM + JIT + AOT</span>
         <span class="badge badge--live">Wave 3 · 12 + 13 closed</span>
-        <span class="badge badge--live">M2 spine 725/725 ✅</span>
+        <span class="badge badge--live">M2 spine 726/726 ✅</span>
         <span class="badge badge--live">M3 strict native emit ✅</span>
+        <span class="badge badge--live">M4 gen-3 spine ✅</span>
+        <span class="badge badge--live">M5 vendor 3/3 ✅</span>
       </div>
       <div class="hero-actions">
         <a class="btn btn--primary" href="#demo">Try in 5 minutes</a>
@@ -117,7 +119,7 @@
         <article class="track-panel track-panel--selfhost">
           <h3>North star — Self-host</h3>
           <p>Native binary from <code>lib/</code> compiles PHP and rebuilds the next compiler without Zend.</p>
-          <p><strong>Now:</strong> M0–M2 ✅ · spine <strong>726/726</strong> complete · M3 smoke emit <strong>native</strong> ✅ · M4 gen-2→gen-3 spine ✅ · M5 vendor prelink 🚧 (<code>php-types</code>)</p>
+          <p><strong>Now:</strong> M0–M2 ✅ · spine <strong>726/726</strong> · M3 smoke emit <strong>native</strong> ✅ · M4 gen-3 spine (argv <code>-o</code>, no Zend on compile) ✅ · M5 vendor prelink <strong>3/3</strong> ✅ · Zend cold boot ⬜</p>
           <p><a href="development-status.html">Status</a> · <a href="missing-implementation.html">Gap tables</a> · <a href="capability-comparison.html">PHP vs us</a> · <a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a></p>
         </article>
         <article class="track-panel track-panel--web">
@@ -133,16 +135,16 @@
       <div class="overall-progress">
         <div class="overall-progress__label">
           <span>Toward self-hosting</span>
-          <span class="overall-progress__pct">~70%</span>
+          <span class="overall-progress__pct">~75%</span>
         </div>
-        <div class="progress-track" role="progressbar" aria-valuenow="70" aria-valuemin="0" aria-valuemax="100">
-          <div class="progress-fill" data-width="70" style="width: 0"></div>
+        <div class="progress-track" role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100">
+          <div class="progress-fill" data-width="75" style="width: 0"></div>
         </div>
         <p class="overall-progress__note">
-          On <code>master</code> (LLVM 9): Phase A spine <strong>726/726</strong> links; M3 strict probes
-          <code>emit_path=native</code>; M4 gen-2 native driver recompiles spine → <strong>gen-3</strong> (argv <code>-o</code>).
-          Next: full revision rebuild (changed tree) → vendor cold boot (M5).
-          Presenter: <code>make north-star5-verify</code> · ladder: <a href="https://github.com/PurHur/php-compiler/blob/master/docs/bootstrap-generations.md">bootstrap-generations.md</a>.
+          On <code>master</code> @ 03c44c5f (LLVM 9): spine <strong>726/726</strong>; gen-2→gen-3 recompile without Zend on the compile step;
+          vendor prelink <strong>3/3</strong> <code>object_ok</code> ([#3036](https://github.com/PurHur/php-compiler/pull/3036)).
+          Next: native <code>bin/compile.php</code> full revision probe → retire Zend on empty <code>build/</code> bootstrap.
+          Presenter: <code>make north-star5-verify</code> · <code>make bootstrap-loop-gen2-recompile-spine</code>.
         </p>
       </div>
     </section>
@@ -153,8 +155,8 @@
         <li class="is-done"><span class="ladder__marker" aria-hidden="true">✓</span><h4>M0–M1</h4><p>Minimal + compiler-shaped bundles.</p></li>
         <li class="is-done"><span class="ladder__marker" aria-hidden="true">✓</span><h4>M2</h4><p>Spine <strong>726/726</strong> — Phase A inventory complete ([#2868](https://github.com/PurHur/php-compiler/issues/2868), [#2652](https://github.com/PurHur/php-compiler/issues/2652)).</p></li>
         <li class="is-wip"><span class="ladder__marker" aria-hidden="true">3</span><h4>M3</h4><p>Smoke <strong>native emit</strong> ✅; emit TU grows Compiler spine ([#2667](https://github.com/PurHur/php-compiler/pull/2667)); <code>bin/compile.php</code> still open ([#1937](https://github.com/PurHur/php-compiler/issues/1937)).</p></li>
-        <li class="is-wip"><span class="ladder__marker" aria-hidden="true">4</span><h4>M4</h4><p>Gen-2→gen-3 spine <strong>726/726</strong> ✅; revision probe / inventory driver segfaults still tracked ([#2880](https://github.com/PurHur/php-compiler/issues/2880), [#2967](https://github.com/PurHur/php-compiler/issues/2967)).</p></li>
-        <li class="is-wip"><span class="ladder__marker" aria-hidden="true">5</span><h4>M5</h4><p>Vendor <code>php-types</code> prelinked; compiled cold boot ⬜ ([#1416](https://github.com/PurHur/php-compiler/issues/1416)).</p></li>
+        <li class="is-done"><span class="ladder__marker" aria-hidden="true">✓</span><h4>M4</h4><p>Gen-2→gen-3 spine <strong>726/726</strong> ✅; full revision <code>bin/compile.php</code> probe ✅ ([#2880](https://github.com/PurHur/php-compiler/issues/2880), [#3046](https://github.com/PurHur/php-compiler/issues/3046)).</p></li>
+        <li class="is-wip"><span class="ladder__marker" aria-hidden="true">5</span><h4>M5</h4><p>Vendor prelink <strong>3/3</strong> ✅ ([#3036](https://github.com/PurHur/php-compiler/pull/3036)); Zend cold boot for <code>bin/compile.php</code> ⬜ ([#1416](https://github.com/PurHur/php-compiler/issues/1416)).</p></li>
       </ol>
       <p style="margin-top: 1rem">
         <a class="btn btn--ghost" href="missing-implementation.html">See missing implementation tables →</a>

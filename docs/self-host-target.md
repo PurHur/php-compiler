@@ -34,11 +34,11 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | Layer | Today | Target |
 |-------|-------|--------|
 | **Bootstrap driver** | Gen-0 Zend once on empty `build/`; after `bootstrap-selfhost-driver-smoke`, `bootstrap-selfhost-link` uses `build/bin-compile-aot` via link-time sidecars ([#2894](https://github.com/PurHur/php-compiler/issues/2894), [#2842](https://github.com/PurHur/php-compiler/issues/2842)) | Compiled `bin/compile.php` only |
-| **Bundle size** | **725** curated `require_once` in spine smoke (`cli_spine_shim` for `src/cli.php` only) | **725** Phase A inventory files (SSOT) |
-| **Inventory coverage** | **725/725** literal `require_once` with real **`bin/vm.php`** ([#2134](https://github.com/PurHur/php-compiler/issues/2134); **#2652** emit-TU JIT batch; **`lib/VM/HashTable.php`** promoted [#2543](https://github.com/PurHur/php-compiler/issues/2543); **`src/cli_driver.php`** literal [#2868](https://github.com/PurHur/php-compiler/issues/2868)) | **~100%** |
+| **Bundle size** | **726** curated `require_once` in spine smoke (`cli_spine_shim` for `src/cli.php` only) | **726** Phase A inventory files (SSOT) |
+| **Inventory coverage** | **726** / **726** literal `require_once` with real **`bin/vm.php`** ([#2134](https://github.com/PurHur/php-compiler/issues/2134); **#2652** emit-TU JIT batch; **`lib/VM/HashTable.php`** promoted [#2543](https://github.com/PurHur/php-compiler/issues/2543); **`src/cli_driver.php`** literal [#2868](https://github.com/PurHur/php-compiler/issues/2868)) | **~100%** |
 | **HelloWorld** | Native **run** ✅; strict probe **emit_path=native** ✅ (27 May 2026) | Native compile for arbitrary PHP |
-| **Bootstrap loop (M4)** | Gen-1→gen-2 smoke/spine **native** ✅; gen-2→gen-3 spine **726/726** ✅; full revision / argv CLI 🚧 (probe flakey/segfault 139 — `make bootstrap-selfhost-full-revision-probe`, [#2880](https://github.com/PurHur/php-compiler/issues/2880), [#2967](https://github.com/PurHur/php-compiler/issues/2967)) | Native full revision rebuild |
-| **Vendor** | `ircmaxell/php-types` **object_ok** ([#1416](https://github.com/PurHur/php-compiler/issues/1416)); cfg/llvm parse blockers | Prelinked artifacts only (no `vendor/autoload.php`) |
+| **Bootstrap loop (M4)** | Gen-1→gen-2 smoke/spine **native** ✅; gen-2→gen-3 spine **726/726** ✅; full revision argv probe ✅ (`make bootstrap-selfhost-full-revision-probe`, [#2880](https://github.com/PurHur/php-compiler/issues/2880)) | Native full revision rebuild |
+| **Vendor** | **3/3** vendor `object_ok` (cfg, types, llvm) ([#3036](https://github.com/PurHur/php-compiler/pull/3036), [#1416](https://github.com/PurHur/php-compiler/issues/1416)); committed `.o` cold boot without `vendor/` ✅ | No Zend `vendor/autoload.php` at bootstrap |
 
 ### Gates (run after `script/apply-patches.sh`)
 
@@ -52,13 +52,13 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M2 `BOOTSTRAP_LIB_SPINE_SMOKE=1` spine link | ✅ `compiler_lib_spine_smoke bundle OK` |
 | M3 `make bootstrap-selfhost-helloworld` | ✅ strict default — HelloWorld `emit_path=native` (verified 27 May 2026) |
 | M4 `make bootstrap-loop-gen1-link` | ✅ gen-1 link + gen-2 smoke **`emit_path=native`** (`BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1`, #2611); **Zend fallback** (`emit_path=zend partial`) when native blocked; strict: `BOOTSTRAP_M4_GEN2_STRICT=1`; presenter: [GETTING-STARTED §7](GETTING-STARTED.md) ([#2464](https://github.com/PurHur/php-compiler/issues/2464)) |
-| M4 `make bootstrap-loop-gen1-full-spine-emit` | ✅ gen-1→gen-2 **725/725** spine (`bootstrap-loop-gen2-full-spine`) |
-| M4 `make bootstrap-loop-gen2-recompile-spine` | ✅ gen-2→gen-3 **725/725** spine (`bootstrap-loop-gen3-full-spine`) — native driver recompiles spine ([#2697](https://github.com/PurHur/php-compiler/pull/2697)) |
-| M4 `make bootstrap-selfhost-full-revision-probe` | 🚧 gen-2 `build/bin-compile-aot` argv-compiles `bin/compile.php` → gen-3 driver + smoke run (**emit_path=native**) when green; can segfault 139 on inventory driver path ([#2880](https://github.com/PurHur/php-compiler/issues/2880), [#2967](https://github.com/PurHur/php-compiler/issues/2967)); alias `make bootstrap-loop-gen2-recompile-bin-compile` |
+| M4 `make bootstrap-loop-gen1-full-spine-emit` | ✅ gen-1→gen-2 **726/726** spine (`bootstrap-loop-gen2-full-spine`) |
+| M4 `make bootstrap-loop-gen2-recompile-spine` | ✅ gen-2→gen-3 **726/726** spine (`bootstrap-loop-gen3-full-spine`) — native driver recompiles spine ([#2697](https://github.com/PurHur/php-compiler/pull/2697)) |
+| M4 `make bootstrap-selfhost-full-revision-probe` | ✅ gen-2 inventory argv driver compiles `bin/compile.php` → gen-3 + fixture smoke (**emit_path=native**) ([#2880](https://github.com/PurHur/php-compiler/issues/2880), [#3046](https://github.com/PurHur/php-compiler/issues/3046)); alias `make bootstrap-loop-gen2-recompile-bin-compile` |
 | M4 `make bootstrap-loop-probe` | ✅ full ladder — M2 + M3 HelloWorld strict + gen-1→gen-2 + gen-2→gen-3; `--dry-run` skips gen-3 ([#1498](https://github.com/PurHur/php-compiler/issues/1498)); `make north-star4-verify` — [GETTING-STARTED §7](GETTING-STARTED.md) |
 | `make bootstrap-aot-link` | ✅ **71/71** |
-| `make bootstrap-inventory-check` | ✅ **725** Phase A files, **725** vm.php-path files, **0** source blockers |
-| `make north-star5-verify` | ✅ inventory + spine + selfhost link; vendor **1/3** `object_ok` (partial; `--strict` for 3/3) |
+| `make bootstrap-inventory-check` | ✅ **726** Phase A files, **726** vm.php-path files, **0** source blockers |
+| `make north-star5-verify` | ✅ inventory + spine + selfhost link; vendor **3/3** `object_ok`; committed `.o` cold boot without `vendor/`; Zend still default for empty `build/` |
 
 ---
 
@@ -68,23 +68,23 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 |-----------|----------------|--------|-----|
 | **M0** | AOT can link a **small** honest `lib/` subset | ✅ | 100% |
 | **M1** | Bundle is **compiler-shaped** (lint + compile-smoke) | ✅ | 100% |
-| **M2** | Spine grows toward full `bin/vm.php` inventory | ✅ **725/725** literal `require_once` ([#2868](https://github.com/PurHur/php-compiler/issues/2868)) | **~100%** |
+| **M2** | Spine grows toward full `bin/vm.php` inventory | ✅ **726/726** literal `require_once` ([#2868](https://github.com/PurHur/php-compiler/issues/2868)) | **~100%** |
 | **M3** | Self-host binary **compiles external PHP** (HelloWorld) without Zend emit | 🚧 smoke strict **native** ✅; full `Compiler` CFG 🚧 | **~65%** |
 
 **M3 unit probe presenter** ([#2360](https://github.com/PurHur/php-compiler/issues/2360)): `make north-star3-verify` runs `008-SelfHostProbe` plus optional `bootstrap-selfhost-{compiler,jit,vm,parser,types}-unit-probe.sh` when LLVM 9 and probe scripts are present (parser step [#2418](https://github.com/PurHur/php-compiler/issues/2418), PHPTypes step [#2434](https://github.com/PurHur/php-compiler/issues/2434)). **Parser unit probe** ([#2409](https://github.com/PurHur/php-compiler/issues/2409)): `make bootstrap-selfhost-parser-unit-probe` — CFG front-end (`Runtime` + `lib/Compiler.php` bundle); CI gate ([#2417](https://github.com/PurHur/php-compiler/issues/2417)) opt-in in `ci-local.sh`. **PHPTypes unit probe** ([#2430](https://github.com/PurHur/php-compiler/issues/2430)): `make bootstrap-selfhost-types-unit-probe` — `lib/JIT.php` / `JIT\Builtin\Type` external-class constant seeds; Zend smoke for `Type::TYPE_*` + union/intersection `fromTypeDecl`; `BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE=1` default-on in `ci-local.sh` ([#2433](https://github.com/PurHur/php-compiler/issues/2433), [#2436](https://github.com/PurHur/php-compiler/issues/2436)). **VM unit probe** ([#2354](https://github.com/PurHur/php-compiler/issues/2354)): `make bootstrap-selfhost-vm-unit-probe` / `BOOTSTRAP_VM_UNIT_PROBE_GATE=1` in `ci-local.sh` llvm tail. Compiler/JIT unit probes: [#2216](https://github.com/PurHur/php-compiler/issues/2216), [#2332](https://github.com/PurHur/php-compiler/issues/2332).
-| **M4** | Self-host binary **rebuilds** the next compiler tree | ✅ gen-2→gen-3 spine **726/726** · revision probe 🚧 ([#2880](https://github.com/PurHur/php-compiler/issues/2880)) | **~80%** |
-| **M5** | Full self-host; Zend retired from loop | 🚧 `php-types` prelinked **object_ok**; cold boot open | **~15%** |
+| **M4** | Self-host binary **rebuilds** the next compiler tree | ✅ gen-2→gen-3 spine **726/726** · full revision argv probe ✅ ([#2880](https://github.com/PurHur/php-compiler/issues/2880)) | **~90%** |
+| **M5** | Full self-host; Zend retired from loop | 🚧 vendor **3/3** prelinked ✅; Zend cold boot for `bin/compile.php` open | **~50%** |
 
-**Indicative north star composite:** **~70%** (weighted across M0–M5; see formula below).
+**Indicative north star composite:** **~75%** (weighted across M0–M5; see formula below).
 
 ### North star % (single formula)
 
 | Indicator | Formula | May 2026 |
 |-----------|---------|----------|
-| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **725 / 725** ([#2868](https://github.com/PurHur/php-compiler/issues/2868)) |
-| **Public “Self-host” row** | Same M2 ratio until M3–M5 gates add weight ([`development-status.md`](pages/development-status.md)) | **~99%** |
-| **M5 vendor prelink** | `object_ok` packages ÷ 3 | **1 / 3** (`php-types`) |
-| **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~70%** |
+| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **726 / 726** ([#2868](https://github.com/PurHur/php-compiler/issues/2868)) |
+| **Public “Self-host” row** | Same M2 ratio until M3–M5 gates add weight ([`development-status.md`](pages/development-status.md)) | **~100%** |
+| **M5 vendor prelink** | `object_ok` packages ÷ 3 | **3 / 3** (cfg, types, llvm) |
+| **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~75%** |
 
 Regenerate inventory: `make bootstrap-inventory-regenerate` (or `php script/bootstrap-inventory.php`) · spine count: `php script/bootstrap-spine-count.php` (or `grep -c '^require_once' test/selfhost/compiler_lib_spine_smoke/main.php`)
 
@@ -135,7 +135,7 @@ Parallel batches ([#1419](https://github.com/PurHur/php-compiler/issues/1419), [
 | Entry | Units | Role |
 |-------|------:|------|
 | `test/selfhost/compiler_minimal/main.php` | **108** | M0 core |
-| `test/selfhost/compiler_lib_spine_smoke/main.php` | **725** literal | M2 complete ([#2868](https://github.com/PurHur/php-compiler/issues/2868)) |
+| `test/selfhost/compiler_lib_spine_smoke/main.php` | **726** literal | M2 complete ([#2868](https://github.com/PurHur/php-compiler/issues/2868)) |
 | `test/selfhost/compiler_helloworld_smoke/` | — | M3 probe + compile driver |
 | `test/selfhost/bootstrap_loop_smoke/` | — | M4 scaffold (gen-1→gen-2→gen-3 loop; [#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 
