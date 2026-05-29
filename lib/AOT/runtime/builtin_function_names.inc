@@ -299,6 +299,7 @@ static const char *phpc_builtin_functions[] = {
     "trigger_error",
     "trim",
     "uasort",
+    "uksort",
     "ucfirst",
     "ucwords",
     "uniqid",

@@ -130,7 +130,7 @@ final class SelfHostBuiltinPolicy
         'array_replace' => 'array', 'array_sum' => 'array', 'sort' => 'array', 'rsort' => 'array',
         'ksort' => 'array', 'krsort' => 'array', 'asort' => 'array', 'arsort' => 'array',
         'array_multisort' => 'array',
-        'usort' => 'array', 'uasort' => 'array',
+        'usort' => 'array', 'uasort' => 'array', 'uksort' => 'array',
         'compact' => 'array', 'extract' => 'array', 'defined' => 'array', 'define' => 'array',
         'class_exists' => 'array', 'enum_exists' => 'array', 'function_exists' => 'array', 'method_exists' => 'array',
         'property_exists' => 'array',
