@@ -322,6 +322,7 @@ class Module extends ModuleAbstract
             new putenv_(),
             new shell_exec(),
             new escapeshellarg(),
+            new escapeshellcmd(),
             new phpc_run_command(),
             new sys_get_temp_dir(),
             new tempnam(),

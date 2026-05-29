@@ -677,6 +677,8 @@ class Type extends Builtin {
         $this->context->registerFunction('__compiler_shell_exec', $fnShellExec);
         $fnEscapeshellarg = $this->context->module->addFunction('__compiler_escapeshellarg', $fntypeShellExec);
         $this->context->registerFunction('__compiler_escapeshellarg', $fnEscapeshellarg);
+        $fnEscapeshellcmd = $this->context->module->addFunction('__compiler_escapeshellcmd', $fntypeShellExec);
+        $this->context->registerFunction('__compiler_escapeshellcmd', $fnEscapeshellcmd);
         $fntypePhpcRunCommand = $this->context->context->functionType(
             $this->context->getTypeFromString('__hashtable__*'),
             false,

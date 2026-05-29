@@ -1423,6 +1423,7 @@ class InternalArgInfo
         'Error::__toString' => ['string'],
         'escapeshellarg' => ['string', 'arg' => 'string'],
         'escapeshellcmd' => ['string', 'command' => 'string'],
+        'escapeshellcmd' => ['string', 'command' => 'string'],
         'eval' => ['', 'code_str' => 'string'],
         'event_add' => ['bool', 'event' => '', 'timeout=' => 'int'],
         'event_base_free' => ['', 'event_base' => ''],
