@@ -333,6 +333,7 @@ class Module extends ModuleAbstract
             new time(),
             new getmypid(),
             new microtime(),
+            new hrtime(),
             new date(),
             new gmdate(),
             new sleep(),
