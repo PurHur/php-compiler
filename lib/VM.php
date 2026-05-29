@@ -96,11 +96,23 @@ class VM {
     {
         $savedStack = $this->context->swapRunStack(null);
         try {
-            $child = $closureState->func->getFrame($this->context, null);
-            $this->bindClosureCallCaptures($child, $closureState);
+            $init = new Frame(null, $closureState->func->block, null);
+            $init->vmContext = $this->context;
+            $this->initClosureCall($init, $closureState);
+            if (null === $init->call) {
+                throw new \LogicException('Closure invocation failed in this compiler build');
+            }
+            $child = $init->call->getFrame($this->context, !empty($init->callArgs) ? $init : null);
+            $this->applyClosureBinding($child, $closureState);
             $child->calledArgs = $args;
             $out = new Variable();
             $child->returnVar = $out;
+            if ($child->hasHandler()) {
+                $child->vmContext = $this->context;
+                $child->handler->execute($child);
+
+                return $out->resolveIndirect();
+            }
             $this->context->push($child);
             $result = $this->runFrames();
             if (self::SUCCESS !== $result) {
@@ -673,10 +685,7 @@ restart:
                     if (Variable::TYPE_OBJECT === $callee->type) {
                         $closureState = $callee->toObject()->closureState;
                         if (null !== $closureState) {
-                            $frame->call = $closureState->func;
-                            $frame->closureCall = $closureState;
-                            $frame->callArgs = [];
-                            $frame->callArgEntries = [];
+                            $this->initClosureCall($frame, $closureState);
                             break;
                         }
                         $this->initMethodCall($frame, $callee, '__invoke');
@@ -754,8 +763,11 @@ restart:
                         $frame->callArgEntries = [];
                         break;
                     }
-                    $new = $frame->call->getFrame($this->context, $frame);
-                    $this->bindClosureCallCaptures($new, $frame->closureCall);
+                    $new = $frame->call->getFrame(
+                        $this->context,
+                        !empty($frame->callArgs) ? $frame : null
+                    );
+                    $this->applyClosureBinding($new, $frame->closureCall);
                     $frame->closureCall = null;
                     $new->calledClass = $this->inferCalledClass($frame);
                     $new->returnVar = null;
@@ -1795,6 +1807,48 @@ restart:
         }
     }
 
+    protected function initClosureCall(Frame $frame, ClosureState $state): void
+    {
+        if (null !== $state->methodName && null !== $state->methodReceiver) {
+            if (null !== $state->boundScopeClass && '' !== $state->boundScopeClass) {
+                $frame->calledClass = $state->boundScopeClass;
+            }
+            $this->initMethodCall($frame, $state->methodReceiver, $state->methodName);
+            $frame->closureCall = null;
+
+            return;
+        }
+        if (null !== $state->wrappedFunc) {
+            $frame->call = $state->wrappedFunc;
+            $frame->closureCall = null;
+            $frame->callArgs = [];
+            $frame->callArgEntries = [];
+
+            return;
+        }
+        $frame->call = $state->func;
+        $frame->closureCall = $state;
+        $frame->callArgs = [];
+        $frame->callArgEntries = [];
+    }
+
+    protected function applyClosureBinding(Frame $callee, ?ClosureState $closureState): void
+    {
+        $this->bindClosureCallCaptures($callee, $closureState);
+        if (null === $closureState) {
+            return;
+        }
+        if (null !== $closureState->boundThis) {
+            $thisIdx = $closureState->func->block->slotIndexForVariableName('this');
+            if (null !== $thisIdx) {
+                $callee->scope[$thisIdx] = $closureState->boundThis;
+            }
+        }
+        if (null !== $closureState->boundScopeClass && '' !== $closureState->boundScopeClass) {
+            $callee->calledClass = $closureState->boundScopeClass;
+        }
+    }
+
     protected function resolveStaticClassName(string $className, Frame $frame): string
     {
         return $this->resolveClassScopeName($className, $frame);
@@ -1866,10 +1920,7 @@ restart:
         $methodLc = strtolower($methodName);
         $object = $receiver->toObject();
         if (null !== $object->closureState && '__invoke' === $methodLc) {
-            $frame->call = $object->closureState->func;
-            $frame->closureCall = $object->closureState;
-            $frame->callArgs = [];
-            $frame->callArgEntries = [];
+            $this->initClosureCall($frame, $object->closureState);
 
             return;
         }
@@ -1881,6 +1932,9 @@ restart:
         $callerClassLc = null;
         if (null !== $frame->block->func && null !== $frame->block->func->class) {
             $callerClassLc = strtolower($frame->block->func->class->value);
+        }
+        if (null === $callerClassLc && null !== $frame->calledClass && '' !== $frame->calledClass) {
+            $callerClassLc = strtolower($frame->calledClass);
         }
         MethodVisibility::assertCallable(
             $vis,
