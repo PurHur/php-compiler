@@ -2285,7 +2285,6 @@ class Object_ extends Type {
                     Variable::KIND_VARIABLE,
                     $slot
                 );
-<<<<<<< HEAD
             case Variable::TYPE_HASHTABLE:
                 if (!isset($entry['vmTable']) || !$entry['vmTable'] instanceof \PHPCompiler\VM\HashTable) {
                     throw new \LogicException('Missing VM table for class constant array');
