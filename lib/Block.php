@@ -320,6 +320,17 @@ class Block {
         return null;
     }
 
+    public function operandForScopeSlot(int $slot): ?Operand
+    {
+        foreach ($this->scope as $operand) {
+            if ($this->scope[$operand] === $slot) {
+                return $operand;
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Resolve a local by runtime name for variable variables (`$$name`, issue #1226).
      */

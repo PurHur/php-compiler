@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * JIT lowering for anonymous closures without use() (issue #72).
+ * JIT lowering for anonymous closures with and without use() (issue #72).
  *
  * @group llvm
  */
@@ -26,17 +26,51 @@ final class ClosureJitCompileTest extends TestCase
         }
     }
 
-    public function testClosureSimpleModuleVerifies(): void
+    public function testClosureModuleVerify(): void
     {
-        $code = $this->fixtureCode('closure_simple.phpt');
         $runtime = new Runtime();
-        $block = $runtime->parseAndCompile($code, 'closure_simple.phpt');
-        $runtime->jitCompileBlock($block);
+        foreach (['closure_simple.phpt', 'closure_use.phpt'] as $file) {
+            $block = $runtime->parseAndCompile($this->fixtureCode($file), $file);
+            $runtime->jitCompileBlock($block);
+        }
 
         $context = $runtime->loadJitContext();
         $verify = new \ReflectionMethod($context, 'compileCommon');
         $verify->setAccessible(true);
         $verify->invoke($context);
+    }
+
+    public function testBinJitRunClosureUseInline(): void
+    {
+        if (!$this->jitProbeOk()) {
+            $this->markTestSkipped('JIT MCJIT probe failed — bin/jit.php not runnable (#72)');
+        }
+        $jit = realpath($this->repoRoot.'/bin/jit.php');
+        if (false === $jit) {
+            $this->markTestSkipped('bin/jit.php missing');
+        }
+        $code = '$n = 10; $f = function($x) use ($n) { return $x + $n; }; echo $f(5), "\n"; $n = 99; echo $f(5), "\n";';
+        $env = $this->llvmProcessEnv();
+        $cmd = array_merge(
+            LlvmToolchain::envPrefix($this->repoRoot),
+            [PHP_BINARY, $jit, '-r', $code]
+        );
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $this->repoRoot, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $combined = trim(($stdout !== false ? $stdout : '').($stderr !== false ? $stderr : ''));
+        $this->assertSame(0, $exit, $combined);
+        $this->assertStringContainsString('15', $combined);
     }
 
     public function testBinJitRunClosureInline(): void
@@ -112,9 +146,7 @@ final class ClosureJitCompileTest extends TestCase
         return 0 === proc_close($proc);
     }
 
-    /**
-     * @return array<string, string>
-     */
+    /** @return array<string, string> */
     private function llvmProcessEnv(): array
     {
         $env = $_ENV;
