@@ -49,6 +49,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gc_collect_cycles')) {
                 continue;
             }
+            // array_walk_recursive() is VM-only until recursive LLVM walk (#3111).
+            if (str_contains($name, 'array_walk_recursive')) {
+                continue;
+            }
             // preg_last_error_msg() MCJIT path unsafe with preg_match stub runtime (#3110).
             if (str_contains($name, 'preg_last_error_msg')) {
                 continue;

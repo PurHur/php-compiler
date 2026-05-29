@@ -43,6 +43,7 @@ static const char *phpc_builtin_functions[] = {
     "array_unshift",
     "array_values",
     "array_walk",
+    "array_walk_recursive",
     "atan2",
     "base64_decode",
     "base64_encode",
