@@ -753,3 +753,124 @@ tr:last-child td {
 .demo-disclaimer strong {
   color: var(--php-amber);
 }
+
+/* Index — production sections */
+.callout {
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.2rem;
+  background: rgba(119, 123, 180, 0.1);
+  border: 1px solid rgba(119, 123, 180, 0.35);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.callout strong {
+  color: var(--text);
+}
+
+.callout--stable {
+  border-color: rgba(107, 203, 119, 0.35);
+  background: rgba(107, 203, 119, 0.08);
+}
+
+.backend-grid {
+  display: grid;
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+
+@media (min-width: 700px) {
+  .backend-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.backend-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.2rem;
+}
+
+.backend-card h4 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  color: #fff;
+}
+
+.backend-card code {
+  font-size: 0.82rem;
+  color: var(--php-accent);
+}
+
+.backend-card p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.flow-diagram {
+  margin: 1.25rem 0 0;
+  padding: 1rem 1.15rem;
+  background: #12121f;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.feature-columns {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 1.25rem;
+}
+
+@media (min-width: 800px) {
+  .feature-columns {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.feature-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.2rem 1.35rem;
+}
+
+.feature-panel h4 {
+  margin: 0 0 0.65rem;
+  font-size: 0.95rem;
+  color: var(--php-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.feature-panel ul {
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.feature-panel li {
+  margin-bottom: 0.35rem;
+}
+
+.lineage-table td:first-child {
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  width: 9rem;
+}
+
+.site-footer .footer-meta {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin-top: 0.5rem;
+}

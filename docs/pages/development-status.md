@@ -5,7 +5,7 @@ description: High-level snapshot of php-compiler — VM, AOT web apps, and self-
 permalink: /development-status.html
 ---
 
-*Last updated: 29 May 2026 (`master` @ 03c44c5f) · Tracker: [#1492](https://github.com/PurHur/php-compiler/issues/1492) · Roadmap: [#78](https://github.com/PurHur/php-compiler/issues/78)*
+*Last updated: 29 May 2026 (`master` @ 84cd4246) · Tracker: [#1492](https://github.com/PurHur/php-compiler/issues/1492) · Roadmap: [#78](https://github.com/PurHur/php-compiler/issues/78)*
 
 ## At a glance
 
@@ -47,7 +47,7 @@ permalink: /development-status.html
 
 **Critical path:** native `bin/compile.php` emit (full revision probe) → retire Zend on empty `build/` bootstrap ([#1416](https://github.com/PurHur/php-compiler/issues/1416), [#1492](https://github.com/PurHur/php-compiler/issues/1492)).
 
-**Verified 29 May 2026** (`master` @ 03c44c5f, Docker `php-compiler:22.04-dev`, LLVM 9): `bootstrap-loop-gen2-recompile-spine` (gen-3 **726/726**, no Zend on compile); `bootstrap-selfhost-full-revision-probe` (inventory argv `bin/compile.php` → gen-3); `north-star5-verify` (vendor **3/3**, committed `.o` cold boot).
+**Verified 29 May 2026** (`master` @ 84cd4246, Docker `php-compiler:22.04-dev`, LLVM 9): `bootstrap-loop-gen2-recompile-spine` (gen-3 **726/726**, no Zend on compile); `bootstrap-selfhost-full-revision-probe` (inventory argv `bin/compile.php` → gen-3); `north-star5-verify` (vendor **3/3**, committed `.o` cold boot).
 
 Contributor detail: [`docs/self-host-target.md`](https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md), [`docs/bootstrap-generations.md`](https://github.com/PurHur/php-compiler/blob/master/docs/bootstrap-generations.md), [`docs/bootstrap-selfhost.md`](https://github.com/PurHur/php-compiler/blob/master/docs/bootstrap-selfhost.md).
 
