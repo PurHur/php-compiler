@@ -35,7 +35,11 @@ function syntaxRowDefinitions(): array
             'construct' => 'Anonymous class `new class { }`',
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_NEW', 'TYPE_METHODCALL_INIT'],
             'issue' => 1233,
-            'notes' => ['php-cfg inline Stmt\\Class_ in parseExpr_New; synthetic AnonymousClass@line name'],
+            'aot' => true,
+            'notes' => [
+                'php-cfg inline Stmt\\Class_ in parseExpr_New; synthetic AnonymousClass@line name',
+                'AOT: user AnonymousClass@* methods lowered when PHP_COMPILER_SELFHOST_AOT=1 (#3098)',
+            ],
             'probe' => '$o = new class { public function f(): int { return 42; } }; echo $o->f();',
         ],
         [

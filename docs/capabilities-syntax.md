@@ -10,7 +10,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Construct | VM | JIT | AOT | Issue | Notes |
 |-----------|:--:|:---:|:---:|-------|-------|
 | `class` / `new` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
-| Anonymous class `new class { }` | yes | yes | yes | [#1233](https://github.com/PurHur/php-compiler/issues/1233) | php-cfg inline Stmt\Class_ in parseExpr_New; synthetic AnonymousClass@line name |
+| Anonymous class `new class { }` | yes | yes | yes | [#1233](https://github.com/PurHur/php-compiler/issues/1233) | php-cfg inline Stmt\Class_ in parseExpr_New; synthetic AnonymousClass@line name; AOT: user AnonymousClass@* methods lowered when PHP_COMPILER_SELFHOST_AOT=1 (#3098) |
 | Enum declarations `enum Foo: string { case Bar = 'x'; }` | yes | yes | yes | [#1356](https://github.com/PurHur/php-compiler/issues/1356) | Backed enum case objects with `->name` / `->value`; string context coerces to backed scalar (#3518); `Foo::Bar` singleton fetch; `enum_exists` registry; `implements` interface list + instance methods + `instanceof` (#3373); static methods (#2299); `Enum::cases()` VM (#3308) |
 | Abstract enum `abstract enum E { case A; }` | yes | yes | yes | [#3737](https://github.com/PurHur/php-compiler/issues/3737) | Source rewriter + php-cfg flags; `new E()` fatals; case fetch works on VM |
 | Instance methods (`ClassMethod` / `Expr_MethodCall`) | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | MiniWebApp `$router->dispatch()` (#2059); compliance PHPT; bootstrap AOT |

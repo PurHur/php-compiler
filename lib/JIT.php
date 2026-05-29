@@ -360,33 +360,49 @@ class JIT {
 
     private function shouldSkipExternalClassBodyLowering(int $classId): bool
     {
-        if ($this->shouldUseEmitHelperLinkStubs()
-            || $this->shouldUseM3EmitTuNativeBridge()
-            || $this->shouldUseVendorPrelinkJitStubs()
-            || $this->isBundledSuperglobalsClass($classId)
-        ) {
+        if ($this->isBundledSuperglobalsClass($classId)) {
             return true;
         }
         $className = strtolower($this->context->type->object->classNameForId($classId));
         if ('' === $className) {
-            return false;
+            return $this->shouldUseSelfHostJitStubs()
+                || $this->shouldUseEmitHelperLinkStubs()
+                || $this->shouldUseM3EmitTuNativeBridge()
+                || $this->shouldUseVendorPrelinkJitStubs();
         }
-
-        if (str_starts_with($className, 'phpcfg\\')
-            || str_starts_with($className, 'phptypes\\')
-            || str_starts_with($className, 'phpllvm\\')
-            || str_starts_with($className, 'nikic\\')
+        if ($this->isBundledJitExternalClassPrefix($className)) {
+            return true;
+        }
+        if ($this->shouldUseEmitHelperLinkStubs()
+            || $this->shouldUseM3EmitTuNativeBridge()
+            || $this->shouldUseVendorPrelinkJitStubs()
         ) {
             return true;
         }
-
-        // Self-host AOT skips compiler/runtime spine classes only — user script classes
-        // (e.g. property-hook fixtures) still need method lowering (#3723).
+        // bin/compile.php sets PHP_COMPILER_SELFHOST_AOT=1 for LLVM stability (#2600), but user
+        // script classes (including synthetic AnonymousClass@line) still need method lowering (#3098).
         if ($this->shouldUseSelfHostJitStubs()) {
-            return str_starts_with($className, 'phpcompiler\\');
+            return $this->isSelfHostBundledClassPrefix($className);
         }
 
         return false;
+    }
+
+    private function isBundledJitExternalClassPrefix(string $classLc): bool
+    {
+        return str_starts_with($classLc, 'phpcfg\\')
+            || str_starts_with($classLc, 'phptypes\\')
+            || str_starts_with($classLc, 'phpllvm\\')
+            || str_starts_with($classLc, 'nikic\\');
+    }
+
+    private function isSelfHostBundledClassPrefix(string $classLc): bool
+    {
+        return $this->isBundledJitExternalClassPrefix($classLc)
+            || str_starts_with($classLc, 'phpcompiler\\')
+            || 'compiler' === $classLc
+            || 'runtime' === $classLc
+            || str_starts_with($classLc, 'ircmaxell\\');
     }
 
     /** Opt-in when linking test/selfhost compile_driver.php bundles (#1056, #1768). */
