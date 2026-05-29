@@ -5698,6 +5698,10 @@ class JIT {
                             $this->context->scope->classId,
                             $parentOp->value
                         );
+                        $this->context->type->object->inheritMethodVisibilityFromParent(
+                            $this->context->scope->classId,
+                            $this->context->scope->className
+                        );
                     }
                     if ([] !== $op->classImplements) {
                         $this->context->type->object->setClassInterfaces(
@@ -5738,6 +5742,7 @@ class JIT {
                         );
                         $resultOp = $block->getOperand($op->arg1);
                         $this->assignOperand($resultOp, $obj, true);
+                        $resultOp->type = new Type(Type::TYPE_OBJECT, [], $resolvedName);
                         if ($classOp instanceof Operand\Literal
                             && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'ReflectionClass')
                         ) {
@@ -7607,7 +7612,9 @@ class JIT {
             }
         }
 
-        $declaringClassId = $this->context->type->object->lookup($className);
+        $proxyName = $this->resolveJitInstanceMethodProxyName($declaringClassLc, $methodLc);
+        $resolvedClassLc = strstr($proxyName, '::', true) ?: $declaringClassLc;
+        $declaringClassId = $this->context->type->object->lookup($resolvedClassLc);
         $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
         $callerClassLc = null;
         if (null !== $block->func && null !== $block->func->class) {
@@ -7618,13 +7625,36 @@ class JIT {
         MethodVisibility::assertCallable(
             $visFlags,
             $callerClassLc,
-            $declaringClassLc,
+            $resolvedClassLc,
             $className,
             $methodName
         );
-        $proxyName = $declaringClassLc.'::'.$methodLc;
         $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
         $this->context->scope->args = [$this->context->getVariableFromOp($receiverOp)];
+    }
+
+    /**
+     * Resolve lowered instance method proxy, walking extends chain (#101, Zend zend_inheritance).
+     */
+    private function resolveJitInstanceMethodProxyName(string $classLc, string $methodLc): string
+    {
+        $methodLc = strtolower($methodLc);
+        $visited = [];
+        $current = strtolower(ltrim($classLc, '\\'));
+        while (!isset($visited[$current])) {
+            $visited[$current] = true;
+            $proxy = $current.'::'.$methodLc;
+            if ($this->context->functionIsRegistered($proxy)) {
+                return $proxy;
+            }
+            $parent = $this->context->type->object->parentClassLc($current);
+            if (null === $parent) {
+                break;
+            }
+            $current = $parent;
+        }
+
+        return strtolower(ltrim($classLc, '\\')).'::'.$methodLc;
     }
 
     private function initJitStaticCall(Block $block, int $classOpIdx, int $nameOpIdx): void
