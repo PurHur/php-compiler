@@ -27,6 +27,7 @@ use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\Ast\GroupUseStripper;
 use PHPCompiler\Ast\SealedClassAnnotator;
 use PHPCompiler\Ast\SealedClassPreprocessor;
+use PHPCompiler\Ast\PipeOperatorDesugar;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Lint\LintCompiler;
 use PHPCompiler\VM\ShutdownQueue;
@@ -219,6 +220,7 @@ class Runtime {
     public function parse(string $code, string $filename): Script {
         [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code);
         $this->compiler->setBareRethrowLines($bareRethrowLines);
+        $code = PipeOperatorDesugar::desugar($code);
         try {
             $script = $this->parser->parse($code, $filename);
         } finally {

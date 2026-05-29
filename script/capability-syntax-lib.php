@@ -480,6 +480,17 @@ function syntaxRowDefinitions(): array
             'probe' => '$fn = strlen(...); echo $fn("x");',
         ],
         [
+            'id' => 'pipe_operator',
+            'construct' => 'PHP 8.4+ pipe operator (`|>`)',
+            'opcodes' => ['TYPE_FUNCCALL_INIT', 'TYPE_FUNCCALL_EXEC_RETURN'],
+            'issue' => 3243,
+            'notes' => [
+                'Ast\\PipeOperatorDesugar before php-parser (#3243); lowers $lhs |> f(...) to f($lhs, ...)',
+                'Zend/zend_compile.c pipe expression; requires first-class callable (#1363)',
+            ],
+            'probe' => 'echo "hi" |> strtoupper(...);',
+        ],
+        [
             'id' => 'use_function_const_import',
             'construct' => '`use function` / `use const` imports',
             'opcodes' => ['TYPE_FUNCCALL_INIT', 'TYPE_CONST_FETCH'],
