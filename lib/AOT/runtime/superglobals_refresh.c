@@ -2198,3 +2198,31 @@ void __compiler_trigger_error(const char *message, size_t len, int level)
         abort();
     }
 }
+
+/** assert() failure with C string message (issue #3157; ext/standard/assert.c). */
+void __compiler_assert_fail(const char *message, size_t len)
+{
+    if (!message || 0 == len) {
+        __compiler_trigger_error("assert(): assert(false) failed", 29, 512);
+
+        return;
+    }
+    __compiler_trigger_error(message, len, 512);
+}
+
+/** assert() failure with runtime PHP string description. */
+void __compiler_assert_fail_string(__string__ *description)
+{
+    char buf[4096];
+    const char *prefix = "Assertion failed: ";
+    const size_t prefix_len = 19;
+    const char *desc = nf_strdata(description);
+    size_t desc_len = nf_strlen(description);
+    if (desc_len >= sizeof(buf) - prefix_len - 1) {
+        desc_len = sizeof(buf) - prefix_len - 2;
+    }
+    memcpy(buf, prefix, prefix_len);
+    memcpy(buf + prefix_len, desc, desc_len);
+    buf[prefix_len + desc_len] = '\0';
+    __compiler_assert_fail(buf, prefix_len + desc_len);
+}

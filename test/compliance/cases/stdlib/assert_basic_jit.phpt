@@ -1,0 +1,14 @@
+--TEST--
+Stdlib: assert() — pass and fail with warning (JIT, #3157)
+--FILE--
+<?php
+echo function_exists('assert') ? "1\n" : "0\n";
+echo assert(true) ? "1\n" : "0\n";
+@assert(false, 'boom');
+echo assert(false) ? "1\n" : "0\n";
+echo "ok\n";
+--EXPECT--
+1
+1
+0
+ok
