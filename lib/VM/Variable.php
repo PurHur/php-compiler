@@ -449,9 +449,13 @@ final class Variable {
     }
 
     public function object(ObjectEntry $value): void {
+        if (self::TYPE_OBJECT === $this->type && $this->object->id === $value->id) {
+            return;
+        }
         $this->reset();
         $this->type = self::TYPE_OBJECT;
         $this->object = $value;
+        ObjectLifetime::addRef($value);
     }
 
     public function enumCase(EnumCaseEntry $value): void
@@ -490,6 +494,9 @@ final class Variable {
     }
 
     public function reset(): void {
+        if (self::TYPE_OBJECT === $this->type) {
+            ObjectLifetime::releaseRef($this->object);
+        }
         $this->releaseArrayRef();
         $this->resetScalars();
         $this->type = self::TYPE_NULL;
