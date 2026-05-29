@@ -431,6 +431,13 @@ function bootstrapVendorPrelinkCompilePackages(
             fwrite(STDOUT, "OK {$package} → {$objectRel}\n");
             continue;
         }
+        if (0 === $code && !is_file($objectCandidate) && is_file($buildBase.'.o')) {
+            copy($buildBase.'.o', $objectAbs);
+            $manifest['packages'][$package]['status'] = 'object_ok';
+            $manifest['packages'][$package]['blocker'] = null;
+            fwrite(STDOUT, "OK {$package} → {$objectRel} (native compile)\n");
+            continue;
+        }
 
         $sidecarSource = bootstrapVendorPrelinkCopySidecarFallback($root, $slug, $objectAbs);
         if (null !== $sidecarSource) {

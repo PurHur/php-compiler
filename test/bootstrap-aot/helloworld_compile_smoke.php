@@ -37,6 +37,11 @@ function helloworld_compile_smoke(string $sourceFile, string $outFile): int
         if (false === $m3CompileDriverMain || '' === $m3CompileDriverMain) {
             putenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1');
         }
+        $vendorPrelink = getenv('PHP_COMPILER_VENDOR_PRELINK');
+        if ('1' === $vendorPrelink || 'true' === strtolower((string) $vendorPrelink)) {
+            putenv('PHP_COMPILER_KEEP_OBJECT_FILE=1');
+            putenv('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1');
+        }
     }
     if (!is_file($sourceFile)) {
         echo 'helloworld_compile_smoke: missing source '.$sourceFile."\n";
