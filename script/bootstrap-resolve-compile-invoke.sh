@@ -9,6 +9,7 @@
 #
 # Opt-out / bisect:
 #   BOOTSTRAP_GEN0_ZEND_ONLY=1  — always php bin/compile.php (requires php on PATH)
+#   BOOTSTRAP_M5_NO_ZEND=1       — refuse Zend fallback (implies BOOTSTRAP_NO_ZEND_FALLBACK=1)
 set -euo pipefail
 
 BOOTSTRAP_COMPILE_DRIVER_MODE=""
@@ -139,12 +140,6 @@ bootstrap_resolve_compile_driver() {
     return 1
   fi
 
-  if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" ]]; then
-    # shellcheck source=bootstrap-gen0-seed.sh
-    source "$(dirname "$0")/bootstrap-gen0-seed.sh"
-    bootstrap_gen0_seed_install || true
-  fi
-
   if [[ "${BOOTSTRAP_GEN0_ZEND_ONLY:-0}" == "1" ]]; then
     BOOTSTRAP_COMPILE_DRIVER_MODE=zend
     BOOTSTRAP_COMPILE_DRIVER="${root}/bin/compile.php"
@@ -206,7 +201,7 @@ bootstrap_compile_invoke() {
   printf '%s' "${entry}" > "${PHP_COMPILER_JIT_ENTRY_FILE}" 2>/dev/null || true
 
   local no_zend_fallback=0
-  if [[ "${BOOTSTRAP_NO_ZEND_FALLBACK:-0}" == "1" ]]; then
+  if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" || "${BOOTSTRAP_NO_ZEND_FALLBACK:-0}" == "1" ]]; then
     no_zend_fallback=1
   fi
 

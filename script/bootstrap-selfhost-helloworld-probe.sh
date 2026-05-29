@@ -16,7 +16,8 @@ COMPILE_DRIVER_BIN="${ROOT}/build/selfhost-helloworld-compile"
 COMPILE_ENTRY="${ROOT}/test/bootstrap-aot/helloworld_compile_m3_emit_native_entry.php"
 EMIT_ENTRY="${ROOT}/test/bootstrap-aot/helloworld_m3_emit_native_entry.php"
 INVENTORY_EMIT_DRIVER="${ROOT}/test/selfhost/compiler_helloworld_smoke/compile_driver.php"
-USE_INVENTORY_EMIT_DRIVER="${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER:-1}"
+# Inventory compile_driver as emit-helper link OK but runtime segfaults at {main} (#2540); thin emit TU works.
+USE_INVENTORY_EMIT_DRIVER="${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER:-0}"
 M3_NATIVE_COMPILE=0
 M3_EMIT_PATH="none"
 M3_EMIT_HELPER_LINKED=0
@@ -64,9 +65,8 @@ if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT:-0}" == "1" ]]; then
   export BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1
   export BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1
   export BOOTSTRAP_M3_RUNTIME_COMPILE="${BOOTSTRAP_M3_RUNTIME_COMPILE:-1}"
-  # Prefer the inventory compile driver when available: it avoids the heavier
-  # "emit helper TU" path and makes strict HelloWorld more reliable under memory caps.
-  USE_INVENTORY_EMIT_DRIVER="${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER:-1}"
+  # Opt-in inventory compile_driver link (argv gen-2 driver); default emit-helper TU (#2540).
+  USE_INVENTORY_EMIT_DRIVER="${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER:-0}"
 fi
 
 m3_exit_label() {
@@ -162,7 +162,13 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
     echo "bootstrap-selfhost-helloworld-probe: native emit helper link OK (${EMIT_HELPER}, ${m3_link_mode})"
     if [[ "${BOOTSTRAP_M3_RUNTIME_COMPILE:-1}" == "1" ]]; then
       set +e
-      m3_run_env=(PHP_COMPILER_M3_EMIT_MINIMAL=1 PHP_COMPILER_M3_SOURCE="${SOURCE}" PHP_COMPILER_M3_OUT="${AOT_OUT}")
+      m3_run_env=(
+        PHP_COMPILER_M3_COMPILE_MODE=compile
+        PHP_COMPILER_M3_RUNTIME_COMPILE=1
+        PHP_COMPILER_M3_EMIT_MINIMAL=1
+        PHP_COMPILER_M3_SOURCE="${SOURCE}"
+        PHP_COMPILER_M3_OUT="${AOT_OUT}"
+      )
       if [[ "${USE_INVENTORY_EMIT_DRIVER}" == "1" ]]; then
         m3_run_env+=(PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1)
       fi

@@ -319,6 +319,17 @@ class JIT {
         return '1' === $selfhost || 'true' === strtolower((string) $selfhost);
     }
 
+    /** Gen-0 argv driver + self-host link: real-lower standalone when not vendor-prelink (#3053). */
+    private function shouldUseSelfHostExecutableEmit(): bool
+    {
+        if ($this->shouldUseVendorPrelinkJitStubs()) {
+            return false;
+        }
+        $selfhost = getenv('PHP_COMPILER_SELFHOST_AOT');
+
+        return '1' === $selfhost || 'true' === strtolower((string) $selfhost);
+    }
+
     private function shouldSkipExternalClassBodyLowering(int $classId): bool
     {
         if ($this->shouldUseSelfHostJitStubs()
@@ -1295,7 +1306,8 @@ class JIT {
         if (!$this->shouldUseM3CompileDriverRealLowering()) {
             if ($this->shouldUseM3EmitTuEmitHelperSpineRealLowering()) {
                 $emitHelperSpineReal = ['parse', 'compileemitsmoke'];
-                if ($this->shouldUseVendorPrelinkExecutableEmit()) {
+                if ($this->shouldUseVendorPrelinkExecutableEmit()
+                    || $this->shouldUseSelfHostExecutableEmit()) {
                     $emitHelperSpineReal = ['parse', 'compile', 'standalone'];
                 }
 

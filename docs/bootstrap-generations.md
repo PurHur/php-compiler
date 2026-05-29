@@ -10,7 +10,7 @@ This document is the **canonical reference** for generation numbering, artifacts
 
 | Gen | Built by | Artifact | What it proves |
 |-----|----------|----------|----------------|
-| **0** | Zend `php bin/compile.php` **or** committed `prelinked/bootstrap-gen0/bin-compile-aot` | `build/selfhost-helloworld-compile`, emit helpers | M3 emit TU links; `BOOTSTRAP_M5_NO_ZEND=1` uses prelinked gen-0 driver only ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) |
+| **0** | Committed `prelinked/bootstrap-gen0/bin-compile-aot` or Zend `php bin/compile.php` | `build/bin-compile-aot`, `build/selfhost-helloworld-compile`, emit helpers | M3 emit TU links; `BOOTSTRAP_M5_NO_ZEND=1` installs prelinked argv driver + `compiler_minimal` sidecar without Zend ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) |
 | **1** | Gen-0 emit helper | `build/bootstrap-loop-gen1-compile` | Native compile driver (M3 bridge) is linkable |
 | **2 (smoke)** | Gen-1 emit helper | `build/bootstrap-loop-gen2` | Gen-1 **native-emits** a smoke fixture (`compiler smoke`) |
 | **2 (spine)** | Gen-1 full-spine emit | `build/bootstrap-loop-gen2-full-spine` | Gen-1 **native-emits** the **726/726** spine bundle |
@@ -36,8 +36,7 @@ This document is the **canonical reference** for generation numbering, artifacts
 | Priority | Artifact | When used |
 |----------|----------|-----------|
 | 1 | `build/selfhost-compile-driver` | M5 host-linked `bin/compile.php` (optional) |
-| 2 | `build/bin-compile-aot` | After `make bootstrap-selfhost-driver-smoke` — argv driver + M0 `compiler_minimal` sidecar |
-| 2b | `prelinked/bootstrap-gen0/bin-compile-aot` | Committed gen-0 seed; `script/bootstrap-gen0-seed.sh` copies into `build/` ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) |
+| 2 | `build/bin-compile-aot` | `bootstrap-gen0-install-prelinked-driver.sh` on empty `build/` ([#3053](https://github.com/PurHur/php-compiler/issues/3053)); or after `make bootstrap-selfhost-driver-smoke` |
 | 3 | `build/selfhost-native-compile-driver` | Emit-helper alias (same bytes as `bin-compile-aot`; last resort) |
 | — | Zend `php bin/compile.php` | Empty `build/` when seed not used; `BOOTSTRAP_M5_NO_ZEND=1` forbids Zend |
 

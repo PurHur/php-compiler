@@ -23,6 +23,19 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringNotContainsString('apply-patches.sh" >/dev/null', $script);
     }
 
+    public function testLinkScriptInstallsPrelinkedGen0Driver(): void
+    {
+        $link = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-link.sh');
+        $this->assertStringContainsString('bootstrap-gen0-install-prelinked-driver.sh', $link);
+        $this->assertStringContainsString('bootstrap_gen0_install_prelinked_driver', $link);
+        $this->assertStringContainsString('BOOTSTRAP_M5_NO_ZEND', $link);
+        $install = (string) file_get_contents(self::$root.'/script/bootstrap-gen0-install-prelinked-driver.sh');
+        $this->assertStringContainsString('prelinked/bootstrap-gen0/bin-compile-aot', $install);
+        $this->assertStringContainsString('compiler_minimal_aot_blob', $install);
+        $this->assertFileExists(self::$root.'/prelinked/bootstrap-gen0/bin-compile-aot');
+        $this->assertFileExists(self::$root.'/prelinked/bootstrap-gen0/compiler_minimal_aot_blob');
+    }
+
     public function testLinkScriptUsesCompiledDriverResolver(): void
     {
         $link = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-link.sh');
@@ -44,6 +57,7 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertLessThan($nativeAliasPos, $argvPos, 'prefer bin-compile-aot before emit-helper alias (#2894)');
         $this->assertStringContainsString('failed (exit', $body);
         $this->assertStringContainsString('falling back to Zend gen-0', $body);
+        $this->assertStringContainsString('BOOTSTRAP_M5_NO_ZEND', $body);
     }
 
     public function testNativeLinkScriptPrintsBundleOkWhenLlvmPresent(): void

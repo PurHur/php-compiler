@@ -108,10 +108,10 @@ function helloworld_compile_smoke(string $sourceFile, string $outFile): int
     $vendorPrelink = $envTruthy('PHP_COMPILER_VENDOR_PRELINK');
     $keepObject = $envTruthy('PHP_COMPILER_KEEP_OBJECT_FILE');
     $selfhostAot = $envTruthy('PHP_COMPILER_SELFHOST_AOT');
-    // Vendor .o rebuild (#3036) or spine link with prelinked vendor objects (#3052).
+    // Vendor .o rebuild (#3036), spine link with prelinked vendor (#3052), or gen-0 argv driver (#3053).
     $vendorPrelinkEmit = $vendorPrelink && ($keepObject || $selfhostAot);
-    if ($vendorPrelinkEmit) {
-        // Inventory driver stubs Runtime::standalone (sidecar copy). Emit via compileToFile (#3036, #3052).
+    if ($vendorPrelinkEmit || $selfhostAot) {
+        // Inventory driver stubs Runtime::standalone (sidecar copy). Emit via compileToFile (#3036, #3052, #3053).
         $jit = $runtime->loadJit();
         $context = $runtime->loadJitContext();
         $context->setMain($jit->compile($block));
