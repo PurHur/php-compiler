@@ -108,6 +108,53 @@ final class VmReflection
         throw new \LogicException('property_exists() expects an object or class name string in this compiler build');
     }
 
+    /**
+     * class_uses() operand — string or object; optional autoload (#3119).
+     *
+     * php-src: ext/standard/spl_functions.c — PHP_FUNCTION(class_uses)
+     */
+    public static function resolveClassForClassUses(Context $ctx, Variable $arg, bool $autoload): ?ClassEntry
+    {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            return $arg->toObject()->class;
+        }
+        if (Variable::TYPE_STRING !== $arg->type) {
+            return null;
+        }
+        $className = $arg->toString();
+        $lc = strtolower(ltrim($className, '\\'));
+        if (isset($ctx->classes[$lc])) {
+            return $ctx->classes[$lc];
+        }
+        if (!$autoload) {
+            return null;
+        }
+        $ctx->autoloadClass($className);
+
+        return $ctx->classes[$lc] ?? null;
+    }
+
+    /** @return array<string, string> trait name => trait name (Zend class_uses map) */
+    public static function traitUsesMap(ClassEntry $class): array
+    {
+        return $class->usedTraits;
+    }
+
+    public static function classUsesArray(ClassEntry $class): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (self::traitUsesMap($class) as $traitName) {
+            $value = new Variable();
+            $value->string($traitName);
+            $ht->add($traitName, $value);
+        }
+
+        return $result;
+    }
+
     public static function resolveClassFromArg(Context $ctx, Variable $arg): ClassEntry
     {
         $arg = $arg->resolveIndirect();

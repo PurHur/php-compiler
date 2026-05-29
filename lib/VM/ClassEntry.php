@@ -29,6 +29,8 @@ class ClassEntry {
     public bool $isInterface = false;
     /** True for `trait` declarations (#2312). */
     public bool $isTrait = false;
+    /** @var array<string, string> trait FQCN => FQCN from direct `use Trait;` (#3119) */
+    public array $usedTraits = [];
     /** @var list<string> */
     public array $interfaces = [];
     /** User method or VM builtin handler (issues #1360, #1366). */

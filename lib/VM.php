@@ -1994,6 +1994,7 @@ restart:
         if (!$trait->isTrait) {
             throw new \LogicException("{$traitName} is not a trait");
         }
+        $entry->usedTraits[$trait->name] = $trait->name;
         foreach ($trait->methods as $name => $method) {
             if (!isset($entry->methods[$name])) {
                 $entry->methods[$name] = $method;
