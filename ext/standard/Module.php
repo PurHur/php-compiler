@@ -336,6 +336,7 @@ class Module extends ModuleAbstract
             new compact_(),
             new scandir(),
             new glob_(),
+            new fnmatch(),
             new time(),
             new getmypid(),
             new microtime(),
