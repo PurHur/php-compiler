@@ -72,7 +72,7 @@ print_segfault_context() {
 # a different `build/bin-compile-aot` (inventory bin/compile.php) which can segfault on
 # spine-scale sources (#2930).
 if [[ "${BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT:-0}" != "1" ]]; then
-  EMIT_ENTRY="${ROOT}/test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php"
+  EMIT_ENTRY="${ROOT}/test/selfhost/compiler_helloworld_smoke/compile_driver.php"
   rm -f "${DRIVER}"
   _driver_debug_env=()
   if [[ "${BOOTSTRAP_DEBUG:-0}" == "1" || "${-}" == *x* ]]; then

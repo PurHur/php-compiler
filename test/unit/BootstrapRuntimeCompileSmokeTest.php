@@ -85,7 +85,7 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $script = self::$root.'/script/bootstrap-selfhost-runtime-compile-smoke.sh';
         $source = (string) file_get_contents($script);
         $this->assertStringContainsString('BOOTSTRAP_M3_LINK_COMPILE_DRIVER', $source);
-        $this->assertStringContainsString('runtime_m3_emit_native_entry.php', $source);
+        $this->assertStringContainsString('runtime_compile_smoke/compile_driver.php', $source);
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER=1', $source);
         $this->assertStringContainsString('runtime_compile_smoke_m3_emit', $source);
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
@@ -100,7 +100,7 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
     public function testCompilePhpPreservesSelfhostAotForRuntimeM3NativeEmitEntry(): void
     {
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
-        $this->assertStringContainsString('runtime_m3_emit_native_entry.php', $compile);
+        $this->assertStringContainsString('runtime_compile_smoke/compile_driver.php', $compile);
         $this->assertStringContainsString('PHP_COMPILER_EMIT_HELPER_LINK=1', $compile);
         $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_TU=1', $compile);
         $probe = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-runtime-compile-smoke.sh');

@@ -227,7 +227,7 @@ final class Doctor
         fwrite(STDOUT, "   BOOTSTRAP_RUNTIME_COMPILE_SMOKE_STRICT_GATE=".(self::gateEnabled('BOOTSTRAP_RUNTIME_COMPILE_SMOKE_STRICT_GATE', $runtimeSmokeStrictDefault) ? '1' : '0')." (default {$runtimeSmokeStrictDefault}) — opt-in strict runtime emit ([#2294](https://github.com/PurHur/php-compiler/issues/2294))\n");
         fwrite(STDOUT, "   BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 BOOTSTRAP_M3_RUNTIME_COMPILE=1 ./script/bootstrap-selfhost-helloworld-probe.sh\n");
         fwrite(STDOUT, "   BOOTSTRAP_M3_HELLOWORLD_STRICT=1 … helloworld-probe.sh  (no Zend fallback; #1493)\n");
-        fwrite(STDOUT, "   Emit TU: test/bootstrap-aot/helloworld_m3_emit_native_entry.php (#1768)\n\n");
+        fwrite(STDOUT, "   Emit TU: test/selfhost/compiler_helloworld_smoke/compile_driver.php (#1768)\n\n");
 
         fwrite(STDOUT, "4. Presenter / fast CI\n");
         fwrite(STDOUT, "   NORTH_STAR2_VERIFY_GATE=".(self::gateEnabled('NORTH_STAR2_VERIFY_GATE', $ns2Default) ? '1' : '0')." (default {$ns2Default}) — ci-fast\n");

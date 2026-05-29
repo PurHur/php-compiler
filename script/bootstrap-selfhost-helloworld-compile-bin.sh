@@ -2,7 +2,7 @@
 # M5 repro: native compile via helloworld compile_driver (not emit-TU — #2681).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ENTRY="${ROOT}/test/bootstrap-aot/helloworld_compile_m3_emit_native_entry.php"
+ENTRY="${ROOT}/test/selfhost/compiler_helloworld_smoke/compile_driver.php"
 OUT="${ROOT}/build/selfhost-helloworld-compile"
 SOURCE="${PHP_COMPILER_M3_SOURCE:-${ROOT}/examples/000-HelloWorld/example.php}"
 AOT_OUT="${PHP_COMPILER_M3_OUT:-${ROOT}/build/helloworld-compile-bin-aot}"

@@ -25,7 +25,7 @@ final class BootstrapCompilerUnitProbeTest extends TestCase
         $this->assertStringContainsString('emit_path=', $source);
         $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER', $source);
         $this->assertStringContainsString('inventory compile_driver', $source);
-        $this->assertStringContainsString('compiler_unit_probe_m3_emit_native_entry.php', $source);
+        $this->assertStringContainsString('compiler_unit_probe/compile_driver.php', $source);
         $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $source);
         $this->assertStringContainsString('compiler unit probe compile OK', $source);
     }
@@ -39,19 +39,10 @@ final class BootstrapCompilerUnitProbeTest extends TestCase
         $this->assertFileExists(self::$root.'/test/selfhost/compiler_unit_probe/compile_driver.php');
     }
 
-    public function testCompilerUnitProbeM3EmitNativeEntryExists(): void
-    {
-        $entry = self::$root.'/test/bootstrap-aot/compiler_unit_probe_m3_emit_native_entry.php';
-        $this->assertFileExists($entry);
-        $source = (string) file_get_contents($entry);
-        $this->assertStringContainsString('compile_smoke_m3_emit', $source);
-        $this->assertStringContainsString('lib/Compiler.php', $source);
-    }
-
     public function testCompilePhpRecognizesCompilerUnitProbeM3EmitEntry(): void
     {
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
-        $this->assertStringContainsString('compiler_unit_probe_m3_emit_native_entry.php', $compile);
+        $this->assertStringContainsString('compiler_unit_probe/compile_driver.php', $compile);
         $this->assertStringContainsString('PHP_COMPILER_EMIT_HELPER_LINK=1', $compile);
         $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_TU=1', $compile);
     }

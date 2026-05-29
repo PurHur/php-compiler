@@ -194,19 +194,10 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('helloworld compile binary link OK', $script);
     }
 
-    public function testHelloWorldCompileM3EmitNativeEntryExists(): void
-    {
-        $entry = self::$root.'/test/bootstrap-aot/helloworld_compile_m3_emit_native_entry.php';
-        $this->assertFileExists($entry);
-        $source = (string) file_get_contents($entry);
-        $this->assertStringContainsString('helloworld_compile_smoke:', $source);
-        $this->assertStringContainsString('selfhost-helloworld-compile', $source);
-    }
-
     public function testCompilePhpSetsHelloWorldCompileEmitLogPrefix(): void
     {
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
-        $this->assertStringContainsString('helloworld_compile_m3_emit_native_entry.php', $compile);
+        $this->assertStringContainsString('compiler_helloworld_smoke/compile_driver.php', $compile);
         $this->assertStringContainsString(
             "putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke')",
             $compile
@@ -426,7 +417,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('block_reason=', $script);
         $this->assertStringContainsString('M3_NATIVE_COMPILE=1', $script);
         $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $script);
-        $this->assertStringContainsString('helloworld_m3_emit_native_entry.php', $script);
+        $this->assertStringContainsString('compiler_helloworld_smoke/compile_driver.php', $script);
         $this->assertStringContainsString('PHP_COMPILER_EMIT_HELPER_LINK=1', $script);
         $this->assertStringContainsString('helloworld_m3_emit_next_lower', $script);
         $this->assertStringContainsString('NEXT_LOWER_CMD:', $script);
@@ -434,19 +425,12 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('missing executable', $script);
     }
 
-    public function testHelloWorldM3EmitNativeEntryExists(): void
-    {
-        $entry = self::$root.'/test/bootstrap-aot/helloworld_m3_emit_native_entry.php';
-        $this->assertFileExists($entry);
-        $source = (string) file_get_contents($entry);
-        $this->assertStringContainsString('compile_smoke_m3_emit', $source);
-    }
-
     public function testCompilePhpSetsUnifiedEmitLogPrefixForHelloWorldEmitEntry(): void
     {
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
-        $this->assertStringContainsString('helloworld_m3_emit_native_entry.php', $compile);
-        $this->assertStringContainsString("putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit')", $compile);
+        $this->assertStringContainsString('compiler_helloworld_smoke/compile_driver.php', $compile);
+        $this->assertStringContainsString("putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke')", $compile);
+        $this->assertStringNotContainsString('m3_emit_native_entry', $compile);
     }
 
     /** Issue #2666: helloworld emit TU registers unit-probe + compile_driver sidecars without probe-only env. */
@@ -464,40 +448,6 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('CLI_DRIVER_SIDECAR_REL', $jit);
         $this->assertStringContainsString('isM5BootstrapSidecarScriptMain', $jit);
         $this->assertStringNotContainsString('PHP_COMPILER_M3_COMPILER_UNIT_PROBE_EMIT', $jit);
-    }
-
-    public function testHelloWorldM3EmitNativeEntryLinksWithRealLowering(): void
-    {
-        if (!LlvmToolchain::isReady(self::$root)) {
-            $this->markTestSkipped('LLVM 9 not available for M3 HelloWorld emit helper link test.');
-        }
-
-        $entry = self::$root.'/test/bootstrap-aot/helloworld_m3_emit_native_entry.php';
-        $out = self::$root.'/build/selfhost-helloworld-emit-test';
-        @unlink($out);
-
-        $prefix = LlvmToolchain::envPrefix(self::$root);
-        $cmd = implode(' ', array_map('escapeshellarg', [
-            ...$prefix,
-            'env',
-            'PHP_COMPILER_SELFHOST_AOT=1',
-            'PHP_COMPILER_M3_COMPILE_DRIVER=1',
-            'PHP_COMPILER_EMIT_HELPER_LINK=1',
-            'php',
-            self::$root.'/bin/compile.php',
-            '-o',
-            $out,
-            $entry,
-        ])).' 2>&1';
-        exec($cmd, $lines, $exitCode);
-
-        if (139 === $exitCode) {
-            $this->markTestSkipped('LLVM 9 segfault during M3 emit-helper link (#2442).');
-        }
-
-        $this->assertSame(0, $exitCode, implode("\n", $lines));
-        $this->assertFileExists($out);
-        $this->assertTrue(is_executable($out));
     }
 
     /** Issue #2843: inventory compile_driver links without *_m3_emit_native_entry.php. */
@@ -565,7 +515,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
             $this->markTestSkipped('LLVM 9 not available for M3 Compiler.php sidecar emit test.');
         }
 
-        $entry = self::$root.'/test/bootstrap-aot/helloworld_m3_emit_native_entry.php';
+        $entry = self::$root.'/test/bootstrap-aot/compiler_helloworld_smoke/compile_driver.php';
         $emitHelper = self::$root.'/build/selfhost-helloworld-emit-compiler-php-test';
         $aotOut = self::$root.'/build/m3-compiler-php-aot-test';
         @unlink($emitHelper);
@@ -617,7 +567,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
             $this->markTestSkipped('LLVM 9 not available for M3 bin/compile.php sidecar emit test.');
         }
 
-        $entry = self::$root.'/test/bootstrap-aot/helloworld_m3_emit_native_entry.php';
+        $entry = self::$root.'/test/bootstrap-aot/compiler_helloworld_smoke/compile_driver.php';
         $emitHelper = self::$root.'/build/selfhost-helloworld-emit-bin-compile-test';
         $aotOut = self::$root.'/build/m3-bin-compile-aot-test';
         $sidecar = self::$root.'/'.JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL;
@@ -672,7 +622,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
             $this->markTestSkipped('LLVM 9 not available for M3 helloworld compile-driver bin/compile.php test.');
         }
 
-        $entry = self::$root.'/test/bootstrap-aot/helloworld_compile_m3_emit_native_entry.php';
+        $entry = self::$root.'/test/bootstrap-aot/compiler_helloworld_smoke/compile_driver.php';
         $compileDriver = self::$root.'/build/selfhost-helloworld-compile-bin-compile-test';
         $aotOut = self::$root.'/build/m3-bin-compile-hw-driver-aot-test';
         $sidecar = self::$root.'/'.JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL;

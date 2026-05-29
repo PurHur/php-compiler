@@ -82,8 +82,8 @@ final class BootstrapJitUnitProbeTest extends TestCase
         $source = (string) file_get_contents($script);
         $this->assertStringContainsString('BOOTSTRAP_M3_JIT_UNIT_PROBE_STRICT=1', $source);
         $this->assertStringContainsString('emit_path=', $source);
-        $this->assertStringContainsString('jit_unit_probe_m3_emit_native_entry.php', $source);
         $this->assertStringContainsString('jit_unit_probe/compile_driver.php', $source);
+        $this->assertStringContainsString('inventory compile_driver (#3032)', $source);
         $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER', $source);
         $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $source);
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_MODE=compile', $source);
@@ -99,22 +99,12 @@ final class BootstrapJitUnitProbeTest extends TestCase
         $this->assertFileExists(self::$root.'/test/selfhost/jit_unit_probe/compile_driver.php');
     }
 
-    public function testJitUnitProbeM3EmitNativeEntryExists(): void
-    {
-        $entry = self::$root.'/test/bootstrap-aot/jit_unit_probe_m3_emit_native_entry.php';
-        $this->assertFileExists($entry);
-        $source = (string) file_get_contents($entry);
-        $this->assertStringContainsString('compile_smoke_m3_emit', $source);
-        $this->assertStringContainsString('lib/JIT.php', $source);
-    }
-
-    public function testCompilePhpRecognizesJitUnitProbeM3EmitEntry(): void
+    public function testCompilePhpRecognizesInventoryJitUnitProbeCompileDriver(): void
     {
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
-        $this->assertStringContainsString('jit_unit_probe_m3_emit_native_entry.php', $compile);
-        $this->assertStringContainsString('PHP_COMPILER_M3_JIT_UNIT_PROBE_EMIT', $compile);
-        $this->assertStringContainsString('PHP_COMPILER_EMIT_HELPER_LINK=1', $compile);
-        $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_TU=1', $compile);
+        $this->assertStringContainsString("str_contains(\$normalized, 'compile_driver.php')", $compile);
+        $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER', $compile);
+        $this->assertStringNotContainsString('jit_unit_probe_m3_emit_native_entry', $compile);
     }
 
     public function testJitCachesJitUnitProbeFixtureSidecar(): void

@@ -2,7 +2,7 @@
 # M3 emit-TU: native link, compile, and execute (issue #2444; fix tracked in #2442).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-EMIT_ENTRY="${ROOT}/test/bootstrap-aot/runtime_m3_emit_native_entry.php"
+EMIT_ENTRY="${ROOT}/test/selfhost/runtime_compile_smoke/compile_driver.php"
 SOURCE="${ROOT}/test/bootstrap-aot/runtime_trivial_echo.php"
 EMIT_HELPER="${ROOT}/build/m3-emit-tu-phpunit-helper"
 AOT_OUT="${ROOT}/build/m3-emit-tu-phpunit-aot"
@@ -25,7 +25,7 @@ m3_exit_label() {
 }
 
 if [[ ! -f "${EMIT_ENTRY}" ]]; then
-  echo "bootstrap-m3-emit-tu-execute: missing ${EMIT_ENTRY}" >&2
+  echo "bootstrap-m3-emit-tu-execute: missing inventory ${EMIT_ENTRY}" >&2
   exit 1
 fi
 
@@ -44,7 +44,7 @@ export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-m3-emit-tu-p
 rm -f "${EMIT_HELPER}" "${AOT_OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}"
 
 # Real Runtime::parse lowering required for native emit-TU execute (#2442, #2552).
-m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_EMIT_HELPER_LINK=1 PHP_COMPILER_M3_COMPILE_DRIVER=1)
+m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_EMIT_HELPER_LINK=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1)
 
 set +e
 m3_link_code=1
@@ -68,7 +68,9 @@ rm -f "${AOT_OUT}"
 set +e
 compile_out="$(
   env PHP_COMPILER_M3_COMPILE_DRIVER=1 \
-    PHP_COMPILER_M3_EMIT_MINIMAL=1 \
+    PHP_COMPILER_M3_COMPILE_MODE=compile \
+    PHP_COMPILER_M3_RUNTIME_COMPILE=1 \
+    PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 \
     PHP_COMPILER_M3_SOURCE="${SOURCE}" \
     PHP_COMPILER_M3_OUT="${AOT_OUT}" \
     "${EMIT_HELPER}" 2>&1

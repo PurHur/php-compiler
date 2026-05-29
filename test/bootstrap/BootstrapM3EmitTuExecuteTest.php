@@ -23,7 +23,7 @@ final class BootstrapM3EmitTuExecuteTest extends TestCase
         $script = self::$root.'/script/bootstrap-m3-emit-tu-execute.sh';
         $this->assertFileExists($script);
         $source = (string) file_get_contents($script);
-        $this->assertStringContainsString('runtime_m3_emit_native_entry.php', $source);
+        $this->assertStringContainsString('runtime_compile_smoke/compile_driver.php', $source);
         $this->assertStringContainsString('runtime_compile_smoke_m3_emit: compile OK', $source);
         $this->assertStringContainsString('PHP_COMPILER_EMIT_HELPER_LINK=1', $source);
     }
