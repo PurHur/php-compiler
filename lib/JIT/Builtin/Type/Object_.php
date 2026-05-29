@@ -31,6 +31,14 @@ class Object_ extends Type {
     private array $classIdToName = [];
     /** @var array<string, string> declaring class lc => parent class lc (#1858) */
     private array $classParentLc = [];
+    /** @var array<string, list<string>> class lc => interface lc names (#1357, #3077) */
+    private array $classInterfacesLc = [];
+    /** @var array<string, list<string>> interface lc => parent interface lc names */
+    private array $interfaceExtendsLc = [];
+    /** @var array<string, true> interface lc => registered */
+    private array $interfaceClassLcs = [];
+    /** @var array<string, list<string>> class lc => transitive interface lc (lazy) */
+    private array $classAllInterfacesLc = [];
     private array $properties = [];
     private array $propNameMap = [];
     /** @var array<int, array<string, int>> class id => method lc => visibility flags */
@@ -76,6 +84,8 @@ class Object_ extends Type {
         $this->pointer = $this->context->getTypeFromString('__object__*');
         \PHPCompiler\JIT\Builtin\ReadonlyRaise::registerDeclarations($this->context);
         \PHPCompiler\JIT\Builtin\ReadonlyRaise::ensureLinked($this->context);
+        \PHPCompiler\JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
+        \PHPCompiler\JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
         // JitThrow linked on demand when compiling try/catch (#1056).
 
         $this->registerFn('__object__load_value_slot', 'void', ['void**', '__value__*']);
@@ -537,6 +547,91 @@ class Object_ extends Type {
     public function parentClassLc(string $declaringClassLc): ?string
     {
         return $this->classParentLc[strtolower(ltrim($declaringClassLc, '\\'))] ?? null;
+    }
+
+    /**
+     * @param list<string> $interfaceLcs lowercase interface names
+     */
+    public function setClassInterfaces(string $className, array $interfaceLcs): void
+    {
+        $lc = strtolower(ltrim($className, '\\'));
+        $expanded = [];
+        foreach ($interfaceLcs as $iface) {
+            $expanded = array_merge($expanded, $this->expandInterfaceLc($iface));
+        }
+        $this->classInterfacesLc[$lc] = array_values(array_unique($expanded));
+        unset($this->classAllInterfacesLc[$lc]);
+    }
+
+    /**
+     * @param list<string> $extendsLcs lowercase parent interface names
+     */
+    public function setInterfaceExtends(string $interfaceName, array $extendsLcs): void
+    {
+        $lc = strtolower(ltrim($interfaceName, '\\'));
+        $this->interfaceClassLcs[$lc] = true;
+        $this->interfaceExtendsLc[$lc] = array_values(array_unique(array_map(
+            static fn (string $n): string => strtolower(ltrim($n, '\\')),
+            $extendsLcs
+        )));
+        $this->classInterfacesLc[$lc] = $this->expandInterfaceLc($lc);
+        unset($this->classAllInterfacesLc[$lc]);
+    }
+
+    public function isInterfaceClassLc(string $classLc): bool
+    {
+        return isset($this->interfaceClassLcs[strtolower(ltrim($classLc, '\\'))]);
+    }
+
+    public function markInterfaceClass(string $interfaceName): void
+    {
+        $lc = strtolower(ltrim($interfaceName, '\\'));
+        $this->interfaceClassLcs[$lc] = true;
+        if (!isset($this->classInterfacesLc[$lc])) {
+            $this->classInterfacesLc[$lc] = [$lc];
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function allInterfacesForClassLc(string $classLc): array
+    {
+        $classLc = strtolower(ltrim($classLc, '\\'));
+        if (isset($this->classAllInterfacesLc[$classLc])) {
+            return $this->classAllInterfacesLc[$classLc];
+        }
+        $ifaces = $this->classInterfacesLc[$classLc] ?? [];
+        $parent = $this->classParentLc[$classLc] ?? null;
+        if (null !== $parent) {
+            $ifaces = array_merge($ifaces, $this->allInterfacesForClassLc($parent));
+        }
+
+        return $this->classAllInterfacesLc[$classLc] = array_values(array_unique($ifaces));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function expandInterfaceLc(string $ifaceLc): array
+    {
+        $ifaceLc = strtolower(ltrim($ifaceLc, '\\'));
+        $out = [$ifaceLc];
+        foreach ($this->interfaceExtendsLc[$ifaceLc] ?? [] as $parent) {
+            $out = array_merge($out, $this->expandInterfaceLc($parent));
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    public function classLcForId(int $classId): ?string
+    {
+        $name = $this->classIdToName[$classId] ?? null;
+        if (null === $name) {
+            return null;
+        }
+
+        return strtolower(ltrim($name, '\\'));
     }
 
     public function declareEnum(Operand $name): int
