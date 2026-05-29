@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Web\Superglobals;
 /**
  * VM helpers for extract() / compact() (caller scope via Frame::parent).
  */
@@ -105,6 +106,30 @@ final class VmScope
         }
 
         return Variable::TYPE_NULL !== $v->type;
+    }
+
+    /** get_defined_vars() — snapshot of caller locals (php-src: zend_get_defined_vars). */
+    public static function getDefinedVars(Frame $frame): HashTable
+    {
+        $caller = self::requireCaller($frame);
+        $result = new HashTable();
+        foreach ($caller->block->eachNamedScopeSlot() as [$name, $slot]) {
+            if ('this' === $name || Superglobals::isSuperglobalName($name)) {
+                continue;
+            }
+            if (!isset($caller->scope[$slot])) {
+                continue;
+            }
+            $value = $caller->scope[$slot];
+            if (!self::callerVarIsSet($value)) {
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($value->resolveIndirect());
+            $result->add($name, $copy);
+        }
+
+        return $result;
     }
 
 }

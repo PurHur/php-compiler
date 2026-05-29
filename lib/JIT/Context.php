@@ -50,6 +50,9 @@ class Context {
     /** User function CFG block while compiling its body (func_get_args / func_num_args, #197). */
     public ?Block $jitEnclosingBlock = null;
 
+    /** CFG block currently being lowered (get_defined_vars snapshot, #3135). */
+    public ?Block $jitCurrentBlock = null;
+
     /** Call-site file strict_types while lowering FUNCCALL (issues #156, #1229). */
     public bool $callerStrictTypes = false;
 
@@ -967,6 +970,7 @@ class Context {
                 throw new \LogicException("Unknown variable referenced: " . get_class($op));
             }
         }
+
         return $this->scope->variables[$op];
     }
 

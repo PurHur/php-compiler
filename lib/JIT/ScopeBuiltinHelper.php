@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\Block as CompilerBlock;
 use PHPCompiler\ext\standard\VmScope;
 use PHPCompiler\Web\Superglobals;
 use PHPLLVM\Builder;
@@ -396,6 +397,201 @@ final class ScopeBuiltinHelper
             'extract() target variable type not supported for JIT: '
             .Variable::getStringType($dest->type)
         );
+    }
+
+    /**
+     * @return array<string, Variable>
+     */
+    public static function namedVariablesForDefinedVars(Context $context): array
+    {
+        $map = [];
+        $block = $context->jitCurrentBlock ?? $context->jitEnclosingBlock;
+        if (!$block instanceof CompilerBlock) {
+            return $map;
+        }
+        foreach ($block->eachNamedScopeSlot() as [$name, $_slot]) {
+            if ('this' === $name || Superglobals::isSuperglobalName($name)) {
+                continue;
+            }
+            $var = VarFetchHelper::bindingByName($context, $block, $name);
+            if (null === $var) {
+                continue;
+            }
+            if (0 !== ($var->type & Variable::IS_NATIVE_ARRAY)) {
+                continue;
+            }
+            $map[$name] = $var;
+        }
+
+        return $map;
+    }
+
+    /**
+     * get_defined_vars() — export all named locals in the current scope (issue #3135).
+     */
+    public static function getDefinedVars(Context $context): Value
+    {
+        $named = self::namedVariablesForDefinedVars($context);
+        $ht = HashTableHelper::alloc($context);
+        if ([] === $named) {
+            return self::wrapHashTableValue($context, $ht);
+        }
+
+        $tag = 'gdv'.(string) ++self::$blockSeq;
+        $done = BasicBlockHelper::append($context, 'gdv_done_'.$tag);
+        $first = $context->builder->getInsertBlock();
+        $blocks = [$first];
+        $names = array_keys($named);
+        $n = \count($names);
+        for ($i = 1; $i < $n; ++$i) {
+            $blocks[$i] = BasicBlockHelper::append($context, 'gdv_check_'.$tag.'_'.$i);
+        }
+
+        foreach ($names as $i => $name) {
+            $dest = $named[$name];
+            $context->builder->positionAtEnd($blocks[$i]);
+            $isSet = IssetHelper::compile($context, $dest, null);
+            $storeBlock = BasicBlockHelper::append($context, 'gdv_store_'.$tag.'_'.$i);
+            $nextBlock = ($i < $n - 1) ? $blocks[$i + 1] : $done;
+            $context->builder->branchIf($isSet, $storeBlock, $nextBlock);
+
+            $context->builder->positionAtEnd($storeBlock);
+            $keyStr = $context->builder->load($context->constantStringFromString($name));
+            self::storeDefinedVarAtStringKey($context, $ht, $keyStr, $dest);
+            $context->builder->branch($nextBlock);
+        }
+
+        $context->builder->positionAtEnd($done);
+
+        return self::wrapHashTableValue($context, $ht);
+    }
+
+    private static function storeDefinedVarAtStringKey(
+        Context $context,
+        Value $ht,
+        Value $keyStr,
+        Variable $element
+    ): void {
+        if (Variable::TYPE_VALUE !== $element->type) {
+            HashTableHelper::setAtStringKey($context, $ht, $keyStr, $element);
+
+            return;
+        }
+
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $element);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep(
+                $valuePtr,
+                $context->structFieldMap['__value__']['type']
+            )
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $tag = 'dv'.(string) ++self::$blockSeq;
+        $stringBlock = BasicBlockHelper::append($context, 'gdv_val_string_'.$tag);
+        $longBlock = BasicBlockHelper::append($context, 'gdv_val_long_'.$tag);
+        $boolBlock = BasicBlockHelper::append($context, 'gdv_val_bool_'.$tag);
+        $htBlock = BasicBlockHelper::append($context, 'gdv_val_ht_'.$tag);
+        $done = BasicBlockHelper::append($context, 'gdv_val_done_'.$tag);
+        $afterString = BasicBlockHelper::append($context, 'gdv_val_after_string_'.$tag);
+        $afterLong = BasicBlockHelper::append($context, 'gdv_val_after_long_'.$tag);
+        $afterBool = BasicBlockHelper::append($context, 'gdv_val_after_bool_'.$tag);
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyString'),
+            $ht,
+            $keyStr,
+            $owned
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $context->builder->branchIf($isLong, $longBlock, $afterLong);
+
+        $context->builder->positionAtEnd($longBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyLong'),
+            $ht,
+            $keyStr,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterLong);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyBool'),
+            $ht,
+            $keyStr,
+            $context->builder->truncOrBitCast(
+                $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr),
+                $context->getTypeFromString('int1')
+            )
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterBool);
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isHt, $htBlock, $done);
+
+        $context->builder->positionAtEnd($htBlock);
+        $childHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valuePtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyHashtable'),
+            $ht,
+            $keyStr,
+            $childHt
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    private static function wrapHashTableValue(Context $context, Value $ht): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $ptr,
+            $ht
+        );
+
+        return $ptr;
     }
 
     private static function stringDataPtr(Context $context, Value $str): Value

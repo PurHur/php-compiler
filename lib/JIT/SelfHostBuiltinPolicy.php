@@ -132,6 +132,7 @@ final class SelfHostBuiltinPolicy
         'array_multisort' => 'array',
         'usort' => 'array', 'uasort' => 'array', 'uksort' => 'array',
         'compact' => 'array', 'extract' => 'array', 'defined' => 'array', 'define' => 'array',
+        'get_defined_constants' => 'array', 'get_defined_vars' => 'array',
         'class_exists' => 'array', 'enum_exists' => 'array', 'function_exists' => 'array', 'method_exists' => 'array',
         'property_exists' => 'array',
         'get_object_vars' => 'array',
