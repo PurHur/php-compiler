@@ -36,6 +36,8 @@ use PHPCompiler\Compiler\InterfaceImplementationCheck;
 use PHPCompiler\Compiler\ParameterMetadata;
 use PHPCompiler\Compiler\ReadonlyClassCompileCheck;
 use PHPCompiler\Compiler\TraitCollisionCheck;
+use PHPCompiler\Compiler\ClassCompileRegistry;
+use PHPCompiler\Compiler\OverrideValidator;
 use PHPCompiler\Web\ConstStringFolder;
 use PHPCompiler\Web\IncludePathResolver;
 use PHPCompiler\Web\Superglobals;
@@ -75,6 +77,8 @@ class Compiler {
 
     /** Class being compiled while lowering static property declarations (#3814). */
     private ?string $currentClassStaticPropertyCompile = null;
+
+    private ClassCompileRegistry $classCompileRegistry;
 
     public function setBareRethrowLines(array $lines): void
     {
@@ -256,6 +260,7 @@ class Compiler {
         $this->haltCompilerRemaining = null;
         $this->compiledClassStaticProperties = [];
         $this->currentClassStaticPropertyCompile = null;
+        $this->classCompileRegistry = new ClassCompileRegistry();
         $this->seen = new SplObjectStorage;
         $this->ternaryMergeVarSlots = new SplObjectStorage;
         $this->debugWriteLastPhase('Compiler::compile enter');
@@ -296,6 +301,7 @@ class Compiler {
         $this->resetCompileAbortDetail();
         $this->abstractClasses = [];
         $this->abstractEnums = [];
+        $this->classCompileRegistry = new ClassCompileRegistry();
         // Inventory-scale sources declare user functions and/or class-like units; emit-smoke only needs {main}
         // — same as compile() without a compile() callee in the M3 emit TU (#2633, #2666).
         if ([] !== $script->functions || $this->emitSmokeScriptHasClassLike($script)) {
@@ -332,6 +338,7 @@ class Compiler {
 
     public function compileFunc(string $name, CfgFunc $func): Func {
         $this->resetCompileAbortDetail();
+        $this->classCompileRegistry = new ClassCompileRegistry();
         $this->seen = new SplObjectStorage;
 
         $funcBlock = $this->compileCfgBlock($func->cfg, $func->params, $func);
@@ -1424,12 +1431,20 @@ class Compiler {
 
     protected function compileInterface(Op\Stmt\Interface_ $iface, Block $block): OpCode
     {
+        $name = $this->staticNameFromOperand($iface->name);
+        if (null === $name) {
+            $this->throwCompileError('Interface name must be a compile-time class reference');
+        }
+        $extends = $this->interfaceNamesFromOperands($iface->extends);
+        OverrideValidator::validateClassBody($iface->stmts, $name, null, $extends, $this->classCompileRegistry);
+        $this->classCompileRegistry->registerInterface($name, $extends, $iface->stmts);
+
         $return = new OpCode(
             OpCode::TYPE_DECLARE_INTERFACE,
             $this->compileOperand($iface->name, $block, true)
         );
         AttributeNames::assertNoDuplicates(AttributeNames::fromOp($iface));
-        $return->classImplements = $this->interfaceNamesFromOperands($iface->extends);
+        $return->classImplements = $extends;
         $this->applySealedMetadataFromOp($iface, $return);
         $return->block1 = $this->compileClassBody(
             $iface->stmts,
@@ -1442,6 +1457,13 @@ class Compiler {
 
     protected function compileTrait(Op\Stmt\Trait_ $trait, Block $block): OpCode
     {
+        $name = $this->staticNameFromOperand($trait->name);
+        if (null === $name) {
+            $this->throwCompileError('Trait name must be a compile-time class reference');
+        }
+        OverrideValidator::validateClassBody($trait->stmts, $name, null, [], $this->classCompileRegistry);
+        $this->classCompileRegistry->registerTrait($name, $trait->stmts);
+
         $return = new OpCode(
             OpCode::TYPE_DECLARE_TRAIT,
             $this->compileOperand($trait->name, $block, true)
@@ -1572,6 +1594,26 @@ class Compiler {
         } else {
             $this->throwCompileLogic('Unsupported class type: ' . get_class($class));
         }
+        $className = $this->staticNameFromOperand($class->name);
+        if (null === $className) {
+            $this->throwCompileError('Class name must be a compile-time class reference');
+        }
+        $parentLc = null;
+        if ($class instanceof Op\Stmt\Class_ && null !== $class->extends) {
+            $parentName = $this->staticNameFromOperand($class->extends);
+            if (null === $parentName) {
+                $this->throwCompileError('Parent class name must be a compile-time class reference');
+            }
+            $parentLc = strtolower(ltrim($parentName, '\\'));
+        }
+        $interfaceLcs = $this->interfaceNamesFromOperands($class->implements);
+        OverrideValidator::validateClassBody(
+            $class->stmts,
+            $className,
+            $parentLc,
+            $interfaceLcs,
+            $this->classCompileRegistry
+        );
         $parentSlot = null;
         if ($class instanceof Op\Stmt\Class_ && null !== $class->extends) {
             $parentSlot = $this->compileOperand($class->extends, $block, true);
@@ -1587,26 +1629,18 @@ class Compiler {
             $parentSlot,
             $readonlySlot
         );
-        $return->classImplements = $this->interfaceNamesFromOperands($class->implements);
+        $return->classImplements = $interfaceLcs;
         if (VM\StringableSupport::requiresImplementation($return->classImplements)) {
-            $className = $this->staticNameFromOperand($class->name) ?? 'class';
             VM\StringableSupport::assertConcreteClassImplements($class, $className);
         }
         $this->assignAttributeMetadata($return, $class);
         $this->applySealedMetadataFromOp($class, $return);
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($class->flags);
         if ($return->classIsAbstract) {
-            $name = $this->staticNameFromOperand($class->name);
-            if (null !== $name) {
-                $this->abstractClasses[strtolower(ltrim($name, '\\'))] = true;
-            }
+            $this->abstractClasses[strtolower(ltrim($className, '\\'))] = true;
         }
-        $classLc = null;
-        $className = $this->staticNameFromOperand($class->name);
-        if (null !== $className) {
-            $classLc = strtolower(ltrim($className, '\\'));
-            $this->compiledClassStaticProperties[$classLc] = $this->compiledClassStaticProperties[$classLc] ?? [];
-        }
+        $classLc = strtolower(ltrim($className, '\\'));
+        $this->compiledClassStaticProperties[$classLc] = $this->compiledClassStaticProperties[$classLc] ?? [];
         $prevClassStaticCompile = $this->currentClassStaticPropertyCompile;
         $this->currentClassStaticPropertyCompile = $classLc;
         $return->block1 = $this->compileClassBody(
@@ -1615,15 +1649,13 @@ class Compiler {
             $className
         );
         $this->currentClassStaticPropertyCompile = $prevClassStaticCompile;
-        if (null !== $classLc && $class instanceof Op\Stmt\Class_ && null !== $class->extends) {
-            $parentName = $this->staticNameFromOperand($class->extends);
-            if (null !== $parentName) {
-                $parentLc = strtolower(ltrim($parentName, '\\'));
-                foreach ($this->compiledClassStaticProperties[$parentLc] ?? [] as $prop => $_) {
-                    $this->compiledClassStaticProperties[$classLc][$prop] = true;
-                }
+        if ($class instanceof Op\Stmt\Class_ && null !== $class->extends && null !== $parentLc) {
+            foreach ($this->compiledClassStaticProperties[$parentLc] ?? [] as $prop => $_) {
+                $this->compiledClassStaticProperties[$classLc][$prop] = true;
             }
         }
+        $this->classCompileRegistry->registerClass($className, $parentLc, $interfaceLcs, $class->stmts);
+
         return $return;
     }
 
