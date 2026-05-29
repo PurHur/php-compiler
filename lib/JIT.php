@@ -5358,15 +5358,29 @@ class JIT {
                     $this->compileBlock($op->block1, $nameOp->value);
                     break;
                 case OpCode::TYPE_CLOSURE:
-                    // Bootstrap stub: closures are not executable yet; represent as null.
-                    $nullVar = new Variable(
+                    if ($this->shouldUseSelfHostJitStubs() || null === $op->block1) {
+                        // Bootstrap / vendor prelink: closures are not executable yet; represent as null.
+                        $nullVar = new Variable(
+                            $this->context,
+                            Variable::TYPE_NULL,
+                            Variable::KIND_VALUE,
+                            $this->context->getTypeFromString('__value__*')->constNull()
+                        );
+                        $nullVar->isNullConstant = true;
+                        $this->assignOperandValue($block->getOperand($op->arg1), $nullVar->value);
+                        break;
+                    }
+                    $internalName = JIT\ClosureHelper::nextInternalName();
+                    $this->compileBlock($op->block1, $internalName);
+                    $lcname = strtolower($internalName);
+                    if (!isset($this->context->functionProxies[$lcname])) {
+                        throw new \LogicException("Closure body failed to register JIT proxy: {$internalName}");
+                    }
+                    $closureObj = JIT\ClosureHelper::allocateClosureObject(
                         $this->context,
-                        Variable::TYPE_NULL,
-                        Variable::KIND_VALUE,
-                        $this->context->getTypeFromString('__value__*')->constNull()
+                        $this->context->functionProxies[$lcname]
                     );
-                    $nullVar->isNullConstant = true;
-                    $this->assignOperandValue($block->getOperand($op->arg1), $nullVar->value);
+                    $this->assignOperand($block->getOperand($op->arg1), $closureObj, true);
                     break;
                 case OpCode::TYPE_YIELD:
                 case OpCode::TYPE_YIELD_FROM:
@@ -5379,6 +5393,13 @@ class JIT {
                         $this->context->scope->toCall = $this->context->resolveFunctionProxy($lcname);
                     } else {
                         if (null !== $nameOp->type && Type::TYPE_OBJECT === $nameOp->type->type) {
+                            $calleeVar = $this->context->getVariableFromOp($nameOp);
+                            $closureCall = JIT\ClosureHelper::resolveCall($calleeVar);
+                            if (null !== $closureCall) {
+                                $this->context->scope->toCall = $closureCall;
+                                $this->context->scope->args = [];
+                                break;
+                            }
                             $this->initJitMethodCall($block, $nameOp, '__invoke');
                             break;
                         }
@@ -7142,6 +7163,7 @@ class JIT {
         $dest->objectPropertyReceiver = $src->objectPropertyReceiver;
         $dest->objectPropertyName = $src->objectPropertyName;
         $dest->objectPropertyClassName = $src->objectPropertyClassName;
+        $dest->closureCall = $src->closureCall;
     }
 
     private function markJitThisConstructedIfLeavingConstruct(Block $block): void
@@ -7425,6 +7447,16 @@ class JIT {
      */
     private function initJitMethodCall(Block $block, Operand $receiverOp, string $methodName): void
     {
+        if ('__invoke' === strtolower($methodName)) {
+            $receiver = $this->context->getVariableFromOp($receiverOp);
+            $closureCall = JIT\ClosureHelper::resolveCall($receiver);
+            if (null !== $closureCall) {
+                $this->context->scope->toCall = $closureCall;
+                $this->context->scope->args = [];
+
+                return;
+            }
+        }
         if (null === $receiverOp->type) {
             // Bootstrap/self-host can hit methodcall init before operand typing stabilizes.
             // Prefer a safe short-circuit for stubbed self-host JIT paths over hard-crashing.

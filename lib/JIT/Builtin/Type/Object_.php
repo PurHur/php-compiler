@@ -885,6 +885,9 @@ class Object_ extends Type {
                 $this->defineProperty($id, 'mode', Variable::TYPE_NATIVE_LONG);
             }
         }
+        if ('closure' === $lcname) {
+            // Marker class for JIT-lowered closures; invoke target lives on Variable::$closureCall (#72).
+        }
         if ('splobjectstorage' === $lcname) {
             $this->splObjectStorageClassId = $id;
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);

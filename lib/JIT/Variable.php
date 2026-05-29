@@ -119,6 +119,9 @@ final class Variable {
     /** Declaring class name for readonly diagnostics (#1360). */
     public ?string $objectPropertyClassName = null;
 
+    /** Native call proxy when this object is a JIT-lowered closure (#72). */
+    public ?Call $closureCall = null;
+
     private static int $lvalueCounter = 0;
     public int $nextFreeElement = 0;
 

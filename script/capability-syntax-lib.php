@@ -157,7 +157,7 @@ function syntaxRowDefinitions(): array
             'issue' => 72,
             'jit' => false,
             'aot' => false,
-            'notes' => ['VM via ClosureState + __invoke; bootstrap stubs null; use() deferred'],
+            'notes' => ['VM via ClosureState + __invoke; bootstrap stubs null; use() by-value on VM; use (&$x) deferred'],
             'probe' => '$f = function ($x) { return $x + 1; }; echo $f(2);',
         ],
         [
