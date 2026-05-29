@@ -64,10 +64,11 @@
       </div>
       <div class="hero-badges">
         <span class="badge badge--live">VM + JIT + AOT</span>
-        <span class="badge badge--live">Wave 3 · 12 + 13</span>
+        <span class="badge badge--live">Closures · try/catch</span>
+        <span class="badge badge--live">321 builtins</span>
         <span class="badge badge--live">Spine 726/726</span>
-        <span class="badge badge--live">M4 gen-3 loop</span>
-        <span class="badge badge--wip">M5 self-host</span>
+        <span class="badge badge--live">M3 inventory emit</span>
+        <span class="badge badge--wip">MCJIT execute</span>
       </div>
       <div class="hero-actions">
         <a class="btn btn--primary" href="#demo">Try in 5 minutes</a>
@@ -286,22 +287,22 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
         <article class="feature-panel">
           <h4>v1.0 supports well</h4>
           <ul>
-            <li>Classes, interfaces, <code>match</code>, namespaces, magic constants</li>
-            <li><code>try</code> / <code>catch</code> on VM; multi-type catch</li>
+            <li>Classes, interfaces, <code>match</code>, namespaces, <code>parent::class</code></li>
+            <li><strong>Closures</strong> and <code>fn () =&gt;</code> — VM + JIT IR (<code>use()</code> value and ref)</li>
+            <li><code>try</code> / <code>catch</code> / <code>finally</code> — VM compliance; JIT IR verified</li>
+            <li>Generators — <strong>VM</strong>; JIT/AOT VM fallback</li>
             <li>CGI superglobals, sessions, uploads, <code>phpc deploy</code></li>
-            <li>~200+ builtins (strings, arrays, JSON, <code>preg_*</code>, filesystem)</li>
-            <li>Wave 3 batch: <strong>12/12</strong> language + <strong>13/13</strong> stdlib tracked items</li>
-            <li>Generators — <strong>VM only</strong></li>
+            <li><strong>321</strong> builtins + closure <code>array_map</code> callbacks on VM</li>
           </ul>
         </article>
         <article class="feature-panel">
           <h4>Known gaps (summary)</h4>
           <ul>
-            <li><code>try</code> / <code>finally</code> — partial VM; JIT unwind incomplete (<a href="https://github.com/PurHur/php-compiler/issues/2114">#2114</a>)</li>
-            <li>Closures / <code>fn () =&gt;</code> — not in v1.0 app path (<a href="https://github.com/PurHur/php-compiler/issues/72">#72</a>, <a href="https://github.com/PurHur/php-compiler/issues/142">#142</a>)</li>
-            <li>Native <code>yield</code> in JIT/AOT — VM fallback (<a href="https://github.com/PurHur/php-compiler/issues/167">#167</a>)</li>
-            <li>No Composer autoload at AOT runtime; no arbitrary <code>ext-*</code></li>
-            <li>Not targeting Laravel, Symfony, WordPress, or full framework stacks</li>
+            <li><code>bin/jit.php</code> MCJIT execute — SIGSEGV in probe (<a href="https://github.com/PurHur/php-compiler/issues/98">#98</a>)</li>
+            <li>JIT try/catch scripts — VM fallback (<a href="https://github.com/PurHur/php-compiler/issues/2114">#2114</a>)</li>
+            <li>Generator / enum <strong>AOT</strong> native lowering open</li>
+            <li>Self-host bootstrap may stub closures to <code>null</code></li>
+            <li>Not Laravel, Symfony, WordPress, or arbitrary Composer stacks</li>
           </ul>
         </article>
       </div>
@@ -318,23 +319,28 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
           <tbody>
             <tr>
               <td>Try / catch / finally</td>
-              <td class="status-wip">Partial</td>
-              <td class="status-no">Unwind incomplete</td>
+              <td class="status-yes">Yes</td>
+              <td class="status-wip">IR only; execute → VM</td>
             </tr>
             <tr>
               <td>Closures / arrow functions</td>
-              <td class="status-no">Limited</td>
-              <td class="status-no">Not lowered</td>
+              <td class="status-yes">Yes</td>
+              <td class="status-wip">JIT IR</td>
             </tr>
             <tr>
               <td>Generators (<code>yield</code>)</td>
               <td class="status-yes">Yes</td>
-              <td class="status-no">No native</td>
+              <td class="status-wip">VM fallback</td>
             </tr>
             <tr>
               <td>Enums in AOT</td>
-              <td class="status-yes">VM/JIT</td>
+              <td class="status-yes">VM</td>
               <td class="status-no">No</td>
+            </tr>
+            <tr>
+              <td>M3 inventory emit (HelloWorld)</td>
+              <td class="status-yes">Native</td>
+              <td class="status-yes">Native</td>
             </tr>
           </tbody>
         </table>
@@ -356,17 +362,13 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
           <div class="progress-fill" data-width="85" style="width: 0"></div>
         </div>
         <p class="overall-progress__note">
-          <code>master</code> @ <a href="https://github.com/PurHur/php-compiler/commit/84cd4246">84cd4246</a> (May 2026, LLVM 9):
+          <code>master</code> @ <a href="https://github.com/PurHur/php-compiler/commit/7816b0bc">7816b0bc</a> (May 2026, LLVM 9):
           spine <strong>726/726</strong>;
-          gen-2→gen-3 recompile without Zend on compile ✅
-          (<a href="https://github.com/PurHur/php-compiler/pull/2697">#2697</a>);
-          full revision <code>bin/compile.php</code> probe ✅
-          (<a href="https://github.com/PurHur/php-compiler/pull/3058">#3058</a>);
-          vendor prelink <strong>3/3</strong> <code>object_ok</code> ✅
-          (<a href="https://github.com/PurHur/php-compiler/pull/3036">#3036</a>, <a href="https://github.com/PurHur/php-compiler/pull/3050">#3050</a>);
-          Zend-free gen-0 seed ✅
-          (<a href="https://github.com/PurHur/php-compiler/pull/3059">#3059</a>, <a href="https://github.com/PurHur/php-compiler/pull/3060">#3060</a>).
-          Next: native <code>bin/compile.php</code> inventory path → full CLI parity
+          M3 HelloWorld + <strong>inventory emit</strong> strict native ✅
+          (<a href="https://github.com/PurHur/php-compiler/pull/3070">#3070</a>);
+          gen-2→gen-3 + full revision probe ✅;
+          vendor prelink <strong>3/3</strong> ✅; Zend-free gen-0 seed ✅.
+          Next: production <code>bin/compile.php</code> inventory emit without thin TU
           (<a href="https://github.com/PurHur/php-compiler/issues/3024">#3024</a>).
           Presenter: <code>make north-star5-verify</code>.
         </p>
@@ -396,9 +398,10 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
         <li class="is-wip">
           <span class="ladder__marker" aria-hidden="true">3</span>
           <h4>M3</h4>
-          <p>Smoke <strong>native emit</strong> ✅; remaining: production <code>bin/compile.php</code> inventory path
-            (<a href="https://github.com/PurHur/php-compiler/issues/3024">#3024</a>,
-            <a href="https://github.com/PurHur/php-compiler/issues/1937">#1937</a>).</p>
+          <p>Thin TU + <strong>inventory emit</strong> strict native ✅
+            (<a href="https://github.com/PurHur/php-compiler/pull/3070">#3070</a>);
+            production <code>bin/compile.php</code> inventory path 🚧
+            (<a href="https://github.com/PurHur/php-compiler/issues/3024">#3024</a>).</p>
         </li>
         <li class="is-done">
           <span class="ladder__marker" aria-hidden="true">✓</span>
@@ -464,7 +467,7 @@ make test</code></pre>
       <a href="capability-comparison.html">PHP compare</a> ·
       <a href="https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md">Getting started</a>
     </p>
-    <p class="footer-meta">Site: docs/pages/ · Updated May 2026 · <code>master</code> @ 84cd4246</p>
+    <p class="footer-meta">Site: docs/pages/ · Updated May 2026 · <code>master</code> @ 7816b0bc</p>
   </footer>
 
   <script src="js/main.js" defer></script>

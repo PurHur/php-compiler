@@ -48,11 +48,11 @@
         <p class="section-intro" style="margin-top: 0.5rem">
           Real gaps toward the
           <a href="https://github.com/PurHur/php-compiler/issues/1492">self-host north star (#1492)</a>.
-          Updated 29 May 2026 (<code>master</code> @ 7f894053; LLVM&nbsp;9).
-          Wave-2 language: closure <code>use()</code> VM + JIT IR (#3081, #3092),
-          indirect <code>$arr[0]()</code> (#3089, #3092), generators VM-fallback (#3085),
-          <code>array_map</code> closure callbacks (#3086).
-          <strong>not</strong> implemented yet for compiling the compiler without Zend.
+          Updated 29 May 2026 (<code>master</code> @ 7816b0bc; LLVM&nbsp;9).
+          May wave: closures VM+JIT (<code>use()</code> value/ref, indirect invoke),
+          try/catch VM+JIT IR, generators VM-fallback, M3 inventory emit native (#3070),
+          stdlib expansion (321 builtins). <strong>Still open:</strong> MCJIT execute (#98),
+          generator/enum AOT, full <code>bin/compile.php</code> inventory path (#3024).
         </p>
       </header>
 
@@ -129,7 +129,12 @@
               <tr>
                 <td>Strict gates <code>BOOTSTRAP_M3_*_STRICT=1</code></td>
                 <td class="status-yes">Pass (smoke)</td>
-                <td>HelloWorld, compile-smoke, runtime smoke, compiler-unit: <code>emit_path=native</code> (verified 27 May 2026)</td>
+                <td>HelloWorld, compile-smoke, runtime smoke, compiler-unit: <code>emit_path=native</code></td>
+              </tr>
+              <tr>
+                <td>Inventory emit driver (<code>BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1</code>)</td>
+                <td class="status-yes">Pass</td>
+                <td>Thin-TU spine for emit-helper link — no argv-driver stubs ([#3070](https://github.com/PurHur/php-compiler/pull/3070), [#2540](https://github.com/PurHur/php-compiler/issues/2540))</td>
               </tr>
             </tbody>
           </table>
@@ -199,26 +204,38 @@
               <tr>
                 <td>Try / catch / finally</td>
                 <td class="status-yes">VM yes</td>
-                <td class="status-wip">EH gate</td>
-                <td><a href="https://github.com/PurHur/php-compiler/pull/3081">#3081</a> VM finally-before-catch ✅; JIT shares <code>requiresVmLowering</code> with generators — <a href="https://github.com/PurHur/php-compiler/issues/2114">#2114</a></td>
+                <td class="status-wip">IR verify; execute → VM</td>
+                <td>[#3106](https://github.com/PurHur/php-compiler/pull/3106) return-through-finally; [#3107](https://github.com/PurHur/php-compiler/pull/3107) JIT IR; <code>bin/jit.php</code> VM fallback ([#2114](https://github.com/PurHur/php-compiler/issues/2114))</td>
               </tr>
               <tr>
                 <td>Closures / arrow functions</td>
                 <td class="status-yes">VM yes</td>
-                <td class="status-wip">Partial</td>
-                <td><a href="https://github.com/PurHur/php-compiler/pull/3092">#3092</a> JIT <code>use()</code> by-value + indirect invoke; <code>use(&amp;$x)</code> + MCJIT execute still open; bootstrap AOT stubs <code>null</code> — <a href="https://github.com/PurHur/php-compiler/issues/72">#72</a>, <a href="https://github.com/PurHur/php-compiler/issues/142">#142</a></td>
+                <td class="status-wip">JIT IR</td>
+                <td>[#3092](https://github.com/PurHur/php-compiler/pull/3092) indirect invoke; [#3108](https://github.com/PurHur/php-compiler/pull/3108) <code>use(&amp;$x)</code>; bootstrap stubs <code>null</code>; MCJIT execute ([#98](https://github.com/PurHur/php-compiler/issues/98), [#72](https://github.com/PurHur/php-compiler/issues/72))</td>
               </tr>
               <tr>
                 <td>Generators (<code>yield</code>)</td>
                 <td class="status-yes">VM yes</td>
                 <td class="status-wip">VM fallback</td>
-                <td><a href="https://github.com/PurHur/php-compiler/pull/3085">#3085</a> keyed yield + <code>Block::requiresVmLowering</code>; native MCJIT lowering still open — <a href="https://github.com/PurHur/php-compiler/issues/167">#167</a></td>
+                <td>[#3085](https://github.com/PurHur/php-compiler/pull/3085) keyed yield; native lowering ([#167](https://github.com/PurHur/php-compiler/issues/167), [#3074](https://github.com/PurHur/php-compiler/issues/3074))</td>
               </tr>
               <tr>
                 <td><code>array_map</code> / callback builtins</td>
                 <td class="status-yes">Closures VM</td>
-                <td class="status-wip">String only</td>
-                <td><a href="https://github.com/PurHur/php-compiler/pull/3086">#3086</a> VM closure callbacks; JIT/AOT still null + compile-time string builtins — <a href="https://github.com/PurHur/php-compiler/issues/1154">#1154</a></td>
+                <td class="status-wip">String / named</td>
+                <td>[#3086](https://github.com/PurHur/php-compiler/pull/3086) VM closures; JIT closure callbacks open ([#1154](https://github.com/PurHur/php-compiler/issues/1154))</td>
+              </tr>
+              <tr>
+                <td>Backed enums (AOT)</td>
+                <td class="status-yes">VM</td>
+                <td class="status-no">No</td>
+                <td>VM regression fixed ([#3091](https://github.com/PurHur/php-compiler/pull/3091)); AOT ([#1356](https://github.com/PurHur/php-compiler/issues/1356), [#3076](https://github.com/PurHur/php-compiler/issues/3076))</td>
+              </tr>
+              <tr>
+                <td><code>bin/jit.php</code> MCJIT execute</td>
+                <td>—</td>
+                <td class="status-no">SIGSEGV</td>
+                <td>IR verify passes for many scripts; runtime probe fails ([#98](https://github.com/PurHur/php-compiler/issues/98)); embed work partial on master</td>
               </tr>
               <tr>
                 <td>Method calls / class methods (general)</td>
