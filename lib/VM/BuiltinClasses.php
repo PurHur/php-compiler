@@ -26,18 +26,26 @@ use PHPCompiler\VM\Builtin\WeakReferenceCreate;
 use PHPCompiler\VM\Builtin\WeakReferenceGet;
 
 /**
- * Register VM builtin classes WeakReference, WeakMap, and Reflection* (#1366, #1936).
+ * Register VM builtin classes stdClass, WeakReference, WeakMap, and Reflection* (#1366, #1936, #3117).
  */
 final class BuiltinClasses
 {
     public static function register(Context $ctx): void
     {
+        self::registerStdClass($ctx);
         self::registerWeakReference($ctx);
         self::registerWeakMap($ctx);
         self::registerReflection($ctx);
         self::registerDateTime($ctx);
         GeneratorState::register($ctx);
         ClosureState::register($ctx);
+    }
+
+    private static function registerStdClass(Context $ctx): void
+    {
+        $entry = new ClassEntry('stdClass');
+        $entry->allowsDynamicProperties = true;
+        $ctx->classes['stdclass'] = $entry;
     }
 
     private static function registerWeakReference(Context $ctx): void

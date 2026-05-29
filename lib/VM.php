@@ -328,6 +328,28 @@ restart:
                 case OpCode::TYPE_CAST_STRING:
                     $frame->scope[$op->arg1]->castFrom(Variable::TYPE_STRING, $frame->scope[$op->arg2]);
                     break;
+                case OpCode::TYPE_CAST_OBJECT:
+                    $dst = $frame->scope[$op->arg1];
+                    $src = $frame->scope[$op->arg2]->resolveIndirect();
+                    if (Variable::TYPE_OBJECT === $src->type) {
+                        $dst->copyFrom($src);
+                        break;
+                    }
+                    if (!isset($this->context->classes['stdclass'])) {
+                        throw new \LogicException('stdClass is not registered');
+                    }
+                    $object = new VM\ObjectEntry($this->context->classes['stdclass']);
+                    $object->constructed = true;
+                    $dst->object($object);
+                    if (Variable::TYPE_ARRAY === $src->type) {
+                        foreach ($src->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+                            $propName = $keyVar->is(Variable::TYPE_INTEGER)
+                                ? (string) $keyVar->toInt()
+                                : $keyVar->toString();
+                            $object->getProperty($propName)->copyFrom($valueVar);
+                        }
+                    }
+                    break;
                 case OpCode::TYPE_IDENTICAL:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
