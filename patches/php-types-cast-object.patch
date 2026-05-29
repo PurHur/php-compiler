@@ -1,0 +1,12 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -374,7 +374,8 @@ class TypeReconstructor
+     protected function resolveOp_Expr_Cast_Object(Operand $var, Op\Expr\Cast\Object_ $op, SplObjectStorage $resolved)
+     {
+         if ($resolved->contains($op->expr)) {
+-            if ($resolved[$op->expr]->type->resolves(Type::object())) {
++            $exprType = $resolved[$op->expr];
++            if ($exprType instanceof Type && $exprType->type === Type::TYPE_OBJECT) {
+                 return [$resolved[$op->expr]];
+             }
+ 

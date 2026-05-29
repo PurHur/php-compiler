@@ -375,7 +375,8 @@ class TypeReconstructor
     protected function resolveOp_Expr_Cast_Object(Operand $var, Op\Expr\Cast\Object_ $op, SplObjectStorage $resolved)
     {
         if ($resolved->contains($op->expr)) {
-            if ($resolved[$op->expr]->type->resolves(Type::object())) {
+            $exprType = $resolved[$op->expr];
+            if ($exprType instanceof Type && $exprType->type === Type::TYPE_OBJECT) {
                 return [$resolved[$op->expr]];
             }
 
