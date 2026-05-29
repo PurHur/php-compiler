@@ -102,6 +102,7 @@ class Module extends ModuleAbstract
             new decoct(),
             new octdec(),
             new bindec(),
+            new base_convert_(),
             new is_numeric(),
             new is_scalar(),
             new is_countable(),
