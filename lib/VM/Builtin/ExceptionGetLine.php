@@ -20,7 +20,7 @@ final class ExceptionGetLine extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('getLine() called without $this');
         }
-        $receiver = ExceptionSupport::requireThrowableObject($frame->calledArgs[0], 'getLine()');
+        $receiver = ExceptionSupport::requireThrowableObject($frame->calledArgs[0], 'getLine()', $frame->vmContext);
         if (null === $frame->returnVar) {
             return;
         }

@@ -20,7 +20,7 @@ final class ExceptionGetFile extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('getFile() called without $this');
         }
-        $receiver = ExceptionSupport::requireThrowableObject($frame->calledArgs[0], 'getFile()');
+        $receiver = ExceptionSupport::requireThrowableObject($frame->calledArgs[0], 'getFile()', $frame->vmContext);
         if (null === $frame->returnVar) {
             return;
         }

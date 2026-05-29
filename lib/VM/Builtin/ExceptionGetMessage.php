@@ -20,7 +20,7 @@ final class ExceptionGetMessage extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('getMessage() called without $this');
         }
-        $receiver = ExceptionSupport::requireThrowableObject($frame->calledArgs[0], 'getMessage()');
+        $receiver = ExceptionSupport::requireThrowableObject($frame->calledArgs[0], 'getMessage()', $frame->vmContext);
         if (null === $frame->returnVar) {
             return;
         }

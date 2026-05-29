@@ -20,7 +20,7 @@ final class ExceptionGetCode extends VmClassMethod
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('getCode() called without $this');
         }
-        $receiver = ExceptionSupport::requireThrowableObject($frame->calledArgs[0], 'getCode()');
+        $receiver = ExceptionSupport::requireThrowableObject($frame->calledArgs[0], 'getCode()', $frame->vmContext);
         if (null === $frame->returnVar) {
             return;
         }

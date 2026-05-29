@@ -32,7 +32,7 @@ use PHPCompiler\VM\Builtin\WeakReferenceGet;
 use PHPCompiler\VM\ExceptionSupport;
 
 /**
- * Register VM builtin classes stdClass, WeakReference, WeakMap, Reflection*, and Throwable* (#1366, #1936, #3117, #195).
+ * Register VM builtin classes stdClass, WeakReference, WeakMap, Reflection*, and Throwable* (#1366, #1936, #3117, #195, #3371).
  */
 final class BuiltinClasses
 {
@@ -173,16 +173,51 @@ final class BuiltinClasses
 
         self::registerThrowableClass($ctx, 'Exception', ExceptionSupport::CLASS_EXCEPTION);
         self::registerThrowableClass($ctx, 'Error', ExceptionSupport::CLASS_ERROR);
+        self::registerThrowableClass($ctx, 'TypeError', ExceptionSupport::CLASS_TYPE_ERROR, ExceptionSupport::CLASS_ERROR);
+        self::registerThrowableClass($ctx, 'ValueError', ExceptionSupport::CLASS_VALUE_ERROR, ExceptionSupport::CLASS_ERROR);
+        self::registerThrowableClass(
+            $ctx,
+            'ArgumentCountError',
+            ExceptionSupport::CLASS_ARGUMENT_COUNT_ERROR,
+            ExceptionSupport::CLASS_TYPE_ERROR
+        );
+        self::registerThrowableClass($ctx, 'ParseError', ExceptionSupport::CLASS_PARSE_ERROR, ExceptionSupport::CLASS_ERROR);
+        self::registerThrowableClass(
+            $ctx,
+            'UnhandledMatchError',
+            ExceptionSupport::CLASS_UNHANDLED_MATCH_ERROR,
+            ExceptionSupport::CLASS_ERROR
+        );
+        self::registerThrowableClass(
+            $ctx,
+            'DivisionByZeroError',
+            ExceptionSupport::CLASS_DIVISION_BY_ZERO_ERROR,
+            ExceptionSupport::CLASS_ERROR
+        );
+        self::registerThrowableClass(
+            $ctx,
+            'AssertionError',
+            ExceptionSupport::CLASS_ASSERTION_ERROR,
+            ExceptionSupport::CLASS_ERROR
+        );
     }
 
-    private static function registerThrowableClass(Context $ctx, string $name, string $lcKey): void
-    {
+    private static function registerThrowableClass(
+        Context $ctx,
+        string $name,
+        string $lcKey,
+        ?string $parentLc = null
+    ): void {
         $strProto = new Variable(Variable::TYPE_STRING);
         $intProto = new Variable(Variable::TYPE_INTEGER);
         $pub = CfgFunc::FLAG_PUBLIC;
 
         $entry = new ClassEntry($name);
-        $entry->interfaces = [ExceptionSupport::CLASS_THROWABLE];
+        if (null !== $parentLc) {
+            $entry->parentLc = $parentLc;
+        } else {
+            $entry->interfaces = [ExceptionSupport::CLASS_THROWABLE];
+        }
         $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_MESSAGE, null, $strProto);
         $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_CODE, null, $intProto);
         $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_FILE, null, $strProto);
