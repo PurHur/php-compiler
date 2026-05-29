@@ -31,6 +31,8 @@ class ClassEntry {
     public bool $isTrait = false;
     /** True for `abstract class` declarations (#3385). */
     public bool $isAbstract = false;
+    /** @var array<string, true> lowercase method names declared abstract on this class */
+    public array $abstractMethods = [];
     /** @var array<string, string> trait FQCN => FQCN from direct `use Trait;` (#3119) */
     public array $usedTraits = [];
     /** @var list<string> */
