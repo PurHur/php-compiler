@@ -168,6 +168,7 @@ final class SelfHostBuiltinPolicy
         'json_decode' => 'json',
         'json_validate' => 'json',
         'json_last_error' => 'json',
+        'json_last_error_msg' => 'json',
         'serialize' => 'json',
         'unserialize' => 'json',
     ];

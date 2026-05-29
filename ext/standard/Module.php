@@ -228,6 +228,7 @@ class Module extends ModuleAbstract
             new serialize(),
             new unserialize(),
             new json_last_error_(),
+            new json_last_error_msg_(),
             new web_int(),
             new web_string(),
             new web_bool(),
