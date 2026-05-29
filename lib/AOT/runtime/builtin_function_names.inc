@@ -99,6 +99,7 @@ static const char *phpc_builtin_functions[] = {
     "filter_var",
     "floatval",
     "floor",
+    "flush",
     "fnmatch",
     "fmod",
     "fopen",
@@ -326,4 +327,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 287;
+static const size_t phpc_builtin_functions_count = 288;

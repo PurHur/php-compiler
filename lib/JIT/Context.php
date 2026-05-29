@@ -86,7 +86,10 @@ class Context {
     private array $builtins;
     private array $stringConstantMap = [];
     private array $modules = [];
-    
+
+    /** @var array<string, true>|null */
+    private ?array $registeredBuiltinLookup = null;
+
     private ?Result $result = null;
     public Builtin\MemoryManager $memory;
     public Builtin\Output $output;
@@ -302,8 +305,27 @@ class Context {
         if ($short !== $lc && $this->functionProxyIsCallable($short)) {
             return true;
         }
+        if (isset($this->registeredBuiltinNames()[$lc]) || ($short !== $lc && isset($this->registeredBuiltinNames()[$short]))) {
+            return true;
+        }
 
         return isset($this->functions[$lc]) || ($short !== $lc && isset($this->functions[$short]));
+    }
+
+    /** @return array<string, true> */
+    private function registeredBuiltinNames(): array
+    {
+        if (null !== $this->registeredBuiltinLookup) {
+            return $this->registeredBuiltinLookup;
+        }
+        $this->registeredBuiltinLookup = [];
+        foreach ($this->modules as $module) {
+            foreach ($module->getFunctions() as $func) {
+                $this->registeredBuiltinLookup[strtolower($func->getName())] = true;
+            }
+        }
+
+        return $this->registeredBuiltinLookup;
     }
 
     /**

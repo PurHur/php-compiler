@@ -248,6 +248,7 @@ class Module extends ModuleAbstract
             new ob_start(),
             new ob_get_clean(),
             new ob_end_flush(),
+            new flush_(),
             new ob_get_level(),
             new http_response_code(),
             new json_encode(),
