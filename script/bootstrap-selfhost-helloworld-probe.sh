@@ -16,8 +16,15 @@ COMPILE_DRIVER_BIN="${ROOT}/build/selfhost-helloworld-compile"
 COMPILE_ENTRY="${ROOT}/test/bootstrap-aot/helloworld_compile_m3_emit_native_entry.php"
 EMIT_ENTRY="${ROOT}/test/bootstrap-aot/helloworld_m3_emit_native_entry.php"
 INVENTORY_EMIT_DRIVER="${ROOT}/test/selfhost/compiler_helloworld_smoke/compile_driver.php"
-# Inventory compile_driver as emit-helper link OK but runtime segfaults at {main} (#2540); thin emit TU works.
-USE_INVENTORY_EMIT_DRIVER="${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER:-0}"
+default_inventory_emit_driver=0
+if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT:-0}" == "1" ]]; then
+  default_inventory_emit_driver=1
+fi
+if [[ -n "${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER+x}" ]]; then
+  USE_INVENTORY_EMIT_DRIVER="${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER}"
+else
+  USE_INVENTORY_EMIT_DRIVER="${default_inventory_emit_driver}"
+fi
 M3_NATIVE_COMPILE=0
 M3_EMIT_PATH="none"
 M3_EMIT_HELPER_LINKED=0
@@ -65,8 +72,6 @@ if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT:-0}" == "1" ]]; then
   export BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1
   export BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1
   export BOOTSTRAP_M3_RUNTIME_COMPILE="${BOOTSTRAP_M3_RUNTIME_COMPILE:-1}"
-  # Opt-in inventory compile_driver link (argv gen-2 driver); default emit-helper TU (#2540).
-  USE_INVENTORY_EMIT_DRIVER="${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER:-0}"
 fi
 
 m3_exit_label() {

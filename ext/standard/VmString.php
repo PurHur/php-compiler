@@ -1638,6 +1638,107 @@ final class VmString
         return $out;
     }
 
+    /** Whether every byte is ASCII alphanumeric ([0-9A-Za-z]). */
+    public static function onlyAsciiAlphanumeric(string $string): bool
+    {
+        $len = self::byteLength($string);
+        for ($i = 0; $i < $len; ++$i) {
+            $ord = self::byteOrd($string[$i]);
+            if (!(($ord >= 48 && $ord <= 57) || ($ord >= 65 && $ord <= 90) || ($ord >= 97 && $ord <= 122))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * str_increment() — PHP 8.3 alphanumeric increment (ext/standard/string.c).
+     */
+    public static function strIncrement(string $string): string
+    {
+        if ('' === $string) {
+            throw new \ValueError('str_increment(): Argument #1 ($string) must not be empty');
+        }
+        if (!self::onlyAsciiAlphanumeric($string)) {
+            throw new \ValueError('str_increment(): Argument #1 ($string) must be composed only of alphanumeric ASCII characters');
+        }
+
+        $incremented = $string;
+        $len = self::byteLength($incremented);
+        $position = $len - 1;
+        $carry = false;
+
+        do {
+            $c = $incremented[$position];
+            if ('z' !== $c && 'Z' !== $c && '9' !== $c) {
+                $carry = false;
+                $incremented[$position] = self::byteChr(self::byteOrd($c) + 1);
+            } else {
+                $carry = true;
+                if ('9' === $c) {
+                    $incremented[$position] = '0';
+                } else {
+                    $incremented[$position] = self::byteChr(self::byteOrd($c) - 25);
+                }
+            }
+        } while ($carry && $position-- > 0);
+
+        if ($carry) {
+            $prefix = '0' === $incremented[0] ? '1' : $incremented[0];
+
+            return $prefix.$incremented;
+        }
+
+        return $incremented;
+    }
+
+    /**
+     * str_decrement() — PHP 8.3 alphanumeric decrement (ext/standard/string.c).
+     */
+    public static function strDecrement(string $string): string
+    {
+        if ('' === $string) {
+            throw new \ValueError('str_decrement(): Argument #1 ($string) must not be empty');
+        }
+        if (!self::onlyAsciiAlphanumeric($string)) {
+            throw new \ValueError('str_decrement(): Argument #1 ($string) must be composed only of alphanumeric ASCII characters');
+        }
+        if ('0' === $string[0]) {
+            throw new \ValueError('str_decrement(): Argument #1 ($string) "'.$string.'" is out of decrement range');
+        }
+
+        $decremented = $string;
+        $len = self::byteLength($decremented);
+        $position = $len - 1;
+        $carry = false;
+
+        do {
+            $c = $decremented[$position];
+            if ('a' !== $c && 'A' !== $c && '0' !== $c) {
+                $carry = false;
+                $decremented[$position] = self::byteChr(self::byteOrd($c) - 1);
+            } else {
+                $carry = true;
+                if ('0' === $c) {
+                    $decremented[$position] = '9';
+                } else {
+                    $decremented[$position] = self::byteChr(self::byteOrd($c) + 25);
+                }
+            }
+        } while ($carry && $position-- > 0);
+
+        if ($carry || ('0' === $decremented[0] && $len > 1)) {
+            if (1 === $len) {
+                throw new \ValueError('str_decrement(): Argument #1 ($string) "'.$string.'" is out of decrement range');
+            }
+
+            return substr($decremented, 1);
+        }
+
+        return $decremented;
+    }
+
     public static function pregQuote(string $string, ?string $delimiter = null): string
     {
         $delim = null;
