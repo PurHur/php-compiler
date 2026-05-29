@@ -6,6 +6,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(_WIN32)
+#include <io.h>
+#else
+#include <sys/file.h>
+#include <unistd.h>
+#endif
 
 
 typedef struct __string__ __string__;
@@ -147,6 +153,60 @@ int __compiler_fclose(int64_t handle)
     phpc_stream_handles[handle] = NULL;
 
     return fclose(fp) == 0 ? 1 : 0;
+}
+
+/* Map PHP LOCK_* (ext/standard/flock.c) to host flock(2) flags. */
+static int phpc_map_flock_operation(int operation)
+{
+    const int PHP_LOCK_SH = 1;
+    const int PHP_LOCK_EX = 2;
+    const int PHP_LOCK_UN = 3;
+    const int PHP_LOCK_NB = 4;
+    int sys_op = 0;
+
+    if ((operation & PHP_LOCK_UN) == PHP_LOCK_UN) {
+        sys_op |= LOCK_UN;
+        operation &= ~PHP_LOCK_UN;
+    }
+    if (operation & PHP_LOCK_SH) {
+        sys_op |= LOCK_SH;
+    }
+    if (operation & PHP_LOCK_EX) {
+        sys_op |= LOCK_EX;
+    }
+    if (operation & PHP_LOCK_NB) {
+        sys_op |= LOCK_NB;
+    }
+
+    return sys_op;
+}
+
+int __compiler_flock(int64_t handle, int64_t operation)
+{
+    FILE *fp;
+    int fd;
+    int sys_op;
+
+    fp = phpc_resolve_stream(handle);
+    if (NULL == fp) {
+        return 0;
+    }
+    fd = fileno(fp);
+    if (fd < 0) {
+        return 0;
+    }
+#if defined(_WIN32)
+    (void) operation;
+
+    return 0;
+#else
+    sys_op = phpc_map_flock_operation((int) operation);
+    if (0 == sys_op) {
+        return 0;
+    }
+
+    return flock(fd, sys_op) == 0 ? 1 : 0;
+#endif
 }
 
 int64_t __compiler_fpassthru(int64_t handle)
