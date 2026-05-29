@@ -305,6 +305,7 @@ class Module extends ModuleAbstract
             new interface_exists_(),
             new trait_exists_(),
             new class_uses_(),
+            new class_implements_(),
             new function_exists(),
             new func_get_args(),
             new func_num_args(),

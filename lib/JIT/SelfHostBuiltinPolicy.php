@@ -134,6 +134,7 @@ final class SelfHostBuiltinPolicy
         'property_exists' => 'array',
         'get_object_vars' => 'array',
         'get_class' => 'array', 'get_parent_class' => 'array', 'is_a' => 'array', 'is_subclass_of' => 'array',
+        'class_implements' => 'array',
         'trigger_error' => 'array',
         'ini_set' => 'array', 'ini_get' => 'array',
     ];
