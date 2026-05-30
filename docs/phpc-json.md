@@ -52,7 +52,7 @@ Runtime template `include` / `require` paths (for example `include __DIR__ . '/l
 }
 ```
 
-`phpc serve` registers a VM class autoloader from `autoload.psr-4` before compiling the entry script. `phpc lint --project` also lints PHP files under mapped directories. `phpc build --project` walks static class references (`new`, `extends`, `::class`, etc.) and adds matching PSR-4 paths to the link graph without hand-listed `includes[]` ([#1762](https://github.com/PurHur/php-compiler/issues/1762)); literal `require` paths from the entry still need `includes[]` when not reachable via autoload.
+`phpc serve` registers a VM class autoloader from `autoload.psr-4` before compiling the entry script. `phpc build --project` and `phpc lint --project` resolve compile units via [`ProjectGraph`](../lib/AOT/ProjectGraph.php): manifest `includes[]`, literal `require`/`include` paths, and classes referenced from the entry script under `autoload.psr-4` ([#154](https://github.com/PurHur/php-compiler/issues/154), [#1762](https://github.com/PurHur/php-compiler/issues/1762)). Hand-maintained `includes[]` is optional when PSR-4 + literal includes cover the graph.
 
 ## Examples
 
@@ -77,7 +77,7 @@ Runtime template `include` / `require` paths (for example `include __DIR__ . '/l
 }
 ```
 
-Compile unit order for `phpc build --project`: `src/Router.php`, `config.php`, then `public/index.php` (`ProjectManifest::resolveCompileUnitPaths`).
+Compile unit order for `phpc build --project`: discovered units from `ProjectGraph::resolve` (manifest `includes[]`, literal includes, PSR-4 classes), then `entry` last.
 
 ### JSON API flat project (`examples/004-ApiJson/phpc.json`)
 

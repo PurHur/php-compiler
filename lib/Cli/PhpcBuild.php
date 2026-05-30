@@ -118,6 +118,30 @@ final class PhpcBuild
     }
 
     /**
+     * Non-entry compile units from ProjectGraph (manifest includes, literal includes, PSR-4).
+     *
+     * @return array{includes: list<string>, errors: list<string>}
+     */
+    public static function resolveGraphIncludePaths(string $projectDir, string $entry): array
+    {
+        $graph = ProjectGraph::resolve($projectDir);
+        if ([] !== $graph['errors']) {
+            return ['includes' => [], 'errors' => $graph['errors']];
+        }
+
+        $entryKey = realpath($entry) ?: $entry;
+        $includes = [];
+        foreach ($graph['files'] as $path) {
+            $key = realpath($path) ?: $path;
+            if ($key !== $entryKey) {
+                $includes[] = $path;
+            }
+        }
+
+        return ['includes' => $includes, 'errors' => []];
+    }
+
+    /**
      * Print manifest link order (includes[] then entry) as absolute paths; no LLVM (issue #729).
      */
     public static function printIncludes(string $projectDir): int
