@@ -810,6 +810,17 @@ restart:
         }
         $left = $left->resolveIndirect();
         $right = $right->resolveIndirect();
+        if (OpCode::TYPE_PLUS === $opCode
+            && self::TYPE_ARRAY === $left->type
+            && self::TYPE_ARRAY === $right->type) {
+            if ($this === $left) {
+                $left->array->unionInPlace($right->array);
+            } else {
+                $this->array($left->array->unionCopy($right->array));
+            }
+
+            return;
+        }
         // In-place ops (e.g. $i++ → PLUS($i,$i,1)) alias $this with an operand (#1228).
         if ($this === $left || $this === $right) {
             $this->storeNumericOp($opCode, $left->toNumeric(), $right->toNumeric());
