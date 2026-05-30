@@ -3320,11 +3320,15 @@ restart:
 
     protected function declaringClassLc(Frame $frame): string
     {
-        if (null === $frame->block->func || null === $frame->block->func->class) {
-            throw new \LogicException('self:: used outside of class scope');
+        if (null !== $frame->block->func && null !== $frame->block->func->class) {
+            return strtolower($frame->block->func->class->value);
+        }
+        // Bound closure scope (Closure::bind/bindTo $newScope) — #3673.
+        if (null !== $frame->calledClass && '' !== $frame->calledClass) {
+            return strtolower($frame->calledClass);
         }
 
-        return strtolower($frame->block->func->class->value);
+        throw new \LogicException('self:: used outside of class scope');
     }
 
     protected function lateStaticClassLc(Frame $frame): string
@@ -3440,6 +3444,9 @@ restart:
         $callerClassLc = null;
         if (null !== $frame->block->func && null !== $frame->block->func->class) {
             $callerClassLc = strtolower($frame->block->func->class->value);
+        }
+        if (null === $callerClassLc && null !== $frame->calledClass && '' !== $frame->calledClass) {
+            $callerClassLc = strtolower($frame->calledClass);
         }
         $parentScopeAllows = false;
         if ($this->isParentClassDispatch($frame, $lcClass)) {
