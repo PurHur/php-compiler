@@ -21,13 +21,14 @@ final class fclose extends Internal
             throw new \LogicException('fclose() requires exactly one argument in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_INTEGER !== $handleVar->type) {
             throw new \LogicException('fclose() handle must be an integer in this compiler build');
         }
-        $frame->returnVar->bool(VmFs::fclose($handleVar->toInt()));
+        $closed = VmFs::fclose($handleVar->toInt());
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool($closed);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

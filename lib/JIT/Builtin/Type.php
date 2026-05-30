@@ -244,6 +244,9 @@ class Type extends Builtin {
         $fntypeFclose = $this->context->context->functionType($i32, false, $i64);
         $fnFclose = $this->context->module->addFunction('__compiler_fclose', $fntypeFclose);
         $this->context->registerFunction('__compiler_fclose', $fnFclose);
+        $fntypeIsResource = $this->context->context->functionType($i32, false, $i64);
+        $fnIsResource = $this->context->module->addFunction('__compiler_is_resource', $fntypeIsResource);
+        $this->context->registerFunction('__compiler_is_resource', $fnIsResource);
         $fntypeFlock = $this->context->context->functionType($i32, false, $i64, $i64);
         $fnFlock = $this->context->module->addFunction('__compiler_flock', $fntypeFlock);
         $this->context->registerFunction('__compiler_flock', $fnFlock);

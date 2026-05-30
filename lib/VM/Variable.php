@@ -51,6 +51,9 @@ final class Variable {
 
     public ?string $objectPropertyName = null;
 
+    /** Stream handle from fopen()/similar; distinguishes handle ints from plain integers (#3519). */
+    public bool $streamResource = false;
+
     public function __construct(int $type = self::TYPE_NULL) {
         $this->type = $type;
     }
@@ -117,6 +120,18 @@ final class Variable {
         $this->reset();
         $this->type = self::TYPE_INTEGER;
         $this->integer = $value;
+        $this->streamResource = false;
+    }
+
+    public function streamHandle(int $value): void
+    {
+        $this->int($value);
+        $this->streamResource = true;
+    }
+
+    public function isStreamResource(): bool
+    {
+        return $this->streamResource && self::TYPE_INTEGER === $this->type;
     }
 
     public function is(int $type): bool {
@@ -277,6 +292,7 @@ final class Variable {
 
     public function reset(): void {
         $this->type = self::TYPE_NULL;
+        $this->streamResource = false;
         unset($this->string);
         unset($this->integer);
         unset($this->float);
@@ -354,6 +370,7 @@ final class Variable {
                 break;
             case self::TYPE_INTEGER:
                 $this->int($var->integer);
+                $this->streamResource = $var->streamResource;
                 break;
             case self::TYPE_FLOAT:
                 $this->float($var->float);
