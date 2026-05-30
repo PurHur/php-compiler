@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** class_implements() VM builtin (issue #3099). */
+/** class_implements() VM builtin (issue #3099, #3748). */
 final class ClassImplementsBuiltinTest extends TestCase
 {
     public function testVmClassImplementsDirectAndInherited(): void
@@ -41,6 +41,22 @@ echo isset($map['I']) ? '1' : '0';
 PHP;
         $rt = new Runtime();
         $block = $rt->parseAndCompile($code, 'class_implements_obj.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('1', ob_get_clean());
+    }
+
+    public function testVmClassImplementsAutoloadFlagFalse(): void
+    {
+        $code = <<<'PHP'
+<?php
+interface I {}
+class C implements I {}
+$map = class_implements(new C, false);
+echo isset($map['I']) ? '1' : '0';
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'class_implements_autoload.php');
         ob_start();
         $rt->run($block);
         $this->assertSame('1', ob_get_clean());
