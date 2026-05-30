@@ -54,6 +54,9 @@ class Context {
     /** Pending thrown value while dispatching catch handlers (issue #1362). */
     public ?Variable $pendingException = null;
 
+    /** Set when a property set hook throws (even if caught); suppresses outer assign (#3145). */
+    public bool $propertyHookSetAborted = false;
+
     /** Handler frame whose catch chain resumes after a throw-path finally (issue #2114). */
     public ?Frame $pendingCatchResumeHandler = null;
 
@@ -78,6 +81,19 @@ class Context {
 
     /** @var array<int, Variable> foreach iterator container cache (issue #167, #1885). */
     public array $foreachIterators = [];
+
+    /** @var array<int, ObjectPropertyIterator> foreach object property walk (#3661). */
+    public array $objectPropertyIterators = [];
+
+    /**
+     * Handler frames for active try regions (block with TYPE_TRY/CATCH), innermost last (#3521).
+     *
+     * @var list<Frame>
+     */
+    public array $activeTryHandlerFrames = [];
+
+    /** @var array<int, true> merge block object id => pop one try handler on entry */
+    public array $tryMergeBlockIds = [];
 
     public function __construct(Runtime $runtime) {
         $this->runtime = $runtime;
@@ -132,6 +148,12 @@ class Context {
         if (null !== $stdlibInt) {
             $var = new Variable(Variable::TYPE_INTEGER);
             $var->int($stdlibInt);
+            return $var;
+        }
+        $stdlibFloat = \PHPCompiler\ext\standard\StdlibConstants::CORE_FLOAT_BY_NAME[strtolower($name)] ?? null;
+        if (null !== $stdlibFloat) {
+            $var = new Variable(Variable::TYPE_FLOAT);
+            $var->float($stdlibFloat);
             return $var;
         }
         $phpCore = \PHPCompiler\ext\standard\VmPhpCoreConstants::fetch($name);

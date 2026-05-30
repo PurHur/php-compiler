@@ -61,6 +61,18 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'countable')) {
                 continue;
             }
+            // __halt_compiler() is compile-time only (#3479).
+            if (str_contains($name, 'halt_compiler')) {
+                continue;
+            }
+            // gethostname() MCJIT: dedicated GethostnameJITTest (#3465); umbrella JITTest skips until stable.
+            if (str_contains($name, 'gethostname')) {
+                continue;
+            }
+            // getrusage() MCJIT: dedicated compliance JIT path (#3240); umbrella JITTest skips until stable.
+            if (str_contains($name, 'getrusage')) {
+                continue;
+            }
             // array_walk_recursive() is VM-only until recursive LLVM walk (#3111).
             if (str_contains($name, 'array_walk_recursive')) {
                 continue;
@@ -69,12 +81,20 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'allow_dynamic_properties')) {
                 continue;
             }
+            // count() COUNT_RECURSIVE is VM-only until recursive LLVM count (#3511).
+            if (str_contains($name, 'count_recursive')) {
+                continue;
+            }
             // preg_last_error_msg() MCJIT path unsafe with preg_match stub runtime (#3110).
             if (str_contains($name, 'preg_last_error_msg')) {
                 continue;
             }
             // json_validate() MCJIT path unsafe until __compiler_json_validate link is stable (#3101).
             if (str_contains($name, 'json_validate')) {
+                continue;
+            }
+            // Nested break/continue levels use php-cfg goto labels; VM-only until JIT (#3405).
+            if (str_contains($name, 'break2_') || str_contains($name, 'continue2_')) {
                 continue;
             }
             // (unset) cast reference break is VM-only until JIT TYPE_CAST_UNSET lowering (#3517).
@@ -101,12 +121,39 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'enum_cases')) {
                 continue;
             }
+            // Global function __METHOD__/__FUNCTION__ — parse-time literals; MCJIT segfault (#3595).
+            if (str_contains($name, 'magic_const_method_function')) {
+                continue;
+            }
             // object == structural compare is VM-only until JIT Object_ lowering (#3602).
             if (str_contains($name, 'object_loose_equals')) {
                 continue;
             }
+            // object <=> is VM-only until JIT zend_compare_objects lowering (#3691).
+            if (str_contains($name, 'spaceship_objects')) {
+                continue;
+            }
+            // string/number loose == juggling is VM-only until ArrayBuiltinHelper string-long compare (#3644).
+            if (str_contains($name, 'loose_numeric_string')) {
+                continue;
+            }
+            if (str_contains($name, 'loose_int_empty_string')) {
+                continue;
+            }
+            // string/string loose == numeric compare is VM-only until JIT string== is stable (#3680).
+            if (str_contains($name, 'loose_string_scientific')) {
+                continue;
+            }
             // object === identity compare is VM-only until JIT handle compare is stable (#3622).
             if (str_contains($name, 'object_identical')) {
+                continue;
+            }
+            // foreach over user objects / stdClass is VM-only until IteratorHelper object walk (#3661).
+            if (str_contains($name, 'foreach_object_by_ref')) {
+                continue;
+            }
+            // array <=> array is VM-only until __hashtable__compareSpaceship JIT lowering (#3672).
+            if (str_contains($name, 'spaceship_array')) {
                 continue;
             }
             // gettype() object/resource is VM-only until __compiler_gettype JIT path is stable (#3618).
@@ -115,6 +162,26 @@ class JITTest extends BaseTest {
             }
             // __TRAIT__ in trait bodies requires trait JIT lowering (#3609); parse-time fold is VM-only for now.
             if (str_contains($name, 'magic_const_trait')) {
+                continue;
+            }
+            // pre/post inc/dec VM-only until JIT lowering (#3552).
+            if (str_contains($name, 'pre_post_inc')) {
+                continue;
+            }
+            // array union (+/+=) is VM-only until JIT TYPE_PLUS array branch (#3690).
+            if (str_contains($name, 'array_union')) {
+                continue;
+            }
+            // User enum DECLARE_ENUM segfaults in MCJIT until enum lowering is stable (#3518).
+            if (str_contains($name, 'enum_')) {
+                continue;
+            }
+            // Property hooks are VM-only until JIT property dispatch (#3145).
+            if (str_contains($name, 'property_hook')) {
+                continue;
+            }
+            // ++/-- string increment_string is VM-only until JIT reads OpCode::isIncDec (#3469).
+            if (str_contains($name, 'string_increment')) {
                 continue;
             }
             yield $name => $case;

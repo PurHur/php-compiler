@@ -58,6 +58,8 @@ class ClassEntry {
     public array $attributeNames = [];
     /** @var array<string, list<string>> method (lowercase) => attribute names (#1936). */
     public array $methodAttributeNames = [];
+    /** @var array<string, string> method (lowercase) => trait FQCN when imported via use Trait (#3416). */
+    public array $traitMethodSources = [];
     /** @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata> method (lowercase) => deprecation (#3569). */
     public array $methodDeprecated = [];
     /** @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata> constant (lowercase) => deprecation (#3569). */

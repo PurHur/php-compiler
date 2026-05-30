@@ -26,6 +26,7 @@ final class SelfHostBuiltinPolicy
         'is_bool' => 'numeric',
         'is_string' => 'numeric',
         'is_array' => 'numeric',
+        'is_countable' => 'numeric',
         'is_null' => 'numeric',
         'is_numeric' => 'numeric',
         'time' => 'numeric',
@@ -33,6 +34,7 @@ final class SelfHostBuiltinPolicy
         'getdate' => 'numeric',
         'uniqid' => 'numeric',
         'getmypid' => 'numeric',
+        'getrusage' => 'numeric',
         'pi' => 'numeric',
     ];
 
@@ -85,7 +87,7 @@ final class SelfHostBuiltinPolicy
         'pathinfo' => 'filesystem', 'readfile' => 'filesystem', 'readlink' => 'filesystem', 'rename' => 'filesystem',
         'is_uploaded_file' => 'filesystem', 'move_uploaded_file' => 'filesystem', 'touch' => 'filesystem',
         'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem', 'tempnam' => 'filesystem',
-        'getcwd' => 'filesystem', 'chdir' => 'filesystem',
+        'getcwd' => 'filesystem', 'chdir' => 'filesystem', 'gethostname' => 'filesystem',
         'stream_context_create' => 'filesystem',
     ];
 
@@ -94,6 +96,7 @@ final class SelfHostBuiltinPolicy
         // Required for AOT linker/toolchain discovery (lib/AOT/Linker.php) and bootstrap M5 path.
         'shell_exec' => 'process',
         'escapeshellarg' => 'process',
+        'escapeshellcmd' => 'process',
         'phpc_run_command' => 'process',
     ];
 
@@ -137,7 +140,7 @@ final class SelfHostBuiltinPolicy
         'array_multisort' => 'array',
         'usort' => 'array', 'uasort' => 'array', 'uksort' => 'array',
         'compact' => 'array', 'extract' => 'array', 'defined' => 'array', 'define' => 'array',
-        'get_defined_constants' => 'array', 'get_defined_vars' => 'array',
+        'get_defined_constants' => 'array', 'get_defined_vars' => 'array', 'get_declared_interfaces' => 'array',
         'class_exists' => 'array', 'enum_exists' => 'array', 'get_declared_enums' => 'array', 'function_exists' => 'array', 'method_exists' => 'array',
         'property_exists' => 'array',
         'get_object_vars' => 'array',
@@ -151,7 +154,7 @@ final class SelfHostBuiltinPolicy
     ];
 
     /** @var array<string, string> */
-    private const CATEGORY_HASH = ['hash' => 'hash', 'hash_hmac' => 'hash', 'md5' => 'hash', 'sha1' => 'hash', 'crc32' => 'hash'];
+    private const CATEGORY_HASH = ['hash' => 'hash', 'hash_hmac' => 'hash', 'md5' => 'hash', 'sha1' => 'hash', 'crc32' => 'hash', 'crc32c' => 'hash'];
 
     /** @var array<string, string> */
     private const CATEGORY_PREG = [

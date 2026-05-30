@@ -43,8 +43,8 @@ function syntaxRowDefinitions(): array
             'construct' => 'Enum declarations `enum Foo: string { case Bar = \'x\'; }`',
             'opcodes' => ['TYPE_DECLARE_ENUM', 'TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH'],
             'issue' => 1356,
-            'notes' => ['Backed enum cases as class constants; `Foo::Bar` const-like fetch; case `->name` / `->value` (#3420); `enum_exists` registry; `implements` metadata (#2299); static methods (#2299); `Enum::cases()` VM (#3308)'],
-            'probe' => 'enum Status: string { case Ok = \'ok\'; public static function tag(): string { return \'ok\'; } } echo Status::tag();',
+            'notes' => ['Backed enum case objects with `->name` / `->value`; string context coerces to backed scalar (#3518); `Foo::Bar` singleton fetch; `enum_exists` registry; `implements` metadata (#2299); static methods (#2299); `Enum::cases()` VM (#3308)'],
+            'probe' => 'enum Status: string { case Ok = \'ok\'; public static function tag(): string { return \'ok\'; } } echo Status::Ok; echo Status::tag();',
         ],
         [
             'id' => 'instance_methods',
@@ -352,6 +352,17 @@ function syntaxRowDefinitions(): array
             'probe' => 'declare(strict_types=1); function f(int $x) { return $x; } echo f(1);',
         ],
         [
+            'id' => 'array_type_list',
+            'construct' => 'PHP 8.3+ generic array types `list<T>` / `array<K,V>` (parameters and properties)',
+            'opcodes' => ['TYPE_ARG_RECV', 'TYPE_DECLARE_PROPERTY', 'TYPE_ASSIGN'],
+            'issue' => 3705,
+            'notes' => [
+                'Source rewrite to magic identifier types for php-parser v4; VM list shape check (#3705)',
+                'Zend generic-array RFC not merged in php-src 8.4 — parity target is proposed list/array forms',
+            ],
+            'probe' => 'function f(list $x): void {} f([1]);',
+        ],
+        [
             'id' => 'variable_variables',
             'construct' => 'Variable variables (`$$name`)',
             'opcodes' => ['TYPE_VAR_FETCH'],
@@ -456,6 +467,7 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'php-cfg-trait-use.patch; VM merges trait methods into class',
                 'TraitUseAdaptation (alias/insteadof) is #144',
+                'Horizontal trait method collision fatals at compile time (#3416)',
             ],
             'probe' => 'trait T { public function m(): int { return 1; } } class C { use T; } echo (new C())->m();',
         ],

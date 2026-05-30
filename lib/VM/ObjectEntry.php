@@ -37,6 +37,15 @@ class ObjectEntry {
     /** True until first property access or method call runs the lazy initializer. */
     public bool $lazyPending = false;
 
+    /** True for backed/unit enum case singleton objects (#3518). */
+    public bool $isEnumCase = false;
+
+    /** Case name as declared (`Active`), not lowercased. */
+    public ?string $enumCaseName = null;
+
+    /** Backed scalar for backed enums; null for unit enums (#3404). */
+    public ?Variable $enumCaseValue = null;
+
     public function __construct(ClassEntry $class) {
         $this->class = $class;
         $this->id = ++self::$counter;
@@ -79,6 +88,9 @@ class ObjectEntry {
     }
 
     public function getProperty(string $name): Variable {
+        if ($this->isEnumCase) {
+            return EnumCaseSupport::getProperty($this, $name);
+        }
         if (!isset($this->properties[$name])) {
             if (!$this->class->allowsDynamicProperties) {
                 throw new \LogicException("Undefined property access");
@@ -154,6 +166,42 @@ class ObjectEntry {
         }
 
         return true;
+    }
+
+    /**
+     * Zend {@see zend_compare_objects()} / {@see zend_std_compare_objects()} for spaceship (#3691).
+     *
+     * Same class: compare instance properties via {@see Variable::compareSpaceship()}.
+     * Different classes on PHP 8.2: always 1 (not a total order; matches Zend <=>).
+     */
+    public function compareSpaceship(self $other): int
+    {
+        if ($this === $other) {
+            return 0;
+        }
+        if ($this->class->name !== $other->class->name) {
+            return 1;
+        }
+        $names = array_keys($this->properties);
+        foreach (array_keys($other->properties) as $name) {
+            if (!\in_array($name, $names, true)) {
+                $names[] = $name;
+            }
+        }
+        foreach ($names as $name) {
+            $left = isset($this->properties[$name])
+                ? $this->properties[$name]->resolveIndirect()
+                : new Variable(Variable::TYPE_NULL);
+            $right = isset($other->properties[$name])
+                ? $other->properties[$name]->resolveIndirect()
+                : new Variable(Variable::TYPE_NULL);
+            $cmp = Variable::compareSpaceship($left, $right);
+            if (0 !== $cmp) {
+                return $cmp;
+            }
+        }
+
+        return 0;
     }
 
     /** Shallow clone: new object id, copied instance property values. */

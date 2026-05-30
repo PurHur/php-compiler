@@ -1,8 +1,7 @@
+diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php
-@@ -12,6 +12,7 @@
- namespace PHPCfg\Visitor;
- 
+@@ -14,5 +14,6 @@
  use PHPCfg\AbstractVisitor;
  use PHPCfg\Block;
 +use PHPCfg\ErrorSuppressBlock;

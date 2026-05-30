@@ -55,7 +55,7 @@ final class in_array extends Internal
 
     public static function looseEquals(Variable $left, Variable $right): bool
     {
-        return self::toCompareValue($left) == self::toCompareValue($right);
+        return $left->resolveIndirect()->equals($right->resolveIndirect());
     }
 
     public static function toCompareValue(Variable $v): mixed

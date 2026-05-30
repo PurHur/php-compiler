@@ -1694,6 +1694,74 @@ final class VmString
     }
 
     /**
+     * Zend increment_string() for ++ on string operands (issue #3469).
+     *
+     * @see Zend/zend_operators.c increment_string()
+     */
+    public static function incrementStringOperator(string $string): string
+    {
+        if ('' === $string) {
+            return '1';
+        }
+
+        $incremented = $string;
+        $len = self::byteLength($incremented);
+        $position = $len - 1;
+        $carry = false;
+        $last = 0;
+
+        do {
+            $c = $incremented[$position];
+            $ord = self::byteOrd($c);
+            if ($ord >= 97 && $ord <= 122) {
+                if ('z' === $c) {
+                    $incremented[$position] = 'a';
+                    $carry = true;
+                } else {
+                    $incremented[$position] = self::byteChr($ord + 1);
+                    $carry = false;
+                    $last = 1;
+                }
+            } elseif ($ord >= 65 && $ord <= 90) {
+                if ('Z' === $c) {
+                    $incremented[$position] = 'A';
+                    $carry = true;
+                } else {
+                    $incremented[$position] = self::byteChr($ord + 1);
+                    $carry = false;
+                    $last = 2;
+                }
+            } elseif ($ord >= 48 && $ord <= 57) {
+                if ('9' === $c) {
+                    $incremented[$position] = '0';
+                    $carry = true;
+                } else {
+                    $incremented[$position] = self::byteChr($ord + 1);
+                    $carry = false;
+                    $last = 3;
+                }
+            } else {
+                if (!$carry) {
+                    $incremented[$position] = self::byteChr($ord + 1);
+                }
+                $carry = false;
+            }
+        } while ($carry && $position-- > 0);
+
+        if ($carry) {
+            $prefix = match ($last) {
+                2 => 'A',
+                3 => '0' === $incremented[0] ? '1' : $incremented[0],
+                default => 'a',
+            };
+
+            return $prefix.$incremented;
+        }
+
+        return $incremented;
+    }
+
+    /**
      * str_decrement() — PHP 8.3 alphanumeric decrement (ext/standard/string.c).
      */
     public static function strDecrement(string $string): string
@@ -2430,26 +2498,43 @@ final class VmString
         return self::byteSlice($path, 0, $last);
     }
 
-    public static function basename(string $path): string
+    public static function basename(string $path, string $suffix = ''): string
     {
         $len = self::byteLength($path);
         if (0 === $len) {
-            return '';
+            return self::stripBasenameSuffix('', $suffix);
         }
         $end = $len;
         while ($end > 0 && ('/' === $path[$end - 1] || '\\' === $path[$end - 1])) {
             --$end;
         }
         if (0 === $end) {
-            return '';
+            return self::stripBasenameSuffix('', $suffix);
         }
         for ($i = $end - 1; $i >= 0; --$i) {
             if ('/' === $path[$i] || '\\' === $path[$i]) {
-                return self::byteSlice($path, $i + 1, $end - $i - 1);
+                return self::stripBasenameSuffix(
+                    self::byteSlice($path, $i + 1, $end - $i - 1),
+                    $suffix
+                );
             }
         }
 
-        return self::byteSlice($path, 0, $end);
+        return self::stripBasenameSuffix(self::byteSlice($path, 0, $end), $suffix);
+    }
+
+    private static function stripBasenameSuffix(string $base, string $suffix): string
+    {
+        $suffixLen = self::byteLength($suffix);
+        if ($suffixLen > 0) {
+            $baseLen = self::byteLength($base);
+            if ($baseLen >= $suffixLen
+                && self::compareBytes($base, $suffix, $suffixLen, $baseLen - $suffixLen)) {
+                return self::byteSlice($base, 0, $baseLen - $suffixLen);
+            }
+        }
+
+        return $base;
     }
 
     /**

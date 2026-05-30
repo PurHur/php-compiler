@@ -14,6 +14,10 @@ class ClassProperty {
     public string $name;
     public ?Variable $default;
     public Variable $prototype;
+    /** Lowercase set-hook method name from property-hooks lowering (#3145), or null. */
+    public ?string $setHookMethodLc = null;
+    /** Lowercase get-hook method name from property-hooks lowering (#3145), or null. */
+    public ?string $getHookMethodLc = null;
 
     public function __construct(string $name, ?Variable $default, Variable $prototype) {
         $this->name = $name;

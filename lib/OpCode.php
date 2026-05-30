@@ -145,13 +145,20 @@ class OpCode {
      * block1 = compiled anonymous function body (VM-only today; JIT still lowers to null).
      */
     const TYPE_CLOSURE = 109;
+    /** Bare `throw;` in catch — rethrow active caught exception (#3508). */
+    const TYPE_RETHROW = 111;
     /** Begin `@` error-control: mask E_WARNING/E_NOTICE for wrapped expression (issue #3546). */
     const TYPE_BEGIN_SILENCE = 112;
     /** End `@` error-control: restore prior error_reporting (issue #3546). */
     const TYPE_END_SILENCE = 113;
-
-    /** Bare `throw;` in catch — rethrow active caught exception (#3508). */
-    const TYPE_RETHROW = 111;
+    /** Post-increment: arg1=result, arg2=read, arg3=write (#3552). */
+    const TYPE_POST_INC = 114;
+    /** Pre-increment: arg1=result, arg2=read, arg3=write (#3552). */
+    const TYPE_PRE_INC = 115;
+    /** Post-decrement: arg1=result, arg2=read, arg3=write (#3552). */
+    const TYPE_POST_DEC = 116;
+    /** Pre-decrement: arg1=result, arg2=read, arg3=write (#3552). */
+    const TYPE_PRE_DEC = 117;
 
     public int $type;
     public ?int $arg1;
@@ -183,6 +190,9 @@ class OpCode {
      * @var list<array{name: string, slot: int, byRef: bool}>
      */
     public array $closureCaptures = [];
+
+    /** Lowered from ++/-- (issue #3469); enables Zend increment_string on strings. */
+    public bool $isIncDec = false;
 
     public function __construct(int $type, ?int $arg1 = null, ?int $arg2 = null, ?int $arg3 = null) {
         $this->type = $type;

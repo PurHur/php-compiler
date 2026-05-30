@@ -15,13 +15,14 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * count() for arrays (subset of PHP).
+ * count() for arrays (subset of PHP; php-src ext/standard/array.c).
  */
 final class array_count extends Internal
 {
@@ -32,8 +33,9 @@ final class array_count extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('count() requires exactly one argument');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('count() expects at least 1 argument, at most 2');
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
@@ -42,19 +44,56 @@ final class array_count extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('count() requires VM context in this compiler build');
         }
-        $frame->returnVar->int(VmArray::countValue($frame->vmContext, $v));
+        $mode = VmArray::COUNT_NORMAL;
+        if (2 === $argc) {
+            $modeArg = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $modeArg->type) {
+                throw new \TypeError('count(): Argument #2 ($mode) must be of type int');
+            }
+            $mode = $modeArg->toInt();
+            if (VmArray::COUNT_NORMAL !== $mode && VmArray::COUNT_RECURSIVE !== $mode) {
+                throw new \LogicException(
+                    'count(): Parameter must be an integer or use the COUNT_RECURSIVE flag'
+                );
+            }
+        }
+        if (Variable::TYPE_ARRAY === $v->type) {
+            $ht = $v->toArray();
+            if (VmArray::COUNT_RECURSIVE === $mode) {
+                $frame->returnVar->int(VmArray::countRecursive($ht));
+            } else {
+                $frame->returnVar->int($ht->getNumElements());
+            }
+        } else {
+            $frame->returnVar->int(VmArray::countValue($frame->vmContext, $v));
+        }
     }
 
     public Context $context;
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== count($args)) {
-            throw new \LogicException('count() requires exactly one argument');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('count() expects at least 1 argument, at most 2');
         }
         foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
                 $this->jitString($context, $arg, 'array_count() argument #'.((int) $i + 1));
+            }
+        }
+        if (2 === $argc) {
+            $modeLit = JitLongArg::compileTimeLiteral($args[1]);
+            if (null === $modeLit) {
+                throw new \LogicException('count() mode must be a compile-time integer in this compiler build');
+            }
+            if (VmArray::COUNT_RECURSIVE === $modeLit) {
+                throw new \LogicException('count() COUNT_RECURSIVE is not supported in JIT in this compiler build');
+            }
+            if (VmArray::COUNT_NORMAL !== $modeLit) {
+                throw new \LogicException(
+                    'count(): Parameter must be an integer or use the COUNT_RECURSIVE flag'
+                );
             }
         }
         if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY) {

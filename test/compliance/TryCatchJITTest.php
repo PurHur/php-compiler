@@ -26,6 +26,10 @@ final class TryCatchJITTest extends BaseTest
             __DIR__.'/cases/language/throw_in_function_jit.phpt',
             'throw_in_function_jit.phpt'
         );
+        yield 'throw_expression_assign_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/language/throw_expression_assign_jit.phpt',
+            'throw_expression_assign_jit.phpt'
+        );
     }
 
     public function setUp(): void

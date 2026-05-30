@@ -107,6 +107,9 @@ class MagicStringResolver extends NodeVisitorAbstract
             if (! empty($this->methodStack)) {
                 return new Node\Scalar\String_(end($this->methodStack), $node->getAttributes());
             }
+            if (! empty($this->functionStack)) {
+                return new Node\Scalar\String_(end($this->functionStack), $node->getAttributes());
+            }
         }
     }
 
