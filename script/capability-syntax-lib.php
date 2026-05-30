@@ -412,6 +412,7 @@ function syntaxRowDefinitions(): array
             'issue' => 1363,
             'notes' => [
                 'php-cfg Expr_FirstClassCallable (#1230); VM stores string or [obj, method] array',
+                'Instance method $obj->m(...) VM + argument forwarding (#3566); JIT deferred',
                 'JIT folds strlen(...) / Class::m(...) via compileTimeString assign chains (#1363)',
                 'php-types TypeReconstructor patch for Expr_FirstClassCallable (#2315)',
             ],
