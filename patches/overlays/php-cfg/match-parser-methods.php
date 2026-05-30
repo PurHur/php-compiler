@@ -69,6 +69,7 @@
 
     /**
      * Match arm value: assign to result or throw (issue #3398).
+     * Assignment arms use readVariable for the LHS so side effects bind in {main} (#3787).
      */
     private function lowerMatchArmBody($body, Temporary $result, array $attrs, Block $endBlock): void
     {
@@ -80,6 +81,22 @@
             $dead = $this->block->create();
             $dead->dead = true;
             $this->block = $dead;
+
+            return;
+        }
+
+        if ($body instanceof Expr\Assign) {
+            $bodyAttrs = $this->mapAttributes($body);
+            $rhs = $this->readVariable($this->parseExprNode($body->expr));
+            $lhs = $this->readVariable($this->parseExprNode($body->var));
+            $this->block->children[] = $inner = new Op\Expr\Assign($lhs, $rhs, $bodyAttrs);
+            $this->block->children[] = new Op\Expr\Assign(
+                $result,
+                $this->readVariable($inner->result),
+                $attrs
+            );
+            $this->block->children[] = new Jump($endBlock, $attrs);
+            $endBlock->addParent($this->block);
 
             return;
         }
