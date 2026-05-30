@@ -757,6 +757,26 @@ class Object_ extends Type {
         return array_keys($this->classes);
     }
 
+    /**
+     * @return list<string>
+     */
+    public function allDeclaredInterfaceNames(): array
+    {
+        $names = [];
+        foreach (array_keys($this->interfaceClassLcs) as $ifaceLc) {
+            $resolved = null;
+            foreach ($this->classIdToName as $name) {
+                if (strtolower(ltrim($name, '\\')) === $ifaceLc) {
+                    $resolved = $name;
+                    break;
+                }
+            }
+            $names[] = $resolved ?? $ifaceLc;
+        }
+
+        return $names;
+    }
+
     public function hasUserDeclaredEnum(string $name): bool
     {
         return isset($this->enums[strtolower($name)]);

@@ -114,6 +114,7 @@ static const char *phpc_builtin_functions[] = {
     "get_class",
     "get_defined_constants",
     "get_defined_vars",
+    "get_declared_interfaces",
     "get_object_vars",
     "get_parent_class",
     "getallheaders",
