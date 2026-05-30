@@ -143,7 +143,9 @@ CI: `./script/ci-fast.sh` runs `--check` by default (`BOOTSTRAP_VENDOR_INVENTORY
 ./script/docker-exec.sh -- bash -lc 'make bootstrap-selfhost-probe && ./script/bootstrap-selfhost-link.sh'
 ```
 
-On harness hosts where `docker-exec` prints `bind-mount incomplete; copying repo via tar…`, M5 ladders that run **multiple** `./script/docker-exec.sh` steps auto-sync `build/bin-compile-aot`, `build/bin-compile-aot-inventory`, and related driver binaries back to the host ([#2963](https://github.com/PurHur/php-compiler/issues/2963)). Override with explicit paths: `./script/docker-exec.sh --sync-back build/foo -- …`.
+On harness hosts where `docker-exec` prints `bind-mount incomplete; copying repo via tar…`, M5 ladders that run **multiple** `./script/docker-exec.sh` steps auto-sync `build/bin-compile-aot-inventory` (SSOT inventory argv driver) and related driver binaries back to the host ([#2963](https://github.com/PurHur/php-compiler/issues/2963), [#2968](https://github.com/PurHur/php-compiler/issues/2968)). Override with explicit paths: `./script/docker-exec.sh --sync-back build/foo -- …`.
+
+**Inventory argv driver SSOT:** `./script/bootstrap-ensure-inventory-argv-driver.sh` builds or refreshes `build/bin-compile-aot-inventory` and exports `BOOTSTRAP_COMPILE_DRIVER`. Bootstrap probes (`bootstrap-selfhost-driver-smoke.sh`, `bootstrap-selfhost-full-revision-probe.sh`) use this path exclusively for gen-2/gen-3 argv emit ([#2968](https://github.com/PurHur/php-compiler/issues/2968)). Legacy `build/bin-compile-aot` remains for gen-0 prelinked seeds only.
 
 Self-host native link requires `PHP_COMPILER_SELFHOST_AOT=1` (set by `./script/bootstrap-selfhost-link.sh` and `make bootstrap-selfhost-probe`). `PHP_COMPILER_JIT_PROGRESS_FILE` is optional progress logging for segfault triage only — it does not enable JIT stubs.
 

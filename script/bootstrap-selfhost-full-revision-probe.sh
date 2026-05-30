@@ -8,8 +8,8 @@ cd "${ROOT}"
 
 # shellcheck source=php-env.sh
 source "$(dirname "$0")/php-env.sh"
-# shellcheck source=bootstrap-resolve-compile-invoke.sh
-source "$(dirname "$0")/bootstrap-resolve-compile-invoke.sh"
+# shellcheck source=bootstrap-ensure-inventory-argv-driver.sh
+source "$(dirname "$0")/bootstrap-ensure-inventory-argv-driver.sh"
 ci_apply_llvm_memory_env
 
 GEN2_INVENTORY="${ROOT}/build/bin-compile-aot-inventory"
@@ -29,7 +29,7 @@ fi
 
 mkdir -p "${ROOT}/build"
 
-if ! bootstrap_ensure_inventory_argv_driver "${GEN2_INVENTORY}"; then
+if ! bootstrap_ensure_inventory_argv_driver_ssot "${GEN2_INVENTORY}"; then
   echo "bootstrap-selfhost-full-revision-probe: failed to ensure gen-2 inventory argv driver ${GEN2_INVENTORY}" >&2
   exit 1
 fi
