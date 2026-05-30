@@ -884,6 +884,57 @@ class Compiler {
     }
 
     /**
+     * php-cfg may embed Expr (e.g. spaceship) only under ConcatList / echo without a separate block op (#3671).
+     */
+    private function isExprLoweredInBlock(Op\Expr $expr, Block $block): bool
+    {
+        if (null === $block->orig) {
+            return false;
+        }
+        foreach ($block->orig->ops as $op) {
+            if ($op === $expr) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Lower embedded expressions before reading operand slots (echo / concat paths).
+     */
+    private function compileEmbeddedExprForOperand(?Operand $operand, Block $block): void
+    {
+        if (null === $operand) {
+            return;
+        }
+        if (!$operand instanceof Operand\Temporary || null === $operand->original) {
+            return;
+        }
+        $original = $operand->original;
+        if ($original instanceof Op\Expr && $this->isExprLoweredInBlock($original, $block)) {
+            return;
+        }
+        if ($original instanceof Op\Expr\ConcatList) {
+            $this->compileOp($original, $block);
+
+            return;
+        }
+        if ($original instanceof Op\Expr) {
+            foreach ($this->compileExpr($original, $block) as $opCode) {
+                $block->addOpCode($opCode);
+            }
+        }
+    }
+
+    private function compileConcatListPart(Operand $part, Block $block): int
+    {
+        $this->compileEmbeddedExprForOperand($part, $block);
+
+        return $this->compileOperand($part, $block, true);
+    }
+
+    /**
      * @return ?Op\Expr\BinaryOp\Coalesce
      */
     private function unwrapCoalesceExpr(Operand $operand): ?Op\Expr\BinaryOp\Coalesce
@@ -1535,7 +1586,7 @@ class Compiler {
                     $emptySlot
                 ));
             } elseif (1 === $total) {
-                $part = $this->compileOperand($op->list[0], $block, true);
+                $part = $this->compileConcatListPart($op->list[0], $block);
                 $block->addOpCode(new OpCode(
                     OpCode::TYPE_ASSIGN,
                     $return,
@@ -1547,11 +1598,11 @@ class Compiler {
                 $block->addOpCode(new OpCode(
                     OpCode::TYPE_CONCAT,
                     $return,
-                    $this->compileOperand($op->list[0], $block, true),
-                    $this->compileOperand($op->list[1], $block, true)
+                    $this->compileConcatListPart($op->list[0], $block),
+                    $this->compileConcatListPart($op->list[1], $block)
                 ));
                 while ($pointer < $total) {
-                    $right = $this->compileOperand($op->list[$pointer++], $block, true);
+                    $right = $this->compileConcatListPart($op->list[$pointer++], $block);
                     $block->addOpCode(new OpCode(
                         OpCode::TYPE_CONCAT,
                         $return,
@@ -3449,7 +3500,14 @@ class Compiler {
     protected function compileTerminal(Op\Terminal $terminal, Block $block): array {
         switch ($terminal->getType()) {
             case 'Terminal_Echo':
-                $var = $this->compileOperand($terminal->expr, $block, true);
+                $concat = $this->unwrapConcatListExpr($terminal->expr);
+                if (null !== $concat) {
+                    $this->compileOp($concat, $block);
+                    $var = $this->compileOperand($concat->result, $block, true);
+                } else {
+                    $this->compileEmbeddedExprForOperand($terminal->expr, $block);
+                    $var = $this->compileOperand($terminal->expr, $block, true);
+                }
 
                 return [new OpCode(
                     OpCode::TYPE_ECHO,
