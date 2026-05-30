@@ -146,7 +146,7 @@ final class SelfHostBuiltinPolicy
         'class_exists' => 'array', 'enum_exists' => 'array', 'get_declared_enums' => 'array', 'function_exists' => 'array', 'method_exists' => 'array',
         'property_exists' => 'array',
         'get_object_vars' => 'array',
-        'get_class' => 'array', 'get_class_vars' => 'array', 'get_parent_class' => 'array', 'is_a' => 'array', 'is_subclass_of' => 'array',
+        'get_class' => 'array', 'get_class_methods' => 'array', 'get_class_vars' => 'array', 'get_parent_class' => 'array', 'is_a' => 'array', 'is_subclass_of' => 'array',
         'class_implements' => 'array', 'class_parents' => 'array',
         'assert' => 'array',
         'trigger_error' => 'array',

@@ -53,6 +53,8 @@ class Object_ extends Type {
     private array $methodVisibility = [];
     /** @var array<int, array<string, int>> class id => property lc => visibility flags (#3159) */
     private array $propertyVisibility = [];
+    /** @var array<int, array<string, string>> class id => method lc => declared casing (#3118) */
+    private array $methodDisplayNames = [];
     /** @var array<int, true> class ids with a compiled __construct body */
     private array $hasConstructor = [];
     /** @var array<int, true> vendor/external classes without lowered methods (#2666) */
@@ -1536,9 +1538,50 @@ class Object_ extends Type {
         return Variable::TYPE_VALUE;
     }
 
-    public function defineMethodVisibility(int $classId, string $methodLc, int $visibilityFlags): void
+    public function defineMethodVisibility(int $classId, string $methodLc, int $visibilityFlags, ?string $displayName = null): void
     {
-        $this->methodVisibility[$classId][strtolower($methodLc)] = $visibilityFlags;
+        $methodLc = strtolower($methodLc);
+        $this->methodVisibility[$classId][$methodLc] = $visibilityFlags;
+        if (null !== $displayName) {
+            $this->methodDisplayNames[$classId][$methodLc] = $displayName;
+        }
+    }
+
+    /**
+     * Method names visible on a class (including inherited), filtered by visibility bitmask (#3118).
+     *
+     * @return list<string>
+     */
+    public function allMethodNamesForClassId(int $classId, int $filter): array
+    {
+        $classLc = $this->classLcForId($classId);
+        if (null === $classLc) {
+            return [];
+        }
+
+        $chain = [];
+        $currentLc = $classLc;
+        while (null !== $currentLc) {
+            array_unshift($chain, $currentLc);
+            $currentLc = $this->classParentLc[$currentLc] ?? null;
+        }
+
+        /** @var array<string, string> method lc => display name */
+        $seen = [];
+        foreach ($chain as $lc) {
+            if (!isset($this->classes[$lc])) {
+                continue;
+            }
+            $id = $this->classes[$lc];
+            foreach ($this->methodVisibility[$id] ?? [] as $methodLc => $vis) {
+                if (0 !== ($filter & 7) && 0 === ($vis & $filter & 7)) {
+                    continue;
+                }
+                $seen[$methodLc] = $this->methodDisplayNames[$id][$methodLc] ?? $methodLc;
+            }
+        }
+
+        return array_values($seen);
     }
 
     public function definePropertyVisibility(int $classId, string $name, int $visibilityFlags): void

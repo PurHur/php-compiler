@@ -534,4 +534,62 @@ final class VmReflection
 
         return $result;
     }
+
+    /** Default visibility filter: public | protected | private (php-src get_class_methods). */
+    public const METHOD_FILTER_DEFAULT = \PHPCfg\Func::FLAG_PUBLIC
+        | \PHPCfg\Func::FLAG_PROTECTED
+        | \PHPCfg\Func::FLAG_PRIVATE;
+
+    /**
+     * get_class_methods() operand — object or class name string (#3118).
+     */
+    public static function resolveClassForGetClassMethods(Context $ctx, Variable $arg): ?ClassEntry
+    {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            return $arg->toObject()->class;
+        }
+        if (Variable::TYPE_STRING === $arg->type) {
+            $className = $arg->toString();
+            $lc = strtolower(ltrim($className, '\\'));
+            if (!isset($ctx->classes[$lc])) {
+                $ctx->autoloadClass($className);
+            }
+
+            return $ctx->classes[$lc] ?? null;
+        }
+
+        throw new \LogicException('get_class_methods() argument must be an object or class name string in this compiler build');
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function classMethodsList(ClassEntry $entry, int $filter = self::METHOD_FILTER_DEFAULT): array
+    {
+        $names = [];
+        foreach ($entry->methods as $methodLc => $_method) {
+            $vis = $entry->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            if (0 !== ($filter & 7) && 0 === ($vis & $filter & 7)) {
+                continue;
+            }
+            $names[] = $entry->methodNames[$methodLc] ?? $methodLc;
+        }
+
+        return $names;
+    }
+
+    public static function classMethodsArray(ClassEntry $entry, int $filter = self::METHOD_FILTER_DEFAULT): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (self::classMethodsList($entry, $filter) as $methodName) {
+            $value = new Variable();
+            $value->string($methodName);
+            $ht->append($value);
+        }
+
+        return $result;
+    }
 }
