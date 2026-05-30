@@ -12,6 +12,11 @@ use PHPCompiler\VM\Variable;
 /** VM array helpers (no PHP internal wrappers in compiled paths). */
 final class VmArray
 {
+    /** count() mode — php-src ext/standard/basic_functions.c (#3511). */
+    public const COUNT_NORMAL = 0;
+
+    public const COUNT_RECURSIVE = 1;
+
     public static function isList(HashTable $ht): bool
     {
         $n = $ht->getNumElements();
@@ -452,6 +457,23 @@ final class VmArray
         $result->array($arr);
 
         return $result;
+    }
+
+    /**
+     * count($array, COUNT_RECURSIVE) — php-src ext/standard/array.c (#3511).
+     *
+     * Top-level element count plus recursive counts of nested arrays (PHP 8.2+).
+     */
+    public static function countRecursive(HashTable $ht): int
+    {
+        $count = $ht->getNumElements();
+        foreach ($ht->iterate(true) as $value) {
+            if (Variable::TYPE_ARRAY === $value->type) {
+                $count += self::countRecursive($value->toArray());
+            }
+        }
+
+        return $count;
     }
 
     /**

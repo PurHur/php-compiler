@@ -82,6 +82,8 @@ final class StdlibConstants
         'fnm_pathname' => VmFnmatch::FNM_PATHNAME,
         'fnm_period' => VmFnmatch::FNM_PERIOD,
         'fnm_casefold' => VmFnmatch::FNM_CASEFOLD,
+        'count_normal' => VmArray::COUNT_NORMAL,
+        'count_recursive' => VmArray::COUNT_RECURSIVE,
     ];
 
     /** Lowercase name => float value for VM\Context::constantFetch(). */
@@ -130,6 +132,8 @@ final class StdlibConstants
         'fnm_pathname',
         'fnm_period',
         'fnm_casefold',
+        'count_normal',
+        'count_recursive',
         'm_e',
         'm_log2e',
         'm_log10e',
