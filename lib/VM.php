@@ -2593,6 +2593,11 @@ restart:
 
                 continue;
             }
+            if (VM\ClassConstExpr::isSupportedOpcode($op->type)) {
+                VM\ClassConstExpr::execute($this->context, $frame, $op, $entry);
+
+                continue;
+            }
             switch ($op->type) {
                 case OpCode::TYPE_DECLARE_PROPERTY:
                     $name = $frame->scope[$op->arg1];
@@ -2632,10 +2637,11 @@ restart:
                 case OpCode::TYPE_DECLARE_CLASS_CONST:
                     $canonical = $frame->scope[$op->arg1]->toString();
                     $name = strtolower($canonical);
-                    if (!isset($block->constants[$op->arg2])) {
-                        throw new \LogicException('Class constant value must be a compile-time constant');
-                    }
-                    $entry->constants[$name] = $block->constants[$op->arg2];
+                    $entry->constants[$name] = VM\ClassConstExpr::resolveValue(
+                        $frame,
+                        $block,
+                        $op->arg2
+                    );
                     if ($entry->isEnum) {
                         $entry->enumCaseCanonicalNames[$name] = $canonical;
                         $entry->enumCases[] = [
