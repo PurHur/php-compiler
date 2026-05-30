@@ -51,6 +51,14 @@ function syntaxRowDefinitions(): array
             'probe' => 'interface L { public function n(): string; } enum S: string implements L { case A = "a"; public function n(): string { return $this->name; } } echo S::A->n();',
         ],
         [
+            'id' => 'abstract_enum_declarations',
+            'construct' => 'Abstract enum `abstract enum E { case A; }`',
+            'opcodes' => ['TYPE_DECLARE_ENUM', 'TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH'],
+            'issue' => 3737,
+            'notes' => ['Source rewriter + php-cfg flags; `new E()` fatals; case fetch works on VM'],
+            'probe' => 'abstract enum E { case A; } echo E::A->name;',
+        ],
+        [
             'id' => 'instance_methods',
             'construct' => 'Instance methods (`ClassMethod` / `Expr_MethodCall`)',
             'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_METHODCALL_INIT'],

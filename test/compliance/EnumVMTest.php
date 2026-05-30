@@ -26,6 +26,7 @@ final class EnumVMTest extends BaseTest
                 'unit_enum_case_name.phpt',
                 'enum_user_method.phpt',
                 'enum_backed_user_method.phpt',
+                'abstract_enum.phpt',
             ] as $file
         ) {
             yield $file => self::parsePHPT(
