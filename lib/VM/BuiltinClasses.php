@@ -20,7 +20,15 @@ use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethod;
 use PHPCompiler\VM\Builtin\ReflectionClassNewLazyProxy;
+use PHPCompiler\VM\Builtin\ReflectionConstantConstruct;
+use PHPCompiler\VM\Builtin\ReflectionConstantGetName;
+use PHPCompiler\VM\Builtin\ReflectionConstantGetValue;
+use PHPCompiler\VM\Builtin\ReflectionFunctionConstruct;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
+use PHPCompiler\VM\Builtin\ReflectionPropertyConstruct;
+use PHPCompiler\VM\Builtin\ReflectionPropertyGetName;
+use PHPCompiler\VM\Builtin\ReflectionPropertyGetValue;
 use PHPCompiler\VM\Builtin\WeakMapConstruct;
 use PHPCompiler\VM\Builtin\WeakMapCount;
 use PHPCompiler\VM\Builtin\WeakMapOffsetExists;
@@ -149,6 +157,40 @@ final class BuiltinClasses
         $rc->methodVisibility['getmethod'] = $pub;
         $rc->methods['newlazyproxy'] = new ReflectionClassNewLazyProxy();
         $rc->methodVisibility['newlazyproxy'] = $pub;
+
+        $rp = new ClassEntry('ReflectionProperty');
+        $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
+        $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_PROPERTY_NAME, null, $strProto);
+        $rp->constructor = new ReflectionPropertyConstruct();
+        $rp->methods['__construct'] = $rp->constructor;
+        $rp->methodVisibility['__construct'] = $pub;
+        $rp->methods['getname'] = new ReflectionPropertyGetName();
+        $rp->methodVisibility['getname'] = $pub;
+        $rp->methods['getvalue'] = new ReflectionPropertyGetValue();
+        $rp->methodVisibility['getvalue'] = $pub;
+        $ctx->classes[ReflectionSupport::REFLECTION_PROPERTY] = $rp;
+
+        $rf = new ClassEntry('ReflectionFunction');
+        $rf->properties[] = new ClassProperty(ReflectionSupport::PROP_FUNCTION_NAME, null, $strProto);
+        $rf->constructor = new ReflectionFunctionConstruct();
+        $rf->methods['__construct'] = $rf->constructor;
+        $rf->methodVisibility['__construct'] = $pub;
+        $rf->methods['getname'] = new ReflectionFunctionGetName();
+        $rf->methodVisibility['getname'] = $pub;
+        $ctx->classes[ReflectionSupport::REFLECTION_FUNCTION] = $rf;
+
+        $rconst = new ClassEntry('ReflectionConstant');
+        $rconst->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
+        $rconst->properties[] = new ClassProperty(ReflectionSupport::PROP_CONSTANT_NAME, null, $strProto);
+        $rconst->constructor = new ReflectionConstantConstruct();
+        $rconst->methods['__construct'] = $rconst->constructor;
+        $rconst->methodVisibility['__construct'] = $pub;
+        $rconst->methods['getname'] = new ReflectionConstantGetName();
+        $rconst->methodVisibility['getname'] = $pub;
+        $rconst->methods['getvalue'] = new ReflectionConstantGetValue();
+        $rconst->methodVisibility['getvalue'] = $pub;
+        $ctx->classes[ReflectionSupport::REFLECTION_CONSTANT] = $rconst;
+
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS] = $rc;
     }
 

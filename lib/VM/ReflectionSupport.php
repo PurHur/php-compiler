@@ -16,11 +16,23 @@ final class ReflectionSupport
 
     public const REFLECTION_METHOD = 'reflectionmethod';
 
+    public const REFLECTION_PROPERTY = 'reflectionproperty';
+
+    public const REFLECTION_FUNCTION = 'reflectionfunction';
+
+    public const REFLECTION_CONSTANT = 'reflectionconstant';
+
     public const REFLECTION_ATTRIBUTE = 'reflectionattribute';
 
     public const PROP_CLASS_NAME = 'name';
 
     public const PROP_METHOD_NAME = 'method';
+
+    public const PROP_PROPERTY_NAME = 'property';
+
+    public const PROP_FUNCTION_NAME = 'function';
+
+    public const PROP_CONSTANT_NAME = 'constant';
 
     public const PROP_ATTR_NAME = 'name';
 
@@ -95,6 +107,78 @@ final class ReflectionSupport
         $nameVar = $reflection->getProperty(self::PROP_METHOD_NAME)->resolveIndirect();
         if (Variable::TYPE_STRING !== $nameVar->type) {
             throw new \LogicException('ReflectionMethod missing method name');
+        }
+
+        return $nameVar->toString();
+    }
+
+    public static function requireReflectionProperty(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('ReflectionProperty method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (strtolower($obj->class->name) !== self::REFLECTION_PROPERTY) {
+            throw new \LogicException('Expected ReflectionProperty instance');
+        }
+
+        return $obj;
+    }
+
+    public static function requireReflectionFunction(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('ReflectionFunction method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (strtolower($obj->class->name) !== self::REFLECTION_FUNCTION) {
+            throw new \LogicException('Expected ReflectionFunction instance');
+        }
+
+        return $obj;
+    }
+
+    public static function requireReflectionConstant(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('ReflectionConstant method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (strtolower($obj->class->name) !== self::REFLECTION_CONSTANT) {
+            throw new \LogicException('Expected ReflectionConstant instance');
+        }
+
+        return $obj;
+    }
+
+    public static function propertyNameFromReflection(ObjectEntry $reflection): string
+    {
+        $nameVar = $reflection->getProperty(self::PROP_PROPERTY_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $nameVar->type) {
+            throw new \LogicException('ReflectionProperty missing property name');
+        }
+
+        return $nameVar->toString();
+    }
+
+    public static function functionNameFromReflection(ObjectEntry $reflection): string
+    {
+        $nameVar = $reflection->getProperty(self::PROP_FUNCTION_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $nameVar->type) {
+            throw new \LogicException('ReflectionFunction missing function name');
+        }
+
+        return $nameVar->toString();
+    }
+
+    public static function constantNameFromReflection(ObjectEntry $reflection): string
+    {
+        $nameVar = $reflection->getProperty(self::PROP_CONSTANT_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $nameVar->type) {
+            throw new \LogicException('ReflectionConstant missing constant name');
         }
 
         return $nameVar->toString();

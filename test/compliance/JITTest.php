@@ -89,6 +89,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'phpversion')) {
                 continue;
             }
+            // ReflectionProperty/Function/Constant builtins are VM-only (#3354).
+            if (str_contains($name, 'reflection_oop')) {
+                continue;
+            }
             // array_walk_recursive() is VM-only until recursive LLVM walk (#3111).
             if (str_contains($name, 'array_walk_recursive')) {
                 continue;
