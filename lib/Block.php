@@ -144,6 +144,14 @@ class Block {
         return '';
     }
 
+    /** File-level {main} body (not a named function or method). */
+    public function isMainScript(): bool
+    {
+        return null !== $this->func
+            && null === $this->func->class
+            && '{main}' === $this->func->name;
+    }
+
     public function getOperand(int $offset): Operand {
         foreach ($this->scope as $operand) {
             if ($this->scope[$operand] === $offset) {
@@ -429,7 +437,7 @@ class Block {
                 $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
             } elseif ($this->args->contains($op)) {
                 if (is_null($frame)) {
-                    $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
                     continue;
                 }
                 $found = false;
@@ -487,7 +495,16 @@ class Block {
                 ) {
                     $scope[$pos] = $frame->scope[$pos];
                 } else {
-                    $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    $name = self::resolveVariableName($op);
+                    if (null !== $name && $this->declaresGlobalName($name)) {
+                        $local = new Variable(Variable::TYPE_NULL);
+                        $local->indirect($context->ensureGlobal($name));
+                        $scope[$pos] = $local;
+                    } elseif (null === $frame) {
+                        $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
+                    } else {
+                        $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    }
                 }
             }
         }
@@ -500,6 +517,29 @@ class Block {
             $return->returnVar = $frame->returnVar;
         }
         return $return;
+    }
+
+    /**
+     * Entry-frame locals for {main}: top-level script variables live in the global symbol table (#3601).
+     */
+    private static function initialEntryVariable(
+        Operand $op,
+        Context $context,
+        int $slot,
+        self $block
+    ): Variable {
+        $name = self::resolveVariableName($op);
+        if (null !== $name && $block->isMainScript() && !Superglobals::isSuperglobalName($name)) {
+            $local = new Variable(Variable::TYPE_NULL);
+            $local->indirect($context->ensureGlobal($name));
+            if (isset($block->paramTypeConstraints[$slot])) {
+                $local->resolveIndirect()->typeConstraint = $block->paramTypeConstraints[$slot];
+            }
+
+            return $local;
+        }
+
+        return self::initialVariableForOperand($op, $context, $slot, $block);
     }
 
     private static function initialVariableForOperand(
@@ -635,17 +675,25 @@ class Block {
             OpCode::TYPE_TRY,
             OpCode::TYPE_CATCH,
             OpCode::TYPE_FINALLY,
-            OpCode::TYPE_THROW
+            OpCode::TYPE_THROW,
+            OpCode::TYPE_RETHROW
         );
+    }
+
+    /** Script contains `finally` — JIT lowering still VM-fallback until #2114 phase B. */
+    public static function containsFinallyOpcodes(?self $root): bool
+    {
+        return self::containsOpcodeTypes($root, OpCode::TYPE_FINALLY);
     }
 
     /**
      * CFG regions that MCJIT must not execute yet; `bin/jit.php` runs the VM instead (#2114, #167).
-     * JIT IR lowering for simple try/catch may still compile and verify — see TryCatchJitCompileTest.
+     * Simple try/catch without `finally` may pass MCJIT when {@see TryCatchJitExecuteTest} is green.
      */
     public static function requiresVmLowering(?self $root): bool
     {
-        return self::containsExceptionHandlingOpcodes($root)
-            || self::containsGeneratorOpcodes($root);
+        return self::containsGeneratorOpcodes($root)
+            || self::containsFinallyOpcodes($root)
+            || self::containsExceptionHandlingOpcodes($root);
     }
 }

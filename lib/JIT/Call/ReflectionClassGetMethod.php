@@ -19,12 +19,12 @@ final class ReflectionClassGetMethod implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
-        $objPtr = $context->builder->pointerCast($obj, $context->getTypeFromString('__object__*'));
-        $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
+        $i8p = $context->getTypeFromString('int8*');
+        $objArg = $context->builder->pointerCast($obj, $i8p);
 
         $outClassLen = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $classCstr = $context->builder->call($context->lookupFunction('phpc_reflect_get_class_name'), $objPtr, $outClassLen);
+        $classCstr = $context->builder->call($context->lookupFunction('phpc_reflect_get_class_name'), $objArg, $outClassLen);
         $classLen = $context->builder->load($outClassLen);
         $classNull = $context->builder->icmp(Builder::INT_EQ, $classCstr, $classCstr->typeOf()->constNull());
         $empty = $context->builder->pointerCast($context->constantFromString(''), $i8p);
@@ -46,7 +46,7 @@ final class ReflectionClassGetMethod implements Call
         $rmObj = $context->type->object->allocate($rmClassId);
         $context->builder->call(
             $context->lookupFunction('phpc_reflect_set_method'),
-            $context->builder->pointerCast($rmObj, $context->getTypeFromString('__object__*')),
+            $context->builder->pointerCast($rmObj, $i8p),
             $classSafe,
             $classLen,
             $context->builder->pointerCast($methodData, $i8p),
