@@ -392,7 +392,12 @@ final class Variable {
                 $this->float = $var->toFloat($vm);
                 break;
             case Variable::TYPE_STRING:
-                $this->string = $var->toString();
+                $src = $var->resolveIndirect();
+                if (self::TYPE_OBJECT === $src->type && null !== $vm) {
+                    $this->string = $vm->castObjectToString($src->toObject());
+                } else {
+                    $this->string = $var->toString();
+                }
                 break;
             default:
                 throw new \LogicException("Unsupported cast type $type");

@@ -572,23 +572,12 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_CAST_STRING:
-<<<<<<< HEAD
-                    $castSrc = $frame->scope[$op->arg2]->resolveIndirect();
-                    if (Variable::TYPE_OBJECT === $castSrc->type) {
-                        $frame->scope[$op->arg1]->string(
-                            $this->castObjectToString($castSrc->toObject())
-                        );
-                    } else {
-                        $frame->scope[$op->arg1]->castFrom(Variable::TYPE_STRING, $frame->scope[$op->arg2]);
-                    }
-=======
                     $frame->scope[$op->arg1]->castFrom(Variable::TYPE_STRING, $frame->scope[$op->arg2], $this);
                     break;
                 case OpCode::TYPE_CAST_ARRAY:
                     $frame->scope[$op->arg1]->copyFrom(
                         CastSupport::toArray($frame->scope[$op->arg2])
                     );
->>>>>>> master
                     break;
                 case OpCode::TYPE_CAST_OBJECT:
                     $dst = $frame->scope[$op->arg1];
