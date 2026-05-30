@@ -368,6 +368,7 @@ class Module extends ModuleAbstract
             new microtime(),
             new date(),
             new gmdate(),
+            new getdate(),
             new sleep(),
             new spl_autoload_register(),
             new usleep(),
