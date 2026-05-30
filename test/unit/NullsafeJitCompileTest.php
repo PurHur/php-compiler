@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__ . '/../LlvmToolchain.php';
 
 /**
- * JIT lowering for ?-> nullsafe property fetch (issues #308, #3219).
+ * JIT lowering for ?-> nullsafe property/method fetch (issues #308, #3219).
  *
  * @group llvm
  */
@@ -28,14 +28,14 @@ final class NullsafeJitCompileTest extends TestCase
 
     public function testNullsafeModuleVerify(): void
     {
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile($this->fixtureCode('nullsafe.phpt'), 'nullsafe.phpt');
-        $runtime->jitCompileBlock($block);
+        $methodPath = $this->repoRoot . '/test/bootstrap-aot/nullsafe_method_call.php';
+        $methodCode = file_get_contents($methodPath);
+        $this->assertNotFalse($methodCode);
 
-        $context = $runtime->loadJitContext();
-        $verify = new \ReflectionMethod($context, 'compileCommon');
-        $verify->setAccessible(true);
-        $verify->invoke($context);
+        $this->assertJitModuleVerifies(
+            [$this->fixtureCode('nullsafe.phpt'), $methodCode],
+            ['nullsafe.phpt', 'nullsafe_method_call.php']
+        );
     }
 
     public function testBinJitRunNullsafeOneLiner(): void
@@ -69,6 +69,21 @@ final class NullsafeJitCompileTest extends TestCase
         $combined = trim(($stdout !== false ? $stdout : '') . ($stderr !== false ? $stderr : ''));
         $this->assertSame(0, $exit, $combined);
         $this->assertStringContainsString('ok', $combined);
+    }
+
+    /** @param list<string> $codes @param list<string> $filenames */
+    private function assertJitModuleVerifies(array $codes, array $filenames): void
+    {
+        $runtime = new Runtime();
+        foreach ($codes as $i => $code) {
+            $block = $runtime->parseAndCompile($code, $filenames[$i]);
+            $runtime->jitCompileBlock($block);
+        }
+
+        $context = $runtime->loadJitContext();
+        $verify = new \ReflectionMethod($context, 'compileCommon');
+        $verify->setAccessible(true);
+        $verify->invoke($context);
     }
 
     private function fixtureCode(string $file): string
