@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 require_once __DIR__.'/../BaseTest.php';
 
-/** VM compliance for __serialize / __unserialize (issue #1365). */
+/** VM compliance for __serialize / __unserialize (issues #1365, #3368). */
 final class SerializeMagicBuiltinTest extends BaseTest
 {
     protected static string $DIR = __DIR__;
@@ -18,7 +18,13 @@ final class SerializeMagicBuiltinTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
-        $path = __DIR__.'/../compliance/cases/stdlib/serialize_magic.phpt';
-        yield 'serialize_magic.phpt' => self::parsePHPT($path, 'serialize_magic.phpt');
+        foreach (
+            [
+                'serialize_magic.phpt' => __DIR__.'/../compliance/cases/stdlib/serialize_magic.phpt',
+                'serialize_magic_methods.phpt' => __DIR__.'/../compliance/cases/language/serialize_magic_methods.phpt',
+            ] as $name => $path
+        ) {
+            yield $name => self::parsePHPT($path, $name);
+        }
     }
 }

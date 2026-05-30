@@ -36,7 +36,7 @@ final class array_change_key_case extends Internal
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('array_change_key_case() argument must be an array in this compiler build');
         }
-        $case = \CASE_LOWER;
+        $case = StdlibConstants::CASE_LOWER;
         if ($argc >= 2) {
             $caseVar = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $caseVar->type) {
@@ -58,7 +58,7 @@ final class array_change_key_case extends Internal
             throw new \LogicException('array_change_key_case() argument must be an array in this compiler build');
         }
         $i64 = $context->getTypeFromString('int64');
-        $case = $i64->constInt(\CASE_LOWER, false);
+        $case = $i64->constInt(StdlibConstants::CASE_LOWER, false);
         if ($argc >= 2) {
             $case = JitLongArg::lower($context, $args[1], 'array_change_key_case() case');
         }

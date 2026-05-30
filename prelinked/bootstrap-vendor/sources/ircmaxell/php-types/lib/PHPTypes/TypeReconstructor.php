@@ -386,6 +386,11 @@ class TypeReconstructor
         return false;
     }
 
+    protected function resolveOp_Expr_Cast_Unset(Operand $var, Op\Expr\Cast\Unset_ $op, SplObjectStorage $resolved)
+    {
+        return [Type::null()];
+    }
+
     protected function resolveOp_Expr_Clone(Operand $var, Op\Expr\Clone_ $op, SplObjectStorage $resolved)
     {
         if ($resolved->contains($op->expr)) {

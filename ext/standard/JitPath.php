@@ -179,6 +179,61 @@ final class JitPath
     }
 
     /**
+     * Strip $suffix from the end of $str when it matches (php-src php_basename suffix).
+     */
+    public static function stripSuffixIfPresent(Context $context, Value $str, Value $suffix): Value
+    {
+        $id = (string) (++self::$blockSerial);
+        [$strLen, $strPtr] = self::stringFields($context, $str);
+        [$suffixLen, $suffixPtr] = self::stringFields($context, $suffix);
+        $i64 = JitStringIndex::i64($context);
+        $zero = JitStringIndex::zero($context);
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+
+        $done = self::block($context, 'basename_suffix_done_'.$id);
+        $noStrip = self::block($context, 'basename_suffix_no_strip_'.$id);
+        $strip = self::block($context, 'basename_suffix_strip_'.$id);
+
+        $emptySuffix = $context->builder->icmp(Builder::INT_EQ, $suffixLen, $zero);
+        $tooShort = $context->builder->icmp(Builder::INT_ULT, $strLen, $suffixLen);
+        $skipStrip = $context->builder->or($emptySuffix, $tooShort);
+        $context->builder->branchIf($skipStrip, $noStrip, $strip);
+
+        $context->builder->positionAtEnd($strip);
+        $start = $context->builder->sub($strLen, $suffixLen);
+        $tailPtr = $context->builder->gep($strPtr, $start);
+        $compareLen = $context->builder->zExt(
+            $context->builder->trunc($suffixLen, $i32),
+            $sizeT
+        );
+        $cmp = $context->builder->call(
+            $context->lookupFunction('strncmp'),
+            $tailPtr,
+            $suffixPtr,
+            $compareLen
+        );
+        $matches = $context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
+        $stripBlock = self::block($context, 'basename_suffix_do_strip_'.$id);
+        $context->builder->branchIf($matches, $stripBlock, $noStrip);
+
+        $context->builder->positionAtEnd($stripBlock);
+        $stripped = string_trim::jitCopySlice($context, $str, $strPtr, JitStringIndex::zero($context), $start, $id);
+        $stripDoneBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($noStrip);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $phi = $context->builder->phi($str->typeOf());
+        $phi->addIncoming($str, $noStrip);
+        $phi->addIncoming($stripped, $stripDoneBlock);
+
+        return $phi;
+    }
+
+    /**
      * @return array{0: Value, 1: Value}
      */
     private static function stringFields(Context $context, Value $str): array
