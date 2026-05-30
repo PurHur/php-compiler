@@ -29,9 +29,12 @@
             $conds = $arm->conds;
             $lastCondIdx = count($conds) - 1;
             foreach ($conds as $idx => $condNode) {
+                $patternBlock = $this->block;
                 $caseOperand = $this->matchPatternOperand($condNode, $attrs);
                 // Pattern expr may finish in a different block than $testBlock started (#3397).
-                $testBlock = $this->block;
+                if ($this->block !== $patternBlock) {
+                    $testBlock = $this->block;
+                }
                 $cmp = new Op\Expr\BinaryOp\Identical(
                     $cond,
                     $caseOperand,
@@ -50,8 +53,13 @@
             $this->block = $chainBlock;
         }
 
+        $this->block = $chainBlock;
         if (null !== $defaultArm) {
             $this->lowerMatchArmBody($defaultArm->body, $result, $attrs, $endBlock);
+        } else {
+            // Non-empty fallthrough keeps JumpIf else wiring valid for comma arms (#3717).
+            $this->block->children[] = new Jump($endBlock, $attrs);
+            $endBlock->addParent($this->block);
         }
 
         $this->block = $endBlock;
