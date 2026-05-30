@@ -6,6 +6,7 @@ demo
 *.reproduce.c
 *.debug.c
 .phpunit.result.cache
+.php-compiler-cache
 .php_cs.cache
 .env
 .php-compiler-ci.lock

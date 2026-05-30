@@ -172,6 +172,13 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                     $options['-l'] = true;
 
                     break;
+                case '--no-cache':
+                    $options['--no-cache'] = true;
+                    putenv('PHP_COMPILER_CACHE=0');
+                    $_ENV['PHP_COMPILER_CACHE'] = '0';
+                    $_SERVER['PHP_COMPILER_CACHE'] = '0';
+
+                    break;
                 case '-y':
                     if ($i >= $argc || substr((string) $argv[$i], 0, 1) === '-') {
                         $options['-y'] = true;
