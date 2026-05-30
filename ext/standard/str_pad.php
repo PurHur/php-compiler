@@ -32,9 +32,6 @@ final class str_pad extends Internal
         }
         $input = $frame->calledArgs[0]->resolveIndirect();
         $padLength = $frame->calledArgs[1]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_STRING !== $input->type) {
             throw new \LogicException('str_pad() input must be a string in this compiler build');
         }
@@ -58,9 +55,11 @@ final class str_pad extends Internal
             }
             $padType = $typeArg->toInt();
         }
-        $frame->returnVar->string(
-            VmString::strPad($input->toString(), $padLength->toInt(), $padString, $padType)
-        );
+        $result = VmString::strPad($input->toString(), $padLength->toInt(), $padString, $padType);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->string($result);
     }
 
     public Context $context;
@@ -87,6 +86,7 @@ final class str_pad extends Internal
         } else {
             $padType = $context->getTypeFromString('int64')->constInt(1, false);
         }
+        JitStrPad::emitRuntimeEmptyPadStringGuard($context, $padString);
 
         return JitStrPad::pad($context, $input, $padLength, $padString, $padType);
     }

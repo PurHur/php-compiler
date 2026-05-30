@@ -9,12 +9,38 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 final class JitStrPad
 {
+    private const PAD_STRING_ERROR = 'str_pad(): Argument #3 ($pad_string) must be a non-empty string';
+
+    /**
+     * Runtime guard for empty pad string (issue #3762; avoids div-by-zero in fillPadding()).
+     */
+    public static function emitRuntimeEmptyPadStringGuard(Context $context, Value $padString): void
+    {
+        $map = $context->structFieldMap['__string__'];
+        $padLen = $context->builder->load(
+            $context->builder->structGep($padString, $map['length'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $invalid = $context->builder->icmp(Builder::INT_EQ, $padLen, $zero);
+        $okBlock = BasicBlockHelper::append($context, 'strpad_padstr_ok');
+        $errBlock = BasicBlockHelper::append($context, 'strpad_padstr_err');
+        $context->builder->branchIf($invalid, $errBlock, $okBlock);
+        $context->builder->positionAtEnd($errBlock);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, self::PAD_STRING_ERROR);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->positionAtEnd($okBlock);
+    }
+
     public static function pad(
         Context $context,
         Value $input,
