@@ -311,6 +311,7 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringFilePutContents::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringDateTime::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringMicrotime::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringGettimeofday::implement($this->context);
     }
 
     private function implementStrlen(): void {

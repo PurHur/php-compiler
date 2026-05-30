@@ -122,10 +122,14 @@ class Block {
     /** Absolute entry script path when CFG filename attribute is missing (issue #707). */
     private string $scriptPathOverride = '';
 
+    /** Operand / cfg-Var roots assigned in this block (not inherited reads, #2059). */
+    private \SplObjectStorage $localWrittenVars;
+
     public function __construct(?CfgBlock $block) {
         $this->orig = $block;
         $this->scope = new \SplObjectStorage;
         $this->args = new \SplObjectStorage;
+        $this->localWrittenVars = new \SplObjectStorage;
     }
 
     public function setScriptPath(string $path): void
@@ -221,8 +225,11 @@ class Block {
 
     public function getVarSlot(Operand $operand, bool $isRead): int {
         if ($this->scope->contains($operand)) {
-            if ($isRead && null !== self::resolveVariableName($operand)) {
+            if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
                 $this->args[$operand] = $this->scope[$operand];
+            }
+            if (!$isRead) {
+                $this->markLocallyWritten($operand);
             }
 
             return $this->scope[$operand];
@@ -232,8 +239,11 @@ class Block {
             $existing = $this->slotIndexForVariableName($name);
             if (null !== $existing) {
                 $this->scope[$operand] = $existing;
-                if ($isRead) {
+                if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
                     $this->args[$operand] = $existing;
+                }
+                if (!$isRead) {
+                    $this->markLocallyWritten($operand);
                 }
 
                 return $existing;
@@ -245,8 +255,11 @@ class Block {
                 if (self::cfgVarRoot($scopedOp) === $cfgVar) {
                     $existing = $this->scope[$scopedOp];
                     $this->scope[$operand] = $existing;
-                    if ($isRead) {
+                    if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
                         $this->args[$operand] = $existing;
+                    }
+                    if (!$isRead) {
+                        $this->markLocallyWritten($operand);
                     }
 
                     return $existing;
@@ -255,11 +268,49 @@ class Block {
         }
         $next = $this->nextScopeSlot();
             $this->scope[$operand] = $next;
-            if ($isRead) {
+            if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
                 $this->args[$operand] = $next;
+            }
+            if (!$isRead) {
+                $this->markLocallyWritten($operand);
             }
 
         return $this->scope[$operand];
+    }
+
+    /** Reads that must bind from caller/include/merge — not same-block locals (#3787, #2059). */
+    private function shouldRegisterInheritedArg(Operand $operand): bool
+    {
+        if (null === self::resolveVariableName($operand)) {
+            return false;
+        }
+        if ($this->isLocallyWritten($operand)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function markLocallyWritten(Operand $operand): void
+    {
+        $this->localWrittenVars[$operand] = true;
+        $root = self::cfgVarRoot($operand);
+        if (null !== $root) {
+            $this->localWrittenVars[$root] = true;
+        }
+    }
+
+    private function isLocallyWritten(Operand $operand): bool
+    {
+        if (isset($this->localWrittenVars[$operand])) {
+            return true;
+        }
+        $root = self::cfgVarRoot($operand);
+        if (null !== $root && isset($this->localWrittenVars[$root])) {
+            return true;
+        }
+
+        return false;
     }
 
     /** Bind operand to a fresh slot (?: throw arm must not alias merge phi slot, #3802). */
@@ -590,11 +641,6 @@ class Block {
                     continue;
                 }
                 if (is_null($frame)) {
-                    $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
-                    continue;
-                }
-                // {main} top-level names always live in the global table (#3601, #3787).
-                if (self::usesMainScriptGlobalSlot($op, $this)) {
                     $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
                     continue;
                 }

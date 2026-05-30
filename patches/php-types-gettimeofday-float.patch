@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
+@@ -1870,7 +1870,7 @@
+         'getservbyname' => ['int', 'service' => 'string', 'protocol' => 'string'],
+         'getservbyport' => ['string', 'port' => 'int', 'protocol' => 'string'],
+         'gettext' => ['string', 'msgid' => 'string'],
+-        'gettimeofday' => ['array', 'get_as_float=' => 'bool'],
++        'gettimeofday' => ['', 'get_as_float=' => 'bool'],
+         'gettype' => ['string', 'var' => ''],
+         'glob' => ['array', 'pattern' => 'string', 'flags=' => 'int'],
+         'GlobIterator::__construct' => ['GlobIterator', 'path' => 'string', 'flags' => 'int'],
