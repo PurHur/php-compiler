@@ -542,6 +542,12 @@ restart:
         if ($self->type === self::TYPE_BOOLEAN && $other->type === self::TYPE_STRING) {
             return $other->toBool() === $self->bool;
         }
+        if ($self->type === self::TYPE_ARRAY && $other->type === self::TYPE_BOOLEAN) {
+            return ($self->toArray()->getNumElements() === 0) !== $other->bool;
+        }
+        if ($other->type === self::TYPE_ARRAY && $self->type === self::TYPE_BOOLEAN) {
+            return ($other->toArray()->getNumElements() === 0) !== $self->bool;
+        }
         try {
             return $self->toNumeric() == $other->toNumeric();
         } catch (\LogicException) {
