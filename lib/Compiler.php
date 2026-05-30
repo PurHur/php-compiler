@@ -683,6 +683,9 @@ class Compiler {
                     if ($child instanceof Op\Expr\Isset_ && count($child->vars) > 1) {
                         $block = $this->compileIssetMulti($child, $block);
                     } elseif ($child instanceof Op\Expr\BinaryOp\Coalesce) {
+                        if ($this->isCoalesceChainInnerStmt($child, $ops, $i)) {
+                            break;
+                        }
                         $resultOverride = null;
                         if (
                             $i + 1 < $opCount
@@ -887,6 +890,27 @@ class Compiler {
         Op\Expr\BinaryOp\Coalesce $coalesce
     ): bool {
         return $this->operandsChainEqual($assign->expr, $coalesce->result);
+    }
+
+    /**
+     * php-cfg emits inner ?? before outer for chains ($a ?? $b ?? $c); only lower the outer stmt (#3798).
+     *
+     * @param Op[] $ops
+     */
+    private function isCoalesceChainInnerStmt(
+        Op\Expr\BinaryOp\Coalesce $inner,
+        array $ops,
+        int $index
+    ): bool {
+        if ($index + 1 >= count($ops)) {
+            return false;
+        }
+        $next = $ops[$index + 1];
+        if (!$next instanceof Op\Expr\BinaryOp\Coalesce) {
+            return false;
+        }
+
+        return $this->operandsChainEqual($next->right, $inner->result);
     }
 
     /**
@@ -3063,25 +3087,32 @@ class Compiler {
     }
 
     /**
-     * ?? right branch: evaluate RHS expr ops only when the left is null (#3462).
+     * ?? right branch: evaluate RHS expr ops only when the left is null (#3462, #3798).
+     *
+     * @return array{0: ?int, 1: Block} value slot and block that must receive the outer ?? assign
      */
-    private function compileCoalesceRhsValue(Operand $rhs, Block $targetBlock, Block $entryBlock): ?int
+    private function compileCoalesceRhsValue(Operand $rhs, Block $targetBlock, Block $entryBlock): array
     {
         $exprOp = $this->findOrigExprOpForOperand($rhs, $entryBlock);
+        if ($exprOp instanceof Op\Expr\BinaryOp\Coalesce) {
+            $afterCoalesce = $this->compileCoalesce($exprOp, $targetBlock);
+
+            return [$this->compileOperand($rhs, $afterCoalesce, true), $afterCoalesce];
+        }
         if (null !== $exprOp) {
             if ($exprOp instanceof Op\Expr\Throw_) {
                 foreach ($this->compileThrowExpression($exprOp, $targetBlock, $entryBlock) as $op) {
                     $targetBlock->addOpCode($op);
                 }
 
-                return null;
+                return [null, $targetBlock];
             }
             foreach ($this->compileExpr($exprOp, $targetBlock) as $op) {
                 $targetBlock->addOpCode($op);
             }
         }
 
-        return $this->compileOperand($rhs, $targetBlock, true);
+        return [$this->compileOperand($rhs, $targetBlock, true), $targetBlock];
     }
 
     /**
@@ -3350,16 +3381,16 @@ class Compiler {
         $rightBlock->syntheticCfgBranch = true;
         $rightBlock->inheritUndefinedLocals = true;
         $rightBlock->inheritScopeFrom($block);
-        $rightSlot = $this->compileCoalesceRhsValue($expr->right, $rightBlock, $block);
+        [$rightSlot, $rightEmitBlock] = $this->compileCoalesceRhsValue($expr->right, $rightBlock, $block);
         $coalesceAssignTarget = $resultOverride ?? $expr->result;
         if (
             null !== $dimFetch
             && $this->operandsChainEqual($coalesceAssignTarget, $dimFetch->result)
         ) {
-            $this->compileArrayDimFetchWrite($dimFetch, $rightBlock);
+            $this->compileArrayDimFetchWrite($dimFetch, $rightEmitBlock);
         }
         if (null !== $rightSlot) {
-            $rightBlock->addOpCode(new OpCode(
+            $rightEmitBlock->addOpCode(new OpCode(
                 OpCode::TYPE_ASSIGN,
                 $resultSlot,
                 $resultSlot,
@@ -3397,11 +3428,11 @@ class Compiler {
         $leftBlock->addOpCode($leftJump);
         $rightJump = new OpCode(OpCode::TYPE_JUMP);
         $rightJump->block1 = $endBlock;
-        $rightBlock->addOpCode($rightJump);
+        $rightEmitBlock->addOpCode($rightJump);
         $endBlock->parents[] = $leftBlock;
-        $endBlock->parents[] = $rightBlock;
+        $endBlock->parents[] = $rightEmitBlock;
         $endBlock->inheritScopeFrom($leftBlock);
-        $endBlock->inheritScopeFrom($rightBlock);
+        $endBlock->inheritScopeFrom($rightEmitBlock);
 
         $coalesceOp = new OpCode(
             OpCode::TYPE_COALESCE,

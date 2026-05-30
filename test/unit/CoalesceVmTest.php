@@ -95,6 +95,23 @@ echo (int) ($stat["missing"] ?? 0), "\n";
         );
     }
 
+    /** Issue #3798: chained ?? short-circuits left-to-right (Zend zend_compile.c). */
+    public function testNullCoalesceChain(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+$a = null;
+$b = null;
+echo $a ?? $b ?? "z", "\n";
+
+$c = 0;
+echo $c ?? "zero", "\n";
+echo null ?? "n", "\n";
+',
+            "z\n0\nn\n"
+        );
+    }
+
     public function testNullCoalesceThrow(): void
     {
         $this->assertVmOutput(
