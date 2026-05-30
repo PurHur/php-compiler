@@ -202,7 +202,7 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'VM ClosureState + __invoke; use() by-value and by-ref (#3081, #3108); array_map/filter/usort callbacks (#3086)',
                 'JIT ClosureHelper: TYPE_CLOSURE + use() value/ref IR (#3092, #3108); use (&$x) bin/jit.php VM-fallback until MCJIT execute stable (#2483); indirect $arr[0]() via __closure_target (#3089, #3092)',
-                'AOT user scripts: real ClosureHelper lowering via PHP_COMPILER_AOT_USER_SCRIPT (#3725); bootstrap spine still stubs null',
+                'AOT user scripts: real ClosureHelper lowering via PHP_COMPILER_AOT_USER_SCRIPT (#3725); use (&$x) AOT fixture closure_use_byref.phpt (#2483); bootstrap spine still stubs null',
                 'bin/jit.php MCJIT execute still probe-dependent (#98)',
             ],
             'probe' => '$f = function ($x) { return $x + 1; }; echo $f(2);',
