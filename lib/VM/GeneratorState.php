@@ -7,7 +7,13 @@ namespace PHPCompiler\VM;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
+use PHPCompiler\VM\Builtin\GeneratorCurrent;
 use PHPCompiler\VM\Builtin\GeneratorGetReturn;
+use PHPCompiler\VM\Builtin\GeneratorKey;
+use PHPCompiler\VM\Builtin\GeneratorNext;
+use PHPCompiler\VM\Builtin\GeneratorRewind;
+use PHPCompiler\VM\Builtin\GeneratorSend;
+use PHPCompiler\VM\Builtin\GeneratorValid;
 
 /**
  * VM state for a user generator (`function g() { yield $v; }`, issue #167).
@@ -35,6 +41,13 @@ final class GeneratorState
 
     public Variable $returnValue;
 
+    /** Scope slot receiving Generator::send() value for `yield` expression result (#167). */
+    public ?int $yieldResultSlot = null;
+
+    public bool $hasPendingSend = false;
+
+    public Variable $pendingSend;
+
     public function __construct(
         public readonly \PHPCompiler\VM $vm,
         public readonly Func\PHP $func,
@@ -45,6 +58,8 @@ final class GeneratorState
         $this->currentValue = new Variable();
         $this->yieldFromContainer = new Variable();
         $this->returnValue = new Variable();
+        $this->pendingSend = new Variable();
+        $this->pendingSend->null();
     }
 
     public static function register(Context $ctx): void
@@ -53,6 +68,18 @@ final class GeneratorState
         $pub = CfgFunc::FLAG_PUBLIC;
         $entry->methods['getreturn'] = new GeneratorGetReturn();
         $entry->methodVisibility['getreturn'] = $pub;
+        $entry->methods['send'] = new GeneratorSend();
+        $entry->methodVisibility['send'] = $pub;
+        $entry->methods['rewind'] = new GeneratorRewind();
+        $entry->methodVisibility['rewind'] = $pub;
+        $entry->methods['current'] = new GeneratorCurrent();
+        $entry->methodVisibility['current'] = $pub;
+        $entry->methods['key'] = new GeneratorKey();
+        $entry->methodVisibility['key'] = $pub;
+        $entry->methods['valid'] = new GeneratorValid();
+        $entry->methodVisibility['valid'] = $pub;
+        $entry->methods['next'] = new GeneratorNext();
+        $entry->methodVisibility['next'] = $pub;
         $ctx->classes['generator'] = $entry;
     }
 
@@ -87,5 +114,8 @@ final class GeneratorState
         $this->yieldFromActive = false;
         $this->hasReturned = false;
         $this->returnValue->null();
+        $this->yieldResultSlot = null;
+        $this->hasPendingSend = false;
+        $this->pendingSend->null();
     }
 }

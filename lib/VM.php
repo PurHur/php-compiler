@@ -1805,6 +1805,9 @@ restart:
                     } else {
                         $gen->currentKey->int($gen->autoKey++);
                     }
+                    if (null !== $op->arg1) {
+                        $gen->yieldResultSlot = $op->arg1;
+                    }
                     $gen->hasCurrent = true;
                     $gen->frame = $frame;
                     $frame->generatorYield = true;
@@ -2925,11 +2928,40 @@ restart:
         return null;
     }
 
+    /**
+     * Resume a generator (Generator::send / ::next / ::rewind / foreach), optionally injecting a send value.
+     */
+    public function resumeGenerator(GeneratorState $gen, ?Variable $sendValue = null): bool
+    {
+        if ($gen->done) {
+            return false;
+        }
+        if (null !== $sendValue) {
+            $gen->pendingSend->copyFrom($sendValue);
+            $gen->hasPendingSend = true;
+        }
+
+        return $this->advanceGeneratorIteration($gen);
+    }
+
+    private function applyGeneratorPendingSend(GeneratorState $gen): void
+    {
+        if (!$gen->hasPendingSend || null === $gen->frame || null === $gen->yieldResultSlot) {
+            return;
+        }
+        if (!isset($gen->frame->scope[$gen->yieldResultSlot])) {
+            return;
+        }
+        $gen->frame->scope[$gen->yieldResultSlot]->copyFrom($gen->pendingSend);
+        $gen->hasPendingSend = false;
+    }
+
     private function advanceGeneratorIteration(GeneratorState $gen): bool
     {
         if ($gen->done) {
             return false;
         }
+        $this->applyGeneratorPendingSend($gen);
         if (null === $gen->frame) {
             $gen->frame = $gen->func->getFrame($this->context, null);
             $gen->frame->calledArgs = $gen->calledArgs;
