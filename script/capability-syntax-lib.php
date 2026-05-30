@@ -407,6 +407,18 @@ function syntaxRowDefinitions(): array
             'probe' => 'namespace N { class A {} } namespace U { use N\\{A}; echo (new A()) ? 1 : 0; }',
         ],
         [
+            'id' => 'heredoc_flexible_indent',
+            'construct' => 'Flexible heredoc/nowdoc indentation stripping (PHP 7.3+)',
+            'opcodes' => [],
+            'issue' => 3636,
+            'notes' => [
+                'php-parser Emulative FlexibleDocStringEmulator + parseDocString stripIndentation (#3636)',
+                'Indented closing label sets docIndentation column; basic heredoc/nowdoc #178',
+                'Zend/zend_language_scanner.l flexible heredoc/nowdoc parity',
+            ],
+            'probe' => "echo <<<EOT\n    hello\n    EOT;",
+        ],
+        [
             'id' => 'never_return',
             'construct' => '`never` return type',
             'opcodes' => ['TYPE_EXIT', 'TYPE_RETURN', 'TYPE_RETURN_VOID'],
@@ -677,6 +689,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'array_argument_unpack' => '/\.\.\.\s*\$/',
         'multi_catch' => '/catch\s*\([^)]*\|/',
         'try_catch_throw' => '/\btry\s*\{/',
+        'heredoc_flexible_indent' => '/<<<\s*\w+\s*\r?\n\s+\S/',
     ];
 
     $scan = [];
