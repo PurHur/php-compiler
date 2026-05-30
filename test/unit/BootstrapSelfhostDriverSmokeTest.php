@@ -24,7 +24,9 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
         $this->assertStringContainsString('emit_path=native', $script);
         $this->assertStringContainsString('compiler smoke', $script);
         $this->assertStringContainsString('selfhost-helloworld-compile', $script);
-        $this->assertStringContainsString('bin-compile-aot', $script);
+        $this->assertStringContainsString('bin-compile-aot-inventory', $script);
+        $this->assertStringContainsString('bootstrap-ensure-inventory-argv-driver', $script);
+        $this->assertStringContainsString('bootstrap_ensure_inventory_argv_driver_ssot', $script);
         $this->assertStringContainsString('"${BIN_COMPILE_DRIVER}" -o "${EMIT_OUT}"', $script);
         $this->assertStringContainsString('stage 5', $script);
         $this->assertStringContainsString('bootstrap-driver-smoke-gen3', $script);
@@ -105,8 +107,18 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
         $this->assertStringContainsString('shouldUseHelloworldBinCompileInventoryArgvLink', $jit);
         $this->assertStringContainsString('shouldUseM3InventoryEmitForCompileDriverBlock', $jit);
         $compileBin = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-compile-bin.sh');
-        $this->assertStringContainsString('build/bin-compile-aot', $compileBin);
+        $this->assertStringContainsString('build/bin-compile-aot-inventory', $compileBin);
         $this->assertStringContainsString('#3011', $compileBin);
+    }
+
+    /** Issue #2968: SSOT inventory argv driver entry script. */
+    public function testEnsureInventoryArgvDriverScriptExportsCompileDriver(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-ensure-inventory-argv-driver.sh');
+        $this->assertStringContainsString('bootstrap_ensure_inventory_argv_driver_ssot', $script);
+        $this->assertStringContainsString('BOOTSTRAP_COMPILE_DRIVER', $script);
+        $this->assertStringContainsString('bin-compile-aot-inventory', $script);
+        $this->assertStringContainsString('#2968', $script);
     }
 
     /** Issue #3012: inventory argv driver (helloworld prefix) must register spine smoke sidecar. */
