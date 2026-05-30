@@ -98,4 +98,39 @@ PHP;
         $runtime->parseAndCompile($code, 'weakref_parse.php');
         $this->addToAssertionCount(1);
     }
+
+    public function testWeakReferenceGetNullAfterGcCollect(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Box {}
+$o = new Box();
+$r = WeakReference::create($o);
+unset($o);
+gc_collect_cycles();
+echo $r->get() === null ? '1' : '0';
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakref_gc.php'));
+        $this->assertSame('1', ob_get_clean());
+    }
+
+    public function testWeakMapEntryRemovedAfterGcCollect(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Box {}
+$m = new WeakMap();
+$k = new Box();
+$m->offsetSet($k, 99);
+unset($k);
+gc_collect_cycles();
+echo $m->count();
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakmap_gc.php'));
+        $this->assertSame('0', ob_get_clean());
+    }
 }

@@ -19,20 +19,23 @@ final class ReflectionNative
 
         foreach (
             [
-                ['phpc_reflect_set_class', $void, [$objPtr, $i8p, $sizeT]],
-                ['phpc_reflect_get_class_name', $i8p, [$objPtr, $sizeTPtr]],
-                ['phpc_reflect_set_method', $void, [$objPtr, $i8p, $sizeT, $i8p, $sizeT]],
-                ['phpc_reflect_get_method_class', $i8p, [$objPtr, $sizeTPtr]],
-                ['phpc_reflect_get_method_name', $i8p, [$objPtr, $sizeTPtr]],
-                ['phpc_reflect_set_attr_name', $void, [$objPtr, $i8p, $sizeT]],
-                ['phpc_reflect_get_attr_name', $i8p, [$objPtr, $sizeTPtr]],
+                ['phpc_reflect_set_class', $void, [$i8p, $i8p, $sizeT]],
+                ['phpc_reflect_get_class_name', $i8p, [$i8p, $sizeTPtr]],
+                ['phpc_reflect_set_method', $void, [$i8p, $i8p, $sizeT, $i8p, $sizeT]],
+                ['phpc_reflect_get_method_class', $i8p, [$i8p, $sizeTPtr]],
+                ['phpc_reflect_get_method_name', $i8p, [$i8p, $sizeTPtr]],
+                ['phpc_reflect_set_attr_name', $void, [$i8p, $i8p, $sizeT]],
+                ['phpc_reflect_get_attr_name', $i8p, [$i8p, $sizeTPtr]],
                 ['phpc_attr_class_count', $sizeT, [$i8p]],
                 ['phpc_attr_class_name_at', $i8p, [$i8p, $sizeT]],
                 ['phpc_attr_method_count', $sizeT, [$i8p, $i8p]],
                 ['phpc_attr_method_name_at', $i8p, [$i8p, $i8p, $sizeT]],
             ] as [$name, $ret, $params]
         ) {
-            if (null !== $context->module->getNamedFunction($name)) {
+            $existing = $context->module->getNamedFunction($name);
+            if (null !== $existing) {
+                $context->registerFunction($name, $existing);
+
                 continue;
             }
             $ft = $context->context->functionType($ret, false, ...$params);
