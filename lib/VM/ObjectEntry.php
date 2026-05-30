@@ -92,6 +92,16 @@ class ObjectEntry {
         return $this->properties[$name];
     }
 
+    public function issetProperty(string $name): bool
+    {
+        if (!isset($this->properties[$name])) {
+            return false;
+        }
+        $var = $this->properties[$name]->resolveIndirect();
+
+        return !$var->isUndefined() && Variable::TYPE_NULL !== $var->type;
+    }
+
     public function unsetProperty(string $name): void
     {
         if (!isset($this->properties[$name])) {

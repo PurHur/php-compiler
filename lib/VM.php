@@ -1261,6 +1261,13 @@ restart:
                     $dst = $frame->scope[$op->arg1];
                     if (null !== $op->arg3) {
                         $container = $frame->scope[$op->arg2]->resolveIndirect();
+                        if (Variable::TYPE_OBJECT === $container->type) {
+                            $name = $frame->scope[$op->arg3]->toString();
+                            $propertyObject = $container->toObject();
+                            VM\LazyObjectSupport::ensureInitialized($this, $propertyObject);
+                            $dst->bool($propertyObject->issetProperty($name));
+                            break;
+                        }
                         if (Variable::TYPE_ARRAY !== $container->type) {
                             $dst->bool(false);
                             break;
