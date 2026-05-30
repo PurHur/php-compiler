@@ -44,6 +44,8 @@ class ClassEntry {
     public array $constants = [];
     /** @var array<string, string> lowercase enum case name => declared case name (#3420) */
     public array $enumCaseCanonicalNames = [];
+    /** @var list<array{name: string, value: Variable}> enum cases in declaration order (#3308) */
+    public array $enumCases = [];
     /** @var array<string, Variable> static property name (lowercase) => shared storage */
     public array $staticProperties = [];
     /** Readonly class: instance properties cannot change after construction (issue #1360). */
