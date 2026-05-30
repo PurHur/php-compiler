@@ -1256,6 +1256,7 @@ final class Doctor
         $checks[] = self::checkPhpVersion();
         $checks = array_merge($checks, self::checkExtensions());
         $checks[] = self::checkVendor($repoRoot);
+        $checks[] = self::checkPhpParserHostCompatibility($repoRoot);
         $checks[] = self::checkLlvm($repoRoot);
         $checks[] = self::checkJitCompliance($repoRoot);
         $checks[] = self::checkLoopback($repoRoot);
@@ -1321,6 +1322,114 @@ final class Doctor
             'detail' => $ok ? 'vendor/ installed (pre/plugin present)' : 'vendor/ incomplete',
             'hint' => 'composer install --no-interaction && script/apply-patches.sh',
         ];
+    }
+
+    /**
+     * Host PHP tokenizer constants must match nikic/php-parser Lexer (#113).
+     *
+     * @return array{name: string, ok: bool, required: bool, detail: string, hint: string}
+     */
+    private static function checkPhpParserHostCompatibility(string $repoRoot): array
+    {
+        $autoload = $repoRoot.'/vendor/autoload.php';
+        if (!is_file($autoload)) {
+            return [
+                'name' => 'nikic/php-parser',
+                'ok' => false,
+                'required' => true,
+                'detail' => 'vendor/autoload.php missing',
+                'hint' => 'composer install --no-interaction && script/apply-patches.sh',
+            ];
+        }
+
+        $version = self::resolvePhpParserVersion($repoRoot);
+        try {
+            if (!class_exists(\PhpParser\Lexer::class, false)) {
+                require_once $autoload;
+            }
+            new \PhpParser\Lexer();
+        } catch (\Throwable $e) {
+            return [
+                'name' => 'nikic/php-parser',
+                'ok' => false,
+                'required' => true,
+                'detail' => 'Lexer load failed on PHP '.PHP_VERSION.($version !== '' ? " (parser {$version})" : ''),
+                'hint' => 'composer update nikic/php-parser --with-all-dependencies && script/apply-patches.sh (#113)',
+            ];
+        }
+
+        $missing = self::missingHostTokenizerConstantsForPhpParser();
+        if ([] !== $missing) {
+            return [
+                'name' => 'nikic/php-parser',
+                'ok' => false,
+                'required' => true,
+                'detail' => 'host PHP missing tokenizer constants: '.implode(', ', $missing),
+                'hint' => 'Use PHP 8.1+ or bump nikic/php-parser (composer update nikic/php-parser)',
+            ];
+        }
+
+        $detail = $version !== '' ? "Lexer OK ({$version})" : 'Lexer OK';
+
+        return [
+            'name' => 'nikic/php-parser',
+            'ok' => true,
+            'required' => true,
+            'detail' => $detail,
+            'hint' => '',
+        ];
+    }
+
+    /**
+     * Tokens referenced by modern php-parser Lexer maps on PHP 8.1+ hosts (#113).
+     *
+     * @return list<string>
+     */
+    private static function missingHostTokenizerConstantsForPhpParser(): array
+    {
+        if (version_compare(PHP_VERSION, '8.1.0', '<')) {
+            return [];
+        }
+
+        $required = [
+            'T_OPEN_TAG_WITH_ECHO',
+            'T_AMPERSAND_NOT_FOLLOWED_BY_VAR_OR_VARARG',
+            'T_AMPERSAND_FOLLOWED_BY_VAR_OR_VARARG',
+            'T_READONLY',
+        ];
+        $missing = [];
+        foreach ($required as $token) {
+            if (!\defined($token)) {
+                $missing[] = $token;
+            }
+        }
+
+        return $missing;
+    }
+
+    private static function resolvePhpParserVersion(string $repoRoot): string
+    {
+        if (class_exists(\Composer\InstalledVersions::class)) {
+            if (\Composer\InstalledVersions::isInstalled('nikic/php-parser')) {
+                return \Composer\InstalledVersions::getPrettyVersion('nikic/php-parser') ?? '';
+            }
+        }
+
+        $lock = $repoRoot.'/composer.lock';
+        if (!is_readable($lock)) {
+            return '';
+        }
+        $json = json_decode((string) file_get_contents($lock), true);
+        if (!is_array($json) || !isset($json['packages']) || !is_array($json['packages'])) {
+            return '';
+        }
+        foreach ($json['packages'] as $package) {
+            if (is_array($package) && ($package['name'] ?? '') === 'nikic/php-parser') {
+                return (string) ($package['version'] ?? '');
+            }
+        }
+
+        return '';
     }
 
     /**
