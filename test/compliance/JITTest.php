@@ -240,6 +240,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'array_cow')) {
                 continue;
             }
+            // Variable variables MCJIT execute segfaults; VM + compile probe in JitVariableVariablesTest (#3801, #1226).
+            if (str_contains($name, 'variable_variables')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
