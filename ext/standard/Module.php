@@ -345,6 +345,7 @@ class Module extends ModuleAbstract
             new get_parent_class_(),
             new is_a_(),
             new is_subclass_of_(),
+            new assert_(),
             new trigger_error_(),
             new set_error_handler_(),
             new restore_error_handler_(),
