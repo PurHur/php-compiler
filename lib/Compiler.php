@@ -1828,7 +1828,8 @@ class Compiler {
                         $this->compileTypeConstrainedVariable($result, $declared, $propertyDeclName)
                     );
                     if (!$child->static) {
-                        $declare->propertyReadonly = $this->isReadonlyPropertyFlags($child->visibility);
+                        $declare->propertyReadonly = (property_exists($child, 'readonly') && $child->readonly)
+                            || $this->isReadonlyPropertyFlags($child->visibility);
                         $declare->propertyVisibility = MethodVisibility::mask($child->visibility);
                     }
                     $result->addOpCode($declare);
@@ -2046,6 +2047,22 @@ class Compiler {
         if (null !== $arraySpec) {
             $var->typeConstraint = Variable::TYPE_ARRAY;
             $var->genericArrayTypeSpec = $arraySpec;
+            $var->declaredTypeLabel = $declName;
+
+            return $return;
+        }
+        if (Type::TYPE_UNION === $type->type) {
+            $members = [];
+            foreach ($type->subTypes as $sub) {
+                $mapped = Variable::mapFromType($sub);
+                if (Variable::TYPE_UNDEFINED !== $mapped) {
+                    $members[] = $mapped;
+                }
+            }
+            if ([] !== $members) {
+                $var->unionTypeConstraints = $members;
+                $var->declaredTypeLabel = $type->toString();
+            }
 
             return $return;
         }
@@ -2057,6 +2074,7 @@ class Compiler {
             $var->classConstraint = $type->userType;
         }
         $var->typeConstraint = $mappedType;
+        $var->declaredTypeLabel = $type->toString();
 
         return $return;
     }
