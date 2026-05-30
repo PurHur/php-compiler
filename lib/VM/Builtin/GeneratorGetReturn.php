@@ -30,7 +30,7 @@ final class GeneratorGetReturn extends VmClassMethod
         $object = $receiver->toObject();
         $gen = self::requireGeneratorState($object);
         if (!$gen->hasReturned) {
-            throw new \LogicException(
+            throw new \Exception(
                 "Cannot get return value of a generator that hasn't returned"
             );
         }
