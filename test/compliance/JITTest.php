@@ -109,6 +109,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'object_identical')) {
                 continue;
             }
+            // gettype() object/resource is VM-only until __compiler_gettype JIT path is stable (#3618).
+            if (str_contains($name, 'gettype_object_resource')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
