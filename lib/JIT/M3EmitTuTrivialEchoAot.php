@@ -26,6 +26,8 @@ final class M3EmitTuTrivialEchoAot
 
     private const JIT_UNIT_PROBE_SENTINEL_LOGICAL = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::jitUnitProbeSentinelBlock';
 
+    private const JIT_UNIT_PROBE_COMPILE_DRIVER_SENTINEL_LOGICAL = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::jitUnitProbeCompileDriverSentinelBlock';
+
     private const COMPILER_LIB_SENTINEL_LOGICAL = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock';
 
     private const COMPILE_DRIVER_SENTINEL_LOGICAL = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileDriverSentinelBlock';
@@ -39,6 +41,8 @@ final class M3EmitTuTrivialEchoAot
     public const COMPILER_UNIT_PROBE_SIDECAR_REL = 'build/.m3_compiler_unit_probe_aot_blob';
 
     public const JIT_UNIT_PROBE_SIDECAR_REL = 'build/.m3_jit_unit_probe_aot_blob';
+
+    public const JIT_UNIT_PROBE_COMPILE_DRIVER_SIDECAR_REL = 'build/.m3_jit_unit_probe_compile_driver_aot_blob';
 
     public const COMPILER_LIB_SIDECAR_REL = 'build/.m3_compiler_lib_aot_blob';
 
@@ -93,6 +97,7 @@ final class M3EmitTuTrivialEchoAot
                 self::COMPILE_SMOKE_SIDECAR_REL => self::COMPILE_SMOKE_SENTINEL_LOGICAL,
                 self::COMPILER_UNIT_PROBE_SIDECAR_REL => self::COMPILER_UNIT_PROBE_SENTINEL_LOGICAL,
                 self::JIT_UNIT_PROBE_SIDECAR_REL => self::JIT_UNIT_PROBE_SENTINEL_LOGICAL,
+                self::JIT_UNIT_PROBE_COMPILE_DRIVER_SIDECAR_REL => self::JIT_UNIT_PROBE_COMPILE_DRIVER_SENTINEL_LOGICAL,
                 self::COMPILER_LIB_SIDECAR_REL => self::COMPILER_LIB_SENTINEL_LOGICAL,
                 self::COMPILER_MINIMAL_SIDECAR_REL => 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerMinimalSentinelBlock',
                 self::COMPILE_DRIVER_SIDECAR_REL => self::COMPILE_DRIVER_SENTINEL_LOGICAL,
