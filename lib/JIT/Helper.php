@@ -1101,6 +1101,46 @@ return_bool:
     }
 
     public function loadValue(Variable $variable): PHPLLVM\Value {
+        if (null !== $variable->valueBoxAliasPtr) {
+            $ptr = JitValueBox::normalizeValuePtr($this->context, $variable->valueBoxAliasPtr);
+            switch ($variable->type) {
+                case Variable::TYPE_NATIVE_BOOL:
+                    return $this->context->builder->truncOrBitCast(
+                        $this->context->builder->call(
+                            $this->context->lookupFunction('__value__readLong'),
+                            $ptr
+                        ),
+                        $this->context->getTypeFromString('int1')
+                    );
+                case Variable::TYPE_NATIVE_DOUBLE:
+                    return $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readDouble'),
+                        $ptr
+                    );
+                case Variable::TYPE_STRING:
+                    return $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readString'),
+                        $ptr
+                    );
+                case Variable::TYPE_OBJECT:
+                    return $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readObject'),
+                        $ptr
+                    );
+                case Variable::TYPE_HASHTABLE:
+                    return $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readHashtable'),
+                        $ptr
+                    );
+                case Variable::TYPE_NATIVE_LONG:
+                case Variable::TYPE_VALUE:
+                default:
+                    return $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readLong'),
+                        $ptr
+                    );
+            }
+        }
         if (null !== $variable->objectPropertySlot) {
             $loaded = $this->context->builder->load($variable->objectPropertySlot);
             if (null === $variable->objectPropertyType) {

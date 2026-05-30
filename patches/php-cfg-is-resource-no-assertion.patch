@@ -1,0 +1,10 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -1254,7 +1254,6 @@
+                 'is_object' => 'object',
+                 'is_real' => 'float',
+                 'is_string' => 'string',
+-                'is_resource' => 'resource',
+             ];
+             $lname = strtolower($name->value);
+             if (isset($assertionFunctions[$lname])) {

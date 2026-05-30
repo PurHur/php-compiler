@@ -44,6 +44,10 @@ class ClassEntry {
     public array $methodVisibility = [];
     /** @var array<string, Variable> constant name (lowercase) => value */
     public array $constants = [];
+    /** @var array<string, string> lowercase enum case name => declared case name (#3420) */
+    public array $enumCaseCanonicalNames = [];
+    /** @var list<array{name: string, value: Variable}> enum cases in declaration order (#3308) */
+    public array $enumCases = [];
     /** @var array<string, Variable> static property name (lowercase) => shared storage */
     public array $staticProperties = [];
     /** Readonly class: instance properties cannot change after construction (issue #1360). */
@@ -54,6 +58,10 @@ class ClassEntry {
     public array $attributeNames = [];
     /** @var array<string, list<string>> method (lowercase) => attribute names (#1936). */
     public array $methodAttributeNames = [];
+    /** @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata> method (lowercase) => deprecation (#3569). */
+    public array $methodDeprecated = [];
+    /** @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata> constant (lowercase) => deprecation (#3569). */
+    public array $constDeprecated = [];
 
     public function __construct(string $name) {
         $this->name = $name;
