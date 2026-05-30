@@ -4548,6 +4548,9 @@ class JIT {
                     }
                     break;  
                 case OpCode::TYPE_ASSIGN_REF:
+                    if (null !== $op->arg3 && 0 !== (int) $op->arg3) {
+                        throw new \LogicException('Cannot assign reference to non referenceable value');
+                    }
                     $destOp = $block->getOperand($op->arg1);
                     $srcOp = $block->getOperand($op->arg2);
                     $destName = JIT\OperandName::resolve($destOp);
