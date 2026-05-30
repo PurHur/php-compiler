@@ -718,6 +718,48 @@ class Block {
     }
 
     /**
+     * User class implements ArrayAccess and uses $obj[$key] — VM-only until JIT lowering (#3331).
+     */
+    public static function containsArrayAccessObjectOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        $hasArrayAccessClass = false;
+        $hasObjectDimFetch = false;
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (
+                    OpCode::TYPE_DECLARE_CLASS === $op->type
+                    && in_array('arrayaccess', $op->classImplements, true)
+                ) {
+                    $hasArrayAccessClass = true;
+                }
+                if (
+                    in_array($op->type, [OpCode::TYPE_ARRAY_DIM_FETCH, OpCode::TYPE_ARRAY_DIM_FETCH_WRITE], true)
+                    && null !== $op->arg3
+                ) {
+                    $hasObjectDimFetch = true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return $hasArrayAccessClass && $hasObjectDimFetch;
+    }
+
+    /**
      * CFG regions that MCJIT must not execute yet; `bin/jit.php` runs the VM instead (#2114, #167).
      * Simple try/catch without `finally` may pass MCJIT when {@see TryCatchJitExecuteTest} is green.
      */
@@ -725,6 +767,7 @@ class Block {
     {
         return self::containsGeneratorOpcodes($root)
             || self::containsFinallyOpcodes($root)
-            || self::containsExceptionHandlingOpcodes($root);
+            || self::containsExceptionHandlingOpcodes($root)
+            || self::containsArrayAccessObjectOpcodes($root);
     }
 }
