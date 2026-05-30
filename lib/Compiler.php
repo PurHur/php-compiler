@@ -2424,10 +2424,22 @@ class Compiler {
             case Op\Expr\InstanceOf_::class:
                 return $this->compileInstanceOf($expr, $block);
             case Op\Expr\AssignRef::class:
+                $bindRefFlags = 0;
+                $dimFetch = $this->unwrapArrayDimFetch($expr->expr)
+                    ?? $this->findArrayDimFetchForResult($expr->expr, $block);
+                $arrayLiteral = null !== $dimFetch
+                    ? ($this->unwrapArrayLiteralExpr($dimFetch->var)
+                        ?? $this->findArrayExprForResult($dimFetch->var, $block))
+                    : null;
+                if (null !== $arrayLiteral) {
+                    // Zend zend_compile_list_assign: ref target from inline array literal (#3799).
+                    $bindRefFlags = 1;
+                }
                 $ops = [new OpCode(
                     OpCode::TYPE_ASSIGN_REF,
                     $this->compileOperand($expr->var, $block, false),
-                    $this->compileOperand($expr->expr, $block, true)
+                    $this->compileOperand($expr->expr, $block, true),
+                    $bindRefFlags ?: null
                 )];
                 if ([] !== $expr->result->usages) {
                     $ops[] = new OpCode(
@@ -3618,7 +3630,10 @@ class Compiler {
     protected function isArrayDimFetchForWrite(Op\Expr\ArrayDimFetch $fetch, Block $block): bool
     {
         foreach ($fetch->result->usages as $usage) {
-            if ($usage instanceof Op\Expr\Assign && $usage->var === $fetch->result) {
+            if (
+                ($usage instanceof Op\Expr\Assign || $usage instanceof Op\Expr\AssignRef)
+                && $usage->var === $fetch->result
+            ) {
                 continue;
             }
             if ($usage instanceof Op\Terminal\Unset_ && $this->unsetTerminalUsesOperand($usage, $fetch->result)) {
@@ -3648,7 +3663,10 @@ class Compiler {
             }
             $next = $children[$i + 1];
 
-            if ($next instanceof Op\Expr\Assign && $next->var === $fetch->result) {
+            if (
+                ($next instanceof Op\Expr\Assign || $next instanceof Op\Expr\AssignRef)
+                && $next->var === $fetch->result
+            ) {
                 return true;
             }
             if ($next instanceof Op\Terminal\Unset_ && $this->unsetTerminalUsesOperand($next, $fetch->result)) {
@@ -3666,6 +3684,55 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * php-cfg Expr::result temporaries omit ->original; match list-destruct fetch by result (#3799).
+     */
+    protected function findArrayDimFetchForResult(Operand $result, Block $block): ?Op\Expr\ArrayDimFetch
+    {
+        foreach ($block->orig->children as $child) {
+            if ($child instanceof Op\Expr\ArrayDimFetch && $child->result === $result) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * php-cfg Expr::result temporaries omit ->original; match inline array literal RHS (#3799).
+     */
+    protected function findArrayExprForResult(Operand $result, Block $block): ?Op\Expr\Array_
+    {
+        foreach ($block->orig->children as $child) {
+            if ($child instanceof Op\Expr\Array_ && $child->result === $result) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * php-cfg lowers short list `[$a, $b] = …` and `[$a, $b]` RHS via Op\Expr\Array_ (#1222).
+     */
+    protected function unwrapArrayLiteralExpr(Operand $operand): ?Op\Expr\Array_
+    {
+        while ($operand instanceof Temporary) {
+            if ($operand->original instanceof Op\Expr\Array_) {
+                return $operand->original;
+            }
+            if (null === $operand->original) {
+                return null;
+            }
+            $operand = $operand->original;
+        }
+        if ($operand instanceof Op\Expr\Array_) {
+            return $operand;
+        }
+
+        return null;
     }
 
     private function unsetTerminalUsesOperand(Op\Terminal\Unset_ $unset, Operand $operand): bool

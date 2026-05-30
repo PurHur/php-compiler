@@ -601,6 +601,17 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_ASSIGN_REF:
+                    if (null !== $op->arg3 && 0 !== (int) $op->arg3) {
+                        $catchFrame = $this->dispatchVmError(
+                            'Cannot assign reference to non referenceable value',
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     $lhs = $frame->scope[$op->arg1];
                     $catchFrame = $this->enforcePropertyVisibilityWrite($lhs, $frame);
                     if (null !== $catchFrame) {
