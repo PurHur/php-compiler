@@ -63,6 +63,9 @@ class Object_ extends Type {
     /** @var array<int, true> class ids declared readonly (issue #1360) */
     private array $readonlyClassIds = [];
 
+    /** @var array<int, array<string, true>> class id => property lc => true (#3149, #3432) */
+    private array $readonlyPropertyNames = [];
+
     /** @var array<int, PHPLLVM\Value> property slot handle => owning __object__* */
     private array $slotReceivers = [];
 
@@ -517,6 +520,37 @@ class Object_ extends Type {
     public function readonlyClassIds(): array
     {
         return array_keys($this->readonlyClassIds);
+    }
+
+    public function markPropertyReadonly(int $classId, string $name): void
+    {
+        $this->readonlyPropertyNames[$classId][strtolower($name)] = true;
+    }
+
+    public function isPropertyReadonly(int $classId, string $name): bool
+    {
+        return isset($this->readonlyPropertyNames[$classId][strtolower($name)]);
+    }
+
+    /**
+     * @return list<int> class ids declaring $name as a readonly instance property
+     */
+    public function readonlyPropertyClassIdsForProperty(string $name): array
+    {
+        $lc = strtolower($name);
+        $ids = [];
+        foreach ($this->readonlyPropertyNames as $classId => $props) {
+            if (isset($props[$lc])) {
+                $ids[] = $classId;
+            }
+        }
+
+        return $ids;
+    }
+
+    public function hasReadonlyPropertyGuards(): bool
+    {
+        return [] !== $this->readonlyClassIds || [] !== $this->readonlyPropertyNames;
     }
 
     public function markObjectConstructed(PHPLLVM\Value $obj): void

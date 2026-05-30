@@ -6528,6 +6528,9 @@ class JIT {
                         );
                     }
                     $this->context->type->object->defineProperty($classId, $name->value, $jitType);
+                    if ($op->propertyReadonly) {
+                        $this->context->type->object->markPropertyReadonly($classId, $name->value);
+                    }
                     if (null !== $op->arg2 && isset($block->constants[$op->arg2])) {
                         $this->context->type->object->definePropertyDefault(
                             $classId,
