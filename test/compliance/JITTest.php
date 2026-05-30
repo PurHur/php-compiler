@@ -189,7 +189,7 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'loose_numeric_string')) {
                 continue;
             }
-            // var_dump() not JIT-implemented; int↔string loose == covered by VMTest (#3658).
+            // var_dump() not JIT-implemented; int↔string loose == IR guarded by LooseScientificStringJitCompileTest (#3658).
             if (str_contains($name, 'loose_scientific_string')) {
                 continue;
             }
