@@ -1,0 +1,125 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\Test\Unit;
+
+use PHPCompiler\Runtime;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * Always-on gate for curated AOT PHPT fixtures (#3671+ regressions).
+ *
+ * Runs in the default unit testsuite (no LLVM link). Full native link coverage
+ * remains in {@see \PHPCompiler\AotTest} (@group aot-link) via ci-local.sh.
+ */
+final class AotRegressionFixtureCatalogTest extends TestCase
+{
+    /**
+     * Regression fixtures added for recent language/stdlib merges.
+     * Each must exist under test/fixtures/aot/cases/ and compile in MODE_AOT.
+     *
+     * @var list<string>
+     */
+    private const REGRESSION_FIXTURES = [
+        'echo_spaceship.phpt',
+        'empty_array_loose_false.phpt',
+        'object_identical.phpt',
+        'basename_suffix.phpt',
+        'stdlib_predefined_constants.phpt',
+        'gettype_object_resource.phpt',
+        'is_countable.phpt',
+    ];
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function regressionFixturesProvider(): array
+    {
+        $cases = [];
+        foreach (self::REGRESSION_FIXTURES as $basename) {
+            $cases[$basename] = [$basename];
+        }
+
+        return $cases;
+    }
+
+    /**
+     * @dataProvider regressionFixturesProvider
+     */
+    public function testRegressionFixtureExistsWithPhptSections(string $basename): void
+    {
+        $path = $this->fixturePath($basename);
+        $this->assertFileExists($path);
+        $contents = (string) file_get_contents($path);
+        $this->assertStringContainsString('--FILE--', $contents, $basename);
+        $this->assertTrue(
+            str_contains($contents, '--EXPECT--')
+                || str_contains($contents, '--EXPECTF--')
+                || str_contains($contents, '--EXPECTREGEX--'),
+            $basename.' missing EXPECT section'
+        );
+    }
+
+    /**
+     * @dataProvider regressionFixturesProvider
+     */
+    public function testRegressionFixtureParseAndCompileInAotMode(string $basename): void
+    {
+        $path = $this->fixturePath($basename);
+        $code = $this->extractFileSection($path);
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $block = $runtime->parseAndCompile($code, $path);
+        $this->assertNotNull($block, 'parseAndCompile returned null for '.$basename);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function compileOnlyFixturesProvider(): array
+    {
+        return [
+            'enum_instanceof.php' => ['enum_instanceof.php'],
+            'loose_numeric_string_eq.php' => ['loose_numeric_string_eq.php'],
+            'bool_increment.php' => ['bool_increment.php'],
+            'intdiv_division_by_zero.php' => ['intdiv_division_by_zero.php'],
+        ];
+    }
+
+    /**
+     * @dataProvider compileOnlyFixturesProvider
+     */
+    public function testCompileOnlyFixtureParseAndCompileInAotMode(string $basename): void
+    {
+        $root = dirname(__DIR__, 2);
+        $path = $root.'/test/fixtures/aot/compile-only/'.$basename;
+        $this->assertFileExists($path);
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $block = $runtime->parseAndCompile((string) file_get_contents($path), $path);
+        $this->assertNotNull($block);
+    }
+
+    private function fixturePath(string $basename): string
+    {
+        return dirname(__DIR__, 2).'/test/fixtures/aot/cases/'.$basename;
+    }
+
+    private function extractFileSection(string $path): string
+    {
+        $sections = [];
+        $section = '';
+        foreach (file($path) as $line) {
+            if (preg_match('/^--([_A-Z]+)--/', $line, $m)) {
+                $section = $m[1];
+                $sections[$section] = '';
+                continue;
+            }
+            if ('' !== $section) {
+                $sections[$section] .= $line;
+            }
+        }
+        $this->assertArrayHasKey('FILE', $sections, 'missing --FILE-- in '.$path);
+
+        return rtrim($sections['FILE'], "\r\n");
+    }
+}

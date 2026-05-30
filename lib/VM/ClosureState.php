@@ -99,6 +99,8 @@ final class ClosureState
         $pub = \PHPCfg\Func::FLAG_PUBLIC;
         $entry->methods['fromcallable'] = new Builtin\ClosureFromCallable();
         $entry->methodVisibility['fromcallable'] = $pub;
+        $entry->methods['bind'] = new Builtin\ClosureBind();
+        $entry->methodVisibility['bind'] = $pub;
         $entry->methods['bindto'] = new Builtin\ClosureBindTo();
         $entry->methodVisibility['bindto'] = $pub;
         $ctx->classes['closure'] = $entry;
