@@ -12,6 +12,7 @@ use PHPCompiler\ext\standard\VmErrorHandler;
  */
 final class ErrorReporter
 {
+    public const E_PARSE = 4;
     public const E_WARNING = 2;
     public const E_USER_ERROR = 256;
     public const E_USER_WARNING = 512;

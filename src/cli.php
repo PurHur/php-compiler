@@ -56,3 +56,49 @@ if (!function_exists('php_compiler_cli_should_skip_vendor_autoload')) {
         return '1' === $vendorPrelink || 'true' === strtolower((string) $vendorPrelink);
     }
 }
+
+if (!function_exists('php_compiler_cli_note_invocation_cwd')) {
+    /**
+     * Remember the process cwd before bin/*.php chdir to the repo root (#1770, #586).
+     *
+     * Relative script paths (e.g. MiniWebApp `public/index.php`) resolve against this directory.
+     */
+    function php_compiler_cli_note_invocation_cwd(): void
+    {
+        $cwd = getcwd();
+        if (!is_string($cwd) || '' === $cwd) {
+            return;
+        }
+        putenv('PHP_COMPILER_CLI_INVOCATION_CWD='.$cwd);
+        $_ENV['PHP_COMPILER_CLI_INVOCATION_CWD'] = $cwd;
+        $_SERVER['PHP_COMPILER_CLI_INVOCATION_CWD'] = $cwd;
+    }
+}
+
+if (!function_exists('php_compiler_cli_resolve_user_path')) {
+    /**
+     * Resolve a user-supplied relative path against the pre-chdir invocation cwd.
+     */
+    function php_compiler_cli_resolve_user_path(string $path): string
+    {
+        if ('' === $path || '-' === $path || 'Command line code' === $path) {
+            return $path;
+        }
+        if ('/' === $path[0]) {
+            return $path;
+        }
+        if (
+            strlen($path) >= 2
+            && ctype_alpha($path[0])
+            && (':' === $path[1] || (strlen($path) >= 3 && ':' === $path[2] && ('\\' === $path[1] || '/' === $path[1])))
+        ) {
+            return $path;
+        }
+        $base = getenv('PHP_COMPILER_CLI_INVOCATION_CWD');
+        if (!is_string($base) || '' === $base) {
+            return $path;
+        }
+
+        return rtrim($base, '/\\').'/'.$path;
+    }
+}

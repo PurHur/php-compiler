@@ -40,6 +40,9 @@ class Context {
     /** @var array<string, Variable> */
     private array $globalVars = [];
 
+    /** Lazily built $GLOBALS superglobal table (issue #3413). */
+    private ?Variable $globalsSuperglobal = null;
+
     /** @var array<string, Variable> function-local static storage keyed by compile-time key (#2286) */
     private array $functionStaticVars = [];
 
@@ -124,91 +127,50 @@ class Context {
                 $var = new Variable(Variable::TYPE_INTEGER);
                 $var->int(\PHPCompiler\ext\standard\VmFilter::INPUT_POST);
                 return $var;
-            case 'fnm_noescape':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmFnmatch::FNM_NOESCAPE);
-                return $var;
-            case 'fnm_pathname':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmFnmatch::FNM_PATHNAME);
-                return $var;
-            case 'fnm_period':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmFnmatch::FNM_PERIOD);
-                return $var;
-            case 'fnm_casefold':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmFnmatch::FNM_CASEFOLD);
-                return $var;
-            case 'e_error':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(1);
-                return $var;
-            case 'e_warning':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(ErrorReporter::E_WARNING);
-                return $var;
-            case 'e_parse':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(4);
-                return $var;
-            case 'e_notice':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(8);
-                return $var;
-            case 'e_core_error':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(16);
-                return $var;
-            case 'e_core_warning':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(32);
-                return $var;
-            case 'e_compile_error':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(64);
-                return $var;
-            case 'e_compile_warning':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(128);
-                return $var;
-            case 'e_user_error':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(ErrorReporter::E_USER_ERROR);
-                return $var;
-            case 'e_user_warning':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(ErrorReporter::E_USER_WARNING);
-                return $var;
-            case 'e_user_notice':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(ErrorReporter::E_USER_NOTICE);
-                return $var;
-            case 'e_strict':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(2048);
-                return $var;
-            case 'e_recoverable_error':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(4096);
-                return $var;
-            case 'e_deprecated':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(8192);
-                return $var;
-            case 'e_user_deprecated':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(ErrorReporter::E_USER_DEPRECATED);
-                return $var;
-            case 'e_all':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(E_ALL);
-                return $var;
+        }
+        $stdlibInt = \PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[strtolower($name)] ?? null;
+        if (null !== $stdlibInt) {
+            $var = new Variable(Variable::TYPE_INTEGER);
+            $var->int($stdlibInt);
+            return $var;
+        }
+        $phpCore = \PHPCompiler\ext\standard\VmPhpCoreConstants::fetch($name);
+        if (null !== $phpCore) {
+            return $phpCore;
+        }
+        $errorInt = self::errorReportingConstant($name);
+        if (null !== $errorInt) {
+            $var = new Variable(Variable::TYPE_INTEGER);
+            $var->int($errorInt);
+            return $var;
         }
         if (isset($this->constants[$name])) {
             return $this->constants[$name];
         }
         return null;
+    }
+
+    private static function errorReportingConstant(string $name): ?int
+    {
+        return match (strtolower($name)) {
+            'e_error' => 1,
+            'e_warning' => ErrorReporter::E_WARNING,
+            'e_parse' => 4,
+            'e_notice' => 8,
+            'e_core_error' => 16,
+            'e_core_warning' => 32,
+            'e_compile_error' => 64,
+            'e_compile_warning' => 128,
+            'e_user_error' => ErrorReporter::E_USER_ERROR,
+            'e_user_warning' => ErrorReporter::E_USER_WARNING,
+            'e_user_notice' => ErrorReporter::E_USER_NOTICE,
+            'e_strict' => 2048,
+            'e_recoverable_error' => 4096,
+            'e_deprecated' => 8192,
+            'e_user_deprecated' => ErrorReporter::E_USER_DEPRECATED,
+            'e_all' => E_ALL,
+            default => null,
+        };
     }
 
     public function isUserConstantDefined(string $name): bool
@@ -304,6 +266,9 @@ class Context {
 
     public function ensureSuperglobal(string $name): Variable
     {
+        if ('GLOBALS' === $name) {
+            return $this->ensureGlobalsTable();
+        }
         if (!Superglobals::isSuperglobalName($name)) {
             throw new \InvalidArgumentException("Unknown superglobal: {$name}");
         }
@@ -326,7 +291,82 @@ class Context {
         if (!isset($this->globalVars[$name])) {
             $this->globalVars[$name] = new Variable(Variable::TYPE_NULL);
         }
+        $this->syncGlobalEntryInGlobalsTable($name, $this->globalVars[$name]);
+
         return $this->globalVars[$name];
+    }
+
+    public function ensureGlobalsTable(): Variable
+    {
+        if (null === $this->globalsSuperglobal) {
+            $this->globalsSuperglobal = new Variable(Variable::TYPE_ARRAY);
+            $this->globalsSuperglobal->array(new HashTable());
+            foreach ($this->globalVars as $name => $global) {
+                $this->syncGlobalEntryInGlobalsTable($name, $global);
+            }
+        }
+
+        return $this->globalsSuperglobal;
+    }
+
+    public function isGlobalsTable(Variable $container): bool
+    {
+        if (null === $this->globalsSuperglobal) {
+            return false;
+        }
+
+        return $this->globalsSuperglobal === $container->resolveIndirect();
+    }
+
+    /**
+     * $GLOBALS['name'] read/write shares storage with `global $name` (Zend symbol table).
+     */
+    public function globalsTableOffsetFetch(Variable $index, bool $forWrite): Variable
+    {
+        if (Variable::TYPE_STRING !== $index->type) {
+            return $this->ensureGlobalsTable()->toArray()->findVariable($index, $forWrite);
+        }
+        $name = $index->toString();
+        $global = $this->ensureGlobal($name);
+        $table = $this->ensureGlobalsTable()->toArray();
+        $slot = $table->find($name);
+        if (null === $slot) {
+            $ref = new Variable(Variable::TYPE_NULL);
+            $ref->indirect($global);
+            $table->add($name, $ref);
+
+            return $ref;
+        }
+        if (Variable::TYPE_INDIRECT !== $slot->type) {
+            $ref = new Variable(Variable::TYPE_NULL);
+            $ref->indirect($global);
+            $table->updateIndirect($name, $ref);
+
+            return $ref;
+        }
+
+        return $slot;
+    }
+
+    private function syncGlobalEntryInGlobalsTable(string $name, Variable $global): void
+    {
+        if (null === $this->globalsSuperglobal) {
+            return;
+        }
+        $table = $this->globalsSuperglobal->toArray();
+        $existing = $table->find($name);
+        if (null === $existing) {
+            $ref = new Variable(Variable::TYPE_NULL);
+            $ref->indirect($global);
+            $table->add($name, $ref);
+
+            return;
+        }
+        if (Variable::TYPE_INDIRECT !== $existing->type) {
+            $ref = new Variable(Variable::TYPE_NULL);
+            $ref->indirect($global);
+            $table->updateIndirect($name, $ref);
+        }
     }
 
     public function ensureFunctionStatic(string $storageKey): Variable

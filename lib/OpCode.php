@@ -146,9 +146,12 @@ class OpCode {
      */
     const TYPE_CLOSURE = 109;
     /** Begin `@` error-control: mask E_WARNING/E_NOTICE for wrapped expression (issue #3546). */
-    const TYPE_BEGIN_SILENCE = 111;
+    const TYPE_BEGIN_SILENCE = 112;
     /** End `@` error-control: restore prior error_reporting (issue #3546). */
-    const TYPE_END_SILENCE = 112;
+    const TYPE_END_SILENCE = 113;
+
+    /** Bare `throw;` in catch — rethrow active caught exception (#3508). */
+    const TYPE_RETHROW = 111;
 
     public int $type;
     public ?int $arg1;
@@ -165,8 +168,12 @@ class OpCode {
     public array $classImplements = [];
     /** Declared PHP 8 attribute class names on class/method (#1936). */
     public array $attributeNames = [];
+    /** #[\Deprecated] metadata on function/method/class const declarations (#3569). */
+    public ?\PHPCompiler\Compiler\DeprecatedMetadata $deprecatedMetadata = null;
     /** Pipe-separated lowercase catch class names for TYPE_CATCH (#1362). */
     public ?string $catchTypes = null;
+    /** Pipe-separated lowercase class/interface names for union `instanceof` RHS (#3461). */
+    public ?string $instanceofUnionTypes = null;
 
     /**
      * Closure `use ($var)` metadata for TYPE_CLOSURE (issue #72).

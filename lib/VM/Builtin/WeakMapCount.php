@@ -24,6 +24,14 @@ final class WeakMapCount extends VmClassMethod
             return;
         }
         $receiver = WeakRefSupport::requireObject($frame->calledArgs[0], 'WeakMap');
-        $frame->returnVar->int(WeakRefSupport::mapTable($receiver->toObject())->getNumElements());
+        $map = $receiver->toObject();
+        WeakRefSupport::purgeStaleMapEntries($map);
+        $ht = WeakRefSupport::mapTable($map);
+        if (null === $ht) {
+            $frame->returnVar->int(0);
+
+            return;
+        }
+        $frame->returnVar->int($ht->getNumElements());
     }
 }

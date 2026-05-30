@@ -16,7 +16,7 @@ class ClosureVMTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
-        foreach (['closure_simple.phpt', 'closure_arrow.phpt', 'closure_in_array.phpt', 'closure_array_element_call.phpt', 'closure_use.phpt', 'closure_use_byref.phpt', 'closure_array_map.phpt'] as $file) {
+        foreach (['closure_simple.phpt', 'closure_arrow.phpt', 'closure_in_array.phpt', 'closure_array_element_call.phpt', 'closure_use.phpt', 'closure_use_byref.phpt', 'closure_array_map.phpt', 'closure_from_callable.phpt', 'closure_from_callable_method.phpt', 'closure_bind_to.phpt'] as $file) {
             $path = __DIR__ . '/cases/language/' . $file;
             $name = preg_replace('/\.phpt$/', '', $file) ?: $file;
             yield $name => self::parsePHPT($path, $file);

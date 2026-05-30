@@ -912,6 +912,21 @@ final class HashTable {
         }
     }
 
+    /**
+     * Grow the hash index table so integer keys up to $maxHashIndex are not masked together.
+     * Required for sparse int-key arrays (e.g. count_chars() mode 1; ext/standard/string.c).
+     */
+    public function ensureHashSlotCapacity(int $maxHashIndex): void
+    {
+        $this->assertConsistent();
+        if ($this->flags & self::FLAG_UNINITIALIZED) {
+            $this->initMixed();
+        }
+        while ($maxHashIndex >= $this->indexes->size()) {
+            $this->resize();
+        }
+    }
+
     public function addIndex(int $index, Variable $data): ?Variable {
         return $this->addOrUpdate($index, null, $data, self::ADD);
     }

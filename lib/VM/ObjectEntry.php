@@ -31,6 +31,12 @@ class ObjectEntry {
     /** Anonymous function / closure body (issue #72). */
     public ?ClosureState $closureState = null;
 
+    /** Initializer for lazy proxy objects (#3317). */
+    public ?ClosureState $lazyInitializer = null;
+
+    /** True until first property access or method call runs the lazy initializer. */
+    public bool $lazyPending = false;
+
     public function __construct(ClassEntry $class) {
         $this->class = $class;
         $this->id = ++self::$counter;
@@ -50,6 +56,12 @@ class ObjectEntry {
         return array_values($this->properties);
     }
 
+    /** @return array<string, Variable> */
+    public function propertiesWithNames(): array
+    {
+        return $this->properties;
+    }
+
     /** Break property edges and detach generator/closure state after cycle collection (#3113). */
     public function destroyForGc(): void
     {
@@ -62,6 +74,8 @@ class ObjectEntry {
         }
         $this->generatorState = null;
         $this->closureState = null;
+        $this->lazyInitializer = null;
+        $this->lazyPending = false;
     }
 
     public function getProperty(string $name): Variable {
@@ -76,6 +90,16 @@ class ObjectEntry {
         }
 
         return $this->properties[$name];
+    }
+
+    public function issetProperty(string $name): bool
+    {
+        if (!isset($this->properties[$name])) {
+            return false;
+        }
+        $var = $this->properties[$name]->resolveIndirect();
+
+        return !$var->isUndefined() && Variable::TYPE_NULL !== $var->type;
     }
 
     public function unsetProperty(string $name): void
@@ -108,6 +132,8 @@ class ObjectEntry {
         }
         $clone->constructed = $this->constructed;
         $clone->closureState = $this->closureState;
+        $clone->lazyInitializer = $this->lazyInitializer;
+        $clone->lazyPending = $this->lazyPending;
 
         return $clone;
     }
