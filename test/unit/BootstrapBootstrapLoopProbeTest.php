@@ -98,11 +98,9 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
     {
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-loop-gen1-link.sh');
         $this->assertStringContainsString('cd "${ROOT}"', $script);
-        $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER:-0', $script);
-        $this->assertStringContainsString('BOOTSTRAP_M3_EMIT_HELPER_TU', $script);
+        $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1', $script);
         $this->assertStringContainsString('compiler_helloworld_smoke/compile_driver.php', $script);
-        $this->assertStringContainsString('inventory compile_driver (helloworld compile_driver', $script);
-        $this->assertStringContainsString('compiler_compile_smoke/compile_driver.php', $script);
+        $this->assertStringContainsString('inventory compile_driver (#3032)', $script);
         $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $script);
         $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_MINIMAL=1', $script);
         $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1', $script);

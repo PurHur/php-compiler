@@ -90,12 +90,12 @@ final class BootstrapJitUnitProbeTest extends TestCase
         $this->assertStringContainsString('jit unit probe compile OK', $source);
     }
 
-    /** Issue #2879: inventory compile_driver without *_m3_emit_native_entry.php. */
+    /** Issue #3032: inventory compile_driver without *_m3_emit_native_entry.php. */
     public function testJitUnitProbeDocumentsInventoryEmitDriverOptIn(): void
     {
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-jit-unit-probe.sh');
         $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER', $script);
-        $this->assertStringContainsString('inventory compile_driver (no emit-helper TU, #2879)', $script);
+        $this->assertStringContainsString('inventory compile_driver (#3032)', $script);
         $this->assertFileExists(self::$root.'/test/selfhost/jit_unit_probe/compile_driver.php');
     }
 

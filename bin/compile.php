@@ -32,9 +32,6 @@ function phpc_compile_is_user_script_aot(string $normalized): bool
     if (str_contains($normalized, 'compile_driver.php')) {
         return false;
     }
-    if (str_contains($normalized, '_m3_emit_native_entry.php')) {
-        return false;
-    }
     if (str_contains($normalized, 'compiler_unit_probe')) {
         return false;
     }
