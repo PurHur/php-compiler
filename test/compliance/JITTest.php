@@ -172,6 +172,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'property_hook')) {
                 continue;
             }
+            // ++/-- string increment_string is VM-only until JIT reads OpCode::isIncDec (#3469).
+            if (str_contains($name, 'string_increment')) {
+                continue;
+            }
             yield $name => $case;
         }
     }

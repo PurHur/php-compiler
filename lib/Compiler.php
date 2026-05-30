@@ -17,8 +17,10 @@ use PHPCfg\Op;
 use PHPCfg\Block as CfgBlock;
 use PHPCfg\ErrorSuppressBlock;
 use PHPCfg\Operand;
+use PHPCfg\Operand\BoundVariable;
 use PHPCfg\Operand\Literal;
 use PHPCfg\Operand\Temporary;
+use PHPCfg\Operand\Variable as CfgVariable;
 use PHPCfg\Script;
 use PHPTypes\Type;
 use PHPCompiler\VM\HashTable;
@@ -1904,12 +1906,17 @@ class Compiler {
 
     protected function compileExpr(Op\Expr $expr, Block $block): array {
         if ($expr instanceof Op\Expr\BinaryOp) {
-            return [new OpCode(
+            $opcode = new OpCode(
                 $this->getOpCodeTypeFromBinaryOp($expr),
                 $this->compileOperand($expr->result, $block, false),
                 null !== $expr->left ? $this->compileOperand($expr->left, $block, true) : null,
                 null !== $expr->right ? $this->compileOperand($expr->right, $block, true) : null,
-            )];
+            );
+            if ($this->isIncDecBinaryOp($expr)) {
+                $opcode->isIncDec = true;
+            }
+
+            return [$opcode];
         } elseif ($expr instanceof Op\Expr\Cast) {
             return [new OpCode(
                 $this->getOpCodeTypeFromCastOp($expr),
@@ -4253,6 +4260,64 @@ class Compiler {
                 $operand->usages[] = $operand;
             }
         }
+    }
+
+    /**
+     * php-cfg lowers ++/-- to Plus/Minus(read, 1) + Assign(write, result) (#3469).
+     */
+    private function isIncDecBinaryOp(Op\Expr\BinaryOp $expr): bool
+    {
+        if (!$expr instanceof Op\Expr\BinaryOp\Plus && !$expr instanceof Op\Expr\BinaryOp\Minus) {
+            return false;
+        }
+        $varSide = null;
+        if ($expr->right instanceof Literal && 1 == $expr->right->value) {
+            $varSide = $expr->left;
+        } elseif ($expr->left instanceof Literal && 1 == $expr->left->value) {
+            $varSide = $expr->right;
+        }
+        if (null === $varSide) {
+            return false;
+        }
+        foreach ($expr->result->usages as $usage) {
+            if (!$usage instanceof Op\Expr\Assign) {
+                continue;
+            }
+            if ($usage->expr !== $expr->result) {
+                continue;
+            }
+            if ($this->operandsSameBaseVariable($usage->var, $varSide)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function operandsSameBaseVariable(?Operand $left, ?Operand $right): bool
+    {
+        $leftName = $this->baseVariableName($left);
+        $rightName = $this->baseVariableName($right);
+        if (null === $leftName || null === $rightName) {
+            return false;
+        }
+
+        return $leftName === $rightName;
+    }
+
+    private function baseVariableName(?Operand $operand): ?string
+    {
+        while ($operand instanceof Temporary && $operand->original instanceof Operand) {
+            $operand = $operand->original;
+        }
+        if ($operand instanceof BoundVariable && $operand->name instanceof Literal && is_string($operand->name->value)) {
+            return $operand->name->value;
+        }
+        if ($operand instanceof CfgVariable && $operand->name instanceof Literal && is_string($operand->name->value)) {
+            return $operand->name->value;
+        }
+
+        return null;
     }
 
 }

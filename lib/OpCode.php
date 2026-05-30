@@ -191,6 +191,9 @@ class OpCode {
      */
     public array $closureCaptures = [];
 
+    /** Lowered from ++/-- (issue #3469); enables Zend increment_string on strings. */
+    public bool $isIncDec = false;
+
     public function __construct(int $type, ?int $arg1 = null, ?int $arg2 = null, ?int $arg3 = null) {
         $this->type = $type;
         $this->arg1 = $arg1;
