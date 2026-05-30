@@ -1422,6 +1422,10 @@ restart:
                     }
                     $propertyObject = $var->toObject();
                     VM\LazyObjectSupport::ensureInitialized($this, $propertyObject);
+                    if (EnumCaseSupport::isEnumCase($propertyObject)) {
+                        $result->copyFrom(EnumCaseSupport::getProperty($propertyObject, $name));
+                        break;
+                    }
                     $hookValue = $this->fetchPropertyWithHooks($propertyObject, $name, $frame);
                     if (null !== $hookValue) {
                         $result->copyFrom($hookValue);
@@ -2375,7 +2379,7 @@ restart:
         $methodLc = strtolower($func->name);
         $wantSet = strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($propName));
 
-        return $methodLc === $wantSet || $methodLc === strtolower($func->class.'::'.$wantSet);
+        return $methodLc === $wantSet || $methodLc === strtolower($func->class->value.'::'.$wantSet);
     }
 
     private function linkPropertyHooks(ClassEntry $entry, VM\ClassProperty $prop): void

@@ -37,12 +37,13 @@ final class EnumCaseSupport
             throw new \LogicException('getProperty called on non-enum-case object');
         }
         $result = new Variable();
-        if ('name' === $name) {
+        $lc = strtolower($name);
+        if ('name' === $lc) {
             $result->string($object->enumCaseName ?? '');
 
             return $result;
         }
-        if ('value' === $name) {
+        if ('value' === $lc) {
             if (null === $object->enumCaseValue) {
                 throw new \LogicException('Cannot read value on a unit enum case');
             }
