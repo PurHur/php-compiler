@@ -14,6 +14,7 @@ require_once __DIR__.'/OpCodeNames.php';
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Func;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\CastSupport;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\GeneratorState;
@@ -439,6 +440,11 @@ restart:
                 case OpCode::TYPE_CAST_STRING:
                     $frame->scope[$op->arg1]->string(
                         $this->coerceVariableToString($frame->scope[$op->arg2])
+                    );
+                    break;
+                case OpCode::TYPE_CAST_ARRAY:
+                    $frame->scope[$op->arg1]->copyFrom(
+                        CastSupport::toArray($frame->scope[$op->arg2])
                     );
                     break;
                 case OpCode::TYPE_CAST_OBJECT:
