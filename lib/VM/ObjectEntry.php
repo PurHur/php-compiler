@@ -87,6 +87,11 @@ class ObjectEntry {
         $this->lazyPending = false;
     }
 
+    public function hasProperty(string $name): bool
+    {
+        return isset($this->properties[$name]);
+    }
+
     public function getProperty(string $name): Variable {
         if ($this->isEnumCase) {
             return EnumCaseSupport::getProperty($this, $name);

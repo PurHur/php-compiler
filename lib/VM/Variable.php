@@ -76,6 +76,11 @@ final class Variable {
     /** Stream handle from fopen()/similar; distinguishes handle ints from plain integers (#3519). */
     public bool $streamResource = false;
 
+    /** Lvalue proxy for __set dispatch when the property slot does not exist (#146). */
+    public ?ObjectEntry $magicSetTarget = null;
+
+    public ?string $magicSetName = null;
+
     public function __construct(int $type = self::TYPE_NULL) {
         $this->type = $type;
     }

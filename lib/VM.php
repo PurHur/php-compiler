@@ -347,6 +347,57 @@ class VM {
     }
 
     /**
+     * Zend zend_std_read_property / __get slow path (#146).
+     */
+    protected function invokeMagicGet(ObjectEntry $object, string $name): Variable
+    {
+        if (!$this->hasInstanceMethod($object->class, '__get')) {
+            throw new \LogicException('Undefined property access');
+        }
+        $nameVar = new Variable(Variable::TYPE_STRING);
+        $nameVar->string($name);
+
+        return $this->invokeInstanceMethod($object, '__get', $nameVar);
+    }
+
+    /**
+     * Zend zend_std_write_property / __set slow path (#146).
+     */
+    protected function invokeMagicSet(ObjectEntry $object, string $name, Variable $value): void
+    {
+        if (!$this->hasInstanceMethod($object->class, '__set')) {
+            throw new \LogicException('Undefined property access');
+        }
+        $nameVar = new Variable(Variable::TYPE_STRING);
+        $nameVar->string($name);
+        $valueCopy = new Variable();
+        $valueCopy->copyFrom($value);
+        $this->invokeInstanceMethod($object, '__set', $nameVar, $valueCopy);
+    }
+
+    /**
+     * Resolve an instance property write lvalue, including __set / dynamic properties (#146).
+     */
+    protected function fetchObjectPropertyWriteLvalue(ObjectEntry $object, string $name): Variable
+    {
+        if ($object->hasProperty($name)) {
+            return $object->getProperty($name);
+        }
+        if ($this->hasInstanceMethod($object->class, '__set')) {
+            $proxy = new Variable();
+            $proxy->magicSetTarget = $object;
+            $proxy->magicSetName = $name;
+
+            return $proxy;
+        }
+        if ($object->class->allowsDynamicProperties) {
+            return $object->getProperty($name);
+        }
+
+        throw new \LogicException('Undefined property access');
+    }
+
+    /**
      * Invoke a closure from a VM builtin (isolated run stack; issue #72).
      */
     public function invokeClosure(ClosureState $closureState, Variable ...$args): Variable
@@ -577,6 +628,12 @@ restart:
                     }
                     if ($this->context->propertyHookSetAborted) {
                         $this->context->propertyHookSetAborted = false;
+                        break;
+                    }
+                    $writeTarget = $arg2->resolveIndirect();
+                    if (null !== $writeTarget->magicSetTarget && null !== $writeTarget->magicSetName) {
+                        $this->invokeMagicSet($writeTarget->magicSetTarget, $writeTarget->magicSetName, $arg3);
+                        $arg1->copyFrom($arg3);
                         break;
                     }
                     $catchFrame = $this->enforcePropertyVisibilityWrite($arg2, $frame);
@@ -1642,12 +1699,31 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
-                    $hookValue = $this->fetchPropertyWithHooks($propertyObject, $name, $frame);
-                    if (null !== $hookValue) {
-                        $result->copyFrom($hookValue);
-                    } else {
-                        $result->indirect($propertyObject->getProperty($name));
+                    if ($propertyObject->hasProperty($name)) {
+                        $hookValue = $this->fetchPropertyWithHooks($propertyObject, $name, $frame);
+                        if (null !== $hookValue) {
+                            $result->copyFrom($hookValue);
+                        } else {
+                            $result->indirect($propertyObject->getProperty($name));
+                        }
+                        break;
                     }
+                    $forWrite = $frame->pos < $frame->block->nOpCodes
+                        && OpCode::TYPE_ASSIGN === $frame->block->opCodes[$frame->pos]->type
+                        && (int) $frame->block->opCodes[$frame->pos]->arg2 === (int) $op->arg1;
+                    if ($forWrite) {
+                        $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name));
+                        break;
+                    }
+                    if ($this->hasInstanceMethod($propertyObject->class, '__get')) {
+                        $result->copyFrom($this->invokeMagicGet($propertyObject, $name));
+                        break;
+                    }
+                    if ($propertyObject->class->allowsDynamicProperties) {
+                        $result->indirect($propertyObject->getProperty($name));
+                        break;
+                    }
+                    throw new \LogicException('Undefined property access');
                     break;
                 case OpCode::TYPE_INIT_ARRAY:
                     $result = $frame->scope[$op->arg1];
@@ -3292,6 +3368,14 @@ restart:
         }
         $class = $object->class;
         if (!isset($class->methods[$methodLc])) {
+            if (isset($class->methods['__call'])) {
+                $frame->magicCallMethodName = $methodName;
+                $frame->call = $class->methods['__call'];
+                $frame->callArgs = [$receiver];
+                $frame->callArgEntries = [];
+
+                return;
+            }
             throw new \LogicException("Call to undefined method {$class->name}::{$methodLc}()");
         }
         $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;

@@ -2113,6 +2113,7 @@ class Compiler {
         if (null === $prop->defaultVar) {
             return null;
         }
+        $propertyType = $prop->declaredType ?? new Op\Type\Literal('mixed');
         $pseudo = new Op\Expr\Param(
             new Operand\Literal(''),
             new Op\Type\Mixed_(),

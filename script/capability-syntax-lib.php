@@ -97,6 +97,18 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { public int $x = 1; public function __clone() { $this->x = 2; } } $a = new C(); $b = clone $a; echo $b->x;',
         ],
         [
+            'id' => 'magic_methods',
+            'construct' => 'Magic methods `__get` / `__set` / `__call` / `__toString`',
+            'opcodes' => [],
+            'issue' => 146,
+            'jit' => false,
+            'notes' => [
+                'Zend zend_object_handlers.c: zend_std_read_property, zend_std_write_property, zend_std_get_method, __toString cast',
+                'VM slow path on undeclared property read/write and missing method call; __callStatic (#3273); JIT deopt/fallback',
+            ],
+            'probe' => 'class M { function __get(string $k): string { return $k; } } echo (new M)->foo;',
+        ],
+        [
             'id' => 'private_methods',
             'construct' => 'Private methods',
             'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_METHODCALL_INIT'],
@@ -753,6 +765,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'instance_methods' => '/function\s+\w+\s*\(/',
         'construct_method' => '/function\s+__construct\s*\(/',
         'clone_magic' => '/function\s+__clone\s*\(/',
+        'magic_methods' => '/function\s+__get\s*\(|function\s+__call\s*\(|function\s+__toString\s*\(/',
         'private_methods' => '/\bprivate\s+function\b/',
         'method_return_types' => '/function\s+\w+\([^)]*\)\s*:\s*(?:string|void|int)/',
         'property_fetch' => '/\$this->\w+/',
