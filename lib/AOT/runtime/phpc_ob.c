@@ -141,15 +141,14 @@ int __phpc_ob_end_flush(struct __value__ *out)
     return 1;
 }
 
-<<<<<<< HEAD
 volatile int __phpc_shutdown_registered = 0;
 
 void __phpc_shutdown_mark_registered(void)
 {
     __phpc_shutdown_registered = 1;
-=======
+}
+
 void __phpc_flush(void)
 {
     fflush(stdout);
->>>>>>> f0018891 (Stdlib: flush() — VM + JIT + AOT (#3388))
 }

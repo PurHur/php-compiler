@@ -356,6 +356,15 @@ class Type extends Builtin {
         $fntypeMicrotimeFloat = $this->context->context->functionType($double, false);
         $fnMicrotimeFloat = $this->context->module->addFunction('__compiler_microtime_float', $fntypeMicrotimeFloat);
         $this->context->registerFunction('__compiler_microtime_float', $fnMicrotimeFloat);
+        $fntypePhpversion = $this->context->context->functionType($strPtr, false, $strPtr);
+        $fnPhpversion = $this->context->module->addFunction('__compiler_phpversion', $fntypePhpversion);
+        $this->context->registerFunction('__compiler_phpversion', $fnPhpversion);
+        $fntypePhpSapi = $this->context->context->functionType($strPtr, false);
+        $fnPhpSapi = $this->context->module->addFunction('__compiler_php_sapi_name', $fntypePhpSapi);
+        $this->context->registerFunction('__compiler_php_sapi_name', $fnPhpSapi);
+        $fntypePhpUname = $this->context->context->functionType($strPtr, false, $strPtr);
+        $fnPhpUname = $this->context->module->addFunction('__compiler_php_uname', $fntypePhpUname);
+        $this->context->registerFunction('__compiler_php_uname', $fnPhpUname);
         $i64 = $this->context->getTypeFromString('int64');
         $fntypePasswordHash = $this->context->context->functionType($strPtr, false, $strPtr, $i64);
         $fnPasswordHash = $this->context->module->addFunction('__compiler_password_hash', $fntypePasswordHash);

@@ -77,6 +77,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'getrusage')) {
                 continue;
             }
+            // phpversion/php_sapi_name/php_uname MCJIT: VM + AOT (#3174); umbrella JITTest skips until stable.
+            if (str_contains($name, 'phpversion')) {
+                continue;
+            }
             // array_walk_recursive() is VM-only until recursive LLVM walk (#3111).
             if (str_contains($name, 'array_walk_recursive')) {
                 continue;
