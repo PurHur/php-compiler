@@ -73,6 +73,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'json_validate')) {
                 continue;
             }
+            // (unset) cast reference break is VM-only until JIT TYPE_CAST_UNSET lowering (#3517).
+            if (str_contains($name, 'cast_unset')) {
+                continue;
+            }
             // exit/die expression ScriptExit status — VM compliance (#3539).
             if (str_contains($name, 'exit_expression') || str_contains($name, 'die_expression')) {
                 continue;

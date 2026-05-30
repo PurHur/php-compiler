@@ -31,6 +31,9 @@ patch_already_applied() {
     php-types-cast-object.patch)
       grep -q 'exprType instanceof Type' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
+    php-types-cast-unset.patch)
+      grep -q 'resolveOp_Expr_Cast_Unset' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
+      ;;
     php-types-nullsafe.patch)
       grep -q "case 'Expr_NullsafePropertyFetch':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
@@ -1646,6 +1649,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-binaryop-pow.patch"
   apply_patch "$PATCH_DIR/php-types-binaryop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-types-cast-object.patch"
+  apply_patch "$PATCH_DIR/php-types-cast-unset.patch"
   apply_patch "$PATCH_DIR/php-types-binaryop-spaceship.patch"
   apply_patch "$PATCH_DIR/php-types-str-bool-fns.patch"
   apply_patch "$PATCH_DIR/php-types-str-incdec.patch"
