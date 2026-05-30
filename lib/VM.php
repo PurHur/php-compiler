@@ -575,6 +575,11 @@ restart:
                         $this->context->propertyHookSetAborted = false;
                         break;
                     }
+                    $catchFrame = $this->enforcePropertyVisibilityWrite($arg2, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $catchFrame = $this->enforceReadonlyPropertyWrite($arg2, $frame);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -597,6 +602,11 @@ restart:
                     break;
                 case OpCode::TYPE_ASSIGN_REF:
                     $lhs = $frame->scope[$op->arg1];
+                    $catchFrame = $this->enforcePropertyVisibilityWrite($lhs, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $catchFrame = $this->enforceReadonlyPropertyWrite($lhs, $frame);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -1557,6 +1567,11 @@ restart:
                     if (EnumCaseSupport::isEnumCase($propertyObject)) {
                         $result->copyFrom(EnumCaseSupport::getProperty($propertyObject, $name));
                         break;
+                    }
+                    $catchFrame = $this->enforcePropertyVisibilityRead($propertyObject, $name, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
                     }
                     $hookValue = $this->fetchPropertyWithHooks($propertyObject, $name, $frame);
                     if (null !== $hookValue) {
@@ -2692,6 +2707,59 @@ restart:
         return null;
     }
 
+    private function enforcePropertyVisibilityWrite(Variable $lvalue, Frame $frame): ?Frame
+    {
+        $target = $lvalue->resolveIndirect();
+        $owner = $target->objectPropertyOwner;
+        if (null === $owner) {
+            return null;
+        }
+
+        return $this->enforcePropertyVisibility($owner, $target->objectPropertyName ?? 'property', $frame);
+    }
+
+    private function enforcePropertyVisibilityRead(ObjectEntry $object, string $propName, Frame $frame): ?Frame
+    {
+        return $this->enforcePropertyVisibility($object, $propName, $frame);
+    }
+
+    private function enforcePropertyVisibility(ObjectEntry $object, string $propName, Frame $frame): ?Frame
+    {
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null === $meta || MethodVisibility::isPublic($meta->visibility)) {
+            return null;
+        }
+        $declaringDisplay = $this->context->classes[$meta->declaringClassLc]->name
+            ?? $meta->declaringClassLc;
+        try {
+            PropertyVisibility::assertAccessible(
+                $meta->visibility,
+                $this->callerClassLc($frame),
+                $meta->declaringClassLc,
+                $declaringDisplay,
+                $propName,
+                strtolower($object->class->name),
+                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc)
+            );
+        } catch (\LogicException $e) {
+            return $this->dispatchVmError($e->getMessage(), $frame);
+        }
+
+        return null;
+    }
+
+    private function callerClassLc(Frame $frame): ?string
+    {
+        if (null !== $frame->block->func && null !== $frame->block->func->class) {
+            return strtolower($frame->block->func->class->value);
+        }
+        if (null !== $frame->calledClass && '' !== $frame->calledClass) {
+            return strtolower($frame->calledClass);
+        }
+
+        return null;
+    }
+
     private function isReadonlyPropertyWrite(ClassEntry $class, string $propName): bool
     {
         if ($class->readonly) {
@@ -3397,7 +3465,9 @@ restart:
                         $name->toString(),
                         $default,
                         $frame->scope[$op->arg3],
-                        $op->propertyReadonly
+                        $op->propertyReadonly,
+                        MethodVisibility::mask($op->propertyVisibility),
+                        strtolower($entry->name)
                     );
                     break;
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:

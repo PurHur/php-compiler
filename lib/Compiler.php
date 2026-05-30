@@ -1519,7 +1519,8 @@ class Compiler {
                         $this->compileTypeConstrainedVariable($result, $declared, $propertyDeclName)
                     );
                     if (!$child->static) {
-                        $declare->propertyReadonly = $this->isReadonlyPropertyFlags($child->propertyFlags ?? 0);
+                        $declare->propertyReadonly = $this->isReadonlyPropertyFlags($child->visibility);
+                        $declare->propertyVisibility = MethodVisibility::mask($child->visibility);
                     }
                     $result->addOpCode($declare);
                     break;
@@ -1661,6 +1662,7 @@ class Compiler {
             $this->compileTypeConstrainedVariable($result, $declared)
         );
         $declare->propertyReadonly = $this->isPromotedParamReadonly($param);
+        $declare->propertyVisibility = MethodVisibility::mask($param->promotionFlags);
         $result->addOpCode($declare);
     }
 
