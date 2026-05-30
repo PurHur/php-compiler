@@ -5303,6 +5303,7 @@ class JIT {
                     break;
                 case OpCode::TYPE_EQUAL:
                 case OpCode::TYPE_NOT_EQUAL:
+                case OpCode::TYPE_LOGICAL_XOR:
                 case OpCode::TYPE_SPACESHIP:
                     $this->maybeRefreshIncludeBindingsBeforeUse();
                     $this->assignOperand(

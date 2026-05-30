@@ -159,6 +159,8 @@ class OpCode {
     const TYPE_POST_DEC = 116;
     /** Pre-decrement: arg1=result, arg2=read, arg3=write (#3552). */
     const TYPE_PRE_DEC = 117;
+    /** Logical xor (`$a xor $b`): both operands evaluated, truthiness exclusive-or (#2313). */
+    const TYPE_LOGICAL_XOR = 118;
 
     public int $type;
     public ?int $arg1;

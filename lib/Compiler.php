@@ -2514,6 +2514,8 @@ class Compiler {
             return OpCode::TYPE_SHIFT_LEFT;
         } elseif ($expr instanceof Op\Expr\BinaryOp\ShiftRight) {
             return OpCode::TYPE_SHIFT_RIGHT;
+        } elseif ($expr instanceof Op\Expr\BinaryOp\LogicalXor) {
+            return OpCode::TYPE_LOGICAL_XOR;
         }
         $this->throwCompileLogic("Unknown BinaryOp Type: " . $expr->getType());
     }
