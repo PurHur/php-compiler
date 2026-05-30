@@ -4801,6 +4801,7 @@ class JIT {
                         throw new \LogicException('clone requires an object');
                     }
                     $cloned = $this->context->type->object->cloneObject($srcObj);
+                    $this->context->type->object->invokeCloneMagicIfPresent($block, $cloned);
                     $objVar = new JIT\Variable(
                         $this->context,
                         Variable::TYPE_OBJECT,

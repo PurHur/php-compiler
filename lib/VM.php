@@ -191,6 +191,20 @@ class VM {
     }
 
     /**
+     * Zend zend_std_clone_object: shallow copy then user __clone() when defined (#3170).
+     */
+    protected function invokeCloneMagicMethod(ObjectEntry $object): void
+    {
+        $class = $object->class;
+        if (!isset($class->methods['__clone'])) {
+            return;
+        }
+        $thisVar = new Variable(Variable::TYPE_OBJECT);
+        $thisVar->object($object);
+        $this->invokePhpFunction($class->methods['__clone'], $thisVar);
+    }
+
+    /**
      * Invoke a closure from a VM builtin (isolated run stack; issue #72).
      */
     public function invokeClosure(ClosureState $closureState, Variable ...$args): Variable
@@ -1217,7 +1231,9 @@ restart:
                     if (Variable::TYPE_OBJECT !== $src->type) {
                         throw new \LogicException('clone requires an object');
                     }
-                    $result->object($src->toObject()->cloneShallow());
+                    $cloned = $src->toObject()->cloneShallow();
+                    $result->object($cloned);
+                    $this->invokeCloneMagicMethod($cloned);
                     break;
                 case OpCode::TYPE_BOOLEAN_NOT:
                     $value = !($frame->scope[$op->arg2]->toBool());

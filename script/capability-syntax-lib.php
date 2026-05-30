@@ -74,6 +74,17 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { private string $x; public function __construct(string $x = "a") { $this->x = $x; } public function get(): string { return $this->x; } } echo (new C())->get();',
         ],
         [
+            'id' => 'clone_magic',
+            'construct' => '`clone` + `__clone()` magic method',
+            'opcodes' => ['TYPE_CLONE', 'TYPE_DECLARE_METHOD'],
+            'issue' => 3170,
+            'notes' => [
+                'Zend zend_std_clone_object: shallow copy then __clone when defined',
+                'VM invokePhpFunction; JIT invokeCloneMagicIfPresent after cloneObject',
+            ],
+            'probe' => 'class C { public int $x = 1; public function __clone() { $this->x = 2; } } $a = new C(); $b = clone $a; echo $b->x;',
+        ],
+        [
             'id' => 'private_methods',
             'construct' => 'Private methods',
             'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_METHODCALL_INIT'],
@@ -633,6 +644,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'class_new' => '/\b(?:class\s+\w+|new\s+\w+)/',
         'instance_methods' => '/function\s+\w+\s*\(/',
         'construct_method' => '/function\s+__construct\s*\(/',
+        'clone_magic' => '/function\s+__clone\s*\(/',
         'private_methods' => '/\bprivate\s+function\b/',
         'method_return_types' => '/function\s+\w+\([^)]*\)\s*:\s*(?:string|void|int)/',
         'property_fetch' => '/\$this->\w+/',
