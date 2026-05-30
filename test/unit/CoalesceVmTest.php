@@ -83,6 +83,18 @@ echo "\n";
     }
 
     /** Issue #3462: ($x ?? throw new Ex()) — RHS only when LHS is null. */
+    public function testNullCoalesceNestedInCast(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+$stat = ["mode" => 0644];
+echo (int) ($stat["mode"] ?? 0), "\n";
+echo (int) ($stat["missing"] ?? 0), "\n";
+',
+            "420\n0\n"
+        );
+    }
+
     public function testNullCoalesceThrow(): void
     {
         $this->assertVmOutput(

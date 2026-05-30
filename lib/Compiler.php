@@ -2046,6 +2046,11 @@ class Compiler {
     }
 
     protected function compileExpr(Op\Expr $expr, Block $block): array {
+        if ($expr instanceof Op\Expr\BinaryOp\Coalesce) {
+            $this->compileCoalesce($expr, $block);
+
+            return [];
+        }
         if ($expr instanceof Op\Expr\BinaryOp) {
             $opcode = new OpCode(
                 $this->getOpCodeTypeFromBinaryOp($expr),
