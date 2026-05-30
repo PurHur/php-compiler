@@ -168,6 +168,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'enum_')) {
                 continue;
             }
+            // Property hooks are VM-only until JIT property dispatch (#3145).
+            if (str_contains($name, 'property_hook')) {
+                continue;
+            }
             yield $name => $case;
         }
     }

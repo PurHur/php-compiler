@@ -195,6 +195,7 @@ class Runtime {
     }
 
     public function parse(string $code, string $filename): Script {
+        [$code] = (new SourcePreprocessor\PropertyHooks())->process($code);
         $code = SwitchCommaCaseRewriter::rewrite($code);
         [$code, $bareRethrowLines] = SourceBareThrowRewriter::rewrite($code);
         $this->compiler->setBareRethrowLines($bareRethrowLines);
