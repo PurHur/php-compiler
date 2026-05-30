@@ -1044,21 +1044,21 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_CLASS_CONST_FETCH:
-                    $constName = strtolower($frame->scope[$op->arg3]->toString());
+                    $memberNameRaw = $frame->scope[$op->arg3]->toString();
                     $classOperand = $frame->scope[$op->arg2]->resolveIndirect();
                     if (Variable::TYPE_OBJECT === $classOperand->type) {
                         $classEntry = $classOperand->toObject()->class;
-                        if ('class' === $constName) {
-                            $frame->scope[$op->arg1]->string($classEntry->name);
-                            break;
-                        }
-                        if (!isset($classEntry->constants[$constName])) {
+                        if (!$this->copyClassConstOrStaticPropertyByName(
+                            $classEntry,
+                            $memberNameRaw,
+                            $frame->scope[$op->arg1],
+                            $frame
+                        )) {
                             return $this->raise(
-                                "Undefined class constant {$classEntry->name}::{$constName}",
+                                "Undefined class constant {$classEntry->name}::{$memberNameRaw}",
                                 $frame
                             );
                         }
-                        $frame->scope[$op->arg1]->copyFrom($classEntry->constants[$constName]);
                         break;
                     }
                     try {
@@ -1078,26 +1078,15 @@ restart:
                     if (!isset($this->context->classes[$lcClass])) {
                         return $this->raise("Unknown class for constant fetch: {$className}", $frame);
                     }
-                    $constNameRaw = $frame->scope[$op->arg3]->toString();
-                    $constName = strtolower($constNameRaw);
                     $classEntry = $this->context->classes[$lcClass];
-                    if ('class' === $constName) {
-                        $frame->scope[$op->arg1]->string($classEntry->name);
-                        break;
+                    if (!$this->copyClassConstOrStaticPropertyByName(
+                        $classEntry,
+                        $memberNameRaw,
+                        $frame->scope[$op->arg1],
+                        $frame
+                    )) {
+                        return $this->raise("Undefined class constant {$className}::{$memberNameRaw}", $frame);
                     }
-                    if (!isset($classEntry->constants[$constName])) {
-                        return $this->raise("Undefined class constant {$className}::{$constNameRaw}", $frame);
-                    }
-                    if (isset($classEntry->constDeprecated[$constName])) {
-                        $this->emitDeprecatedNotice(
-                            $classEntry->constDeprecated[$constName]->formatConstant(
-                                $classEntry->name,
-                                $frame->scope[$op->arg3]->toString()
-                            ),
-                            $frame
-                        );
-                    }
-                    $frame->scope[$op->arg1]->copyFrom($classEntry->constants[$constName]);
                     break;
                 case OpCode::TYPE_INSTANCEOF:
                     $value = $frame->scope[$op->arg2];
@@ -3719,6 +3708,45 @@ restart:
             $this->context,
             $frame
         );
+    }
+
+    /**
+     * ClassConstFetch with a runtime member name (php-parser: Class::{$var}).
+     * Zend resolves constants first; when no constant exists, fall back to static property (#3788).
+     */
+    private function copyClassConstOrStaticPropertyByName(
+        ClassEntry $classEntry,
+        string $memberNameRaw,
+        Variable $dest,
+        Frame $frame
+    ): bool {
+        $memberLc = strtolower($memberNameRaw);
+        if ('class' === $memberLc) {
+            $dest->string($classEntry->name);
+
+            return true;
+        }
+        if (isset($classEntry->constants[$memberLc])) {
+            if (isset($classEntry->constDeprecated[$memberLc])) {
+                $this->emitDeprecatedNotice(
+                    $classEntry->constDeprecated[$memberLc]->formatConstant(
+                        $classEntry->name,
+                        $memberNameRaw
+                    ),
+                    $frame
+                );
+            }
+            $dest->copyFrom($classEntry->constants[$memberLc]);
+
+            return true;
+        }
+        if (isset($classEntry->staticProperties[$memberLc])) {
+            $dest->indirect($classEntry->staticProperties[$memberLc]);
+
+            return true;
+        }
+
+        return false;
     }
 
 }
