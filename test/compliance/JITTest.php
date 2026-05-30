@@ -109,6 +109,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'json_validate')) {
                 continue;
             }
+            // JsonSerializable json_encode() needs VM method dispatch (#3370).
+            if (str_contains($name, 'json_serializable')) {
+                continue;
+            }
             // Generator::getReturn() and generator return slot are VM-only until JIT generators (#167, #3350).
             if (str_contains($name, 'generator_get_return')) {
                 continue;

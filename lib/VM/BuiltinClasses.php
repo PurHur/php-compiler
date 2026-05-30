@@ -47,6 +47,7 @@ final class BuiltinClasses
         self::registerReflection($ctx);
         self::registerDateTime($ctx);
         self::registerExceptions($ctx);
+        self::registerJsonSerializable($ctx);
         GeneratorState::register($ctx);
         ClosureState::register($ctx);
     }
@@ -267,5 +268,13 @@ final class BuiltinClasses
             $entry->methodVisibility[$methodName] = $pub;
         }
         $ctx->classes[$lcKey] = $entry;
+    }
+
+    /** Zend JsonSerializable interface (ext/json/php_json.c, issue #3370). */
+    private static function registerJsonSerializable(Context $ctx): void
+    {
+        $entry = new ClassEntry('JsonSerializable');
+        $entry->isInterface = true;
+        $ctx->classes['jsonserializable'] = $entry;
     }
 }
