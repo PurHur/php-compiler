@@ -97,6 +97,9 @@ class Block {
     /** Parameter indices declared with `&$param` (issue #140). */
     public array $paramByRef = [];
 
+    /** Parameter indices marked `#[\SensitiveParameter]` (issue #3351). */
+    public array $paramSensitive = [];
+
     /** Function body contains `yield` (issue #167). */
     public bool $isGenerator = false;
 

@@ -2133,6 +2133,9 @@ class Compiler {
         if ($param->name instanceof Operand\Literal && is_string($param->name->value)) {
             $block->paramNames[$paramIdx] = $param->name->value;
         }
+        if (AttributeNames::isSensitiveParameter(AttributeNames::fromOp($param))) {
+            $block->paramSensitive[$paramIdx] = true;
+        }
         $this->applyParamDeclaredType($param, $block, $slot);
 
         return new OpCode(

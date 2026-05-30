@@ -1998,6 +1998,9 @@ restart:
                     }
                     $catchFrame = $this->dispatchEngineThrow($frame, $thrown);
                     if (null !== $catchFrame) {
+                        VM\ExceptionTrace::captureOnThrow($frame, $thrown);
+                    }
+                    if (null !== $catchFrame) {
                         $frame = $catchFrame;
                         goto restart;
                     }

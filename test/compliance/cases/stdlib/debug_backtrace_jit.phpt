@@ -11,7 +11,7 @@ function callee() {
 }
 callee();
 --EXPECT--
-debug_backtrace
 callee
+{main}
 file
 0

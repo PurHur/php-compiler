@@ -15,8 +15,8 @@ function caller() {
 }
 caller();
 --EXPECT--
-debug_backtrace
 callee
 caller
+{main}
 file
 0

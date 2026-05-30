@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\SensitiveParamSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -12,14 +13,18 @@ use PHPCompiler\VM\Variable;
  */
 final class VmDebugBacktrace
 {
-    public static function build(Frame $frame): Variable
+    public static function build(Frame $frame, bool $includeArgs = false): Variable
     {
         $result = new Variable();
         $result->newArray();
         $ht = $result->toArray();
 
-        for ($f = $frame; null !== $f; $f = $f->parent) {
-            $entry = self::frameEntry($f);
+        $start = $frame->hasHandler() && null !== $frame->parent ? $frame->parent : $frame;
+        for ($f = $start; null !== $f; $f = $f->parent) {
+            if ($f->hasHandler()) {
+                continue;
+            }
+            $entry = self::frameEntry($f, $includeArgs);
             if (null === $entry) {
                 continue;
             }
@@ -29,7 +34,7 @@ final class VmDebugBacktrace
         return $result;
     }
 
-    private static function frameEntry(Frame $frame): ?Variable
+    private static function frameEntry(Frame $frame, bool $includeArgs): ?Variable
     {
         $function = self::frameFunction($frame);
         $file = self::frameFile($frame);
@@ -52,6 +57,13 @@ final class VmDebugBacktrace
         $fnVar = new Variable(Variable::TYPE_STRING);
         $fnVar->string($function);
         $ht->add('function', $fnVar);
+
+        if ($includeArgs) {
+            $args = SensitiveParamSupport::buildArgsArray($frame);
+            if (null !== $args) {
+                $ht->add('args', $args);
+            }
+        }
 
         return $entry;
     }
