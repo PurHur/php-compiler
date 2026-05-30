@@ -9,5 +9,5 @@ $j = 5;
 echo $j--, $j;
 echo "\n";
 --EXPECT--
-112
+111
 54

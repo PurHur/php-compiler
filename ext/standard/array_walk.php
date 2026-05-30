@@ -15,9 +15,12 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_walk() — in-place walk with string builtin callbacks (subset of PHP; issue #1209).
+ * array_walk() — in-place walk with string builtin or closure callbacks (issues #1209, #3627).
  *
- * JIT/AOT: compile-time string builtin callbacks (subset; #1209).
+ * php-src: ext/standard/array.c — php_array_walk()
+ *
+ * JIT/AOT: compile-time string builtin callbacks (subset; #1209). Closure callbacks and
+ * optional $userdata are VM-only (#3627).
  */
 final class array_walk extends Internal
 {
@@ -32,27 +35,36 @@ final class array_walk extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_walk() requires two or three arguments in this compiler build');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         $array = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('array_walk() first argument must be an array in this compiler build');
         }
         $callback = $frame->calledArgs[1]->resolveIndirect();
+        $userdata = 3 === $argc ? $frame->calledArgs[2]->resolveIndirect() : null;
+        $src = $array->toArray();
+        if (VmClosureCall::isClosure($callback)) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException('array_walk() requires VM context in this compiler build');
+            }
+            $closure = VmClosureCall::resolve($callback);
+            $ok = self::walkClosure($frame->vmContext, $src, $closure, $userdata);
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool($ok);
+            }
+
+            return;
+        }
         if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
             throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
         }
         $fn = VmInternalCall::resolveStringCallback($callback->toString());
-        if (3 === $argc) {
-            throw new \LogicException('array_walk() userdata is not supported in this compiler build');
-        }
-        $src = $array->toArray();
         $out = new HashTable();
         foreach ($src->iterateKeyed(true) as [$key, $value]) {
             $result = VmInternalCall::invoke($fn, $value);
             if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
-                $frame->returnVar->bool(false);
+                if (null !== $frame->returnVar) {
+                    $frame->returnVar->bool(false);
+                }
 
                 return;
             }
@@ -63,12 +75,19 @@ final class array_walk extends Internal
             }
         }
         $array->array($out);
-        $frame->returnVar->bool(true);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
         if (2 !== \count($args)) {
+            if (3 === \count($args)) {
+                throw new \LogicException(
+                    'array_walk() userdata is not supported for JIT/AOT in this compiler build (#3627)'
+                );
+            }
             throw new \LogicException('array_walk() requires exactly two arguments in this compiler build');
         }
         if (!ArrayMapCallbackPolicy::isJitLowerable($args[1])) {
@@ -79,5 +98,43 @@ final class array_walk extends Internal
         }
 
         return ArrayBuiltinHelper::walkInPlace($context, $args[0], $args[1]);
+    }
+
+    private static function walkClosure(
+        \PHPCompiler\VM\Context $context,
+        HashTable $table,
+        \PHPCompiler\VM\ClosureState $closure,
+        ?Variable $userdata
+    ): bool {
+        foreach ($table->iterateKeyed(false) as [$key, $value]) {
+            $keyCopy = new Variable();
+            $keyCopy->copyFrom($key);
+            if (null !== $userdata) {
+                $userdataCopy = new Variable();
+                $userdataCopy->copyFrom($userdata);
+                $result = VmClosureCall::invokeDirect($context, $closure, $value, $keyCopy, $userdataCopy);
+            } else {
+                $result = VmClosureCall::invokeDirect($context, $closure, $value, $keyCopy);
+            }
+            if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
+                return false;
+            }
+            if (Variable::TYPE_NULL !== $result->type) {
+                self::replaceAtKey($table, $key, $result);
+            }
+        }
+
+        return true;
+    }
+
+    private static function replaceAtKey(HashTable $table, Variable $key, Variable $value): void
+    {
+        $copy = new Variable();
+        $copy->copyFrom($value);
+        if (Variable::TYPE_INTEGER === $key->type) {
+            $table->updateIndex($key->toInt(), $copy);
+        } else {
+            $table->update($key->toString(), $copy);
+        }
     }
 }

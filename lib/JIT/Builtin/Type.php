@@ -30,10 +30,12 @@ class Type extends Builtin {
         $this->value->register();
         $this->object->register();
         $this->hashtable->register();
+        $i8 = $this->context->getTypeFromString('int8');
         $fntypeGetenv = $this->context->context->functionType(
             $this->context->getTypeFromString('void'),
             false,
             $this->context->getTypeFromString('__string__*'),
+            $i8,
             $this->context->getTypeFromString('__value__*')
         );
         $fnGetenv = $this->context->module->addFunction('__compiler_getenv', $fntypeGetenv);
@@ -130,11 +132,14 @@ class Type extends Builtin {
         $i8p = $this->context->getTypeFromString('int8*');
         $i32 = $this->context->getTypeFromString('int32');
         $sizeT = $this->context->getTypeFromString('size_t');
+        $voidTy = $this->context->getTypeFromString('void');
         foreach (
             [
                 'getenv' => [$i8p, false, $i8p],
                 'putenv' => [$i32, false, $i8p],
                 'strlen' => [$sizeT, false, $i8p],
+                '__compiler_env_local_lookup' => [$i8p, false, $i8p],
+                '__compiler_env_register_putenv' => [$voidTy, false, $i8p],
             ] as $libcName => [$ret, $vararg, $param]
         ) {
             $ft = $this->context->context->functionType($ret, $vararg, $param);
@@ -326,6 +331,7 @@ class Type extends Builtin {
             $i32,
             false,
             $this->context->getTypeFromString('__string__*'),
+            $i64,
             $i64
         );
         $fnTouch = $this->context->module->addFunction('__compiler_touch', $fntypeTouch);
@@ -356,7 +362,23 @@ class Type extends Builtin {
         $fntypeMicrotimeFloat = $this->context->context->functionType($double, false);
         $fnMicrotimeFloat = $this->context->module->addFunction('__compiler_microtime_float', $fntypeMicrotimeFloat);
         $this->context->registerFunction('__compiler_microtime_float', $fnMicrotimeFloat);
+        $fntypePhpversion = $this->context->context->functionType($strPtr, false, $strPtr);
+        $fnPhpversion = $this->context->module->addFunction('__compiler_phpversion', $fntypePhpversion);
+        $this->context->registerFunction('__compiler_phpversion', $fnPhpversion);
+        $fntypePhpSapi = $this->context->context->functionType($strPtr, false);
+        $fnPhpSapi = $this->context->module->addFunction('__compiler_php_sapi_name', $fntypePhpSapi);
+        $this->context->registerFunction('__compiler_php_sapi_name', $fnPhpSapi);
+        $fntypePhpUname = $this->context->context->functionType($strPtr, false, $strPtr);
+        $fnPhpUname = $this->context->module->addFunction('__compiler_php_uname', $fntypePhpUname);
+        $this->context->registerFunction('__compiler_php_uname', $fnPhpUname);
         $i64 = $this->context->getTypeFromString('int64');
+        $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $fntypeHrtimeNs = $this->context->context->functionType($i64, false);
+        $fnHrtimeNs = $this->context->module->addFunction('__compiler_hrtime_ns', $fntypeHrtimeNs);
+        $this->context->registerFunction('__compiler_hrtime_ns', $fnHrtimeNs);
+        $fntypeHrtimePair = $this->context->context->functionType($htPtr, false);
+        $fnHrtimePair = $this->context->module->addFunction('__compiler_hrtime_pair', $fntypeHrtimePair);
+        $this->context->registerFunction('__compiler_hrtime_pair', $fnHrtimePair);
         $fntypePasswordHash = $this->context->context->functionType($strPtr, false, $strPtr, $i64);
         $fnPasswordHash = $this->context->module->addFunction('__compiler_password_hash', $fntypePasswordHash);
         $this->context->registerFunction('__compiler_password_hash', $fnPasswordHash);
@@ -366,6 +388,9 @@ class Type extends Builtin {
         $fntypeCrc32 = $this->context->context->functionType($i64, false, $strPtr, $i64);
         $fnCrc32 = $this->context->module->addFunction('__compiler_crc32', $fntypeCrc32);
         $this->context->registerFunction('__compiler_crc32', $fnCrc32);
+        $fntypeCrc32c = $this->context->context->functionType($i64, false, $strPtr);
+        $fnCrc32c = $this->context->module->addFunction('__compiler_crc32c', $fntypeCrc32c);
+        $this->context->registerFunction('__compiler_crc32c', $fnCrc32c);
         $fntypeStrtr = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr);
         $fnStrtr = $this->context->module->addFunction('__compiler_strtr', $fntypeStrtr);
         $this->context->registerFunction('__compiler_strtr', $fnStrtr);
@@ -571,6 +596,11 @@ class Type extends Builtin {
             $this->context->context->functionType($void, false, $i64, $valuePtr)
         );
         $this->context->registerFunction('__compiler_getdate', $fnGetdate);
+        $fnGetrusage = $this->context->module->addFunction(
+            '__compiler_getrusage',
+            $this->context->context->functionType($void, false, $i64, $valuePtr)
+        );
+        $this->context->registerFunction('__compiler_getrusage', $fnGetrusage);
         $fnPendingFlush = $this->context->module->addFunction(
             '__phpc_response_headers_flush',
             $this->context->context->functionType($void, false)
@@ -669,6 +699,8 @@ class Type extends Builtin {
         $this->context->registerFunction('__compiler_shell_exec', $fnShellExec);
         $fnEscapeshellarg = $this->context->module->addFunction('__compiler_escapeshellarg', $fntypeShellExec);
         $this->context->registerFunction('__compiler_escapeshellarg', $fnEscapeshellarg);
+        $fnEscapeshellcmd = $this->context->module->addFunction('__compiler_escapeshellcmd', $fntypeShellExec);
+        $this->context->registerFunction('__compiler_escapeshellcmd', $fnEscapeshellcmd);
         $fntypePhpcRunCommand = $this->context->context->functionType(
             $this->context->getTypeFromString('__hashtable__*'),
             false,
@@ -680,6 +712,9 @@ class Type extends Builtin {
         $fntypeSysGetTempDir = $this->context->context->functionType($strPtr, false);
         $fnSysGetTempDir = $this->context->module->addFunction('__compiler_sys_get_temp_dir', $fntypeSysGetTempDir);
         $this->context->registerFunction('__compiler_sys_get_temp_dir', $fnSysGetTempDir);
+        $fntypeGethostname = $this->context->context->functionType($strPtr, false);
+        $fnGethostname = $this->context->module->addFunction('__compiler_gethostname', $fntypeGethostname);
+        $this->context->registerFunction('__compiler_gethostname', $fnGethostname);
         $fntypeTempnam = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr);
         $fnTempnam = $this->context->module->addFunction('__compiler_tempnam', $fntypeTempnam);
         $this->context->registerFunction('__compiler_tempnam', $fnTempnam);

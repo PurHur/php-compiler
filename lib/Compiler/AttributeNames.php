@@ -55,4 +55,43 @@ final class AttributeNames
 
         return false;
     }
+
+    /** PHP 8.2 #[\SensitiveParameter] on parameters (issue #3351, Zend zend_attributes.c). */
+    public static function isSensitiveParameter(array $names): bool
+    {
+        foreach ($names as $name) {
+            if ('SensitiveParameter' === $name || str_ends_with($name, '\\SensitiveParameter')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Zend compile-time duplicate guard (zend_compile.c, zend_is_attribute_repeated) (#3718).
+     *
+     * @param list<string> $names
+     */
+    public static function assertNoDuplicates(array $names): void
+    {
+        $seen = [];
+        foreach ($names as $name) {
+            $key = strtolower(ltrim($name, '\\'));
+            if (isset($seen[$key])) {
+                throw new \CompileError(
+                    'Attribute "'.self::messageName($name).'" must not be repeated'
+                );
+            }
+            $seen[$key] = true;
+        }
+    }
+
+    private static function messageName(string $name): string
+    {
+        $name = ltrim($name, '\\');
+        $pos = strrpos($name, '\\');
+
+        return false !== $pos ? substr($name, $pos + 1) : $name;
+    }
 }

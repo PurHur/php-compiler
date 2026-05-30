@@ -26,9 +26,6 @@ final class chunk_split extends Internal
             throw new \LogicException('chunk_split() requires one to three arguments in this compiler build');
         }
         $string = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_STRING !== $string->type) {
             throw new \LogicException('chunk_split() first argument must be a string in this compiler build');
         }
@@ -48,9 +45,11 @@ final class chunk_split extends Internal
             }
             $separator = $sepArg->toString();
         }
-        $frame->returnVar->string(
-            VmString::chunkSplit($string->toString(), $length, $separator)
-        );
+        $result = VmString::chunkSplit($string->toString(), $length, $separator);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->string($result);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -67,6 +66,7 @@ final class chunk_split extends Internal
                 throw new \LogicException('chunk_split() length must be an integer in this compiler build');
             }
             $chunkLen = $context->helper->loadValue($args[1]);
+            JitChunkSplit::emitRuntimeLengthGuard($context, $chunkLen);
         }
         if ($argc >= 3) {
             $separator = $this->jitString($context, $args[2], 'chunk_split() argument #3');

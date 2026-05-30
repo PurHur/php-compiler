@@ -25,6 +25,8 @@ use PHPCompiler\VM\Context as VMContext;
 use PHPCompiler\VM\ObjectRegistry;
 use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\Ast\GroupUseStripper;
+use PHPCompiler\Ast\SealedClassAnnotator;
+use PHPCompiler\Ast\SealedClassPreprocessor;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Lint\LintCompiler;
 use PHPCompiler\VM\ShutdownQueue;
@@ -37,6 +39,7 @@ class Runtime {
     public Parser $parser;
     public Traverser $preprocessor;
     public Traverser $postprocessor;
+    private Ast\AbstractEnumMarker $abstractEnumMarker;
     public CfgLivenessDetector $detector;
     public Optimizer $assignOpResolver;
     public VMContext $vmContext;
@@ -45,6 +48,7 @@ class Runtime {
     private ?JIT $jit = null;
     public array $modules = [];
     public int $mode;
+    private SealedClassAnnotator $sealedClassAnnotator;
     public ?string $debugFile = null;
 
     public TypeReconstructor $typeReconstructor;
@@ -69,6 +73,10 @@ class Runtime {
             new NodeVisitor\NameResolver
         );
         $astTraverser->addVisitor(new GroupUseStripper());
+        $this->abstractEnumMarker = new Ast\AbstractEnumMarker();
+        $astTraverser->addVisitor($this->abstractEnumMarker);
+        $this->sealedClassAnnotator = new SealedClassAnnotator();
+        $astTraverser->addVisitor($this->sealedClassAnnotator);
         $this->parser = new Parser(
             (new ParserFactory)->create(ParserFactory::ONLY_PHP7),
             $astTraverser
@@ -194,11 +202,28 @@ class Runtime {
         }
     }
 
-    public function parse(string $code, string $filename): Script {
+    public function preprocessSourceForParse(string $code): array
+    {
+        $sealedPreprocessor = new SealedClassPreprocessor();
+        [$code, $permitsByLine] = $sealedPreprocessor->preprocess($code);
+        $this->sealedClassAnnotator->setPermitsByLine($permitsByLine);
+        [$code] = (new SourcePreprocessor\PropertyHooks())->process($code);
         $code = SwitchCommaCaseRewriter::rewrite($code);
-        [$code, $bareRethrowLines] = SourceBareThrowRewriter::rewrite($code);
+        $code = GenericArrayTypeSourceRewriter::rewrite($code);
+        [$code, $abstractEnumLines] = AbstractEnumSourceRewriter::rewrite($code);
+        $this->abstractEnumMarker->setAbstractLines($abstractEnumLines);
+
+        return SourceBareThrowRewriter::rewrite($code);
+    }
+
+    public function parse(string $code, string $filename): Script {
+        [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code);
         $this->compiler->setBareRethrowLines($bareRethrowLines);
-        $script = $this->parser->parse($code, $filename);
+        try {
+            $script = $this->parser->parse($code, $filename);
+        } finally {
+            $this->abstractEnumMarker->clear();
+        }
         $this->preprocessor->traverse($script);
         if (!$this->isBootstrapVendorPrelinkMode()) {
             $state = new State($script);

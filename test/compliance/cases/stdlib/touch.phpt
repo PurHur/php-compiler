@@ -27,9 +27,24 @@ if ($m === $t) {
 } else {
     echo 'badmtime', "\n";
 }
+$mtime = 1000000100;
+$atime = 1000000200;
+if (touch($path, $mtime, $atime)) {
+    echo 'atime_set', "\n";
+} else {
+    echo 'noatime', "\n";
+}
+$s = stat($path);
+if ($s['mtime'] === $mtime && $s['atime'] === $atime) {
+    echo 'atime_ok', "\n";
+} else {
+    echo 'badatime', "\n";
+}
 @unlink($path);
 --EXPECT--
 create
 exists
 set
 mtime
+atime_set
+atime_ok

@@ -25,8 +25,9 @@ final class JitStringCompare
     ): Value {
         switch ($opcode->type) {
             case OpCode::TYPE_IDENTICAL:
-            case OpCode::TYPE_EQUAL:
                 return self::identical($context, $leftStr, $rightStr);
+            case OpCode::TYPE_EQUAL:
+                return JitValueCompare::looseEqualStringToString($context, $leftStr, $rightStr);
             case OpCode::TYPE_NOT_IDENTICAL:
             case OpCode::TYPE_NOT_EQUAL:
                 $same = self::identical($context, $leftStr, $rightStr);

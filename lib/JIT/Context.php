@@ -94,7 +94,10 @@ class Context {
     private array $builtins;
     private array $stringConstantMap = [];
     private array $modules = [];
-    
+
+    /** @var array<string, true>|null */
+    private ?array $registeredBuiltinLookup = null;
+
     private ?Result $result = null;
     public Builtin\MemoryManager $memory;
     public Builtin\Output $output;
@@ -164,6 +167,9 @@ class Context {
 
     /** @var array<string, Variable> function-local static storage (#2286) */
     public array $jitFunctionStaticVariables = [];
+
+    /** @var array<string, true> logical function names that return by reference (#3778) */
+    public array $functionReturnsRef = [];
 
     /** @var array<string, string> */
     public array $refAliasNames = [];
@@ -310,8 +316,27 @@ class Context {
         if ($short !== $lc && $this->functionProxyIsCallable($short)) {
             return true;
         }
+        if (isset($this->registeredBuiltinNames()[$lc]) || ($short !== $lc && isset($this->registeredBuiltinNames()[$short]))) {
+            return true;
+        }
 
         return isset($this->functions[$lc]) || ($short !== $lc && isset($this->functions[$short]));
+    }
+
+    /** @return array<string, true> */
+    private function registeredBuiltinNames(): array
+    {
+        if (null !== $this->registeredBuiltinLookup) {
+            return $this->registeredBuiltinLookup;
+        }
+        $this->registeredBuiltinLookup = [];
+        foreach ($this->modules as $module) {
+            foreach ($module->getFunctions() as $func) {
+                $this->registeredBuiltinLookup[strtolower($func->getName())] = true;
+            }
+        }
+
+        return $this->registeredBuiltinLookup;
     }
 
     /**
@@ -391,6 +416,7 @@ class Context {
 
         Builtin\ReflectionNative::registerDeclarations($this);
         Builtin\AttributeRegistry::registerDeclarations($this);
+        Builtin\MethodRegistry::registerDeclarations($this);
 
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();
         $this->functionProxies['phpcompiler\\is_null'] = new Builtin\IsNullFn();
@@ -400,6 +426,13 @@ class Context {
         $this->functionProxies['splobjectstorage::offsetexists'] = new Call\SplObjectStorageMethod('offsetexists');
         $this->functionProxies['splobjectstorage::offsetget'] = new Call\SplObjectStorageMethod('offsetget');
         $this->functionProxies['splobjectstorage::offsetset'] = new Call\SplObjectStorageMethod('offsetset');
+
+        $this->functionProxies['weakreference::create'] = new Call\WeakReferenceCreate();
+        $this->functionProxies['weakreference::get'] = new Call\WeakReferenceGet();
+        $this->functionProxies['weakmap::offsetset'] = new Call\WeakMapMethod('offsetset');
+        $this->functionProxies['weakmap::offsetget'] = new Call\WeakMapMethod('offsetget');
+        $this->functionProxies['weakmap::offsetexists'] = new Call\WeakMapMethod('offsetexists');
+        $this->functionProxies['weakmap::count'] = new Call\WeakMapMethod('count');
 
         $this->functionProxies['reflectionclass::__construct'] = new Call\ReflectionClassConstruct();
         $this->functionProxies['reflectionclass::getname'] = new Call\ReflectionClassGetName();

@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * LLVM implementation of __compiler_getenv — libc getenv into a __value__ out-parameter.
  *
- * Standalone AOT uses the C runtime in lib/AOT/runtime/superglobals_refresh.c (issue #1068).
+ * Standalone AOT uses the C runtime in lib/AOT/runtime/superglobals_refresh.c (issue #1068, #3710).
  */
 final class StringGetenv
 {
@@ -25,43 +25,57 @@ final class StringGetenv
             return;
         }
 
+        StringEnvLocal::ensureLinked($context);
+
         $entry = $fn->appendBasicBlock('main');
         $context->builder->positionAtEnd($entry);
 
         $name = $fn->getParam(0);
-        $out = $fn->getParam(1);
+        $localOnly = $fn->getParam(1);
+        $out = $fn->getParam(2);
         $strMap = $context->structFieldMap['__string__'];
         $valMap = $context->structFieldMap['__value__'];
         $i8p = $context->getTypeFromString('int8*');
         $i64 = $context->getTypeFromString('int64');
         $i8 = $context->getTypeFromString('int8');
         $zero = $i64->constInt(0, false);
-        $one = $i64->constInt(1, false);
 
         $nameLen = $context->builder->load(
             $context->builder->structGep($name, $strMap['length'])
         );
         $nameBytes = $context->builder->structGep($name, $strMap['value']);
-        $bufLen = $context->builder->add($nameLen, $one);
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $nameBuf = $context->builder->call(
-                $context->lookupFunction('__mm__malloc'),
-                $bufLen
-            );
-            $nameCStr = $context->builder->pointerCast($nameBuf, $i8p);
-        } else {
-            $nameBuf = $context->builder->alloca($i8, $bufLen, 'getenv_name');
-            $nameCStr = $context->builder->pointerCast($nameBuf, $i8p);
-        }
+        $bufLen = $context->builder->add($nameLen, $i64->constInt(1, false));
+        $nameBuf = $context->builder->alloca($i8, $bufLen, 'getenv_name');
+        $nameCStr = $context->builder->pointerCast($nameBuf, $i8p);
         $context->intrinsic->memcpy($nameCStr, $nameBytes, $nameLen, false);
         $context->builder->store(
             $i8->constInt(0, false),
             $context->builder->inBoundsGEP($nameCStr, $nameLen)
         );
-        $env = $context->builder->call($context->lookupFunction('getenv'), $nameCStr);
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $context->builder->call($context->lookupFunction('__mm__free'), $nameBuf);
-        }
+
+        $useLocal = $fn->appendBasicBlock('getenv_use_local');
+        $useLibc = $fn->appendBasicBlock('getenv_use_libc');
+        $check = $fn->appendBasicBlock('getenv_check');
+        $isLocal = $context->builder->icmp(Builder::INT_NE, $localOnly, $i8->constInt(0, false));
+        $context->builder->branchIf($isLocal, $useLocal, $useLibc);
+
+        $context->builder->positionAtEnd($useLocal);
+        $envLocal = $context->builder->call(
+            $context->lookupFunction('__compiler_env_local_lookup'),
+            $nameCStr
+        );
+        $context->builder->branch($check);
+
+        $context->builder->positionAtEnd($useLibc);
+        $envLibc = $context->builder->call($context->lookupFunction('getenv'), $nameCStr);
+        $context->builder->branch($check);
+
+        $context->builder->positionAtEnd($check);
+        $phi = $context->builder->phi($i8p, 'getenv_result');
+        $phi->addIncoming($envLocal, $useLocal);
+        $phi->addIncoming($envLibc, $useLibc);
+        $env = $phi;
+
         $isNull = $context->builder->icmp(Builder::INT_EQ, $env, $i8p->constNull());
 
         $missing = $fn->appendBasicBlock('getenv_missing');

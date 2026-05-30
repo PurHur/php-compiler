@@ -26,13 +26,16 @@ final class SelfHostBuiltinPolicy
         'is_bool' => 'numeric',
         'is_string' => 'numeric',
         'is_array' => 'numeric',
+        'is_countable' => 'numeric',
         'is_null' => 'numeric',
         'is_numeric' => 'numeric',
         'time' => 'numeric',
         'microtime' => 'numeric',
+        'hrtime' => 'numeric',
         'getdate' => 'numeric',
         'uniqid' => 'numeric',
         'getmypid' => 'numeric',
+        'getrusage' => 'numeric',
         'pi' => 'numeric',
     ];
 
@@ -53,7 +56,7 @@ final class SelfHostBuiltinPolicy
     /** @var array<string, string> */
     private const CATEGORY_OUTPUT = [
         'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_end_flush' => 'output',
-        'ob_get_level' => 'output',
+        'ob_get_level' => 'output', 'flush' => 'output',
         'getallheaders' => 'output', 'header_list' => 'output',
         'headers_sent' => 'output', 'register_shutdown_function' => 'output',
         'set_error_handler' => 'error', 'restore_error_handler' => 'error',
@@ -85,7 +88,7 @@ final class SelfHostBuiltinPolicy
         'pathinfo' => 'filesystem', 'readfile' => 'filesystem', 'readlink' => 'filesystem', 'rename' => 'filesystem',
         'is_uploaded_file' => 'filesystem', 'move_uploaded_file' => 'filesystem', 'touch' => 'filesystem',
         'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem', 'tempnam' => 'filesystem',
-        'getcwd' => 'filesystem', 'chdir' => 'filesystem',
+        'getcwd' => 'filesystem', 'chdir' => 'filesystem', 'gethostname' => 'filesystem',
         'stream_context_create' => 'filesystem',
     ];
 
@@ -94,6 +97,7 @@ final class SelfHostBuiltinPolicy
         // Required for AOT linker/toolchain discovery (lib/AOT/Linker.php) and bootstrap M5 path.
         'shell_exec' => 'process',
         'escapeshellarg' => 'process',
+        'escapeshellcmd' => 'process',
         'phpc_run_command' => 'process',
     ];
 
@@ -110,7 +114,8 @@ final class SelfHostBuiltinPolicy
         'sizeof' => 'string', 'gettype' => 'string', 'get_debug_type' => 'string', 'var_export' => 'string',
         'str_replace' => 'string', 'str_ireplace' => 'string', 'strtr' => 'string', 'str_rot13' => 'string',
         'str_increment' => 'string', 'str_decrement' => 'string', 'strval' => 'string',
-        'strip_tags' => 'string', 'sprintf' => 'string', 'chr' => 'string', 'number_format' => 'string',
+        'strip_tags' => 'string',         'sprintf' => 'string', 'chr' => 'string', 'number_format' => 'string',
+        'phpversion' => 'string', 'php_sapi_name' => 'string', 'php_uname' => 'string',
         'soundex' => 'string',
         'base64_encode' => 'string', 'base64_decode' => 'string',
         'htmlspecialchars' => 'string', 'htmlspecialchars_decode' => 'string', 'header' => 'string', 'http_response_code' => 'string',
@@ -137,12 +142,12 @@ final class SelfHostBuiltinPolicy
         'array_multisort' => 'array',
         'usort' => 'array', 'uasort' => 'array', 'uksort' => 'array',
         'compact' => 'array', 'extract' => 'array', 'defined' => 'array', 'define' => 'array',
-        'get_defined_constants' => 'array', 'get_defined_vars' => 'array',
+        'get_defined_constants' => 'array', 'get_defined_vars' => 'array', 'get_declared_interfaces' => 'array',
         'class_exists' => 'array', 'enum_exists' => 'array', 'get_declared_enums' => 'array', 'function_exists' => 'array', 'method_exists' => 'array',
         'property_exists' => 'array',
         'get_object_vars' => 'array',
-        'get_class' => 'array', 'get_parent_class' => 'array', 'is_a' => 'array', 'is_subclass_of' => 'array',
-        'class_implements' => 'array',
+        'get_class' => 'array', 'get_class_methods' => 'array', 'get_class_vars' => 'array', 'get_parent_class' => 'array', 'is_a' => 'array', 'is_subclass_of' => 'array',
+        'class_implements' => 'array', 'class_parents' => 'array',
         'assert' => 'array',
         'trigger_error' => 'array',
         'error_get_last' => 'array',
@@ -151,7 +156,7 @@ final class SelfHostBuiltinPolicy
     ];
 
     /** @var array<string, string> */
-    private const CATEGORY_HASH = ['hash' => 'hash', 'hash_hmac' => 'hash', 'md5' => 'hash', 'sha1' => 'hash', 'crc32' => 'hash'];
+    private const CATEGORY_HASH = ['hash' => 'hash', 'hash_hmac' => 'hash', 'md5' => 'hash', 'sha1' => 'hash', 'crc32' => 'hash', 'crc32c' => 'hash'];
 
     /** @var array<string, string> */
     private const CATEGORY_PREG = [

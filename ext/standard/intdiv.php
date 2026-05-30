@@ -28,15 +28,15 @@ final class intdiv extends Internal
         }
         $a = $frame->calledArgs[0]->resolveIndirect();
         $b = $frame->calledArgs[1]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_INTEGER !== $a->type || Variable::TYPE_INTEGER !== $b->type) {
             throw new \LogicException('intdiv() only supports integers in this compiler build');
         }
         $den = $b->toInt();
         if (0 === $den) {
             throw new \DivisionByZeroError('intdiv() division by zero');
+        }
+        if (null === $frame->returnVar) {
+            return;
         }
         $frame->returnVar->int(\intdiv($a->toInt(), $den));
     }

@@ -28,6 +28,10 @@ final class BuiltinParamNames
                 return ['function', 'parameter'];
             case 'headers_sent':
                 return ['file', 'line'];
+            case 'touch':
+                return ['filename', 'time', 'atime'];
+            case 'getenv':
+                return ['name', 'local_only'];
         }
 
         return null;

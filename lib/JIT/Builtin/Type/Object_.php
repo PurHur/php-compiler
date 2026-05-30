@@ -39,12 +39,22 @@ class Object_ extends Type {
     private array $interfaceExtendsLc = [];
     /** @var array<string, true> interface lc => registered */
     private array $interfaceClassLcs = [];
+    /** @var array<string, true> trait lc => registered (#3789) */
+    private array $traitClassLcs = [];
+    /** @var array<int, array<string, string>> class id => method lc => trait lc (#3789) */
+    private array $classTraitMethodSources = [];
+    /** @var array<int, array<string, Block>> trait id => method lc => CFG block (#3789) */
+    private array $traitMethodBlocks = [];
     /** @var array<string, list<string>> class lc => transitive interface lc (lazy) */
     private array $classAllInterfacesLc = [];
     private array $properties = [];
     private array $propNameMap = [];
     /** @var array<int, array<string, int>> class id => method lc => visibility flags */
     private array $methodVisibility = [];
+    /** @var array<int, array<string, int>> class id => property lc => visibility flags (#3159) */
+    private array $propertyVisibility = [];
+    /** @var array<int, array<string, string>> class id => method lc => declared casing (#3118) */
+    private array $methodDisplayNames = [];
     /** @var array<int, true> class ids with a compiled __construct body */
     private array $hasConstructor = [];
     /** @var array<int, true> vendor/external classes without lowered methods (#2666) */
@@ -61,8 +71,15 @@ class Object_ extends Type {
 
     private ?int $splObjectStorageClassId = null;
 
+    private ?int $weakReferenceClassId = null;
+
+    private ?int $weakMapClassId = null;
+
     /** @var array<int, true> class ids declared readonly (issue #1360) */
     private array $readonlyClassIds = [];
+
+    /** @var array<int, array<string, true>> class id => property lc => true (#3149, #3432) */
+    private array $readonlyPropertyNames = [];
 
     /** @var array<int, PHPLLVM\Value> property slot handle => owning __object__* */
     private array $slotReceivers = [];
@@ -520,6 +537,37 @@ class Object_ extends Type {
         return array_keys($this->readonlyClassIds);
     }
 
+    public function markPropertyReadonly(int $classId, string $name): void
+    {
+        $this->readonlyPropertyNames[$classId][strtolower($name)] = true;
+    }
+
+    public function isPropertyReadonly(int $classId, string $name): bool
+    {
+        return isset($this->readonlyPropertyNames[$classId][strtolower($name)]);
+    }
+
+    /**
+     * @return list<int> class ids declaring $name as a readonly instance property
+     */
+    public function readonlyPropertyClassIdsForProperty(string $name): array
+    {
+        $lc = strtolower($name);
+        $ids = [];
+        foreach ($this->readonlyPropertyNames as $classId => $props) {
+            if (isset($props[$lc])) {
+                $ids[] = $classId;
+            }
+        }
+
+        return $ids;
+    }
+
+    public function hasReadonlyPropertyGuards(): bool
+    {
+        return [] !== $this->readonlyClassIds || [] !== $this->readonlyPropertyNames;
+    }
+
     public function markObjectConstructed(PHPLLVM\Value $obj): void
     {
         $map = $this->context->structFieldMap['__object__'];
@@ -756,6 +804,26 @@ class Object_ extends Type {
     public function allDeclaredClassLowerNames(): array
     {
         return array_keys($this->classes);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function allDeclaredInterfaceNames(): array
+    {
+        $names = [];
+        foreach (array_keys($this->interfaceClassLcs) as $ifaceLc) {
+            $resolved = null;
+            foreach ($this->classIdToName as $name) {
+                if (strtolower(ltrim($name, '\\')) === $ifaceLc) {
+                    $resolved = $name;
+                    break;
+                }
+            }
+            $names[] = $resolved ?? $ifaceLc;
+        }
+
+        return $names;
     }
 
     public function hasUserDeclaredEnum(string $name): bool
@@ -1011,6 +1079,41 @@ class Object_ extends Type {
         return $this->classIdToName[$id];
     }
 
+    public function classIdByName(string $name): ?int
+    {
+        $lc = strtolower($name);
+        foreach ($this->classIdToName as $id => $className) {
+            if (strtolower($className) === $lc) {
+                return $id;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * WeakMap backing __hashtable__ at property slot 0 (#3667).
+     */
+    public function weakMapBackingHashtable(Variable $obj): Variable
+    {
+        if (Variable::TYPE_OBJECT !== $obj->type) {
+            throw new \LogicException('weakMapBackingHashtable requires __object__*');
+        }
+        $objPtr = $this->context->helper->loadValue($obj);
+        $loaded = $this->context->builder->load($this->propertySlotPtr($objPtr, 0));
+        $htPtr = $this->context->builder->pointerCast(
+            $loaded,
+            $this->context->getTypeFromString('__hashtable__*')
+        );
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $htPtr
+        );
+    }
+
     public function hasMethod(int $classId, string $methodLc): bool
     {
         return isset($this->methodVisibility[$classId][strtolower($methodLc)]);
@@ -1057,6 +1160,16 @@ class Object_ extends Type {
     public function instancePropertySets(int $classId): array
     {
         return $this->properties[$classId] ?? [];
+    }
+
+    /**
+     * Compile-time property default metadata for get_class_vars() (#3159).
+     *
+     * @return array<int, array{propertyType: int, type: int, value: int|float|bool|string|null}>
+     */
+    public function propertyDefaultEntries(int $classId): array
+    {
+        return $this->propertyDefaults[$classId] ?? [];
     }
 
     public function lookupOperand(Operand $name): int
@@ -1207,9 +1320,11 @@ class Object_ extends Type {
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
         }
         if ('weakreference' === $lcname) {
-            $this->defineProperty($id, '__weak_target', Variable::TYPE_NULL);
+            $this->weakReferenceClassId = $id;
+            $this->defineProperty($id, '__weak_target', Variable::TYPE_VALUE);
         }
         if ('weakmap' === $lcname) {
+            $this->weakMapClassId = $id;
             $this->defineProperty($id, '__weak_map', Variable::TYPE_HASHTABLE);
         }
         if ('phpcompiler\\vm\\variable' === $lcname) {
@@ -1424,9 +1539,60 @@ class Object_ extends Type {
         return Variable::TYPE_VALUE;
     }
 
-    public function defineMethodVisibility(int $classId, string $methodLc, int $visibilityFlags): void
+    public function defineMethodVisibility(int $classId, string $methodLc, int $visibilityFlags, ?string $displayName = null): void
     {
-        $this->methodVisibility[$classId][strtolower($methodLc)] = $visibilityFlags;
+        $methodLc = strtolower($methodLc);
+        $this->methodVisibility[$classId][$methodLc] = $visibilityFlags;
+        if (null !== $displayName) {
+            $this->methodDisplayNames[$classId][$methodLc] = $displayName;
+        }
+    }
+
+    /**
+     * Method names visible on a class (including inherited), filtered by visibility bitmask (#3118).
+     *
+     * @return list<string>
+     */
+    public function allMethodNamesForClassId(int $classId, int $filter): array
+    {
+        $classLc = $this->classLcForId($classId);
+        if (null === $classLc) {
+            return [];
+        }
+
+        $chain = [];
+        $currentLc = $classLc;
+        while (null !== $currentLc) {
+            array_unshift($chain, $currentLc);
+            $currentLc = $this->classParentLc[$currentLc] ?? null;
+        }
+
+        /** @var array<string, string> method lc => display name */
+        $seen = [];
+        foreach ($chain as $lc) {
+            if (!isset($this->classes[$lc])) {
+                continue;
+            }
+            $id = $this->classes[$lc];
+            foreach ($this->methodVisibility[$id] ?? [] as $methodLc => $vis) {
+                if (0 !== ($filter & 7) && 0 === ($vis & $filter & 7)) {
+                    continue;
+                }
+                $seen[$methodLc] = $this->methodDisplayNames[$id][$methodLc] ?? $methodLc;
+            }
+        }
+
+        return array_values($seen);
+    }
+
+    public function definePropertyVisibility(int $classId, string $name, int $visibilityFlags): void
+    {
+        $this->propertyVisibility[$classId][strtolower($name)] = $visibilityFlags;
+    }
+
+    public function propertyVisibility(int $classId, string $name): int
+    {
+        return $this->propertyVisibility[$classId][strtolower($name)] ?? \PHPCfg\Func::FLAG_PUBLIC;
     }
 
     public function methodVisibility(int $classId, string $methodLc): int
@@ -1506,6 +1672,19 @@ class Object_ extends Type {
     public function defineClassConst(int $classId, string $name, VMVariable $value): void
     {
         $key = strtolower($name);
+        if (VMVariable::TYPE_ARRAY === $value->type) {
+            $table = $value->toArray();
+            if (!$table instanceof \PHPCompiler\VM\HashTable) {
+                throw new \LogicException('Class constant array must be a HashTable');
+            }
+            $this->classConstants[$classId][$key] = [
+                'type' => Variable::TYPE_HASHTABLE,
+                'value' => null,
+                'vmTable' => $table,
+            ];
+
+            return;
+        }
         $this->classConstants[$classId][$key] = [
             'type' => Variable::fromVMVariable($value->type),
             'value' => $this->compileTimeValueFromVm($value),
@@ -1527,6 +1706,63 @@ class Object_ extends Type {
                 if (!isset($this->classConstants[$classId][$name])) {
                     $this->classConstants[$classId][$name] = $entry;
                 }
+            }
+        }
+    }
+
+    public function markTraitClass(string $classLc): void
+    {
+        $this->traitClassLcs[strtolower(ltrim($classLc, '\\'))] = true;
+    }
+
+    public function isTraitClass(string $classLc): bool
+    {
+        return isset($this->traitClassLcs[strtolower(ltrim($classLc, '\\'))]);
+    }
+
+    public function recordTraitMethodSource(int $classId, string $methodLc, string $traitLc): void
+    {
+        $this->classTraitMethodSources[$classId][strtolower($methodLc)] = strtolower(ltrim($traitLc, '\\'));
+    }
+
+    public function traitMethodSource(int $classId, string $methodLc): ?string
+    {
+        return $this->classTraitMethodSources[$classId][strtolower($methodLc)] ?? null;
+    }
+
+    public function recordTraitMethodBlock(int $traitId, string $methodLc, Block $block): void
+    {
+        $this->traitMethodBlocks[$traitId][strtolower($methodLc)] = $block;
+    }
+
+    public function traitMethodBlock(int $traitId, string $methodLc): ?Block
+    {
+        return $this->traitMethodBlocks[$traitId][strtolower($methodLc)] ?? null;
+    }
+
+    public function inheritTraitConstants(int $classId, int $traitId, string $traitName): void
+    {
+        if (!isset($this->classConstants[$traitId])) {
+            return;
+        }
+        foreach ($this->classConstants[$traitId] as $name => $entry) {
+            if (isset($this->classConstants[$classId][$name])) {
+                throw new \LogicException(
+                    "Trait constant {$traitName}::{$name} conflicts with an existing class constant"
+                );
+            }
+            $this->classConstants[$classId][$name] = $entry;
+        }
+    }
+
+    public function inheritTraitStaticProperties(int $classId, int $traitId): void
+    {
+        if (!isset($this->staticPropertyGlobals[$traitId])) {
+            return;
+        }
+        foreach ($this->staticPropertyGlobals[$traitId] as $name => $entry) {
+            if (!isset($this->staticPropertyGlobals[$classId][$name])) {
+                $this->staticPropertyGlobals[$classId][$name] = $entry;
             }
         }
     }
@@ -2022,6 +2258,12 @@ class Object_ extends Type {
                     Variable::KIND_VARIABLE,
                     $slot
                 );
+            case Variable::TYPE_HASHTABLE:
+                if (!isset($entry['vmTable']) || !$entry['vmTable'] instanceof \PHPCompiler\VM\HashTable) {
+                    throw new \LogicException('Missing VM table for class constant array');
+                }
+
+                return HashTableHelper::variableFromVmHashTable($this->context, $entry['vmTable']);
             default:
                 throw new \LogicException('Unsupported class constant type for JIT');
         }

@@ -24,6 +24,7 @@ final class PhpcDoctorTest extends TestCase
         $this->assertSame(0, $result['exit'], $result['stdout']."\n".$result['stderr']);
         $this->assertStringContainsString('[ok] PHP:', $result['stdout']);
         $this->assertStringContainsString('[ok] Composer deps:', $result['stdout']);
+        $this->assertStringContainsString('[ok] nikic/php-parser:', $result['stdout']);
         $this->assertStringContainsString('LLVM 9:', $result['stdout']);
         $this->assertStringContainsString('libLLVM-9.so.1:', $result['stdout']);
         $this->assertStringContainsString('JIT compliance:', $result['stdout']);

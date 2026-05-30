@@ -1,0 +1,52 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -508,11 +508,14 @@
+ 
+     protected function parseStmt_HaltCompiler(Stmt\HaltCompiler $node)
+     {
+-        $this->block->children[] = new Op\Terminal\Echo_(
+-            $this->readVariable(new Operand\Literal($node->remaining)),
+-            $this->mapAttributes($node)
+-        );
++        $attrs = $this->mapAttributes($node);
++        $this->block->children[] = new Op\Stmt\HaltCompiler(
++            $node->remaining,
++            $attrs
++        );
++        $this->block = new Block();
++        $this->block->dead = true;
+     }
+ 
+     protected function parseStmt_If(Stmt\If_ $node)
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/HaltCompiler.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/HaltCompiler.php
+@@ -0,0 +1,29 @@
++<?php
++
++declare(strict_types=1);
++
++namespace PHPCfg\Op\Stmt;
++
++use PHPCfg\Op\Stmt;
++
++class HaltCompiler extends Stmt
++{
++    /** @var string bytes after __halt_compiler(); in source (PHAR stubs, issue #3479) */
++    public string $remaining;
++
++    public function __construct(string $remaining, array $attributes = [])
++    {
++        parent::__construct($attributes);
++        $this->remaining = $remaining;
++    }
++
++    public function getSubBlocks(): array
++    {
++        return [];
++    }
++
++    public function getType(): string
++    {
++        return 'Stmt_HaltCompiler';
++    }
++}

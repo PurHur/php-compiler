@@ -44,6 +44,14 @@ final class PhpcLintBootstrapInventoryTest extends TestCase
         }
     }
 
+    /** Issue #2276 — nested ?? in casts must not report Expr_BinaryOp_Coalesce. */
+    public function testBootstrapSpineVmFsLintClean(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $exit = $this->runLint([$repoRoot.'/ext/standard/VmFs.php']);
+        $this->assertSame(0, $exit['code'], $exit['stderr']."\n".$exit['stdout']);
+    }
+
     public function testPhpcDelegatesBootstrapInventory(): void
     {
         $repoRoot = dirname(__DIR__, 2);

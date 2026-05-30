@@ -299,9 +299,10 @@ final class IssetHelper
             $context->builder->structGep($str, $map['length'])
         );
         $index = $context->helper->loadValue($dim);
-        $i32 = $context->getTypeFromString('int32');
-        $inRange = $context->builder->icmp(Builder::INT_SLT, $index, $len);
-        $nonNeg = $context->builder->icmp(Builder::INT_SGE, $index, $i32->constInt(0, false));
+        $offset = StringOffsetHelper::normalizeOffset($context, $index, $len);
+        $zero = $context->getTypeFromString('size_t')->constInt(0, false);
+        $nonNeg = $context->builder->icmp(Builder::INT_UGE, $offset, $zero);
+        $inRange = $context->builder->icmp(Builder::INT_ULT, $offset, $len);
 
         return $context->builder->and($inRange, $nonNeg);
     }

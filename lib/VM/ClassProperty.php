@@ -9,21 +9,50 @@
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Block;
+
 class ClassProperty {
 
     public string $name;
     public ?Variable $default;
     public Variable $prototype;
+    public ?string $setHookMethodLc = null;
+    /** Lowercase get-hook method name from property-hooks lowering (#3145), or null. */
+    public ?string $getHookMethodLc = null;
+    /** Individual readonly property (issue #3149, promoted readonly #3432). */
+    public bool $readonly = false;
+    /** Per-instance `new` default initializer (issue #3391). */
+    public ?Block $defaultInitBlock = null;
+    public ?int $defaultInitResultSlot = null;
+    /** PHPCfg visibility flags (issue #145). */
+    public int $visibility;
+    /** Lowercase class that declared this property (issue #145). */
+    public string $declaringClassLc;
 
-    public function __construct(string $name, ?Variable $default, Variable $prototype) {
+    public function __construct(
+        string $name,
+        ?Variable $default,
+        Variable $prototype,
+        bool $readonly = false,
+        int $visibility = \PHPCfg\Func::FLAG_PUBLIC,
+        string $declaringClassLc = ''
+    ) {
         $this->name = $name;
         $this->default = $default;
         $this->prototype = $prototype;
+        $this->readonly = $readonly;
+        $this->visibility = $visibility;
+        $this->declaringClassLc = $declaringClassLc;
+    }
+
+    public function hasRuntimeDefaultInit(): bool
+    {
+        return null !== $this->defaultInitBlock && null !== $this->defaultInitResultSlot;
     }
 
     public function getVariable(): Variable {
         $var = clone $this->prototype;
-        if (!is_null($this->default)) {
+        if (!is_null($this->default) && !$this->hasRuntimeDefaultInit()) {
             $var->copyFrom($this->default);
         }
 

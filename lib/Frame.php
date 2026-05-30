@@ -50,6 +50,14 @@ class Frame {
     /** Pending closure call: captures bound when the callee frame is entered (issue #72). */
     public ?VM\ClosureState $closureCall = null;
 
+    /**
+     * When set, writes to this instance property name use backing storage (inside a hook body, #3145).
+     */
+    public ?string $propertyHookRawProperty = null;
+
+    /** Original method name when dispatching via __call / __callStatic (#146, #3273). */
+    public ?string $magicCallMethodName = null;
+
     /** Set when TYPE_YIELD suspends; runFrames returns GENERATOR_YIELD. */
     public bool $generatorYield = false;
 
@@ -63,6 +71,13 @@ class Frame {
      * @var array<int, Variable>
      */
     public array $iterators = [];
+
+    /**
+     * Runtime locals materialized by variable variables when the name is absent from compile-time scope (#3801).
+     *
+     * @var array<string, Variable>
+     */
+    public array $dynamicLocals = [];
 
     public function __construct(?Handler $handler, ?Block $block, ?Frame $parent, Variable ...$scope) {
         $this->handler = $handler;

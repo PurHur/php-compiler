@@ -10,7 +10,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM implementation of __string__ucwords (ASCII uppercase at word starts; VmString::asciiUcwords).
+ * LLVM implementation of __string__ucwords / __string__ucwords_ex (VmString::asciiUcwords / asciiUcwordsEx).
  */
 final class StringUcwords
 {
@@ -25,9 +25,20 @@ final class StringUcwords
         self::transformInPlace($context, $copy);
         $context->builder->returnValue($copy);
         $context->builder->clearInsertionPosition();
+
+        $fnEx = $context->lookupFunction('__string__ucwords_ex');
+        $entryEx = $fnEx->appendBasicBlock('ucwords_ex_main');
+        $context->builder->positionAtEnd($entryEx);
+
+        $stringEx = $fnEx->getParam(0);
+        $separatorsEx = $fnEx->getParam(1);
+        $copyEx = $context->builder->call($context->lookupFunction('__string__separate'), $stringEx);
+        self::transformInPlace($context, $copyEx, $separatorsEx);
+        $context->builder->returnValue($copyEx);
+        $context->builder->clearInsertionPosition();
     }
 
-    public static function transformInPlace(Context $context, Value $strPtr): void
+    public static function transformInPlace(Context $context, Value $strPtr, ?Value $separatorsPtr = null): void
     {
         $map = $context->structFieldMap['__string__'];
         $len = $context->builder->load(
@@ -40,12 +51,19 @@ final class StringUcwords
 
         $idxSlot = $context->builder->alloca($i64, 1, 'ucwords_idx');
         $wordStartSlot = $context->builder->alloca($i64, 1, 'ucwords_word_start');
+        $foundSlot = null;
+        if (null !== $separatorsPtr) {
+            $foundSlot = $context->builder->alloca($context->getTypeFromString('int1'), 1, 'ucwords_sep_found');
+        }
         $context->builder->store($zero, $idxSlot);
         $context->builder->store($one, $wordStartSlot);
 
         $done = BasicBlockHelper::append($context, 'ucwords_done');
         $loopHead = BasicBlockHelper::append($context, 'ucwords_head');
         $loopBody = BasicBlockHelper::append($context, 'ucwords_body');
+        $loopBodyTail = null !== $separatorsPtr
+            ? BasicBlockHelper::append($context, 'ucwords_body_tail')
+            : null;
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopHead);
@@ -73,10 +91,25 @@ final class StringUcwords
             $ch->typeOf()
         );
         $context->builder->store($newCh, $atChar);
-        $isWs = self::isWhitespaceByte($context, $chI32);
-        $context->builder->store($context->builder->zExt($isWs, $i64), $wordStartSlot);
-        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
-        $context->builder->branch($loopHead);
+        if (null !== $separatorsPtr) {
+            $sepEntry = self::emitCharInStringCheck($context, $chI32, $separatorsPtr, $foundSlot, $loopBodyTail);
+            $context->builder->positionAtEnd($loopBody);
+            $context->builder->branch($sepEntry);
+        } else {
+            $isSep = self::isWhitespaceByte($context, $chI32);
+            $context->builder->store($context->builder->zExt($isSep, $i64), $wordStartSlot);
+            $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+            $context->builder->branch($loopHead);
+        }
+
+        if (null !== $loopBodyTail) {
+            $context->builder->positionAtEnd($loopBodyTail);
+            $isSep = $context->builder->load($foundSlot);
+            $context->builder->store($context->builder->zExt($isSep, $i64), $wordStartSlot);
+            $idx = $context->builder->load($idxSlot);
+            $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+            $context->builder->branch($loopHead);
+        }
 
         $context->builder->positionAtEnd($done);
     }
@@ -98,5 +131,57 @@ final class StringUcwords
         }
 
         return $result;
+    }
+
+    /**
+     * @return mixed sep-check entry basic block (caller branches here from ucwords_body)
+     */
+    private static function emitCharInStringCheck(
+        Context $context,
+        Value $ch,
+        Value $strPtr,
+        Value $foundSlot,
+        $continueBlock
+    ) {
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+        $sepLen = $context->builder->load(
+            $context->builder->structGep($strPtr, $map['length'])
+        );
+        $sepChars = $context->builder->structGep($strPtr, $map['value']);
+
+        $entry = BasicBlockHelper::append($context, 'ucwords_sep_entry');
+        $idxSlot = $context->builder->alloca($i64, 1, 'ucwords_sep_idx');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->store($context->getTypeFromString('int1')->constInt(0, false), $foundSlot);
+        $context->builder->store($zero, $idxSlot);
+
+        $done = BasicBlockHelper::append($context, 'ucwords_sep_done');
+        $loopHead = BasicBlockHelper::append($context, 'ucwords_sep_head');
+        $loopBody = BasicBlockHelper::append($context, 'ucwords_sep_body');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $sepLen);
+        $context->builder->branchIf($atEnd, $done, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        $atSepChar = $context->builder->gep($sepChars, $idx);
+        $sepCh = $context->builder->load($atSepChar);
+        $sepChI32 = $context->builder->zExt($sepCh, $i32);
+        $matches = $context->builder->icmp(Builder::INT_EQ, $ch, $sepChI32);
+        $found = $context->builder->load($foundSlot);
+        $context->builder->store($context->builder->or($found, $matches), $foundSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($done);
+        $context->builder->branch($continueBlock);
+
+        return $entry;
     }
 }

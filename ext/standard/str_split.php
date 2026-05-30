@@ -31,9 +31,6 @@ final class str_split extends Internal
             throw new \LogicException('str_split() requires one or two arguments');
         }
         $string = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_STRING !== $string->type) {
             throw new \LogicException('str_split() argument must be a string in this compiler build');
         }
@@ -46,6 +43,9 @@ final class str_split extends Internal
             $length = $lenArg->toInt();
         }
         $parts = VmString::strSplit($string->toString(), $length);
+        if (null === $frame->returnVar) {
+            return;
+        }
         $out = new HashTable();
         foreach ($parts as $part) {
             $stored = new Variable();
@@ -78,6 +78,7 @@ final class str_split extends Internal
                 throw new \LogicException('str_split() length must be an integer in this compiler build');
             }
             $chunkLen = $context->helper->loadValue($args[1]);
+            JitStrSplit::emitRuntimeLengthGuard($context, $chunkLen);
         }
 
         return JitStrSplit::split(

@@ -38,7 +38,7 @@ function outer() {
 }
 outer();
 PHP;
-        $this->assertSame("debug_backtrace|inner|outer\nkeys\n0\n", $this->runInline($code));
+        $this->assertSame("inner|outer|{main}\nkeys\n0\n", $this->runInline($code));
     }
 
     private function runInline(string $code, string $bin = 'vm'): string

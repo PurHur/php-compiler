@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\GenericArrayTypeSpec;
+
 /**
  * Scalar type coercion for typed parameters (issue #156).
  */
 final class TypeCheck
 {
-    public static function coerceParameter(Variable $dest, bool $strict): void
+    public static function coerceParameter(Variable $dest, bool $strict, ?GenericArrayTypeSpec $arraySpec = null): void
     {
         self::coerceTypedSlot($dest, $strict, 'Argument');
+        if (null !== $arraySpec) {
+            self::assertGenericArrayShape($dest, $arraySpec, 'Argument');
+        }
     }
 
     /**
@@ -28,6 +33,10 @@ final class TypeCheck
     public static function coercePropertyWrite(Variable $dest, bool $strict): void
     {
         self::coerceTypedSlot($dest, $strict, 'Property');
+        $target = $dest->resolveIndirect();
+        if (null !== $target->genericArrayTypeSpec) {
+            self::assertGenericArrayShape($target, $target->genericArrayTypeSpec, 'Property');
+        }
     }
 
     public static function coerceReturn(Variable $value, bool $strict, int $constraint): void
@@ -45,6 +54,27 @@ final class TypeCheck
     public static function assertNeverReturn(): void
     {
         throw new \TypeError('A never-returning function must not return');
+    }
+
+    public static function assertStaticReturn(
+        Variable $value,
+        string $expectedClassLc,
+        Context $context
+    ): void {
+        $target = $value->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $target->type) {
+            throw new \TypeError(
+                'Return value must be of type static, '.self::typeName($target->type).' given'
+            );
+        }
+        $entry = $target->toObject()->class;
+        if (!InterfaceCheck::entryIsInstanceOf($entry, $expectedClassLc, $context)) {
+            $expectedName = $context->classes[$expectedClassLc]->name ?? $expectedClassLc;
+
+            throw new \TypeError(
+                "Return value must be of type {$expectedName}, {$entry->name} returned"
+            );
+        }
     }
 
     private static function coerceTypedSlot(Variable $dest, bool $strict, string $kind, ?int $constraint = null): void
@@ -177,6 +207,36 @@ final class TypeCheck
         $given = self::typeName($value->type);
 
         return "{$kind} must be of type {$expected}, {$given} given";
+    }
+
+    private static function assertGenericArrayShape(Variable $dest, GenericArrayTypeSpec $spec, string $kind): void
+    {
+        $value = $dest->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $value->type) {
+            return;
+        }
+        if (GenericArrayTypeSpec::KIND_LIST === $spec->kind && !self::arrayValueIsList($value)) {
+            throw new \TypeError(
+                "{$kind} must be of type list, array given"
+            );
+        }
+    }
+
+    private static function arrayValueIsList(Variable $value): bool
+    {
+        $ht = $value->toArray();
+        $index = 0;
+        foreach ($ht->iterateKeyed(true) as [$keyVar]) {
+            if (Variable::TYPE_INTEGER !== $keyVar->type) {
+                return false;
+            }
+            if ($keyVar->toInt() !== $index) {
+                return false;
+            }
+            ++$index;
+        }
+
+        return true;
     }
 
     private static function typeName(int $type): string

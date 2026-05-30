@@ -12,15 +12,19 @@ final class Linker
     /** @var list<string> */
     private const RUNTIME_C_SOURCES = [
         __DIR__.'/runtime/superglobals_refresh.c',
+        __DIR__.'/runtime/phpc_env_local.c',
         __DIR__.'/runtime/phpc_pending_headers.c',
         __DIR__.'/runtime/superglobal_name.c',
         __DIR__.'/runtime/function_exists.c',
         __DIR__.'/runtime/hash_crypto.c',
         __DIR__.'/runtime/phpc_microtime.c',
+        __DIR__.'/runtime/phpc_hrtime.c',
         __DIR__.'/runtime/phpc_getdate.c',
+        __DIR__.'/runtime/phpc_info.c',
         __DIR__.'/runtime/phpc_strnatcmp.c',
         __DIR__.'/runtime/phpc_strnatcasecmp.c',
         __DIR__.'/runtime/phpc_substr_compare.c',
+        __DIR__.'/runtime/phpc_spaceship.c',
         __DIR__.'/runtime/phpc_levenshtein.c',
         __DIR__.'/runtime/phpc_similar_text.c',
         __DIR__.'/runtime/phpc_soundex.c',
@@ -31,10 +35,13 @@ final class Linker
         __DIR__.'/runtime/phpc_strtok.c',
         __DIR__.'/runtime/password_crypto.c',
         __DIR__.'/runtime/crc32.c',
+        __DIR__.'/runtime/crc32c.c',
         __DIR__.'/runtime/strtr.c',
         __DIR__.'/runtime/filter_validate.c',
         __DIR__.'/runtime/phpc_fs_dir.c',
         __DIR__.'/runtime/phpc_count_chars.c',
+        __DIR__.'/runtime/phpc_gethostname.c',
+        __DIR__.'/runtime/phpc_getrusage.c',
         __DIR__.'/runtime/phpc_upload_temp.c',
         __DIR__.'/runtime/phpc_session_id_storage.c',
         __DIR__.'/runtime/phpc_session_name_storage.c',
@@ -63,8 +70,10 @@ final class Linker
         __DIR__.'/runtime/phpc_type_error_raise.c',
         __DIR__.'/runtime/phpc_jit_throw.c',
         __DIR__.'/runtime/phpc_attr_registry.c',
+        __DIR__.'/runtime/phpc_class_methods.c',
         __DIR__.'/runtime/phpc_reflection_attr.c',
         __DIR__.'/runtime/phpc_cli_argv.c',
+        __DIR__.'/runtime/phpc_weakref.c',
     ];
 
     private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt';
@@ -72,6 +81,8 @@ final class Linker
     /** Runtime units that need host libc headers (glob/scandir; llvm sysroot lacks linux/limits.h). */
     private const RUNTIME_HOST_LIBC_BASENAMES = [
         'phpc_fs_dir.c',
+        'phpc_gethostname.c',
+        'phpc_getrusage.c',
         'phpc_upload_temp.c',
         'preg_match.c',
         'password_crypto.c',

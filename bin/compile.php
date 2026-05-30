@@ -15,6 +15,33 @@ use PHPCompiler\Web\LiteralIncludeDiscovery;
 use PHPCompiler\Web\SourceBundler;
 use PHPCompiler\Web\Superglobals;
 
+/**
+ * True when bin/compile.php is building a user/test fixture binary (not bootstrap/self-host spine).
+ */
+function phpc_compile_is_user_script_aot(string $normalized): bool
+{
+    if ('' === $normalized || '-' === $normalized || 'Command line code' === $normalized) {
+        return true;
+    }
+    if (str_contains($normalized, 'bootstrap-aot/')) {
+        return false;
+    }
+    if (str_contains($normalized, 'selfhost/')) {
+        return false;
+    }
+    if (str_contains($normalized, 'compile_driver.php')) {
+        return false;
+    }
+    if (str_contains($normalized, '_m3_emit_native_entry.php')) {
+        return false;
+    }
+    if (str_contains($normalized, 'compiler_unit_probe')) {
+        return false;
+    }
+
+    return true;
+}
+
 function run(string $filename, string $code, array $options): void
 {
     $normalized = '-' !== $filename ? str_replace('\\', '/', $filename) : '';
@@ -122,6 +149,8 @@ function run(string $filename, string $code, array $options): void
         } elseif (str_contains($normalized, 'runtime_compile_smoke/compile_driver.php')) {
             putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=runtime_compile_smoke_m3_emit');
             putenv('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1');
+        } elseif (str_contains($normalized, 'jit_unit_probe/compile_driver.php')) {
+            putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=jit_unit_probe_m3_emit');
         } elseif (str_contains($normalized, 'compile_driver.php')) {
             putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit');
         }
@@ -186,7 +215,27 @@ function run(string $filename, string $code, array $options): void
         is_string($postBody) ? $postBody : null,
         $scriptFilename
     );
-    $block = $runtime->parseAndCompile($code, $filename);
+    $prevUserScriptAot = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+    $setUserScriptAot = phpc_compile_is_user_script_aot($normalized);
+    if ($setUserScriptAot && \function_exists('putenv')) {
+        putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
+        $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
+        $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
+    }
+    try {
+        $block = $runtime->parseAndCompile($code, $filename);
+    } finally {
+        if ($setUserScriptAot && \function_exists('putenv')) {
+            if (false === $prevUserScriptAot || null === $prevUserScriptAot) {
+                putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
+                unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
+            } else {
+                putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prevUserScriptAot);
+                $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
+                $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
+            }
+        }
+    }
     if (null === $block) {
         if (! isset($options['-l'])) {
             $diag = \PHPCompiler\Runtime::getLastParseFailure();
@@ -229,12 +278,27 @@ function run(string $filename, string $code, array $options): void
             $_ENV['PHP_COMPILER_SELFHOST_AOT'] = '1';
             $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = '1';
         }
+        if ($setUserScriptAot && \function_exists('putenv')) {
+            putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
+            $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
+            $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
+        }
         try {
             $runtime->standalone($block, $options['-o'], $code, $filename);
         } catch (\LogicException $e) {
             fwrite(STDERR, $e->getMessage()."\n");
             exit(2);
         } finally {
+            if ($setUserScriptAot && \function_exists('putenv')) {
+                if (false === $prevUserScriptAot || null === $prevUserScriptAot) {
+                    putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
+                    unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
+                } else {
+                    putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prevUserScriptAot);
+                    $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
+                    $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
+                }
+            }
             if ($setSelfHostAotForCompile) {
                 putenv('PHP_COMPILER_SELFHOST_AOT=');
                 unset($_ENV['PHP_COMPILER_SELFHOST_AOT'], $_SERVER['PHP_COMPILER_SELFHOST_AOT']);

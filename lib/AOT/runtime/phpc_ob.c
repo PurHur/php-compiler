@@ -147,3 +147,8 @@ void __phpc_shutdown_mark_registered(void)
 {
     __phpc_shutdown_registered = 1;
 }
+
+void __phpc_flush(void)
+{
+    fflush(stdout);
+}

@@ -44,6 +44,12 @@ class Native implements Call {
     /** @var array<int, true> LLVM arg index => by-reference formal (issue #3161, #140) */
     public array $paramByRefByArg = [];
 
+    /** Declared parameter names by index (issue #3777). */
+    public array $paramNames = [];
+
+    /** PHP variadic parameter index for named-arg resolution (issue #3777). */
+    public ?int $namedArgsVariadicIndex = null;
+
     public function __construct(
         Value $function,
         string $name,
@@ -52,7 +58,9 @@ class Native implements Call {
         ?int $variadicArgIndex = null,
         array $paramTypeConstraintsByArg = [],
         array $paramIntersectionConstraintsByArg = [],
-        array $paramByRefByArg = []
+        array $paramByRefByArg = [],
+        array $paramNames = [],
+        ?int $namedArgsVariadicIndex = null
     ) {
         $this->function = $function;
         $this->name = $name;
@@ -62,6 +70,8 @@ class Native implements Call {
         $this->paramTypeConstraintsByArg = $paramTypeConstraintsByArg;
         $this->paramIntersectionConstraintsByArg = $paramIntersectionConstraintsByArg;
         $this->paramByRefByArg = $paramByRefByArg;
+        $this->paramNames = $paramNames;
+        $this->namedArgsVariadicIndex = $namedArgsVariadicIndex;
     }
 
     public function call(Context $context, Variable ... $args): Value {

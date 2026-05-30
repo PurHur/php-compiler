@@ -133,6 +133,9 @@ final class Variable {
     /** Live {@see __value__*} for closure use (&$var) capture slots (issue #72). */
     public ?\PHPLLVM\Value $valueBoxAliasPtr = null;
 
+    /** Module-global {@see __value__*} slot for function-local static storage (#3778, #2286). */
+    public bool $functionStaticGlobal = false;
+
     private static int $lvalueCounter = 0;
     public int $nextFreeElement = 0;
 

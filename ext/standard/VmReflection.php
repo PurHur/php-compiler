@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\Func;
+use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\InterfaceCheck;
@@ -80,6 +82,26 @@ final class VmReflection
         return null !== $entry && $entry->isInterface;
     }
 
+    /**
+     * get_declared_interfaces() — numerically indexed interface name list (issue #3176).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_interfaces)
+     */
+    public static function declaredInterfacesTable(Context $ctx): \PHPCompiler\VM\HashTable
+    {
+        $result = new \PHPCompiler\VM\HashTable();
+        foreach ($ctx->classes as $lc => $entry) {
+            if (!$entry->isInterface || isset($ctx->classAliases[$lc])) {
+                continue;
+            }
+            $value = new Variable();
+            $value->string($entry->name);
+            $result->append($value);
+        }
+
+        return $result;
+    }
+
     public static function traitExists(Context $ctx, string $traitName): bool
     {
         $entry = self::resolveClassEntry($ctx, $traitName);
@@ -110,6 +132,72 @@ final class VmReflection
         }
 
         return false;
+    }
+
+    /**
+     * Declared instance property name on $class or an ancestor, or null.
+     *
+     * php-src: zend_get_property_info — walk CE hierarchy
+     */
+    public static function findInstancePropertyName(ClassEntry $class, string $property, Context $ctx): ?string
+    {
+        $lc = strtolower($property);
+        $current = $class;
+        while (true) {
+            foreach ($current->properties as $prop) {
+                if (strtolower($prop->name) === $lc) {
+                    return $prop->name;
+                }
+            }
+            if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
+                return null;
+            }
+            $current = $ctx->classes[$current->parentLc];
+        }
+    }
+
+    /** Static property storage key on $class or an ancestor, or null. */
+    public static function findStaticPropertyKey(ClassEntry $class, string $property, Context $ctx): ?string
+    {
+        $lc = strtolower($property);
+        $current = $class;
+        while (true) {
+            if (isset($current->staticProperties[$lc])) {
+                return $lc;
+            }
+            if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
+                return null;
+            }
+            $current = $ctx->classes[$current->parentLc];
+        }
+    }
+
+    /**
+     * Class constant value storage key on $class or an ancestor, or null.
+     */
+    public static function findClassConstantKey(ClassEntry $class, string $constant, Context $ctx): ?string
+    {
+        $lc = strtolower($constant);
+        $current = $class;
+        while (true) {
+            if (isset($current->constants[$lc])) {
+                return $lc;
+            }
+            if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
+                return null;
+            }
+            $current = $ctx->classes[$current->parentLc];
+        }
+    }
+
+    public static function requireFunction(Context $ctx, string $functionName): Func
+    {
+        $lc = strtolower(ltrim($functionName, '\\'));
+        if (!isset($ctx->functions[$lc])) {
+            throw new \LogicException("Function {$functionName} does not exist");
+        }
+
+        return $ctx->functions[$lc];
     }
 
     public static function propertyExists(Context $ctx, Variable $objectOrClass, string $property): bool
@@ -256,6 +344,73 @@ final class VmReflection
         return $ctx->classes[$entry->parentLc]->name;
     }
 
+    /**
+     * class_parents() — ordered parent class names from immediate parent to root (#3159).
+     *
+     * php-src: ext/standard/class.c — PHP_FUNCTION(class_parents)
+     *
+     * @return list<string>
+     */
+    public static function classParentsList(ClassEntry $entry, Context $ctx): array
+    {
+        $parents = [];
+        $current = $entry;
+        while (null !== $current->parentLc && isset($ctx->classes[$current->parentLc])) {
+            $parent = $ctx->classes[$current->parentLc];
+            $parents[] = $parent->name;
+            $current = $parent;
+        }
+
+        return $parents;
+    }
+
+    /**
+     * class_parents() result as a numerically indexed VM array (#3159).
+     */
+    public static function classParentsArray(ClassEntry $entry, Context $ctx): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (self::classParentsList($entry, $ctx) as $parentName) {
+            $value = new Variable();
+            $value->string($parentName);
+            $ht->append($value);
+        }
+
+        return $result;
+    }
+
+    /**
+     * get_class_vars() — default values for public properties declared on $entry (#3159).
+     *
+     * php-src: ext/standard/class.c — PHP_FUNCTION(get_class_vars)
+     */
+    public static function getClassVarsArray(ClassEntry $entry): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        $classLc = strtolower($entry->name);
+        foreach ($entry->properties as $prop) {
+            if ($prop->declaringClassLc !== $classLc) {
+                continue;
+            }
+            if (!MethodVisibility::isPublic($prop->visibility)) {
+                continue;
+            }
+            $copy = new Variable();
+            if (null !== $prop->default && !$prop->hasRuntimeDefaultInit()) {
+                $copy->copyFrom($prop->default);
+            } else {
+                $copy->copyFrom($prop->getVariable());
+            }
+            $ht->add($prop->name, $copy);
+        }
+
+        return $result;
+    }
+
     public static function resolveClassFromArg(Context $ctx, Variable $arg): ClassEntry
     {
         $arg = $arg->resolveIndirect();
@@ -375,6 +530,64 @@ final class VmReflection
             $copy = new Variable();
             $copy->copyFrom($value);
             $ht->add($name, $copy);
+        }
+
+        return $result;
+    }
+
+    /** Default visibility filter: public | protected | private (php-src get_class_methods). */
+    public const METHOD_FILTER_DEFAULT = \PHPCfg\Func::FLAG_PUBLIC
+        | \PHPCfg\Func::FLAG_PROTECTED
+        | \PHPCfg\Func::FLAG_PRIVATE;
+
+    /**
+     * get_class_methods() operand — object or class name string (#3118).
+     */
+    public static function resolveClassForGetClassMethods(Context $ctx, Variable $arg): ?ClassEntry
+    {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            return $arg->toObject()->class;
+        }
+        if (Variable::TYPE_STRING === $arg->type) {
+            $className = $arg->toString();
+            $lc = strtolower(ltrim($className, '\\'));
+            if (!isset($ctx->classes[$lc])) {
+                $ctx->autoloadClass($className);
+            }
+
+            return $ctx->classes[$lc] ?? null;
+        }
+
+        throw new \LogicException('get_class_methods() argument must be an object or class name string in this compiler build');
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function classMethodsList(ClassEntry $entry, int $filter = self::METHOD_FILTER_DEFAULT): array
+    {
+        $names = [];
+        foreach ($entry->methods as $methodLc => $_method) {
+            $vis = $entry->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            if (0 !== ($filter & 7) && 0 === ($vis & $filter & 7)) {
+                continue;
+            }
+            $names[] = $entry->methodNames[$methodLc] ?? $methodLc;
+        }
+
+        return $names;
+    }
+
+    public static function classMethodsArray(ClassEntry $entry, int $filter = self::METHOD_FILTER_DEFAULT): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (self::classMethodsList($entry, $filter) as $methodName) {
+            $value = new Variable();
+            $value->string($methodName);
+            $ht->append($value);
         }
 
         return $result;

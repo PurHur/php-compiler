@@ -58,4 +58,12 @@ final class OutputBuffer
         }
         self::append(array_pop(self::$stack));
     }
+
+    /** flush() — fflush stdout; ob buffers unchanged until ob_end_flush (issue #3388, php-src php_flush). */
+    public static function flush(): void
+    {
+        if (\defined('STDOUT') && \is_resource(\STDOUT)) {
+            @\fflush(\STDOUT);
+        }
+    }
 }

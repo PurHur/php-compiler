@@ -64,8 +64,17 @@ class Block {
     /** @var array<int, int> scope slot index => Variable::TYPE_* for typed parameters */
     public array $paramTypeConstraints = [];
 
+    /** @var array<int, GenericArrayTypeSpec> generic list/array parameter types (#3705) */
+    public array $paramGenericArrayTypeSpecs = [];
+
     /** @var array<int, list<string>> */
     public array $paramIntersectionConstraints = [];
+
+    /** @var array<int, Op\Type> declared parameter types for reflection (#3355). */
+    public array $paramDeclaredTypes = [];
+
+    /** Declared return type AST for reflection (#3355), or null when untyped. */
+    public ?Op\Type $returnDeclaredType = null;
 
     /** Declared scalar return type for this function (issue #205), or null when untyped. */
     public ?int $returnTypeConstraint = null;
@@ -76,6 +85,9 @@ class Block {
     /** Declared `: never` return — any return is rejected (issue #1358). */
     public bool $returnTypeNever = false;
 
+    /** Declared `: static` return — late-bound object type (issue #3412). */
+    public bool $returnTypeStatic = false;
+
     /** Parameter index (0-based, excluding $this) that receives a packed trailing-arg array (#197). */
     public ?int $variadicParamIndex = null;
 
@@ -84,6 +96,9 @@ class Block {
 
     /** Parameter indices declared with `&$param` (issue #140). */
     public array $paramByRef = [];
+
+    /** Parameter indices marked `#[\SensitiveParameter]` (issue #3351). */
+    public array $paramSensitive = [];
 
     /** Function body contains `yield` (issue #167). */
     public bool $isGenerator = false;
@@ -186,12 +201,49 @@ class Block {
         return $operands;
     }
 
+    /**
+     * Opcode sub-sequence for class property `new` defaults (issue #3391).
+     *
+     * @param list<OpCode> $opCodes
+     */
+    public function fragmentForOpcodes(array $opCodes): Block
+    {
+        $frag = new Block(null);
+        $frag->opCodes = $opCodes;
+        $frag->nOpCodes = count($opCodes);
+        $frag->constants = $this->constants;
+        foreach ($this->scope as $operand) {
+            $frag->scope[$operand] = $this->scope[$operand];
+        }
+
+        return $frag;
+    }
+
     public function getVarSlot(Operand $operand, bool $isRead): int {
-        if (!$this->scope->contains($operand)) {
-            $name = self::resolveVariableName($operand);
-            if (null !== $name) {
-                $existing = $this->slotIndexForVariableName($name);
-                if (null !== $existing) {
+        if ($this->scope->contains($operand)) {
+            if ($isRead && null !== self::resolveVariableName($operand)) {
+                $this->args[$operand] = $this->scope[$operand];
+            }
+
+            return $this->scope[$operand];
+        }
+        $name = self::resolveVariableName($operand);
+        if (null !== $name) {
+            $existing = $this->slotIndexForVariableName($name);
+            if (null !== $existing) {
+                $this->scope[$operand] = $existing;
+                if ($isRead) {
+                    $this->args[$operand] = $existing;
+                }
+
+                return $existing;
+            }
+        }
+        $cfgVar = self::cfgVarRoot($operand);
+        if (null !== $cfgVar) {
+            foreach ($this->scope as $scopedOp) {
+                if (self::cfgVarRoot($scopedOp) === $cfgVar) {
+                    $existing = $this->scope[$scopedOp];
                     $this->scope[$operand] = $existing;
                     if ($isRead) {
                         $this->args[$operand] = $existing;
@@ -200,27 +252,23 @@ class Block {
                     return $existing;
                 }
             }
-            $cfgVar = self::cfgVarRoot($operand);
-            if (null !== $cfgVar) {
-                foreach ($this->scope as $scopedOp) {
-                    if (self::cfgVarRoot($scopedOp) === $cfgVar) {
-                        $existing = $this->scope[$scopedOp];
-                        $this->scope[$operand] = $existing;
-                        if ($isRead) {
-                            $this->args[$operand] = $existing;
-                        }
-
-                        return $existing;
-                    }
-                }
-            }
-            $next = $this->nextScopeSlot();
+        }
+        $next = $this->nextScopeSlot();
             $this->scope[$operand] = $next;
             if ($isRead) {
                 $this->args[$operand] = $next;
             }
-        }
+
         return $this->scope[$operand];
+    }
+
+    /** Bind operand to a fresh slot (?: throw arm must not alias merge phi slot, #3802). */
+    public function forceFreshVarSlot(Operand $operand): int
+    {
+        $slot = $this->nextScopeSlot();
+        $this->scope[$operand] = $slot;
+
+        return $slot;
     }
 
     /** Next unused scope slot (SplObjectStorage::count() can collide after inheritScopeFrom, #1058). */
@@ -238,6 +286,61 @@ class Block {
         $slot = $this->getVarSlot($operand, false);
         $this->constants[$slot] = $const;
         return $slot;
+    }
+
+    /**
+     * Copy cfg Var root slot mappings from a sibling branch (?: / if merge, #3790).
+     */
+    public function inheritCfgVarSlotsFrom(Block $sibling): void
+    {
+        foreach ($sibling->eachCfgVarRootSlot() as [$root, $slot]) {
+            if ($this->scope->contains($root)) {
+                continue;
+            }
+            $this->scope[$root] = $slot;
+            if ($sibling->args->contains($root) || $sibling->isArgSlot($slot)) {
+                $this->args[$root] = $slot;
+            }
+        }
+    }
+
+    /**
+     * @return iterable<array{0: VarOperand, 1: int}>
+     */
+    public function eachCfgVarRootSlot(): iterable
+    {
+        $seenRoots = [];
+        foreach ($this->scope as $operand) {
+            $root = self::cfgVarRoot($operand);
+            if (null === $root) {
+                continue;
+            }
+            $rootId = spl_object_id($root);
+            if (isset($seenRoots[$rootId])) {
+                continue;
+            }
+            $seenRoots[$rootId] = true;
+            yield [$root, $this->scope[$operand]];
+        }
+    }
+
+    /** Pre-bind a cfg Var root before lowering branch assigns (#3790). */
+    public function prebindCfgVarRoot(VarOperand $root, int $slot): void
+    {
+        if (!$this->scope->contains($root)) {
+            $this->scope[$root] = $slot;
+        }
+    }
+
+    private function isArgSlot(int $slot): bool
+    {
+        foreach ($this->args as $op) {
+            if ($this->args[$op] === $slot) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -266,6 +369,12 @@ class Block {
             $this->returnTypeConstraint = $parent->returnTypeConstraint;
             $this->returnTypeVoid = $parent->returnTypeVoid;
             $this->returnTypeNever = $parent->returnTypeNever;
+            $this->returnTypeStatic = $parent->returnTypeStatic;
+            $this->returnDeclaredType = $parent->returnDeclaredType;
+            $this->paramDeclaredTypes = $parent->paramDeclaredTypes;
+            $this->paramTypeConstraints = $parent->paramTypeConstraints;
+            $this->paramIntersectionConstraints = $parent->paramIntersectionConstraints;
+            $this->paramNames = $parent->paramNames;
         }
     }
 
@@ -367,7 +476,41 @@ class Block {
      */
     public function findVariableByRuntimeName(string $name, Frame $frame): ?Variable
     {
-        return self::findVariableInParentFramesByName($name, $frame);
+        $found = self::findVariableInParentFramesByName($name, $frame);
+        if (null !== $found) {
+            return $found;
+        }
+        for ($f = $frame; null !== $f; $f = $f->parent) {
+            if ($f->block === $this && isset($f->dynamicLocals[$name])) {
+                return $f->dynamicLocals[$name];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Create or return a writable local for `$$name = …` when the resolved name has no slot yet (#3801).
+     */
+    public function ensureVariableByRuntimeName(string $name, Frame $frame): Variable
+    {
+        $found = $this->findVariableByRuntimeName($name, $frame);
+        if (null !== $found) {
+            return $found;
+        }
+        $idx = $this->slotIndexForVariableName($name);
+        if (null !== $idx) {
+            if (!isset($frame->scope[$idx])) {
+                $frame->scope[$idx] = new Variable();
+            }
+
+            return $frame->scope[$idx];
+        }
+        if (!isset($frame->dynamicLocals[$name])) {
+            $frame->dynamicLocals[$name] = new Variable();
+        }
+
+        return $frame->dynamicLocals[$name];
     }
 
     /**
@@ -376,7 +519,8 @@ class Block {
     private static function findVariableInParentFrames(Operand $op, Frame $frame): ?Variable
     {
         $name = self::resolveVariableName($op);
-        if (null === $name) {
+        // php-cfg merge temporaries use empty Var names; do not match other "" slots (#3790).
+        if (null === $name || '' === $name) {
             return null;
         }
 
@@ -395,6 +539,9 @@ class Block {
             $idx = $f->block->slotIndexForVariableName($name);
             if (null !== $idx && isset($f->scope[$idx])) {
                 return $f->scope[$idx];
+            }
+            if (isset($f->dynamicLocals[$name])) {
+                return $f->dynamicLocals[$name];
             }
         }
 
@@ -417,7 +564,8 @@ class Block {
         foreach ($this->scope as $op) {
             $pos = $this->scope[$op];
             // php-cfg may register the same slot under multiple Operand keys (#1885).
-            if (isset($scope[$pos])) {
+            // Variable reads in args must still resolve (#3787 merge + literal arm).
+            if (isset($scope[$pos]) && !$this->args->contains($op)) {
                 continue;
             }
             if (null !== $frame && 'this' === self::resolveVariableName($op)) {
@@ -431,19 +579,28 @@ class Block {
                 }
             }
 
-            if (isset($this->constants[$pos])) {
+            if (isset($this->constants[$pos]) && !$this->args->contains($op)) {
                 $scope[$pos] = $this->constants[$pos];
             } elseif (isset($this->closureCaptureSlots[$pos])) {
                 $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
             } elseif ($this->args->contains($op)) {
+                // Callee parameters are filled by TYPE_ARG_RECV; do not inherit caller locals (#3803).
+                if ($this->isArgRecvParameterSlot($pos)) {
+                    $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    continue;
+                }
                 if (is_null($frame)) {
                     $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
                     continue;
                 }
+                // {main} top-level names always live in the global table (#3601, #3787).
+                if (self::usesMainScriptGlobalSlot($op, $this)) {
+                    $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
+                    continue;
+                }
                 $found = false;
-                $parent = $cfgMerge
-                    ? $this->findSlot($op, $frame)
-                    : $frame->block->findSlot($op, $frame);
+                // Resolve reads from the jump parent block, not the merge block's scope (#3787).
+                $parent = $frame->block->findSlot($op, $frame);
                 if (!is_null($parent)) {
                     $scope[$pos] = $parent;
                     $found = true;
@@ -500,7 +657,8 @@ class Block {
                         $local = new Variable(Variable::TYPE_NULL);
                         $local->indirect($context->ensureGlobal($name));
                         $scope[$pos] = $local;
-                    } elseif (null === $frame) {
+                    } elseif (null === $frame || self::usesMainScriptGlobalSlot($op, $this)) {
+                        // {main} locals live in the global table on every CFG block (#3601, #3787).
                         $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
                     } else {
                         $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
@@ -519,6 +677,17 @@ class Block {
         return $return;
     }
 
+    /** Top-level script variable (not superglobal) — always indirect through global table (#3787). */
+    private static function usesMainScriptGlobalSlot(Operand $op, self $block): bool
+    {
+        if (!$block->isMainScript()) {
+            return false;
+        }
+        $name = self::resolveVariableName($op);
+
+        return null !== $name && !Superglobals::isSuperglobalName($name);
+    }
+
     /**
      * Entry-frame locals for {main}: top-level script variables live in the global symbol table (#3601).
      */
@@ -534,6 +703,9 @@ class Block {
             $local->indirect($context->ensureGlobal($name));
             if (isset($block->paramTypeConstraints[$slot])) {
                 $local->resolveIndirect()->typeConstraint = $block->paramTypeConstraints[$slot];
+            }
+            if (isset($block->paramGenericArrayTypeSpecs[$slot])) {
+                $local->resolveIndirect()->genericArrayTypeSpec = $block->paramGenericArrayTypeSpecs[$slot];
             }
 
             return $local;
@@ -561,6 +733,9 @@ class Block {
         $var = new Variable(Variable::TYPE_NULL);
         if (isset($block->paramTypeConstraints[$slot])) {
             $var->typeConstraint = $block->paramTypeConstraints[$slot];
+        }
+        if (isset($block->paramGenericArrayTypeSpecs[$slot])) {
+            $var->genericArrayTypeSpec = $block->paramGenericArrayTypeSpecs[$slot];
         }
 
         return $var;
@@ -593,7 +768,7 @@ class Block {
     /**
      * php-cfg may wrap the same Var in distinct Operand objects (e.g. call result vs return expr).
      */
-    private static function cfgVarRoot(Operand $op): ?VarOperand
+    public static function cfgVarRoot(Operand $op): ?VarOperand
     {
         while ($op instanceof Temporary) {
             if (null === $op->original) {
@@ -603,6 +778,18 @@ class Block {
         }
 
         return $op instanceof VarOperand ? $op : null;
+    }
+
+    /** Scope slot receiving TYPE_ARG_RECV (function parameter, not caller local). */
+    private function isArgRecvParameterSlot(int $slot): bool
+    {
+        foreach ($this->opCodes as $op) {
+            if (OpCode::TYPE_ARG_RECV === $op->type && (int) $op->arg1 === $slot) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function resolveVariableName(Operand $op): ?string
@@ -735,6 +922,80 @@ class Block {
     }
 
     /**
+     * User class implements ArrayAccess and uses $obj[$key] — VM-only until JIT lowering (#3331).
+     */
+    public static function containsArrayAccessObjectOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        $hasArrayAccessClass = false;
+        $hasObjectDimFetch = false;
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (
+                    OpCode::TYPE_DECLARE_CLASS === $op->type
+                    && in_array('arrayaccess', $op->classImplements, true)
+                ) {
+                    $hasArrayAccessClass = true;
+                }
+                if (
+                    in_array($op->type, [OpCode::TYPE_ARRAY_DIM_FETCH, OpCode::TYPE_ARRAY_DIM_FETCH_WRITE], true)
+                    && null !== $op->arg3
+                ) {
+                    $hasObjectDimFetch = true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return $hasArrayAccessClass && $hasObjectDimFetch;
+    }
+
+    public static function containsDynamicStaticPropertyOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (
+                    in_array($op->type, [OpCode::TYPE_STATIC_PROPERTY_FETCH, OpCode::TYPE_STATIC_PROPERTY_UNSET], true)
+                    && null !== $op->arg3
+                    && !isset($block->constants[$op->arg3])
+                ) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * CFG regions that MCJIT must not execute yet; `bin/jit.php` runs the VM instead (#2114, #167).
      * Simple try/catch without `finally` may pass MCJIT when {@see TryCatchJitExecuteTest} is green.
      */
@@ -742,6 +1003,8 @@ class Block {
     {
         return self::containsGeneratorOpcodesInScriptScope($root)
             || self::containsFinallyOpcodes($root)
-            || self::containsExceptionHandlingOpcodes($root);
+            || self::containsExceptionHandlingOpcodes($root)
+            || self::containsArrayAccessObjectOpcodes($root)
+            || self::containsDynamicStaticPropertyOpcodes($root);
     }
 }

@@ -6,6 +6,7 @@ namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
 final class VmEnumBasicTest extends TestCase
@@ -35,7 +36,10 @@ PHP;
         $this->assertSame('string', $ctx->classes['status']->backedType);
         $active = $ctx->classes['status']->constants['active'] ?? null;
         $this->assertNotNull($active);
+        $this->assertSame(Variable::TYPE_OBJECT, $active->type);
         $this->assertSame('active', $active->toString());
+        $this->assertSame('active', $active->toObject()->getProperty('value')->toString());
+        $this->assertSame('Active', $active->toObject()->getProperty('name')->toString());
         $this->assertFalse(VmReflection::classExists($ctx, 'Status'));
     }
 

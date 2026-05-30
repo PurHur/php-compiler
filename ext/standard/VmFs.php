@@ -190,13 +190,20 @@ final class VmFs
         return @copy($from, $to);
     }
 
-    public static function touch(string $path, ?int $mtime = null): bool
+    public static function touch(string $path, ?int $mtime = null, ?int $atime = null): bool
     {
-        if (null === $mtime) {
-            return @touch($path);
+        if (null === $mtime && null === $atime) {
+            $ok = @touch($path);
+        } elseif (null === $atime) {
+            $ok = @touch($path, $mtime);
+        } else {
+            $ok = @touch($path, $mtime, $atime);
+        }
+        if ($ok) {
+            \clearstatcache(true, $path);
         }
 
-        return @touch($path, $mtime);
+        return $ok;
     }
 
     private static function modeToFiletype(int $mode): string

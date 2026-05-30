@@ -30,6 +30,8 @@ final class SelfHostBuiltinPolicyTest extends TestCase
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('abs'));
         $this->assertTrue(SelfHostBuiltinPolicy::isRequiredForBundle('abs'));
         $this->assertSame('numeric', SelfHostBuiltinPolicy::categoryFor('abs'));
+        $this->assertTrue(SelfHostBuiltinPolicy::isRequiredForBundle('hrtime'));
+        $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('hrtime'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('pack'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('copy'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('dirname'));
@@ -70,6 +72,7 @@ final class SelfHostBuiltinPolicyTest extends TestCase
             'ini_get',
             'shell_exec',
             'escapeshellarg',
+            'escapeshellcmd',
             'phpc_run_command',
             'gettype',
             'get_debug_type',

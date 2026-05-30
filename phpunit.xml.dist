@@ -37,6 +37,7 @@
             <file>./test/compliance/ClassConstFetchVMTest.php</file>
             <file>./test/compliance/ClassStaticMethodVMTest.php</file>
             <file>./test/compliance/SplAutoloadRegisterJITTest.php</file>
+            <file>./test/compliance/GethostnameJITTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler Unit Test Suites">
             <directory suffix=".php">./test/unit</directory>

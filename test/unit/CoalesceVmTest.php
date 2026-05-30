@@ -83,6 +83,35 @@ echo "\n";
     }
 
     /** Issue #3462: ($x ?? throw new Ex()) — RHS only when LHS is null. */
+    public function testNullCoalesceNestedInCast(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+$stat = ["mode" => 0644];
+echo (int) ($stat["mode"] ?? 0), "\n";
+echo (int) ($stat["missing"] ?? 0), "\n";
+',
+            "420\n0\n"
+        );
+    }
+
+    /** Issue #3798: chained ?? short-circuits left-to-right (Zend zend_compile.c). */
+    public function testNullCoalesceChain(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+$a = null;
+$b = null;
+echo $a ?? $b ?? "z", "\n";
+
+$c = 0;
+echo $c ?? "zero", "\n";
+echo null ?? "n", "\n";
+',
+            "z\n0\nn\n"
+        );
+    }
+
     public function testNullCoalesceThrow(): void
     {
         $this->assertVmOutput(

@@ -30,16 +30,17 @@ final class str_repeat extends Internal
         }
         $input = $frame->calledArgs[0]->resolveIndirect();
         $mult = $frame->calledArgs[1]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_STRING !== $input->type) {
             throw new \LogicException('str_repeat() input must be a string in this compiler build');
         }
         if (Variable::TYPE_INTEGER !== $mult->type) {
             throw new \LogicException('str_repeat() multiplier must be an integer in this compiler build');
         }
-        $frame->returnVar->string(VmString::repeat($input->toString(), $mult->toInt()));
+        $result = VmString::repeat($input->toString(), $mult->toInt());
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->string($result);
     }
 
     public Context $context;
@@ -53,10 +54,13 @@ final class str_repeat extends Internal
         if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
             throw new \LogicException('str_repeat() multiplier must be an integer in this compiler build');
         }
+        $multiplier = $context->helper->loadValue($args[1]);
+        JitStrRepeat::emitRuntimeTimesGuard($context, $multiplier);
+
         return JitStrRepeat::repeat(
             $context,
             $this->jitString($context, $args[0], 'str_repeat() argument #1'),
-            $context->helper->loadValue($args[1])
+            $multiplier
         );
     }
 }

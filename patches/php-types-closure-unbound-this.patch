@@ -1,0 +1,30 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -31,7 +31,11 @@
+             if (! empty($op->type) && $op->type->type !== Type::TYPE_UNKNOWN) {
+                 $resolved[$op] = $op->type;
+             } elseif ($op instanceof Operand\BoundVariable && $op->scope === Operand\BoundVariable::SCOPE_OBJECT) {
+-                $resolved[$op] = $op->type = Type::fromDecl($op->extra->value);
++                if ($op->extra instanceof Operand\Literal && is_string($op->extra->value) && '' !== $op->extra->value) {
++                    $resolved[$op] = $op->type = Type::fromDecl($op->extra->value);
++                } else {
++                    $resolved[$op] = $op->type = Type::unknown();
++                }
+             } elseif ($op instanceof Operand\Literal) {
+                 $resolved[$op] = $op->type = Type::fromValue($op->value);
+             } else {
+@@ -699,8 +703,11 @@
+             return new Type(Type::TYPE_OBJECT, [], $var->value);
+         }
+         if ($var instanceof Operand\BoundVariable && $var->scope === Operand\BoundVariable::SCOPE_OBJECT) {
+-            assert($var->extra instanceof Operand\Literal);
+-
+-            return Type::fromDecl($var->extra->value);
++            if ($var->extra instanceof Operand\Literal && is_string($var->extra->value) && '' !== $var->extra->value) {
++                return Type::fromDecl($var->extra->value);
++            }
++
++            return Type::unknown();
+         }
+         if ($resolved->contains($var)) {
+             $type = $resolved[$var];

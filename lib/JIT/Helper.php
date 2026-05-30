@@ -974,6 +974,89 @@ restart:
             }
             goto return_bool;
         }
+        if ((Variable::TYPE_HASHTABLE === $leftType || ArrayBuiltinHelper::isNativeArray($leftType))
+            && Variable::TYPE_NATIVE_BOOL === $rightType) {
+            $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
+            $trueVal = $this->context->getTypeFromString('int1')->constInt(1, false);
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                $result = $falseVal;
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                $result = $trueVal;
+                goto return_bool;
+            }
+            if (OpCode::TYPE_EQUAL === $opcode->type) {
+                $result = JitValueCompare::looseEqualArrayToBool(
+                    $this->context,
+                    $left,
+                    $rightValue
+                );
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $same = JitValueCompare::looseEqualArrayToBool(
+                    $this->context,
+                    $left,
+                    $rightValue
+                );
+                $result = $this->context->builder->xor($same, $trueVal);
+                goto return_bool;
+            }
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $leftType
+            && (Variable::TYPE_HASHTABLE === $rightType || ArrayBuiltinHelper::isNativeArray($rightType))) {
+            $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
+            $trueVal = $this->context->getTypeFromString('int1')->constInt(1, false);
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                $result = $falseVal;
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                $result = $trueVal;
+                goto return_bool;
+            }
+            if (OpCode::TYPE_EQUAL === $opcode->type) {
+                $result = JitValueCompare::looseEqualArrayToBool(
+                    $this->context,
+                    $right,
+                    $leftValue
+                );
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $same = JitValueCompare::looseEqualArrayToBool(
+                    $this->context,
+                    $right,
+                    $leftValue
+                );
+                $result = $this->context->builder->xor($same, $trueVal);
+                goto return_bool;
+            }
+        }
+        $leftIsArray = Variable::TYPE_HASHTABLE === $leftType || ArrayBuiltinHelper::isNativeArray($leftType);
+        $rightIsArray = Variable::TYPE_HASHTABLE === $rightType || ArrayBuiltinHelper::isNativeArray($rightType);
+        if ($leftIsArray xor $rightIsArray) {
+            $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
+            $trueVal = $this->context->getTypeFromString('int1')->constInt(1, false);
+            if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                if ($leftIsArray) {
+                    if (Variable::TYPE_NULL === $rightType) {
+                        $same = JitValueCompare::looseEqualArrayToNull($this->context, $left);
+                    } else {
+                        $same = $falseVal;
+                    }
+                } elseif (Variable::TYPE_NULL === $leftType) {
+                    $same = JitValueCompare::looseEqualArrayToNull($this->context, $right);
+                } else {
+                    $same = $falseVal;
+                }
+                $result = OpCode::TYPE_EQUAL === $opcode->type
+                    ? $same
+                    : $this->context->builder->xor($same, $trueVal);
+                goto return_bool;
+            }
+        }
         if (Variable::TYPE_STRING === $leftType && Variable::TYPE_NATIVE_BOOL === $rightType) {
             $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
             if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {

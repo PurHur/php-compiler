@@ -10,7 +10,9 @@
 namespace PHPCompiler\VM;
 
 use PHPTypes\Type;
+use PHPCompiler\GenericArrayTypeSpec;
 use PHPCompiler\OpCode;
+use PHPCompiler\ext\standard\VmString;
 
 final class Variable {
     const TYPE_UNDEFINED = -1;
@@ -26,6 +28,8 @@ final class Variable {
     const TYPE_STRING_OFFSET = 8;
     /** Zend enum case object for E::Case fetches (#3420, #3554). */
     const TYPE_ENUM_CASE = 9;
+    /** Writable ArrayAccess dimension ($obj[$key] assignment, #3331). */
+    const TYPE_ARRAYACCESS_OFFSET = 10;
 
 
     const NUMERIC = self::TYPE_INTEGER | self::TYPE_FLOAT;
@@ -45,12 +49,18 @@ final class Variable {
     private HashTable $array;
     private Variable $stringOffsetParent;
     private int $stringOffsetIndex;
+    private ?ErrorReporter $stringOffsetReporter = null;
+    private ?string $stringOffsetFile = null;
+    private ArrayAccessDimension $arrayAccessDimension;
 
 
     public int $next = -1;
 
     public ?int $typeConstraint = null;
     public ?string $classConstraint = null;
+
+    /** list&lt;T&gt; / array&lt;K,V&gt; shape when declaration used generic array syntax (#3705). */
+    public ?GenericArrayTypeSpec $genericArrayTypeSpec = null;
 
     /** Set for instance properties so readonly-class writes can be enforced (issue #1360). */
     public ?ObjectEntry $objectPropertyOwner = null;
@@ -110,9 +120,31 @@ final class Variable {
     }
 
     public function array(HashTable $ht): void {
-        $this->reset();
+        $this->releaseArrayRef();
+        $this->resetScalars();
         $this->type = self::TYPE_ARRAY;
+        $this->streamResource = false;
         $this->array = $ht;
+    }
+
+    /**
+     * Detach from a shared array HashTable before assignment (Zend zval separation).
+     */
+    public function separateArrayForWrite(): void
+    {
+        if (self::TYPE_INDIRECT === $this->type) {
+            $this->indirect->separateArrayForWrite();
+
+            return;
+        }
+        if (self::TYPE_ARRAY !== $this->type || !isset($this->array)) {
+            return;
+        }
+        if (!$this->array->needsSeparate()) {
+            return;
+        }
+        $this->array->delRef();
+        $this->array = $this->array->duplicate();
     }
 
     public function toArray(): HashTable {
@@ -156,6 +188,10 @@ final class Variable {
     }
 
     public function toInt(?\PHPCompiler\VM $vm = null): int {
+        if (self::TYPE_INDIRECT === $this->type) {
+            return $this->indirect->toInt($vm);
+        }
+        TypedPropertyCheck::assertReadable($this);
         switch ($this->type) {
             case self::TYPE_NULL:
                 return 0;
@@ -168,10 +204,11 @@ final class Variable {
             case self::TYPE_STRING:
                 return (int) $this->string;
             case self::TYPE_OBJECT:
-                return $this->objectToScalarString($vm, 'int')->toInt();
-            case self::TYPE_INDIRECT:
-                return $this->indirect->toInt($vm);
+                return $this->objectToScalarString($vm, 'int')->toInt($vm);
+            case self::TYPE_ARRAYACCESS_OFFSET:
+                return $this->arrayAccessDimension->read()->toInt($vm);
         }
+        throw new \LogicException("Cannot convert type {$this->type} to int");
     }
 
     public function float(float $value): void {
@@ -181,9 +218,13 @@ final class Variable {
     }
 
     public function toFloat(?\PHPCompiler\VM $vm = null): float {
+        if (self::TYPE_INDIRECT === $this->type) {
+            return $this->indirect->toFloat($vm);
+        }
+        TypedPropertyCheck::assertReadable($this);
         switch ($this->type) {
             case self::TYPE_NULL:
-                return 0;
+                return 0.0;
             case self::TYPE_INTEGER:
                 return (float) $this->integer;
             case self::TYPE_FLOAT:
@@ -193,13 +234,16 @@ final class Variable {
             case self::TYPE_STRING:
                 return (float) $this->string;
             case self::TYPE_OBJECT:
-                return $this->objectToScalarString($vm, 'float')->toFloat();
-            case self::TYPE_INDIRECT:
-                return $this->indirect->toFloat($vm);
+                return $this->objectToScalarString($vm, 'float')->toFloat($vm);
         }
+        throw new \LogicException("Cannot convert type {$this->type} to float");
     }
 
     public function toNumeric(?\PHPCompiler\VM $vm = null) {
+        if (self::TYPE_INDIRECT === $this->type) {
+            return $this->indirect->toNumeric($vm);
+        }
+        TypedPropertyCheck::assertReadable($this);
         switch ($this->type) {
             case self::TYPE_NULL:
                 return 0;
@@ -218,11 +262,89 @@ final class Variable {
                 }
                 return (float) $this->string;
             case self::TYPE_OBJECT:
-                return $this->objectToScalarString($vm, 'int')->toNumeric();
-            case self::TYPE_INDIRECT:
-                return $this->indirect->toNumeric($vm);
+                return $this->objectToScalarString($vm, 'int')->toNumeric($vm);
         }
-        throw new \LogicException("Not implemented numeric conversion: $this->type");
+        throw new \TypeError(sprintf(
+            'Unsupported operand types: %s',
+            self::operandZendTypeName($this)
+        ));
+    }
+
+    /** Zend zend_operators.c type name for operand TypeError messages (#3695). */
+    private static function operandZendTypeName(Variable $var): string
+    {
+        switch ($var->type) {
+            case self::TYPE_INTEGER:
+                return 'int';
+            case self::TYPE_FLOAT:
+                return 'float';
+            case self::TYPE_BOOLEAN:
+                return 'bool';
+            case self::TYPE_STRING:
+                return 'string';
+            case self::TYPE_NULL:
+                return 'null';
+            case self::TYPE_ARRAY:
+                return 'array';
+            case self::TYPE_OBJECT:
+            case self::TYPE_ENUM_CASE:
+                return 'object';
+            default:
+                return 'mixed';
+        }
+    }
+
+    private static function numericOpOperatorSymbol(int $opCode): string
+    {
+        switch ($opCode) {
+            case OpCode::TYPE_PLUS:
+                return '+';
+            case OpCode::TYPE_MINUS:
+                return '-';
+            case OpCode::TYPE_MUL:
+                return '*';
+            case OpCode::TYPE_DIV:
+                return '/';
+            case OpCode::TYPE_MODULO:
+                return '%';
+            case OpCode::TYPE_POW:
+                return '**';
+            default:
+                return '?';
+        }
+    }
+
+    private static function throwUnsupportedOperandTypes(int $opCode, Variable $left, Variable $right): void
+    {
+        throw new \TypeError(sprintf(
+            'Unsupported operand types: %s %s %s',
+            self::operandZendTypeName($left),
+            self::numericOpOperatorSymbol($opCode),
+            self::operandZendTypeName($right)
+        ));
+    }
+
+    private static function operandsValidForNumericOp(Variable $left, Variable $right): bool
+    {
+        if (self::TYPE_ARRAY === $left->type || self::TYPE_ARRAY === $right->type) {
+            return false;
+        }
+        if (self::TYPE_STRING === $left->type && !is_numeric($left->string)) {
+            return false;
+        }
+        if (self::TYPE_STRING === $right->type && !is_numeric($right->string)) {
+            return false;
+        }
+        if (self::TYPE_STRING_OFFSET === $left->type
+            || self::TYPE_STRING_OFFSET === $right->type
+            || self::TYPE_UNDEFINED === $left->type
+            || self::TYPE_UNDEFINED === $right->type
+            || self::TYPE_ENUM_CASE === $left->type
+            || self::TYPE_ENUM_CASE === $right->type) {
+            return false;
+        }
+
+        return true;
     }
 
 
@@ -238,13 +360,17 @@ final class Variable {
     }
 
     public function toBool(?\PHPCompiler\VM $vm = null): bool {
+        if (self::TYPE_INDIRECT === $this->type) {
+            return $this->indirect->toBool($vm);
+        }
+        TypedPropertyCheck::assertReadable($this);
         switch ($this->type) {
             case self::TYPE_NULL:
                 return false;
             case self::TYPE_INTEGER:
                 return 0 !== $this->integer;
             case self::TYPE_FLOAT:
-                return 0 !== $this->float;
+                return 0.0 !== $this->float;
             case self::TYPE_BOOLEAN:
                 return $this->bool;
             case self::TYPE_STRING:
@@ -258,10 +384,9 @@ final class Variable {
                     return true;
                 }
 
-                return $this->objectToScalarString($vm, 'bool')->toBool();
-            case self::TYPE_INDIRECT:
-                return $this->indirect->toBool($vm);
+                return $this->objectToScalarString($vm, 'bool')->toBool($vm);
         }
+        throw new \LogicException("Cannot convert type {$this->type} to bool");
     }
 
     public function string(string $value): void {
@@ -272,6 +397,7 @@ final class Variable {
 
     public function toString(): string {
         $var = $this->resolveIndirect();
+        TypedPropertyCheck::assertReadable($var);
         switch ($var->type) {
             case self::TYPE_STRING:
                 return $var->string;
@@ -283,6 +409,8 @@ final class Variable {
                 return $var->bool ? '1' : '';
             case self::TYPE_STRING_OFFSET:
                 return $var->readStringOffset();
+            case self::TYPE_ARRAYACCESS_OFFSET:
+                return $var->arrayAccessDimension->read()->toString();
             case self::TYPE_NULL:
             case self::TYPE_UNDEFINED:
                 return '';
@@ -290,6 +418,14 @@ final class Variable {
                 // todo: raise notice
                 return 'Array';
             case self::TYPE_OBJECT:
+                if (EnumCaseSupport::isEnumCase($var->object)) {
+                    return EnumCaseSupport::toString($var->object);
+                }
+                $typeString = ReflectionTypeSupport::tryObjectTypeString($var->object);
+                if (null !== $typeString) {
+                    return $typeString;
+                }
+
                 return 'Object';
             case self::TYPE_ENUM_CASE:
                 if (null !== $var->enumCase->enumClass->backedType) {
@@ -326,11 +462,12 @@ final class Variable {
     }
 
     public function toObject(): ObjectEntry {
-        switch ($this->type) {
-            case self::TYPE_OBJECT:
-                return $this->object;
-            case self::TYPE_INDIRECT:
-                return $this->indirect->toObject();
+        if (self::TYPE_INDIRECT === $this->type) {
+            return $this->indirect->toObject();
+        }
+        TypedPropertyCheck::assertReadable($this);
+        if (self::TYPE_OBJECT === $this->type) {
+            return $this->object;
         }
         throw new \LogicException("Cannot convert $this->type to Object");
     }
@@ -342,8 +479,22 @@ final class Variable {
     }
 
     public function reset(): void {
+        $this->releaseArrayRef();
+        $this->resetScalars();
         $this->type = self::TYPE_NULL;
         $this->streamResource = false;
+    }
+
+    private function releaseArrayRef(): void
+    {
+        if (self::TYPE_ARRAY === $this->type && isset($this->array)) {
+            $this->array->delRef();
+            unset($this->array);
+        }
+    }
+
+    private function resetScalars(): void
+    {
         unset($this->string);
         unset($this->integer);
         unset($this->float);
@@ -353,14 +504,45 @@ final class Variable {
         unset($this->indirect);
         unset($this->stringOffsetParent);
         unset($this->stringOffsetIndex);
+        unset($this->stringOffsetReporter);
+        unset($this->stringOffsetFile);
+        unset($this->arrayAccessDimension);
     }
 
-    public function stringOffset(Variable $parent, int $index): void
+    public function arrayAccessDimension(ArrayAccessDimension $dimension): void
     {
+        $this->reset();
+        $this->type = self::TYPE_ARRAYACCESS_OFFSET;
+        $this->arrayAccessDimension = $dimension;
+    }
+
+    public function isArrayAccessOffset(): bool
+    {
+        return self::TYPE_ARRAYACCESS_OFFSET === $this->type;
+    }
+
+    /** Value from offsetGet for nested read ($obj[$k][$j]) without indirect write (#3446). */
+    public function readArrayAccessOffsetValue(): self
+    {
+        if (self::TYPE_ARRAYACCESS_OFFSET !== $this->type) {
+            throw new \LogicException('Not an ArrayAccess offset');
+        }
+
+        return $this->arrayAccessDimension->read()->resolveIndirect();
+    }
+
+    public function stringOffset(
+        Variable $parent,
+        int $index,
+        ?ErrorReporter $reporter = null,
+        ?string $file = null
+    ): void {
         $this->reset();
         $this->type = self::TYPE_STRING_OFFSET;
         $this->stringOffsetParent = $parent;
         $this->stringOffsetIndex = $index;
+        $this->stringOffsetReporter = $reporter;
+        $this->stringOffsetFile = $file;
     }
 
     public function castFrom(int $type, self $var, ?\PHPCompiler\VM $vm = null) {
@@ -414,8 +596,14 @@ final class Variable {
             // destroy the indirection
             $var = $var->indirect;
         }
+        TypedPropertyCheck::assertReadable($var);
         if ($this->type === self::TYPE_STRING_OFFSET) {
             $this->writeStringOffset($var);
+
+            return;
+        }
+        if ($this->type === self::TYPE_ARRAYACCESS_OFFSET) {
+            $this->arrayAccessDimension->write($var);
 
             return;
         }
@@ -449,12 +637,42 @@ final class Variable {
                 ));
                 break;
             case self::TYPE_ARRAY:
-                $this->array($var->array);
+                if (self::TYPE_ARRAY === $this->type && isset($this->array) && $this->array === $var->array) {
+                    break;
+                }
+                $this->releaseArrayRef();
+                $this->resetScalars();
+                $var->array->addRef();
+                $this->type = self::TYPE_ARRAY;
+                $this->streamResource = false;
+                $this->array = $var->array;
                 break;
             default:
                 var_dump($var);
                 throw new \LogicException("Unsupported type copy: {$var->type}");
         }
+    }
+
+    /**
+     * Deep copy used when duplicating array storage (COW separation, zend_array_dup).
+     */
+    public function duplicateFrom(self $var): void
+    {
+        if (self::TYPE_INDIRECT === $this->type) {
+            $this->indirect->duplicateFrom($var);
+
+            return;
+        }
+        while (self::TYPE_INDIRECT === $var->type) {
+            $var = $var->indirect;
+        }
+        TypedPropertyCheck::assertReadable($var);
+        if (self::TYPE_ARRAY === $var->type) {
+            $this->array($var->array->duplicate());
+
+            return;
+        }
+        $this->copyFrom($var);
     }
 
     public function identicalTo(Variable $other): bool {
@@ -465,6 +683,9 @@ final class Variable {
         }
         if (self::TYPE_OBJECT === $self->type) {
             return $self->object === $other->object;
+        }
+        if (self::TYPE_STRING === $self->type) {
+            return $self->string === $other->string;
         }
 
         return $self->equals($other);
@@ -479,8 +700,6 @@ restart:
                 return $self->integer === $other->integer;
             case TYPE_PAIR_FLOAT_FLOAT:
                 return $self->float === $other->float;
-            case TYPE_PAIR_STRING_STRING:
-                return $self->string === $other->string;
             case TYPE_PAIR_OBJECT_OBJECT:
                 return $self->object->looseEquals($other->object);
             case TYPE_PAIR_BOOLEAN_BOOLEAN:
@@ -504,6 +723,21 @@ restart:
         throw new \LogicException("Equals comparison between {$self->type} and {$other->type} not implemented");
     }
 
+    /**
+     * Zend compare_function: non-numeric strings compare as 0 against numbers (zend_operators.c).
+     */
+    private static function looseNumericFromString(string $s): int|float
+    {
+        if (!is_numeric($s)) {
+            return 0;
+        }
+        if (((string) (int) $s) === $s) {
+            return (int) $s;
+        }
+
+        return (float) $s;
+    }
+
     private function looseEqual(Variable $self, Variable $other): bool {
         if ($self->type === self::TYPE_NULL) {
             switch ($other->type) {
@@ -517,6 +751,8 @@ restart:
                     return '' === $other->string;
                 case self::TYPE_FLOAT:
                     return 0.0 === $other->float;
+                case self::TYPE_ARRAY:
+                    return 0 === $other->toArray()->getNumElements();
                 default:
                     return false;
             }
@@ -531,10 +767,24 @@ restart:
             return ($self->integer !== 0) === $other->bool;
         }
         if ($self->type === self::TYPE_STRING && $other->type === self::TYPE_INTEGER) {
-            return is_numeric($self->string) && (int) $self->string == $other->integer;
+            if ('' === $self->string) {
+                return false;
+            }
+
+            return $other->integer == self::looseNumericFromString($self->string);
         }
         if ($self->type === self::TYPE_INTEGER && $other->type === self::TYPE_STRING) {
-            return is_numeric($other->string) && $self->integer == (int) $other->string;
+            if ('' === $other->string) {
+                return false;
+            }
+
+            return $self->integer == self::looseNumericFromString($other->string);
+        }
+        if ($self->type === self::TYPE_STRING && $other->type === self::TYPE_FLOAT) {
+            return $other->float == self::looseNumericFromString($self->string);
+        }
+        if ($self->type === self::TYPE_FLOAT && $other->type === self::TYPE_STRING) {
+            return $self->float == self::looseNumericFromString($other->string);
         }
         if ($self->type === self::TYPE_STRING && $other->type === self::TYPE_BOOLEAN) {
             return $self->toBool() === $other->bool;
@@ -542,9 +792,28 @@ restart:
         if ($self->type === self::TYPE_BOOLEAN && $other->type === self::TYPE_STRING) {
             return $other->toBool() === $self->bool;
         }
+        if ($self->type === self::TYPE_STRING && $other->type === self::TYPE_STRING) {
+            if (is_numeric($self->string) && is_numeric($other->string)) {
+                return self::looseNumericFromString($self->string) == self::looseNumericFromString($other->string);
+            }
+
+            return $self->string == $other->string;
+        }
+        if ($self->type === self::TYPE_ARRAY && $other->type === self::TYPE_BOOLEAN) {
+            return ($self->toArray()->getNumElements() === 0) !== $other->bool;
+        }
+        if ($other->type === self::TYPE_ARRAY && $self->type === self::TYPE_BOOLEAN) {
+            return ($other->toArray()->getNumElements() === 0) !== $self->bool;
+        }
+        if ($self->type === self::TYPE_ARRAY && $other->type === self::TYPE_ARRAY) {
+            return $self->toArray()->compareLooseEqual($other->toArray());
+        }
+        if ($self->type === self::TYPE_ARRAY || $other->type === self::TYPE_ARRAY) {
+            return false;
+        }
         try {
             return $self->toNumeric() == $other->toNumeric();
-        } catch (\LogicException) {
+        } catch (\LogicException|\TypeError) {
             return false;
         }
     }
@@ -654,6 +923,20 @@ restart:
         }
     }
 
+    /** Alias for {@see compareSpaceship()} used by ObjectEntry property walks (#3691). */
+    public static function compareSpaceship(Variable $left, Variable $right): int
+    {
+        return self::spaceshipCompare($left, $right);
+    }
+
+    public static function spaceshipCompare(Variable $left, Variable $right): int
+    {
+        $result = new self();
+        $result->spaceshipOp($left, $right);
+
+        return $result->integer;
+    }
+
     public function spaceshipOp(Variable $left, Variable $right): void {
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();
@@ -688,7 +971,11 @@ restart:
                 $this->int(0);
                 break;
             case TYPE_PAIR_OBJECT_OBJECT:
-                self::throwObjectNumericCompareError($left);
+                $this->int($left->object->compareSpaceship($right->object));
+                break;
+            case TYPE_PAIR_ARRAY_ARRAY:
+                $this->int($left->array->compareSpaceship($right->array));
+                break;
             default:
                 if ($left->type === self::TYPE_INDIRECT) {
                     $left = $left->indirect;
@@ -775,6 +1062,20 @@ restart:
         }
         $left = $left->resolveIndirect();
         $right = $right->resolveIndirect();
+        if (OpCode::TYPE_PLUS === $opCode
+            && self::TYPE_ARRAY === $left->type
+            && self::TYPE_ARRAY === $right->type) {
+            if ($this === $left) {
+                $left->array->unionInPlace($right->array);
+            } else {
+                $this->array($left->array->unionCopy($right->array));
+            }
+
+            return;
+        }
+        if (!self::operandsValidForNumericOp($left, $right)) {
+            self::throwUnsupportedOperandTypes($opCode, $left, $right);
+        }
         // In-place ops (e.g. $i++ → PLUS($i,$i,1)) alias $this with an operand (#1228).
         if ($this === $left || $this === $right) {
             $this->storeNumericOp($opCode, $left->toNumeric(), $right->toNumeric());
@@ -813,6 +1114,70 @@ restart:
         }
     }
 
+    /**
+     * ++/-- lowered as Plus/Minus(read, 1) with isIncDec (issue #3469).
+     *
+     * @see Zend/zend_operators.c increment_function() / decrement_function()
+     */
+    public function incDecOp(int $opCode, Variable $left, Variable $right): void
+    {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $result = new self();
+            $result->incDecOp($opCode, $left, $right);
+            $this->indirect->copyFrom($result);
+
+            return;
+        }
+        $left = $left->resolveIndirect();
+        $right = $right->resolveIndirect();
+        $strVar = self::TYPE_STRING === $left->type ? $left : (self::TYPE_STRING === $right->type ? $right : null);
+        if (null !== $strVar) {
+            $this->applyStringIncDec($opCode, $strVar->toString());
+
+            return;
+        }
+        if ($this === $left || $this === $right) {
+            $this->storeNumericOp($opCode, $left->toNumeric(), $right->toNumeric());
+
+            return;
+        }
+        $this->numericOp($opCode, $left, $right);
+    }
+
+    private function applyStringIncDec(int $opCode, string $str): void
+    {
+        if (OpCode::TYPE_PLUS === $opCode) {
+            if (self::isNumericStringForIncDec($str)) {
+                $this->storeNumericStringIncDec($str, 1);
+
+                return;
+            }
+            $this->string(VmString::incrementStringOperator($str));
+
+            return;
+        }
+        if (self::isNumericStringForIncDec($str)) {
+            $this->storeNumericStringIncDec($str, -1);
+
+            return;
+        }
+        $this->string($str);
+    }
+
+    private static function isNumericStringForIncDec(string $str): bool
+    {
+        return '' !== $str && is_numeric($str);
+    }
+
+    private function storeNumericStringIncDec(string $str, int $delta): void
+    {
+        if (str_contains($str, '.') || str_contains(strtolower($str), 'e')) {
+            $this->float((float) $str + $delta);
+        } else {
+            $this->int((int) $str + $delta);
+        }
+    }
+
     private function storeNumericOp(int $opCode, $left, $right): void
     {
         $this->reset();
@@ -844,6 +1209,73 @@ restart:
                 return \pow((float) $left, (float) $right);
             default:
                 throw new \LogicException("Non-implemented numeric binary operation $opCode");
+        }
+    }
+
+    /**
+     * Zend increment_function() on a single value (issue #3552).
+     */
+    public function applyIncrement(): void
+    {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $copy = new self();
+            $copy->copyFrom($this->indirect);
+            $copy->applyIncrement();
+            $this->indirect->copyFrom($copy);
+
+            return;
+        }
+        switch ($this->type) {
+            case self::TYPE_BOOLEAN:
+                return;
+            case self::TYPE_NULL:
+                $this->int(1);
+
+                return;
+            case self::TYPE_INTEGER:
+                ++$this->integer;
+
+                return;
+            case self::TYPE_FLOAT:
+                $this->float += 1;
+
+                return;
+            default:
+                $one = new self();
+                $one->int(1);
+                $this->numericOp(OpCode::TYPE_PLUS, $this, $one);
+        }
+    }
+
+    /**
+     * Zend decrement_function() on a single value (issue #3552).
+     */
+    public function applyDecrement(): void
+    {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $copy = new self();
+            $copy->copyFrom($this->indirect);
+            $copy->applyDecrement();
+            $this->indirect->copyFrom($copy);
+
+            return;
+        }
+        switch ($this->type) {
+            case self::TYPE_BOOLEAN:
+            case self::TYPE_NULL:
+                return;
+            case self::TYPE_INTEGER:
+                --$this->integer;
+
+                return;
+            case self::TYPE_FLOAT:
+                $this->float -= 1;
+
+                return;
+            default:
+                $one = new self();
+                $one->int(1);
+                $this->numericOp(OpCode::TYPE_MINUS, $this, $one);
         }
     }
 
@@ -879,6 +1311,24 @@ restart:
         throw new \LogicException("UnaryOp $opCode not implemented for type $expr->type");
     }
 
+    /**
+     * Zend-style string byte index: negative offsets count from the end (PHP 7.1+).
+     *
+     * @return int|null byte index, or null when out of range (caller emits warning)
+     */
+    private function resolveStringOffsetByteIndex(int $rawIndex, int $len): ?int
+    {
+        $index = $rawIndex;
+        if ($index < 0) {
+            $index += $len;
+        }
+        if ($index < 0 || $index >= $len) {
+            return null;
+        }
+
+        return $index;
+    }
+
     private function readStringOffset(): string
     {
         $parent = $this->stringOffsetParent->resolveIndirect();
@@ -886,8 +1336,19 @@ restart:
             throw new \LogicException('String offset parent is not a string');
         }
         $str = $parent->string;
-        $index = $this->stringOffsetIndex;
-        if ($index < 0 || $index >= strlen($str)) {
+        $rawIndex = $this->stringOffsetIndex;
+        $len = strlen($str);
+        $index = $this->resolveStringOffsetByteIndex($rawIndex, $len);
+        if (null === $index) {
+            if (null !== $this->stringOffsetReporter) {
+                $this->stringOffsetReporter->uninitializedStringOffset(
+                    $rawIndex,
+                    null,
+                    null,
+                    $this->stringOffsetFile
+                );
+            }
+
             return '';
         }
 
@@ -901,12 +1362,22 @@ restart:
             throw new \LogicException('String offset parent is not a string');
         }
         $str = $parent->string;
-        $index = $this->stringOffsetIndex;
-        if ($index < 0) {
-            throw new \LogicException('Illegal string offset');
+        $rawIndex = $this->stringOffsetIndex;
+        $len = strlen($str);
+        $index = $this->resolveStringOffsetByteIndex($rawIndex, $len);
+        if (null === $index) {
+            if (null !== $this->stringOffsetReporter) {
+                $this->stringOffsetReporter->illegalStringOffset(
+                    $rawIndex,
+                    null,
+                    null,
+                    $this->stringOffsetFile
+                );
+            }
+
+            return;
         }
         $byte = self::byteFromAssignValue($value);
-        $len = strlen($str);
         if ($index >= $len) {
             $str .= str_repeat("\0", $index - $len + 1);
         }
@@ -943,6 +1414,7 @@ const TYPE_PAIR_STRING_STRING = 1028;
 const TYPE_PAIR_OBJECT_OBJECT = 1285;
 const TYPE_PAIR_BOOLEAN_BOOLEAN = 771;
 const TYPE_PAIR_NULL_NULL = 0;
+const TYPE_PAIR_ARRAY_ARRAY = 1542;
 
 function type_pair(int $left, int $right): int {
     return $left * 256 + $right;

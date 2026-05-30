@@ -254,6 +254,16 @@ class String_ extends Type {
             $fn___ucwords->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
             $this->context->registerFunction('__string__ucwords', $fn___ucwords);
 
+        $fntype___ucwords_ex = $this->context->context->functionType(
+                $this->context->getTypeFromString('__string__*'),
+                false,
+                $this->context->getTypeFromString('__string__*'),
+                $this->context->getTypeFromString('__string__*')
+            );
+            $fn___ucwords_ex = $this->context->module->addFunction('__string__ucwords_ex', $fntype___ucwords_ex);
+            $fn___ucwords_ex->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
+            $this->context->registerFunction('__string__ucwords_ex', $fn___ucwords_ex);
+
         $fntype___wordwrap = $this->context->context->functionType(
                 $this->context->getTypeFromString('__string__*'),
                 false,

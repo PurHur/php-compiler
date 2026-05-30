@@ -81,7 +81,8 @@ final class natsort_ extends Internal
                     'natsort() only supports homogeneous string or integer values in this compiler build'
                 );
             }
-            $ht->replacePackedValues($values);
+            $array->separateArrayForWrite();
+            $array->resolveIndirect()->toArray()->replacePackedValues($values);
         } else {
             $array->array(VmArray::natsortCopy($ht));
         }

@@ -165,14 +165,16 @@ int __compiler_copy(__string__ *from, __string__ *to)
 
 /**
  * touch() runtime: returns 1 on success, 0 on failure.
- * When mtime is negative, utime(path, NULL) sets both times to now.
+ * mtime/atime < 0 are sentinels: both negative sets both times to now;
+ * atime negative alone copies mtime (or now when mtime is also negative).
  */
-int __compiler_touch(__string__ *path, long long mtime)
+int __compiler_touch(__string__ *path, long long mtime, long long atime)
 {
     const char *p;
     struct stat st;
     struct utimbuf times;
     int fd;
+    time_t now;
 
     if (NULL == path) {
         return 0;
@@ -187,10 +189,17 @@ int __compiler_touch(__string__ *path, long long mtime)
             return 0;
         }
     }
-    if (mtime < 0) {
+    if (mtime < 0 && atime < 0) {
         return utime(p, NULL) == 0 ? 1 : 0;
     }
-    times.actime = (time_t) mtime;
+    now = time(NULL);
+    if (mtime < 0) {
+        mtime = (long long) now;
+    }
+    if (atime < 0) {
+        atime = mtime;
+    }
+    times.actime = (time_t) atime;
     times.modtime = (time_t) mtime;
 
     return utime(p, &times) == 0 ? 1 : 0;
