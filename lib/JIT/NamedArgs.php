@@ -12,9 +12,9 @@ use PHPCfg\Operand;
 final class NamedArgs
 {
     /**
-     * @param list<Variable|array{unpack: Variable}|array{named: string, value: Variable, operand?: Operand|null}> $entries
-     * @param list<Operand|null>                                                                                    $operands parallel to $entries
-     * @param list<string>                                                                                          $paramNames
+     * @param list<Variable|array<string, mixed>> $entries positional Variable, or named/unpack arrays
+     * @param list<Operand|null>                  $operands parallel to $entries
+     * @param list<string>                        $paramNames
      *
      * @return array{0: list<Variable>, 1: list<Operand|null>}
      */
@@ -46,10 +46,10 @@ final class NamedArgs
     }
 
     /**
-     * @param list<Variable|array{unpack: Variable}|array{named: string, value: Variable, operand?: Operand|null}> $entries
-     * @param list<Operand|null>                                                                                    $operands
+     * @param list<Variable|array<string, mixed>> $entries
+     * @param list<Operand|null>                  $operands
      *
-     * @return list<array{kind: string, name?: string, value: Variable, operand: Operand|null}>
+     * @return list<array<string, mixed>>
      */
     private static function normalizeEntries(array $entries, array $operands): array
     {
@@ -81,8 +81,8 @@ final class NamedArgs
     }
 
     /**
-     * @param list<array{kind: string, name?: string, value: Variable, operand: Operand|null}> $entries
-     * @param list<string>                                                                   $paramNames
+     * @param list<array<string, mixed>> $entries
+     * @param list<string>               $paramNames
      *
      * @return array{0: list<Variable>, 1: list<Operand|null>}
      */

@@ -244,7 +244,11 @@ final class VmReflection
         return $ctx->classes[$lc] ?? null;
     }
 
-    /** @return array<string, string> trait name => trait name (Zend class_uses map) */
+    /**
+     * trait name => trait name (Zend class_uses map).
+     *
+     * @return array<string, string>
+     */
     public static function traitUsesMap(ClassEntry $class): array
     {
         return $class->usedTraits;
@@ -261,7 +265,9 @@ final class VmReflection
     }
 
     /**
-     * @return array<string, string> interface name => interface name (Zend class_implements map)
+     * interface name => interface name (Zend class_implements map).
+     *
+     * @return array<string, string>
      */
     public static function classImplementsMap(ClassEntry $entry, Context $ctx): array
     {
