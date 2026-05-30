@@ -29,6 +29,7 @@ use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\DeprecatedMetadata;
 use PHPCompiler\Compiler\FinalClassExtensionCheck;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
+use PHPCompiler\Compiler\TraitCollisionCheck;
 use PHPCompiler\Web\ConstStringFolder;
 use PHPCompiler\Web\IncludePathResolver;
 use PHPCompiler\Web\Superglobals;
@@ -245,6 +246,7 @@ class Compiler {
         $this->seen = null;
 
         InterfaceImplementationCheck::validate($script);
+        TraitCollisionCheck::validate($script);
         FinalClassExtensionCheck::validate($script);
         AbstractMethodVisibilityCheck::validate($script);
 
