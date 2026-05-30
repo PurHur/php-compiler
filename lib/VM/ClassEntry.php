@@ -42,6 +42,8 @@ class ClassEntry {
     public array $methods = [];
     /** @var array<string, int> method name (lowercase) => PHPCfg visibility flags */
     public array $methodVisibility = [];
+    /** @var array<string, string> method name (lowercase) => declared casing (#3118) */
+    public array $methodNames = [];
     /** @var array<string, Variable> constant name (lowercase) => value */
     public array $constants = [];
     /** @var array<string, string> lowercase enum case name => declared case name (#3420) */

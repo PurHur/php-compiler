@@ -408,6 +408,7 @@ class Context {
 
         Builtin\ReflectionNative::registerDeclarations($this);
         Builtin\AttributeRegistry::registerDeclarations($this);
+        Builtin\MethodRegistry::registerDeclarations($this);
 
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();
         $this->functionProxies['phpcompiler\\is_null'] = new Builtin\IsNullFn();

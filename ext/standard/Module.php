@@ -356,6 +356,7 @@ class Module extends ModuleAbstract
             new get_object_vars_(),
             new get_class_(),
             new get_class_vars_(),
+            new get_class_methods_(),
             new get_parent_class_(),
             new is_a_(),
             new is_subclass_of_(),
