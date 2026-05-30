@@ -9,12 +9,34 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 final class JitStrRepeat
 {
+    private const TIMES_ERROR = 'str_repeat(): Argument #2 ($times) must be greater than or equal to 0';
+
+    /**
+     * Runtime guard for negative multiplier (issue #3735; php-src ext/standard/string.c).
+     */
+    public static function emitRuntimeTimesGuard(Context $context, Value $multiplier): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $invalid = $context->builder->icmp(Builder::INT_SLT, $multiplier, $zero);
+        $okBlock = BasicBlockHelper::append($context, 'strrepeat_times_ok');
+        $errBlock = BasicBlockHelper::append($context, 'strrepeat_times_err');
+        $context->builder->branchIf($invalid, $errBlock, $okBlock);
+        $context->builder->positionAtEnd($errBlock);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, self::TIMES_ERROR);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->positionAtEnd($okBlock);
+    }
+
     public static function repeat(Context $context, Value $input, Value $multiplier): Value
     {
         $map = $context->structFieldMap['__string__'];
