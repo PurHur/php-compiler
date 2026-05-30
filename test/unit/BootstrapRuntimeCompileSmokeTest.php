@@ -97,12 +97,13 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('declareRuntimeParseAndCompileNative', $emit);
     }
 
-    public function testCompilePhpPreservesSelfhostAotForRuntimeM3NativeEmitEntry(): void
+    /** Issue #3032: runtime probe links inventory compile_driver only. */
+    public function testCompilePhpPreservesSelfhostAotForRuntimeInventoryEmitDriver(): void
     {
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
         $this->assertStringContainsString('runtime_compile_smoke/compile_driver.php', $compile);
-        $this->assertStringContainsString('PHP_COMPILER_EMIT_HELPER_LINK=1', $compile);
-        $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_TU=1', $compile);
+        $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1', $compile);
+        $this->assertStringNotContainsString('m3_emit_native_entry', $compile);
         $probe = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-runtime-compile-smoke.sh');
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER=1', $probe);
     }
