@@ -271,9 +271,7 @@ function syntaxRowDefinitions(): array
             'construct' => 'By-reference parameters (`function f(&$x)`)',
             'opcodes' => ['TYPE_ARG_RECV', 'TYPE_ARG_SEND'],
             'issue' => 140,
-            'jit' => false,
-            'aot' => false,
-            'notes' => ['VM aliases caller slots via TYPE_INDIRECT; JIT pointer args deferred'],
+            'notes' => ['VM TYPE_INDIRECT; JIT aliases caller __value__* via paramByRef (#3161)'],
             'probe' => 'function inc(&$n) { $n++; } $x = 1; inc($x); echo $x;',
         ],
         [
