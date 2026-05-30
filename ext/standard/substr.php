@@ -59,13 +59,6 @@ final class substr extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('substr() requires two or three arguments');
         }
-        if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-            throw new \LogicException('substr() requires a string and integer offset in this compiler build');
-        }
-        if (3 === $argc && JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-            throw new \LogicException('substr() length must be an integer in this compiler build');
-        }
-
         $str = $this->jitString($context, $args[0], 'substr() argument #1');
         $structName = $str->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
@@ -74,11 +67,11 @@ final class substr extends Internal
         );
         $charPtr = $context->builder->structGep($str, $map['value']);
         $zero = JitStringIndex::zero($context);
-        $offset = $context->helper->loadValue($args[1]);
+        $offset = $this->jitLong($context, $args[1], 'substr() argument #2');
         $start = JitStringIndex::clamp($context, $offset, $zero, $len);
 
         if (3 === $argc) {
-            $lengthArg = $context->helper->loadValue($args[2]);
+            $lengthArg = $this->jitLong($context, $args[2], 'substr() argument #3');
             $negLen = $context->builder->icmp(Builder::INT_SLT, $lengthArg, $zero);
             $remaining = $context->builder->sub($len, $start);
             $maxLen = $context->builder->select($negLen, $zero, $lengthArg);
