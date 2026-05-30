@@ -7394,7 +7394,7 @@ class JIT {
         $readOp = $this->operandAt($block, $op->arg2, 'inc/dec read');
         $writeOp = $this->operandAt($block, $op->arg3, 'inc/dec write');
         $resultOp = $this->operandAt($block, $op->arg1, 'inc/dec result');
-        $read = $this->context->getVariableFromOp($readOp);
+        $read = $this->context->getVariableFromOpInScopes($readOp);
 
         if (Variable::TYPE_NATIVE_BOOL === $read->type) {
             $this->assignOperand($writeOp, $read, true);
@@ -7405,6 +7405,51 @@ class JIT {
 
         if (!$prefix) {
             $this->assignOperand($resultOp, $read, true);
+        }
+
+        if (Variable::TYPE_VALUE === $read->type && Variable::KIND_VARIABLE === $read->kind) {
+            $slot = $read->value;
+            $cur = $this->context->builder->call(
+                $this->context->lookupFunction('__value__readLong'),
+                JIT\JitValueBox::pointer($this->context, $slot)
+            );
+            $one = $cur->typeOf()->constInt(1, false);
+            $newLong = $increment
+                ? $this->context->builder->add($cur, $one)
+                : $this->context->builder->sub($cur, $one);
+            $write = $this->context->getVariableFromOpInScopes($writeOp);
+            JIT\JitValueBox::writeLong($this->context, $write->value, $newLong);
+            if ($prefix) {
+                $newVar = new Variable(
+                    $this->context,
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::KIND_VALUE,
+                    $newLong
+                );
+                $this->assignOperand($resultOp, $newVar, true);
+            }
+
+            return;
+        }
+
+        if (Variable::TYPE_NATIVE_LONG === $read->type && Variable::KIND_VARIABLE === $read->kind) {
+            $cur = $this->context->helper->loadValue($read);
+            $one = $cur->typeOf()->constInt(1, false);
+            $newLong = $increment
+                ? $this->context->builder->add($cur, $one)
+                : $this->context->builder->sub($cur, $one);
+            $newVar = new Variable(
+                $this->context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $newLong
+            );
+            $this->assignOperand($writeOp, $newVar, true);
+            if ($prefix) {
+                $this->assignOperand($resultOp, $newVar, true);
+            }
+
+            return;
         }
 
         $arithOp = new OpCode($increment ? OpCode::TYPE_PLUS : OpCode::TYPE_MINUS);
