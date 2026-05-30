@@ -4859,13 +4859,19 @@ class JIT {
                     $nameOp = $block->getOperand($op->arg3);
                     assert($nameOp instanceof Operand\Literal);
                     if ('class' === strtolower($nameOp->value)) {
-                        $className = $this->resolveClassNameForPseudoConst($block, $classOp);
-                        $lit = new Operand\Literal($className);
-                        $lit->type = Type::string();
-                        $this->assignOperand(
-                            $block->getOperand($op->arg1),
-                            JIT\Variable::fromLiteral($this->context, $lit)
-                        );
+                        if ($classOp instanceof Operand\Literal) {
+                            $className = $this->resolveClassNameForPseudoConst($block, $classOp);
+                            $lit = new Operand\Literal($className);
+                            $lit->type = Type::string();
+                            $this->assignOperand(
+                                $block->getOperand($op->arg1),
+                                JIT\Variable::fromLiteral($this->context, $lit)
+                            );
+                            break;
+                        }
+                        $objectVar = $this->context->getVariableFromOp($classOp);
+                        $classNameVal = JIT\ReflectionBuiltinHelper::getClassName($this->context, $objectVar);
+                        $this->assignOperandValue($block->getOperand($op->arg1), $classNameVal);
                         break;
                     }
                     if ('native_type_map' === strtolower($nameOp->value) || 'type_map' === strtolower($nameOp->value)) {
