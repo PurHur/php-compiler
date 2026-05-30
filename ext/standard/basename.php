@@ -17,8 +17,9 @@ final class basename extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('basename() requires exactly one argument');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('basename() expects 1 or 2 arguments');
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
@@ -27,16 +28,31 @@ final class basename extends Internal
         if (Variable::TYPE_STRING !== $v->type) {
             throw new \LogicException('basename() only supports strings in this compiler build');
         }
-        $frame->returnVar->string(VmString::basename($v->toString()));
+        $suffix = '';
+        if (2 === $argc) {
+            $s = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_STRING !== $s->type) {
+                throw new \LogicException('basename() only supports strings in this compiler build');
+            }
+            $suffix = $s->toString();
+        }
+        $frame->returnVar->string(VmString::basename($v->toString(), $suffix));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('basename() requires exactly one argument');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('basename() expects 1 or 2 arguments');
         }
         $path = JitStringArg::lower($context, $args[0], 'basename() path');
+        $base = JitPath::basename($context, $path);
+        if (2 === $argc) {
+            $suffix = JitStringArg::lower($context, $args[1], 'basename() suffix');
 
-        return JitPath::basename($context, $path);
+            return JitPath::stripSuffixIfPresent($context, $base, $suffix);
+        }
+
+        return $base;
     }
 }
