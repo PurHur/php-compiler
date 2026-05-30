@@ -9,7 +9,7 @@ use PHPCompiler\Func;
 use PHPCompiler\MethodVisibility;
 
 /**
- * Closure::fromCallable / bindTo helpers (issue #3266, Zend zend_closures.c).
+ * Closure::fromCallable / bind / bindTo helpers (issue #3266, #3673, Zend zend_closures.c).
  */
 final class ClosureSupport
 {
