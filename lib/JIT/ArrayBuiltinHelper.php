@@ -1355,7 +1355,7 @@ final class ArrayBuiltinHelper
         $caseUpper = $context->builder->icmp(
             Builder::INT_EQ,
             $case,
-            $i64->constInt(\CASE_UPPER, false)
+            $i64->constInt(\PHPCompiler\ext\standard\StdlibConstants::CASE_UPPER, false)
         );
 
         $nextFree = $context->builder->load($context->builder->structGep($src, $map['nextFreeElement']));
@@ -5133,6 +5133,8 @@ final class ArrayBuiltinHelper
         $bbBool = BasicBlockHelper::append($context, 'entry_match_bool');
         $bbCheckDouble = BasicBlockHelper::append($context, 'entry_match_check_double');
         $bbDouble = BasicBlockHelper::append($context, 'entry_match_double');
+        $bbCheckHashtable = BasicBlockHelper::append($context, 'entry_match_check_hashtable');
+        $bbHashtable = BasicBlockHelper::append($context, 'entry_match_hashtable');
         $bbNull = BasicBlockHelper::append($context, 'entry_match_null');
         $bbDone = BasicBlockHelper::append($context, 'entry_match_done');
 
@@ -5207,7 +5209,7 @@ final class ArrayBuiltinHelper
             $typeByte,
             $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
         );
-        $context->builder->branchIf($isDouble, $bbDouble, $bbNull);
+        $context->builder->branchIf($isDouble, $bbDouble, $bbCheckHashtable);
 
         $context->builder->positionAtEnd($bbDouble);
         $doubleCand = new Variable(
@@ -5218,6 +5220,27 @@ final class ArrayBuiltinHelper
         );
         $context->builder->store(
             self::valuesEqual($context, self::coerceNeedleForCompare($context, $needle, Variable::TYPE_NATIVE_DOUBLE), $doubleCand, $strict),
+            $resultSlot
+        );
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbCheckHashtable);
+        $isHashtable = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isHashtable, $bbHashtable, $bbNull);
+
+        $context->builder->positionAtEnd($bbHashtable);
+        $htCand = new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $context->builder->call($context->lookupFunction('__value__readHashtable'), $entry)
+        );
+        $context->builder->store(
+            self::valuesEqual($context, $needle, $htCand, $strict),
             $resultSlot
         );
         $context->builder->branch($bbDone);
@@ -5296,6 +5319,14 @@ final class ArrayBuiltinHelper
     private static function looseEqual(Context $context, Variable $left, Variable $right): Value
     {
         if ($left->type === $right->type) {
+            if (Variable::TYPE_STRING === $left->type) {
+                return JitValueCompare::looseEqualStringToString(
+                    $context,
+                    $context->helper->loadValue($left),
+                    $context->helper->loadValue($right)
+                );
+            }
+
             return self::sameTypeEqual($context, $left, $right);
         }
         if (Variable::TYPE_NATIVE_LONG === $left->type && Variable::TYPE_NATIVE_DOUBLE === $right->type) {
@@ -5313,6 +5344,30 @@ final class ArrayBuiltinHelper
         }
         if (Variable::TYPE_NATIVE_LONG === $left->type && Variable::TYPE_STRING === $right->type) {
             return self::looseEqualStringLong($context, $right, $left);
+        }
+        if (Variable::TYPE_HASHTABLE === $left->type && Variable::TYPE_NATIVE_BOOL === $right->type) {
+            return JitValueCompare::looseEqualArrayToBool($context, $left, $context->helper->loadValue($right));
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $left->type && Variable::TYPE_HASHTABLE === $right->type) {
+            return JitValueCompare::looseEqualArrayToBool($context, $right, $context->helper->loadValue($left));
+        }
+        if (ArrayBuiltinHelper::isNativeArray($left->type) && Variable::TYPE_NATIVE_BOOL === $right->type) {
+            return JitValueCompare::looseEqualArrayToBool($context, $left, $context->helper->loadValue($right));
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $left->type && ArrayBuiltinHelper::isNativeArray($right->type)) {
+            return JitValueCompare::looseEqualArrayToBool($context, $right, $context->helper->loadValue($left));
+        }
+        if (Variable::TYPE_HASHTABLE === $left->type && Variable::TYPE_NULL === $right->type) {
+            return JitValueCompare::looseEqualArrayToNull($context, $left);
+        }
+        if (Variable::TYPE_NULL === $left->type && Variable::TYPE_HASHTABLE === $right->type) {
+            return JitValueCompare::looseEqualArrayToNull($context, $right);
+        }
+        if (ArrayBuiltinHelper::isNativeArray($left->type) && Variable::TYPE_NULL === $right->type) {
+            return JitValueCompare::looseEqualArrayToNull($context, $left);
+        }
+        if (Variable::TYPE_NULL === $left->type && ArrayBuiltinHelper::isNativeArray($right->type)) {
+            return JitValueCompare::looseEqualArrayToNull($context, $right);
         }
 
         return $context->constantFromBool(false);

@@ -6,4 +6,4 @@ $i = 0;
 echo ++$i, $i, $i++;
 echo "\n";
 --EXPECT--
-112
+111

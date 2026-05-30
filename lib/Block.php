@@ -64,6 +64,9 @@ class Block {
     /** @var array<int, int> scope slot index => Variable::TYPE_* for typed parameters */
     public array $paramTypeConstraints = [];
 
+    /** @var array<int, GenericArrayTypeSpec> generic list/array parameter types (#3705) */
+    public array $paramGenericArrayTypeSpecs = [];
+
     /** @var array<int, list<string>> */
     public array $paramIntersectionConstraints = [];
 
@@ -75,6 +78,9 @@ class Block {
 
     /** Declared `: never` return — any return is rejected (issue #1358). */
     public bool $returnTypeNever = false;
+
+    /** Declared `: static` return — late-bound object type (issue #3412). */
+    public bool $returnTypeStatic = false;
 
     /** Parameter index (0-based, excluding $this) that receives a packed trailing-arg array (#197). */
     public ?int $variadicParamIndex = null;
@@ -142,6 +148,14 @@ class Block {
         }
 
         return '';
+    }
+
+    /** File-level {main} body (not a named function or method). */
+    public function isMainScript(): bool
+    {
+        return null !== $this->func
+            && null === $this->func->class
+            && '{main}' === $this->func->name;
     }
 
     public function getOperand(int $offset): Operand {
@@ -258,6 +272,7 @@ class Block {
             $this->returnTypeConstraint = $parent->returnTypeConstraint;
             $this->returnTypeVoid = $parent->returnTypeVoid;
             $this->returnTypeNever = $parent->returnTypeNever;
+            $this->returnTypeStatic = $parent->returnTypeStatic;
         }
     }
 
@@ -312,6 +327,26 @@ class Block {
         }
 
         return null;
+    }
+
+    /**
+     * @return iterable<array{0: string, 1: int}> variable name and scope slot
+     */
+    public function eachNamedScopeSlot(): iterable
+    {
+        $seen = [];
+        foreach ($this->scope as $operand) {
+            $slot = $this->scope[$operand];
+            if (isset($seen[$slot])) {
+                continue;
+            }
+            $seen[$slot] = true;
+            $name = self::resolveVariableName($operand);
+            if (null === $name) {
+                continue;
+            }
+            yield [$name, $slot];
+        }
     }
 
     public function slotForOperand(Operand $operand): ?int
@@ -409,7 +444,7 @@ class Block {
                 $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
             } elseif ($this->args->contains($op)) {
                 if (is_null($frame)) {
-                    $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
                     continue;
                 }
                 $found = false;
@@ -467,7 +502,16 @@ class Block {
                 ) {
                     $scope[$pos] = $frame->scope[$pos];
                 } else {
-                    $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    $name = self::resolveVariableName($op);
+                    if (null !== $name && $this->declaresGlobalName($name)) {
+                        $local = new Variable(Variable::TYPE_NULL);
+                        $local->indirect($context->ensureGlobal($name));
+                        $scope[$pos] = $local;
+                    } elseif (null === $frame) {
+                        $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
+                    } else {
+                        $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    }
                 }
             }
         }
@@ -480,6 +524,32 @@ class Block {
             $return->returnVar = $frame->returnVar;
         }
         return $return;
+    }
+
+    /**
+     * Entry-frame locals for {main}: top-level script variables live in the global symbol table (#3601).
+     */
+    private static function initialEntryVariable(
+        Operand $op,
+        Context $context,
+        int $slot,
+        self $block
+    ): Variable {
+        $name = self::resolveVariableName($op);
+        if (null !== $name && $block->isMainScript() && !Superglobals::isSuperglobalName($name)) {
+            $local = new Variable(Variable::TYPE_NULL);
+            $local->indirect($context->ensureGlobal($name));
+            if (isset($block->paramTypeConstraints[$slot])) {
+                $local->resolveIndirect()->typeConstraint = $block->paramTypeConstraints[$slot];
+            }
+            if (isset($block->paramGenericArrayTypeSpecs[$slot])) {
+                $local->resolveIndirect()->genericArrayTypeSpec = $block->paramGenericArrayTypeSpecs[$slot];
+            }
+
+            return $local;
+        }
+
+        return self::initialVariableForOperand($op, $context, $slot, $block);
     }
 
     private static function initialVariableForOperand(
@@ -501,6 +571,9 @@ class Block {
         $var = new Variable(Variable::TYPE_NULL);
         if (isset($block->paramTypeConstraints[$slot])) {
             $var->typeConstraint = $block->paramTypeConstraints[$slot];
+        }
+        if (isset($block->paramGenericArrayTypeSpecs[$slot])) {
+            $var->genericArrayTypeSpec = $block->paramGenericArrayTypeSpecs[$slot];
         }
 
         return $var;
@@ -545,7 +618,7 @@ class Block {
         return $op instanceof VarOperand ? $op : null;
     }
 
-    private static function resolveVariableName(Operand $op): ?string
+    public static function resolveVariableName(Operand $op): ?string
     {
         $root = self::cfgVarRoot($op);
         if (null === $root) {
@@ -615,17 +688,25 @@ class Block {
             OpCode::TYPE_TRY,
             OpCode::TYPE_CATCH,
             OpCode::TYPE_FINALLY,
-            OpCode::TYPE_THROW
+            OpCode::TYPE_THROW,
+            OpCode::TYPE_RETHROW
         );
+    }
+
+    /** Script contains `finally` — JIT lowering still VM-fallback until #2114 phase B. */
+    public static function containsFinallyOpcodes(?self $root): bool
+    {
+        return self::containsOpcodeTypes($root, OpCode::TYPE_FINALLY);
     }
 
     /**
      * CFG regions that MCJIT must not execute yet; `bin/jit.php` runs the VM instead (#2114, #167).
-     * JIT IR lowering for simple try/catch may still compile and verify — see TryCatchJitCompileTest.
+     * Simple try/catch without `finally` may pass MCJIT when {@see TryCatchJitExecuteTest} is green.
      */
     public static function requiresVmLowering(?self $root): bool
     {
-        return self::containsExceptionHandlingOpcodes($root)
-            || self::containsGeneratorOpcodes($root);
+        return self::containsGeneratorOpcodes($root)
+            || self::containsFinallyOpcodes($root)
+            || self::containsExceptionHandlingOpcodes($root);
     }
 }

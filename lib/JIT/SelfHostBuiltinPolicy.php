@@ -26,13 +26,16 @@ final class SelfHostBuiltinPolicy
         'is_bool' => 'numeric',
         'is_string' => 'numeric',
         'is_array' => 'numeric',
+        'is_countable' => 'numeric',
         'is_null' => 'numeric',
         'is_numeric' => 'numeric',
         'time' => 'numeric',
         'microtime' => 'numeric',
         'hrtime' => 'numeric',
+        'getdate' => 'numeric',
         'uniqid' => 'numeric',
         'getmypid' => 'numeric',
+        'getrusage' => 'numeric',
         'pi' => 'numeric',
     ];
 
@@ -53,8 +56,9 @@ final class SelfHostBuiltinPolicy
     /** @var array<string, string> */
     private const CATEGORY_OUTPUT = [
         'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_end_flush' => 'output',
-        'ob_get_level' => 'output',
+        'ob_get_level' => 'output', 'flush' => 'output',
         'getallheaders' => 'output', 'header_list' => 'output',
+        'headers_sent' => 'output', 'register_shutdown_function' => 'output',
         'set_error_handler' => 'error', 'restore_error_handler' => 'error',
     ];
 
@@ -74,16 +78,17 @@ final class SelfHostBuiltinPolicy
         'is_writable' => 'filesystem', 'file_get_contents' => 'filesystem', 'file_put_contents' => 'filesystem',
         'filemtime' => 'filesystem', 'fileperms' => 'filesystem', 'filesize' => 'filesystem', 'filetype' => 'filesystem',
         'mkdir' => 'filesystem', 'unlink' => 'filesystem', 'rmdir' => 'filesystem', 'realpath' => 'filesystem',
-        'glob' => 'filesystem', 'scandir' => 'filesystem',
+        'glob' => 'filesystem', 'scandir' => 'filesystem', 'fnmatch' => 'filesystem',
         'fopen' => 'filesystem', 'fread' => 'filesystem', 'fwrite' => 'filesystem', 'fgetc' => 'filesystem', 'fgets' => 'filesystem',
         'fgetcsv' => 'filesystem',
         'fputcsv' => 'filesystem',
-        'ftell' => 'filesystem', 'fseek' => 'filesystem', 'fclose' => 'filesystem',
-        'feof' => 'filesystem', 'fflush' => 'filesystem', 'fpassthru' => 'filesystem',
+        'ftell' => 'filesystem', 'fseek' => 'filesystem', 'fclose' => 'filesystem', 'flock' => 'filesystem',
+        'is_resource' => 'filesystem',
+        'feof' => 'filesystem', 'fflush' => 'filesystem', 'rewind' => 'filesystem', 'fpassthru' => 'filesystem',
         'pathinfo' => 'filesystem', 'readfile' => 'filesystem', 'readlink' => 'filesystem', 'rename' => 'filesystem',
         'is_uploaded_file' => 'filesystem', 'move_uploaded_file' => 'filesystem', 'touch' => 'filesystem',
         'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem', 'tempnam' => 'filesystem',
-        'getcwd' => 'filesystem', 'chdir' => 'filesystem',
+        'getcwd' => 'filesystem', 'chdir' => 'filesystem', 'gethostname' => 'filesystem',
         'stream_context_create' => 'filesystem',
     ];
 
@@ -92,6 +97,7 @@ final class SelfHostBuiltinPolicy
         // Required for AOT linker/toolchain discovery (lib/AOT/Linker.php) and bootstrap M5 path.
         'shell_exec' => 'process',
         'escapeshellarg' => 'process',
+        'escapeshellcmd' => 'process',
         'phpc_run_command' => 'process',
     ];
 
@@ -102,15 +108,18 @@ final class SelfHostBuiltinPolicy
         'chr' => 'string',
         'chunk_split' => 'string',
         'pack' => 'string',
-        'strtolower' => 'string', 'strtoupper' => 'string', 'strcmp' => 'string', 'strncmp' => 'string', 'substr_compare' => 'string',
+        'unpack' => 'string',
+        'strtolower' => 'string', 'strtoupper' => 'string', 'strcmp' => 'string', 'strncmp' => 'string', 'substr_compare' => 'string', 'strtok' => 'string',
         'strcasecmp' => 'string', 'strncasecmp' => 'string', 'strlen' => 'string', 'count' => 'string',
         'sizeof' => 'string', 'gettype' => 'string', 'get_debug_type' => 'string', 'var_export' => 'string',
         'str_replace' => 'string', 'str_ireplace' => 'string', 'strtr' => 'string', 'str_rot13' => 'string',
         'str_increment' => 'string', 'str_decrement' => 'string', 'strval' => 'string',
-        'strip_tags' => 'string', 'sprintf' => 'string', 'chr' => 'string', 'number_format' => 'string',
+        'strip_tags' => 'string',         'sprintf' => 'string', 'chr' => 'string', 'number_format' => 'string',
+        'phpversion' => 'string', 'php_sapi_name' => 'string', 'php_uname' => 'string',
         'soundex' => 'string',
         'base64_encode' => 'string', 'base64_decode' => 'string',
         'htmlspecialchars' => 'string', 'htmlspecialchars_decode' => 'string', 'header' => 'string', 'http_response_code' => 'string',
+        'headers_sent' => 'string', 'register_shutdown_function' => 'string',
         'substr' => 'string', 'trim' => 'string', 'ltrim' => 'string', 'rtrim' => 'string',
         'urlencode' => 'string', 'rawurlencode' => 'string', 'http_build_query' => 'string',
         'parse_str' => 'string',
@@ -131,13 +140,15 @@ final class SelfHostBuiltinPolicy
         'array_replace' => 'array', 'array_sum' => 'array', 'sort' => 'array', 'rsort' => 'array',
         'ksort' => 'array', 'krsort' => 'array', 'asort' => 'array', 'arsort' => 'array',
         'array_multisort' => 'array',
-        'usort' => 'array', 'uasort' => 'array',
+        'usort' => 'array', 'uasort' => 'array', 'uksort' => 'array',
         'compact' => 'array', 'extract' => 'array', 'defined' => 'array', 'define' => 'array',
-        'class_exists' => 'array', 'enum_exists' => 'array', 'function_exists' => 'array', 'method_exists' => 'array',
+        'get_defined_constants' => 'array', 'get_defined_vars' => 'array', 'get_declared_interfaces' => 'array',
+        'class_exists' => 'array', 'enum_exists' => 'array', 'get_declared_enums' => 'array', 'function_exists' => 'array', 'method_exists' => 'array',
         'property_exists' => 'array',
         'get_object_vars' => 'array',
         'get_class' => 'array', 'get_parent_class' => 'array', 'is_a' => 'array', 'is_subclass_of' => 'array',
         'class_implements' => 'array',
+        'assert' => 'array',
         'trigger_error' => 'array',
         'error_get_last' => 'array',
         'error_clear_last' => 'array',
@@ -145,7 +156,7 @@ final class SelfHostBuiltinPolicy
     ];
 
     /** @var array<string, string> */
-    private const CATEGORY_HASH = ['hash' => 'hash', 'hash_hmac' => 'hash', 'md5' => 'hash', 'sha1' => 'hash', 'crc32' => 'hash'];
+    private const CATEGORY_HASH = ['hash' => 'hash', 'hash_hmac' => 'hash', 'md5' => 'hash', 'sha1' => 'hash', 'crc32' => 'hash', 'crc32c' => 'hash'];
 
     /** @var array<string, string> */
     private const CATEGORY_PREG = [
@@ -169,6 +180,7 @@ final class SelfHostBuiltinPolicy
         'json_decode' => 'json',
         'json_validate' => 'json',
         'json_last_error' => 'json',
+        'json_last_error_msg' => 'json',
         'serialize' => 'json',
         'unserialize' => 'json',
     ];

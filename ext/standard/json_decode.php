@@ -27,9 +27,6 @@ final class json_decode extends Internal
         if ($argc < 1) {
             throw new \LogicException('json_decode() requires at least one argument');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         $jsonVar = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_STRING !== $jsonVar->type) {
             throw new \LogicException('json_decode() first argument must be a string in this compiler build');
@@ -49,6 +46,10 @@ final class json_decode extends Internal
             throw new \LogicException('json_decode() requires assoc=true in this compiler build');
         }
         $decoded = \json_decode($jsonVar->toString(), true);
+        VmJson::syncLastErrorFromHost();
+        if (null === $frame->returnVar) {
+            return;
+        }
         if (!\is_array($decoded) && null !== $decoded) {
             $frame->returnVar->copyFrom(VmJson::import($decoded));
 

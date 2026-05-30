@@ -43,4 +43,43 @@ final class AttributeNames
 
         return $names;
     }
+
+    /** True when `#[\AllowDynamicProperties]` is present (#3467). */
+    public static function hasAllowDynamicProperties(array $attributeNames): bool
+    {
+        foreach ($attributeNames as $name) {
+            if ('AllowDynamicProperties' === ltrim($name, '\\')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Zend compile-time duplicate guard (zend_compile.c, zend_is_attribute_repeated) (#3718).
+     *
+     * @param list<string> $names
+     */
+    public static function assertNoDuplicates(array $names): void
+    {
+        $seen = [];
+        foreach ($names as $name) {
+            $key = strtolower(ltrim($name, '\\'));
+            if (isset($seen[$key])) {
+                throw new \CompileError(
+                    'Attribute "'.self::messageName($name).'" must not be repeated'
+                );
+            }
+            $seen[$key] = true;
+        }
+    }
+
+    private static function messageName(string $name): string
+    {
+        $name = ltrim($name, '\\');
+        $pos = strrpos($name, '\\');
+
+        return false !== $pos ? substr($name, $pos + 1) : $name;
+    }
 }

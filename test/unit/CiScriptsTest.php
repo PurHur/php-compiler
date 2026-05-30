@@ -1984,6 +1984,20 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ci_docker_create', $cap);
     }
 
+    /** Tar-fallback must not leak docker create containers (#2708). */
+    public function testDockerExecTarFallbackContainerCleanup(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/docker-exec.sh');
+        $this->assertStringContainsString('_tar_fallback_cleanup', $body);
+        $this->assertStringContainsString('php-compiler.tar-fallback=1', $body);
+        $this->assertStringContainsString('trap _tar_fallback_cleanup EXIT INT TERM', $body);
+        // No sync-back path uses --rm via ci_docker_run (same as docker-ci-local.sh tar mode).
+        $this->assertStringContainsString(
+            "tar -cf - --exclude='.git' --exclude='.llvm' . | ci_docker_run -i -w /compiler",
+            $body
+        );
+    }
+
     public function testLocalCiMatrixDocumentsHarnessDockerRunOpts(): void
     {
         $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
@@ -2026,6 +2040,18 @@ final class CiScriptsTest extends TestCase
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
         $this->assertStringContainsString('JIT_PREFLIGHT_GATE', $body);
+    }
+
+    public function testDockerExecTarFallbackSyncsM5BuildDrivers(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/docker-exec.sh');
+        $this->assertStringContainsString('_docker_exec_m5_sync_back_paths', $body);
+        $this->assertStringContainsString('build/bin-compile-aot-inventory', $body);
+        $this->assertStringContainsString('build/selfhost-lib-spine-smoke', $body);
+        $this->assertStringContainsString('build/selfhost"', $body);
+        $this->assertStringContainsString('bootstrap-selfhost-lib-spine-smoke', $body);
+        $this->assertStringContainsString('bootstrap-selfhost-link', $body);
+        $this->assertStringContainsString('#2963', $body);
     }
 
     public function testCiFastPreparesRuntimeLimits(): void

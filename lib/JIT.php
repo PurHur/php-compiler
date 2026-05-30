@@ -221,6 +221,20 @@ class JIT {
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
 
+    /** User script AOT via bin/compile.php: real closure lowering (#3725). */
+    private function shouldStubClosureLowering(): bool
+    {
+        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        if ('1' === $userScript || 'true' === strtolower((string) $userScript)) {
+            return false;
+        }
+        if ($this->shouldUseVendorPrelinkJitStubs()) {
+            return true;
+        }
+
+        return $this->shouldUseSelfHostJitStubs();
+    }
+
     /** Bundle-only PHP constants (spine smoke defines; bin/compile.php AOT folds false — #2600). */
     /**
      * Fold OpCode::* class constants when php-cfg scopes the class as Type (#2666).
@@ -1073,7 +1087,8 @@ class JIT {
                     $defaultArgs,
                     $variadicArgIndex,
                     $this->paramTypeConstraintsForNativeCall($block),
-                    $this->paramIntersectionConstraintsForNativeCall($block)
+                    $this->paramIntersectionConstraintsForNativeCall($block),
+                    $this->paramByRefForNativeCall($block)
                 );
             }
         }
@@ -2553,6 +2568,9 @@ class JIT {
 
     private function llvmTypeForCfgParam(\PHPCfg\Op\Expr\Param $param): PHPLLVM\Type
     {
+        if ($param->byRef) {
+            return $this->context->getTypeFromString('__value__*');
+        }
         if ($param->variadic) {
             return $this->context->getTypeFromString('__hashtable__*');
         }
@@ -3958,7 +3976,7 @@ class JIT {
         if ($this->shouldUseM3InventoryEmitDriver() && !$this->shouldUseEmitHelperLinkStubs()) {
             // Never scan O(modules×funcs) on inventory argv links (#2967). parse/compileEmitSmoke from
             // Runtime.php; ctor/init* use native M3 via compileBlock / ensureM3EmitTuRuntimeInitSpineSymbols.
-            if (in_array($methodLc, ['parse', 'compileemitsmoke'], true)) {
+            if (in_array($methodLc, ['parse', 'compileemitsmoke', 'peeklastparsefailure', 'noteparsecompilenullforscript'], true)) {
                 unset(
                     $this->context->functions[$lc],
                     $this->context->functionReturnType[$lc],
@@ -4345,6 +4363,7 @@ class JIT {
         $this->context->scope->blockStorage[$block] = $basicBlock;
         $builder = $this->context->builder;
         $builder->positionAtEnd($basicBlock);
+        $this->context->jitCurrentBlock = $block;
         if ([] !== $args) {
             $this->context->implicitThisArgument = null;
         }
@@ -4400,7 +4419,11 @@ class JIT {
                     if (!$this->context->hasVariableOp($param->result)) {
                         $this->context->makeVariableFromOp($func, $basicBlock, $block, $param->result);
                     }
-                    $this->assignOperand($param->result, $args[$argIdx], true);
+                    if (isset($block->paramByRef[$idx])) {
+                        $this->bindJitParamByReference($block, $param->result, $args[$argIdx]);
+                    } else {
+                        $this->assignOperand($param->result, $args[$argIdx], true);
+                    }
                 }
                 $captureSlots = JIT\ClosureHelper::orderedCaptureSlots($block);
                 if ([] !== $captureSlots) {
@@ -4455,7 +4478,15 @@ class JIT {
                     if (!isset($args[$recvSlot])) {
                         throw new \LogicException('Missing required argument ' . $op->arg2);
                     }
-                    $this->assignOperand($block->getOperand($op->arg1), $args[$recvSlot]);
+                    if (isset($block->paramByRef[(int) $op->arg2])) {
+                        $this->bindJitParamByReference(
+                            $block,
+                            $block->getOperand($op->arg1),
+                            $args[$recvSlot]
+                        );
+                    } else {
+                        $this->assignOperand($block->getOperand($op->arg1), $args[$recvSlot]);
+                    }
                     break;
                 case OpCode::TYPE_ASSIGN:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg3));
@@ -4784,6 +4815,7 @@ class JIT {
                         throw new \LogicException('clone requires an object');
                     }
                     $cloned = $this->context->type->object->cloneObject($srcObj);
+                    $this->context->type->object->invokeCloneMagicIfPresent($block, $cloned);
                     $objVar = new JIT\Variable(
                         $this->context,
                         Variable::TYPE_OBJECT,
@@ -4858,13 +4890,19 @@ class JIT {
                     $nameOp = $block->getOperand($op->arg3);
                     assert($nameOp instanceof Operand\Literal);
                     if ('class' === strtolower($nameOp->value)) {
-                        $className = $this->resolveClassNameForPseudoConst($block, $classOp);
-                        $lit = new Operand\Literal($className);
-                        $lit->type = Type::string();
-                        $this->assignOperand(
-                            $block->getOperand($op->arg1),
-                            JIT\Variable::fromLiteral($this->context, $lit)
-                        );
+                        if ($classOp instanceof Operand\Literal) {
+                            $className = $this->resolveClassNameForPseudoConst($block, $classOp);
+                            $lit = new Operand\Literal($className);
+                            $lit->type = Type::string();
+                            $this->assignOperand(
+                                $block->getOperand($op->arg1),
+                                JIT\Variable::fromLiteral($this->context, $lit)
+                            );
+                            break;
+                        }
+                        $objectVar = $this->context->getVariableFromOp($classOp);
+                        $classNameVal = JIT\ReflectionBuiltinHelper::getClassName($this->context, $objectVar);
+                        $this->assignOperandValue($block->getOperand($op->arg1), $classNameVal);
                         break;
                     }
                     if ('native_type_map' === strtolower($nameOp->value) || 'type_map' === strtolower($nameOp->value)) {
@@ -4889,9 +4927,16 @@ class JIT {
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
                 case OpCode::TYPE_INSTANCEOF:
+                    $expr = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $unionEncoded = $op->instanceofUnionTypes;
+                    if (null !== $unionEncoded && '' !== $unionEncoded) {
+                        $types = array_values(array_filter(explode('|', $unionEncoded), static fn (string $t): bool => '' !== $t));
+                        $result = $this->context->type->object->emitInstanceOfUnion($expr, $types);
+                        $this->assignOperand($block->getOperand($op->arg1), $result);
+                        break;
+                    }
                     $classOp = $block->getOperand($op->arg3);
                     assert($classOp instanceof Operand\Literal);
-                    $expr = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $result = $this->context->type->object->emitInstanceOf($expr, $classOp->value);
                     $this->assignOperand($block->getOperand($op->arg1), $result);
                     break;
@@ -5131,6 +5176,18 @@ class JIT {
                     );
                     $this->assignOperandValue($block->getOperand($op->arg1), $powResult);
                     break;
+                case OpCode::TYPE_POST_INC:
+                    $this->compileIncDecOp($block, $op, true, false);
+                    break;
+                case OpCode::TYPE_PRE_INC:
+                    $this->compileIncDecOp($block, $op, true, true);
+                    break;
+                case OpCode::TYPE_POST_DEC:
+                    $this->compileIncDecOp($block, $op, false, false);
+                    break;
+                case OpCode::TYPE_PRE_DEC:
+                    $this->compileIncDecOp($block, $op, false, true);
+                    break;
                 case OpCode::TYPE_MUL:
                 case OpCode::TYPE_PLUS:
                 case OpCode::TYPE_MINUS:
@@ -5273,37 +5330,35 @@ class JIT {
                 case OpCode::TYPE_NULLSAFE:
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
+                    $nullsafeResult = $block->getOperand($op->arg1);
+                    $this->context->coalesceAssignTargets[$nullsafeResult] = true;
                     $receiver = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $valuePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $receiver);
-                    $typeByte = $this->context->builder->load(
-                        $this->context->builder->structGep(
-                            $valuePtr,
-                            $this->context->structFieldMap['__value__']['type']
-                        )
-                    );
-                    $i8 = $this->context->getTypeFromString('int8');
-                    $isNull = $this->context->builder->icmp(
-                        \PHPLLVM\Builder::INT_EQ,
-                        $typeByte,
-                        $i8->constInt(JIT\Variable::TYPE_NULL, false)
-                    );
-                    $nullBb = JIT\NullsafeHelper::compileBranch($this, $func, $op->block1);
-                    $fetchBb = JIT\NullsafeHelper::compileBranch($this, $func, $op->block2);
+                    $isNull = JIT\NullsafeHelper::isReceiverNull($this, $receiver);
+                    // Mirror ?? lowering: branchIf targets entry blocks; merge from branch tails (#3219).
+                    $nullTail = JIT\NullsafeHelper::compileBranch($this, $func, $op->block1);
+                    $fetchTail = JIT\NullsafeHelper::compileBranch($this, $func, $op->block2);
+                    $nullEntry = $this->context->scope->blockStorage[$op->block1];
+                    $fetchEntry = $this->context->scope->blockStorage[$op->block2];
                     $builder->positionAtEnd($branchBlock);
-                    if ($this->shouldFreeDeadVariablesBeforeBranch()) {
-                        $this->context->freeDeadVariables($func, $branchBlock, $block);
-                    }
-                    $builder->branchIf($isNull, $nullBb, $fetchBb);
+                    // Do not free php-cfg "dead" operands here; ?-> temps are used on branch/merge blocks (#3219).
+                    $builder->branchIf($isNull, $nullEntry, $fetchEntry);
                     if (null !== $op->block3) {
                         $mergeBb = JIT\BasicBlockHelper::append($this->context, 'nullsafe_merge');
-                        $builder->positionAtEnd($nullBb);
-                        $builder->branch($mergeBb);
-                        $builder->positionAtEnd($fetchBb);
-                        $builder->branch($mergeBb);
+                        $builder->positionAtEnd($nullTail);
+                        if (null === $nullTail->getTerminator()) {
+                            $builder->branch($mergeBb);
+                        }
+                        $builder->positionAtEnd($fetchTail);
+                        if (null === $fetchTail->getTerminator()) {
+                            $builder->branch($mergeBb);
+                        }
                         $builder->positionAtEnd($mergeBb);
+                        $merged = $this->compileBlockInternal($func, $op->block3, null, $mergeBb, ...$args);
+                        unset($this->context->coalesceAssignTargets[$nullsafeResult]);
 
-                        return $this->compileBlockInternal($func, $op->block3, null, $mergeBb, ...$args);
+                        return $merged;
                     }
+                    unset($this->context->coalesceAssignTargets[$nullsafeResult]);
 
                     return $origBasicBlock;
                 case OpCode::TYPE_JUMPIF:
@@ -5348,6 +5403,7 @@ class JIT {
                     return $origBasicBlock;
                 case OpCode::TYPE_CATCH:
                     if ([] !== $this->context->tryCatch->handlerStack) {
+                        JIT\TryCatchHelper::finishPostTryOpcode($this->context);
                         break;
                     }
                     if (null !== $op->block1) {
@@ -5357,6 +5413,7 @@ class JIT {
                     return $origBasicBlock;
                 case OpCode::TYPE_FINALLY:
                     if ([] !== $this->context->tryCatch->handlerStack) {
+                        JIT\TryCatchHelper::finishPostTryOpcode($this->context);
                         break;
                     }
                     if (null !== $op->block1) {
@@ -5434,7 +5491,7 @@ class JIT {
                     $this->compileBlock($op->block1, $nameOp->value);
                     break;
                 case OpCode::TYPE_CLOSURE:
-                    if ($this->shouldUseSelfHostJitStubs() || null === $op->block1) {
+                    if ($this->shouldStubClosureLowering() || null === $op->block1) {
                         // Bootstrap / vendor prelink: closures are not executable yet; represent as null.
                         $nullVar = new Variable(
                             $this->context,
@@ -5483,6 +5540,7 @@ class JIT {
                         if (null !== $closureCall) {
                             $this->context->scope->toCall = $closureCall;
                             $this->context->scope->args = [];
+                            $this->context->scope->argOperands = [];
                             break;
                         }
                         if (null !== $nameOp->type && Type::TYPE_OBJECT === $nameOp->type->type) {
@@ -5497,6 +5555,7 @@ class JIT {
                             if ($this->shouldUseSelfHostJitStubs()) {
                                 $this->context->scope->toCall = null;
                                 $this->context->scope->args = [];
+                                $this->context->scope->argOperands = [];
                                 break;
                             }
                             $hints = array_values(array_unique(array_merge(
@@ -5517,6 +5576,7 @@ class JIT {
                         }
                     }
                     $this->context->scope->args = [];
+                    $this->context->scope->argOperands = [];
                     break;
                 case OpCode::TYPE_STATICCALL_INIT:
                     $this->initJitStaticCall($block, $op->arg1, $op->arg2);
@@ -5528,8 +5588,10 @@ class JIT {
                     $sendValue = $this->context->getVariableFromOp($block->getOperand($op->arg1));
                     if (null !== $op->arg3) {
                         $this->context->scope->args[] = ['unpack' => $sendValue];
+                        $this->context->scope->argOperands[] = null;
                     } else {
                         $this->context->scope->args[] = $sendValue;
+                        $this->context->scope->argOperands[] = $block->getOperand($op->arg1);
                     }
                     break;
                 case OpCode::TYPE_FUNCCALL_EXEC_NORETURN:
@@ -5542,6 +5604,16 @@ class JIT {
                         $this->context->scope->toCall,
                         $this->finalizeJitCallArgs($this->context->scope->args)
                     );
+                    $callOperands = $this->context->scope->argOperands;
+                    if ($this->context->scope->toCall instanceof JIT\Call\Native) {
+                        $nativeCall = $this->context->scope->toCall;
+                        $callOperands = $this->prependImplicitThisOperandForStaticInstanceCall(
+                            $block,
+                            $nativeCall,
+                            $callOperands
+                        );
+                        $callArgs = $this->adaptByRefCallArgs($nativeCall, $callArgs, $callOperands);
+                    }
                     if (null !== $block->func && '{main}' === $block->func->name) {
                         $toCall = $this->context->scope->toCall;
                         $label = get_class($toCall);
@@ -5576,6 +5648,16 @@ class JIT {
                         $this->context->scope->toCall,
                         $this->finalizeJitCallArgs($this->context->scope->args)
                     );
+                    $callOperands = $this->context->scope->argOperands;
+                    if ($this->context->scope->toCall instanceof JIT\Call\Native) {
+                        $nativeCall = $this->context->scope->toCall;
+                        $callOperands = $this->prependImplicitThisOperandForStaticInstanceCall(
+                            $block,
+                            $nativeCall,
+                            $callOperands
+                        );
+                        $callArgs = $this->adaptByRefCallArgs($nativeCall, $callArgs, $callOperands);
+                    }
                     if (
                         $this->context->scope->toCall instanceof CoreFunc\Internal
                         && 'sprintf' === strtolower($this->context->scope->toCall->getName())
@@ -5622,18 +5704,9 @@ class JIT {
                 case OpCode::TYPE_DECLARE_INTERFACE:
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
-                    if ($this->shouldUseSelfHostJitStubs()) {
-                        $this->context->type->object->declareClass($nameOp);
-                        $this->context->type->object->markInterfaceClass($nameOp->value);
-                        if ([] !== $op->classImplements) {
-                            $this->context->type->object->setInterfaceExtends(
-                                $nameOp->value,
-                                $op->classImplements
-                            );
-                        }
-                        break;
-                    }
-                    $this->context->type->object->declareClass($nameOp);
+                    $this->context->pushScope();
+                    $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
+                    $this->context->scope->className = strtolower($nameOp->value);
                     $this->context->type->object->markInterfaceClass($nameOp->value);
                     if ([] !== $op->classImplements) {
                         $this->context->type->object->setInterfaceExtends(
@@ -5641,6 +5714,14 @@ class JIT {
                             $op->classImplements
                         );
                     }
+                    if (null !== $op->block1) {
+                        $this->compileClass($op->block1, $this->context->scope->classId);
+                    }
+                    $this->context->type->object->inheritInterfaceConstants(
+                        $this->context->scope->classId,
+                        $nameOp->value
+                    );
+                    $this->context->popScope();
                     break;
                 case OpCode::TYPE_DECLARE_TRAIT:
                     $nameOp = $block->getOperand($op->arg1);
@@ -5698,6 +5779,10 @@ class JIT {
                             $this->context->scope->classId,
                             $parentOp->value
                         );
+                        $this->context->type->object->inheritMethodVisibilityFromParent(
+                            $this->context->scope->classId,
+                            $this->context->scope->className
+                        );
                     }
                     if ([] !== $op->classImplements) {
                         $this->context->type->object->setClassInterfaces(
@@ -5705,6 +5790,10 @@ class JIT {
                             $op->classImplements
                         );
                     }
+                    $this->context->type->object->inheritInterfaceConstants(
+                        $this->context->scope->classId,
+                        $nameOp->value
+                    );
                     $this->context->popScope();
                     break;
                 case OpCode::TYPE_NEW:
@@ -5738,6 +5827,7 @@ class JIT {
                         );
                         $resultOp = $block->getOperand($op->arg1);
                         $this->assignOperand($resultOp, $obj, true);
+                        $resultOp->type = new Type(Type::TYPE_OBJECT, [], $resolvedName);
                         if ($classOp instanceof Operand\Literal
                             && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'ReflectionClass')
                         ) {
@@ -5770,22 +5860,36 @@ class JIT {
                     $propName = $name instanceof Operand\Literal ? $name->value : null;
                     $declaringClass = $this->resolvePropertyDeclaringClass($obj, $block, $propName);
                     $receiver = $this->loadPropertyFetchReceiver($obj);
+                    $forceBranchMerge = $this->context->coalesceAssignTargets->contains($result);
                     if ($name instanceof Operand\Literal) {
                         $fetched = $this->context->type->object->propertyFetch(
                             $receiver,
                             $declaringClass,
                             $name->value
                         );
-                        $this->context->scope->variables[$result] = $fetched;
+                        if ($forceBranchMerge) {
+                            $this->assignOperand($result, $fetched, true);
+                        } else {
+                            $this->context->scope->variables[$result] = $fetched;
+                        }
                         $this->applyExternalPropertyResultType($result, $declaringClass, $name->value);
                     } else {
                         $nameVar = $this->context->getVariableFromOp($name);
-                        $this->context->scope->variables[$result] = $this->context->type->object->propertyFetchDynamic(
+                        $fetched = $this->context->type->object->propertyFetchDynamic(
                             $receiver,
                             $declaringClass,
                             $nameVar
                         );
+                        if ($forceBranchMerge) {
+                            $this->assignOperand($result, $fetched, true);
+                        } else {
+                            $this->context->scope->variables[$result] = $fetched;
+                        }
                     }
+                    break;
+                case OpCode::TYPE_BEGIN_SILENCE:
+                case OpCode::TYPE_END_SILENCE:
+                    // VM-only silence today; JIT/AOT ignore (#3546).
                     break;
                 default:
                     throw new \LogicException("Unknown JIT opcode: ". opcode_type_name($op->type));
@@ -5916,6 +6020,12 @@ class JIT {
             if ('__hashtable__*' === $expected && Variable::TYPE_NULL === $return->type) {
                 return $this->context->getTypeFromString('__hashtable__*')->constNull();
             }
+            if ('__hashtable__*' === $expected && Variable::TYPE_HASHTABLE === $return->type) {
+                return $retval;
+            }
+            if ('__hashtable__*' === $expected && 0 !== ($return->type & Variable::IS_NATIVE_ARRAY)) {
+                return JIT\HashTableHelper::materializeNativeArrayForCall($this->context, $return);
+            }
             if ('__string__*' === $expected && Variable::TYPE_VALUE === $return->type) {
                 return $this->context->builder->call(
                     $this->context->lookupFunction('__value__readString'),
@@ -5940,9 +6050,15 @@ class JIT {
         if (Variable::KIND_VALUE === $return->kind) {
             $this->context->builder->store($retval, $valuePtr);
         }
-        if ('long long' === $expected) {
+        if ('long long' === $expected || 'int64' === $expected) {
             return $this->context->builder->call(
                 $this->context->lookupFunction('__value__readLong'),
+                $valuePtr
+            );
+        }
+        if ('double' === $expected) {
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readDouble'),
                 $valuePtr
             );
         }
@@ -6035,6 +6151,8 @@ class JIT {
             case 'long long':
             case 'int64':
                 return $this->context->getTypeFromString('int64')->constInt($longReturn ?? 0, false);
+            case 'double':
+                return $this->context->getTypeFromString('double')->constReal(0.0);
             case 'bool':
             case 'int1':
                 return $this->context->getTypeFromString('bool')->constInt(0, false);
@@ -6259,7 +6377,10 @@ class JIT {
         $type = $this->context->unwrapNullableUnionType($type);
         switch ($type->type) {
             case Type::TYPE_LONG:
-                $callback = 'long long';
+                $callback = 'int64';
+                break;
+            case Type::TYPE_DOUBLE:
+                $callback = 'double';
                 break;
             case Type::TYPE_BOOLEAN:
                 $callback = 'bool';
@@ -6326,7 +6447,9 @@ class JIT {
                 case 'never':
                     return 'void';
                 case 'int':
-                    return 'long long';
+                    return 'int64';
+                case 'float':
+                    return 'double';
                 case 'string':
                     return '__string__*';
                 case 'bool':
@@ -6419,6 +6542,9 @@ class JIT {
                         );
                     }
                     $this->context->type->object->defineProperty($classId, $name->value, $jitType);
+                    if ($op->propertyReadonly) {
+                        $this->context->type->object->markPropertyReadonly($classId, $name->value);
+                    }
                     if (null !== $op->arg2 && isset($block->constants[$op->arg2])) {
                         $this->context->type->object->definePropertyDefault(
                             $classId,
@@ -6436,17 +6562,22 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     $methodLc = strtolower($name->value);
-                    if ([] !== $op->attributeNames && '' !== $this->context->scope->className) {
-                        $attrNames = [];
-                        foreach ($op->attributeNames as $n) {
-                            $attrNames[] = ltrim($n, '\\');
+                    if ([] !== $op->attributeNames) {
+                        $classLc = '' !== $this->context->scope->className
+                            ? strtolower(ltrim($this->context->scope->className, '\\'))
+                            : strtolower(ltrim($this->context->type->object->classNameForId($this->context->scope->classId), '\\'));
+                        if ('' !== $classLc) {
+                            $attrNames = [];
+                            foreach ($op->attributeNames as $n) {
+                                $attrNames[] = ltrim($n, '\\');
+                            }
+                            AttributeRegistry::emitRegisterMethod(
+                                $this->context,
+                                $classLc,
+                                $methodLc,
+                                $attrNames
+                            );
                         }
-                        AttributeRegistry::emitRegisterMethod(
-                            $this->context,
-                            strtolower(ltrim($this->context->scope->className, '\\')),
-                            $methodLc,
-                            $attrNames
-                        );
                     }
                     if (($this->isBundledSuperglobalsClass($classId) || $this->shouldSkipExternalClassBodyLowering($classId))
                         && 'issuperglobalname' !== $methodLc
@@ -6543,13 +6674,49 @@ class JIT {
             return;
         }
         if (null !== $result->valueBoxAliasPtr) {
-            JIT\JitValueBox::copyFromPointer(
-                $this->context,
-                $result->valueBoxAliasPtr,
-                $this->valueBoxPointer($value)
-            );
+            $destPtr = JIT\JitValueBox::normalizeValuePtr($this->context, $result->valueBoxAliasPtr);
+            if (Variable::TYPE_VALUE === $value->type || null !== $value->valueBoxAliasPtr) {
+                JIT\JitValueBox::copyFromPointer(
+                    $this->context,
+                    $result->valueBoxAliasPtr,
+                    $this->valueBoxPointer($value)
+                );
 
-            return;
+                return;
+            }
+            $native = $this->context->helper->loadValue($value);
+            switch ($value->type) {
+                case Variable::TYPE_NATIVE_LONG:
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('__value__writeLong'),
+                        $destPtr,
+                        $native
+                    );
+
+                    return;
+                case Variable::TYPE_NATIVE_BOOL:
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('__value__writeLong'),
+                        $destPtr,
+                        $this->context->builder->zExt($native, $this->context->getTypeFromString('int64'))
+                    );
+
+                    return;
+                case Variable::TYPE_NATIVE_DOUBLE:
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('__value__writeDouble'),
+                        $destPtr,
+                        $native
+                    );
+
+                    return;
+                default:
+                    throw new \LogicException(
+                        'Cannot assign '
+                        . Variable::getStringType($value->type)
+                        . ' through by-reference alias'
+                    );
+            }
         }
         if (
             $force
@@ -6666,7 +6833,7 @@ class JIT {
                             $result->value
                         );
                     }
-                    $this->copyObjectPropertyBacking($result, $value);
+                    $this->maybeCopyObjectPropertyBacking($result, $value, $force);
                     if (null === $result->objectPropertySlot) {
                         $result->addref();
                     }
@@ -6680,7 +6847,7 @@ class JIT {
                 $toStore,
                 $result->value
             );
-            $this->copyObjectPropertyBacking($result, $value);
+            $this->maybeCopyObjectPropertyBacking($result, $value, $force);
             if (null === $result->objectPropertySlot) {
                 $result->addref();
             }
@@ -6752,6 +6919,7 @@ class JIT {
                     , $this->context->helper->loadValue($value)
                     
                 );
+                    $result->compileTimeConstantName = $value->compileTimeConstantName;
     
                     return;
                 case Variable::TYPE_NATIVE_DOUBLE:
@@ -6841,6 +7009,7 @@ class JIT {
                         $valueRef,
                         $objVal
                     );
+                    $result->closureCall = $value->closureCall;
 
                     return;
                 case Variable::TYPE_VALUE:
@@ -6918,7 +7087,7 @@ class JIT {
             );
             $result->free();
             $this->context->builder->store($ht, $result->value);
-            $this->copyObjectPropertyBacking($result, $value);
+            $this->maybeCopyObjectPropertyBacking($result, $value, $force);
             if (null === $result->objectPropertySlot) {
                 $result->addref();
             }
@@ -7271,6 +7440,23 @@ class JIT {
     }
 
     /** Keep borrowed object-property hashtable metadata on locals ($cfg = $this->config, #848). */
+    private function maybeCopyObjectPropertyBacking(Variable $dest, Variable $src, bool $force): void
+    {
+        // Branch-merge assigns (?-> / ??) must read the unified __value__ slot at the merge block (#3219).
+        if ($force) {
+            $dest->objectPropertySlot = null;
+            $dest->objectPropertyType = null;
+            $dest->objectPropertyReceiver = null;
+            $dest->objectPropertyName = null;
+            $dest->objectPropertyClassName = null;
+        } else {
+            $this->copyObjectPropertyBacking($dest, $src);
+        }
+        if (null !== $src->closureCall) {
+            $dest->closureCall = $src->closureCall;
+        }
+    }
+
     private function copyObjectPropertyBacking(Variable $dest, Variable $src): void
     {
         $dest->objectPropertySlot = $src->objectPropertySlot;
@@ -7367,6 +7553,84 @@ class JIT {
                     'Cannot infer JIT variable type from LLVM type: '
                     .$this->context->getStringFromType($value->typeOf())
                 );
+        }
+    }
+
+    private function compileIncDecOp(Block $block, OpCode $op, bool $increment, bool $prefix): void
+    {
+        $this->maybeRefreshIncludeBindingsBeforeUse();
+        $readOp = $this->operandAt($block, $op->arg2, 'inc/dec read');
+        $writeOp = $this->operandAt($block, $op->arg3, 'inc/dec write');
+        $resultOp = $this->operandAt($block, $op->arg1, 'inc/dec result');
+        $read = $this->context->getVariableFromOpInScopes($readOp);
+
+        if (Variable::TYPE_NATIVE_BOOL === $read->type) {
+            $this->assignOperand($writeOp, $read, true);
+            $this->assignOperand($resultOp, $read, true);
+
+            return;
+        }
+
+        if (!$prefix) {
+            $this->assignOperand($resultOp, $read, true);
+        }
+
+        if (Variable::TYPE_VALUE === $read->type && Variable::KIND_VARIABLE === $read->kind) {
+            $slot = $read->value;
+            $cur = $this->context->builder->call(
+                $this->context->lookupFunction('__value__readLong'),
+                JIT\JitValueBox::pointer($this->context, $slot)
+            );
+            $one = $cur->typeOf()->constInt(1, false);
+            $newLong = $increment
+                ? $this->context->builder->add($cur, $one)
+                : $this->context->builder->sub($cur, $one);
+            $write = $this->context->getVariableFromOpInScopes($writeOp);
+            JIT\JitValueBox::writeLong($this->context, $write->value, $newLong);
+            if ($prefix) {
+                $newVar = new Variable(
+                    $this->context,
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::KIND_VALUE,
+                    $newLong
+                );
+                $this->assignOperand($resultOp, $newVar, true);
+            }
+
+            return;
+        }
+
+        if (Variable::TYPE_NATIVE_LONG === $read->type && Variable::KIND_VARIABLE === $read->kind) {
+            $cur = $this->context->helper->loadValue($read);
+            $one = $cur->typeOf()->constInt(1, false);
+            $newLong = $increment
+                ? $this->context->builder->add($cur, $one)
+                : $this->context->builder->sub($cur, $one);
+            $newVar = new Variable(
+                $this->context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $newLong
+            );
+            $this->assignOperand($writeOp, $newVar, true);
+            if ($prefix) {
+                $this->assignOperand($resultOp, $newVar, true);
+            }
+
+            return;
+        }
+
+        $arithOp = new OpCode($increment ? OpCode::TYPE_PLUS : OpCode::TYPE_MINUS);
+        $oneVar = new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $this->context->constantFromInteger(1)
+        );
+        $newVal = $this->context->helper->binaryOp($arithOp, $read, $oneVar);
+        $this->assignOperand($writeOp, $newVal, true);
+        if ($prefix) {
+            $this->assignOperand($resultOp, $newVal, true);
         }
     }
 
@@ -7534,6 +7798,22 @@ class JIT {
         return $classOp->value;
     }
 
+    private function jitIsClassSameOrSubclassOf(string $classLc, string $ancestorLc): bool
+    {
+        $current = strtolower(ltrim($classLc, '\\'));
+        $ancestorLc = strtolower(ltrim($ancestorLc, '\\'));
+        while (true) {
+            if ($current === $ancestorLc) {
+                return true;
+            }
+            $parentLc = $this->context->type->object->parentClassLc($current);
+            if (null === $parentLc) {
+                return false;
+            }
+            $current = $parentLc;
+        }
+    }
+
     private function blockUsesThis(Block $block): bool
     {
         foreach ($block->orig->hoistedOperands as $hoisted) {
@@ -7607,7 +7887,9 @@ class JIT {
             }
         }
 
-        $declaringClassId = $this->context->type->object->lookup($className);
+        $proxyName = $this->resolveJitInstanceMethodProxyName($declaringClassLc, $methodLc);
+        $resolvedClassLc = strstr($proxyName, '::', true) ?: $declaringClassLc;
+        $declaringClassId = $this->context->type->object->lookup($resolvedClassLc);
         $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
         $callerClassLc = null;
         if (null !== $block->func && null !== $block->func->class) {
@@ -7618,13 +7900,36 @@ class JIT {
         MethodVisibility::assertCallable(
             $visFlags,
             $callerClassLc,
-            $declaringClassLc,
+            $resolvedClassLc,
             $className,
             $methodName
         );
-        $proxyName = $declaringClassLc.'::'.$methodLc;
         $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
         $this->context->scope->args = [$this->context->getVariableFromOp($receiverOp)];
+    }
+
+    /**
+     * Resolve lowered instance method proxy, walking extends chain (#101, Zend zend_inheritance).
+     */
+    private function resolveJitInstanceMethodProxyName(string $classLc, string $methodLc): string
+    {
+        $methodLc = strtolower($methodLc);
+        $visited = [];
+        $current = strtolower(ltrim($classLc, '\\'));
+        while (!isset($visited[$current])) {
+            $visited[$current] = true;
+            $proxy = $current.'::'.$methodLc;
+            if ($this->context->functionIsRegistered($proxy)) {
+                return $proxy;
+            }
+            $parent = $this->context->type->object->parentClassLc($current);
+            if (null === $parent) {
+                break;
+            }
+            $current = $parent;
+        }
+
+        return strtolower(ltrim($classLc, '\\')).'::'.$methodLc;
     }
 
     private function initJitStaticCall(Block $block, int $classOpIdx, int $nameOpIdx): void
@@ -7646,12 +7951,26 @@ class JIT {
         } elseif ($this->context->scope->className !== '') {
             $callerClassLc = $this->context->scope->className;
         }
+        $parentScopeAllows = false;
+        if (null !== $callerClassLc) {
+            $directParentLc = $this->context->type->object->parentClassLc($callerClassLc);
+            if (null !== $directParentLc && $directParentLc === $declaringClassLc) {
+                $parentScopeAllows = MethodVisibility::parentScopeAllows(
+                    $visFlags,
+                    $callerClassLc,
+                    $declaringClassLc,
+                    $declaringClassLc,
+                    fn (string $classLc, string $ancestorLc): bool => $this->jitIsClassSameOrSubclassOf($classLc, $ancestorLc)
+                );
+            }
+        }
         MethodVisibility::assertCallable(
             $visFlags,
             $callerClassLc,
             $declaringClassLc,
             $className,
-            $nameOp->value
+            $nameOp->value,
+            $parentScopeAllows
         );
         $proxyName = $declaringClassLc.'::'.$methodLc;
         if (!$this->context->functionIsRegistered($proxyName)) {
@@ -7752,6 +8071,41 @@ class JIT {
         return $args;
     }
 
+    /**
+     * @param list<Variable|array{unpack: Variable}> $args
+     * @param list<Operand|null> $operands
+     *
+     * @return list<Operand|null>
+     */
+    private function prependImplicitThisOperandForStaticInstanceCall(
+        Block $block,
+        JIT\Call\Native $toCall,
+        array $operands
+    ): array {
+        if ([] === $toCall->argTypes) {
+            return $operands;
+        }
+        if ('__object__*' !== $this->context->getStringFromType($toCall->argTypes[0])) {
+            return $operands;
+        }
+        if (\count($operands) >= \count($toCall->argTypes)) {
+            return $operands;
+        }
+        if (null === $block->func || null === $block->func->cfg) {
+            return $operands;
+        }
+        if (($block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) {
+            return $operands;
+        }
+        if (null === $this->resolveThisVariable($block)) {
+            return $operands;
+        }
+
+        array_unshift($operands, null);
+
+        return $operands;
+    }
+
     private function resolveThisVariable(Block $block): ?Variable
     {
         if (null === $block->func || null === $block->func->cfg) {
@@ -7813,6 +8167,116 @@ class JIT {
         }
 
         return $constraints;
+    }
+
+    /**
+     * @return array<int, true> LLVM argument index => by-reference formal (issue #3161, #140)
+     */
+    private function paramByRefForNativeCall(Block $block): array
+    {
+        $refs = [];
+        $offset = $this->instanceMethodUsesThis($block) ? 1 : 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARG_RECV !== $op->type) {
+                continue;
+            }
+            if (!isset($block->paramByRef[(int) $op->arg2])) {
+                continue;
+            }
+            $refs[(int) $op->arg2 + $offset] = true;
+        }
+
+        return $refs;
+    }
+
+    private function bindJitParamByReference(
+        Block $block,
+        Operand $paramOperand,
+        Variable $callerArg
+    ): void {
+        if (!$this->context->hasVariableOp($paramOperand)) {
+            throw new \LogicException('By-reference parameter requires a bound operand');
+        }
+        $paramVar = $this->context->getVariableFromOp($paramOperand);
+        JIT\ClosureHelper::bindCaptureSlotByReference($this->context, $paramVar, $callerArg);
+        $this->context->setVariableOp($paramOperand, $paramVar);
+    }
+
+    /**
+     * @param list<Variable> $args
+     * @param list<Operand> $operands
+     *
+     * @return list<Variable>
+     */
+    private function adaptByRefCallArgs(JIT\Call\Native $call, array $args, array $operands): array
+    {
+        if ([] === $call->paramByRefByArg) {
+            return $args;
+        }
+        foreach ($call->paramByRefByArg as $idx => $_) {
+            if (!isset($args[$idx])) {
+                continue;
+            }
+            $operand = $operands[$idx] ?? null;
+            if (null === $operand) {
+                continue;
+            }
+            $args[$idx] = $this->ensureValueBoxLvalueForByRefPass($operand, $args[$idx]);
+        }
+
+        return $args;
+    }
+
+    private function ensureValueBoxLvalueForByRefPass(Operand $op, Variable $var): Variable
+    {
+        if (Variable::TYPE_VALUE === $var->type || null !== $var->valueBoxAliasPtr) {
+            return JIT\ClosureHelper::referenceCapture($var);
+        }
+        $slot = JIT\JitValueBox::alloc($this->context);
+        $native = $this->context->helper->loadValue($var);
+        switch ($var->type) {
+            case Variable::TYPE_NATIVE_LONG:
+                JIT\JitValueBox::writeLong($this->context, $slot, $native);
+                break;
+            case Variable::TYPE_NATIVE_BOOL:
+                JIT\JitValueBox::writeLong(
+                    $this->context,
+                    $slot,
+                    $this->context->builder->zExt($native, $this->context->getTypeFromString('int64'))
+                );
+                break;
+            case Variable::TYPE_NATIVE_DOUBLE:
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeDouble'),
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $native
+                );
+                break;
+            case Variable::TYPE_STRING:
+                $owned = $this->context->builder->call(
+                    $this->context->lookupFunction('__string__separate'),
+                    $native
+                );
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeString'),
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $owned
+                );
+                break;
+            default:
+                throw new \LogicException(
+                    'By-reference call argument requires a boxed lvalue, got '
+                    . Variable::getStringType($var->type)
+                );
+        }
+        $boxed = new Variable($this->context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+        $this->context->setVariableOp($op, $boxed);
+        $name = JIT\OperandName::resolve($op);
+        if (null !== $name) {
+            $this->context->bindVariableByName($name, $boxed);
+        }
+
+        return JIT\ClosureHelper::referenceCapture($boxed);
     }
 
     private function collectParamDefaults(Block $block): array {

@@ -22,10 +22,12 @@ use PhpParser\ParserFactory;
 use PHPTypes\State;
 use PHPCompiler\VM\Optimizer;
 use PHPCompiler\VM\Context as VMContext;
+use PHPCompiler\VM\ObjectRegistry;
 use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\Ast\GroupUseStripper;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Lint\LintCompiler;
+use PHPCompiler\VM\ShutdownQueue;
 
 class Runtime {
     const MODE_NORMAL   = 0b0001;
@@ -35,6 +37,7 @@ class Runtime {
     public Parser $parser;
     public Traverser $preprocessor;
     public Traverser $postprocessor;
+    private Ast\AbstractEnumMarker $abstractEnumMarker;
     public CfgLivenessDetector $detector;
     public Optimizer $assignOpResolver;
     public VMContext $vmContext;
@@ -51,6 +54,7 @@ class Runtime {
     private static ?string $lastParseFailure = null;
 
     public function __construct(int $mode = self::MODE_NORMAL) {
+        ObjectRegistry::reset();
         self::clearLastParseFailure();
         $this->mode = $mode;
         $this->initParsePipeline();
@@ -66,6 +70,8 @@ class Runtime {
             new NodeVisitor\NameResolver
         );
         $astTraverser->addVisitor(new GroupUseStripper());
+        $this->abstractEnumMarker = new Ast\AbstractEnumMarker();
+        $astTraverser->addVisitor($this->abstractEnumMarker);
         $this->parser = new Parser(
             (new ParserFactory)->create(ParserFactory::ONLY_PHP7),
             $astTraverser
@@ -109,6 +115,12 @@ class Runtime {
         if (null === $this->vm) {
             $this->vm = new VM($this->vmContext);
         }
+    }
+
+    public function vm(): VM {
+        $this->ensureVm();
+
+        return $this->vm;
     }
 
     public function __destruct() {
@@ -186,7 +198,18 @@ class Runtime {
     }
 
     public function parse(string $code, string $filename): Script {
-        $script = $this->parser->parse($code, $filename);
+        [$code] = (new SourcePreprocessor\PropertyHooks())->process($code);
+        $code = SwitchCommaCaseRewriter::rewrite($code);
+        $code = GenericArrayTypeSourceRewriter::rewrite($code);
+        [$code, $abstractEnumLines] = AbstractEnumSourceRewriter::rewrite($code);
+        $this->abstractEnumMarker->setAbstractLines($abstractEnumLines);
+        [$code, $bareRethrowLines] = SourceBareThrowRewriter::rewrite($code);
+        $this->compiler->setBareRethrowLines($bareRethrowLines);
+        try {
+            $script = $this->parser->parse($code, $filename);
+        } finally {
+            $this->abstractEnumMarker->clear();
+        }
         $this->preprocessor->traverse($script);
         if (!$this->isBootstrapVendorPrelinkMode()) {
             $state = new State($script);
@@ -511,6 +534,7 @@ class Runtime {
         try {
             return $this->vm->run($block);
         } finally {
+            ShutdownQueue::run($this->vmContext);
             Superglobals::setActiveContext(null);
         }
     }

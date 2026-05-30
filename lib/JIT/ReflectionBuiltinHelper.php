@@ -94,6 +94,22 @@ final class ReflectionBuiltinHelper
         return self::objectBuiltin($context)->emitInstanceOf($value, $className);
     }
 
+    public static function classIsInstanceOfLiteral(Context $context, string $childName, string $parentName): Value
+    {
+        $match = self::objectBuiltin($context)->classIsInstanceOf($childName, $parentName);
+        $i1 = $context->getTypeFromString('int1');
+
+        return $i1->constInt($match ? 1 : 0, false);
+    }
+
+    public static function classIsSubclassOfLiteral(Context $context, string $childName, string $parentName): Value
+    {
+        $match = self::objectBuiltin($context)->classIsSubclassOf($childName, $parentName);
+        $i1 = $context->getTypeFromString('int1');
+
+        return $i1->constInt($match ? 1 : 0, false);
+    }
+
     public static function getClassName(Context $context, Variable $object): Value
     {
         if (Variable::TYPE_OBJECT !== $object->type && Variable::TYPE_VALUE !== $object->type) {
@@ -132,16 +148,6 @@ final class ReflectionBuiltinHelper
         $falseStr = $context->builder->load($context->constantStringFromString(''));
 
         return $context->builder->select($isObject, $nameWhenObject, $falseStr);
-    }
-
-    /**
-     * get_parent_class() — no class extends yet; always false (issue #1218).
-     */
-    public static function getParentClassLiteral(Context $context): Value
-    {
-        $i1 = $context->getTypeFromString('int1');
-
-        return $i1->constInt(0, false);
     }
 
     private static function classNameFromId(Context $context, Value $classId): Value

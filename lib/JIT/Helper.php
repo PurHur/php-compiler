@@ -974,6 +974,89 @@ restart:
             }
             goto return_bool;
         }
+        if ((Variable::TYPE_HASHTABLE === $leftType || ArrayBuiltinHelper::isNativeArray($leftType))
+            && Variable::TYPE_NATIVE_BOOL === $rightType) {
+            $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
+            $trueVal = $this->context->getTypeFromString('int1')->constInt(1, false);
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                $result = $falseVal;
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                $result = $trueVal;
+                goto return_bool;
+            }
+            if (OpCode::TYPE_EQUAL === $opcode->type) {
+                $result = JitValueCompare::looseEqualArrayToBool(
+                    $this->context,
+                    $left,
+                    $rightValue
+                );
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $same = JitValueCompare::looseEqualArrayToBool(
+                    $this->context,
+                    $left,
+                    $rightValue
+                );
+                $result = $this->context->builder->xor($same, $trueVal);
+                goto return_bool;
+            }
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $leftType
+            && (Variable::TYPE_HASHTABLE === $rightType || ArrayBuiltinHelper::isNativeArray($rightType))) {
+            $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
+            $trueVal = $this->context->getTypeFromString('int1')->constInt(1, false);
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                $result = $falseVal;
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                $result = $trueVal;
+                goto return_bool;
+            }
+            if (OpCode::TYPE_EQUAL === $opcode->type) {
+                $result = JitValueCompare::looseEqualArrayToBool(
+                    $this->context,
+                    $right,
+                    $leftValue
+                );
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $same = JitValueCompare::looseEqualArrayToBool(
+                    $this->context,
+                    $right,
+                    $leftValue
+                );
+                $result = $this->context->builder->xor($same, $trueVal);
+                goto return_bool;
+            }
+        }
+        $leftIsArray = Variable::TYPE_HASHTABLE === $leftType || ArrayBuiltinHelper::isNativeArray($leftType);
+        $rightIsArray = Variable::TYPE_HASHTABLE === $rightType || ArrayBuiltinHelper::isNativeArray($rightType);
+        if ($leftIsArray xor $rightIsArray) {
+            $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
+            $trueVal = $this->context->getTypeFromString('int1')->constInt(1, false);
+            if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                if ($leftIsArray) {
+                    if (Variable::TYPE_NULL === $rightType) {
+                        $same = JitValueCompare::looseEqualArrayToNull($this->context, $left);
+                    } else {
+                        $same = $falseVal;
+                    }
+                } elseif (Variable::TYPE_NULL === $leftType) {
+                    $same = JitValueCompare::looseEqualArrayToNull($this->context, $right);
+                } else {
+                    $same = $falseVal;
+                }
+                $result = OpCode::TYPE_EQUAL === $opcode->type
+                    ? $same
+                    : $this->context->builder->xor($same, $trueVal);
+                goto return_bool;
+            }
+        }
         if (Variable::TYPE_STRING === $leftType && Variable::TYPE_NATIVE_BOOL === $rightType) {
             $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
             if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
@@ -1101,6 +1184,46 @@ return_bool:
     }
 
     public function loadValue(Variable $variable): PHPLLVM\Value {
+        if (null !== $variable->valueBoxAliasPtr) {
+            $ptr = JitValueBox::normalizeValuePtr($this->context, $variable->valueBoxAliasPtr);
+            switch ($variable->type) {
+                case Variable::TYPE_NATIVE_BOOL:
+                    return $this->context->builder->truncOrBitCast(
+                        $this->context->builder->call(
+                            $this->context->lookupFunction('__value__readLong'),
+                            $ptr
+                        ),
+                        $this->context->getTypeFromString('int1')
+                    );
+                case Variable::TYPE_NATIVE_DOUBLE:
+                    return $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readDouble'),
+                        $ptr
+                    );
+                case Variable::TYPE_STRING:
+                    return $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readString'),
+                        $ptr
+                    );
+                case Variable::TYPE_OBJECT:
+                    return $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readObject'),
+                        $ptr
+                    );
+                case Variable::TYPE_HASHTABLE:
+                    return $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readHashtable'),
+                        $ptr
+                    );
+                case Variable::TYPE_NATIVE_LONG:
+                case Variable::TYPE_VALUE:
+                default:
+                    return $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readLong'),
+                        $ptr
+                    );
+            }
+        }
         if (null !== $variable->objectPropertySlot) {
             $loaded = $this->context->builder->load($variable->objectPropertySlot);
             if (null === $variable->objectPropertyType) {

@@ -183,6 +183,80 @@ final class JitValueCompare
         return self::notLooseEqualValueToNativeLong($context, $boxed, $nativeLong);
     }
 
+    /**
+     * Loose == between {@see __hashtable__*} and native bool (Zend: empty array == false).
+     */
+    public static function looseEqualHashtableToBool(
+        Context $context,
+        Value $hashtable,
+        Value $bool
+    ): Value {
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $hashtable
+        );
+        $sizeT = $context->getTypeFromString('size_t');
+        $isEmpty = $context->builder->icmp(
+            Builder::INT_EQ,
+            $num,
+            $sizeT->constInt(0, false)
+        );
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+        $trueVal = $i1->constInt(1, false);
+        $notBool = $context->builder->select($bool, $falseVal, $trueVal);
+
+        return $context->builder->select($isEmpty, $notBool, $bool);
+    }
+
+    /**
+     * Loose == between a JIT array operand (native or hashtable) and native bool.
+     */
+    public static function looseEqualArrayToBool(
+        Context $context,
+        Variable $array,
+        Value $bool
+    ): Value {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
+            $i1 = $context->getTypeFromString('int1');
+            $falseVal = $i1->constInt(0, false);
+            $trueVal = $i1->constInt(1, false);
+            if (0 === $array->nextFreeElement) {
+                return $context->builder->select($bool, $falseVal, $trueVal);
+            }
+
+            return $bool;
+        }
+        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+
+        return self::looseEqualHashtableToBool($context, $ht, $bool);
+    }
+
+    /**
+     * Loose == between a JIT array operand and null (Zend: only empty array == null).
+     */
+    public static function looseEqualArrayToNull(
+        Context $context,
+        Variable $array
+    ): Value {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
+            return $context->constantFromBool(0 === $array->nextFreeElement);
+        }
+        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $ht
+        );
+        $sizeT = $context->getTypeFromString('size_t');
+        $i1 = $context->getTypeFromString('int1');
+
+        return $context->builder->icmp(
+            Builder::INT_EQ,
+            $num,
+            $sizeT->constInt(0, false)
+        );
+    }
+
 
     /** True when a boxed operand is unset: null {@see __value__*} or a null-tagged box (#1086). */
     public static function valueBoxIsNull(Context $context, Variable $boxed): Value
@@ -343,11 +417,19 @@ final class JitValueCompare
             $context->builder->icmp(Builder::INT_EQ, $rightType, $longTag)
         );
 
+        $objectTag = $i8->constInt(Variable::TYPE_OBJECT, false);
+        $bothObject = $context->builder->and(
+            $context->builder->icmp(Builder::INT_EQ, $leftType, $objectTag),
+            $context->builder->icmp(Builder::INT_EQ, $rightType, $objectTag)
+        );
+
         $entry = $context->builder->getInsertBlock();
         $i1 = $context->getTypeFromString('int1');
         $stringBlock = BasicBlockHelper::append($context, 'identical_value_string');
         $longCheckBlock = BasicBlockHelper::append($context, 'identical_value_long_check');
         $longBlock = BasicBlockHelper::append($context, 'identical_value_long');
+        $objectCheckBlock = BasicBlockHelper::append($context, 'identical_value_object_check');
+        $objectBlock = BasicBlockHelper::append($context, 'identical_value_object');
         $typedFalseBlock = BasicBlockHelper::append($context, 'identical_value_typed_false');
         $doneBlock = BasicBlockHelper::append($context, 'identical_value_typed_done');
 
@@ -372,12 +454,37 @@ final class JitValueCompare
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($longCheckBlock);
-        $context->builder->branchIf($bothLong, $longBlock, $typedFalseBlock);
+        $context->builder->branchIf($bothLong, $longBlock, $objectCheckBlock);
 
         $context->builder->positionAtEnd($longBlock);
         $leftLong = $context->builder->call($context->lookupFunction('__value__readLong'), $leftPtr);
         $rightLong = $context->builder->call($context->lookupFunction('__value__readLong'), $rightPtr);
         $longMatch = $context->builder->icmp(Builder::INT_EQ, $leftLong, $rightLong);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($objectCheckBlock);
+        $context->builder->branchIf($bothObject, $objectBlock, $typedFalseBlock);
+
+        $context->builder->positionAtEnd($objectBlock);
+        $leftObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $leftPtr
+        );
+        $rightObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $rightPtr
+        );
+        $voidp = $context->getTypeFromString('void')->pointerType(0);
+        $sizeT = $context->getTypeFromString('size_t');
+        $leftHandle = $context->builder->ptrToInt(
+            $context->builder->pointerCast($leftObj, $voidp),
+            $sizeT
+        );
+        $rightHandle = $context->builder->ptrToInt(
+            $context->builder->pointerCast($rightObj, $voidp),
+            $sizeT
+        );
+        $objectMatch = $context->builder->icmp(Builder::INT_EQ, $leftHandle, $rightHandle);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($typedFalseBlock);
@@ -387,6 +494,7 @@ final class JitValueCompare
         $phi = $context->builder->phi($i1);
         $phi->addIncoming($stringsMatch, $stringBlock);
         $phi->addIncoming($longMatch, $longBlock);
+        $phi->addIncoming($objectMatch, $objectBlock);
         $phi->addIncoming($falseVal, $typedFalseBlock);
         $context->builder->branch($exitBlock);
 
@@ -500,5 +608,76 @@ final class JitValueCompare
                     'Ordered compare opcode not implemented for boxed long: '.opcode_type_name($opcodeType)
                 );
         }
+    }
+
+    /**
+     * Loose == between two native {@see __string__} operands (Zend zendi_smart_strcmp parity).
+     */
+    public static function looseEqualStringToString(
+        Context $context,
+        Value $leftStr,
+        Value $rightStr
+    ): Value {
+        $identical = JitStringCompare::identical($context, $leftStr, $rightStr);
+        $leftNumeric = self::stringIsNumeric($context, $leftStr);
+        $rightNumeric = self::stringIsNumeric($context, $rightStr);
+        $bothNumeric = $context->builder->and($leftNumeric, $rightNumeric);
+        $leftDouble = self::stringToDouble($context, $leftStr);
+        $rightDouble = self::stringToDouble($context, $rightStr);
+        $numericEq = $context->builder->fcmp(Builder::REAL_OEQ, $leftDouble, $rightDouble);
+        $numericMatch = $context->builder->and($bothNumeric, $numericEq);
+
+        return $context->builder->or($identical, $numericMatch);
+    }
+
+    private static function stringIsNumeric(Context $context, Value $strPtr): Value
+    {
+        $structName = $strPtr->typeOf()->getElementType()->getName();
+        $map = $context->structFieldMap[$structName];
+        $len = $context->builder->load(
+            $context->builder->structGep($strPtr, $map['length'])
+        );
+        $zero = $len->typeOf()->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $zero);
+
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $endPtrSlot = $context->builder->alloca(
+            $context->getTypeFromString('int8*'),
+            1,
+            'loose_str_is_numeric_end'
+        );
+        $nullEnd = $context->getTypeFromString('int8*')->constNull();
+        $context->builder->store($nullEnd, $endPtrSlot);
+        $context->builder->call($context->lookupFunction('strtod'), $charPtr, $endPtrSlot);
+        $endPtr = $context->builder->load($endPtrSlot);
+        $notConsumed = $context->builder->icmp(Builder::INT_EQ, $endPtr, $charPtr);
+        $i64 = $context->getTypeFromString('int64');
+        $endOffset = $context->builder->sub(
+            $context->builder->ptrToInt($endPtr, $i64),
+            $context->builder->ptrToInt($charPtr, $i64)
+        );
+        $consumedAll = $context->builder->icmp(Builder::INT_EQ, $endOffset, $len);
+        $numeric = $context->builder->and(
+            $context->builder->not($notConsumed),
+            $consumedAll
+        );
+
+        return $context->builder->select($isEmpty, $context->constantFromBool(false), $numeric);
+    }
+
+    private static function stringToDouble(Context $context, Value $strPtr): Value
+    {
+        $structName = $strPtr->typeOf()->getElementType()->getName();
+        $map = $context->structFieldMap[$structName];
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $endPtrSlot = $context->builder->alloca(
+            $context->getTypeFromString('int8*'),
+            1,
+            'loose_str_strtod_end'
+        );
+        $nullEnd = $context->getTypeFromString('int8*')->constNull();
+        $context->builder->store($nullEnd, $endPtrSlot);
+
+        return $context->builder->call($context->lookupFunction('strtod'), $charPtr, $endPtrSlot);
     }
 }

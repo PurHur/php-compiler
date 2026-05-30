@@ -72,11 +72,11 @@ class LoopResolver extends NodeVisitorAbstract
             return new Goto_(end($stack), $node->getAttributes());
         }
         if ($node->num instanceof LNumber) {
-            $num = $node->num->value - 1;
-            if ($num >= count($stack)) {
+            $num = $node->num->value;
+            if ($num < 1 || $num > count($stack)) {
                 throw new \LogicException('Too high of a count for '.$node->getType());
             }
-            $loc = array_slice($stack, -1 * $num, 1);
+            $loc = array_slice($stack, -$num, 1);
 
             return new Goto_($loc[0], $node->getAttributes());
         }

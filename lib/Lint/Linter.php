@@ -10,6 +10,8 @@ use PHPCfg\Op;
 use PHPCfg\Operand;
 use PHPCfg\Script;
 use PHPTypes\State;
+use PHPCompiler\Compiler\CompileFatal;
+use PHPCompiler\AOT\AutoloadDiscovery;
 use PHPCompiler\Runtime;
 use PHPCompiler\Web\ConstStringFolder;
 use PHPCompiler\Web\IncludePathResolver;
@@ -64,6 +66,15 @@ final class Linter
                 ProjectAutoload::parsePsr4Map($projectDir, $manifest)
             )
         );
+
+        $psr4Map = ProjectAutoload::parsePsr4Map($projectDir, $manifest);
+        if ([] !== $psr4Map) {
+            $seedFiles = array_merge($extraFiles, [$entry]);
+            $autoload = AutoloadDiscovery::discover($this->runtime, $projectDir, $psr4Map, $seedFiles);
+            foreach ($autoload['errors'] as $message) {
+                $issues[] = new Issue($entry, 0, 'autoload', $message, 1803);
+            }
+        }
 
         $entryReal = realpath($entry) ?: $entry;
         foreach ($extraFiles as $file) {
@@ -248,6 +259,20 @@ final class Linter
         $this->runtime->compiler = $compiler;
         try {
             $this->runtime->compile($script);
+        } catch (CompileFatal $e) {
+            $compiler->issues[] = new Issue(
+                $e->sourceFile,
+                $e->sourceLine,
+                $e->getMessage(),
+                $e->getMessage()
+            );
+        } catch (\CompileError $e) {
+            $compiler->issues[] = new Issue(
+                $script->main->cfg->getFile(),
+                0,
+                $e->getMessage(),
+                $e->getMessage()
+            );
         } catch (\Throwable $e) {
             // Parse/type errors are outside lint scope; let callers handle separately.
         } finally {
@@ -286,7 +311,7 @@ final class Linter
         $seen = new \SplObjectStorage();
         $this->walkCfgBlock($script->main->cfg, $paths, $seen);
         foreach ($script->functions as $func) {
-            if ($func instanceof CfgFunc) {
+            if ($func instanceof CfgFunc && null !== $func->cfg) {
                 $this->walkCfgBlock($func->cfg, $paths, $seen);
             }
         }

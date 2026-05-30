@@ -200,6 +200,63 @@ final class HashTable {
     }
 
     /**
+     * Zend zend_compare_arrays() parity for spaceship (<=>).
+     */
+    public function compareSpaceship(self $other): int
+    {
+        $leftCount = $this->getNumElements();
+        $rightCount = $other->getNumElements();
+        if ($leftCount > $rightCount) {
+            return 1;
+        }
+        if ($leftCount < $rightCount) {
+            return -1;
+        }
+
+        $leftItems = iterator_to_array($this->iterateKeyed(true));
+        $rightItems = iterator_to_array($other->iterateKeyed(true));
+        for ($i = 0, $n = \count($leftItems); $i < $n; ++$i) {
+            [$leftKey, $leftVal] = $leftItems[$i];
+            [$rightKey, $rightVal] = $rightItems[$i];
+            $keyCmp = Variable::spaceshipCompare($leftKey, $rightKey);
+            if (0 !== $keyCmp) {
+                return $keyCmp;
+            }
+            $valCmp = Variable::spaceshipCompare($leftVal, $rightVal);
+            if (0 !== $valCmp) {
+                return $valCmp;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Zend zend_compare_arrays() parity for loose == (compare_function returns 0).
+     */
+    public function compareLooseEqual(self $other): bool
+    {
+        if ($this->getNumElements() !== $other->getNumElements()) {
+            return false;
+        }
+
+        $leftItems = iterator_to_array($this->iterateKeyed(true));
+        $rightItems = iterator_to_array($other->iterateKeyed(true));
+        for ($i = 0, $n = \count($leftItems); $i < $n; ++$i) {
+            [$leftKey, $leftVal] = $leftItems[$i];
+            [$rightKey, $rightVal] = $rightItems[$i];
+            if (!$leftKey->equals($rightKey)) {
+                return false;
+            }
+            if (!$leftVal->equals($rightVal)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Remove and return the last element of a packed list array (no holes).
      * Returns null when the array is empty.
      */
@@ -500,6 +557,54 @@ final class HashTable {
                 } else {
                     $out->add($k, $copy);
                 }
+            }
+        }
+    }
+
+    /**
+     * Array union ($left + $right): copy this array, then append keys from $other that are missing.
+     * Left-hand keys win on collision (Zend zend_hash_merge / add_function parity, issue #3690).
+     */
+    public function unionCopy(HashTable $other): HashTable
+    {
+        $out = new self();
+        foreach ($this->iterateKeyed(true) as [$key, $value]) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $copy);
+            } else {
+                $out->add($key->toString(), $copy);
+            }
+        }
+        $out->unionInPlace($other);
+
+        return $out;
+    }
+
+    /**
+     * In-place array union ($left += $right): add keys from $other that are missing in this table.
+     */
+    public function unionInPlace(HashTable $other): void
+    {
+        $this->assertConsistent();
+        $this->refcount->assertSeparated();
+        foreach ($other->iterateKeyed(true) as [$key, $value]) {
+            if (Variable::TYPE_INTEGER === $key->type) {
+                if (null !== $this->findIndex($key->toInt())) {
+                    continue;
+                }
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $this->addIndex($key->toInt(), $copy);
+            } else {
+                $k = $key->toString();
+                if (null !== $this->find($k)) {
+                    continue;
+                }
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $this->add($k, $copy);
             }
         }
     }
@@ -909,6 +1014,21 @@ final class HashTable {
             } else {
                 $this->add($key->toString(), $copy);
             }
+        }
+    }
+
+    /**
+     * Grow the hash index table so integer keys up to $maxHashIndex are not masked together.
+     * Required for sparse int-key arrays (e.g. count_chars() mode 1; ext/standard/string.c).
+     */
+    public function ensureHashSlotCapacity(int $maxHashIndex): void
+    {
+        $this->assertConsistent();
+        if ($this->flags & self::FLAG_UNINITIALIZED) {
+            $this->initMixed();
+        }
+        while ($maxHashIndex >= $this->indexes->size()) {
+            $this->resize();
         }
     }
 

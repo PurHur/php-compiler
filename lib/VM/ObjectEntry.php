@@ -31,6 +31,21 @@ class ObjectEntry {
     /** Anonymous function / closure body (issue #72). */
     public ?ClosureState $closureState = null;
 
+    /** Initializer for lazy proxy objects (#3317). */
+    public ?ClosureState $lazyInitializer = null;
+
+    /** True until first property access or method call runs the lazy initializer. */
+    public bool $lazyPending = false;
+
+    /** True for backed/unit enum case singleton objects (#3518). */
+    public bool $isEnumCase = false;
+
+    /** Case name as declared (`Active`), not lowercased. */
+    public ?string $enumCaseName = null;
+
+    /** Backed scalar for backed enums; null for unit enums (#3404). */
+    public ?Variable $enumCaseValue = null;
+
     public function __construct(ClassEntry $class) {
         $this->class = $class;
         $this->id = ++self::$counter;
@@ -50,6 +65,12 @@ class ObjectEntry {
         return array_values($this->properties);
     }
 
+    /** @return array<string, Variable> */
+    public function propertiesWithNames(): array
+    {
+        return $this->properties;
+    }
+
     /** Break property edges and detach generator/closure state after cycle collection (#3113). */
     public function destroyForGc(): void
     {
@@ -62,9 +83,14 @@ class ObjectEntry {
         }
         $this->generatorState = null;
         $this->closureState = null;
+        $this->lazyInitializer = null;
+        $this->lazyPending = false;
     }
 
     public function getProperty(string $name): Variable {
+        if ($this->isEnumCase) {
+            return EnumCaseSupport::getProperty($this, $name);
+        }
         if (!isset($this->properties[$name])) {
             if (!$this->class->allowsDynamicProperties) {
                 throw new \LogicException("Undefined property access");
@@ -78,6 +104,16 @@ class ObjectEntry {
         return $this->properties[$name];
     }
 
+    public function issetProperty(string $name): bool
+    {
+        if (!isset($this->properties[$name])) {
+            return false;
+        }
+        $var = $this->properties[$name]->resolveIndirect();
+
+        return !$var->isUndefined() && Variable::TYPE_NULL !== $var->type;
+    }
+
     public function unsetProperty(string $name): void
     {
         if (!isset($this->properties[$name])) {
@@ -86,8 +122,86 @@ class ObjectEntry {
         $this->properties[$name]->null();
     }
 
-    public function getProperties(int $purpose): array {
+    /** @return array<string, Variable> */
+    public function getRawProperties(): array
+    {
+        return $this->properties;
+    }
+
+    public function getProperties(int $purpose, ?\PHPCompiler\VM $vm = null): array {
+        if (ClassEntry::PROP_PURPOSE_DEBUG === $purpose && null !== $vm) {
+            return $vm->getObjectDebugProperties($this);
+        }
+
         return $this->class->getProperties($this->properties, $purpose);
+    }
+
+    /**
+     * Zend {@see compare_objects()} default handler: same class and equal property values (#3602).
+     */
+    public function looseEquals(self $other): bool
+    {
+        if ($this === $other) {
+            return true;
+        }
+        if ($this->class->name !== $other->class->name) {
+            return false;
+        }
+        $names = array_keys($this->properties);
+        foreach (array_keys($other->properties) as $name) {
+            if (!\in_array($name, $names, true)) {
+                $names[] = $name;
+            }
+        }
+        foreach ($names as $name) {
+            $left = isset($this->properties[$name])
+                ? $this->properties[$name]->resolveIndirect()
+                : new Variable(Variable::TYPE_NULL);
+            $right = isset($other->properties[$name])
+                ? $other->properties[$name]->resolveIndirect()
+                : new Variable(Variable::TYPE_NULL);
+            if (!$left->equals($right)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Zend {@see zend_compare_objects()} / {@see zend_std_compare_objects()} for spaceship (#3691).
+     *
+     * Same class: compare instance properties via {@see Variable::compareSpaceship()}.
+     * Different classes on PHP 8.2: always 1 (not a total order; matches Zend <=>).
+     */
+    public function compareSpaceship(self $other): int
+    {
+        if ($this === $other) {
+            return 0;
+        }
+        if ($this->class->name !== $other->class->name) {
+            return 1;
+        }
+        $names = array_keys($this->properties);
+        foreach (array_keys($other->properties) as $name) {
+            if (!\in_array($name, $names, true)) {
+                $names[] = $name;
+            }
+        }
+        foreach ($names as $name) {
+            $left = isset($this->properties[$name])
+                ? $this->properties[$name]->resolveIndirect()
+                : new Variable(Variable::TYPE_NULL);
+            $right = isset($other->properties[$name])
+                ? $other->properties[$name]->resolveIndirect()
+                : new Variable(Variable::TYPE_NULL);
+            $cmp = Variable::compareSpaceship($left, $right);
+            if (0 !== $cmp) {
+                return $cmp;
+            }
+        }
+
+        return 0;
     }
 
     /** Shallow clone: new object id, copied instance property values. */
@@ -98,6 +212,8 @@ class ObjectEntry {
         }
         $clone->constructed = $this->constructed;
         $clone->closureState = $this->closureState;
+        $clone->lazyInitializer = $this->lazyInitializer;
+        $clone->lazyPending = $this->lazyPending;
 
         return $clone;
     }

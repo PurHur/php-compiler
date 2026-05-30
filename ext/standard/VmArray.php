@@ -4,12 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\Variable;
 
 /** VM array helpers (no PHP internal wrappers in compiled paths). */
 final class VmArray
 {
+    /** count() mode — php-src ext/standard/basic_functions.c (#3511). */
+    public const COUNT_NORMAL = 0;
+
+    public const COUNT_RECURSIVE = 1;
+
     public static function isList(HashTable $ht): bool
     {
         $n = $ht->getNumElements();
@@ -453,6 +460,23 @@ final class VmArray
     }
 
     /**
+     * count($array, COUNT_RECURSIVE) — php-src ext/standard/array.c (#3511).
+     *
+     * Top-level element count plus recursive counts of nested arrays (PHP 8.2+).
+     */
+    public static function countRecursive(HashTable $ht): int
+    {
+        $count = $ht->getNumElements();
+        foreach ($ht->iterate(true) as $value) {
+            if (Variable::TYPE_ARRAY === $value->type) {
+                $count += self::countRecursive($value->toArray());
+            }
+        }
+
+        return $count;
+    }
+
+    /**
      * array_count_values() — count occurrences of string or integer values (#2356).
      */
     public static function countValues(HashTable $ht): HashTable
@@ -516,5 +540,61 @@ final class VmArray
         }
 
         return $out;
+    }
+
+    /**
+     * count() for arrays and Countable objects (Zend php_count parity, #3364).
+     */
+    public static function countValue(Context $ctx, Variable $value): int
+    {
+        $v = $value->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $v->type) {
+            return $v->toArray()->getNumElements();
+        }
+        if (Variable::TYPE_OBJECT === $v->type) {
+            $entry = $v->toObject()->class;
+            if (!InterfaceCheck::entryImplements($entry, 'countable', $ctx)) {
+                throw new \TypeError(
+                    'count(): Argument #1 ($value) must be of type Countable|array, '
+                    . $entry->name . ' given'
+                );
+            }
+            $result = $ctx->runtime->vm->invokeInstanceMethod($v->toObject(), 'count')->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $result->type) {
+                throw new \TypeError(
+                    'Return value of ' . $entry->name . '::count() must be of type int, '
+                    . self::valueTypeLabel($result) . ' returned'
+                );
+            }
+
+            return $result->toInt();
+        }
+
+        throw new \TypeError(
+            'count(): Argument #1 ($value) must be of type Countable|array, '
+            . self::valueTypeLabel($v) . ' given'
+        );
+    }
+
+    private static function valueTypeLabel(Variable $value): string
+    {
+        switch ($value->type) {
+            case Variable::TYPE_INTEGER:
+                return 'int';
+            case Variable::TYPE_FLOAT:
+                return 'float';
+            case Variable::TYPE_BOOLEAN:
+                return 'bool';
+            case Variable::TYPE_STRING:
+                return 'string';
+            case Variable::TYPE_NULL:
+                return 'null';
+            case Variable::TYPE_ARRAY:
+                return 'array';
+            case Variable::TYPE_OBJECT:
+                return 'object';
+            default:
+                return 'mixed';
+        }
     }
 }

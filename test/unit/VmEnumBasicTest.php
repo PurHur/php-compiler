@@ -6,6 +6,7 @@ namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
 final class VmEnumBasicTest extends TestCase
@@ -35,7 +36,44 @@ PHP;
         $this->assertSame('string', $ctx->classes['status']->backedType);
         $active = $ctx->classes['status']->constants['active'] ?? null;
         $this->assertNotNull($active);
+        $this->assertSame(Variable::TYPE_OBJECT, $active->type);
         $this->assertSame('active', $active->toString());
+        $this->assertSame('active', $active->toObject()->getProperty('value')->toString());
+        $this->assertSame('Active', $active->toObject()->getProperty('name')->toString());
         $this->assertFalse(VmReflection::classExists($ctx, 'Status'));
+    }
+
+    public function testEnumCasesBackedAndUnit(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum Suit: string {
+    case Hearts = 'H';
+    case Diamonds = 'D';
+}
+enum Status {
+    case Pending;
+    case Done;
+}
+$cases = Suit::cases();
+echo count($cases);
+echo $cases[0]->name;
+echo $cases[1]->value;
+$unit = Status::cases();
+echo count($unit);
+echo $unit[0]->name;
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_cases.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame('2HeartsD2Pending', $output);
+        $ctx = $runtime->vmContext;
+        $this->assertInstanceOf(Context::class, $ctx);
+        $this->assertCount(2, $ctx->classes['suit']->enumCases);
+        $this->assertSame('Hearts', $ctx->classes['suit']->enumCases[0]['name']);
+        $this->assertSame('D', $ctx->classes['suit']->enumCases[1]['value']->toString());
     }
 }

@@ -9,6 +9,7 @@
 
 namespace PHPCompiler\Func;
 
+use PHPCompiler\Compiler\DeprecatedMetadata;
 use PHPCompiler\Func;
 use PHPCompiler\Frame;
 use PHPCompiler\Block;
@@ -17,6 +18,8 @@ use PHPCompiler\VM\Context;
 final class PHP extends Func {
 
     public Block $block;
+    /** #[\Deprecated] metadata when declared on this function/method (#3569). */
+    public ?DeprecatedMetadata $deprecated = null;
 
     public function __construct(string $name, Block $block) {
         parent::__construct($name);

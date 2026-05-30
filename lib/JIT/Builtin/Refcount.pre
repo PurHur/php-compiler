@@ -45,6 +45,7 @@ class Refcount extends Builtin {
             static inline function __ref__delref(__ref__virtual*): void;
             static inline function __ref__separate(__ref__virtual**): void;
             static inline function __ref__separate_ex(__ref__virtual**, int32): void;
+            static function phpc_weakref_clear_object_typed(__object__*, int32): void;
         }
         $this->struct = $this->context->getTypeFromString('__ref__');
         $this->virtualStruct = $this->context->getTypeFromString('__ref__virtual');
@@ -53,6 +54,8 @@ class Refcount extends Builtin {
     }
 
     public function implement(): void {
+        \PHPCompiler\JIT\Builtin\WeakRefRuntime::ensureLinked($this->context);
+        \PHPCompiler\JIT\Builtin\WeakRefNative::registerDeclarations($this->context);
         $this->implementInit();
         $this->implementAddref();
         $this->implementDelref();
@@ -108,6 +111,7 @@ class Refcount extends Builtin {
                     $ref.refcount = $current;
                     $test = $current <= 0;
                     if ($test) {
+                        phpc_weakref_clear_object_typed((__object__*) $refVirtual, $typeinfo);
                         free $refVirtual;
                     }
                 }

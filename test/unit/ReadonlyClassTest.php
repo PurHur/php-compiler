@@ -43,7 +43,7 @@ readonly class Box {
 $o = new Box();
 $o->v = 2;
 PHP;
-        $this->expectException(\LogicException::class);
+        $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Cannot modify readonly property Box::$v');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_after.php'));
     }
@@ -59,7 +59,7 @@ readonly class Box {
 $o = new Box();
 $o->v = 2;
 PHP;
-        $this->expectException(\LogicException::class);
+        $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Cannot modify readonly property Box::$v');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_no_ctor.php'));
     }

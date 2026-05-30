@@ -12,6 +12,7 @@ use PHPCompiler\ext\standard\VmErrorHandler;
  */
 final class ErrorReporter
 {
+    public const E_PARSE = 4;
     public const E_WARNING = 2;
     public const E_USER_ERROR = 256;
     public const E_USER_WARNING = 512;
@@ -20,6 +21,11 @@ final class ErrorReporter
 
     private int $errorReporting;
     private bool $displayErrors;
+
+    /** Nesting depth for `@` error-control (issue #3546). */
+    private int $silenceDepth = 0;
+
+    private int $savedErrorReporting = 0;
 
     /** @var list<array{0: ?string, 1: int}> */
     private array $handlerStack = [];
@@ -53,6 +59,31 @@ final class ErrorReporter
     public function setDisplayErrors(bool $display): void
     {
         $this->displayErrors = $display;
+    }
+
+    public function beginSilence(): void
+    {
+        if (0 === $this->silenceDepth) {
+            $this->savedErrorReporting = $this->errorReporting;
+            $this->errorReporting = 0;
+        }
+        ++$this->silenceDepth;
+    }
+
+    public function endSilence(): void
+    {
+        if ($this->silenceDepth <= 0) {
+            return;
+        }
+        --$this->silenceDepth;
+        if (0 === $this->silenceDepth) {
+            $this->errorReporting = $this->savedErrorReporting;
+        }
+    }
+
+    public function isSilenced(): bool
+    {
+        return $this->silenceDepth > 0;
     }
 
     /**
@@ -122,6 +153,34 @@ final class ErrorReporter
         return true;
     }
 
+    public function uninitializedStringOffset(
+        int $offset,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        $this->emitWarning(
+            "Uninitialized string offset {$offset}",
+            $context,
+            $frame,
+            $file
+        );
+    }
+
+    public function illegalStringOffset(
+        int $offset,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        $this->emitWarning(
+            "Illegal string offset {$offset}",
+            $context,
+            $frame,
+            $file
+        );
+    }
+
     public function undefinedArrayKey(
         Variable $index,
         ?Context $context = null,
@@ -133,6 +192,18 @@ final class ErrorReporter
         }
         $key = $this->formatArrayKey($index);
         $message = "Undefined array key {$key}";
+        $this->emitWarning($message, $context, $frame, $file);
+    }
+
+    private function emitWarning(
+        string $message,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        if (0 === ($this->errorReporting & self::E_WARNING)) {
+            return;
+        }
         $this->recordLastError(self::E_WARNING, $message, $file, 0);
         if ($this->dispatchUserHandler($context, $frame, self::E_WARNING, $message, $file, 0)) {
             return;

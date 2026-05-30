@@ -9,7 +9,7 @@ use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPLLVM\Builder;
 
 /**
- * Emit readonly-class instance property write checks before JIT property stores (#1360).
+ * Emit readonly-class and readonly-property instance write checks before JIT property stores (#1360, #3432).
  */
 final class ReadonlyClassGuard
 {
@@ -18,6 +18,8 @@ final class ReadonlyClassGuard
         if (null === $lvalue->objectPropertySlot) {
             return;
         }
+        $objectType = $context->type->object;
+        assert($objectType instanceof Object_);
         if (null === $lvalue->objectPropertyReceiver && null !== $lvalue->objectPropertySlot) {
             $lvalue->objectPropertyReceiver = $objectType->receiverForPropertySlot($lvalue->objectPropertySlot);
         }
@@ -28,9 +30,12 @@ final class ReadonlyClassGuard
             return;
         }
 
-        $objectType = $context->type->object;
-        assert($objectType instanceof Object_);
-        if (!$objectType->hasReadonlyClasses()) {
+        $propName = $lvalue->objectPropertyName ?? 'property';
+        $guardClassIds = array_values(array_unique(array_merge(
+            $objectType->readonlyClassIds(),
+            $objectType->readonlyPropertyClassIdsForProperty($propName)
+        )));
+        if ([] === $guardClassIds) {
             return;
         }
 
@@ -47,7 +52,6 @@ final class ReadonlyClassGuard
         $exitBlock = $fn->appendBasicBlock('readonly_guard_exit');
 
         $className = $lvalue->objectPropertyClassName ?? 'class';
-        $propName = $lvalue->objectPropertyName ?? 'property';
         $message = sprintf(
             'Cannot modify readonly property %s::$%s',
             $className,
@@ -56,11 +60,10 @@ final class ReadonlyClassGuard
         $msgLen = $context->constantFromInteger(strlen($message), 'size_t');
         $msgCStr = self::stringDataPtrFromLiteral($context, $message);
 
-        $readonlyIds = $objectType->readonlyClassIds();
         $checkBlock = $entry;
-        foreach ($readonlyIds as $i => $id) {
+        foreach ($guardClassIds as $i => $id) {
             $matchBlock = $fn->appendBasicBlock('readonly_match_'.$id);
-            $nextCheck = $i + 1 < count($readonlyIds)
+            $nextCheck = $i + 1 < count($guardClassIds)
                 ? $fn->appendBasicBlock('readonly_try_'.($i + 1))
                 : $storeBlock;
             $context->builder->positionAtEnd($checkBlock);

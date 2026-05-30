@@ -75,11 +75,19 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     } elseif ('usort' === $fn->getName() && preg_match('/callables are deferred/i', $source)) {
         $notes[] = 'callbacks: strcmp JIT; strcasecmp VM; closures deferred (#1210)';
     }
+    if ('uksort' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
+        $notes[] = 'callbacks: strcmp JIT (ksort lowering); strcasecmp VM; VM closure comparator (#3086, #3143)';
+    } elseif ('uksort' === $fn->getName() && preg_match('/callables are deferred/i', $source)) {
+        $notes[] = 'callbacks: strcmp JIT; strcasecmp VM; closures deferred (#3143)';
+    }
     if ('array_filter' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
         $notes[] = 'callbacks: string builtins; VM closure callbacks (#3086)';
     }
     if ('array_walk_recursive' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
         $notes[] = 'callbacks: VM closure + string builtins; JIT/AOT recursive walk deferred (#3111)';
+    }
+    if ('array_walk' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
+        $notes[] = 'callbacks: string builtins JIT/AOT; VM closure + optional userdata (#3627)';
     }
     if ('array_reduce' === $fn->getName() && preg_match('/callables are deferred/i', $source)) {
         $notes[] = 'callbacks: string user functions VM-only; closures deferred (#1213, #142)';

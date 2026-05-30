@@ -6,6 +6,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <fnmatch.h>
 #include <glob.h>
 #include <limits.h>
 #include <stdio.h>
@@ -164,14 +165,16 @@ int __compiler_copy(__string__ *from, __string__ *to)
 
 /**
  * touch() runtime: returns 1 on success, 0 on failure.
- * When mtime is negative, utime(path, NULL) sets both times to now.
+ * mtime/atime < 0 are sentinels: both negative sets both times to now;
+ * atime negative alone copies mtime (or now when mtime is also negative).
  */
-int __compiler_touch(__string__ *path, long long mtime)
+int __compiler_touch(__string__ *path, long long mtime, long long atime)
 {
     const char *p;
     struct stat st;
     struct utimbuf times;
     int fd;
+    time_t now;
 
     if (NULL == path) {
         return 0;
@@ -186,10 +189,17 @@ int __compiler_touch(__string__ *path, long long mtime)
             return 0;
         }
     }
-    if (mtime < 0) {
+    if (mtime < 0 && atime < 0) {
         return utime(p, NULL) == 0 ? 1 : 0;
     }
-    times.actime = (time_t) mtime;
+    now = time(NULL);
+    if (mtime < 0) {
+        mtime = (long long) now;
+    }
+    if (atime < 0) {
+        atime = mtime;
+    }
+    times.actime = (time_t) atime;
     times.modtime = (time_t) mtime;
 
     return utime(p, &times) == 0 ? 1 : 0;
@@ -219,6 +229,45 @@ int __compiler_mkdir(__string__ *path, long long mode, int recursive)
 
 
 void __phpc_strvec_free(char **items, int count);
+
+/** fnmatch() — returns 1 on match, 0 otherwise (issue #3189; php-src ext/standard/fnmatch.c). */
+static int phpc_fnmatch_system_flags(int php_flags)
+{
+    int sys = 0;
+
+    if (php_flags & 2) {
+        sys |= FNM_NOESCAPE;
+    }
+    if (php_flags & 1) {
+        sys |= FNM_PATHNAME;
+    }
+    if (php_flags & 4) {
+        sys |= FNM_PERIOD;
+    }
+#ifdef FNM_CASEFOLD
+    if (php_flags & 16) {
+        sys |= FNM_CASEFOLD;
+    }
+#endif
+
+    return sys;
+}
+
+int __phpc_fnmatch(__string__ *pattern, __string__ *filename, int flags)
+{
+    int rc;
+
+    if (NULL == pattern || NULL == filename) {
+        return 0;
+    }
+
+    rc = fnmatch(phpc_strdata(pattern), phpc_strdata(filename), phpc_fnmatch_system_flags(flags));
+    if (0 == rc) {
+        return 1;
+    }
+
+    return 0;
+}
 
 /** Collect glob matches; returns count (>= 0) or -1 on error. Caller frees with __phpc_strvec_free. */
 int __phpc_glob_vec(__string__ *pattern, int flags, char ***out_items)

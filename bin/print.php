@@ -29,6 +29,8 @@ if (
     && !(\function_exists('php_compiler_cli_should_skip_entry_driver') && php_compiler_cli_should_skip_entry_driver())
 ) {
     // Use literal require paths so self-host AOT/JIT can fold includes (#54, #1492).
+    require_once __DIR__.'/../src/cli.php';
+    php_compiler_cli_note_invocation_cwd();
     chdir(__DIR__.'/..');
     require_once 'src/cli.php';
     require_once 'src/cli_driver.php';

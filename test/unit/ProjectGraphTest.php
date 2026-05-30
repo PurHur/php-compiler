@@ -106,6 +106,50 @@ final class ProjectGraphTest extends TestCase
         }
     }
 
+    public function testPsr4StaticDiscoveryAddsReferencedClassFile(): void
+    {
+        $dir = dirname(__DIR__, 2).'/test/fixtures/aot/projects/psr4_static';
+        $result = ProjectGraph::resolve($dir);
+        $this->assertSame([], $result['errors'], implode("\n", $result['errors']));
+        $joined = implode("\n", $result['files']);
+        $this->assertStringContainsString('src/Greeter.php', $joined);
+        $this->assertStringContainsString('public/index.php', $joined);
+    }
+
+    public function testPsr4StaticDiscoveryReportsMissingClass(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_graph_psr4_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        $this->assertTrue(mkdir($dir.'/public', 0777, true));
+        $this->assertTrue(mkdir($dir.'/src', 0777, true));
+        try {
+            file_put_contents(
+                $dir.'/public/index.php',
+                <<<'PHP'
+<?php
+
+declare(strict_types=1);
+
+echo (new App\Missing())->run();
+PHP
+            );
+            file_put_contents(
+                $dir.'/phpc.json',
+                json_encode([
+                    'entry' => 'public/index.php',
+                    'binary' => '.phpc/bin/app',
+                    'autoload' => ['psr-4' => ['App\\' => 'src/']],
+                ], JSON_THROW_ON_ERROR)
+            );
+            $result = ProjectGraph::resolve($dir);
+            $this->assertNotSame([], $result['errors']);
+            $this->assertStringContainsString('autoload: unresolved class App\\Missing', implode("\n", $result['errors']));
+            $this->assertStringContainsString('expected src/Missing.php', implode("\n", $result['errors']));
+        } finally {
+            $this->removeTree($dir);
+        }
+    }
+
     /**
      * @param list<string> $args arguments after phpc build
      *

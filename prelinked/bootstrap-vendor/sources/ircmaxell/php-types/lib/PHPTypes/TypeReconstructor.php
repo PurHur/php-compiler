@@ -295,7 +295,7 @@ class TypeReconstructor
                 return false;
             case 'Expr_FirstClassCallable':
                 if (\PHPCfg\Op\Expr\FirstClassCallable::KIND_METHOD === $op->kind) {
-                    return [Type::array()];
+                    return [new Type(Type::TYPE_ARRAY)];
                 }
 
                 return [Type::string()];
@@ -384,6 +384,11 @@ class TypeReconstructor
         }
 
         return false;
+    }
+
+    protected function resolveOp_Expr_Cast_Unset(Operand $var, Op\Expr\Cast\Unset_ $op, SplObjectStorage $resolved)
+    {
+        return [Type::null()];
     }
 
     protected function resolveOp_Expr_Clone(Operand $var, Op\Expr\Clone_ $op, SplObjectStorage $resolved)

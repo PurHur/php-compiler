@@ -175,6 +175,22 @@ final class IssetHelper
 
             return self::compileHashTableOffsetIsSet($context, $htVar, $dim, $dimOp, $containerOp);
         }
+        if (Variable::TYPE_OBJECT === $container->type && null === $container->objectPropertySlot) {
+            $propName = self::literalStringKey($dimOp);
+            if (
+                null !== $propName
+                && null !== $containerOp
+                && null !== $containerOp->type
+                && Type::TYPE_OBJECT === $containerOp->type->type
+            ) {
+                $class = $containerOp->type->userType ?? '';
+                $objPtr = Variable::KIND_VALUE === $container->kind
+                    ? $container->value
+                    : $context->builder->load($container->value);
+
+                return $context->type->object->propertyIsSet($objPtr, $class, $propName);
+            }
+        }
         if (Variable::TYPE_OBJECT === $container->type) {
             $htVar = self::hashtableFromObjectContainer($context, $container, $containerOp);
             $containerUserType = '';
@@ -283,9 +299,10 @@ final class IssetHelper
             $context->builder->structGep($str, $map['length'])
         );
         $index = $context->helper->loadValue($dim);
-        $i32 = $context->getTypeFromString('int32');
-        $inRange = $context->builder->icmp(Builder::INT_SLT, $index, $len);
-        $nonNeg = $context->builder->icmp(Builder::INT_SGE, $index, $i32->constInt(0, false));
+        $offset = StringOffsetHelper::normalizeOffset($context, $index, $len);
+        $zero = $context->getTypeFromString('size_t')->constInt(0, false);
+        $nonNeg = $context->builder->icmp(Builder::INT_UGE, $offset, $zero);
+        $inRange = $context->builder->icmp(Builder::INT_ULT, $offset, $len);
 
         return $context->builder->and($inRange, $nonNeg);
     }

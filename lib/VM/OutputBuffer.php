@@ -17,6 +17,7 @@ final class OutputBuffer
     public static function reset(): void
     {
         self::$stack = [];
+        SapiOutput::reset();
     }
 
     public static function getLevel(): int
@@ -32,6 +33,7 @@ final class OutputBuffer
     public static function append(string $chunk): void
     {
         if ([] === self::$stack) {
+            SapiOutput::markStarted();
             echo $chunk;
 
             return;
@@ -55,5 +57,13 @@ final class OutputBuffer
             return;
         }
         self::append(array_pop(self::$stack));
+    }
+
+    /** flush() — fflush stdout; ob buffers unchanged until ob_end_flush (issue #3388, php-src php_flush). */
+    public static function flush(): void
+    {
+        if (\defined('STDOUT') && \is_resource(\STDOUT)) {
+            @\fflush(\STDOUT);
+        }
     }
 }

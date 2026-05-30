@@ -8,9 +8,39 @@ use PHPCompiler\VM\Variable;
 
 /**
  * Export/import VM values for json_encode() / json_decode() delegation.
+ *
+ * Tracks {@see lastError()} / {@see lastErrorMsg()} for VM parity with Zend ext/json (issue #3175).
  */
 final class VmJson
 {
+    /** Last JSON_ERROR_* from VM json_* (Zend ext/json/php_json.c). */
+    private static int $lastError = 0;
+
+    public static function lastError(): int
+    {
+        return self::$lastError;
+    }
+
+    public static function lastErrorMsg(): string
+    {
+        return self::errorMsgForCode(self::$lastError);
+    }
+
+    public static function errorMsgForCode(int $code): string
+    {
+        return match ($code) {
+            0 => 'No error',
+            1 => 'Maximum stack depth exceeded',
+            4 => 'Syntax error',
+            default => 'Unknown error',
+        };
+    }
+
+    public static function syncLastErrorFromHost(): void
+    {
+        self::$lastError = \json_last_error();
+    }
+
     public static function import(mixed $value): Variable
     {
         $var = new Variable();

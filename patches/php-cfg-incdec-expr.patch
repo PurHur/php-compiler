@@ -1,0 +1,4 @@
+This file is intentionally kept as a placeholder.
+
+`script/apply-patches.sh` applies pre/post inc/dec expression ops for `vendor/ircmaxell/php-cfg`
+via overlay files under `patches/overlays/php-cfg/` (issue #3552).
