@@ -541,17 +541,30 @@ function syntaxRowDefinitions(): array
         [
             'id' => 'trait_use_simple',
             'construct' => 'Simple `use Trait;` in class body',
-            'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_USE_TRAIT', 'TYPE_DECLARE_METHOD'],
+            'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_USE_TRAIT', 'TYPE_TRAIT_USE_ADAPTATION', 'TYPE_DECLARE_METHOD'],
             'issue' => 2314,
             'jit' => true,
             'aot' => true,
             'notes' => [
                 'php-cfg-trait-use.patch; VM merges trait methods into class',
                 'JIT/AOT alias trait-merged methods onto using class (#3789)',
-                'TraitUseAdaptation (alias/insteadof) is #144',
+                'TraitUseAdaptation alias/insteadof on VM (#3238); visibility `as` deferred #144',
                 'Horizontal trait method collision fatals at compile time (#3416)',
             ],
             'probe' => 'trait T { public function m(): int { return 1; } } class C { use T; } echo (new C())->m();',
+        ],
+        [
+            'id' => 'trait_use_adaptation',
+            'construct' => 'Trait use adaptations (`as` rename, `insteadof` precedence)',
+            'opcodes' => ['TYPE_USE_TRAIT', 'TYPE_TRAIT_USE_ADAPTATION'],
+            'issue' => 3238,
+            'jit' => false,
+            'aot' => false,
+            'notes' => [
+                'Zend/zend_compile.c trait alias/precedence; VM applyTraitUsesWithAdaptations',
+                'Visibility `as private` deferred to #144',
+            ],
+            'probe' => 'trait T { public function f(): int { return 1; } } class C { use T { f as r; } } echo (new C())->r();',
         ],
         [
             'id' => 'array_argument_unpack',

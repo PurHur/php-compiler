@@ -3658,7 +3658,7 @@ restart:
         return [$thisVar];
     }
 
-    protected function applyTraitUse(ClassEntry $entry, string $traitName, array $ownMethods = []): void
+    protected function resolveTraitEntry(string $traitName): ClassEntry
     {
         $traitLc = strtolower(ltrim($traitName, '\\'));
         if (!isset($this->context->classes[$traitLc])) {
@@ -3671,7 +3671,17 @@ restart:
         if (!$trait->isTrait) {
             throw new \LogicException("{$traitName} is not a trait");
         }
-        $entry->usedTraits[$trait->name] = $trait->name;
+
+        return $trait;
+    }
+
+    /**
+     * @param array<string, true> $ownMethods
+     *
+     * @return array<string, true>
+     */
+    protected function traitMethodExclusions(ClassEntry $entry, array $ownMethods): array
+    {
         $excluded = $ownMethods;
         $visited = [];
         $current = $entry->parentLc;
@@ -3685,58 +3695,189 @@ restart:
             }
             $current = $this->context->classes[$current]->parentLc;
         }
-        foreach ($trait->methods as $name => $method) {
-            if (isset($excluded[$name])) {
+
+        return $excluded;
+    }
+
+    protected function applyTraitUse(ClassEntry $entry, string $traitName, array $ownMethods = []): void
+    {
+        $this->applyTraitUsesWithAdaptations($entry, [$traitName], [], $ownMethods);
+    }
+
+    /**
+     * @param list<string> $traitNames
+     * @param list<array<string, mixed>> $adaptations
+     * @param array<string, true> $ownMethods
+     */
+    protected function applyTraitUsesWithAdaptations(
+        ClassEntry $entry,
+        array $traitNames,
+        array $adaptations,
+        array $ownMethods = []
+    ): void {
+        if ([] === $traitNames) {
+            return;
+        }
+
+        $excludedMethods = $this->traitMethodExclusions($entry, $ownMethods);
+
+        /** @var array<string, array<string, array{method: Func, vis: int, traitName: string, methodNames: string, attrs: ?list<string>, deprecated: mixed, attributeEntries: mixed, parameterMetadata: mixed}>> */
+        $perTraitMethods = [];
+        /** @var array<string, true> */
+        $excludedByPrecedence = [];
+
+        foreach ($traitNames as $traitName) {
+            $trait = $this->resolveTraitEntry($traitName);
+            $traitLc = strtolower(ltrim($trait->name, '\\'));
+            $entry->usedTraits[$trait->name] = $trait->name;
+            if (!isset($perTraitMethods[$traitLc])) {
+                $perTraitMethods[$traitLc] = [];
+            }
+            foreach ($trait->methods as $name => $method) {
+                $perTraitMethods[$traitLc][$name] = [
+                    'method' => $method,
+                    'vis' => $trait->methodVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC,
+                    'traitName' => $trait->name,
+                    'methodNames' => $trait->methodNames[$name] ?? $name,
+                    'attrs' => $trait->methodAttributeNames[$name] ?? null,
+                    'deprecated' => $trait->methodDeprecated[$name] ?? null,
+                    'attributeEntries' => $trait->methodAttributeEntries[$name] ?? null,
+                    'parameterMetadata' => $trait->methodParameterMetadata[$name] ?? null,
+                ];
+            }
+            foreach ($trait->abstractMethods as $name => $_) {
+                if (!isset($entry->methods[$name]) && !isset($entry->abstractMethods[$name])) {
+                    $entry->abstractMethods[$name] = true;
+                }
+            }
+            foreach ($trait->staticProperties as $name => $storage) {
+                if (!isset($entry->staticProperties[$name])) {
+                    $entry->staticProperties[$name] = $storage;
+                }
+            }
+            foreach ($trait->constants as $name => $value) {
+                if (isset($entry->constants[$name])) {
+                    throw new \LogicException(
+                        "Trait constant {$trait->name}::{$name} conflicts with an existing class constant"
+                    );
+                }
+                $entry->constants[$name] = $value;
+                if (isset($trait->constDeprecated[$name])) {
+                    $entry->constDeprecated[$name] = $trait->constDeprecated[$name];
+                }
+            }
+        }
+
+        foreach ($adaptations as $adaptation) {
+            if ('precedence' !== ($adaptation['kind'] ?? '')) {
                 continue;
             }
-            if (isset($entry->methods[$name]) && !isset($entry->traitMethodSources[$name])) {
+            $methodLc = strtolower((string) $adaptation['method']);
+            foreach ($adaptation['insteadof'] as $loserTrait) {
+                $loserLc = strtolower(ltrim((string) $loserTrait, '\\'));
+                $excludedByPrecedence["{$loserLc}\0{$methodLc}"] = true;
+            }
+        }
+
+        /** @var array<string, array{traitLc: string, method: Func, vis: int, traitName: string, methodNames: string, attrs: ?list<string>, deprecated: mixed, attributeEntries: mixed, parameterMetadata: mixed}> */
+        $merged = [];
+        foreach ($perTraitMethods as $traitLc => $methods) {
+            foreach ($methods as $methodLc => $data) {
+                if (isset($excludedByPrecedence["{$traitLc}\0{$methodLc}"])) {
+                    continue;
+                }
+                if (isset($merged[$methodLc])) {
+                    throw new \LogicException(
+                        'Trait method ' . $methodLc . ' has not been applied, because there are collisions'
+                        . ' with other trait methods on ' . $entry->name
+                    );
+                }
+                $merged[$methodLc] = [
+                    'traitLc' => $traitLc,
+                    'method' => $data['method'],
+                    'vis' => $data['vis'],
+                    'traitName' => $data['traitName'],
+                    'methodNames' => $data['methodNames'],
+                    'attrs' => $data['attrs'],
+                    'deprecated' => $data['deprecated'],
+                    'attributeEntries' => $data['attributeEntries'],
+                    'parameterMetadata' => $data['parameterMetadata'],
+                ];
+            }
+        }
+
+        foreach ($adaptations as $adaptation) {
+            if ('alias' !== ($adaptation['kind'] ?? '')) {
                 continue;
             }
-            if (isset($entry->traitMethodSources[$name])) {
-                $prevTrait = $entry->traitMethodSources[$name];
-                throw new \CompileError(
-                    "Trait method {$trait->name}::{$name} has not been applied as {$entry->name}::{$name}, "
-                    ."because of collision with {$prevTrait}::{$name}"
-                );
+            $methodLc = strtolower((string) $adaptation['method']);
+            $traitLcFilter = null !== ($adaptation['trait'] ?? null)
+                ? strtolower(ltrim((string) $adaptation['trait'], '\\'))
+                : null;
+            if (!isset($merged[$methodLc])) {
+                throw new \LogicException('Could not find trait method ' . $adaptation['method']);
             }
-            $entry->methods[$name] = $method;
-            $entry->traitMethodSources[$name] = $trait->name;
-            $entry->methodVisibility[$name] = $trait->methodVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
-            $entry->methodNames[$name] = $trait->methodNames[$name] ?? $name;
-            if (isset($trait->methodAttributeNames[$name])) {
-                $entry->methodAttributeNames[$name] = $trait->methodAttributeNames[$name];
-            }
-            if (isset($trait->methodDeprecated[$name])) {
-                $entry->methodDeprecated[$name] = $trait->methodDeprecated[$name];
-            }
-            if (isset($trait->methodAttributeEntries[$name])) {
-                $entry->methodAttributeEntries[$name] = $trait->methodAttributeEntries[$name];
-            }
-            if (isset($trait->methodParameterMetadata[$name])) {
-                $entry->methodParameterMetadata[$name] = $trait->methodParameterMetadata[$name];
-            }
-        }
-        foreach ($trait->abstractMethods as $name => $_) {
-            if (!isset($entry->methods[$name]) && !isset($entry->abstractMethods[$name])) {
-                $entry->abstractMethods[$name] = true;
-            }
-        }
-        foreach ($trait->staticProperties as $name => $storage) {
-            if (!isset($entry->staticProperties[$name])) {
-                $entry->staticProperties[$name] = $storage;
-            }
-        }
-        foreach ($trait->constants as $name => $value) {
-            if (isset($entry->constants[$name])) {
+            if (null !== $traitLcFilter && $merged[$methodLc]['traitLc'] !== $traitLcFilter) {
                 throw new \LogicException(
-                    "Trait constant {$trait->name}::{$name} conflicts with an existing class constant"
+                    'Could not find trait method ' . $adaptation['method'] . ' in trait ' . $adaptation['trait']
                 );
             }
-            $entry->constants[$name] = $value;
-            if (isset($trait->constDeprecated[$name])) {
-                $entry->constDeprecated[$name] = $trait->constDeprecated[$name];
+            $newName = $adaptation['newName'] ?? null;
+            if (null === $newName) {
+                continue;
+            }
+            $newNameLc = strtolower((string) $newName);
+            $data = $merged[$methodLc];
+            unset($merged[$methodLc]);
+            if (isset($merged[$newNameLc])) {
+                throw new \LogicException('Cannot redefine method ' . $newName);
+            }
+            $merged[$newNameLc] = $data;
+        }
+
+        foreach ($merged as $methodLc => $data) {
+            if (isset($excludedMethods[$methodLc])) {
+                continue;
+            }
+            if (isset($entry->methods[$methodLc]) && !isset($entry->traitMethodSources[$methodLc])) {
+                continue;
+            }
+            if (isset($entry->traitMethodSources[$methodLc])) {
+                $prevTrait = $entry->traitMethodSources[$methodLc];
+                throw new \CompileError(
+                    "Trait method {$data['traitName']}::{$methodLc} has not been applied as {$entry->name}::{$methodLc}, "
+                    ."because of collision with {$prevTrait}::{$methodLc}"
+                );
+            }
+            $entry->methods[$methodLc] = $data['method'];
+            $entry->traitMethodSources[$methodLc] = $data['traitName'];
+            $entry->methodVisibility[$methodLc] = $data['vis'];
+            $entry->methodNames[$methodLc] = $data['methodNames'];
+            if (null !== $data['attrs']) {
+                $entry->methodAttributeNames[$methodLc] = $data['attrs'];
+            }
+            if (null !== $data['deprecated']) {
+                $entry->methodDeprecated[$methodLc] = $data['deprecated'];
+            }
+            if (null !== $data['attributeEntries']) {
+                $entry->methodAttributeEntries[$methodLc] = $data['attributeEntries'];
+            }
+            if (null !== $data['parameterMetadata']) {
+                $entry->methodParameterMetadata[$methodLc] = $data['parameterMetadata'];
             }
         }
+    }
+
+    /**
+     * @param list<string> $pendingTraits
+     * @param array<string, true> $ownMethods
+     */
+    protected function flushPendingTraitUses(ClassEntry $entry, array $pendingTraits, array $ownMethods = []): void
+    {
+        if ([] === $pendingTraits) {
+            return;
+        }
+        $this->applyTraitUsesWithAdaptations($entry, $pendingTraits, [], $ownMethods);
     }
 
     protected function inheritFromInterfaces(ClassEntry $entry): void
@@ -3929,6 +4070,8 @@ restart:
         $frame = $block->getFrame($this->context);
         $ownMethods = $this->classBodyOwnMethodNames($block, $frame);
         $pendingNewDefaultOps = [];
+        /** @var list<string> */
+        $pendingTraits = [];
         foreach ($block->opCodes as $op) {
             if ([] !== $pendingNewDefaultOps) {
                 if (OpCode::TYPE_DECLARE_PROPERTY === $op->type || OpCode::TYPE_DECLARE_STATIC_PROPERTY === $op->type) {
@@ -3950,13 +4093,29 @@ restart:
 
                 continue;
             }
+            if ($this->isClassBodyDefaultInitOpcode($op->type)) {
+                $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
+                $pendingTraits = [];
+                $this->executeClassBodyDefaultInitOpcode($frame, $op);
+
+                continue;
+            }
             if (VM\ClassConstExpr::isSupportedOpcode($op->type)) {
                 VM\ClassConstExpr::execute($this->context, $frame, $op, $entry);
 
                 continue;
             }
             switch ($op->type) {
+                case OpCode::TYPE_USE_TRAIT:
+                    $pendingTraits[] = $frame->scope[$op->arg1]->toString();
+                    break;
+                case OpCode::TYPE_TRAIT_USE_ADAPTATION:
+                    $this->applyTraitUsesWithAdaptations($entry, $pendingTraits, $op->traitAdaptations, $ownMethods);
+                    $pendingTraits = [];
+                    break;
                 case OpCode::TYPE_DECLARE_PROPERTY:
+                    $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
+                    $pendingTraits = [];
                     $name = $frame->scope[$op->arg1];
                     $default = is_null($op->arg2) ? null : $frame->scope[$op->arg2];
                     $entry->properties[] = new VM\ClassProperty(
@@ -3969,6 +4128,8 @@ restart:
                     );
                     break;
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:
+                    $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
+                    $pendingTraits = [];
                     $name = strtolower($frame->scope[$op->arg1]->toString());
                     $storage = clone $frame->scope[$op->arg3];
                     if (!is_null($op->arg2)) {
@@ -3977,6 +4138,8 @@ restart:
                     $entry->staticProperties[$name] = $storage;
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
+                    $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
+                    $pendingTraits = [];
                     $declaredName = $frame->scope[$op->arg1]->toString();
                     $name = strtolower($declaredName);
                     $vis = \PHPCfg\Func::FLAG_PUBLIC;
@@ -4011,6 +4174,8 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_DECLARE_CLASS_CONST:
+                    $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
+                    $pendingTraits = [];
                     $canonical = $frame->scope[$op->arg1]->toString();
                     $name = strtolower($canonical);
                     if ($entry->isEnum) {
@@ -4049,15 +4214,15 @@ restart:
                         $entry->constDeprecated[$name] = $op->deprecatedMetadata;
                     }
                     break;
-                case OpCode::TYPE_USE_TRAIT:
-                    $this->applyTraitUse($entry, $frame->scope[$op->arg1]->toString(), $ownMethods);
-                    break;
                 default:
+                    $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
+                    $pendingTraits = [];
                     throw new \LogicException(
                         'Other class body types are not jittable for now: '.opcode_type_name($op->type)
                     );
             }
         }
+        $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
         if ([] !== $pendingNewDefaultOps) {
             throw new \LogicException('Unterminated property default `new` initializer in class body');
         }

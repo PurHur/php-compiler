@@ -1,0 +1,61 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler;
+
+use PHPUnit\Framework\TestCase;
+
+/** Trait use adaptations: `as` alias and `insteadof` precedence (#3238). */
+final class TraitAdaptationTest extends TestCase
+{
+    public function testTraitMethodAliasAsRename(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait T { public function f(): int { return 1; } public function g(): int { return 2; } }
+class C { use T { f as renamed; } }
+$c = new C();
+echo $c->renamed(), $c->g();
+PHP;
+        $this->assertSame('12', $this->runVm($code));
+    }
+
+    public function testTraitInsteadofResolvesConflict(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait T1 { public function f(): int { return 1; } }
+trait T2 { public function f(): int { return 99; } public function g(): int { return 2; } }
+class C { use T1, T2 { T1::f insteadof T2; } }
+$c = new C();
+echo $c->f(), $c->g();
+PHP;
+        $this->assertSame('12', $this->runVm($code));
+    }
+
+    public function testTraitConflictWithoutAdaptationIsFatal(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait T1 { public function f(): int { return 1; } }
+trait T2 { public function f(): int { return 2; } }
+class C { use T1, T2; }
+new C();
+PHP;
+        $rt = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('collision');
+        $rt->parseAndCompile($code, 'trait_adapt.php');
+    }
+
+    private function runVm(string $code): string
+    {
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'trait_adapt.php');
+        ob_start();
+        $rt->run($block);
+
+        return ob_get_clean();
+    }
+}
