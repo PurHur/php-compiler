@@ -68,7 +68,7 @@
         <span class="badge badge--live">VM + JIT + AOT</span>
         <span class="badge badge--live">Closures · try/catch</span>
         <span class="badge badge--live">321 builtins</span>
-        <span class="badge badge--live">Spine 745/952</span>
+        <span class="badge badge--live">Spine 822/973</span>
         <span class="badge badge--live">M3 inventory emit</span>
         <span class="badge badge--wip">MCJIT execute</span>
       </div>
@@ -371,7 +371,7 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
           <code>master</code> @ <a href="https://github.com/PurHur/php-compiler/commit/c33f10ef">c33f10ef</a> (30 May 2026, LLVM 9).
           Verified on a clean clone: <code>make bootstrap-selfhost-link</code> → <code>compiler_minimal bundle OK</code>
           (Docker + prelinked gen-0 driver).
-          Spine SSOT: <code>php script/bootstrap-spine-count.php</code> → <strong>745/952</strong> literal
+          Spine SSOT: <code>php script/bootstrap-spine-count.php</code> → <strong>822/973</strong> literal
           <code>require_once</code> units toward full inventory (M2 in progress).
           CI/harness targets report gen-2→gen-3 and inventory emit green when patches + LLVM are fully wired;
           fresh trees may need <code>./script/docker-exec.sh</code> and <code>script/apply-patches.sh</code> before M4 presenters.
@@ -398,7 +398,7 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
         <li class="is-done">
           <span class="ladder__marker" aria-hidden="true">✓</span>
           <h4>M2</h4>
-          <p>Spine <strong>745/952</strong> literal <code>require_once</code> toward full inventory; native link smoke
+          <p>Spine <strong>822/973</strong> literal <code>require_once</code> toward full inventory; native link smoke
             for the bundled spine when LLVM + patches are green
             (<a href="https://github.com/PurHur/php-compiler/issues/2868">#2868</a>,
             <a href="https://github.com/PurHur/php-compiler/issues/2652">#2652</a>).</p>

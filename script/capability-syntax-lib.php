@@ -233,6 +233,19 @@ function syntaxRowDefinitions(): array
             'probe' => 'function g() { yield 1; yield 2; } foreach (g() as $v) echo $v;',
         ],
         [
+            'id' => 'fiber_suspend',
+            'construct' => 'Fibers (`Fiber`, `Fiber::suspend()`, start/resume)',
+            'opcodes' => [],
+            'issue' => 3130,
+            'jit' => false,
+            'aot' => false,
+            'notes' => [
+                'VM FiberState + builtin Fiber class (#3130); php-src Zend/zend_fibers.c',
+                'JIT/AOT out of scope v1 (mirror generators #167)',
+            ],
+            'probe' => '$f = new Fiber(function (): void { Fiber::suspend(1); }); echo $f->start();',
+        ],
+        [
             'id' => 'class_name_const',
             'construct' => '`ClassName::class` / `static::class`',
             'opcodes' => ['TYPE_CLASS_CONST_FETCH'],

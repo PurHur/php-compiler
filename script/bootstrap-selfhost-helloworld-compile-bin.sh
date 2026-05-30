@@ -33,7 +33,8 @@ fi
 # M5/M4: native bin/compile.php argv driver — inventory Compiler {main}, not emit-TU (#2900, #2880).
 if [[ "${SOURCE_NORM}" == "${ROOT}/bin/compile.php" ]]; then
   EMIT_HELPER="${ROOT}/build/selfhost-native-compile-driver"
-  rm -f "${EMIT_HELPER}" "${AOT_OUT}" "${ROOT}/build/.last-jit-func-native-compile-driver" "${ROOT}/build/.m3_bin_compile_aot_blob"
+  INVENTORY_ARGV="${ROOT}/build/bin-compile-aot-inventory"
+  rm -f "${EMIT_HELPER}" "${AOT_OUT}" "${INVENTORY_ARGV}" "${ROOT}/build/.last-jit-func-native-compile-driver" "${ROOT}/build/.m3_bin_compile_aot_blob"
   export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-native-compile-driver"
   if ! env -u PHP_COMPILER_EMIT_HELPER_LINK PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1 \
     PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \
@@ -51,8 +52,9 @@ if [[ "${SOURCE_NORM}" == "${ROOT}/bin/compile.php" ]]; then
   # return null for non-sidecar sources while we bisect M3 inventory emit crashes (#2967).
   cp -f "${AOT_OUT}" "${EMIT_HELPER}"
   cp -f "${AOT_OUT}" "${ROOT}/build/.m3_bin_compile_aot_blob"
-  chmod +x "${EMIT_HELPER}" "${AOT_OUT}" "${ROOT}/build/.m3_bin_compile_aot_blob"
-  echo "bootstrap-selfhost-helloworld-compile-bin: OK ${AOT_OUT} (inventory bin/compile.php argv driver; sidecar #2880/#2900)"
+  cp -f "${AOT_OUT}" "${INVENTORY_ARGV}"
+  chmod +x "${EMIT_HELPER}" "${AOT_OUT}" "${INVENTORY_ARGV}" "${ROOT}/build/.m3_bin_compile_aot_blob"
+  echo "bootstrap-selfhost-helloworld-compile-bin: OK ${AOT_OUT} (inventory bin/compile.php argv driver; SSOT ${INVENTORY_ARGV})"
   exit 0
 fi
 
@@ -87,7 +89,7 @@ printf '%s\n' "${compile_out}"
 if [[ "${compile_code}" -eq 0 ]] && grep -qE 'helloworld_compile_smoke: compile OK|compile_smoke_m3_emit: compile OK' <<< "${compile_out}"; then
   echo "bootstrap-selfhost-helloworld-compile-bin: OK ${OUT} -> ${AOT_OUT}"
   # M5 gen-2 argv driver must be inventory-linked bin/compile.php (~400KiB), not HelloWorld-only (~180KiB) (#3011).
-  BIN_COMPILE_AOT="${ROOT}/build/bin-compile-aot"
+  BIN_COMPILE_AOT="${ROOT}/build/bin-compile-aot-inventory"
   rm -f "${BIN_COMPILE_AOT}" "${ROOT}/build/.m3_bin_compile_aot_blob"
   if ! env -u PHP_COMPILER_EMIT_HELPER_LINK PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 \
     PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1 PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \

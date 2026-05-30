@@ -47,6 +47,8 @@ class Runtime {
     public ?VM $vm = null;
     private ?JITContext $jitContext = null;
     private ?JIT $jit = null;
+    private bool $jitLoadedFromDiskCache = false;
+    private ?string $jitCompileCacheKey = null;
     public array $modules = [];
     public int $mode;
     private SealedClassAnnotator $sealedClassAnnotator;
@@ -157,6 +159,10 @@ class Runtime {
     /** M3 emit smoke: compile main block only; skip eager ext/ JIT (#1983, #2599). */
     private function shouldSkipLoadJitCompileModuleFuncs(): bool
     {
+        if (JIT\CompileCache::shouldSkipModuleFuncCompile()) {
+            return true;
+        }
+
         return JIT\EmitTuMode::isMinimalRuntime();
     }
 
@@ -390,9 +396,42 @@ class Runtime {
         return $compiled;
     }
 
-    public function jit(?Block $block) {
-        $this->jitCompileBlock($block);
+    public function jit(?Block $block, ?string $sourceCode = null, ?string $sourcePath = null) {
+        $this->jitLoadedFromDiskCache = false;
+        $this->jitCompileCacheKey = null;
+
+        if (
+            null !== $block
+            && is_string($sourceCode)
+            && is_string($sourcePath)
+            && JIT\CompileCache::isEnabled()
+        ) {
+            $cacheKey = JIT\CompileCache::computeKey($sourcePath, $sourceCode);
+            $this->jitCompileCacheKey = $cacheKey;
+            if (JIT\CompileCache::isFresh($cacheKey, $sourcePath, $sourceCode)) {
+                $context = $this->loadJitContext();
+                if (JIT\CompileCache::tryRestore($context, $block, $cacheKey)) {
+                    $this->jitLoadedFromDiskCache = true;
+                }
+            }
+            if (!$this->jitLoadedFromDiskCache) {
+                JIT\CompileCache::beginRecording($cacheKey);
+            }
+        }
+
+        if (!$this->jitLoadedFromDiskCache) {
+            $this->jitCompileBlock($block);
+        }
         $this->jitEmitInPlace();
+
+        if (
+            !$this->jitLoadedFromDiskCache
+            && null !== $this->jitCompileCacheKey
+            && null !== $this->jitContext
+        ) {
+            JIT\CompileCache::save($this->jitContext, $this->jitCompileCacheKey);
+        }
+        JIT\CompileCache::finishRecording();
     }
 
     /** Lower script block to LLVM IR (issue #1898 bench-compile phases). */
@@ -402,7 +441,11 @@ class Runtime {
 
     /** MCJIT link / engine creation; no-op when already compiled in-process (#153 warm). */
     public function jitEmitInPlace(): void {
-        $this->loadJitContext()->compileInPlace();
+        if ($this->jitLoadedFromDiskCache) {
+            $this->loadJitContext()->compileInPlaceFromDiskCache();
+        } else {
+            $this->loadJitContext()->compileInPlace();
+        }
     }
 
     public function standalone(?Block $block, string $outfile, ?string $sourceCode = null, ?string $sourceFilename = null) {

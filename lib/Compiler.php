@@ -1817,8 +1817,12 @@ class Compiler {
                             }
                             $defaultSlot = $this->compileOperand($child->defaultVar, $result, true);
                             if (!isset($result->constants[$defaultSlot])) {
+                                $propName = '?';
+                                if ($child->name instanceof Operand\Literal && is_string($child->name->value)) {
+                                    $propName = $child->name->value;
+                                }
                                 $this->throwCompileLogic(
-                                    'Property default must be a compile-time constant (#3803)'
+                                    'Property default must be a compile-time constant (#3803): $'.$propName
                                 );
                             }
                         }
@@ -2140,7 +2144,13 @@ class Compiler {
         }
         $slot = $this->compileOperand($param->defaultVar, $block, true);
         if (!isset($block->constants[$slot])) {
-            $this->throwCompileLogic('Parameter default must be a compile-time constant (#3803)');
+            $paramName = '?';
+            if ($param->name instanceof Operand\Literal && is_string($param->name->value)) {
+                $paramName = $param->name->value;
+            }
+            $this->throwCompileLogic(
+                'Parameter default must be a compile-time constant (#3803): $'.$paramName
+            );
         }
 
         return $slot;
@@ -2180,10 +2190,13 @@ class Compiler {
             return null;
         }
         $children = $param->defaultBlock->children;
-        if (1 !== \count($children)) {
+        if ([] === $children) {
             return null;
         }
-        $expr = $children[0];
+        $expr = $children[\count($children) - 1];
+        if (!$expr instanceof Op\Expr) {
+            return null;
+        }
         if ($expr instanceof Op\Expr\ConstFetch) {
             $vm = $this->tryFoldGlobalConstFetch($expr);
             if (null !== $vm) {
@@ -2195,6 +2208,106 @@ class Compiler {
             if (null !== $vm) {
                 return $block->registerConstant($param->defaultVar, $vm);
             }
+        }
+        if ($expr instanceof Op\Expr\Array_) {
+            $vm = $this->tryBuildCompileTimeArrayFromExpr($expr);
+            if (null !== $vm) {
+                return $block->registerConstant($param->defaultVar, $vm);
+            }
+        }
+        if ($expr instanceof Op\Expr\UnaryMinus || $expr instanceof Op\Expr\UnaryPlus) {
+            $vm = $this->tryFoldUnaryLiteralDefault($expr);
+            if (null !== $vm) {
+                return $block->registerConstant($param->defaultVar, $vm);
+            }
+        }
+        $vm = $this->tryFoldCompileTimeExprDefault($expr, $block, $children);
+        if (null !== $vm) {
+            return $block->registerConstant($param->defaultVar, $vm);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<Op> $defaultBlockChildren
+     */
+    protected function tryFoldCompileTimeExprDefault(Op\Expr $expr, Block $block, array $defaultBlockChildren = []): ?Variable
+    {
+        if ($expr instanceof Op\Expr\ConstFetch) {
+            return $this->tryFoldGlobalConstFetch($expr);
+        }
+        if ($expr instanceof Op\Expr\ClassConstFetch) {
+            return $this->tryFoldClassConstFetchDefault($expr, $block);
+        }
+        if ($expr instanceof Op\Expr\Array_) {
+            return $this->tryBuildCompileTimeArrayFromExpr($expr);
+        }
+        if ($expr instanceof Op\Expr\UnaryMinus || $expr instanceof Op\Expr\UnaryPlus) {
+            return $this->tryFoldUnaryLiteralDefault($expr);
+        }
+        if ($expr instanceof Op\Expr\BinaryOp\BitwiseOr || $expr instanceof Op\Expr\BinaryOp\BitwiseAnd) {
+            $left = $this->tryFoldCompileTimeOperandDefault($expr->left, $block, $defaultBlockChildren);
+            $right = $this->tryFoldCompileTimeOperandDefault($expr->right, $block, $defaultBlockChildren);
+            if (null === $left || null === $right || !$left->is(Variable::TYPE_INTEGER) || !$right->is(Variable::TYPE_INTEGER)) {
+                return null;
+            }
+            $value = new Variable(Variable::TYPE_INTEGER);
+            $combined = $expr instanceof Op\Expr\BinaryOp\BitwiseOr
+                ? ($left->toInt() | $right->toInt())
+                : ($left->toInt() & $right->toInt());
+            $value->int($combined);
+
+            return $value;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<Op> $defaultBlockChildren
+     */
+    protected function tryFoldCompileTimeOperandDefault(Operand $operand, Block $block, array $defaultBlockChildren = []): ?Variable
+    {
+        $vm = $this->vmVariableFromCfgLiteralOperand($operand);
+        if (null !== $vm) {
+            return $vm;
+        }
+        foreach ($defaultBlockChildren as $child) {
+            if (!$child instanceof Op\Expr) {
+                continue;
+            }
+            if (!property_exists($child, 'result') || $child->result !== $operand) {
+                continue;
+            }
+            $vm = $this->tryFoldCompileTimeExprDefault($child, $block, $defaultBlockChildren);
+            if (null !== $vm) {
+                return $vm;
+            }
+        }
+
+        return null;
+    }
+
+    protected function tryFoldUnaryLiteralDefault(Op\Expr\UnaryMinus|Op\Expr\UnaryPlus $expr): ?Variable
+    {
+        $vm = $this->vmVariableFromCfgLiteralOperand($expr->expr);
+        if (null === $vm) {
+            return null;
+        }
+        if ($vm->is(Variable::TYPE_INTEGER)) {
+            $value = new Variable(Variable::TYPE_INTEGER);
+            $n = $vm->toInt();
+            $value->int($expr instanceof Op\Expr\UnaryMinus ? -$n : $n);
+
+            return $value;
+        }
+        if ($vm->is(Variable::TYPE_FLOAT)) {
+            $value = new Variable(Variable::TYPE_FLOAT);
+            $n = $vm->toFloat();
+            $value->float($expr instanceof Op\Expr\UnaryMinus ? -$n : $n);
+
+            return $value;
         }
 
         return null;
@@ -2231,6 +2344,13 @@ class Compiler {
 
             return $v;
         }
+        $errorInt = \PHPCompiler\VM\Context::errorReportingConstant($name);
+        if (null !== $errorInt) {
+            $v = new Variable(Variable::TYPE_INTEGER);
+            $v->int($errorInt);
+
+            return $v;
+        }
 
         return null;
     }
@@ -2247,11 +2367,37 @@ class Compiler {
             return null;
         }
         $lcConst = strtolower($constName);
-        if (!isset($this->compileTimeClassConsts[$lcClass][$lcConst])) {
+        if (isset($this->compileTimeClassConsts[$lcClass][$lcConst])) {
+            $value = new Variable();
+            $value->copyFrom($this->compileTimeClassConsts[$lcClass][$lcConst]);
+
+            return $value;
+        }
+
+        return $this->tryFoldExternalClassConstFetch($className, $constName);
+    }
+
+    protected function tryFoldExternalClassConstFetch(string $className, string $constName): ?Variable
+    {
+        if ('phpcfg\\func' !== strtolower(ltrim($className, '\\'))) {
             return null;
         }
-        $value = new Variable();
-        $value->copyFrom($this->compileTimeClassConsts[$lcClass][$lcConst]);
+        $flags = [
+            'FLAG_PUBLIC' => \PHPCfg\Func::FLAG_PUBLIC,
+            'FLAG_PROTECTED' => \PHPCfg\Func::FLAG_PROTECTED,
+            'FLAG_PRIVATE' => \PHPCfg\Func::FLAG_PRIVATE,
+            'FLAG_STATIC' => \PHPCfg\Func::FLAG_STATIC,
+            'FLAG_ABSTRACT' => \PHPCfg\Func::FLAG_ABSTRACT,
+            'FLAG_FINAL' => \PHPCfg\Func::FLAG_FINAL,
+            'FLAG_RETURNS_REF' => \PHPCfg\Func::FLAG_RETURNS_REF,
+            'FLAG_CLOSURE' => \PHPCfg\Func::FLAG_CLOSURE,
+        ];
+        $lcConst = strtoupper($constName);
+        if (!isset($flags[$lcConst])) {
+            return null;
+        }
+        $value = new Variable(Variable::TYPE_INTEGER);
+        $value->int($flags[$lcConst]);
 
         return $value;
     }

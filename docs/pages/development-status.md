@@ -60,9 +60,9 @@ Closure callbacks in **`array_map` / `array_filter` / `usort`** on VM ([#3086](h
 
 - **`phpc` CLI** — `run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`, `doctor`
 - **Examples 000–009** — VM and AOT link/execute for the curated web subset
-- **Self-host M0–M2** — minimal bundle ✅; spine native link **726/726** ✅
+- **Self-host M0–M2** — minimal bundle ✅; spine native link **822/973** 🚧
 - **Self-host M3** — HelloWorld strict **`emit_path=native`** ✅; thin TU + **inventory emit** strict ✅ ([#3070](https://github.com/PurHur/php-compiler/pull/3070)); production **`bin/compile.php`** inventory emit 🚧 ([#3024](https://github.com/PurHur/php-compiler/issues/3024))
-- **Self-host M4** — gen-2→gen-3 **726/726** without Zend on compile ✅; full revision probe ✅ ([#3058](https://github.com/PurHur/php-compiler/pull/3058))
+- **Self-host M4** — gen-2→gen-3 **822/973** without Zend on compile ✅; full revision probe ✅ ([#3058](https://github.com/PurHur/php-compiler/pull/3058))
 - **Self-host M5 (partial)** — vendor prelink **3/3** ✅; committed `.o` cold boot ✅; gen-0 seed ✅; Zend still used for empty `build/` bootstrap
 
 **Not claimed:** full Zend PHP compatibility (subset compiler only).
@@ -75,7 +75,7 @@ Closure callbacks in **`array_map` / `array_filter` / `usort`** on VM ([#3086](h
 |-----------|--------|
 | **M0** — Small `lib/` bundle runs | ✅ |
 | **M1** — Compiler-shaped bundle + compile-smoke | ✅ |
-| **M2** — Spine toward full inventory | ✅ **726/726** |
+| **M2** — Spine toward full inventory | 🚧 **822/973** |
 | **M3** — Native compiles PHP (no Zend emit) | 🚧 Smoke + inventory emit ✅ · `bin/compile.php` production emit 🚧 |
 | **M4** — Bootstrap loop (next revision) | ✅ |
 | **M5** — Full self-host, no `vendor/` cold boot | 🚧 |

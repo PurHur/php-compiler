@@ -234,6 +234,7 @@ class Context {
 
     public function addExport(string $name, string $signature, Block $block): void {
         $this->exports[] = [$name, $signature, $block];
+        CompileCache::recordExport($name, $signature, $block);
     }
 
     /** Implicit $this passed as the first LLVM arg for instance methods (#877). */
@@ -593,6 +594,41 @@ class Context {
                 $export[2]->handler = $this->result->getHandler($export[0], $export[1]);
             }
         }
+    }
+
+    /** MCJIT from on-disk bitcode cache (#153). */
+    public function compileInPlaceFromDiskCache(): void {
+        if (!is_null($this->result)) {
+            return;
+        }
+        McjitEmbedRuntime::prepareModule($this);
+        $message = '';
+        $this->module->verify($this->module::VERIFY_ACTION_THROW, $message);
+        $engine = $this->module->createJITCompiler(0);
+        $this->result = new Result(
+            $engine,
+            $this->loadType
+        );
+        Builtin\ReadonlyRaise::bindJitEngine($engine);
+        Builtin\TypeErrorRaise::bindJitEngine($engine);
+        Builtin\JitThrow::bindJitEngine($engine);
+        foreach ($this->exports as $export) {
+            $export[2]->handler = $this->result->getHandler($export[0], $export[1]);
+        }
+    }
+
+    public function replaceModuleFromBitcodeFile(string $path): void {
+        $message = '';
+        $buffer = $this->llvm->createMemoryBufferWithFile($path, $message);
+        if ('' !== $message) {
+            throw new \RuntimeException('Bitcode read failed: '.$message);
+        }
+        try {
+            $this->module = $buffer->parseBitcode($this->context);
+        } finally {
+            $buffer->dispose();
+        }
+        $this->targetData = $this->module->getModuleDataLayout();
     }
 
     private function compileCommon() {

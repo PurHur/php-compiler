@@ -565,7 +565,7 @@ final class VmReflection
     /**
      * @return list<string>
      */
-    public static function classMethodsList(ClassEntry $entry, int $filter = self::METHOD_FILTER_DEFAULT): array
+    public static function classMethodsList(ClassEntry $entry, int $filter = 7): array
     {
         $names = [];
         foreach ($entry->methods as $methodLc => $_method) {
@@ -579,7 +579,7 @@ final class VmReflection
         return $names;
     }
 
-    public static function classMethodsArray(ClassEntry $entry, int $filter = self::METHOD_FILTER_DEFAULT): Variable
+    public static function classMethodsArray(ClassEntry $entry, int $filter = 7): Variable
     {
         $result = new Variable();
         $result->newArray();

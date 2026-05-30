@@ -20,6 +20,7 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\FiberState;
 use PHPCompiler\VM\GeneratorState;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\NamedArgs;
@@ -44,6 +45,9 @@ class VM {
 
     /** Generator body suspended at `yield` (issue #167). */
     const GENERATOR_YIELD = 3;
+
+    /** Fiber callback suspended at Fiber::suspend() (issue #3130). */
+    const FIBER_SUSPEND = 4;
 
     public Context $context;
 
@@ -479,6 +483,97 @@ class VM {
         }
 
         return $out->resolveIndirect();
+    }
+
+    /**
+     * Start a new fiber (issue #3130).
+     *
+     * @param list<Variable> $startArgs
+     */
+    public function startFiber(FiberState $fiber, Variable ...$startArgs): Variable
+    {
+        if (FiberState::STATUS_INIT !== $fiber->status) {
+            throw new \LogicException('Fiber has already been started');
+        }
+        $fiber->resumeArgument->null();
+        $child = $fiber->callback->func->getFrame($this->context, null);
+        $this->bindClosureCallCaptures($child, $fiber->callback);
+        $child->calledArgs = $startArgs;
+        $child->fiberState = $fiber;
+        $returnSlot = new Variable();
+        $child->returnVar = $returnSlot;
+        $fiber->frame = $child;
+        $fiber->status = FiberState::STATUS_RUNNING;
+
+        return $this->runFiberExecution($fiber, $returnSlot);
+    }
+
+    /**
+     * Resume a suspended fiber (issue #3130).
+     *
+     * @param list<Variable> $resumeArgs
+     */
+    public function resumeFiber(FiberState $fiber, Variable ...$resumeArgs): Variable
+    {
+        if (FiberState::STATUS_TERMINATED === $fiber->status) {
+            throw new \LogicException('Fiber has already been terminated');
+        }
+        if (FiberState::STATUS_SUSPENDED !== $fiber->status) {
+            throw new \LogicException('Fiber must be suspended to resume');
+        }
+        if ([] !== $resumeArgs) {
+            $fiber->resumeArgument->copyFrom($resumeArgs[0]->resolveIndirect());
+        } else {
+            $fiber->resumeArgument->null();
+        }
+        $child = $fiber->frame;
+        if (null === $child) {
+            throw new \LogicException('Fiber resume missing suspended frame');
+        }
+        $fiber->status = FiberState::STATUS_RUNNING;
+        $returnSlot = new Variable();
+        $savedReturn = $child->returnVar;
+        $child->returnVar = $returnSlot;
+        try {
+            return $this->runFiberExecution($fiber, $returnSlot);
+        } finally {
+            $child->returnVar = $savedReturn;
+        }
+    }
+
+    private function runFiberExecution(FiberState $fiber, Variable $returnSlot): Variable
+    {
+        $child = $fiber->frame;
+        if (null === $child) {
+            throw new \LogicException('Fiber execution missing frame');
+        }
+        $savedFiber = $this->context->currentFiber;
+        $this->context->currentFiber = $fiber;
+        $savedStack = $this->context->swapRunStack(null);
+        try {
+            $this->context->push($child);
+            $result = $this->runFrames();
+        } finally {
+            $this->context->swapRunStack($savedStack);
+            $this->context->currentFiber = $savedFiber;
+        }
+        if (self::FIBER_SUSPEND === $result) {
+            $fiber->status = FiberState::STATUS_SUSPENDED;
+            $out = new Variable();
+            $out->copyFrom($fiber->suspendReturn);
+
+            return $out;
+        }
+        if (self::SUCCESS === $result) {
+            $fiber->status = FiberState::STATUS_TERMINATED;
+            $fiber->frame = null;
+            $out = new Variable();
+            $out->copyFrom($returnSlot->resolveIndirect());
+
+            return $out;
+        }
+
+        throw new \LogicException('Fiber execution failed in this compiler build');
     }
 
     /**
@@ -1499,6 +1594,11 @@ restart:
                             $frame = $catchFrame;
                             goto restart;
                         }
+                        if ($frame->fiberSuspend) {
+                            $frame->fiberSuspend = false;
+
+                            return self::FIBER_SUSPEND;
+                        }
                         break;
                     }
                     $this->context->push($frame);
@@ -2201,6 +2301,11 @@ restart:
                 $frame->generatorYield = false;
 
                 return self::GENERATOR_YIELD;
+            }
+            if ($frame->fiberSuspend) {
+                $frame->fiberSuspend = false;
+
+                return self::FIBER_SUSPEND;
             }
         }
         if ($frame->ephemeral) {

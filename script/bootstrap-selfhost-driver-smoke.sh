@@ -5,16 +5,18 @@
 # Stage 0: Zend links build/selfhost-helloworld-compile (M3 compile-driver TU).
 # Stage 1: Native driver emits test/bootstrap-aot/compiler_smoke_standalone.php → gen-2 binary.
 # Stage 2: Run gen-2; expect "compiler smoke" (same as M4 loop gen-2 slice).
-# Stage 3–4: build bin/compile.php argv driver (build/bin-compile-aot) and native emit probe.
+# Stage 3–4: inventory argv driver (build/bin-compile-aot-inventory SSOT #2968) and native emit probe.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=php-env.sh
 source "${ROOT}/script/php-env.sh"
+# shellcheck source=bootstrap-ensure-inventory-argv-driver.sh
+source "${ROOT}/script/bootstrap-ensure-inventory-argv-driver.sh"
 ci_apply_llvm_memory_env
 
 HELLOWORLD_DRIVER="${ROOT}/build/selfhost-helloworld-compile"
-BIN_COMPILE_DRIVER="${ROOT}/build/bin-compile-aot"
+BIN_COMPILE_DRIVER="${ROOT}/build/bin-compile-aot-inventory"
 SOURCE="${ROOT}/test/bootstrap-aot/compiler_smoke_standalone.php"
 GEN2_OUT="${ROOT}/build/selfhost-driver-smoke-gen2"
 EXPECTED_STDOUT="compiler smoke"
@@ -90,17 +92,13 @@ if ! grep -qx "${EXPECTED_STDOUT}" <<< "${run_out}"; then
   exit 1
 fi
 
-echo "bootstrap-selfhost-driver-smoke: stage 3 — build native bin/compile.php argv driver (no Zend on emit)"
-# Use the dedicated host-compile path for a functional argv driver (M5), rather than the
-# inventory-sidecar compile-driver shim. The inventory argv driver is still under active
-# stabilization and can return null / segfault on bootstrap fixtures (#3004, #2967).
-if ! env BOOTSTRAP_M5_DRIVER_HOST_FULL_CLI=1 PHP_COMPILER_M5_DRIVER_OUT="${BIN_COMPILE_DRIVER}" \
-  ./script/bootstrap-selfhost-driver-host-compile.sh >/dev/null; then
-  echo "bootstrap-selfhost-driver-smoke: native bin/compile.php argv driver host-compile failed" >&2
+echo "bootstrap-selfhost-driver-smoke: stage 3 — ensure inventory argv driver (SSOT #2968)"
+if ! bootstrap_ensure_inventory_argv_driver_ssot "${BIN_COMPILE_DRIVER}" >/dev/null; then
+  echo "bootstrap-selfhost-driver-smoke: inventory argv driver ensure failed" >&2
   exit 1
 fi
 if [[ ! -x "${BIN_COMPILE_DRIVER}" ]]; then
-  echo "bootstrap-selfhost-driver-smoke: missing compiled bin/compile.php helper ${BIN_COMPILE_DRIVER}" >&2
+  echo "bootstrap-selfhost-driver-smoke: missing inventory argv driver ${BIN_COMPILE_DRIVER}" >&2
   exit 1
 fi
 
@@ -129,29 +127,12 @@ fi
 # Output format is intentionally not asserted here: the driver is a compiled bin/compile.php
 # and should behave like the CLI. Existence + exit code are the stable contract.
 
-echo "bootstrap-selfhost-driver-smoke: stage 5 — gen-3 argv emit (#2890)"
-GEN3_DRIVER="${ROOT}/build/bootstrap-driver-smoke-gen3-compile"
+echo "bootstrap-selfhost-driver-smoke: stage 5 — gen-3 argv emit via inventory driver (#2890, #2968)"
+GEN3_DRIVER="${BIN_COMPILE_DRIVER}"
 GEN3_SMOKE="${ROOT}/build/bootstrap-driver-smoke-gen3-smoke"
-rm -f "${GEN3_DRIVER}" "${GEN3_SMOKE}"
-# Re-link gen-3 via the same M5 host path as stage 3 so link-time sidecars match stage 4 (#3004).
-if ! env BOOTSTRAP_M5_DRIVER_HOST_FULL_CLI=1 PHP_COMPILER_M5_DRIVER_OUT="${GEN3_DRIVER}" \
-  ./script/bootstrap-selfhost-driver-host-compile.sh; then
-  echo "bootstrap-selfhost-driver-smoke: gen-3 host-compile bin/compile.php failed" >&2
-  exit 1
-fi
-# Gen-2 emit of bin/compile.php can copy the link-time bin/compile sidecar stub (~180KiB) instead of
-# a full M5 argv driver (~360KiB). Use the stage-3 full driver for gen-3 smoke until native re-link
-# embeds bootstrap-aot sidecars in the gen-3 product (#3004).
-GEN3_STUB_BYTES=250000
-if [[ -f "${GEN3_DRIVER}" ]]; then
-  gen3_bytes="$(wc -c <"${GEN3_DRIVER}")"
-  if [[ "${gen3_bytes}" -lt "${GEN3_STUB_BYTES}" ]]; then
-    echo "bootstrap-selfhost-driver-smoke: gen-3 link produced stub (${gen3_bytes} bytes); using ${BIN_COMPILE_DRIVER} for argv emit" >&2
-    GEN3_DRIVER="${BIN_COMPILE_DRIVER}"
-  fi
-fi
+rm -f "${GEN3_SMOKE}"
 if [[ ! -x "${GEN3_DRIVER}" ]]; then
-  echo "bootstrap-selfhost-driver-smoke: missing gen-3 driver ${GEN3_DRIVER}" >&2
+  echo "bootstrap-selfhost-driver-smoke: missing gen-3 inventory driver ${GEN3_DRIVER}" >&2
   exit 1
 fi
 set +e
@@ -189,4 +170,4 @@ if ! grep -qx "${EXPECTED_STDOUT}" <<< "${gen3_run_out}"; then
 fi
 
 echo "bootstrap-selfhost-driver-smoke: emit_path=native (gen-2 compile + run + gen-3 argv)"
-echo "bootstrap-selfhost-driver-smoke: OK ${HELLOWORLD_DRIVER} -> ${GEN2_OUT} (argv driver ${BIN_COMPILE_DRIVER}, gen-3 ${GEN3_DRIVER})"
+echo "bootstrap-selfhost-driver-smoke: OK ${HELLOWORLD_DRIVER} -> ${GEN2_OUT} (inventory argv ${BIN_COMPILE_DRIVER})"

@@ -15,6 +15,11 @@ use PHPCompiler\VM\Builtin\ExceptionGetCode;
 use PHPCompiler\VM\Builtin\ExceptionGetFile;
 use PHPCompiler\VM\Builtin\ExceptionGetLine;
 use PHPCompiler\VM\Builtin\ExceptionGetMessage;
+use PHPCompiler\VM\Builtin\FiberConstruct;
+use PHPCompiler\VM\Builtin\FiberGetCurrent;
+use PHPCompiler\VM\Builtin\FiberResume;
+use PHPCompiler\VM\Builtin\FiberStart;
+use PHPCompiler\VM\Builtin\FiberSuspend;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetArguments;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetName;
 use PHPCompiler\VM\Builtin\ReflectionAttributeNewInstance;
@@ -55,6 +60,7 @@ use PHPCompiler\VM\Builtin\WeakReferenceConstruct;
 use PHPCompiler\VM\Builtin\WeakReferenceCreate;
 use PHPCompiler\VM\Builtin\WeakReferenceGet;
 use PHPCompiler\VM\ExceptionSupport;
+use PHPCompiler\VM\FiberSupport;
 
 /**
  * Register VM builtin classes stdClass, WeakReference, WeakMap, Reflection*, and Throwable* (#1366, #1936, #3117, #195, #3371).
@@ -73,6 +79,7 @@ final class BuiltinClasses
         self::registerDateTime($ctx);
         self::registerExceptions($ctx);
         self::registerJsonSerializable($ctx);
+        self::registerFiber($ctx);
         GeneratorState::register($ctx);
         ClosureState::register($ctx);
     }
@@ -447,5 +454,26 @@ final class BuiltinClasses
         $entry = new ClassEntry('JsonSerializable');
         $entry->isInterface = true;
         $ctx->classes['jsonserializable'] = $entry;
+    }
+
+    private static function registerFiber(Context $ctx): void
+    {
+        $entry = new ClassEntry('Fiber');
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $entry->constructor = new FiberConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+        foreach (
+            [
+                'start' => new FiberStart(),
+                'resume' => new FiberResume(),
+                'suspend' => new FiberSuspend(),
+                'getcurrent' => new FiberGetCurrent(),
+            ] as $name => $method
+        ) {
+            $entry->methods[$name] = $method;
+            $entry->methodVisibility[$name] = $pub;
+        }
+        $ctx->classes[FiberSupport::CLASS_FIBER] = $entry;
     }
 }

@@ -47,6 +47,9 @@ class Frame {
     /** Active generator while executing a generator function body (issue #167). */
     public ?VM\GeneratorState $generatorState = null;
 
+    /** Active fiber while executing a fiber callback (issue #3130). */
+    public ?VM\FiberState $fiberState = null;
+
     /** Pending closure call: captures bound when the callee frame is entered (issue #72). */
     public ?VM\ClosureState $closureCall = null;
 
@@ -63,6 +66,9 @@ class Frame {
 
     /** Exception object bound for bare `throw;` in this catch body (#3508). */
     public ?Variable $activeCatchException = null;
+
+    /** Set when Fiber::suspend() suspends; runFrames returns FIBER_SUSPEND. */
+    public bool $fiberSuspend = false;
 
     /**
      * Foreach iterator container cache keyed by scope slot.

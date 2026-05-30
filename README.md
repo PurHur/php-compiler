@@ -11,7 +11,7 @@
 
 > **Stable line (2026)** — First maintained **stable** release of this fork: demo-ready VM + AOT for a **web-capable PHP subset**, reference examples **000–009**, and an experimental **self-host** path (compiler compiling its own `lib/`). Not full Zend PHP compatibility — see [what’s missing](https://purhur.github.io/php-compiler/docs/pages/missing-implementation.html).
 
-**Snapshot (`master` @ `158fe6a9`, 30 May 2026):** VM + AOT for shipped examples ✅ · **321** builtins · self-host spine **745/952** · M0 smoke reproducible in Docker — details below.
+**Snapshot (`master` @ `158fe6a9`, 30 May 2026):** VM + AOT for shipped examples ✅ · **321** builtins · self-host spine **822/973** · M0 smoke reproducible in Docker — details below.
 
 ---
 
@@ -40,7 +40,7 @@ Counts from `php script/bootstrap-spine-count.php` (literal `require_once` in `c
 | Milestone | Status | What it means |
 |-----------|--------|----------------|
 | **M0–M1** | ✅ | `compiler_minimal` + compile-smoke bundles link and run natively |
-| **M2** | 🚧 **745/952** | Spine grows toward full `lib/` inventory; native spine link green on maintained Docker CI when patches + LLVM are wired |
+| **M2** | 🚧 **822/973** | Spine grows toward full `lib/` inventory; native spine link green on maintained Docker CI when patches + LLVM are wired |
 | **M3** | 🚧 | HelloWorld + **inventory emit** strict native ✅ ([#3070](https://github.com/PurHur/php-compiler/pull/3070)); production `bin/compile.php` inventory path without thin TU open ([#3024](https://github.com/PurHur/php-compiler/issues/3024)) |
 | **M4** | 🚧 | Gen-2→gen-3 recompile + full revision probe green on CI; `make north-star4-verify` may exit 0 with documented partial blockers on some fresh clones |
 | **M5** | 🚧 | Vendor prelink **3/3** ✅; committed `.o` cold boot ✅; Zend still default when `build/` is empty ([#1416](https://github.com/PurHur/php-compiler/issues/1416)) |
@@ -255,7 +255,7 @@ Full matrices (auto-generated): [`docs/capabilities.md`](docs/capabilities.md) (
 
 **Self-host (experimental, not “stable app” scope)**
 
-See [Current implementation status](#current-implementation-status-may-2026) for the full M0–M5 ladder. Summary: M0 smoke ✅ in Docker; M2 **745/952** spine toward inventory; M3 inventory emit ✅ / production `bin/compile.php` 🚧 ([#3024](https://github.com/PurHur/php-compiler/issues/3024)); M4/M5 partial on fresh trees ([#1492](https://github.com/PurHur/php-compiler/issues/1492)).
+See [Current implementation status](#current-implementation-status-may-2026) for the full M0–M5 ladder. Summary: M0 smoke ✅ in Docker; M2 **822/973** spine toward inventory; M3 inventory emit ✅ / production `bin/compile.php` 🚧 ([#3024](https://github.com/PurHur/php-compiler/issues/3024)); M4/M5 partial on fresh trees ([#1492](https://github.com/PurHur/php-compiler/issues/1492)).
 
 **What we do not target in v1.0**
 
