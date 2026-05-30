@@ -41,21 +41,6 @@ final class BuiltinExceptionSupport
         return $var;
     }
 
-    public static function materializeError(Context $ctx, string $message): Variable
-    {
-        if (!isset($ctx->classes[self::CLASS_ERROR])) {
-            throw new \LogicException('Error builtin class is not registered');
-        }
-        $entry = $ctx->classes[self::CLASS_ERROR];
-        $obj = new ObjectEntry($entry);
-        $obj->getProperty(self::PROP_MESSAGE)->string($message);
-        $obj->constructed = true;
-        $var = new Variable();
-        $var->object($obj);
-
-        return $var;
-    }
-
     public static function materializeDivisionByZeroError(Context $ctx, string $message): Variable
     {
         if (!isset($ctx->classes[self::CLASS_DIVISION_BY_ZERO_ERROR])) {
