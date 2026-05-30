@@ -81,6 +81,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'class_const_scalar_expr')) {
                 continue;
             }
+            // Top-level script globals — VM symbol table (#3601); JIT LLVM global slots deferred.
+            if (str_contains($name, 'global_top_level')) {
+                continue;
+            }
             // Stringable __toString in echo/concat is VM-only until magic method JIT (#146, #3296).
             if (str_contains($name, 'stringable')) {
                 continue;
