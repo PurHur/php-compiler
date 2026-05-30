@@ -5739,6 +5739,7 @@ class JIT {
                     $this->context->pushScope();
                     $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
                     $this->context->scope->className = strtolower($nameOp->value);
+                    $this->context->type->object->markTraitClass($this->context->scope->className);
                     $this->compileClass($op->block1, $this->context->scope->classId);
                     $this->context->popScope();
                     break;
@@ -6512,6 +6513,8 @@ class JIT {
         if ($block === null) {
             return;
         }
+        $ownMethods = [];
+        $traitMethodSources = [];
         foreach ($block->opCodes as $op) {
             switch ($op->type) {
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:
@@ -6587,6 +6590,7 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     $methodLc = strtolower($name->value);
+                    $ownMethods[$methodLc] = true;
                     if ([] !== $op->attributeNames) {
                         $classLc = '' !== $this->context->scope->className
                             ? strtolower(ltrim($this->context->scope->className, '\\'))
@@ -6627,6 +6631,13 @@ class JIT {
                         if ('__construct' === $methodLc) {
                             $this->context->type->object->markHasConstructor($this->context->scope->classId);
                         }
+                        if ($this->context->type->object->isTraitClass($this->context->scope->className ?? '')) {
+                            $this->context->type->object->recordTraitMethodBlock(
+                                $this->context->scope->classId,
+                                $methodLc,
+                                $methodBlock
+                            );
+                        }
                         $this->compileBlock($methodBlock, $funcName);
                     }
                     break;
@@ -6645,6 +6656,12 @@ class JIT {
                         $block->constants[$op->arg2]
                     );
                     break;
+                case OpCode::TYPE_USE_TRAIT:
+                    if ($this->shouldSkipExternalClassBodyLowering($classId)) {
+                        break;
+                    }
+                    $this->applyJitTraitUse($block, $op, $classId, $ownMethods, $traitMethodSources);
+                    break;
                 default:
                     if ($this->shouldSkipExternalClassBodyLowering($classId)) {
                         break;
@@ -6653,6 +6670,82 @@ class JIT {
             }
             
         }
+    }
+
+    /**
+     * Merge trait methods/constants onto a using class (Zend zend_compile_traits; #3789).
+     *
+     * @param array<string, true> $ownMethods
+     * @param array<string, string> $traitMethodSources method lc => trait FQCN
+     */
+    private function applyJitTraitUse(
+        Block $block,
+        OpCode $op,
+        int $classId,
+        array $ownMethods,
+        array &$traitMethodSources
+    ): void {
+        $traitOp = $block->getOperand($op->arg1);
+        assert($traitOp instanceof Operand\Literal);
+        $traitName = $traitOp->value;
+        $traitLc = strtolower(ltrim($traitName, '\\'));
+        $classLc = '' !== ($this->context->scope->className ?? '')
+            ? strtolower(ltrim($this->context->scope->className, '\\'))
+            : strtolower(ltrim($this->context->type->object->classNameForId($classId), '\\'));
+        $className = $this->context->type->object->classNameForId($classId);
+        $object = $this->context->type->object;
+        if (!$object->hasDeclaredClass($traitName)) {
+            throw new \LogicException("Trait {$traitName} not found");
+        }
+        if (!$object->isTraitClass($traitLc)) {
+            throw new \LogicException("{$traitName} is not a trait");
+        }
+        $traitId = $object->lookup($traitName);
+        $excluded = $ownMethods;
+        $visited = [];
+        $current = $object->parentClassLc($classLc);
+        while (null !== $current && !isset($visited[$current])) {
+            $visited[$current] = true;
+            if (!$object->hasDeclaredClass($current)) {
+                break;
+            }
+            $parentId = $object->lookup($current);
+            foreach ($object->declaredMethodNames($parentId) as $methodLc) {
+                $excluded[$methodLc] = true;
+            }
+            $current = $object->parentClassLc($current);
+        }
+        foreach ($object->declaredMethodNames($traitId) as $methodLc) {
+            if (isset($excluded[$methodLc])) {
+                continue;
+            }
+            if (isset($ownMethods[$methodLc]) && !isset($traitMethodSources[$methodLc])) {
+                continue;
+            }
+            if (isset($traitMethodSources[$methodLc])) {
+                $prevTrait = $traitMethodSources[$methodLc];
+                throw new \CompileError(
+                    "Trait method {$traitName}::{$methodLc} has not been applied as {$className}::{$methodLc}, "
+                    ."because of collision with {$prevTrait}::{$methodLc}"
+                );
+            }
+            $traitMethodSources[$methodLc] = $traitName;
+            $object->defineMethodVisibility(
+                $classId,
+                $methodLc,
+                $object->methodVisibility($traitId, $methodLc)
+            );
+            if ('__construct' === $methodLc) {
+                $object->markHasConstructor($classId);
+            }
+            $object->recordTraitMethodSource($classId, $methodLc, $traitLc);
+            $methodBlock = $object->traitMethodBlock($traitId, $methodLc);
+            if (null !== $methodBlock) {
+                $this->compileBlock($methodBlock, $classLc.'::'.$methodLc);
+            }
+        }
+        $object->inheritTraitConstants($classId, $traitId, $traitName);
+        $object->inheritTraitStaticProperties($classId, $traitId);
     }
 
     public function assignIncludeResult(Operand $result): void
@@ -7955,6 +8048,16 @@ class JIT {
             if ($this->context->functionIsRegistered($proxy)) {
                 return $proxy;
             }
+            if ($this->context->type->object->hasDeclaredClass($current)) {
+                $classId = $this->context->type->object->lookup($current);
+                $traitLc = $this->context->type->object->traitMethodSource($classId, $methodLc);
+                if (null !== $traitLc) {
+                    $traitProxy = $traitLc.'::'.$methodLc;
+                    if ($this->context->functionIsRegistered($traitProxy)) {
+                        return $traitProxy;
+                    }
+                }
+            }
             $parent = $this->context->type->object->parentClassLc($current);
             if (null === $parent) {
                 break;
@@ -7963,6 +8066,28 @@ class JIT {
         }
 
         return strtolower(ltrim($classLc, '\\')).'::'.$methodLc;
+    }
+
+    private function resolveJitStaticMethodProxyName(string $classLc, string $methodLc): string
+    {
+        $methodLc = strtolower($methodLc);
+        $classLc = strtolower(ltrim($classLc, '\\'));
+        $proxy = $classLc.'::'.$methodLc;
+        if ($this->context->functionIsRegistered($proxy)) {
+            return $proxy;
+        }
+        if ($this->context->type->object->hasDeclaredClass($classLc)) {
+            $classId = $this->context->type->object->lookup($classLc);
+            $traitLc = $this->context->type->object->traitMethodSource($classId, $methodLc);
+            if (null !== $traitLc) {
+                $traitProxy = $traitLc.'::'.$methodLc;
+                if ($this->context->functionIsRegistered($traitProxy)) {
+                    return $traitProxy;
+                }
+            }
+        }
+
+        return $classLc.'::'.$methodLc;
     }
 
     private function initJitStaticCall(Block $block, int $classOpIdx, int $nameOpIdx): void
@@ -8005,7 +8130,7 @@ class JIT {
             $nameOp->value,
             $parentScopeAllows
         );
-        $proxyName = $declaringClassLc.'::'.$methodLc;
+        $proxyName = $this->resolveJitStaticMethodProxyName($declaringClassLc, $methodLc);
         if (!$this->context->functionIsRegistered($proxyName)) {
             if ($this->context->type->object->isExternalOnlyClass($declaringClassId)) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
