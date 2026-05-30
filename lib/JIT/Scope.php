@@ -19,6 +19,9 @@ class Scope {
     public ?Call $toCall = null;
     public array $args = [];
 
+    /** Parallel to {@see $args}: CFG operands for the current call (issue #3161). */
+    public array $argOperands = [];
+
     public function __construct() {
         $this->blockStorage = new \SplObjectStorage;
         $this->variables = new \SplObjectStorage;

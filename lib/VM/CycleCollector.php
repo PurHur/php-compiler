@@ -23,6 +23,13 @@ final class CycleCollector
 
         $ctx->visitGcRoots($visitVar);
 
+        foreach (WeakRefRegistry::weakTargetIds() as $targetId) {
+            unset($marked[$targetId]);
+        }
+        foreach (WeakRefRegistry::weakMapKeyTargetIds() as $targetId) {
+            unset($marked[$targetId]);
+        }
+
         $collected = 0;
         foreach (ObjectRegistry::snapshot() as $object) {
             if (isset($marked[$object->id])) {
@@ -58,7 +65,10 @@ final class CycleCollector
                     return;
                 }
                 $marked[$object->id] = true;
-                foreach ($object->instancePropertyVariables() as $prop) {
+                foreach ($object->propertiesWithNames() as $name => $prop) {
+                    if (WeakRefSupport::shouldSkipGcMark($object, $name)) {
+                        continue;
+                    }
                     $visitVar($prop);
                 }
                 if (null !== $object->generatorState) {

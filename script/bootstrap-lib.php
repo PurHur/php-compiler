@@ -555,8 +555,233 @@ function bootstrapWriteInventoryLiveProbe(string $root, string $message): void
 }
 
 /**
- * Strip legacy probe section from committed docs/bootstrap-inventory.md (pre-#2891).
+ * Parse committed docs/bootstrap-inventory.md for --check diff (issue #3006).
+ *
+ * @return array{
+ *   summary: array{vm_path_files: int, phase_a_inventory_files: int, blockers: int, warnings: int},
+ *   compiler_blockers: list<string>,
+ *   files_table: array<string, array{blockers: int, warnings: int}>,
+ *   file_constructs: array<string, array{blockers: list<string>, warnings: list<string>}>
+ * }
  */
+function bootstrapParseInventoryMarkdown(string $content): array
+{
+    $summary = [
+        'vm_path_files' => 0,
+        'phase_a_inventory_files' => 0,
+        'blockers' => 0,
+        'warnings' => 0,
+    ];
+    if (preg_match('/\| PHP files on vm\.php path \| (\d+) \|/', $content, $m)) {
+        $summary['vm_path_files'] = (int) $m[1];
+    }
+    if (preg_match('/\| Phase A inventory files \(M2 ratio SSOT\) \| (\d+) \|/', $content, $m)) {
+        $summary['phase_a_inventory_files'] = (int) $m[1];
+    }
+    if (preg_match('/\| Source constructs flagged \(blockers\) \| (\d+) \|/', $content, $m)) {
+        $summary['blockers'] = (int) $m[1];
+    }
+    if (preg_match('/\| Source constructs flagged \(warnings\) \| (\d+) \|/', $content, $m)) {
+        $summary['warnings'] = (int) $m[1];
+    }
+
+    $compilerBlockers = [];
+    if (preg_match('/## Compiler CFG gaps[^\n]*\n(.*?)## /s', $content, $m)) {
+        if (preg_match_all('/^- `([^`]+)`\s*$/m', $m[1], $items)) {
+            $compilerBlockers = $items[1];
+        }
+    }
+
+    $filesTable = [];
+    if (preg_match('/## Files\n(.*?)## /s', $content, $m)) {
+        if (preg_match_all('/^\| `([^`]+)` \| (\d+) \| (\d+) \|$/m', $m[1], $rows, PREG_SET_ORDER)) {
+            foreach ($rows as $row) {
+                $filesTable[$row[1]] = [
+                    'blockers' => (int) $row[2],
+                    'warnings' => (int) $row[3],
+                ];
+            }
+        }
+    }
+
+    $fileConstructs = [];
+    if (preg_match('/## Per-file construct flags\n(.*)\z/s', $content, $m)) {
+        $body = $m[1];
+        if (preg_match_all('/### `([^`]+)`\n(.*?)(?=\n### `|\z)/s', $body, $sections, PREG_SET_ORDER)) {
+            foreach ($sections as $section) {
+                $rel = $section[1];
+                $block = $section[2];
+                $blockers = [];
+                $warnings = [];
+                if (preg_match('/\*\*Blockers\*\*[^\n]*\n(.*?)(?:\n\*\*Warnings\*\*|\z)/s', $block, $bm)) {
+                    if (preg_match_all('/^- (.+)$/m', $bm[1], $items)) {
+                        $blockers = $items[1];
+                    }
+                }
+                if (preg_match('/\*\*Warnings\*\*[^\n]*\n(.*)/s', $block, $wm)) {
+                    if (preg_match_all('/^- (.+)$/m', $wm[1], $items)) {
+                        $warnings = $items[1];
+                    }
+                }
+                $fileConstructs[$rel] = [
+                    'blockers' => $blockers,
+                    'warnings' => $warnings,
+                ];
+            }
+        }
+    }
+
+    return [
+        'summary' => $summary,
+        'compiler_blockers' => $compilerBlockers,
+        'files_table' => $filesTable,
+        'file_constructs' => $fileConstructs,
+    ];
+}
+
+/**
+ * @param array<string, mixed> $liveReport from bootstrapCollectInventoryReport()
+ *
+ * @return list<string>
+ */
+function bootstrapDiffInventoryReport(array $committed, array $liveReport): array
+{
+    $lines = [];
+    $liveSummary = [
+        'vm_path_files' => (int) ($liveReport['totals']['files'] ?? 0),
+        'phase_a_inventory_files' => (int) ($liveReport['phase_a']['phase_a_inventory_files'] ?? 0),
+        'blockers' => (int) ($liveReport['totals']['blockers'] ?? 0),
+        'warnings' => (int) ($liveReport['totals']['warnings'] ?? 0),
+    ];
+    $summaryLabels = [
+        'vm_path_files' => 'PHP files on vm.php path',
+        'phase_a_inventory_files' => 'Phase A inventory files',
+        'blockers' => 'Source constructs flagged (blockers)',
+        'warnings' => 'Source constructs flagged (warnings)',
+    ];
+    $summaryDiff = [];
+    foreach ($summaryLabels as $key => $label) {
+        $old = $committed['summary'][$key];
+        $new = $liveSummary[$key];
+        if ($old !== $new) {
+            $summaryDiff[] = "  {$label}: {$old} → {$new}";
+        }
+    }
+    if ($summaryDiff !== []) {
+        $lines[] = 'Summary:';
+        array_push($lines, ...$summaryDiff);
+    }
+
+    $liveFlagged = [];
+    foreach ($liveReport['files'] as $rel => $info) {
+        $b = count($info['blockers']);
+        $w = count($info['warnings']);
+        if ($b > 0 || $w > 0) {
+            $liveFlagged[$rel] = ['blockers' => $b, 'warnings' => $w];
+        }
+    }
+    $committedFlagged = $committed['files_table'];
+    $pathAdded = array_diff(array_keys($liveFlagged), array_keys($committedFlagged));
+    $pathRemoved = array_diff(array_keys($committedFlagged), array_keys($liveFlagged));
+    sort($pathAdded, SORT_STRING);
+    sort($pathRemoved, SORT_STRING);
+    $pathLines = [];
+    foreach ($pathRemoved as $rel) {
+        $pathLines[] = "  - {$rel}";
+    }
+    foreach ($pathAdded as $rel) {
+        $pathLines[] = "  + {$rel}";
+    }
+    $maxPaths = 20;
+    if (count($pathLines) > $maxPaths) {
+        $extra = count($pathLines) - $maxPaths;
+        $pathLines = array_slice($pathLines, 0, $maxPaths);
+        $pathLines[] = "  … {$extra} more";
+    }
+    if ($pathLines !== []) {
+        $lines[] = 'Phase A paths (flagged files table):';
+        array_push($lines, ...$pathLines);
+    }
+
+    $countDiffs = [];
+    foreach (array_intersect(array_keys($liveFlagged), array_keys($committedFlagged)) as $rel) {
+        $old = $committedFlagged[$rel];
+        $new = $liveFlagged[$rel];
+        $parts = [];
+        if ($old['blockers'] !== $new['blockers']) {
+            $parts[] = 'blockers '.$old['blockers'].' → '.$new['blockers'];
+        }
+        if ($old['warnings'] !== $new['warnings']) {
+            $parts[] = 'warnings '.$old['warnings'].' → '.$new['warnings'];
+        }
+        if ($parts !== []) {
+            $countDiffs[] = "  {$rel}: ".implode(', ', $parts);
+        }
+    }
+    if ($countDiffs !== []) {
+        $lines[] = 'Per-file counts:';
+        array_push($lines, ...$countDiffs);
+    }
+
+    $normalizeItem = static function (string $item): string {
+        return bootstrapNormalizeInventoryLineNumbers($item);
+    };
+    $constructDiffs = [];
+    foreach ($liveReport['files'] as $rel => $info) {
+        if (!isset($committed['file_constructs'][$rel])) {
+            continue;
+        }
+        $old = $committed['file_constructs'][$rel];
+        $oldBlockers = array_map($normalizeItem, $old['blockers']);
+        $oldWarnings = array_map($normalizeItem, $old['warnings']);
+        $newBlockers = array_map($normalizeItem, $info['blockers']);
+        $newWarnings = array_map($normalizeItem, $info['warnings']);
+        $addedBlockers = array_diff($newBlockers, $oldBlockers);
+        $removedBlockers = array_diff($oldBlockers, $newBlockers);
+        $addedWarnings = array_diff($newWarnings, $oldWarnings);
+        $removedWarnings = array_diff($oldWarnings, $newWarnings);
+        if ($addedBlockers === [] && $removedBlockers === [] && $addedWarnings === [] && $removedWarnings === []) {
+            continue;
+        }
+        $constructDiffs[] = "  {$rel}:";
+        foreach ($removedBlockers as $item) {
+            $constructDiffs[] = "    - {$item}";
+        }
+        foreach ($removedWarnings as $item) {
+            $constructDiffs[] = "    - {$item}";
+        }
+        foreach ($addedBlockers as $item) {
+            $constructDiffs[] = "    + {$item}";
+        }
+        foreach ($addedWarnings as $item) {
+            $constructDiffs[] = "    + {$item}";
+        }
+        if (count($constructDiffs) > 25) {
+            $constructDiffs[] = '  … (truncated construct flag diff)';
+            break;
+        }
+    }
+    if ($constructDiffs !== []) {
+        $lines[] = 'Per-file construct flags:';
+        array_push($lines, ...$constructDiffs);
+    }
+
+    $liveCompilerBlockers = $liveReport['compiler_blockers'] ?? [];
+    $addedCfg = array_diff($liveCompilerBlockers, $committed['compiler_blockers']);
+    $removedCfg = array_diff($committed['compiler_blockers'], $liveCompilerBlockers);
+    if ($addedCfg !== [] || $removedCfg !== []) {
+        $lines[] = 'Compiler CFG gaps:';
+        foreach ($removedCfg as $msg) {
+            $lines[] = "  - `{$msg}`";
+        }
+        foreach ($addedCfg as $msg) {
+            $lines[] = "  + `{$msg}`";
+        }
+    }
+
+    return $lines;
+}
+
 /**
  * Ignore line-number-only drift in per-file warning rows (#3048).
  */

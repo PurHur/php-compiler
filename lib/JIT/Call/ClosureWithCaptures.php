@@ -24,6 +24,17 @@ final class ClosureWithCaptures implements Call
     ) {
     }
 
+    public function innerNative(): Native
+    {
+        return $this->inner;
+    }
+
+    /** @return list<Variable> */
+    public function captureVariables(): array
+    {
+        return $this->captures;
+    }
+
     public function call(Context $context, Variable ...$args): Value
     {
         return $this->inner->call($context, ...$args, ...$this->captures);
