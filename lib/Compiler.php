@@ -2704,6 +2704,8 @@ class Compiler {
             $block->addOpCode($op);
         } elseif ($stmt instanceof Op\Stmt\TryCatch) {
             $merge = $this->compileCfgBranch($stmt->end, $block);
+            // Merge block is entered via TYPE_CATCH before catch locals exist (#195, #2084).
+            $merge->inheritUndefinedLocals = true;
             $try = $this->compileCfgBranch($stmt->try, $block);
             $try->inheritUndefinedLocals = true;
             $tryOp = new OpCode(OpCode::TYPE_TRY);
