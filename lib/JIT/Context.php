@@ -50,6 +50,14 @@ class Context {
     /** User function CFG block while compiling its body (func_get_args / func_num_args, #197). */
     public ?Block $jitEnclosingBlock = null;
 
+    /** While lowering generator resume LLVM (issue #3074). */
+    public bool $compilingGeneratorResume = false;
+
+    public ?\PHPLLVM\Value $generatorStateParam = null;
+
+    /** @var array<string, string> user func lc => resume LLVM symbol */
+    public array $generatorCreators = [];
+
     /** CFG block currently being lowered (get_defined_vars snapshot, #3135). */
     public ?Block $jitCurrentBlock = null;
 

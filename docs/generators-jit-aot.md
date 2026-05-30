@@ -6,9 +6,9 @@
 |-------|--------|-----------|
 | **Compiler** | Done | `TYPE_YIELD` / `TYPE_YIELD_FROM`; `Block::$isGenerator` |
 | **VM** | Done | `GeneratorState`, `VM::GENERATOR_YIELD`, foreach over generators |
-| **JIT (`bin/jit.php`)** | VM fallback | Skips MCJIT when `Block::requiresVmLowering()` (yield or EH) |
-| **AOT (`phpc build`)** | Blocked | `Runtime::standalone()` throws before link |
-| **Bootstrap spine AOT** | Blocked | `script/bootstrap-lib.php` inventory flags `generator yield` |
+| **JIT (`bin/jit.php`)** | MCJIT resume (#3074) | Main script MCJIT when yield only in nested functions; `GeneratorHelper` switch-on-resume-ip |
+| **AOT (`phpc build`)** | Done (#3115) | `GeneratorHelper` resume + foreach; script-scope `yield` rejected |
+| **Bootstrap spine AOT** | Blocked | `script/bootstrap-lib.php` inventory flags `generator yield` on spine TU |
 
 Compliance PHPT: `test/compliance/GeneratorVMTest.php`, `GeneratorJITTest.php`.
 
@@ -16,13 +16,15 @@ Compliance PHPT: `test/compliance/GeneratorVMTest.php`, `GeneratorJITTest.php`.
 
 `Block::containsGeneratorOpcodes()` walks nested CFG blocks (including `TYPE_FUNCDEF` bodies) for `TYPE_YIELD` / `TYPE_YIELD_FROM`.
 
-`Block::requiresVmLowering()` extends that scan with try/catch/throw opcodes (#2114).
+`Block::containsGeneratorOpcodesInScriptScope()` — top-level script only (#3074).
+
+`Block::requiresVmLowering()` — script-scope generators or try/catch/throw (#2114).
 
 Used by:
 
-- `bin/jit.php` — skip `$runtime->jit()` and execute via VM
-- `Runtime::standalone()` — fail fast for AOT
-- `JIT::compileBlock()` — stub generator function bodies instead of lowering opcodes
+- `bin/jit.php` — skip MCJIT when `requiresVmLowering()` (script-scope yield or EH)
+- `Runtime::standalone()` — reject script-scope `yield`; nested generators use `GeneratorHelper`
+- `JIT::compileBlock()` — `GeneratorHelper::compileResumeFunction()` for generator bodies
 
 ## Native lowering options
 
@@ -44,9 +46,9 @@ Requires LLVM coroutine passes (or hand-rolled switch-on-IP state machine like m
 
 1. ✅ VM + JIT fallback + compile-time guards (this issue)
 2. EH stability in MCJIT (#2114) — share `requiresVmLowering` gate
-3. JIT stub → selective VM dispatch for generator *calls* while main script stays native
+3. ✅ MCJIT resume lowering for generator *calls* while main script stays native (#3074)
 4. Prototype switch-on-IP lowering for single-function generators without `yield from`
-5. AOT link only after JIT path is stable; remove bootstrap inventory blocker last
+5. ✅ AOT compile + execute for nested generators (`#3115`, `test/fixtures/aot/cases/generator_yield.phpt`); bootstrap inventory blocker remains until spine is green
 
 ## Related
 

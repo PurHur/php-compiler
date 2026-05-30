@@ -1,0 +1,63 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler;
+
+use PHPUnit\Framework\TestCase;
+
+require_once __DIR__.'/../LlvmToolchain.php';
+
+/**
+ * LLVM compile-only verify for generator MCJIT lowering (#3074).
+ *
+ * @group llvm
+ */
+final class GeneratorJitCompileTest extends TestCase
+{
+    private string $repoRoot;
+
+    protected function setUp(): void
+    {
+        $this->repoRoot = dirname(__DIR__, 2);
+        if (!LlvmToolchain::isReady($this->repoRoot)) {
+            $reason = LlvmToolchain::readyFailureReason() ?? 'LLVM 9 toolchain not available';
+            $this->markTestSkipped($reason.' — generator JIT compile test needs LLVM (#3074)');
+        }
+    }
+
+    public function testGeneratorForeachScriptVerifies(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+function gen(): Generator {
+    yield 1;
+    yield 2;
+}
+foreach (gen() as $v) {
+    echo $v;
+}
+PHP
+            ,
+            'generator_jit_compile.php'
+        );
+        $this->assertNotNull($block);
+        $this->assertFalse(Block::requiresVmLowering($block));
+        $runtime->jitCompileBlock($block);
+        $context = $runtime->loadJitContext();
+        $verify = new \ReflectionMethod($context, 'compileCommon');
+        $verify->setAccessible(true);
+        $verify->invoke($context);
+        $this->assertNotEmpty(
+            $context->generatorCreators,
+            'expected generator creator map: '.json_encode(array_keys($context->generatorCreators))
+        );
+        $this->assertArrayHasKey(
+            'gen',
+            $context->generatorCreators,
+            'creator keys: '.implode(', ', array_keys($context->generatorCreators))
+        );
+        $this->addToAssertionCount(1);
+    }
+}
