@@ -6,7 +6,7 @@
 |-------|--------|-----------|
 | **Compiler** | Done | `TYPE_YIELD` / `TYPE_YIELD_FROM`; `Block::$isGenerator` |
 | **VM** | Done | `GeneratorState`, `VM::GENERATOR_YIELD`, foreach over generators |
-| **JIT (`bin/jit.php`)** | MCJIT resume (#3074) | Main script MCJIT when yield only in nested functions; `GeneratorHelper` switch-on-resume-ip; linear `yield` + packed-array `yield from` |
+| **JIT (`bin/jit.php`)** | MCJIT resume (#3074) | Main script MCJIT when yield only in nested functions; `GeneratorHelper` switch-on-resume-ip; linear `yield`, packed-array `yield from`, nested `yield from inner()` |
 | **AOT (`phpc build`)** | Blocked | `Runtime::standalone()` throws before link |
 | **Bootstrap spine AOT** | Blocked | `script/bootstrap-lib.php` inventory flags `generator yield` |
 
@@ -45,7 +45,7 @@ Requires LLVM coroutine passes (or hand-rolled switch-on-IP state machine like m
 1. ✅ VM + JIT fallback + compile-time guards (this issue)
 2. EH stability in MCJIT (#2114) — share `requiresVmLowering` gate
 3. ✅ MCJIT resume lowering for generator *calls* while main script stays native (#3074)
-4. ✅ Switch-on-IP lowering for generators with packed-array `yield from` (#3074); `yield from` generator delegation still VM-only
+4. ✅ Switch-on-IP lowering for generators with packed-array `yield from` and nested generator delegation (#3074); dynamic `yield from $g` still deferred
 5. AOT link only after JIT path is stable; remove bootstrap inventory blocker last
 
 ## Related

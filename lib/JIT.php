@@ -4368,7 +4368,47 @@ class JIT {
 
         return $exit;
     }
-    
+
+    /**
+     * Compile opcodes before yield from to evaluate the container (e.g. inner() call).
+     *
+     * @return JIT\Variable container variable for yield from
+     */
+    public function compileGeneratorYieldFromSetup(
+        \PHPLLVM\Value\Function_ $func,
+        Block $block,
+        \PHPLLVM\BasicBlock $entryBlock,
+        OpCode $yieldFromOp,
+        ?string $innerResumeName = null
+    ): JIT\Variable {
+        $yfIdx = null;
+        foreach ($block->opCodes as $i => $op) {
+            if ($op === $yieldFromOp) {
+                $yfIdx = $i;
+                break;
+            }
+        }
+        if (null === $yfIdx) {
+            throw new \LogicException('yield from opcode not found in generator block');
+        }
+        if (
+            null !== $innerResumeName
+            && $yfIdx > 0
+            && JIT\GeneratorHelper::prefixOpcodesSafeForYieldFromInit($block, $yfIdx)
+        ) {
+            $savedStorage = $this->context->scope->blockStorage;
+            $this->context->scope->blockStorage = new \SplObjectStorage();
+            $exit = $this->compileBlockInternal($func, $block, $yfIdx, $entryBlock);
+            $this->context->builder->positionAtEnd($exit);
+            $this->context->scope->blockStorage = $savedStorage;
+        }
+        if (null === $yieldFromOp->arg2) {
+            throw new \LogicException('yield from missing container operand');
+        }
+
+        return $this->context->getVariableFromOp($block->getOperand($yieldFromOp->arg2));
+    }
+
     private function compileBlockInternal(
         PHPLLVM\Value $func,
         Block $block,

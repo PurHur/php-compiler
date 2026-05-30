@@ -69,6 +69,7 @@ final class GeneratorJITTest extends BaseTest
         yield 'linear yield' => ['generator_jit.phpt'];
         yield 'yield from array' => ['generator_jit_yield_from.phpt'];
         yield 'yield + yield from' => ['generator_jit_yield_mixed.phpt'];
+        yield 'yield from generator' => ['generator_jit_yield_from_generator.phpt'];
     }
 }
 
