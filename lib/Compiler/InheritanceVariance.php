@@ -190,9 +190,13 @@ final class InheritanceVariance
         MethodSig $parent
     ): ?string {
         if (count($child->params) < count($parent->params)) {
-            return $this->formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
+            for ($i = count($child->params); $i < count($parent->params); ++$i) {
+                if (!($parent->paramHasDefault[$i] ?? false)) {
+                    return $this->formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
+                }
+            }
         }
-        $paramCount = count($parent->params);
+        $paramCount = min(count($child->params), count($parent->params));
         for ($i = 0; $i < $paramCount; ++$i) {
             if (!$this->isParameterCompatible($parent->params[$i], $child->params[$i], $parent->ownerLc, $child->ownerLc)) {
                 return $this->formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
@@ -363,6 +367,9 @@ final class MethodSig
     /** @var list<string> */
     public array $paramNames;
 
+    /** @var list<bool> */
+    public array $paramHasDefault;
+
     public ?TypeSig $returnType;
 
     public string $ownerLc;
@@ -370,12 +377,14 @@ final class MethodSig
     /**
      * @param list<?TypeSig>   $params
      * @param list<string>     $paramNames
+     * @param list<bool>       $paramHasDefault
      */
-    public function __construct(string $ownerLc, array $params, array $paramNames, ?TypeSig $returnType)
+    public function __construct(string $ownerLc, array $params, array $paramNames, array $paramHasDefault, ?TypeSig $returnType)
     {
         $this->ownerLc = $ownerLc;
         $this->params = $params;
         $this->paramNames = $paramNames;
+        $this->paramHasDefault = $paramHasDefault;
         $this->returnType = $returnType;
     }
 
@@ -383,12 +392,14 @@ final class MethodSig
     {
         $params = [];
         $names = [];
+        $hasDefault = [];
         foreach ($func->params as $param) {
             $params[] = TypeSig::fromCfgType($param->declaredType);
             $names[] = self::paramNameFromOperand($param->name);
+            $hasDefault[] = null !== $param->defaultVar;
         }
 
-        return new self($ownerLc, $params, $names, TypeSig::fromCfgType($func->returnType));
+        return new self($ownerLc, $params, $names, $hasDefault, TypeSig::fromCfgType($func->returnType));
     }
 
     private static function paramNameFromOperand(Operand $name): string

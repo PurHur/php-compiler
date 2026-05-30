@@ -83,8 +83,12 @@ if [[ "${BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT:-0}" != "1" ]]; then
     )
     rm -f "${ROOT}/build/last_lowering_phase.json" || true
   fi
-  env "${_driver_debug_env[@]}" PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1 \
-    php "${ROOT}/bin/compile.php" -o "${DRIVER}" "${EMIT_ENTRY}" >/dev/null
+  # Inventory argv driver (bin/compile.php {main}) — compile_driver.php AOT only prints "ready" without argv (#3011).
+  env "${_driver_debug_env[@]}" -u PHP_COMPILER_EMIT_HELPER_LINK \
+    PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1 \
+    PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 \
+    BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke \
+    php "${ROOT}/bin/compile.php" -o "${DRIVER}" "${ROOT}/bin/compile.php" >/dev/null
 fi
 if [[ ! -x "${DRIVER}" ]]; then
   echo "bootstrap-loop-gen2-recompile-spine: missing native driver ${DRIVER}" >&2
