@@ -101,11 +101,10 @@ final class ReadonlyClassGuard
 
     private static function stringDataPtrFromLiteral(Context $context, string $message): \PHPLLVM\Value
     {
-        $strPtr = $context->builder->load($context->constantStringFromString($message));
-        $strMap = $context->structFieldMap['__string__'];
-
+        // Use php_cstr_* rodata (MethodRegistry / M3Emit pattern) — heap __string__ value GEP
+        // can yield a bad memcpy source for raise_logic_exception under MCJIT execute (#3149).
         return $context->builder->pointerCast(
-            $context->builder->structGep($strPtr, $strMap['value']),
+            $context->constantFromString($message),
             $context->getTypeFromString('int8*')
         );
     }
