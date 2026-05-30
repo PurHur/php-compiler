@@ -695,10 +695,11 @@ function bootstrapVendorPrelinkResolveCompileInvoker(string $root): array
     }
 
     foreach ([
-        $root.'/build/selfhost-compile-driver',
-        $root.'/build/selfhost-native-compile-driver',
+        $root.'/build/bin-compile-aot-inventory',
         $root.'/build/bin-compile-aot',
+        $root.'/build/selfhost-native-compile-driver',
         $root.'/build/selfhost-helloworld-compile',
+        $root.'/build/selfhost-compile-driver',
     ] as $candidate) {
         if (is_executable($candidate)) {
             return [

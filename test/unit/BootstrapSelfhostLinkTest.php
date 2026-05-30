@@ -45,19 +45,41 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $resolver = self::$root.'/script/bootstrap-resolve-compile-invoke.sh';
         $this->assertFileExists($resolver);
         $body = (string) file_get_contents($resolver);
+        $this->assertStringContainsString('build/bin-compile-aot-inventory', $body);
         $this->assertStringContainsString('build/selfhost-compile-driver', $body);
         $this->assertStringContainsString('build/bin-compile-aot', $body);
-        $driverPos = strpos($body, 'build/selfhost-compile-driver');
-        $argvPos = strpos($body, 'build/bin-compile-aot');
-        $nativeAliasPos = strpos($body, 'build/selfhost-native-compile-driver');
-        $this->assertNotFalse($driverPos);
-        $this->assertNotFalse($argvPos);
-        $this->assertNotFalse($nativeAliasPos);
-        $this->assertLessThan($driverPos, $argvPos, 'prefer bin-compile-aot before selfhost-compile-driver (#2894)');
-        $this->assertLessThan($nativeAliasPos, $argvPos, 'prefer bin-compile-aot before emit-helper alias (#2894)');
+        $this->assertStringContainsString(
+            '"${root}/build/bin-compile-aot-inventory" \\'."\n"
+            .'    "${root}/build/bin-compile-aot" \\',
+            $body,
+            'inventory argv driver listed before bin-compile-aot (#2894)'
+        );
+        $this->assertStringContainsString(
+            '"${root}/build/bin-compile-aot" \\'."\n"
+            .'    "${root}/build/selfhost-native-compile-driver" \\',
+            $body,
+            'prefer bin-compile-aot before emit-helper alias (#2894)'
+        );
+        $this->assertStringContainsString(
+            '"${root}/build/selfhost-native-compile-driver" \\'."\n"
+            .'    "${root}/build/selfhost-helloworld-compile" \\',
+            $body
+        );
+        $this->assertStringContainsString(
+            '"${root}/build/selfhost-helloworld-compile" \\'."\n"
+            .'    "${root}/build/selfhost-compile-driver"',
+            $body
+        );
+        $this->assertStringContainsString('(gen-0 compiled)', $body);
+        $this->assertStringContainsString('(gen-0 Zend)', $body);
+        $this->assertStringContainsString('BOOTSTRAP_ALLOW_GEN0_ZEND', $body);
         $this->assertStringContainsString('failed (exit', $body);
         $this->assertStringContainsString('falling back to Zend gen-0', $body);
         $this->assertStringContainsString('BOOTSTRAP_M5_NO_ZEND', $body);
+
+        $dockerExec = (string) file_get_contents(self::$root.'/script/docker-exec.sh');
+        $this->assertStringContainsString('bootstrap-selfhost-link', $dockerExec);
+        $this->assertStringContainsString('build/bin-compile-aot-inventory', $dockerExec);
     }
 
     public function testNativeLinkScriptPrintsBundleOkWhenLlvmPresent(): void

@@ -82,6 +82,8 @@ _docker_exec_m5_sync_back_paths() {
   SYNC_BACK_PATHS+=(
     "build/bin-compile-aot"
     "build/bin-compile-aot-inventory"
+    "build/.m3_bin_compile_aot_blob"
+    "build/.m3_compiler_minimal_aot_blob"
     "build/selfhost"
     "build/selfhost-compile-driver"
     "build/selfhost-native-compile-driver"

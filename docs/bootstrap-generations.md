@@ -35,12 +35,14 @@ This document is the **canonical reference** for generation numbering, artifacts
 
 | Priority | Artifact | When used |
 |----------|----------|-----------|
-| 1 | `build/selfhost-compile-driver` | M5 host-linked `bin/compile.php` (optional) |
+| 1 | `build/bin-compile-aot-inventory` | Inventory argv driver (M4 spine / full revision); sole candidate when `BOOTSTRAP_USE_INVENTORY_DRIVER=1` |
 | 2 | `build/bin-compile-aot` | `bootstrap-gen0-install-prelinked-driver.sh` on empty `build/` ([#3053](https://github.com/PurHur/php-compiler/issues/3053)); or after `make bootstrap-selfhost-driver-smoke` |
-| 3 | `build/selfhost-native-compile-driver` | Emit-helper alias (same bytes as `bin-compile-aot`; last resort) |
-| — | Zend `php bin/compile.php` | Empty `build/` when seed not used; `BOOTSTRAP_M5_NO_ZEND=1` forbids Zend |
+| 3 | `build/selfhost-native-compile-driver` | M3 emit-helper alias |
+| 4 | `build/selfhost-helloworld-compile` | helloworld compile probe output |
+| 5 | `build/selfhost-compile-driver` | Optional M5 host-linked `bin/compile.php` |
+| — | Zend `php bin/compile.php` | Only when no native driver and `BOOTSTRAP_ALLOW_GEN0_ZEND=1` (default); logs `(gen-0 Zend)`. `BOOTSTRAP_M5_NO_ZEND=1` forbids Zend. |
 
-`make bootstrap-selfhost-link-compiled` runs driver-smoke once if `build/bin-compile-aot` is missing (`BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER=1`). Resolver tries **each** native candidate before Zend fallback.
+`make bootstrap-selfhost-link` seeds gen-0 from `prelinked/bootstrap-gen0/` when `build/` is empty (compiled path, not Zend). `make bootstrap-selfhost-link-compiled` also runs driver-smoke when `build/bin-compile-aot` is missing (`BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER=1`). Tar-copy `docker-exec` syncs `build/bin-compile-aot*` back to the host so a **second** invocation reuses compiled drivers without driver-smoke ([#2894](https://github.com/PurHur/php-compiler/issues/2894), [#2963](https://github.com/PurHur/php-compiler/issues/2963)).
 
 ---
 
