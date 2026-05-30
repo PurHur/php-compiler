@@ -141,6 +141,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'pre_post_inc')) {
                 continue;
             }
+            // array union (+/+=) is VM-only until JIT TYPE_PLUS array branch (#3690).
+            if (str_contains($name, 'array_union')) {
+                continue;
+            }
             yield $name => $case;
         }
     }

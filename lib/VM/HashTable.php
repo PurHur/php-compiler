@@ -505,6 +505,54 @@ final class HashTable {
     }
 
     /**
+     * Array union ($left + $right): copy this array, then append keys from $other that are missing.
+     * Left-hand keys win on collision (Zend zend_hash_merge / add_function parity, issue #3690).
+     */
+    public function unionCopy(HashTable $other): HashTable
+    {
+        $out = new self();
+        foreach ($this->iterateKeyed(true) as [$key, $value]) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $copy);
+            } else {
+                $out->add($key->toString(), $copy);
+            }
+        }
+        $out->unionInPlace($other);
+
+        return $out;
+    }
+
+    /**
+     * In-place array union ($left += $right): add keys from $other that are missing in this table.
+     */
+    public function unionInPlace(HashTable $other): void
+    {
+        $this->assertConsistent();
+        $this->refcount->assertSeparated();
+        foreach ($other->iterateKeyed(true) as [$key, $value]) {
+            if (Variable::TYPE_INTEGER === $key->type) {
+                if (null !== $this->findIndex($key->toInt())) {
+                    continue;
+                }
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $this->addIndex($key->toInt(), $copy);
+            } else {
+                $k = $key->toString();
+                if (null !== $this->find($k)) {
+                    continue;
+                }
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $this->add($k, $copy);
+            }
+        }
+    }
+
+    /**
      * Copy string-keyed entries from another array into this one.
      */
     public function mergeStringKeysFrom(HashTable $other, bool $overwrite = false): void
