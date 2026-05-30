@@ -18,4 +18,15 @@ final class EnumSupport
         $entry->methods['cases'] = new EnumCases($entry);
         $entry->methodVisibility['cases'] = CfgFunc::FLAG_PUBLIC;
     }
+
+    /** Zend implicit UnitEnum / BackedEnum on all enums (#3550). */
+    public static function ensureBuiltinEnumInterfaces(ClassEntry $entry): void
+    {
+        if (!in_array('unitenum', $entry->interfaces, true)) {
+            $entry->interfaces[] = 'unitenum';
+        }
+        if (null !== $entry->backedType && !in_array('backedenum', $entry->interfaces, true)) {
+            $entry->interfaces[] = 'backedenum';
+        }
+    }
 }
