@@ -1576,13 +1576,11 @@ class Compiler {
         if ($class instanceof Op\Stmt\Class_ && null !== $class->extends) {
             $parentSlot = $this->compileOperand($class->extends, $block, true);
         }
-        $readonlyVar = new Variable(Variable::TYPE_INTEGER);
-        $readonlyVar->int(
-            VM\ClassReadonly::fromClassFlags($class->flags) ? 1 : 0
-        );
-        $readonlyOperand = new Operand\Temporary;
-        $readonlyOperand->type = Type::int();
-        $readonlySlot = $block->registerConstant($readonlyOperand, $readonlyVar);
+        $classFlagsVar = new Variable(Variable::TYPE_INTEGER);
+        $classFlagsVar->int(VM\ClassFlags::pack($class->flags));
+        $classFlagsOperand = new Operand\Temporary;
+        $classFlagsOperand->type = Type::int();
+        $readonlySlot = $block->registerConstant($classFlagsOperand, $classFlagsVar);
         $return = new OpCode(
             $type,
             $this->compileOperand($class->name, $block, true),

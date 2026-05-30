@@ -1614,7 +1614,9 @@ restart:
                         $classEntry->parentLc = $parentLc;
                     }
                     if (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
-                        $classEntry->readonly = (bool) $frame->block->constants[$op->arg3]->toInt();
+                        $classFlags = $frame->block->constants[$op->arg3]->toInt();
+                        $classEntry->readonly = VM\ClassFlags::isReadonly($classFlags);
+                        $classEntry->isAbstract = VM\ClassFlags::isAbstract($classFlags);
                     }
                     if ($op->isSealed) {
                         $classEntry->sealed = true;
@@ -1632,6 +1634,7 @@ restart:
                         $this->inheritFromParent($classEntry);
                     }
                     $this->inheritFromInterfaces($classEntry);
+                    VM\ClassValidator::finalizeClassDefinition($classEntry, $this->context);
                     $this->context->classes[$lcname] = $classEntry;
                     break;
                 case OpCode::TYPE_NEW:
@@ -1661,6 +1664,11 @@ restart:
                     }
                     if ($class->isInterface) {
                         throw new \LogicException("Cannot instantiate interface $name");
+                    }
+                    try {
+                        VM\ClassValidator::assertInstantiable($class);
+                    } catch (\LogicException $e) {
+                        return $this->raise($e->getMessage(), $frame);
                     }
                     $object = new ObjectEntry($class);
                     $this->initInstancePropertyDefaults($object);
@@ -3626,6 +3634,11 @@ restart:
                 $entry->methodParameterMetadata[$name] = $trait->methodParameterMetadata[$name];
             }
         }
+        foreach ($trait->abstractMethods as $name => $_) {
+            if (!isset($entry->methods[$name]) && !isset($entry->abstractMethods[$name])) {
+                $entry->abstractMethods[$name] = true;
+            }
+        }
         foreach ($trait->staticProperties as $name => $storage) {
             if (!isset($entry->staticProperties[$name])) {
                 $entry->staticProperties[$name] = $storage;
@@ -3907,9 +3920,12 @@ restart:
                         $method = new Func\PHP($entry->name.'::'.$name, $op->block1);
                         $method->deprecated = $op->deprecatedMetadata;
                         $entry->methods[$name] = $method;
+                        unset($entry->abstractMethods[$name]);
                         if ('__construct' === $name) {
                             $entry->constructor = $method;
                         }
+                    } else {
+                        $entry->abstractMethods[$name] = true;
                     }
                     break;
                 case OpCode::TYPE_DECLARE_CLASS_CONST:
