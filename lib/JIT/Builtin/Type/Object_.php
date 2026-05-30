@@ -751,6 +751,28 @@ class Object_ extends Type {
     }
 
     /**
+     * Canonical enum class names from DECLARE_ENUM (issue #3538).
+     *
+     * @return list<string>
+     */
+    public function allDeclaredEnumNames(): array
+    {
+        $names = [];
+        foreach (array_keys($this->enums) as $enumLc) {
+            $resolved = null;
+            foreach ($this->classIdToName as $name) {
+                if (strtolower(ltrim($name, '\\')) === $enumLc) {
+                    $resolved = $name;
+                    break;
+                }
+            }
+            $names[] = $resolved ?? $enumLc;
+        }
+
+        return $names;
+    }
+
+    /**
      * Lowercase registry keys for JIT enum_exists() runtime compare (#1373).
      *
      * @return list<string>

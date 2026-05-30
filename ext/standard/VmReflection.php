@@ -53,6 +53,26 @@ final class VmReflection
         return isset($ctx->enums[strtolower($enumName)]);
     }
 
+    /**
+     * get_declared_enums() — user enum class names (issue #3538).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_enums)
+     */
+    public static function declaredEnumsTable(Context $ctx): \PHPCompiler\VM\HashTable
+    {
+        $result = new \PHPCompiler\VM\HashTable();
+        foreach ($ctx->classes as $lc => $entry) {
+            if (!$entry->isEnum || isset($ctx->classAliases[$lc])) {
+                continue;
+            }
+            $value = new Variable();
+            $value->string($entry->name);
+            $result->append($value);
+        }
+
+        return $result;
+    }
+
     public static function interfaceExists(Context $ctx, string $interfaceName): bool
     {
         $entry = self::resolveClassEntry($ctx, $interfaceName);
