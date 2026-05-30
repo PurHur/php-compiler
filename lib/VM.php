@@ -427,6 +427,14 @@ restart:
                         }
                     }
                     break;
+                case OpCode::TYPE_CAST_UNSET:
+                    $src = $frame->scope[$op->arg2];
+                    if (Variable::TYPE_INDIRECT === $src->type) {
+                        $src->reset();
+                        $src->type = Variable::TYPE_UNDEFINED;
+                    }
+                    $frame->scope[$op->arg1]->null();
+                    break;
                 case OpCode::TYPE_IDENTICAL:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
