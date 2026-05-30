@@ -2239,6 +2239,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-docblock-trailing-text.patch"
   apply_patch "$PATCH_DIR/php-types-generic-null-tail.patch"
   apply_patch "$PATCH_DIR/php-types-fromdecl-junk-fragments.patch"
+  apply_patch "$PATCH_DIR/php-types-anonymous-class-type.patch"
   apply_patch "$PATCH_DIR/php-types-ns-func-call.patch"
   apply_patch "$PATCH_DIR/php-types-arrow-function.patch"
   apply_patch "$PATCH_DIR/php-types-closure-unbound-this.patch"
