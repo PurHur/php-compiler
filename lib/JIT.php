@@ -733,7 +733,11 @@ class JIT {
         if (!is_null($funcName)) {
             $internalName = $this->llvmInternalName($funcName);
         } else {
-            $internalName = "internal_" . (++self::$functionNumber);
+            $internalName = 'internal_'.(++self::$functionNumber);
+            $debugMainName = JIT\AotDebugSymbols::scriptMainFunctionName($block);
+            if (null !== $debugMainName) {
+                $internalName = $debugMainName;
+            }
         }
         if (str_contains($internalName, 'opcode_type_name')) {
             return $this->compileSkippedOpcodeNameStub($internalName, $block);

@@ -191,6 +191,10 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                     }
 
                     break;
+                case '--debug-symbols':
+                    $options['--debug-symbols'] = true;
+
+                    break;
                 case '-o':
                     if ($i >= $argc || substr((string) $argv[$i], 0, 1) === '-') {
                         $options['-o'] = true;

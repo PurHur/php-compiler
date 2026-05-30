@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\AOT;
 
+use PHPCompiler\JIT\AotDebugSymbols;
+
 /**
  * Link an LLVM object file into a standalone executable using the bundled toolchain.
  */
@@ -150,6 +152,7 @@ final class Linker
             }
             $cmd = implode(' ', [
                 escapeshellarg($ld),
+                AotDebugSymbols::linkFlag(),
                 '-dynamic-linker /lib64/ld-linux-x86-64.so.2',
                 escapeshellarg('/usr/lib/x86_64-linux-gnu/crt1.o'),
                 escapeshellarg($crtbegin),
@@ -183,7 +186,7 @@ final class Linker
             // When linking with the bundled clang, ensure we can still resolve host libraries
             // (libpcre2-8, libcrypt, ...). Some bootstrap envs only ship the runtime .so/.a under
             // /usr/lib/x86_64-linux-gnu without a full sysroot lib tree.
-            $cmd = escapeshellarg($clang).' '.$objects.' -L/usr/lib/x86_64-linux-gnu -lm '.self::RUNTIME_LINK_LIBS.' -o '.escapeshellarg($executable);
+            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().$objects.' -L/usr/lib/x86_64-linux-gnu -lm '.self::RUNTIME_LINK_LIBS.' -o '.escapeshellarg($executable);
             self::run($cmd, $env);
             self::unlinkIfTemp($runtimeObjects);
 
@@ -219,7 +222,7 @@ final class Linker
             $runtimeObject = $objectFile.'.runtime'.$index.'.o';
             ++$index;
             $sourceFlags = self::runtimeCIncludeFlagsFor(basename($source));
-            $cmd = escapeshellarg($compiler).' -c -fPIC -O2'.$sourceFlags.' '
+            $cmd = escapeshellarg($compiler).' -c -fPIC '.AotDebugSymbols::compileFlag().$sourceFlags.' '
                 .escapeshellarg($source).' -o '.escapeshellarg($runtimeObject);
             $captured = self::runCaptured($cmd, $env);
             if (0 !== $captured['code'] || !is_file($runtimeObject)) {
@@ -464,7 +467,7 @@ final class Linker
                 continue;
             }
             $cmd = escapeshellarg($path) . ' '
-                . $objects . ' -lm '.self::RUNTIME_LINK_LIBS.' -o ' . escapeshellarg($executable);
+                . AotDebugSymbols::linkFlag() . $objects . ' -lm '.self::RUNTIME_LINK_LIBS.' -o ' . escapeshellarg($executable);
             $captured = self::runCaptured($cmd, null);
             if (0 === $captured['code']) {
                 self::unlinkIfTemp($runtimeObjects);
