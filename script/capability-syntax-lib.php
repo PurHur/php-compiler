@@ -43,8 +43,12 @@ function syntaxRowDefinitions(): array
             'construct' => 'Enum declarations `enum Foo: string { case Bar = \'x\'; }`',
             'opcodes' => ['TYPE_DECLARE_ENUM', 'TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH'],
             'issue' => 1356,
-            'notes' => ['Backed enum case objects with `->name` / `->value`; string context coerces to backed scalar (#3518); `Foo::Bar` singleton fetch; `enum_exists` registry; `implements` metadata (#2299); static methods (#2299); `Enum::cases()` VM (#3308)'],
-            'probe' => 'enum Status: string { case Ok = \'ok\'; public static function tag(): string { return \'ok\'; } } echo Status::Ok; echo Status::tag();',
+            'notes' => [
+                'Backed enum case objects with `->name` / `->value`; string context coerces to backed scalar (#3518)',
+                '`Foo::Bar` singleton fetch; `enum_exists` registry; `implements` interface list + instance methods + `instanceof` (#3373)',
+                'static methods (#2299); `Enum::cases()` VM (#3308)',
+            ],
+            'probe' => 'interface L { public function n(): string; } enum S: string implements L { case A = "a"; public function n(): string { return $this->name; } } echo S::A->n();',
         ],
         [
             'id' => 'instance_methods',
