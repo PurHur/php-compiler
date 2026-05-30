@@ -30,11 +30,20 @@ _selfhost_preflight_have_php() {
 
 _selfhost_preflight_print_docker_path() {
   local gate_cmd="${1:-make bootstrap-selfhost-link}"
-  echo "selfhost-preflight: run inside the dev image (no host PHP required):" >&2
+  echo "selfhost-preflight: run inside the dev image (no host PHP/make required):" >&2
   echo "  ./script/docker-exec.sh -- bash -lc '${gate_cmd}'" >&2
+  echo "selfhost-preflight: or without host make/php (gate wrapper, #2905):" >&2
+  case "${gate_cmd}" in
+    *helloworld*) echo "  ./script/bootstrap-selfhost-gate.sh helloworld" >&2 ;;
+    *loop*) echo "  ./script/bootstrap-selfhost-gate.sh loop-probe-dry" >&2 ;;
+    *inventory*) echo "  ./script/bootstrap-selfhost-gate.sh inventory-check" >&2 ;;
+    *) echo "  ./script/bootstrap-selfhost-gate.sh link" >&2 ;;
+  esac
   echo "selfhost-preflight: one-shot full ladder (after link is green):" >&2
   echo "  ./script/docker-exec.sh -- bash -lc 'make bootstrap-selfhost-helloworld'" >&2
-  echo "selfhost-preflight: do not nest 'docker' inside docker-exec — the container has PHP/LLVM only." >&2
+  echo "  ./script/bootstrap-selfhost-gate.sh helloworld" >&2
+  echo "selfhost-preflight: do not nest 'docker info' inside docker-exec — the container has PHP/LLVM only." >&2
+  echo "selfhost-preflight: missing Docker CLI on host: see issue #2674." >&2
 }
 
 _selfhost_preflight_print_install_docker() {

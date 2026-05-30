@@ -1948,6 +1948,7 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('docker-only', $body);
         $this->assertStringContainsString('environment prerequisites missing', $body);
         $this->assertStringContainsString('./script/docker-exec.sh', $body);
+        $this->assertStringContainsString('bootstrap-selfhost-gate.sh', $body);
         $this->assertStringContainsString('do not nest', $body);
     }
 
