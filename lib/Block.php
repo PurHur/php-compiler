@@ -192,6 +192,24 @@ class Block {
         return $operands;
     }
 
+    /**
+     * Opcode sub-sequence for class property `new` defaults (issue #3391).
+     *
+     * @param list<OpCode> $opCodes
+     */
+    public function fragmentForOpcodes(array $opCodes): Block
+    {
+        $frag = new Block(null);
+        $frag->opCodes = $opCodes;
+        $frag->nOpCodes = count($opCodes);
+        $frag->constants = $this->constants;
+        foreach ($this->scope as $operand) {
+            $frag->scope[$operand] = $this->scope[$operand];
+        }
+
+        return $frag;
+    }
+
     public function getVarSlot(Operand $operand, bool $isRead): int {
         if (!$this->scope->contains($operand)) {
             $name = self::resolveVariableName($operand);

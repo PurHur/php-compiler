@@ -9,17 +9,21 @@
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Block;
+
 class ClassProperty {
 
     public string $name;
     public ?Variable $default;
     public Variable $prototype;
-    /** Lowercase set-hook method name from property-hooks lowering (#3145), or null. */
     public ?string $setHookMethodLc = null;
     /** Lowercase get-hook method name from property-hooks lowering (#3145), or null. */
     public ?string $getHookMethodLc = null;
     /** Individual readonly property (issue #3149, promoted readonly #3432). */
     public bool $readonly = false;
+    /** Per-instance `new` default initializer (issue #3391). */
+    public ?Block $defaultInitBlock = null;
+    public ?int $defaultInitResultSlot = null;
 
     public function __construct(string $name, ?Variable $default, Variable $prototype, bool $readonly = false) {
         $this->name = $name;
@@ -28,9 +32,14 @@ class ClassProperty {
         $this->readonly = $readonly;
     }
 
+    public function hasRuntimeDefaultInit(): bool
+    {
+        return null !== $this->defaultInitBlock && null !== $this->defaultInitResultSlot;
+    }
+
     public function getVariable(): Variable {
         $var = clone $this->prototype;
-        if (!is_null($this->default)) {
+        if (!is_null($this->default) && !$this->hasRuntimeDefaultInit()) {
             $var->copyFrom($this->default);
         }
 
