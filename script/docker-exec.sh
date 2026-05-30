@@ -104,6 +104,7 @@ if [[ ${#SYNC_BACK_PATHS[@]} -eq 0 ]]; then
 fi
 
 quoted=$(printf '%q ' "$@")
+selfhost_preflight_warn_nested_docker "$@"
 inner="source script/php-env.sh; ${_llvm_exports} ${quoted}"
 
 if [[ "$FORCE_BIND_MOUNT" -eq 1 ]]; then
