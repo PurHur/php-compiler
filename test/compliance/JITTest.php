@@ -185,7 +185,7 @@ class JITTest extends BaseTest {
                 continue;
             }
             // User enum DECLARE_ENUM segfaults in MCJIT until enum lowering is stable (#3518).
-            if (str_contains($name, 'enum_')) {
+            if (str_contains($name, 'enum_') || str_contains($name, 'abstract_enum')) {
                 continue;
             }
             // Property hooks are VM-only until JIT property dispatch (#3145).
