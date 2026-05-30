@@ -1237,13 +1237,7 @@ class Compiler {
         $result = new Block($block);
         foreach ($block->children as $child) {
             if ($child instanceof Op\Terminal\Const_) {
-                $this->compileOps($child->valueBlock->children, $result);
-                AttributeNames::assertNoDuplicates(AttributeNames::fromOp($child));
-                $result->addOpCode(new OpCode(
-                    OpCode::TYPE_DECLARE_CLASS_CONST,
-                    $this->compileOperand($child->name, $result, true),
-                    $this->compileOperand($child->value, $result, true)
-                ));
+                $this->compileClassConstDeclaration($child, $result);
                 continue;
             }
             if ($child instanceof Op\Stmt\ClassMethod) {
@@ -1504,15 +1498,7 @@ class Compiler {
                     ) {
                         $this->throwCompileLogic('Class constants are only supported on classes, interfaces, and traits for now');
                     }
-                    $this->compileOps($child->valueBlock->children, $result);
-                    AttributeNames::assertNoDuplicates(AttributeNames::fromOp($child));
-                    $constOp = new OpCode(
-                        OpCode::TYPE_DECLARE_CLASS_CONST,
-                        $this->compileOperand($child->name, $result, true),
-                        $this->compileOperand($child->value, $result, true)
-                    );
-                    $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
-                    $result->addOpCode($constOp);
+                    $this->compileClassConstDeclaration($child, $result);
                     break;
                 case Op\Stmt\TraitUse::class:
                     if (OpCode::TYPE_DECLARE_CLASS !== $type) {
@@ -1533,6 +1519,88 @@ class Compiler {
             }
         }
         return $result;
+    }
+
+    protected function compileClassConstDeclaration(Op\Terminal\Const_ $child, Block $result): void
+    {
+        $valueSlot = $this->tryFoldClassConstValueSlot($child, $result);
+        if (null === $valueSlot) {
+            $this->compileOps($child->valueBlock->children, $result);
+            $valueSlot = $this->compileOperand($child->value, $result, true);
+        }
+        $typeSlot = null;
+        if (null !== $child->declaredType && $child->declaredType instanceof Op\Type\Literal) {
+            $declared = Type::fromDecl($child->declaredType->name);
+            if (Variable::TYPE_UNDEFINED !== Variable::mapFromType($declared)) {
+                $typeSlot = $this->compileTypeConstrainedVariable($result, $declared);
+                if (isset($result->constants[$valueSlot])) {
+                    $this->verifyClassConstCompileTimeType($child->name, $result->constants[$valueSlot], $declared);
+                }
+            }
+        }
+        $constOp = new OpCode(
+            OpCode::TYPE_DECLARE_CLASS_CONST,
+            $this->compileOperand($child->name, $result, true),
+            $valueSlot,
+            $typeSlot
+        );
+        $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
+        AttributeNames::assertNoDuplicates(AttributeNames::fromOp($child));
+        $result->addOpCode($constOp);
+    }
+
+    protected function tryFoldClassConstValueSlot(Op\Terminal\Const_ $terminal, Block $block): ?int
+    {
+        if (null !== $terminal->valueBlock && [] !== $terminal->valueBlock->children) {
+            $children = $terminal->valueBlock->children;
+            if (1 === \count($children) && $children[0] instanceof Op\Expr\Array_) {
+                $vm = $this->tryBuildCompileTimeArrayFromExpr($children[0]);
+                if (null !== $vm) {
+                    return $block->registerConstant(new Operand\Temporary(), $vm);
+                }
+            }
+        }
+        $vm = $this->vmVariableFromCfgLiteralOperand($terminal->value);
+        if (null === $vm) {
+            return null;
+        }
+
+        return $block->registerConstant(new Operand\Temporary(), $vm);
+    }
+
+    protected function verifyClassConstCompileTimeType(Operand $nameOp, Variable $value, Type $declared): void
+    {
+        $mapped = Variable::mapFromType($declared);
+        if (Variable::TYPE_UNDEFINED === $mapped) {
+            return;
+        }
+        if ($value->type === $mapped) {
+            return;
+        }
+        $constName = $nameOp instanceof Operand\Literal ? (string) $nameOp->value : 'constant';
+        $expected = self::vmTypeName($mapped);
+        $given = self::vmTypeName($value->type);
+        throw new \TypeError("Cannot assign {$given} to class constant {$constName} of type {$expected}");
+    }
+
+    private static function vmTypeName(int $type): string
+    {
+        switch ($type) {
+            case Variable::TYPE_INTEGER:
+                return 'int';
+            case Variable::TYPE_FLOAT:
+                return 'float';
+            case Variable::TYPE_BOOLEAN:
+                return 'bool';
+            case Variable::TYPE_STRING:
+                return 'string';
+            case Variable::TYPE_NULL:
+                return 'null';
+            case Variable::TYPE_ARRAY:
+                return 'array';
+            default:
+                return 'mixed';
+        }
     }
 
     protected function isPromotedParam(Op\Expr\Param $param): bool

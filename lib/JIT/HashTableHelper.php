@@ -279,6 +279,84 @@ final class HashTableHelper
         );
     }
 
+    public static function variableFromVmHashTable(Context $context, \PHPCompiler\VM\HashTable $table): Variable
+    {
+        $ht = self::alloc($context);
+        $setLong = $context->lookupFunction('__hashtable__setLongAt');
+        $setStringAt = $context->lookupFunction('__hashtable__setStringAt');
+        $setStringKey = $context->lookupFunction('__hashtable__setStringKeyString');
+        foreach ($table->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $resolved = $valueVar->resolveIndirect();
+            if (\PHPCompiler\VM\Variable::TYPE_INTEGER === $keyVar->type) {
+                $idx = $context->constantFromInteger($keyVar->toInt(), 'size_t');
+                if (\PHPCompiler\VM\Variable::TYPE_INTEGER === $resolved->type) {
+                    $context->builder->call(
+                        $setLong,
+                        $ht,
+                        $idx,
+                        $context->getTypeFromString('int64')->constInt($resolved->toInt(), false)
+                    );
+                } elseif (\PHPCompiler\VM\Variable::TYPE_STRING === $resolved->type) {
+                    $str = $context->builder->load(
+                        $context->constantStringFromString($resolved->toString())
+                    );
+                    $context->builder->call($setStringAt, $ht, $idx, $str);
+                } elseif (\PHPCompiler\VM\Variable::TYPE_BOOLEAN === $resolved->type) {
+                    $context->builder->call(
+                        $setLong,
+                        $ht,
+                        $idx,
+                        $context->getTypeFromString('int64')->constInt($resolved->toBool() ? 1 : 0, false)
+                    );
+                } elseif (\PHPCompiler\VM\Variable::TYPE_NULL === $resolved->type) {
+                    $nullSlot = JitValueBox::alloc($context);
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeNull'),
+                        JitValueBox::pointer($context, $nullSlot)
+                    );
+                    self::setAtIndex($context, $ht, $idx, new Variable(
+                        $context,
+                        Variable::TYPE_VALUE,
+                        Variable::KIND_VARIABLE,
+                        $nullSlot
+                    ));
+                } else {
+                    throw new \LogicException('Unsupported class constant array element type for JIT');
+                }
+
+                continue;
+            }
+            if (\PHPCompiler\VM\Variable::TYPE_STRING !== $keyVar->type) {
+                continue;
+            }
+            $key = $context->builder->load(
+                $context->constantStringFromString($keyVar->toString())
+            );
+            if (\PHPCompiler\VM\Variable::TYPE_STRING === $resolved->type) {
+                $str = $context->builder->load(
+                    $context->constantStringFromString($resolved->toString())
+                );
+                $context->builder->call($setStringKey, $ht, $key, $str);
+            } elseif (\PHPCompiler\VM\Variable::TYPE_INTEGER === $resolved->type) {
+                $context->builder->call(
+                    $setLong,
+                    $ht,
+                    $key,
+                    $context->getTypeFromString('int64')->constInt($resolved->toInt(), false)
+                );
+            } else {
+                throw new \LogicException('Unsupported class constant array element type for JIT');
+            }
+        }
+
+        return new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $ht
+        );
+    }
+
     /**
      * Pack JIT call/recv arguments into a list hashtable (issue #197).
      *

@@ -222,6 +222,14 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { private const M = 1; public function f(): int { return self::M; } } echo (new C())->f();',
         ],
         [
+            'id' => 'typed_class_const',
+            'construct' => 'PHP 8.3 typed class constants (`const array X = [1,2];`, `const string S = \'a\';`)',
+            'opcodes' => ['TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH', 'TYPE_ARRAY_DIM_FETCH'],
+            'issue' => 3592,
+            'notes' => ['Compile-time literal fold for array/scalar const values; typed mismatch is compile-time TypeError; JIT lowers immutable array constants (#3592)'],
+            'probe' => 'class C { public const array X = [1, 2]; } echo C::X[0];',
+        ],
+        [
             'id' => 'late_static_binding',
             'construct' => 'Late static binding `static::method()` / `static::class`',
             'opcodes' => ['TYPE_STATICCALL_INIT', 'TYPE_CLASS_CONST_FETCH'],

@@ -3312,11 +3312,16 @@ restart:
                         }
                         break;
                     }
-                    $entry->constants[$name] = VM\ClassConstExpr::resolveValue(
-                        $frame,
-                        $block,
-                        $op->arg2
-                    );
+                    $value = $this->resolveClassConstDefineValue($frame, $block, $op);
+                    if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
+                        $constraint = $block->constants[$op->arg3]->typeConstraint;
+                        if (null !== $constraint) {
+                            $check = new Variable();
+                            $check->copyFrom($value);
+                            TypeCheck::coerceReturn($check, true, $constraint);
+                        }
+                    }
+                    $entry->constants[$name] = $value;
                     if (null !== $op->deprecatedMetadata) {
                         $entry->constDeprecated[$name] = $op->deprecatedMetadata;
                     }
@@ -3333,6 +3338,23 @@ restart:
         foreach ($entry->properties as $prop) {
             $this->linkPropertyHooks($entry, $prop);
         }
+    }
+
+    private function resolveClassConstDefineValue(Frame $frame, Block $block, OpCode $op): Variable
+    {
+        if (isset($block->constants[$op->arg2])) {
+            $value = new Variable();
+            $value->copyFrom($block->constants[$op->arg2]);
+
+            return $value;
+        }
+        if (isset($frame->scope[$op->arg2])) {
+            $value = new Variable();
+            $value->copyFrom($frame->scope[$op->arg2]);
+
+            return $value;
+        }
+        throw new \LogicException('Class constant value must be a compile-time constant');
     }
 
     private function isClassBodyDefaultInitOpcode(int $type): bool
