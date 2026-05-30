@@ -77,6 +77,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'json_validate')) {
                 continue;
             }
+<<<<<<< HEAD
+            // Nested break/continue levels use php-cfg goto labels; VM-only until JIT (#3405).
+            if (str_contains($name, 'break2_') || str_contains($name, 'continue2_')) {
+=======
             // (unset) cast reference break is VM-only until JIT TYPE_CAST_UNSET lowering (#3517).
             if (str_contains($name, 'cast_unset')) {
                 continue;
@@ -127,6 +131,7 @@ class JITTest extends BaseTest {
             }
             // __TRAIT__ in trait bodies requires trait JIT lowering (#3609); parse-time fold is VM-only for now.
             if (str_contains($name, 'magic_const_trait')) {
+>>>>>>> master
                 continue;
             }
             yield $name => $case;
