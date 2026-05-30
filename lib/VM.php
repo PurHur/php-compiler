@@ -1450,13 +1450,20 @@ restart:
                     break;
                 case OpCode::TYPE_NEW:
                     $result = $frame->scope[$op->arg1];
-                    $name = $frame->scope[$op->arg2]->toString();
-                    $lcname = strtolower($name);
-                    if (!isset($this->context->classes[$lcname])) {
-                        $this->context->autoloadClass($name);
+                    $rawName = $frame->scope[$op->arg2]->toString();
+                    try {
+                        $lcname = $this->resolveClassScopeName($rawName, $frame);
+                    } catch (\LogicException $e) {
+                        throw new \LogicException($e->getMessage());
                     }
                     if (!isset($this->context->classes[$lcname])) {
-                        throw new \LogicException("Attempting to instantiate non-existing class $name");
+                        $rawLc = strtolower($rawName);
+                        if (!in_array($rawLc, ['self', 'static', 'parent'], true)) {
+                            $this->context->autoloadClass($rawName);
+                        }
+                    }
+                    if (!isset($this->context->classes[$lcname])) {
+                        throw new \LogicException("Attempting to instantiate non-existing class {$rawName}");
                     }
                     $class = $this->context->classes[$lcname];
                     if ($class->isAbstract) {
@@ -3469,6 +3476,18 @@ restart:
         }
         if ($block->returnTypeVoid) {
             TypeCheck::assertVoidReturn($value);
+
+            return;
+        }
+        if ($block->returnTypeStatic) {
+            if (null === $value) {
+                return;
+            }
+            TypeCheck::assertStaticReturn(
+                $value,
+                $this->lateStaticClassLc($frame),
+                $this->context
+            );
 
             return;
         }
