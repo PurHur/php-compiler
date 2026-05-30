@@ -174,7 +174,7 @@ patch_already_applied() {
       grep -q 'null === \$phi->result' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/PhiResolver.php" 2>/dev/null
       ;;
     php-cfg-magic-constants.patch)
-      grep -q 'namespaceStack' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php" 2>/dev/null
+      grep -q 'traitStack' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php" 2>/dev/null
       ;;
     php-cfg-magic-script-const.patch)
       grep -q 'KIND_LINE' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MagicScriptConst.php" 2>/dev/null
@@ -1852,6 +1852,8 @@ apply_patch "$PATCH_DIR/php-llvm-x86-posix-fallback.patch"
 
 # php-cfg before php-types: php-types-mixed-reserved.patch references Op\Type\Mixed_.
 if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
+  # __TRAIT__ scope (traitStack overlay) must run before patches that can fail early (#3640).
+  apply_php_cfg_magic_constants_overlay || true
   apply_patch "$PATCH_DIR/php-cfg-dollars-brace.patch"
   apply_patch "$PATCH_DIR/php-cfg-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-cfg-nullsafe.patch"
