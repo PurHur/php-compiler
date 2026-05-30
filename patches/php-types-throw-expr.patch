@@ -1,0 +1,10 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -246,6 +246,7 @@
+ 
+                 return false;
+             case 'Expr_Exit':
++            case 'Expr_Throw':
+             case 'Iterator_Reset':
+                 return [Type::null()];
+             case 'Iterator_Valid':

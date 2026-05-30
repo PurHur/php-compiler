@@ -161,6 +161,24 @@ class VM {
         return $this->invokePhpFunction($func, $thisVar);
     }
 
+    /** (string) cast on objects — invoke __toString (Zend zend_operators.c, issue #3421). */
+    public function castObjectToString(ObjectEntry $object): string
+    {
+        if (!$this->hasInstanceMethod($object->class, '__tostring')) {
+            throw new \LogicException(
+                'Object of class '.$object->class->name.' could not be converted to string'
+            );
+        }
+        $result = $this->invokeInstanceMethod($object, '__toString')->resolveIndirect();
+        if (Variable::TYPE_STRING !== $result->type) {
+            throw new \LogicException(
+                $object->class->name.'::__toString() must return a string'
+            );
+        }
+
+        return $result->toString();
+    }
+
     /**
      * Convert a value to string for echo/print (Zend zend_print_variable parity, #3564).
      *
@@ -583,6 +601,14 @@ restart:
                         }
                     }
                     break;
+                case OpCode::TYPE_CAST_UNSET:
+                    $src = $frame->scope[$op->arg2];
+                    if (Variable::TYPE_INDIRECT === $src->type) {
+                        $src->reset();
+                        $src->type = Variable::TYPE_UNDEFINED;
+                    }
+                    $frame->scope[$op->arg1]->null();
+                    break;
                 case OpCode::TYPE_IDENTICAL:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
@@ -754,6 +780,12 @@ restart:
                             : $op->block2
                     )->getFrame($this->context, $frame);
                     goto restart;
+                case OpCode::TYPE_BEGIN_SILENCE:
+                    $this->context->errors->beginSilence();
+                    break;
+                case OpCode::TYPE_END_SILENCE:
+                    $this->context->errors->endSilence();
+                    break;
                 case OpCode::TYPE_EXIT:
                     $exitArg = null;
                     if (null !== $op->arg2) {
