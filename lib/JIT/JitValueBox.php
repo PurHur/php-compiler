@@ -193,19 +193,182 @@ final class JitValueBox
     }
 
     /**
+     * Assign a JIT variable into an existing {@see __value__*} slot (by-ref capture / param).
+     */
+    public static function assignToPointer(Context $context, Value $destPtr, Variable $value): void
+    {
+        $destPtr = self::normalizeValuePtr($context, $destPtr);
+        switch ($value->type) {
+            case Variable::TYPE_VALUE:
+                self::copyIntoPointer(
+                    $context,
+                    $destPtr,
+                    self::valuePtrFromVariable($context, $value)
+                );
+
+                return;
+            case Variable::TYPE_NATIVE_LONG:
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeLong'),
+                    $destPtr,
+                    $context->helper->loadValue($value)
+                );
+
+                return;
+            case Variable::TYPE_NATIVE_DOUBLE:
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeDouble'),
+                    $destPtr,
+                    $context->helper->loadValue($value)
+                );
+
+                return;
+            case Variable::TYPE_NATIVE_BOOL:
+                $long = $context->builder->zExt(
+                    $context->helper->loadValue($value),
+                    $context->getTypeFromString('int64')
+                );
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeLong'),
+                    $destPtr,
+                    $long
+                );
+
+                return;
+            case Variable::TYPE_NULL:
+                $context->builder->call($context->lookupFunction('__value__writeNull'), $destPtr);
+
+                return;
+            case Variable::TYPE_STRING:
+                $owned = $context->builder->call(
+                    $context->lookupFunction('__string__separate'),
+                    $context->helper->loadValue($value)
+                );
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeString'),
+                    $destPtr,
+                    $owned
+                );
+
+                return;
+            case Variable::TYPE_OBJECT:
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeObject'),
+                    $destPtr,
+                    $context->helper->loadValue($value)
+                );
+
+                return;
+            case Variable::TYPE_HASHTABLE:
+                $ht = $context->helper->loadValue($value);
+                $context->refcount->addref($ht);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeHashtable'),
+                    $destPtr,
+                    $ht
+                );
+
+                return;
+        }
+        throw new \LogicException(
+            'assignToPointer: unsupported source type '.Variable::getStringType($value->type)
+        );
+    }
+
+    /**
+     * Promote a scoped variable to a boxed {@see __value__} stack slot so closure
+     * {@code use (&$var)} shares one lvalue with the enclosing scope (issue #72).
+     */
+    public static function promoteNativeLvalueToValueBox(Context $context, Variable $var): void
+    {
+        if (null !== $var->valueBoxAliasPtr) {
+            return;
+        }
+        if (Variable::TYPE_VALUE === $var->type) {
+            $var->valueBoxAliasPtr = self::valuePtrFromVariable($context, $var);
+
+            return;
+        }
+        $slot = self::alloc($context);
+        $ptr = self::pointer($context, $slot);
+        switch ($var->type) {
+            case Variable::TYPE_NATIVE_LONG:
+                self::writeLong($context, $slot, $context->helper->loadValue($var));
+                break;
+            case Variable::TYPE_NATIVE_DOUBLE:
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeDouble'),
+                    $ptr,
+                    $context->helper->loadValue($var)
+                );
+                break;
+            case Variable::TYPE_NATIVE_BOOL:
+                self::writeBool($context, $slot, $context->helper->loadValue($var));
+                break;
+            case Variable::TYPE_NULL:
+                $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
+                break;
+            case Variable::TYPE_STRING:
+                $owned = $context->builder->call(
+                    $context->lookupFunction('__string__separate'),
+                    $context->helper->loadValue($var)
+                );
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeString'),
+                    $ptr,
+                    $owned
+                );
+                break;
+            case Variable::TYPE_OBJECT:
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeObject'),
+                    $ptr,
+                    $context->helper->loadValue($var)
+                );
+                break;
+            case Variable::TYPE_HASHTABLE:
+                $ht = $context->helper->loadValue($var);
+                $context->refcount->addref($ht);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeHashtable'),
+                    $ptr,
+                    $ht
+                );
+                break;
+            default:
+                throw new \LogicException(
+                    'promoteNativeLvalueToValueBox: unsupported type '.Variable::getStringType($var->type)
+                );
+        }
+        $var->type = Variable::TYPE_VALUE;
+        $var->kind = Variable::KIND_VARIABLE;
+        $var->value = $slot;
+        $var->valueBoxAliasPtr = $ptr;
+    }
+
+    /**
+     * Copy a boxed value from {@see __value__*} to {@see __value__*} (by-ref assignment).
+     */
+    public static function copyIntoPointer(Context $context, Value $destPtr, Value $srcPtr): void
+    {
+        self::copyBetweenPointers($context, self::normalizeValuePtr($context, $destPtr), $srcPtr);
+    }
+
+    /**
      * Copy a boxed value from a {@see __value__*} slot into a stack {@see __value__} alloca.
      */
     public static function copyFromPointer(Context $context, Value $destSlot, Value $srcPtr): void
+    {
+        self::copyBetweenPointers($context, self::pointer($context, $destSlot), $srcPtr);
+    }
+
+    private static function copyBetweenPointers(Context $context, Value $destPtr, Value $srcPtr): void
     {
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($srcPtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
-        $destTy = $context->getStringFromType($destSlot->typeOf());
-        $destPtr = '__value__*' === $destTy
-            ? self::normalizeValuePtr($context, $destSlot)
-            : self::pointer($context, $destSlot);
 
         $tag = 'v'.(string) self::$copySeq++;
         $stringBlock = BasicBlockHelper::append($context, 'value_copy_string_'.$tag);
@@ -321,13 +484,10 @@ final class JitValueBox
         $context->builder->branchIf($isBool, $boolBlock, $afterBool);
 
         $context->builder->positionAtEnd($boolBlock);
-        self::writeBool(
-            $context,
-            $destSlot,
-            $context->builder->truncOrBitCast(
-                $context->builder->call($context->lookupFunction('__value__readLong'), $srcPtr),
-                $context->getTypeFromString('int1')
-            )
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $destPtr,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $srcPtr)
         );
         $context->builder->branch($done);
 
