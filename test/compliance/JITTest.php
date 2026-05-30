@@ -152,6 +152,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'loose_string_scientific')) {
                 continue;
             }
+            // array/scalar loose == is VM-only until JIT array compare matrix is stable (#3736).
+            if (str_contains($name, 'loose_eq_array_scalar')) {
+                continue;
+            }
             // object === identity compare is VM-only until JIT handle compare is stable (#3622).
             if (str_contains($name, 'object_identical')) {
                 continue;

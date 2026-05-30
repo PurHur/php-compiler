@@ -232,6 +232,31 @@ final class JitValueCompare
         return self::looseEqualHashtableToBool($context, $ht, $bool);
     }
 
+    /**
+     * Loose == between a JIT array operand and null (Zend: only empty array == null).
+     */
+    public static function looseEqualArrayToNull(
+        Context $context,
+        Variable $array
+    ): Value {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
+            return $context->constantFromBool(0 === $array->nextFreeElement);
+        }
+        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $ht
+        );
+        $sizeT = $context->getTypeFromString('size_t');
+        $i1 = $context->getTypeFromString('int1');
+
+        return $context->builder->icmp(
+            Builder::INT_EQ,
+            $num,
+            $sizeT->constInt(0, false)
+        );
+    }
+
 
     /** True when a boxed operand is unset: null {@see __value__*} or a null-tagged box (#1086). */
     public static function valueBoxIsNull(Context $context, Variable $boxed): Value
