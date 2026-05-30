@@ -10,6 +10,8 @@ use PHPCompiler\Web\FastCgi\Record;
 
 /**
  * FastCGI record + params codec (issue #173 slice 1).
+ *
+ * @group fastcgi
  */
 final class FastCgiRecordTest extends TestCase
 {

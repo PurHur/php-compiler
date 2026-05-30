@@ -1099,6 +1099,18 @@ final class Doctor
             'make examples-fastcgiweb-smoke · examples-web-smoke.sh --fastcgi-only · ci-fast when gate=1 (#2351)',
             '#2351'
         );
+        $fcgiSmokeDefault = $defaults['FASTCGI_SMOKE_GATE'] ?? '0';
+        $fcgiSmokeOn = self::gateEnabled('FASTCGI_SMOKE_GATE', $fcgiSmokeDefault);
+        self::printSessionsWebGateRow(
+            1,
+            'FastCGI PHPUnit adapter',
+            'FASTCGI_SMOKE_GATE',
+            $fcgiSmokeDefault,
+            $fcgiSmokeOn,
+            false,
+            'FASTCGI_SMOKE_GATE=1 ./script/ci-local.sh --filter FastCgiRecordTest|FastCgiTest (#173, #1899)',
+            '#173'
+        );
         $aotStatus = $aotOn && $llvmReady ? '✅' : '📋';
         $aotExecuteNote = $llvmReady
             ? ($aotOn ? '#2352 · FASTCGI_WEB_AOT_SMOKE_GATE=1' : '#2352 · opt-in default 0')
@@ -1128,7 +1140,7 @@ final class Doctor
         fwrite(STDOUT, "      Parity:  ./script/check-init-fastcgiweb-parity.sh (INIT_FASTCGIWEB_PARITY_GATE=1 in ci-fast)\n");
 
         fwrite(STDOUT, "\n  Related:\n");
-        fwrite(STDOUT, "  [📋] FastCGI adapter loop — #173\n");
+        fwrite(STDOUT, "  [📋] FastCGI adapter loop — #173 (FASTCGI_SMOKE_GATE=1 for PHPUnit FastCgi*)\n");
         fwrite(STDOUT, "  Docs: examples/009-FastCGIWeb/README.md · docs/local-ci-matrix.md\n");
     }
 

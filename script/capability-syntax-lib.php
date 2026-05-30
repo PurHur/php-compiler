@@ -989,11 +989,11 @@ function webNorthStarDefinitions(): array
         ],
         [
             'construct' => 'FastCGI loop',
-            'vm' => 'no',
-            'jit' => 'no',
-            'aot' => 'no',
+            'vm' => 'partial',
+            'jit' => 'n/a',
+            'aot' => 'partial',
             'issue' => 173,
-            'notes' => [],
+            'notes' => ['bin/fcgi.php + phpc fcgi; FASTCGI_SMOKE_GATE=1 (#173, #1899)'],
         ],
     ];
 }

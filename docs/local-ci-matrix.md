@@ -311,12 +311,14 @@ Progressive ladder (VM serve → AOT execute → deploy CGI). VM serve smoke is 
 
 | Stage | Variable | Default | When enabled |
 |-------|----------|---------|--------------|
+| FastCGI PHPUnit adapter | `FASTCGI_SMOKE_GATE` | `0` | `FASTCGI_SMOKE_GATE=1 ./script/ci-local.sh --filter 'FastCgiRecordTest\|FastCgiTest'` ([#173](https://github.com/PurHur/php-compiler/issues/173), [#1899](https://github.com/PurHur/php-compiler/issues/1899)) |
 | VM health + PATH_INFO | `FASTCGI_WEB_SMOKE_GATE` | `0` | `make examples-fastcgiweb-smoke` · `ci-fast` when `=1` ([#2351](https://github.com/PurHur/php-compiler/issues/2351)) |
 | AOT execute | `FASTCGI_WEB_AOT_SMOKE_GATE` | `0` | `EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh` ([#2352](https://github.com/PurHur/php-compiler/issues/2352)) |
 | Deploy CGI | `FASTCGI_WEB_DEPLOY_SMOKE_GATE` | `0` | `FASTCGI_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all` ([#2359](https://github.com/PurHur/php-compiler/issues/2359)); `make examples-fastcgiweb-deploy-smoke` (009 only) |
 
 ```bash
 ./phpc doctor --gates | grep -E 'FASTCGI|009-FastCGIWeb'
+FASTCGI_SMOKE_GATE=1 ./script/ci-local.sh --filter 'FastCgiRecordTest|FastCgiTest'
 FASTCGI_WEB_SMOKE_GATE=1 make examples-fastcgiweb-smoke
 FASTCGI_WEB_SMOKE_GATE=1 ./script/examples-web-smoke.sh --fastcgi-only
 FASTCGI_WEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh

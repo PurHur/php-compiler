@@ -1064,6 +1064,23 @@ ci_run_throws_web_uncaught_smoke() {
   THROWSWEB_UNCAUGHT_500_GATE=1 "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --throws-only
 }
 
+# PHPUnit FastCGI record + TCP adapter (issue #173; opt-in FASTCGI_SMOKE_GATE=1, #1899).
+ci_run_fastcgi_smoke() {
+  if [[ "${FASTCGI_SMOKE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+    echo "PHPUnit FastCGI (FastCgi*): skipped (PHP_COMPILER_SKIP_SERVE_TESTS is set)"
+    return 0
+  fi
+  if ! ci_can_bind_loopback; then
+    echo "PHPUnit FastCGI (FastCgi*): skipped (cannot bind loopback TCP)"
+    return 0
+  fi
+  echo "PHPUnit: FastCGI adapter (FastCgi*; FASTCGI_SMOKE_GATE=1, #173, #1899)..."
+  ci_run_phpunit --filter 'FastCgiRecordTest|FastCgiTest' "$@"
+}
+
 # Shell curl harness for 009-FastCGIWeb health + PATH_INFO (issue #2351).
 ci_run_fastcgi_web_smoke() {
   if [[ "${FASTCGI_WEB_SMOKE_GATE:-0}" != "1" ]]; then
