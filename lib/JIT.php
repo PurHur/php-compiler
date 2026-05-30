@@ -1098,7 +1098,9 @@ class JIT {
                     $variadicArgIndex,
                     $this->paramTypeConstraintsForNativeCall($block),
                     $this->paramIntersectionConstraintsForNativeCall($block),
-                    $this->paramByRefForNativeCall($block)
+                    $this->paramByRefForNativeCall($block),
+                    $block->paramNames,
+                    $block->variadicParamIndex
                 );
             }
         }
@@ -5599,6 +5601,12 @@ class JIT {
                     if (null !== $op->arg3) {
                         $this->context->scope->args[] = ['unpack' => $sendValue];
                         $this->context->scope->argOperands[] = null;
+                    } elseif (null !== $op->arg2 && isset($block->constants[$op->arg2])) {
+                        $this->context->scope->args[] = [
+                            'named' => $block->constants[$op->arg2]->toString(),
+                            'value' => $sendValue,
+                        ];
+                        $this->context->scope->argOperands[] = $block->getOperand($op->arg1);
                     } else {
                         $this->context->scope->args[] = $sendValue;
                         $this->context->scope->argOperands[] = $block->getOperand($op->arg1);
@@ -5609,12 +5617,16 @@ class JIT {
                         // short circuit
                         break;
                     }
+                    [$callArgs, $callOperands] = $this->resolveJitOutgoingCall(
+                        $this->context->scope->toCall,
+                        $this->context->scope->args,
+                        $this->context->scope->argOperands
+                    );
                     $callArgs = $this->prependImplicitThisForStaticInstanceCall(
                         $block,
                         $this->context->scope->toCall,
-                        $this->finalizeJitCallArgs($this->context->scope->args)
+                        $callArgs
                     );
-                    $callOperands = $this->context->scope->argOperands;
                     if ($this->context->scope->toCall instanceof JIT\Call\Native) {
                         $nativeCall = $this->context->scope->toCall;
                         $callOperands = $this->prependImplicitThisOperandForStaticInstanceCall(
@@ -5653,12 +5665,16 @@ class JIT {
                         $this->assignOperandValue($block->getOperand($op->arg1), $nullVar->value);
                         break;
                     }
+                    [$callArgs, $callOperands] = $this->resolveJitOutgoingCall(
+                        $this->context->scope->toCall,
+                        $this->context->scope->args,
+                        $this->context->scope->argOperands
+                    );
                     $callArgs = $this->prependImplicitThisForStaticInstanceCall(
                         $block,
                         $this->context->scope->toCall,
-                        $this->finalizeJitCallArgs($this->context->scope->args)
+                        $callArgs
                     );
-                    $callOperands = $this->context->scope->argOperands;
                     if ($this->context->scope->toCall instanceof JIT\Call\Native) {
                         $nativeCall = $this->context->scope->toCall;
                         $callOperands = $this->prependImplicitThisOperandForStaticInstanceCall(
@@ -8190,7 +8206,80 @@ class JIT {
             }
         }
 
-        return $argEntries;
+        $out = [];
+        foreach ($argEntries as $entry) {
+            if (\is_array($entry) && isset($entry['named'])) {
+                $out[] = $entry['value'];
+                continue;
+            }
+            $out[] = $entry;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<Variable|array{unpack: Variable}|array{named: string, value: Variable}> $argEntries
+     * @param list<Operand|null>                                                          $argOperands
+     *
+     * @return array{0: list<Variable>, 1: list<Operand|null>}
+     */
+    private function resolveJitOutgoingCall(JIT\Call $toCall, array $argEntries, array $argOperands): array
+    {
+        foreach ($argEntries as $entry) {
+            if (\is_array($entry) && isset($entry['unpack'])) {
+                return [
+                    $this->finalizeJitCallArgs($argEntries),
+                    $argOperands,
+                ];
+            }
+        }
+
+        if ($this->jitCallArgsHaveNamed($argEntries)) {
+            [$paramNames, $variadicIndex] = $this->jitCalleeParamMetadata($toCall);
+            if ([] !== $paramNames) {
+                return JIT\NamedArgs::resolveOutgoing($argEntries, $argOperands, $paramNames, $variadicIndex);
+            }
+        }
+
+        return [
+            $this->finalizeJitCallArgs($argEntries),
+            $argOperands,
+        ];
+    }
+
+    /**
+     * @param list<Variable|array{unpack: Variable}|array{named: string, value: Variable}> $argEntries
+     */
+    private function jitCallArgsHaveNamed(array $argEntries): bool
+    {
+        foreach ($argEntries as $entry) {
+            if (\is_array($entry) && isset($entry['named'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array{0: list<string>, 1: ?int}
+     */
+    private function jitCalleeParamMetadata(JIT\Call $toCall): array
+    {
+        if ($toCall instanceof JIT\Call\Native) {
+            if ([] !== $toCall->paramNames) {
+                return [$toCall->paramNames, $toCall->namedArgsVariadicIndex];
+            }
+            $names = BuiltinParamNames::forFunction($toCall->name);
+
+            return [$names ?? [], null];
+        }
+        if ($toCall instanceof CoreFunc\Internal) {
+            return [BuiltinParamNames::forFunction($toCall->getName()) ?? [], null];
+        }
+
+        return [[], null];
     }
 
     /**
