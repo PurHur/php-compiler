@@ -1,5 +1,5 @@
 --TEST--
-stdlib STR_PAD_* / ENT_* / CASE_* predefined constants (#3535, #3638)
+stdlib STR_PAD_* / ENT_* / CASE_* / M_* predefined constants (#3535, #3638, #3660)
 --FILE--
 <?php
 echo str_pad('hi', 5, ' ', STR_PAD_LEFT), "\n";
@@ -11,6 +11,11 @@ echo isset($constants['Core']['CASE_LOWER']) && $constants['Core']['CASE_LOWER']
 echo isset($constants['Core']['CASE_UPPER']) && $constants['Core']['CASE_UPPER'] === 1 ? "case_up_ok\n" : "case_up_bad\n";
 $hi = array_change_key_case(array('Ab' => 1), CASE_UPPER);
 echo $hi['AB'], "\n";
+echo defined('M_PI') && defined('M_E') && defined('M_LOG2E') ? "math_defined_ok\n" : "math_defined_bad\n";
+echo abs(M_PI - 3.1415926535898) < 1e-10 ? "pi_ok\n" : "pi_bad\n";
+echo abs(M_E - 2.718281828459) < 1e-10 ? "e_ok\n" : "e_bad\n";
+echo abs(M_LOG2E - 1.4426950408889) < 1e-10 ? "log2e_ok\n" : "log2e_bad\n";
+echo isset($constants['Core']['M_PI']) ? "m_pi_listed\n" : "m_pi_missing\n";
 --EXPECT--
    hi
 &lt;a&gt;
@@ -19,3 +24,8 @@ ent_ok
 case_lo_ok
 case_up_ok
 1
+math_defined_ok
+pi_ok
+e_ok
+log2e_ok
+m_pi_listed
