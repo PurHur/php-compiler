@@ -642,13 +642,20 @@ restart:
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
                 case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:
                     $arg1 = $frame->scope[$op->arg1];
-                    $container = $frame->scope[$op->arg2]->resolveIndirect();
+                    $containerSlot = $frame->scope[$op->arg2];
+                    $container = $containerSlot->resolveIndirect();
                     $forWrite = OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type;
                     if ($container->isArrayAccessOffset()) {
                         if ($forWrite || is_null($op->arg3)) {
                             throw new \Error('Cannot indirectly modify an element of ArrayAccess');
                         }
                         $container = $container->readArrayAccessOffsetValue();
+                    }
+                    $isGlobals = Variable::TYPE_ARRAY === $container->type
+                        && $this->context->isGlobalsTable($container);
+                    if ($forWrite && Variable::TYPE_ARRAY === $container->type && !$isGlobals) {
+                        $container->separateArrayForWrite();
+                        $container = $containerSlot->resolveIndirect();
                     }
                     if (is_null($op->arg3)) {
                         if ($container->type !== Variable::TYPE_ARRAY) {

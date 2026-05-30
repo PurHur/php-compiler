@@ -120,9 +120,31 @@ final class Variable {
     }
 
     public function array(HashTable $ht): void {
-        $this->reset();
+        $this->releaseArrayRef();
+        $this->resetScalars();
         $this->type = self::TYPE_ARRAY;
+        $this->streamResource = false;
         $this->array = $ht;
+    }
+
+    /**
+     * Detach from a shared array HashTable before assignment (Zend zval separation).
+     */
+    public function separateArrayForWrite(): void
+    {
+        if (self::TYPE_INDIRECT === $this->type) {
+            $this->indirect->separateArrayForWrite();
+
+            return;
+        }
+        if (self::TYPE_ARRAY !== $this->type || !isset($this->array)) {
+            return;
+        }
+        if (!$this->array->needsSeparate()) {
+            return;
+        }
+        $this->array->delRef();
+        $this->array = $this->array->duplicate();
     }
 
     public function toArray(): HashTable {
@@ -453,8 +475,22 @@ final class Variable {
     }
 
     public function reset(): void {
+        $this->releaseArrayRef();
+        $this->resetScalars();
         $this->type = self::TYPE_NULL;
         $this->streamResource = false;
+    }
+
+    private function releaseArrayRef(): void
+    {
+        if (self::TYPE_ARRAY === $this->type && isset($this->array)) {
+            $this->array->delRef();
+            unset($this->array);
+        }
+    }
+
+    private function resetScalars(): void
+    {
         unset($this->string);
         unset($this->integer);
         unset($this->float);
@@ -597,12 +633,42 @@ final class Variable {
                 ));
                 break;
             case self::TYPE_ARRAY:
-                $this->array($var->array);
+                if (self::TYPE_ARRAY === $this->type && isset($this->array) && $this->array === $var->array) {
+                    break;
+                }
+                $this->releaseArrayRef();
+                $this->resetScalars();
+                $var->array->addRef();
+                $this->type = self::TYPE_ARRAY;
+                $this->streamResource = false;
+                $this->array = $var->array;
                 break;
             default:
                 var_dump($var);
                 throw new \LogicException("Unsupported type copy: {$var->type}");
         }
+    }
+
+    /**
+     * Deep copy used when duplicating array storage (COW separation, zend_array_dup).
+     */
+    public function duplicateFrom(self $var): void
+    {
+        if (self::TYPE_INDIRECT === $this->type) {
+            $this->indirect->duplicateFrom($var);
+
+            return;
+        }
+        while (self::TYPE_INDIRECT === $var->type) {
+            $var = $var->indirect;
+        }
+        TypedPropertyCheck::assertReadable($var);
+        if (self::TYPE_ARRAY === $var->type) {
+            $this->array($var->array->duplicate());
+
+            return;
+        }
+        $this->copyFrom($var);
     }
 
     public function identicalTo(Variable $other): bool {
