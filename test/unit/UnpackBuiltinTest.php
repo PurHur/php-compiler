@@ -20,9 +20,63 @@ PHP;
 
     private const EXPECT = "42\n4660\ndead\n";
 
+    private const INSUFFICIENT_CODE = <<<'PHP'
+function unpack_warn_capture(int $errno, string $message): bool
+{
+    echo 'W:', $message, "\n";
+
+    return true;
+}
+set_error_handler('unpack_warn_capture');
+$r = unpack('N', 'abcd', 1);
+echo $r === false ? 'false' : 'bad', "\n";
+$r = unpack('N', pack('N', 42));
+echo $r[1], "\n";
+PHP;
+
+    private const INSUFFICIENT_EXPECT = <<<'EXPECT'
+W:unpack(): Type N: not enough input, need 4, have 3
+false
+42
+
+EXPECT;
+
+    private const INSUFFICIENT_AOT_CODE = <<<'PHP'
+unpack('N', 'abcd', 1);
+$r = unpack('N', pack('N', 42));
+echo $r[1], "\n";
+PHP;
+
+    private const INSUFFICIENT_AOT_STDOUT = <<<'EXPECT'
+42
+
+EXPECT;
+
     public function testVmUnpack(): void
     {
         $this->assertSame(self::EXPECT, $this->runBin('bin/vm.php', self::CODE));
+    }
+
+    public function testVmUnpackInsufficientData(): void
+    {
+        $this->assertSame(self::INSUFFICIENT_EXPECT, $this->runBin('bin/vm.php', self::INSUFFICIENT_CODE));
+    }
+
+    /**
+     * @group llvm
+     */
+    public function testAotNativeBinaryUnpackInsufficientData(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        [$stdout, $stderr, $exit] = $this->runAotBinaryWithStderr(self::INSUFFICIENT_AOT_CODE);
+        $this->assertSame(0, $exit, $stderr ?: 'AOT run failed');
+        $this->assertSame(self::INSUFFICIENT_AOT_STDOUT, $stdout);
+        $this->assertStringContainsString(
+            'unpack(): Type N: not enough input, need 4, have 3',
+            $stderr
+        );
     }
 
     /**
@@ -37,6 +91,17 @@ PHP;
     }
 
     private function runAotBinary(string $code): string
+    {
+        [$stdout, , $exit] = $this->runAotBinaryWithStderr($code);
+        $this->assertSame(0, $exit, 'AOT run failed');
+
+        return $stdout;
+    }
+
+    /**
+     * @return array{0: string, 1: string, 2: int}
+     */
+    private function runAotBinaryWithStderr(string $code): array
     {
         $repo = dirname(__DIR__, 2);
         $tmp = tempnam(sys_get_temp_dir(), 'phpc_unpack_');
@@ -71,11 +136,15 @@ PHP;
         fclose($pipes[1]);
         $runErr = stream_get_contents($pipes[2]);
         fclose($pipes[2]);
-        $this->assertSame(0, proc_close($run), $runErr ?: 'AOT run failed');
+        $exit = proc_close($run);
         @unlink($tmp);
         @unlink($out);
 
-        return $stdout;
+        return [
+            false !== $stdout ? $stdout : '',
+            false !== $runErr ? $runErr : '',
+            $exit,
+        ];
     }
 
     private function runBin(string $bin, string $code): string
