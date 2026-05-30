@@ -197,13 +197,19 @@ class Runtime {
         }
     }
 
-    public function parse(string $code, string $filename): Script {
+    public function preprocessSourceForParse(string $code): array
+    {
         [$code] = (new SourcePreprocessor\PropertyHooks())->process($code);
         $code = SwitchCommaCaseRewriter::rewrite($code);
         $code = GenericArrayTypeSourceRewriter::rewrite($code);
         [$code, $abstractEnumLines] = AbstractEnumSourceRewriter::rewrite($code);
         $this->abstractEnumMarker->setAbstractLines($abstractEnumLines);
-        [$code, $bareRethrowLines] = SourceBareThrowRewriter::rewrite($code);
+
+        return SourceBareThrowRewriter::rewrite($code);
+    }
+
+    public function parse(string $code, string $filename): Script {
+        [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code);
         $this->compiler->setBareRethrowLines($bareRethrowLines);
         try {
             $script = $this->parser->parse($code, $filename);

@@ -360,8 +360,7 @@ class JIT {
 
     private function shouldSkipExternalClassBodyLowering(int $classId): bool
     {
-        if ($this->shouldUseSelfHostJitStubs()
-            || $this->shouldUseEmitHelperLinkStubs()
+        if ($this->shouldUseEmitHelperLinkStubs()
             || $this->shouldUseM3EmitTuNativeBridge()
             || $this->shouldUseVendorPrelinkJitStubs()
             || $this->isBundledSuperglobalsClass($classId)
@@ -373,10 +372,21 @@ class JIT {
             return false;
         }
 
-        return str_starts_with($className, 'phpcfg\\')
+        if (str_starts_with($className, 'phpcfg\\')
             || str_starts_with($className, 'phptypes\\')
             || str_starts_with($className, 'phpllvm\\')
-            || str_starts_with($className, 'nikic\\');
+            || str_starts_with($className, 'nikic\\')
+        ) {
+            return true;
+        }
+
+        // Self-host AOT skips compiler/runtime spine classes only — user script classes
+        // (e.g. property-hook fixtures) still need method lowering (#3723).
+        if ($this->shouldUseSelfHostJitStubs()) {
+            return str_starts_with($className, 'phpcompiler\\');
+        }
+
+        return false;
     }
 
     /** Opt-in when linking test/selfhost compile_driver.php bundles (#1056, #1768). */
