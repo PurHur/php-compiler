@@ -156,7 +156,7 @@ final class ProjectVmAutoloadHandler
         if (null === $path) {
             return false;
         }
-        $this->runtime->vm->executeCompileUnit($path);
+        $this->runtime->vm()->executeCompileUnit($path);
 
         return isset($this->runtime->vmContext->classes[strtolower($className)]);
     }

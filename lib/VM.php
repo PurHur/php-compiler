@@ -1890,6 +1890,12 @@ restart:
                     if ('' === $resolved || !is_file($resolved)) {
                         return $this->raise('Failed opening required \''.$file.'\' for inclusion', $frame);
                     }
+                    if ($this->context->isCompileUnitLoaded($resolved)) {
+                        if (null !== $op->arg2 && isset($frame->scope[$op->arg2])) {
+                            $frame->scope[$op->arg2]->int(1);
+                        }
+                        break;
+                    }
                     $this->context->markCompileUnitLoaded($resolved);
                     $this->context->scriptStack->push($resolved);
                     $parsed = $this->context->runtime->parseAndCompileFile($resolved);

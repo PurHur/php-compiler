@@ -18,7 +18,7 @@ final class ProjectBootstrap
         }
 
         foreach (ProjectManifest::resolveIncludePaths($projectDir, $manifest) as $path) {
-            $runtime->vm->executeCompileUnit($path);
+            $runtime->vm()->executeCompileUnit($path);
         }
 
         ProjectAutoload::registerVmAutoload(
