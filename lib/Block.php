@@ -635,7 +635,8 @@ class Block {
             OpCode::TYPE_TRY,
             OpCode::TYPE_CATCH,
             OpCode::TYPE_FINALLY,
-            OpCode::TYPE_THROW
+            OpCode::TYPE_THROW,
+            OpCode::TYPE_RETHROW
         );
     }
 

@@ -22,9 +22,16 @@ try {
 } catch (Throwable $e) {
     echo get_class($e), "\n";
 }
+
+try {
+    1 % 0;
+} catch (ArithmeticError $e) {
+    echo get_class($e), "\n";
+}
 ?>
 --EXPECT--
 TypeError
 bad type
 ValueError
 ArgumentCountError
+DivisionByZeroError

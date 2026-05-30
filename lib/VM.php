@@ -11,8 +11,11 @@ namespace PHPCompiler;
 
 require_once __DIR__.'/OpCodeNames.php';
 
+use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Func;
+use PHPCompiler\ext\standard\VmEval;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\CastSupport;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\GeneratorState;
@@ -122,6 +125,27 @@ class VM {
         return false;
     }
 
+    /** Coerce a VM value to string, invoking __toString on objects when defined (issue #3296). */
+    public function coerceVariableToString(Variable $var): string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            return $var->toString();
+        }
+        $object = $var->toObject();
+        if (!$this->hasInstanceMethod($object->class, '__tostring')) {
+            return 'Object';
+        }
+        $result = $this->invokeInstanceMethod($object, '__toString')->resolveIndirect();
+        if (Variable::TYPE_STRING !== $result->type) {
+            throw new \LogicException(
+                "{$object->class->name}::__toString() must return a string in this compiler build"
+            );
+        }
+
+        return $result->toString();
+    }
+
     /** Invoke a user instance method from VM internals (e.g. __debugInfo, #3259). */
     public function invokeInstanceMethod(ObjectEntry $object, string $methodName): Variable
     {
@@ -173,11 +197,23 @@ class VM {
     {
         $savedStack = $this->context->swapRunStack(null);
         try {
-            $child = $closureState->func->getFrame($this->context, null);
-            $this->bindClosureCallCaptures($child, $closureState);
+            $init = new Frame(null, $closureState->func->block, null);
+            $init->vmContext = $this->context;
+            $this->initClosureCall($init, $closureState);
+            if (null === $init->call) {
+                throw new \LogicException('Closure invocation failed in this compiler build');
+            }
+            $child = $init->call->getFrame($this->context, !empty($init->callArgs) ? $init : null);
+            $this->applyClosureBinding($child, $closureState);
             $child->calledArgs = $args;
             $out = new Variable();
             $child->returnVar = $out;
+            if ($child->hasHandler()) {
+                $child->vmContext = $this->context;
+                $child->handler->execute($child);
+
+                return $out->resolveIndirect();
+            }
             $this->context->push($child);
             $result = $this->runFrames();
             if (self::SUCCESS !== $result) {
@@ -188,6 +224,32 @@ class VM {
         } finally {
             $this->context->swapRunStack($savedStack);
         }
+    }
+
+    /**
+     * Execute dynamically compiled eval() code in the caller variable scope (#3358).
+     */
+    public function executeEvalBlock(Block $block, Frame $caller): Variable
+    {
+        $out = new Variable();
+        $child = $block->getFrame($this->context, $caller);
+        $child->ephemeral = true;
+        // Scope comes from getFrame($caller); parent must stay null so nested runFrames exits.
+        $child->parent = null;
+        $child->returnVar = $out;
+        $child->scriptPath = VmEval::EVAL_FILENAME;
+        $this->context->scriptStack->push($child->scriptPath);
+        try {
+            $this->context->push($child);
+            $result = $this->runFrames();
+            if (self::SUCCESS !== $result) {
+                throw new \LogicException('eval() execution failed in this compiler build');
+            }
+        } finally {
+            $this->context->scriptStack->pop();
+        }
+
+        return $out->resolveIndirect();
     }
 
     /**
@@ -403,7 +465,14 @@ restart:
                     $frame->scope[$op->arg1]->castFrom(Variable::TYPE_INTEGER, $frame->scope[$op->arg2]);
                     break;
                 case OpCode::TYPE_CAST_STRING:
-                    $frame->scope[$op->arg1]->castFrom(Variable::TYPE_STRING, $frame->scope[$op->arg2]);
+                    $frame->scope[$op->arg1]->string(
+                        $this->coerceVariableToString($frame->scope[$op->arg2])
+                    );
+                    break;
+                case OpCode::TYPE_CAST_ARRAY:
+                    $frame->scope[$op->arg1]->copyFrom(
+                        CastSupport::toArray($frame->scope[$op->arg2])
+                    );
                     break;
                 case OpCode::TYPE_CAST_OBJECT:
                     $dst = $frame->scope[$op->arg1];
@@ -458,13 +527,31 @@ restart:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
-                    $arg1->compareOp($op->type, $arg2, $arg3);
+                    try {
+                        $arg1->compareOp($op->type, $arg2, $arg3);
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     break;
                 case OpCode::TYPE_SPACESHIP:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
-                    $arg1->spaceshipOp($arg2, $arg3);
+                    try {
+                        $arg1->spaceshipOp($arg2, $arg3);
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     break;
                 case OpCode::TYPE_PLUS:
                 case OpCode::TYPE_MINUS:
@@ -475,7 +562,16 @@ restart:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
-                    $arg1->numericOp($op->type, $arg2, $arg3);
+                    try {
+                        $arg1->numericOp($op->type, $arg2, $arg3);
+                    } catch (\DivisionByZeroError $e) {
+                        $catchFrame = $this->dispatchVmDivisionByZeroError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     break;
                 case OpCode::TYPE_BITWISE_AND:
                 case OpCode::TYPE_BITWISE_OR:
@@ -496,16 +592,33 @@ restart:
                     break;
                 case OpCode::TYPE_CONCAT:
                     $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $frame->scope[$op->arg2]->toString();
-                    $arg3 = $frame->scope[$op->arg3]->toString();
+                    $arg2 = $this->coerceVariableToString($frame->scope[$op->arg2]);
+                    $arg3 = $this->coerceVariableToString($frame->scope[$op->arg3]);
                     $arg1->string($arg2 . $arg3);
                     break;
                 case OpCode::TYPE_ECHO:
-                    VM\OutputBuffer::append($frame->scope[$op->arg1]->toString());
+                    VM\OutputBuffer::append($this->coerceVariableToString($frame->scope[$op->arg1]));
                     break;
                 case OpCode::TYPE_PRINT:
-                    VM\OutputBuffer::append($frame->scope[$op->arg2]->toString());
+                    VM\OutputBuffer::append($this->coerceVariableToString($frame->scope[$op->arg2]));
                     $frame->scope[$op->arg1]->int(1);
+                    break;
+                case OpCode::TYPE_EVAL:
+                    $codeVar = $frame->scope[$op->arg2]->resolveIndirect();
+                    $dest = $frame->scope[$op->arg1];
+                    if (Variable::TYPE_STRING !== $codeVar->type) {
+                        return $this->raise('eval() expects a string argument', $frame);
+                    }
+                    $evalResult = VmEval::evalCodeInFrame(
+                        $this,
+                        $frame,
+                        $codeVar->toString()
+                    );
+                    if (false === $evalResult) {
+                        $dest->bool(false);
+                        break;
+                    }
+                    $dest->copyFrom($evalResult);
                     break;
                 case OpCode::TYPE_COALESCE:
                     $takeLeft = $frame->scope[$op->arg2]->toBool();
@@ -610,6 +723,16 @@ restart:
                     }
                     if (!isset($classEntry->constants[$constName])) {
                         return $this->raise("Undefined class constant {$className}::{$constName}", $frame);
+                    }
+                    if ($classEntry->isEnum) {
+                        $canonical = $classEntry->enumCaseCanonicalNames[$constName]
+                            ?? $frame->scope[$op->arg3]->toString();
+                        $backing = new Variable();
+                        $backing->copyFrom($classEntry->constants[$constName]);
+                        $frame->scope[$op->arg1]->enumCase(
+                            new VM\EnumCaseEntry($classEntry, $canonical, $backing)
+                        );
+                        break;
                     }
                     $frame->scope[$op->arg1]->copyFrom($classEntry->constants[$constName]);
                     break;
@@ -750,10 +873,7 @@ restart:
                     if (Variable::TYPE_OBJECT === $callee->type) {
                         $closureState = $callee->toObject()->closureState;
                         if (null !== $closureState) {
-                            $frame->call = $closureState->func;
-                            $frame->closureCall = $closureState;
-                            $frame->callArgs = [];
-                            $frame->callArgEntries = [];
+                            $this->initClosureCall($frame, $closureState);
                             break;
                         }
                         $this->initMethodCall($frame, $callee, '__invoke');
@@ -831,8 +951,11 @@ restart:
                         $frame->callArgEntries = [];
                         break;
                     }
-                    $new = $frame->call->getFrame($this->context, $frame);
-                    $this->bindClosureCallCaptures($new, $frame->closureCall);
+                    $new = $frame->call->getFrame(
+                        $this->context,
+                        !empty($frame->callArgs) ? $frame : null
+                    );
+                    $this->applyClosureBinding($new, $frame->closureCall);
                     $frame->closureCall = null;
                     $new->calledClass = $this->inferCalledClass($frame);
                     $new->returnVar = null;
@@ -970,6 +1093,9 @@ restart:
                         $classEntry->readonly = (bool) $frame->block->constants[$op->arg3]->toInt();
                     }
                     $classEntry->attributeNames = $op->attributeNames;
+                    $classEntry->allowsDynamicProperties = AttributeNames::hasAllowDynamicProperties(
+                        $op->attributeNames
+                    );
                     self::defineClass($classEntry, $op->block1);
                     if (null !== $classEntry->parentLc) {
                         $this->inheritFromParent($classEntry);
@@ -1006,7 +1132,9 @@ restart:
                     if ($var->type !== Variable::TYPE_OBJECT) {
                         throw new \LogicException("Unsupported property fetch on non-object");
                     }
-                    $result->indirect($var->toObject()->getProperty($name));
+                    $propertyObject = $var->toObject();
+                    VM\LazyObjectSupport::ensureInitialized($this, $propertyObject);
+                    $result->indirect($propertyObject->getProperty($name));
                     break;
                 case OpCode::TYPE_INIT_ARRAY:
                     $result = $frame->scope[$op->arg1];
@@ -1044,6 +1172,17 @@ restart:
                 case OpCode::TYPE_CLONE:
                     $result = $frame->scope[$op->arg1];
                     $src = $frame->scope[$op->arg2]->resolveIndirect();
+                    if (Variable::TYPE_ENUM_CASE === $src->type) {
+                        $enumCase = $src->toEnumCase();
+                        $message = 'Cannot clone enum case '
+                            .$enumCase->enumClass->name.'::'.$enumCase->caseName;
+                        $catchFrame = $this->dispatchVmError($message, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     if (Variable::TYPE_OBJECT !== $src->type) {
                         throw new \LogicException('clone requires an object');
                     }
@@ -1271,8 +1410,12 @@ restart:
                             }
                             $frame = $op->block1->getFrame($this->context, $frame);
                             if (null !== $op->arg3) {
+                                if (!isset($frame->scope[$op->arg3])) {
+                                    $frame->scope[$op->arg3] = new Variable();
+                                }
                                 $frame->scope[$op->arg3]->copyFrom($caught);
                             }
+                            $frame->activeCatchException = $caught;
                             goto restart;
                         }
                         break;
@@ -1293,6 +1436,18 @@ restart:
                     break;
                 case OpCode::TYPE_THROW:
                     $thrown = $frame->scope[$op->arg1]->resolveIndirect();
+                    $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
+                    $this->raiseUncaughtException($thrown);
+                    break;
+                case OpCode::TYPE_RETHROW:
+                    $thrown = $this->resolveActiveCatchException($frame);
+                    if (null === $thrown) {
+                        throw new \LogicException('Cannot use "throw;" outside of a catch block');
+                    }
                     $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -1346,6 +1501,8 @@ restart:
         $this->markObjectConstructedIfLeavingConstruct($frame);
         $caller = $this->context->pop();
         if (null !== $caller) {
+            $caller->callArgs = [];
+            $caller->callArgEntries = [];
             $frame = $caller;
             goto restart;
         }
@@ -1387,6 +1544,51 @@ restart:
         throw new \LogicException($message.' in '.$where);
     }
 
+    /**
+     * Bridge native TypeError from VM internals into user catch handlers (#3445).
+     */
+    private function dispatchVmTypeError(\TypeError $error, Frame $frame): ?Frame
+    {
+        $thrown = VM\BuiltinExceptionSupport::materializeTypeError($this->context, $error->getMessage());
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /**
+     * Bridge native DivisionByZeroError from numeric ops into user catch handlers (#3562, #3371).
+     */
+    private function dispatchVmDivisionByZeroError(\DivisionByZeroError $error, Frame $frame): ?Frame
+    {
+        $thrown = VM\BuiltinExceptionSupport::materializeDivisionByZeroError($this->context, $error->getMessage());
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /**
+     * Bridge VM Error throws (enum clone guard, etc.) into user catch handlers (#3554).
+     */
+    private function dispatchVmError(string $message, Frame $frame): ?Frame
+    {
+        $thrown = VM\BuiltinExceptionSupport::materializeError($this->context, $message);
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
     private function findCatchFrameForThrow(Frame $frame, Variable $thrown): ?Frame
     {
         $this->context->pendingException = $thrown;
@@ -1402,6 +1604,17 @@ restart:
             }
         }
         $this->clearTryCatchUnwindState();
+
+        return null;
+    }
+
+    private function resolveActiveCatchException(Frame $frame): ?Variable
+    {
+        for ($f = $frame; null !== $f; $f = $f->parent) {
+            if (null !== $f->activeCatchException) {
+                return $f->activeCatchException;
+            }
+        }
 
         return null;
     }
@@ -1458,8 +1671,12 @@ restart:
             }
             $catchFrame = $op->block1->getFrame($this->context, $handler);
             if (null !== $op->arg3) {
+                if (!isset($catchFrame->scope[$op->arg3])) {
+                    $catchFrame->scope[$op->arg3] = new Variable();
+                }
                 $catchFrame->scope[$op->arg3]->copyFrom($caught);
             }
+            $catchFrame->activeCatchException = $caught;
             $mergeFrame = null;
             if (null !== $op->block2) {
                 $mergeFrame = $op->block2->getFrame($this->context, $handler);
@@ -1883,6 +2100,48 @@ restart:
         }
     }
 
+    protected function initClosureCall(Frame $frame, ClosureState $state): void
+    {
+        if (null !== $state->methodName && null !== $state->methodReceiver) {
+            if (null !== $state->boundScopeClass && '' !== $state->boundScopeClass) {
+                $frame->calledClass = $state->boundScopeClass;
+            }
+            $this->initMethodCall($frame, $state->methodReceiver, $state->methodName);
+            $frame->closureCall = null;
+
+            return;
+        }
+        if (null !== $state->wrappedFunc) {
+            $frame->call = $state->wrappedFunc;
+            $frame->closureCall = null;
+            $frame->callArgs = [];
+            $frame->callArgEntries = [];
+
+            return;
+        }
+        $frame->call = $state->func;
+        $frame->closureCall = $state;
+        $frame->callArgs = [];
+        $frame->callArgEntries = [];
+    }
+
+    protected function applyClosureBinding(Frame $callee, ?ClosureState $closureState): void
+    {
+        $this->bindClosureCallCaptures($callee, $closureState);
+        if (null === $closureState) {
+            return;
+        }
+        if (null !== $closureState->boundThis) {
+            $thisIdx = $closureState->func->block->slotIndexForVariableName('this');
+            if (null !== $thisIdx) {
+                $callee->scope[$thisIdx] = $closureState->boundThis;
+            }
+        }
+        if (null !== $closureState->boundScopeClass && '' !== $closureState->boundScopeClass) {
+            $callee->calledClass = $closureState->boundScopeClass;
+        }
+    }
+
     protected function resolveStaticClassName(string $className, Frame $frame): string
     {
         return $this->resolveClassScopeName($className, $frame);
@@ -1953,11 +2212,11 @@ restart:
     {
         $methodLc = strtolower($methodName);
         $object = $receiver->toObject();
+        if ($object->lazyPending) {
+            VM\LazyObjectSupport::ensureInitialized($this, $object);
+        }
         if (null !== $object->closureState && '__invoke' === $methodLc) {
-            $frame->call = $object->closureState->func;
-            $frame->closureCall = $object->closureState;
-            $frame->callArgs = [];
-            $frame->callArgEntries = [];
+            $this->initClosureCall($frame, $object->closureState);
 
             return;
         }
@@ -1969,6 +2228,9 @@ restart:
         $callerClassLc = null;
         if (null !== $frame->block->func && null !== $frame->block->func->class) {
             $callerClassLc = strtolower($frame->block->func->class->value);
+        }
+        if (null === $callerClassLc && null !== $frame->calledClass && '' !== $frame->calledClass) {
+            $callerClassLc = strtolower($frame->calledClass);
         }
         MethodVisibility::assertCallable(
             $vis,
@@ -2120,9 +2382,12 @@ restart:
             }
         }
         foreach ($trait->constants as $name => $value) {
-            if (!isset($entry->constants[$name])) {
-                $entry->constants[$name] = $value;
+            if (isset($entry->constants[$name])) {
+                throw new \LogicException(
+                    "Trait constant {$trait->name}::{$name} conflicts with an existing class constant"
+                );
             }
+            $entry->constants[$name] = $value;
         }
     }
 
@@ -2260,11 +2525,15 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_DECLARE_CLASS_CONST:
-                    $name = strtolower($frame->scope[$op->arg1]->toString());
+                    $canonical = $frame->scope[$op->arg1]->toString();
+                    $name = strtolower($canonical);
                     if (!isset($block->constants[$op->arg2])) {
                         throw new \LogicException('Class constant value must be a compile-time constant');
                     }
                     $entry->constants[$name] = $block->constants[$op->arg2];
+                    if ($entry->isEnum) {
+                        $entry->enumCaseCanonicalNames[$name] = $canonical;
+                    }
                     break;
                 case OpCode::TYPE_USE_TRAIT:
                     $this->applyTraitUse($entry, $frame->scope[$op->arg1]->toString());

@@ -346,6 +346,16 @@ final class VmFs
         return @fclose($fp);
     }
 
+    public static function flock(int $handle, int $operation): bool
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+
+        return @\flock($fp, $operation);
+    }
+
     public static function feof(int $handle): bool
     {
         $fp = self::lookup($handle);
@@ -484,6 +494,11 @@ final class VmFs
         }
 
         return $path;
+    }
+
+    public static function isValidHandle(int $handle): bool
+    {
+        return isset(self::$handles[$handle]);
     }
 
     private static function lookup(int $handle): mixed

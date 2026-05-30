@@ -550,6 +550,73 @@ class Object_ extends Type {
     }
 
     /**
+     * Compile-time extends-chain check for is_a() string form (#3478).
+     */
+    public function classIsInstanceOf(string $childName, string $parentName): bool
+    {
+        return $this->classEntryIsInstanceOfLc(
+            strtolower(ltrim($childName, '\\')),
+            strtolower(ltrim($parentName, '\\'))
+        );
+    }
+
+    /**
+     * Compile-time strict-subclass check for is_subclass_of() string form (#3478).
+     */
+    public function classIsSubclassOf(string $childName, string $parentName): bool
+    {
+        $childLc = strtolower(ltrim($childName, '\\'));
+        $parentLc = strtolower(ltrim($parentName, '\\'));
+        if ($childLc === $parentLc) {
+            return false;
+        }
+
+        return $this->classEntryIsInstanceOfLc($childLc, $parentLc);
+    }
+
+    /**
+     * @return list<int> class ids whose instances satisfy instanceof $className
+     */
+    public function classIdsInstanceOf(string $className): array
+    {
+        $wantLc = strtolower(ltrim($className, '\\'));
+        $ids = [];
+        foreach ($this->classIdToName as $id => $name) {
+            if ($this->classEntryIsInstanceOfLc(strtolower(ltrim($name, '\\')), $wantLc)) {
+                $ids[] = $id;
+            }
+        }
+        if (isset($this->classes[$wantLc])) {
+            $expectedId = $this->classes[$wantLc];
+            if (!in_array($expectedId, $ids, true)) {
+                $ids[] = $expectedId;
+            }
+        }
+
+        return $ids;
+    }
+
+    private function classEntryIsInstanceOfLc(string $classLc, string $wantLc): bool
+    {
+        $visited = [];
+        $current = $classLc;
+        while (true) {
+            if (isset($visited[$current])) {
+                return false;
+            }
+            $visited[$current] = true;
+            if ($current === $wantLc) {
+                return true;
+            }
+            $parent = $this->classParentLc[$current] ?? null;
+            if (null === $parent) {
+                return false;
+            }
+            $current = $parent;
+        }
+    }
+
+    /**
      * @param list<string> $interfaceLcs lowercase interface names
      */
     public function setClassInterfaces(string $className, array $interfaceLcs): void
@@ -681,6 +748,28 @@ class Object_ extends Type {
     public function hasUserDeclaredEnum(string $name): bool
     {
         return isset($this->enums[strtolower($name)]);
+    }
+
+    /**
+     * Canonical enum class names from DECLARE_ENUM (issue #3538).
+     *
+     * @return list<string>
+     */
+    public function allDeclaredEnumNames(): array
+    {
+        $names = [];
+        foreach (array_keys($this->enums) as $enumLc) {
+            $resolved = null;
+            foreach ($this->classIdToName as $name) {
+                if (strtolower(ltrim($name, '\\')) === $enumLc) {
+                    $resolved = $name;
+                    break;
+                }
+            }
+            $names[] = $resolved ?? $enumLc;
+        }
+
+        return $names;
     }
 
     /**
@@ -948,6 +1037,16 @@ class Object_ extends Type {
         $this->classIdToName[$id] = $lcname;
         $this->ensureExternalClassConstants($id, $lcname);
         $this->seedExternalClassProperties($id, $lcname);
+        if ('reflectionattribute' === $lcname) {
+            $this->defineProperty($id, 'name', Variable::TYPE_VALUE);
+        }
+        if ('reflectionclass' === $lcname) {
+            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
+        }
+        if ('reflectionmethod' === $lcname) {
+            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
+            $this->defineProperty($id, 'method', Variable::TYPE_STRING);
+        }
         if ('phpcompiler\vm\context' === $lcname) {
             $this->defineProperty($id, 'runtime', Variable::TYPE_OBJECT);
             $this->defineProperty($id, 'errors', Variable::TYPE_OBJECT);
@@ -1214,6 +1313,35 @@ class Object_ extends Type {
     public function methodVisibility(int $classId, string $methodLc): int
     {
         return $this->methodVisibility[$classId][strtolower($methodLc)] ?? \PHPCfg\Func::FLAG_PUBLIC;
+    }
+
+    /**
+     * @return list<string> lowercase method names declared on this class id
+     */
+    public function declaredMethodNames(int $classId): array
+    {
+        return array_keys($this->methodVisibility[$classId] ?? []);
+    }
+
+    /**
+     * Walk parent chain and copy parent method visibility slots missing on $childId (#101).
+     */
+    public function inheritMethodVisibilityFromParent(int $childId, string $childLc): void
+    {
+        $parentLc = $this->parentClassLc($childLc);
+        if (null === $parentLc || !isset($this->classes[$parentLc])) {
+            return;
+        }
+        $parentId = $this->classes[$parentLc];
+        foreach ($this->declaredMethodNames($parentId) as $methodLc) {
+            if (!isset($this->methodVisibility[$childId][$methodLc])) {
+                $this->methodVisibility[$childId][$methodLc] = $this->methodVisibility[$parentId][$methodLc];
+            }
+        }
+        $grandparent = $this->parentClassLc($parentLc);
+        if (null !== $grandparent) {
+            $this->inheritMethodVisibilityFromParent($childId, $parentLc);
+        }
     }
 
     public function markHasConstructor(int $classId): void
@@ -1610,21 +1738,15 @@ class Object_ extends Type {
 
     public function emitInstanceOf(Variable $expr, string $className): Variable
     {
-        $expectedId = $this->lookup($className);
         $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
         $objMap = $this->context->structFieldMap['__object__'];
-        $expectedClassId = $this->context->constantFromInteger($expectedId, 'int64');
 
         if (Variable::TYPE_OBJECT === $expr->type) {
             $obj = $this->context->helper->loadValue($expr);
             $classId = $this->context->builder->load(
                 $this->context->builder->structGep($obj, $objMap['class_id'])
             );
-            $match = $this->context->builder->icmp(
-                PHPLLVM\Builder::INT_EQ,
-                $classId,
-                $expectedClassId
-            );
+            $match = $this->emitClassIdInstanceOf($classId, $className);
 
             return new Variable(
                 $this->context,
@@ -1649,11 +1771,7 @@ class Object_ extends Type {
             $classId = $this->context->builder->load(
                 $this->context->builder->structGep($obj, $objMap['class_id'])
             );
-            $matches = $this->context->builder->icmp(
-                PHPLLVM\Builder::INT_EQ,
-                $classId,
-                $expectedClassId
-            );
+            $matches = $this->emitClassIdInstanceOf($classId, $className);
             $match = $this->context->builder->and($isObject, $matches);
 
             return new Variable(
@@ -1670,6 +1788,38 @@ class Object_ extends Type {
             Variable::KIND_VALUE,
             $falseVal
         );
+    }
+
+    private function emitClassIdInstanceOf(PHPLLVM\Value $classId, string $className): PHPLLVM\Value
+    {
+        $matchingIds = $this->classIdsInstanceOf($className);
+        if ([] === $matchingIds) {
+            $expectedId = $this->lookup($className);
+
+            return $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $classId,
+                $this->context->constantFromInteger($expectedId, 'int64')
+            );
+        }
+        if (1 === \count($matchingIds)) {
+            return $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $classId,
+                $this->context->constantFromInteger($matchingIds[0], 'int64')
+            );
+        }
+        $match = null;
+        foreach ($matchingIds as $id) {
+            $cmp = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $classId,
+                $this->context->constantFromInteger($id, 'int64')
+            );
+            $match = null === $match ? $cmp : $this->context->builder->or($match, $cmp);
+        }
+
+        return $match;
     }
 
     /**
@@ -1732,6 +1882,32 @@ class Object_ extends Type {
             default:
                 throw new \LogicException('Class constant value must be a scalar compile-time constant');
         }
+    }
+
+    public function propertySlotFor(PHPLLVM\Value $obj, string $class, string $name): PHPLLVM\Value
+    {
+        $classId = $this->lookup('' !== $class ? $class : 'stdclass');
+        $nameId = $this->propNameMap[$name] ?? null;
+        $hasProp = false;
+        if (null !== $nameId) {
+            foreach ($this->properties[$classId] as $propset) {
+                if ($propset[0] === $nameId) {
+                    $hasProp = true;
+                    break;
+                }
+            }
+        }
+        if (!$hasProp) {
+            $this->defineProperty($classId, $name, $this->externalPropertyJitType($class, $name));
+            $nameId = $this->propNameMap[$name];
+        }
+        foreach ($this->properties[$classId] as $propset) {
+            if ($propset[0] === $nameId) {
+                return $this->propertySlotPtr($obj, $propset[3]);
+            }
+        }
+
+        throw new \LogicException('Property slot not found: '.$class.'::$'.$name);
     }
 
     public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name): Variable

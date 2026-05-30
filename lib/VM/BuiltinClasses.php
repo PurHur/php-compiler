@@ -19,6 +19,7 @@ use PHPCompiler\VM\Builtin\ReflectionAttributeGetName;
 use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethod;
+use PHPCompiler\VM\Builtin\ReflectionClassNewLazyProxy;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
 use PHPCompiler\VM\Builtin\WeakMapConstruct;
 use PHPCompiler\VM\Builtin\WeakMapCount;
@@ -38,7 +39,9 @@ final class BuiltinClasses
 {
     public static function register(Context $ctx): void
     {
+        StringableSupport::register($ctx);
         self::registerStdClass($ctx);
+        self::registerCountable($ctx);
         self::registerWeakReference($ctx);
         self::registerWeakMap($ctx);
         self::registerReflection($ctx);
@@ -46,6 +49,14 @@ final class BuiltinClasses
         self::registerExceptions($ctx);
         GeneratorState::register($ctx);
         ClosureState::register($ctx);
+    }
+
+    /** Zend zend_interfaces.c — Countable interface (#3364). */
+    private static function registerCountable(Context $ctx): void
+    {
+        $entry = new ClassEntry('Countable');
+        $entry->isInterface = true;
+        $ctx->classes['countable'] = $entry;
     }
 
     private static function registerStdClass(Context $ctx): void
@@ -81,6 +92,11 @@ final class BuiltinClasses
         $arrayProto = new Variable(Variable::TYPE_ARRAY);
         $entry->properties[] = new ClassProperty(
             WeakRefSupport::MAP_PROPERTY,
+            null,
+            $arrayProto
+        );
+        $entry->properties[] = new ClassProperty(
+            WeakRefSupport::MAP_KEYS_PROPERTY,
             null,
             $arrayProto
         );
@@ -130,6 +146,8 @@ final class BuiltinClasses
         $rc->methodVisibility['getattributes'] = $pub;
         $rc->methods['getmethod'] = new ReflectionClassGetMethod();
         $rc->methodVisibility['getmethod'] = $pub;
+        $rc->methods['newlazyproxy'] = new ReflectionClassNewLazyProxy();
+        $rc->methodVisibility['newlazyproxy'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS] = $rc;
     }
 
@@ -190,9 +208,15 @@ final class BuiltinClasses
         );
         self::registerThrowableClass(
             $ctx,
+            'ArithmeticError',
+            ExceptionSupport::CLASS_ARITHMETIC_ERROR,
+            ExceptionSupport::CLASS_ERROR
+        );
+        self::registerThrowableClass(
+            $ctx,
             'DivisionByZeroError',
             ExceptionSupport::CLASS_DIVISION_BY_ZERO_ERROR,
-            ExceptionSupport::CLASS_ERROR
+            ExceptionSupport::CLASS_ARITHMETIC_ERROR
         );
         self::registerThrowableClass(
             $ctx,

@@ -102,8 +102,8 @@ function syntaxRowDefinitions(): array
             'construct' => 'Method return types (`: string` / `: void`)',
             'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_RETURN', 'TYPE_RETURN_VOID'],
             'issue' => 55,
-            'jit' => false,
-            'notes' => ['Router `dispatch(): void`; JIT non-void deferred (#55)'],
+            'jit' => true,
+            'notes' => ['#55 native `: string`/`: int`/`: bool`/`: float`/`: array`/`: ?T` LLVM returns; MCJIT execute #2055'],
             'probe' => 'class C { public function f(): string { return "ok"; } public function g(): void {} } echo (new C())->f();',
         ],
         [
@@ -426,9 +426,9 @@ function syntaxRowDefinitions(): array
         [
             'id' => 'serialize_magic',
             'construct' => '`__serialize` / `__unserialize` magic methods',
-            'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_METHODCALL_INIT', 'TYPE_METHODCALL_EXEC_RETURN'],
+            'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_METHODCALL_INIT', 'TYPE_FUNCCALL_EXEC_RETURN'],
             'issue' => 1365,
-            'notes' => ['serialize()/unserialize() call __serialize/__unserialize when present; VM via VmSerialize'],
+            'notes' => ['serialize()/unserialize() call __serialize/__unserialize when present; VM via VmSerialize (#3368)'],
             'probe' => 'class B { private int $n = 0; public function __construct(int $n = 0) { $this->n = $n; } public function __serialize(): array { return ["n" => $this->n]; } public function __unserialize(array $d): void { $this->n = $d["n"]; } public function get(): int { return $this->n; } } $r = unserialize(serialize(new B(3))); echo $r->get();',
         ],
         [
@@ -475,11 +475,13 @@ function syntaxRowDefinitions(): array
             'id' => 'weak_reference_weak_map',
             'construct' => 'WeakReference / WeakMap',
             'opcodes' => [],
-            'issue' => 1366,
+            'issue' => 3282,
             'jit' => false,
             'notes' => [
-                'VM stub: WeakReference::create/get via indirect target slot (unset clears get); not cycle-collecting GC weak refs',
-                'WeakMap uses object-id string keys; JIT may compile references but method bodies are VM-only',
+                'VM: WeakReference::create/get via indirect target slot; unset clears get immediately',
+                'GC-backed weak refs via WeakRefRegistry — referent collected by gc_collect_cycles() clears get()',
+                'WeakMap uses object-id string keys; entries removed when key object is collected',
+                'JIT may compile references but method bodies are VM-only',
             ],
             'probe' => 'class Box {} $o = new Box(); $r = WeakReference::create($o); unset($o); echo $r->get() === null ? "1" : "0";',
         ],
@@ -962,10 +964,10 @@ function miniWebAppOopNorthStarDefinitions(): array
         [
             'construct' => 'Method return types (`: string` / `: void`)',
             'vm' => 'yes',
-            'jit' => 'no',
-            'aot' => 'partial',
+            'jit' => 'yes',
+            'aot' => 'yes',
             'issue' => 55,
-            'notes' => ['#55 JIT non-void return types; VM `: void` on Router::dispatch'],
+            'notes' => ['#55 native scalar/array returns; nullable via __value__*; MCJIT execute #2055'],
         ],
     ];
 }

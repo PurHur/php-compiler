@@ -105,7 +105,7 @@ class Context {
 
     public TryCatchState $tryCatch;
 
-    /** ?? result operands that must receive branch assigns even when php-cfg marks them dead (#99). */
+    /** ?? / ?-> result operands that must receive branch assigns even when php-cfg marks them dead (#99, #3219). */
     public \SplObjectStorage $coalesceAssignTargets;
 
     /** Nested compile-time include inlining depth (issue #568). */

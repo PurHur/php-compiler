@@ -68,6 +68,34 @@ try {
         );
     }
 
+    public function testModuloByZeroCaughtAsArithmeticError(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+try {
+    1 % 0;
+} catch (ArithmeticError $e) {
+    echo get_class($e), "\n";
+}
+',
+            "DivisionByZeroError\n"
+        );
+    }
+
+    public function testDivisionByZeroErrorExtendsArithmeticError(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+try {
+    throw new DivisionByZeroError("div");
+} catch (ArithmeticError $e) {
+    echo get_class($e), "\n";
+}
+',
+            "DivisionByZeroError\n"
+        );
+    }
+
     private function assertVmOutput(string $code, string $expected): void
     {
         $runtime = new Runtime();

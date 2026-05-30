@@ -11,6 +11,14 @@ if [[ ! -d "$VENDOR_LLVM" ]]; then
   exit 1
 fi
 
+# Class parseStmt_Class also uses parseExprList($node->implements); scope checks to parseStmt_Enum (#3083, #3419).
+php_cfg_enum_implements_parser_applied() {
+  local parser="${1:-$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php}"
+  [[ -f "$parser" ]] || return 1
+  grep -A30 'function parseStmt_Enum' "$parser" 2>/dev/null \
+    | grep -q 'parseExprList($node->implements)'
+}
+
 patch_already_applied() {
   local patch="$1"
   case "$(basename "$patch")" in
@@ -193,11 +201,11 @@ patch_already_applied() {
       ;;
     php-cfg-enum.patch)
       grep -q 'parseStmt_Enum' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
-        && grep -q 'parseExprList($node->implements)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+        && php_cfg_enum_implements_parser_applied
       ;;
     php-cfg-enum-implements.patch)
       grep -q 'public $implements' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php" 2>/dev/null \
-        && grep -q 'parseExprList($node->implements)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+        && php_cfg_enum_implements_parser_applied
       ;;
     php-cfg-enum-class-method.patch)
       grep -q 'elseif ($stmt instanceof Stmt\\ClassMethod)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
@@ -412,7 +420,12 @@ from pathlib import Path
 
 parser_path = Path(sys.argv[1])
 text = parser_path.read_text()
-if 'parseExprList($node->implements)' in text:
+enum_block = re.search(
+    r'protected function parseStmt_Enum\(Stmt\\Enum_ \$node\)\s*\{.*?\n    \}\n',
+    text,
+    re.S,
+)
+if enum_block and 'parseExprList($node->implements)' in enum_block.group(0):
     raise SystemExit(0)
 pattern = re.compile(
     r"(        \$this->block->children\[\] = new Op\\Stmt\\Enum_\(\n"
@@ -450,7 +463,7 @@ apply_php_cfg_enum_overlay() {
   mkdir -p "$(dirname "$op")"
   cp "$overlay/Op/Stmt/Enum_.php" "$op"
   if grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null \
-    && grep -q 'parseExprList($node->implements)' "$parser" 2>/dev/null \
+    && php_cfg_enum_implements_parser_applied "$parser" \
     && grep -A25 'function parseStmt_Enum' "$parser" | grep -q 'Stmt\\ClassMethod'; then
     echo "Skip php-cfg-enum.patch (already applied)"
     return 0
@@ -487,7 +500,7 @@ apply_php_cfg_enum_implements_overlay() {
     return 1
   fi
   cp "$overlay/Op/Stmt/Enum_.php" "$op"
-  if grep -q 'parseExprList($node->implements)' "$parser" 2>/dev/null \
+  if php_cfg_enum_implements_parser_applied "$parser" \
     && grep -q 'public $implements' "$op" 2>/dev/null; then
     echo "Skip php-cfg-enum-implements.patch (already applied)"
     return 0
@@ -1544,6 +1557,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-ctor-promotion.patch"
   apply_patch "$PATCH_DIR/php-cfg-attribute-groups.patch"
   apply_patch "$PATCH_DIR/php-cfg-trait-use.patch"
+  apply_patch "$PATCH_DIR/php-cfg-is-resource-no-assertion.patch"
 fi
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then

@@ -5274,37 +5274,35 @@ class JIT {
                 case OpCode::TYPE_NULLSAFE:
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
+                    $nullsafeResult = $block->getOperand($op->arg1);
+                    $this->context->coalesceAssignTargets[$nullsafeResult] = true;
                     $receiver = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $valuePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $receiver);
-                    $typeByte = $this->context->builder->load(
-                        $this->context->builder->structGep(
-                            $valuePtr,
-                            $this->context->structFieldMap['__value__']['type']
-                        )
-                    );
-                    $i8 = $this->context->getTypeFromString('int8');
-                    $isNull = $this->context->builder->icmp(
-                        \PHPLLVM\Builder::INT_EQ,
-                        $typeByte,
-                        $i8->constInt(JIT\Variable::TYPE_NULL, false)
-                    );
-                    $nullBb = JIT\NullsafeHelper::compileBranch($this, $func, $op->block1);
-                    $fetchBb = JIT\NullsafeHelper::compileBranch($this, $func, $op->block2);
+                    $isNull = JIT\NullsafeHelper::isReceiverNull($this, $receiver);
+                    // Mirror ?? lowering: branchIf targets entry blocks; merge from branch tails (#3219).
+                    $nullTail = JIT\NullsafeHelper::compileBranch($this, $func, $op->block1);
+                    $fetchTail = JIT\NullsafeHelper::compileBranch($this, $func, $op->block2);
+                    $nullEntry = $this->context->scope->blockStorage[$op->block1];
+                    $fetchEntry = $this->context->scope->blockStorage[$op->block2];
                     $builder->positionAtEnd($branchBlock);
-                    if ($this->shouldFreeDeadVariablesBeforeBranch()) {
-                        $this->context->freeDeadVariables($func, $branchBlock, $block);
-                    }
-                    $builder->branchIf($isNull, $nullBb, $fetchBb);
+                    // Do not free php-cfg "dead" operands here; ?-> temps are used on branch/merge blocks (#3219).
+                    $builder->branchIf($isNull, $nullEntry, $fetchEntry);
                     if (null !== $op->block3) {
                         $mergeBb = JIT\BasicBlockHelper::append($this->context, 'nullsafe_merge');
-                        $builder->positionAtEnd($nullBb);
-                        $builder->branch($mergeBb);
-                        $builder->positionAtEnd($fetchBb);
-                        $builder->branch($mergeBb);
+                        $builder->positionAtEnd($nullTail);
+                        if (null === $nullTail->getTerminator()) {
+                            $builder->branch($mergeBb);
+                        }
+                        $builder->positionAtEnd($fetchTail);
+                        if (null === $fetchTail->getTerminator()) {
+                            $builder->branch($mergeBb);
+                        }
                         $builder->positionAtEnd($mergeBb);
+                        $merged = $this->compileBlockInternal($func, $op->block3, null, $mergeBb, ...$args);
+                        unset($this->context->coalesceAssignTargets[$nullsafeResult]);
 
-                        return $this->compileBlockInternal($func, $op->block3, null, $mergeBb, ...$args);
+                        return $merged;
                     }
+                    unset($this->context->coalesceAssignTargets[$nullsafeResult]);
 
                     return $origBasicBlock;
                 case OpCode::TYPE_JUMPIF:
@@ -5699,6 +5697,10 @@ class JIT {
                             $this->context->scope->classId,
                             $parentOp->value
                         );
+                        $this->context->type->object->inheritMethodVisibilityFromParent(
+                            $this->context->scope->classId,
+                            $this->context->scope->className
+                        );
                     }
                     if ([] !== $op->classImplements) {
                         $this->context->type->object->setClassInterfaces(
@@ -5739,6 +5741,7 @@ class JIT {
                         );
                         $resultOp = $block->getOperand($op->arg1);
                         $this->assignOperand($resultOp, $obj, true);
+                        $resultOp->type = new Type(Type::TYPE_OBJECT, [], $resolvedName);
                         if ($classOp instanceof Operand\Literal
                             && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'ReflectionClass')
                         ) {
@@ -5771,21 +5774,31 @@ class JIT {
                     $propName = $name instanceof Operand\Literal ? $name->value : null;
                     $declaringClass = $this->resolvePropertyDeclaringClass($obj, $block, $propName);
                     $receiver = $this->loadPropertyFetchReceiver($obj);
+                    $forceBranchMerge = $this->context->coalesceAssignTargets->contains($result);
                     if ($name instanceof Operand\Literal) {
                         $fetched = $this->context->type->object->propertyFetch(
                             $receiver,
                             $declaringClass,
                             $name->value
                         );
-                        $this->context->scope->variables[$result] = $fetched;
+                        if ($forceBranchMerge) {
+                            $this->assignOperand($result, $fetched, true);
+                        } else {
+                            $this->context->scope->variables[$result] = $fetched;
+                        }
                         $this->applyExternalPropertyResultType($result, $declaringClass, $name->value);
                     } else {
                         $nameVar = $this->context->getVariableFromOp($name);
-                        $this->context->scope->variables[$result] = $this->context->type->object->propertyFetchDynamic(
+                        $fetched = $this->context->type->object->propertyFetchDynamic(
                             $receiver,
                             $declaringClass,
                             $nameVar
                         );
+                        if ($forceBranchMerge) {
+                            $this->assignOperand($result, $fetched, true);
+                        } else {
+                            $this->context->scope->variables[$result] = $fetched;
+                        }
                     }
                     break;
                 default:
@@ -5917,6 +5930,12 @@ class JIT {
             if ('__hashtable__*' === $expected && Variable::TYPE_NULL === $return->type) {
                 return $this->context->getTypeFromString('__hashtable__*')->constNull();
             }
+            if ('__hashtable__*' === $expected && Variable::TYPE_HASHTABLE === $return->type) {
+                return $retval;
+            }
+            if ('__hashtable__*' === $expected && 0 !== ($return->type & Variable::IS_NATIVE_ARRAY)) {
+                return JIT\HashTableHelper::materializeNativeArrayForCall($this->context, $return);
+            }
             if ('__string__*' === $expected && Variable::TYPE_VALUE === $return->type) {
                 return $this->context->builder->call(
                     $this->context->lookupFunction('__value__readString'),
@@ -5941,9 +5960,15 @@ class JIT {
         if (Variable::KIND_VALUE === $return->kind) {
             $this->context->builder->store($retval, $valuePtr);
         }
-        if ('long long' === $expected) {
+        if ('long long' === $expected || 'int64' === $expected) {
             return $this->context->builder->call(
                 $this->context->lookupFunction('__value__readLong'),
+                $valuePtr
+            );
+        }
+        if ('double' === $expected) {
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readDouble'),
                 $valuePtr
             );
         }
@@ -6036,6 +6061,8 @@ class JIT {
             case 'long long':
             case 'int64':
                 return $this->context->getTypeFromString('int64')->constInt($longReturn ?? 0, false);
+            case 'double':
+                return $this->context->getTypeFromString('double')->constReal(0.0);
             case 'bool':
             case 'int1':
                 return $this->context->getTypeFromString('bool')->constInt(0, false);
@@ -6260,7 +6287,10 @@ class JIT {
         $type = $this->context->unwrapNullableUnionType($type);
         switch ($type->type) {
             case Type::TYPE_LONG:
-                $callback = 'long long';
+                $callback = 'int64';
+                break;
+            case Type::TYPE_DOUBLE:
+                $callback = 'double';
                 break;
             case Type::TYPE_BOOLEAN:
                 $callback = 'bool';
@@ -6327,7 +6357,9 @@ class JIT {
                 case 'never':
                     return 'void';
                 case 'int':
-                    return 'long long';
+                    return 'int64';
+                case 'float':
+                    return 'double';
                 case 'string':
                     return '__string__*';
                 case 'bool':
@@ -6437,17 +6469,22 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     $methodLc = strtolower($name->value);
-                    if ([] !== $op->attributeNames && '' !== $this->context->scope->className) {
-                        $attrNames = [];
-                        foreach ($op->attributeNames as $n) {
-                            $attrNames[] = ltrim($n, '\\');
+                    if ([] !== $op->attributeNames) {
+                        $classLc = '' !== $this->context->scope->className
+                            ? strtolower(ltrim($this->context->scope->className, '\\'))
+                            : strtolower(ltrim($this->context->type->object->classNameForId($this->context->scope->classId), '\\'));
+                        if ('' !== $classLc) {
+                            $attrNames = [];
+                            foreach ($op->attributeNames as $n) {
+                                $attrNames[] = ltrim($n, '\\');
+                            }
+                            AttributeRegistry::emitRegisterMethod(
+                                $this->context,
+                                $classLc,
+                                $methodLc,
+                                $attrNames
+                            );
                         }
-                        AttributeRegistry::emitRegisterMethod(
-                            $this->context,
-                            strtolower(ltrim($this->context->scope->className, '\\')),
-                            $methodLc,
-                            $attrNames
-                        );
                     }
                     if (($this->isBundledSuperglobalsClass($classId) || $this->shouldSkipExternalClassBodyLowering($classId))
                         && 'issuperglobalname' !== $methodLc
@@ -6667,7 +6704,7 @@ class JIT {
                             $result->value
                         );
                     }
-                    $this->copyObjectPropertyBacking($result, $value);
+                    $this->maybeCopyObjectPropertyBacking($result, $value, $force);
                     if (null === $result->objectPropertySlot) {
                         $result->addref();
                     }
@@ -6681,7 +6718,7 @@ class JIT {
                 $toStore,
                 $result->value
             );
-            $this->copyObjectPropertyBacking($result, $value);
+            $this->maybeCopyObjectPropertyBacking($result, $value, $force);
             if (null === $result->objectPropertySlot) {
                 $result->addref();
             }
@@ -6919,7 +6956,7 @@ class JIT {
             );
             $result->free();
             $this->context->builder->store($ht, $result->value);
-            $this->copyObjectPropertyBacking($result, $value);
+            $this->maybeCopyObjectPropertyBacking($result, $value, $force);
             if (null === $result->objectPropertySlot) {
                 $result->addref();
             }
@@ -7272,6 +7309,21 @@ class JIT {
     }
 
     /** Keep borrowed object-property hashtable metadata on locals ($cfg = $this->config, #848). */
+    private function maybeCopyObjectPropertyBacking(Variable $dest, Variable $src, bool $force): void
+    {
+        // Branch-merge assigns (?-> / ??) must read the unified __value__ slot at the merge block (#3219).
+        if ($force) {
+            $dest->objectPropertySlot = null;
+            $dest->objectPropertyType = null;
+            $dest->objectPropertyReceiver = null;
+            $dest->objectPropertyName = null;
+            $dest->objectPropertyClassName = null;
+
+            return;
+        }
+        $this->copyObjectPropertyBacking($dest, $src);
+    }
+
     private function copyObjectPropertyBacking(Variable $dest, Variable $src): void
     {
         $dest->objectPropertySlot = $src->objectPropertySlot;
@@ -7608,7 +7660,9 @@ class JIT {
             }
         }
 
-        $declaringClassId = $this->context->type->object->lookup($className);
+        $proxyName = $this->resolveJitInstanceMethodProxyName($declaringClassLc, $methodLc);
+        $resolvedClassLc = strstr($proxyName, '::', true) ?: $declaringClassLc;
+        $declaringClassId = $this->context->type->object->lookup($resolvedClassLc);
         $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
         $callerClassLc = null;
         if (null !== $block->func && null !== $block->func->class) {
@@ -7619,13 +7673,36 @@ class JIT {
         MethodVisibility::assertCallable(
             $visFlags,
             $callerClassLc,
-            $declaringClassLc,
+            $resolvedClassLc,
             $className,
             $methodName
         );
-        $proxyName = $declaringClassLc.'::'.$methodLc;
         $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
         $this->context->scope->args = [$this->context->getVariableFromOp($receiverOp)];
+    }
+
+    /**
+     * Resolve lowered instance method proxy, walking extends chain (#101, Zend zend_inheritance).
+     */
+    private function resolveJitInstanceMethodProxyName(string $classLc, string $methodLc): string
+    {
+        $methodLc = strtolower($methodLc);
+        $visited = [];
+        $current = strtolower(ltrim($classLc, '\\'));
+        while (!isset($visited[$current])) {
+            $visited[$current] = true;
+            $proxy = $current.'::'.$methodLc;
+            if ($this->context->functionIsRegistered($proxy)) {
+                return $proxy;
+            }
+            $parent = $this->context->type->object->parentClassLc($current);
+            if (null === $parent) {
+                break;
+            }
+            $current = $parent;
+        }
+
+        return strtolower(ltrim($classLc, '\\')).'::'.$methodLc;
     }
 
     private function initJitStaticCall(Block $block, int $classOpIdx, int $nameOpIdx): void

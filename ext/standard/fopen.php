@@ -34,7 +34,7 @@ final class fopen extends Internal
 
             return;
         }
-        $frame->returnVar->int($handle);
+        $frame->returnVar->streamHandle($handle);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

@@ -22,6 +22,7 @@ final class ExceptionSupport
     public const CLASS_ARGUMENT_COUNT_ERROR = 'argumentcounterror';
     public const CLASS_PARSE_ERROR = 'parseerror';
     public const CLASS_UNHANDLED_MATCH_ERROR = 'unhandledmatcherror';
+    public const CLASS_ARITHMETIC_ERROR = 'arithmeticerror';
     public const CLASS_DIVISION_BY_ZERO_ERROR = 'divisionbyzeroerror';
     public const CLASS_ASSERTION_ERROR = 'assertionerror';
 
@@ -68,6 +69,7 @@ final class ExceptionSupport
             self::CLASS_ARGUMENT_COUNT_ERROR,
             self::CLASS_PARSE_ERROR,
             self::CLASS_UNHANDLED_MATCH_ERROR,
+            self::CLASS_ARITHMETIC_ERROR,
             self::CLASS_DIVISION_BY_ZERO_ERROR,
             self::CLASS_ASSERTION_ERROR,
         ], true);
