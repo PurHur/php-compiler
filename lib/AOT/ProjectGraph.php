@@ -7,6 +7,7 @@ namespace PHPCompiler\AOT;
 use PHPCompiler\Runtime;
 use PHPCompiler\Web\LiteralIncludeDiscovery;
 use PHPCompiler\Web\ManifestValidator;
+use PHPCompiler\Web\ProjectAutoload;
 use PHPCompiler\Web\ProjectManifest;
 
 /**
@@ -69,6 +70,27 @@ final class ProjectGraph
             }
             $seen[$key] = true;
             $files[] = $path;
+        }
+
+        $manifest = ProjectManifest::loadManifest($root);
+        $psr4Map = ProjectAutoload::parsePsr4Map($root, $manifest);
+        if ([] !== $psr4Map) {
+            $seedFiles = array_merge($files, [$entry]);
+            $autoload = AutoloadDiscovery::discover($runtime, $root, $psr4Map, $seedFiles);
+            $errors = array_merge($errors, $autoload['errors']);
+            foreach ($autoload['files'] as $path) {
+                $key = realpath($path) ?: $path;
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                if (!is_file($path)) {
+                    $errors[] = 'autoload discovered file not found: '.self::displayPath($root, $path);
+
+                    continue;
+                }
+                $seen[$key] = true;
+                $files[] = $path;
+            }
         }
 
         $entryKey = realpath($entry) ?: $entry;
