@@ -1199,7 +1199,7 @@ final class VmString
     public static function strSplit(string $string, int $length = 1): array
     {
         if ($length < 1) {
-            throw new \LogicException('str_split(): Argument #2 ($length) must be greater than 0');
+            throw new \ValueError('str_split(): Argument #2 ($length) must be greater than 0');
         }
         $len = self::byteLength($string);
         if (0 === $len) {
