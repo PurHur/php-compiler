@@ -23,6 +23,7 @@ use PHPTypes\Type;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\OperandName;
+use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\FinalClassExtensionCheck;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
@@ -233,6 +234,7 @@ class Compiler {
 
         InterfaceImplementationCheck::validate($script);
         FinalClassExtensionCheck::validate($script);
+        AbstractMethodVisibilityCheck::validate($script);
 
         return $main;
     }
