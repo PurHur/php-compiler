@@ -572,7 +572,7 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'php-cfg-trait-use.patch; VM merges trait methods into class',
                 'JIT/AOT alias trait-merged methods onto using class (#3789)',
-                'TraitUseAdaptation alias/insteadof on VM (#3238); visibility `as` deferred #144',
+                'TraitUseAdaptation alias/insteadof/visibility on VM (#3238, #144)',
                 'Horizontal trait method collision fatals at compile time (#3416)',
             ],
             'probe' => 'trait T { public function m(): int { return 1; } } class C { use T; } echo (new C())->m();',
@@ -587,7 +587,7 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'Zend/zend_compile.c trait alias/precedence; VM applyTraitUsesWithAdaptations',
                 'JIT/AOT batch trait use with insteadof/as (#2483, #3238)',
-                'Visibility `as private|protected` on trait alias (#144)',
+                'Visibility `as private|protected` on trait alias — VM/JIT/AOT (#144, #2483)',
             ],
             'probe' => 'trait T { public function f(): int { return 1; } } class C { use T { f as r; } } echo (new C())->r();',
         ],

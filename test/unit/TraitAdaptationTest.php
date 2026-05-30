@@ -95,6 +95,21 @@ PHP;
         $this->assertSame('1', $this->runVm($code));
     }
 
+    public function testTraitMethodAsProtectedVisibility(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait T { public function f(): int { return 1; } }
+class C {
+    use T { f as protected; }
+    public function call(): int { return $this->f(); }
+}
+$c = new C();
+echo $c->call();
+PHP;
+        $this->assertSame('1', $this->runVm($code));
+    }
+
     private function runVm(string $code): string
     {
         $rt = new Runtime();
