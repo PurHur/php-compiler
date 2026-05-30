@@ -1242,6 +1242,12 @@ class Compiler {
     protected function applyParamDeclaredType(Op\Expr\Param $param, Block $block, int $slot): void
     {
         $declared = $param->declaredType;
+        if ($declared instanceof Op\Type\Never_) {
+            $this->throwCompileError('never cannot be used as a parameter type');
+        }
+        if ($declared instanceof Op\Type\Literal && 'never' === strtolower($declared->name)) {
+            $this->throwCompileError('never cannot be used as a parameter type');
+        }
         if ($declared instanceof Op\Type\Intersection) {
             $block->paramTypeConstraints[$slot] = Variable::TYPE_OBJECT;
             $block->paramIntersectionConstraints[$slot] = $this->intersectionNamesFromCfgType($declared);
