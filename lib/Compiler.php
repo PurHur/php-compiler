@@ -525,6 +525,13 @@ class Compiler {
                         && $this->isPropertyFetchOnlyUnsetVar($child, $ops[$i + 1])
                     ) {
                         break;
+                    } elseif (
+                        $child instanceof Op\Expr\PropertyFetch
+                        && $i + 1 < $opCount
+                        && $this->isPropertyFetchOnlyIssetVar($child, $ops[$i + 1])
+                    ) {
+                        // Lowered by compileIsset via isset(object, prop) — no eager fetch (#3603).
+                        break;
                     } else {
                         if ($this->needsCfgSplitBeforeStringDimFetch($child, $block, $ops, $i)) {
                             $block = $this->splitCfgBlockAfterStringKeyedArray($block);
@@ -950,6 +957,35 @@ class Compiler {
             if ($var === $fetch) {
                 return true;
             }
+            $target = $var;
+            while ($target instanceof Temporary) {
+                if ($target === $fetch->result) {
+                    return true;
+                }
+                if (null === $target->original) {
+                    break;
+                }
+                $target = $target->original;
+            }
+            if ($target === $fetch->result) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * php-cfg emits PropertyFetch as its own stmt before Isset_; skip duplicate lowering.
+     */
+    private function isPropertyFetchOnlyIssetVar(
+        Op\Expr\PropertyFetch $fetch,
+        Op $next
+    ): bool {
+        if (!$next instanceof Op\Expr\Isset_) {
+            return false;
+        }
+        foreach ($next->vars as $var) {
             $target = $var;
             while ($target instanceof Temporary) {
                 if ($target === $fetch->result) {
@@ -2119,10 +2155,13 @@ class Compiler {
     {
         assert(1 === count($expr->vars));
         $resultSlot = $this->compileOperand($expr->result, $block, false);
-        $dimFetch = $this->findCoalesceArrayDimFetch($expr->vars[0], $block);
-        [$containerSlot, $dimSlot] = null !== $dimFetch
-            ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
-            : $this->resolveIssetTarget($expr->vars[0], $block);
+        $propFetch = $this->findCoalescePropertyFetch($expr->vars[0], $block);
+        $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($expr->vars[0], $block);
+        [$containerSlot, $dimSlot] = null !== $propFetch
+            ? $this->resolveIssetTargetFromPropertyFetch($propFetch, $block)
+            : (null !== $dimFetch
+                ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
+                : $this->resolveIssetTarget($expr->vars[0], $block));
 
         return [new OpCode(
             OpCode::TYPE_ISSET,
@@ -2800,6 +2839,35 @@ class Compiler {
     }
 
     /**
+     * @return ?Op\Expr\PropertyFetch
+     */
+    protected function findCoalescePropertyFetch(Operand $operand, Block $block): ?Op\Expr\PropertyFetch
+    {
+        $direct = $this->unwrapPropertyFetch($operand);
+        if (null !== $direct) {
+            return $direct;
+        }
+        foreach ($block->orig->children as $child) {
+            if ($child instanceof Op\Expr\PropertyFetch && $child->result === $operand) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{0: int, 1: ?int}
+     */
+    protected function resolveIssetTargetFromPropertyFetch(Op\Expr\PropertyFetch $fetch, Block $block): array
+    {
+        return [
+            $this->compileOperand($fetch->var, $block, true),
+            $this->compileOperand($fetch->name, $block, true),
+        ];
+    }
+
+    /**
      * @return array{0: int, 1: ?int}
      */
     protected function resolveIssetTargetFromArrayDimFetch(Op\Expr\ArrayDimFetch $fetch, Block $block): array
@@ -2857,10 +2925,13 @@ class Compiler {
         $vars = $expr->vars;
         $last = count($vars) - 1;
         foreach ($vars as $i => $var) {
-            $dimFetch = $this->findCoalesceArrayDimFetch($var, $block);
-            [$containerSlot, $dimSlot] = null !== $dimFetch
-                ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
-                : $this->resolveIssetTarget($var, $block);
+            $propFetch = $this->findCoalescePropertyFetch($var, $block);
+            $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($var, $block);
+            [$containerSlot, $dimSlot] = null !== $propFetch
+                ? $this->resolveIssetTargetFromPropertyFetch($propFetch, $block)
+                : (null !== $dimFetch
+                    ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
+                    : $this->resolveIssetTarget($var, $block));
             $checkSlot = $resultSlot;
             if ($i < $last) {
                 $checkSlot = $this->compileBoolTemporary($current);
