@@ -55,10 +55,61 @@ final class CgiAotDriver
      */
     public static function run(string $binary, ?string $deployRoot = null): void
     {
+        CgiDriver::ingestStdinRequestBody();
+        [$status, $contentType, $body, $extraHeaders] = self::runCapture($binary, $deployRoot);
+        fwrite(STDOUT, CgiDriver::formatResponse($status, $contentType, $body, $extraHeaders));
+        exit(0);
+    }
+
+    /**
+     * Execute an AOT binary with the current CGI environment and return response parts.
+     *
+     * @return array{0: int, 1: string, 2: string, 3: list<string>}
+     */
+    public static function runCapture(string $binary, ?string $deployRoot = null): array
+    {
         if (!is_executable($binary)) {
             throw new \InvalidArgumentException('AOT binary is not executable: '.$binary);
         }
 
+        self::ensureDeployRoot($binary, $deployRoot);
+
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $env = self::cgiEnvironment();
+        $proc = proc_open([$binary], $descriptorSpec, $pipes, null, $env);
+        if (!is_resource($proc)) {
+            throw new \RuntimeException('Failed to start AOT binary: '.$binary);
+        }
+        if ('' !== ($stdinBody = (string) (getenv('REQUEST_BODY') ?: ''))) {
+            fwrite($pipes[0], $stdinBody);
+        }
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $code = proc_close($proc);
+        if (0 !== $code) {
+            $detail = trim($stderr !== false ? $stderr : '');
+            throw new \RuntimeException(
+                'AOT binary exited '.$code.('' !== $detail ? ': '.$detail : '')
+            );
+        }
+
+        $raw = $stdout !== false ? $stdout : '';
+        if (preg_match('/^Status:\s*\d+/im', $raw)) {
+            return DevServer::parseCgiOutput($raw);
+        }
+
+        return [200, 'text/plain', $raw, []];
+    }
+
+    private static function ensureDeployRoot(string $binary, ?string $deployRoot): void
+    {
         if (null === $deployRoot || '' === $deployRoot) {
             $deployRoot = getenv(DeployRoot::ENV);
         }
@@ -73,39 +124,6 @@ final class CgiAotDriver
                 }
             }
         }
-
-        CgiDriver::ingestStdinRequestBody();
-
-        $descriptorSpec = [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
-        ];
-        $env = self::cgiEnvironment();
-        $proc = proc_open([$binary], $descriptorSpec, $pipes, null, $env);
-        if (!is_resource($proc)) {
-            throw new \RuntimeException('Failed to start AOT binary: '.$binary);
-        }
-        fclose($pipes[0]);
-        $stdout = stream_get_contents($pipes[1]);
-        $stderr = stream_get_contents($pipes[2]);
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-        $code = proc_close($proc);
-        if (0 !== $code) {
-            fwrite(STDERR, trim($stderr !== false ? $stderr : '')."\n");
-            exit($code > 0 ? $code : 1);
-        }
-
-        $raw = $stdout !== false ? $stdout : '';
-        if (preg_match('/^Status:\s*\d+/im', $raw)) {
-            fwrite(STDOUT, $raw);
-            exit(0);
-        }
-
-        [$status, $contentType, $body, $extraHeaders] = DevServer::parseCgiOutput($raw);
-        fwrite(STDOUT, CgiDriver::formatResponse($status, $contentType, $body, $extraHeaders));
-        exit(0);
     }
 
     /**

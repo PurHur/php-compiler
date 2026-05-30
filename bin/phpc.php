@@ -160,6 +160,17 @@ switch ($command) {
         }
         exit(runProcess(array_merge($php, array_merge([$repoRoot.'/bin/cgi-aot.php'], $cgiArgs)), $repoRoot));
 
+    case 'fcgi':
+        if (!is_file($repoRoot.'/vendor/autoload.php')) {
+            fwrite(STDERR, "phpc fcgi: run composer install first\n");
+            exit(1);
+        }
+        $fcgiArgs = [];
+        while ([] !== $args) {
+            $fcgiArgs[] = array_shift($args);
+        }
+        exit(runProcess(array_merge($php, array_merge([$repoRoot.'/bin/fcgi.php'], $fcgiArgs)), $repoRoot));
+
     case 'build':
         if ([] !== $args && '--project' === $args[0]) {
             array_shift($args);
