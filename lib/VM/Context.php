@@ -95,6 +95,13 @@ class Context {
     /** @var array<int, true> merge block object id => pop one try handler on entry */
     public array $tryMergeBlockIds = [];
 
+    /**
+     * Object-foreach slots: when true, call next() before the next valid() check (#3234).
+     *
+     * @var array<int, bool>
+     */
+    public array $foreachObjectAdvance = [];
+
     public function __construct(Runtime $runtime) {
         $this->runtime = $runtime;
         $this->errors = new ErrorReporter();

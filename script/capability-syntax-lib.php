@@ -321,6 +321,19 @@ function syntaxRowDefinitions(): array
             'probe' => '$a = [1, 2, 3]; foreach ($a as &$v) { $v *= 2; } echo $a[0], $a[1], $a[2];',
         ],
         [
+            'id' => 'foreach_iterator',
+            'construct' => 'foreach over Iterator / IteratorAggregate objects',
+            'opcodes' => ['TYPE_ITER_RESET', 'TYPE_ITER_VALID', 'TYPE_ITER_KEY', 'TYPE_ITER_VALUE'],
+            'issue' => 3234,
+            'jit' => false,
+            'aot' => false,
+            'notes' => [
+                'VM calls rewind/valid/current/key/next (Zend zend_iterators.c parity)',
+                'IteratorAggregate::getIterator(); TypeError for non-iterable objects',
+            ],
+            'probe' => null,
+        ],
+        [
             'id' => 'ref_param',
             'construct' => 'By-reference parameters (`function f(&$x)`)',
             'opcodes' => ['TYPE_ARG_RECV', 'TYPE_ARG_SEND'],
