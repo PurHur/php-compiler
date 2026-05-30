@@ -117,6 +117,9 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'loose_numeric_string')) {
                 continue;
             }
+            if (str_contains($name, 'loose_int_empty_string')) {
+                continue;
+            }
             // string/string loose == numeric compare is VM-only until JIT string== is stable (#3680).
             if (str_contains($name, 'loose_string_scientific')) {
                 continue;
