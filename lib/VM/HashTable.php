@@ -200,6 +200,38 @@ final class HashTable {
     }
 
     /**
+     * Zend zend_compare_arrays() parity for spaceship (<=>).
+     */
+    public function compareSpaceship(self $other): int
+    {
+        $leftCount = $this->getNumElements();
+        $rightCount = $other->getNumElements();
+        if ($leftCount > $rightCount) {
+            return 1;
+        }
+        if ($leftCount < $rightCount) {
+            return -1;
+        }
+
+        $leftItems = iterator_to_array($this->iterateKeyed(true));
+        $rightItems = iterator_to_array($other->iterateKeyed(true));
+        for ($i = 0, $n = \count($leftItems); $i < $n; ++$i) {
+            [$leftKey, $leftVal] = $leftItems[$i];
+            [$rightKey, $rightVal] = $rightItems[$i];
+            $keyCmp = Variable::spaceshipCompare($leftKey, $rightKey);
+            if (0 !== $keyCmp) {
+                return $keyCmp;
+            }
+            $valCmp = Variable::spaceshipCompare($leftVal, $rightVal);
+            if (0 !== $valCmp) {
+                return $valCmp;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
      * Remove and return the last element of a packed list array (no holes).
      * Returns null when the array is empty.
      */
