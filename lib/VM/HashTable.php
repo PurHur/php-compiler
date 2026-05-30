@@ -49,6 +49,40 @@ final class HashTable {
         $this->buckets = MaskedArray::allocate(self::MIN_SIZE);
     }
 
+    public function addRef(): void {
+        $this->refcount->addRef();
+    }
+
+    public function delRef(): void {
+        $this->refcount->delRef();
+    }
+
+    public function needsSeparate(): bool {
+        return $this->refcount->needsSeparate();
+    }
+
+    /**
+     * Deep copy for copy-on-write separation (Zend zend_array_dup).
+     */
+    public function duplicate(): self
+    {
+        $out = new self();
+        if ($this->flags & self::FLAG_UNINITIALIZED) {
+            return $out;
+        }
+        foreach ($this->iterateKeyed(true) as [$key, $value]) {
+            $copy = new Variable();
+            $copy->duplicateFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $copy);
+            } else {
+                $out->add($key->toString(), $copy);
+            }
+        }
+
+        return $out;
+    }
+
     public function iterate(bool $resolveIndirect = false): \Traversable {
         $values = [];
         for ($i = 0; $i < $this->numUsed; $i++) {
