@@ -1521,27 +1521,87 @@ final class VmString
     /**
      * @return list<string>
      */
-    public static function explode(string $delimiter, string $string): array
+    public static function explode(string $delimiter, string $string, int $limit = \PHP_INT_MAX): array
     {
         if ('' === $delimiter) {
             throw new \LogicException('explode(): Argument #1 ($separator) cannot be empty');
         }
+        if ('' === $string) {
+            if ($limit >= 0) {
+                return [''];
+            }
+
+            return [];
+        }
+        if ($limit > 1) {
+            return self::explodePositiveLimit($delimiter, $string, $limit);
+        }
+        if ($limit < 0) {
+            return self::explodeNegativeLimit($delimiter, $string, $limit);
+        }
+
+        return [$string];
+    }
+
+    /**
+     * php-src ext/standard/string.c — php_explode().
+     *
+     * @return list<string>
+     */
+    private static function explodePositiveLimit(string $delimiter, string $string, int $limit): array
+    {
         $parts = [];
         $offset = 0;
         $delimLen = self::byteLength($delimiter);
         $strLen = self::byteLength($string);
+        $pos = self::findSubstring($string, $delimiter, $offset);
+        if (false === $pos) {
+            return [self::byteSlice($string, $offset)];
+        }
+        do {
+            $parts[] = self::byteSlice($string, $offset, $pos - $offset);
+            $offset = $pos + $delimLen;
+            $pos = self::findSubstring($string, $delimiter, $offset);
+            --$limit;
+        } while (false !== $pos && $limit > 1);
+        if ($offset <= $strLen) {
+            $parts[] = self::byteSlice($string, $offset);
+        }
+
+        return $parts;
+    }
+
+    /**
+     * php-src ext/standard/string.c — php_explode_negative_limit().
+     *
+     * @return list<string>
+     */
+    private static function explodeNegativeLimit(string $delimiter, string $string, int $limit): array
+    {
+        $delimLen = self::byteLength($delimiter);
+        $strLen = self::byteLength($string);
+        $positions = [0];
+        $offset = 0;
         while (true) {
             $pos = self::findSubstring($string, $delimiter, $offset);
             if (false === $pos) {
-                $parts[] = self::byteSlice($string, $offset);
                 break;
             }
-            $parts[] = self::byteSlice($string, $offset, $pos - $offset);
             $offset = $pos + $delimLen;
-            if ($offset > $strLen) {
-                $parts[] = '';
-                break;
-            }
+            $positions[] = $offset;
+        }
+        $found = \count($positions);
+        $toReturn = $limit + $found;
+        if ($toReturn <= 0) {
+            return [];
+        }
+        $parts = [];
+        for ($i = 0; $i < $toReturn; ++$i) {
+            $start = $positions[$i];
+            $end = ($i + 1 < $found)
+                ? $positions[$i + 1] - $delimLen
+                : $strLen;
+            $parts[] = self::byteSlice($string, $start, $end - $start);
         }
 
         return $parts;
