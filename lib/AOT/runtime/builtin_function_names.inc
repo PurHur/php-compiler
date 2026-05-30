@@ -63,6 +63,7 @@ static const char *phpc_builtin_functions[] = {
     "cos",
     "count",
     "crc32",
+    "crc32c",
     "date",
     "debug_backtrace",
     "decbin",
