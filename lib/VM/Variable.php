@@ -96,6 +96,11 @@ final class Variable {
         return $var;
     }
 
+    public function isIndirect(): bool
+    {
+        return self::TYPE_INDIRECT === $this->type;
+    }
+
     public function newArray(): HashTable {
         $this->array(new HashTable);
         return $this->array;

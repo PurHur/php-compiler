@@ -40,6 +40,9 @@ class Context {
     /** @var array<string, Variable> */
     private array $globalVars = [];
 
+    /** Lazily built $GLOBALS superglobal table (issue #3413). */
+    private ?Variable $globalsSuperglobal = null;
+
     /** @var array<string, Variable> function-local static storage keyed by compile-time key (#2286) */
     private array $functionStaticVars = [];
 
@@ -240,6 +243,9 @@ class Context {
 
     public function ensureSuperglobal(string $name): Variable
     {
+        if ('GLOBALS' === $name) {
+            return $this->ensureGlobalsTable();
+        }
         if (!Superglobals::isSuperglobalName($name)) {
             throw new \InvalidArgumentException("Unknown superglobal: {$name}");
         }
@@ -262,7 +268,82 @@ class Context {
         if (!isset($this->globalVars[$name])) {
             $this->globalVars[$name] = new Variable(Variable::TYPE_NULL);
         }
+        $this->syncGlobalEntryInGlobalsTable($name, $this->globalVars[$name]);
+
         return $this->globalVars[$name];
+    }
+
+    public function ensureGlobalsTable(): Variable
+    {
+        if (null === $this->globalsSuperglobal) {
+            $this->globalsSuperglobal = new Variable(Variable::TYPE_ARRAY);
+            $this->globalsSuperglobal->array(new HashTable());
+            foreach ($this->globalVars as $name => $global) {
+                $this->syncGlobalEntryInGlobalsTable($name, $global);
+            }
+        }
+
+        return $this->globalsSuperglobal;
+    }
+
+    public function isGlobalsTable(Variable $container): bool
+    {
+        if (null === $this->globalsSuperglobal) {
+            return false;
+        }
+
+        return $this->globalsSuperglobal === $container->resolveIndirect();
+    }
+
+    /**
+     * $GLOBALS['name'] read/write shares storage with `global $name` (Zend symbol table).
+     */
+    public function globalsTableOffsetFetch(Variable $index, bool $forWrite): Variable
+    {
+        if (Variable::TYPE_STRING !== $index->type) {
+            return $this->ensureGlobalsTable()->toArray()->findVariable($index, $forWrite);
+        }
+        $name = $index->toString();
+        $global = $this->ensureGlobal($name);
+        $table = $this->ensureGlobalsTable()->toArray();
+        $slot = $table->find($name);
+        if (null === $slot) {
+            $ref = new Variable(Variable::TYPE_NULL);
+            $ref->indirect($global);
+            $table->add($name, $ref);
+
+            return $ref;
+        }
+        if (Variable::TYPE_INDIRECT !== $slot->type) {
+            $ref = new Variable(Variable::TYPE_NULL);
+            $ref->indirect($global);
+            $table->updateIndirect($name, $ref);
+
+            return $ref;
+        }
+
+        return $slot;
+    }
+
+    private function syncGlobalEntryInGlobalsTable(string $name, Variable $global): void
+    {
+        if (null === $this->globalsSuperglobal) {
+            return;
+        }
+        $table = $this->globalsSuperglobal->toArray();
+        $existing = $table->find($name);
+        if (null === $existing) {
+            $ref = new Variable(Variable::TYPE_NULL);
+            $ref->indirect($global);
+            $table->add($name, $ref);
+
+            return;
+        }
+        if (Variable::TYPE_INDIRECT !== $existing->type) {
+            $ref = new Variable(Variable::TYPE_NULL);
+            $ref->indirect($global);
+            $table->updateIndirect($name, $ref);
+        }
     }
 
     public function ensureFunctionStatic(string $storageKey): Variable

@@ -487,7 +487,14 @@ class Block {
                 ) {
                     $scope[$pos] = $frame->scope[$pos];
                 } else {
-                    $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    $name = self::resolveVariableName($op);
+                    if (null !== $name && $this->declaresGlobalName($name)) {
+                        $local = new Variable(Variable::TYPE_NULL);
+                        $local->indirect($context->ensureGlobal($name));
+                        $scope[$pos] = $local;
+                    } else {
+                        $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    }
                 }
             }
         }
