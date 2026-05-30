@@ -1045,6 +1045,59 @@ class Block {
     }
 
     /**
+     * User functions/methods with non-void declared return types — MCJIT execute segfaults (#55, #2055).
+     * LLVM IR verify passes ({@see FunctionReturnTypeJitCompileTest}); AOT execute is OK.
+     */
+    public static function containsTypedNonVoidReturnOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            if (null !== $block->func && self::cfgFuncHasTypedNonVoidReturn($block->func)) {
+                return true;
+            }
+            foreach ($block->opCodes as $op) {
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static function cfgFuncHasTypedNonVoidReturn(Func $func): bool
+    {
+        $returnType = $func->returnType;
+        if (null === $returnType) {
+            return false;
+        }
+        if ($returnType instanceof Op\Type\Void_ || $returnType instanceof Op\Type\Never_) {
+            return false;
+        }
+        if ($returnType instanceof Op\Type\Mixed_) {
+            return false;
+        }
+        if ($returnType instanceof Op\Type\Literal) {
+            $name = strtolower($returnType->name);
+
+            return 'void' !== $name && 'never' !== $name && 'mixed' !== $name;
+        }
+
+        return true;
+    }
+
+    /**
      * CFG regions that MCJIT must not execute yet; `bin/jit.php` runs the VM instead (#2114, #167).
      * Simple try/catch without `finally` may pass MCJIT when {@see TryCatchJitExecuteTest} is green.
      */
@@ -1054,6 +1107,7 @@ class Block {
             || self::containsFinallyOpcodes($root)
             || self::containsExceptionHandlingOpcodes($root)
             || self::containsArrayAccessObjectOpcodes($root)
-            || self::containsDynamicStaticPropertyOpcodes($root);
+            || self::containsDynamicStaticPropertyOpcodes($root)
+            || self::containsTypedNonVoidReturnOpcodes($root);
     }
 }
