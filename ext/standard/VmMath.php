@@ -6,9 +6,11 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\Variable;
 
-/** Shared math coercion helpers for ext/standard (issue #3578). */
+/** Shared math coercion helpers for ext/standard (issue #3578) and base_convert (#3173). */
 final class VmMath
 {
+    private const DIGITS = '0123456789abcdefghijklmnopqrstuvwxyz';
+
     public static function toFloat(Variable $v): float
     {
         if (Variable::TYPE_INTEGER === $v->type) {
@@ -82,5 +84,151 @@ final class VmMath
         }
 
         return $num * (2 ** $exp);
+    }
+
+    /**
+     * php-src: ext/standard/math.c — base_convert()
+     */
+    public static function baseConvert(string $number, int $fromBase, int $toBase): string
+    {
+        if ($fromBase < 2 || $fromBase > 36) {
+            throw new \ValueError('base_convert(): Argument #2 ($from_base) must be between 2 and 36 (inclusive)');
+        }
+        if ($toBase < 2 || $toBase > 36) {
+            throw new \ValueError('base_convert(): Argument #3 ($to_base) must be between 2 and 36 (inclusive)');
+        }
+
+        $value = self::baseToZval($number, $fromBase);
+
+        return is_float($value)
+            ? self::doubleToBase($value, $toBase)
+            : self::longToBase((int) $value, $toBase);
+    }
+
+    /**
+     * @return int|float
+     */
+    public static function baseToZval(string $str, int $base): int|float
+    {
+        $len = \strlen($str);
+        $start = 0;
+        $end = $len;
+
+        while ($start < $end && \ctype_space($str[$start])) {
+            ++$start;
+        }
+        while ($end > $start && \ctype_space($str[$end - 1])) {
+            --$end;
+        }
+
+        if ($end - $start >= 2) {
+            if (16 === $base && '0' === $str[$start] && ('x' === $str[$start + 1] || 'X' === $str[$start + 1])) {
+                $start += 2;
+            } elseif (8 === $base && '0' === $str[$start] && ('o' === $str[$start + 1] || 'O' === $str[$start + 1])) {
+                $start += 2;
+            } elseif (2 === $base && '0' === $str[$start] && ('b' === $str[$start + 1] || 'B' === $str[$start + 1])) {
+                $start += 2;
+            }
+        }
+
+        $num = 0;
+        $fnum = 0.0;
+        $mode = 0;
+        $cutoff = intdiv(\PHP_INT_MAX, $base);
+        $cutlim = \PHP_INT_MAX % $base;
+        $invalidChars = 0;
+
+        for ($i = $start; $i < $end; ++$i) {
+            $c = $str[$i];
+            if ($c >= '0' && $c <= '9') {
+                $digit = (int) ($c - '0');
+            } elseif ($c >= 'A' && $c <= 'Z') {
+                $digit = (int) (\ord($c) - \ord('A') + 10);
+            } elseif ($c >= 'a' && $c <= 'z') {
+                $digit = (int) (\ord($c) - \ord('a') + 10);
+            } else {
+                ++$invalidChars;
+
+                continue;
+            }
+
+            if ($digit >= $base) {
+                ++$invalidChars;
+
+                continue;
+            }
+
+            if (0 === $mode) {
+                if ($num < $cutoff || ($num === $cutoff && $digit <= $cutlim)) {
+                    $num = $num * $base + $digit;
+
+                    continue;
+                }
+                $fnum = (float) $num;
+                $mode = 1;
+            }
+            $fnum = $fnum * $base + $digit;
+        }
+
+        if ($invalidChars > 0) {
+            @\trigger_error(
+                'Invalid characters passed for attempted conversion, these have been ignored',
+                \E_USER_DEPRECATED
+            );
+        }
+
+        return 1 === $mode ? $fnum : $num;
+    }
+
+    public static function longToBase(int $arg, int $base): string
+    {
+        if ($base < 2 || $base > 36) {
+            return '';
+        }
+
+        if (0 === $arg) {
+            return '0';
+        }
+
+        $negative = $arg < 0;
+        $n = $negative ? abs($arg) : $arg;
+
+        $buf = '';
+        while ($n > 0) {
+            $buf = self::DIGITS[$n % $base].$buf;
+            $n = intdiv($n, $base);
+        }
+
+        return $negative ? '-'.$buf : $buf;
+    }
+
+    public static function doubleToBase(float $fvalue, int $base): string
+    {
+        if ($base < 2 || $base > 36) {
+            return '';
+        }
+
+        if ($fvalue === \INF || $fvalue === -\INF) {
+            throw new \ValueError(\sprintf('An infinite value cannot be converted to base %d', $base));
+        }
+
+        $fvalue = floor($fvalue);
+        if (0.0 === $fvalue) {
+            return '0';
+        }
+
+        $negative = $fvalue < 0.0;
+        if ($negative) {
+            $fvalue = -$fvalue;
+        }
+
+        $buf = '';
+        while ($fvalue >= 1.0) {
+            $digit = (int) fmod($fvalue, (float) $base);
+            $buf = self::DIGITS[$digit].$buf;
+            $fvalue /= (float) $base;
+        }
+
+        return $negative ? '-'.$buf : $buf;
     }
 }
