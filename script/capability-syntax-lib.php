@@ -190,6 +190,8 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'Lowered in php-cfg to === / jump-if / assign (#143)',
                 'Wave-3 literal-arm subset (#2398); acceptance PHPT (#2428)',
+                'Guard arms: expression patterns evaluated before === compare; nested match patterns (#3397); match_guard.phpt',
+                'Arm assignment side effects bind variables when arm matches (#3787); match_arm_assign.phpt',
             ],
             'probe' => 'echo match (2) { 1 => "a", 2 => "b", default => "c" };',
         ],
