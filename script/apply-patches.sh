@@ -1231,7 +1231,7 @@ apply_php_cfg_magic_constants_overlay() {
     return 1
   fi
   if patch_already_applied "$PATCH_DIR/php-cfg-magic-constants.patch" \
-    && grep -q 'traitStack' "$target" 2>/dev/null; then
+    && grep -q 'empty($this->traitStack)' "$target" 2>/dev/null; then
     echo "Skip php-cfg-magic-constants.patch (already applied)"
     return 0
   fi
@@ -1613,6 +1613,8 @@ apply_patch "$PATCH_DIR/php-llvm-x86-posix-fallback.patch"
 
 # php-cfg before php-types: php-types-mixed-reserved.patch references Op\Type\Mixed_.
 if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
+  # __TRAIT__ scope (traitStack overlay) must run before patches that can fail early (#3640).
+  apply_php_cfg_magic_constants_overlay || true
   apply_patch "$PATCH_DIR/php-cfg-dollars-brace.patch"
   apply_patch "$PATCH_DIR/php-cfg-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-cfg-nullsafe.patch"
