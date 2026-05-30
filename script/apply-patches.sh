@@ -1231,7 +1231,10 @@ apply_php_cfg_magic_constants_overlay() {
     return 1
   fi
   if patch_already_applied "$PATCH_DIR/php-cfg-magic-constants.patch" \
-    && grep -q 'traitStack' "$target" 2>/dev/null; then
+    && grep -q 'traitStack' "$target" 2>/dev/null \
+    && grep -q 'functionStack' "$target" 2>/dev/null \
+    && grep -q 'MagicConst\\Method' "$target" 2>/dev/null \
+    && grep -A3 'MagicConst\\Method' "$target" | grep -q 'functionStack'; then
     echo "Skip php-cfg-magic-constants.patch (already applied)"
     return 0
   fi

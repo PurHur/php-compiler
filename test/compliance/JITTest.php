@@ -101,6 +101,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'enum_cases')) {
                 continue;
             }
+            // Global function __METHOD__/__FUNCTION__ — parse-time literals; MCJIT segfault (#3595).
+            if (str_contains($name, 'magic_const_method_function')) {
+                continue;
+            }
             // object == structural compare is VM-only until JIT Object_ lowering (#3602).
             if (str_contains($name, 'object_loose_equals')) {
                 continue;
