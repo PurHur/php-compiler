@@ -45,7 +45,7 @@ Requires LLVM coroutine passes (or hand-rolled switch-on-IP state machine like m
 1. ✅ VM + JIT fallback + compile-time guards (this issue)
 2. EH stability in MCJIT (#2114) — share `requiresVmLowering` gate
 3. ✅ MCJIT resume lowering for generator *calls* while main script stays native (#3074)
-4. Prototype switch-on-IP lowering for single-function generators without `yield from`
+4. ✅ Switch-on-IP lowering for generators with packed-array `yield from` (#3074); `yield from` generator delegation still VM-only
 5. AOT link only after JIT path is stable; remove bootstrap inventory blocker last
 
 ## Related

@@ -121,4 +121,35 @@ PHP
         $this->assertArrayHasKey('gen', $context->generatorCreators);
         $this->addToAssertionCount(1);
     }
+
+    /**
+     * @runInSeparateProcess
+     */
+    public function testYieldFromMixedForeachScriptVerifies(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+function gen(): Generator {
+    yield 1;
+    yield from [2, 3];
+    yield 4;
+}
+foreach (gen() as $v) {
+    echo $v;
+}
+PHP
+            ,
+            'generator_jit_yield_mixed.php'
+        );
+        $this->assertNotNull($block);
+        $this->assertFalse(Block::requiresVmLowering($block));
+        $runtime->jitCompileBlock($block);
+        $context = $runtime->loadJitContext();
+        $verify = new \ReflectionMethod($context, 'compileCommon');
+        $verify->setAccessible(true);
+        $verify->invoke($context);
+        $this->assertArrayHasKey('gen', $context->generatorCreators);
+        $this->addToAssertionCount(1);
+    }
 }

@@ -214,8 +214,8 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'VM GeneratorState + foreach; keyed yield (#3085)',
                 'MCJIT resume lowering for nested generator funcs (#3074); script-scope requiresVmLowering',
-                'linear yield only (no yield from / try in generator JIT yet); see docs/generators-jit-aot.md',
-                '`yield from` generator path supported on VM (#167)',
+                'JIT linear `yield` + packed-array `yield from`; `yield from` generator + try/catch in generator JIT deferred',
+                'see docs/generators-jit-aot.md',
             ],
             'probe' => 'function g() { yield 1; yield 2; } foreach (g() as $v) echo $v;',
         ],

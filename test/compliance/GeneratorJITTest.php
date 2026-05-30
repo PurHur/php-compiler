@@ -24,7 +24,10 @@ final class GeneratorJITTest extends BaseTest
         }
     }
 
-    public function testJitLintGeneratorForeachFixture(): void
+    /**
+     * @dataProvider provideJitLintGeneratorFixtures
+     */
+    public function testJitLintGeneratorForeachFixture(string $fixture): void
     {
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
@@ -32,9 +35,9 @@ final class GeneratorJITTest extends BaseTest
         $root = dirname(__DIR__, 2);
         $bin = realpath($root.'/bin/compile.php');
         $this->assertNotFalse($bin);
-        $path = __DIR__.'/cases/language/generator_jit.phpt';
+        $path = __DIR__.'/cases/language/'.$fixture;
         $this->assertFileExists($path);
-        [, $code] = self::parsePHPT($path, 'generator_jit.phpt');
+        [, $code] = self::parsePHPT($path, $fixture);
         $env = [];
         foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
             if (is_string($value)) {
@@ -55,8 +58,16 @@ final class GeneratorJITTest extends BaseTest
         $this->assertSame(
             0,
             $exit,
-            trim($stderr !== false ? $stderr : '')."\n".'compile.php -l failed for generator_jit.phpt'
+            trim($stderr !== false ? $stderr : '')."\n".'compile.php -l failed for '.$fixture
         );
+    }
+
+    /** @return \Generator<string, array{0: string}> */
+    public static function provideJitLintGeneratorFixtures(): \Generator
+    {
+        yield 'linear yield' => ['generator_jit.phpt'];
+        yield 'yield from array' => ['generator_jit_yield_from.phpt'];
+        yield 'yield + yield from' => ['generator_jit_yield_mixed.phpt'];
     }
 }
 
