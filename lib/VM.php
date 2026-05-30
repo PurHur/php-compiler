@@ -2291,12 +2291,23 @@ restart:
         if (null !== $frame->block->func && null !== $frame->block->func->class) {
             $callerClassLc = strtolower($frame->block->func->class->value);
         }
+        $parentScopeAllows = false;
+        if ($this->isParentClassDispatch($frame, $lcClass)) {
+            $parentScopeAllows = MethodVisibility::parentScopeAllows(
+                $vis,
+                $callerClassLc,
+                $lcClass,
+                strtolower($class->name),
+                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc)
+            );
+        }
         MethodVisibility::assertCallable(
             $vis,
             $callerClassLc,
             $lcClass,
             $class->name,
-            $methodName
+            $methodName,
+            $parentScopeAllows
         );
         $frame->call = $class->methods[$methodLc];
         $frame->callArgs = $this->callArgsForStaticMethod($frame, $lcClass, $frame->call);
@@ -2333,6 +2344,24 @@ restart:
         $parentLc = $this->context->classes[$declaring]->parentLc;
 
         return null !== $parentLc && $resolvedLc === $parentLc;
+    }
+
+    protected function isClassSameOrSubclassOf(string $classLc, string $ancestorLc): bool
+    {
+        $current = $classLc;
+        while (true) {
+            if ($current === $ancestorLc) {
+                return true;
+            }
+            if (!isset($this->context->classes[$current])) {
+                return false;
+            }
+            $parentLc = $this->context->classes[$current]->parentLc;
+            if (null === $parentLc) {
+                return false;
+            }
+            $current = $parentLc;
+        }
     }
 
     protected function resolveCallerThis(Frame $frame): ?Variable

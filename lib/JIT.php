@@ -7594,6 +7594,22 @@ class JIT {
         return $classOp->value;
     }
 
+    private function jitIsClassSameOrSubclassOf(string $classLc, string $ancestorLc): bool
+    {
+        $current = strtolower(ltrim($classLc, '\\'));
+        $ancestorLc = strtolower(ltrim($ancestorLc, '\\'));
+        while (true) {
+            if ($current === $ancestorLc) {
+                return true;
+            }
+            $parentLc = $this->context->type->object->parentClassLc($current);
+            if (null === $parentLc) {
+                return false;
+            }
+            $current = $parentLc;
+        }
+    }
+
     private function blockUsesThis(Block $block): bool
     {
         foreach ($block->orig->hoistedOperands as $hoisted) {
@@ -7731,12 +7747,26 @@ class JIT {
         } elseif ($this->context->scope->className !== '') {
             $callerClassLc = $this->context->scope->className;
         }
+        $parentScopeAllows = false;
+        if (null !== $callerClassLc) {
+            $directParentLc = $this->context->type->object->parentClassLc($callerClassLc);
+            if (null !== $directParentLc && $directParentLc === $declaringClassLc) {
+                $parentScopeAllows = MethodVisibility::parentScopeAllows(
+                    $visFlags,
+                    $callerClassLc,
+                    $declaringClassLc,
+                    $declaringClassLc,
+                    fn (string $classLc, string $ancestorLc): bool => $this->jitIsClassSameOrSubclassOf($classLc, $ancestorLc)
+                );
+            }
+        }
         MethodVisibility::assertCallable(
             $visFlags,
             $callerClassLc,
             $declaringClassLc,
             $className,
-            $nameOp->value
+            $nameOp->value,
+            $parentScopeAllows
         );
         $proxyName = $declaringClassLc.'::'.$methodLc;
         if (!$this->context->functionIsRegistered($proxyName)) {
