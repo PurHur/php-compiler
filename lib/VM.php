@@ -1159,7 +1159,11 @@ restart:
                     if ($new->hasHandler()) {
                         $new->parent = $frame;
                         $new->vmContext = $this->context;
-                        $new->handler->execute($new);
+                        $catchFrame = $this->executeInternalHandler($new, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                         break;
                     }
                     $this->context->push($frame);
@@ -1788,6 +1792,24 @@ restart:
     {
         $where = '' !== $frame->scriptPath ? $frame->scriptPath : 'script';
         throw new \LogicException($message.' in '.$where);
+    }
+
+    /**
+     * Run an internal builtin handler; bridge native Error/Throwable into user catch (#3648).
+     */
+    private function executeInternalHandler(Frame $handlerFrame, Frame $callerFrame): ?Frame
+    {
+        try {
+            $handlerFrame->handler->execute($handlerFrame);
+
+            return null;
+        } catch (\DivisionByZeroError $e) {
+            return $this->dispatchVmDivisionByZeroError($e, $callerFrame);
+        } catch (\TypeError $e) {
+            return $this->dispatchVmTypeError($e, $callerFrame);
+        } catch (\Error $e) {
+            return $this->dispatchVmError($e->getMessage(), $callerFrame);
+        }
     }
 
     /**
