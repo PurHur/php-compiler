@@ -18,6 +18,7 @@ require __DIR__.'/../vendor/autoload.php';
 use PHPCompiler\Runtime;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\ScriptExit;
+use PHPCompiler\VM\ShutdownQueue;
 use PHPCompiler\ext\standard\VmSession;
 use PHPCompiler\Web\DevServer;
 use PHPCompiler\Web\ProjectBootstrap;
@@ -35,6 +36,7 @@ DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv
     ResponseContext::reset();
     VmSession::reset();
     OutputBuffer::reset();
+    ShutdownQueue::reset();
     $code = file_get_contents($script);
     if (false === $code) {
         throw new \RuntimeException('Could not read script');

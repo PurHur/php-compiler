@@ -9,14 +9,14 @@
 typedef struct __object__ __object__;
 
 typedef struct phpc_reflect_class_node {
-    const __object__ *obj;
+    const void *obj;
     const char *class_name;
     size_t class_len;
     struct phpc_reflect_class_node *next;
 } phpc_reflect_class_node;
 
 typedef struct phpc_reflect_method_node {
-    const __object__ *obj;
+    const void *obj;
     const char *class_name;
     size_t class_len;
     const char *method_name;
@@ -25,7 +25,7 @@ typedef struct phpc_reflect_method_node {
 } phpc_reflect_method_node;
 
 typedef struct phpc_reflect_attr_node {
-    const __object__ *obj;
+    const void *obj;
     const char *attr_name;
     size_t attr_len;
     struct phpc_reflect_attr_node *next;
@@ -50,7 +50,7 @@ static char *phpc_copy_bytes(const char *name, size_t len)
     return copy;
 }
 
-void phpc_reflect_set_class(const __object__ *obj, const char *name, size_t len)
+void phpc_reflect_set_class(const void *obj, const char *name, size_t len)
 {
     phpc_reflect_class_node *n;
     char *copy;
@@ -69,7 +69,7 @@ void phpc_reflect_set_class(const __object__ *obj, const char *name, size_t len)
     phpc_reflect_class_head = n;
 }
 
-const char *phpc_reflect_get_class_name(const __object__ *obj, size_t *out_len)
+const char *phpc_reflect_get_class_name(const void *obj, size_t *out_len)
 {
     phpc_reflect_class_node *n = phpc_reflect_class_head;
     while (NULL != n) {
@@ -88,7 +88,7 @@ const char *phpc_reflect_get_class_name(const __object__ *obj, size_t *out_len)
 }
 
 void phpc_reflect_set_method(
-    const __object__ *obj,
+    const void *obj,
     const char *class_name,
     size_t class_len,
     const char *method_name,
@@ -116,7 +116,7 @@ void phpc_reflect_set_method(
     phpc_reflect_method_head = n;
 }
 
-const char *phpc_reflect_get_method_class(const __object__ *obj, size_t *out_len)
+const char *phpc_reflect_get_method_class(const void *obj, size_t *out_len)
 {
     phpc_reflect_method_node *n = phpc_reflect_method_head;
     while (NULL != n) {
@@ -134,7 +134,7 @@ const char *phpc_reflect_get_method_class(const __object__ *obj, size_t *out_len
     return NULL;
 }
 
-const char *phpc_reflect_get_method_name(const __object__ *obj, size_t *out_len)
+const char *phpc_reflect_get_method_name(const void *obj, size_t *out_len)
 {
     phpc_reflect_method_node *n = phpc_reflect_method_head;
     while (NULL != n) {
@@ -152,7 +152,7 @@ const char *phpc_reflect_get_method_name(const __object__ *obj, size_t *out_len)
     return NULL;
 }
 
-void phpc_reflect_set_attr_name(const __object__ *obj, const char *name, size_t len)
+void phpc_reflect_set_attr_name(const void *obj, const char *name, size_t len)
 {
     phpc_reflect_attr_node *n;
     char *copy;
@@ -171,7 +171,7 @@ void phpc_reflect_set_attr_name(const __object__ *obj, const char *name, size_t 
     phpc_reflect_attr_head = n;
 }
 
-const char *phpc_reflect_get_attr_name(const __object__ *obj, size_t *out_len)
+const char *phpc_reflect_get_attr_name(const void *obj, size_t *out_len)
 {
     phpc_reflect_attr_node *n = phpc_reflect_attr_head;
     while (NULL != n) {

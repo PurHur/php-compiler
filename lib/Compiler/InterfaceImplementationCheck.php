@@ -9,7 +9,7 @@ use PHPCfg\Operand;
 use PHPCfg\Script;
 
 /**
- * Compile-time check: concrete classes must implement all interface methods (#3386).
+ * Compile-time check: concrete classes must implement all interface methods (#3386, #3536).
  *
  * php-src: Zend/zend_inheritance.c — zend_do_implement_interface, zend_verify_abstract_class
  */
