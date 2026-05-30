@@ -249,6 +249,7 @@ final class ErrorReporter
             return;
         }
         $prefix = match ($level) {
+            self::E_WARNING => 'Warning',
             self::E_USER_ERROR => 'Fatal error',
             self::E_USER_WARNING => 'Warning',
             self::E_USER_NOTICE => 'Notice',
