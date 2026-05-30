@@ -7249,9 +7249,17 @@ class JIT {
             return;
         }
         if (!$this->context->hasVariableOp($resultOp)) {
-            // it's a kind!
-            $this->context->makeVariableFromValueOp($this->context->helper->loadValue($value), $resultOp);
-            return;
+            if (
+                null !== $this->context->jitCurrentBlock
+                && $this->context->aliasVariableOpFromSlot($this->context->jitCurrentBlock, $resultOp)
+            ) {
+                // fall through to normal assign on the aliased lvalue
+            } else {
+                // it's a kind!
+                $this->context->makeVariableFromValueOp($this->context->helper->loadValue($value), $resultOp);
+
+                return;
+            }
         }
         $result = $this->context->getVariableFromOp($resultOp);
         if ($result === $value) {

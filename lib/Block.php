@@ -1063,6 +1063,37 @@ class Block {
     }
 
     /**
+     * Closures with {@code use ($var)} / {@code use (&$var)} — MCJIT IR verify / execute unstable (#72, #2483).
+     */
+    public static function containsClosureUseCaptureOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_CLOSURE === $op->type && [] !== $op->closureCaptures) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Closures with {@code use (&$var)} — MCJIT execute segfaults after IR verify (#72, #2483).
      * {@see JIT::compileIncDecOp} uses {@see Variable::$valueBoxAliasPtr}; execute ABI still unstable.
      */
@@ -1163,6 +1194,6 @@ class Block {
             || self::containsArrayAccessObjectOpcodes($root)
             || self::containsDynamicStaticPropertyOpcodes($root)
             || self::containsTypedNonVoidReturnOpcodes($root)
-            || self::containsClosureByRefCaptureOpcodes($root);
+            || self::containsClosureUseCaptureOpcodes($root);
     }
 }

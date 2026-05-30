@@ -29,7 +29,7 @@ final class ClosureJitCompileTest extends TestCase
     public function testClosureModuleVerify(): void
     {
         $runtime = new Runtime();
-        // use (&$x) scripts use bin/jit.php VM-fallback (#2483); full-module verify is closure_simple only.
+        // use ($x) / use (&$x) scripts use bin/jit.php VM-fallback (#2483); verify is closure_simple only.
         foreach (['closure_simple.phpt'] as $file) {
             $block = $runtime->parseAndCompile($this->fixtureCode($file), $file);
             $runtime->jitCompileBlock($block);
