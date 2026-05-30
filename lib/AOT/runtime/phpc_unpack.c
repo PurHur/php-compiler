@@ -20,9 +20,10 @@ extern void __hashtable__setStringKeyString(__hashtable__ *ht, __string__ *key, 
 extern void __hashtable__setLongAt(__hashtable__ *ht, size_t index, long long val);
 extern void __hashtable__setStringAt(__hashtable__ *ht, size_t index, __string__ *val);
 extern void __value__writeHashtable(__value__ *out, __hashtable__ *ht);
+extern void __value__writeBool(__value__ *out, int value);
 extern void __compiler_trigger_error(const char *message, size_t len, int level);
 
-#define UNPACK_ERR_LEVEL 256
+#define UNPACK_ERR_LEVEL 2
 #define UNPACK_MAX_SPECS 256
 #define UNPACK_MAX_NAME 64
 
@@ -58,15 +59,6 @@ static __string__ *unpack_key(const char *key)
 static __string__ *unpack_slice(const char *data, size_t len)
 {
     return __string__init((long long) len, data);
-}
-
-static __hashtable__ *unpack_fail_ht(const char *msg)
-{
-    size_t len = strlen(msg);
-
-    __compiler_trigger_error(msg, len, UNPACK_ERR_LEVEL);
-
-    return __hashtable__alloc();
 }
 
 static uint16_t unpack_bswap16(uint16_t v)
@@ -187,7 +179,10 @@ static int unpack_is_code(char c)
 
 static void unpack_fail_out(__value__ *out, const char *msg)
 {
-    __value__writeHashtable(out, unpack_fail_ht(msg));
+    size_t len = strlen(msg);
+
+    __compiler_trigger_error(msg, len, UNPACK_ERR_LEVEL);
+    __value__writeBool(out, 0);
 }
 
 static void unpack_store_long(__hashtable__ *ht, const unpack_spec *spec, int *auto_idx, long long val)
@@ -439,7 +434,14 @@ void __compiler_unpack(__string__ *fmt, __string__ *data, long long offset, __va
 
         if (pos + need > inputlen) {
             char mbuf[96];
-            (void) snprintf(mbuf, sizeof(mbuf), "unpack(): Type %c: not enough input, need %d more bytes", code, (int) (need - (inputlen - pos)));
+            (void) snprintf(
+                mbuf,
+                sizeof(mbuf),
+                "unpack(): Type %c: not enough input, need %d, have %d",
+                code,
+                (int) need,
+                (int) (inputlen - pos)
+            );
             unpack_fail_out(out, mbuf);
 
             return;

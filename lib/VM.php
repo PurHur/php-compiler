@@ -3168,7 +3168,7 @@ restart:
         if ('' === $propName) {
             return null;
         }
-        $meta = $this->classPropertyMeta($owner->class, $propName);
+        $meta = $this->classPropertyMeta($owner, $propName);
         if (null === $meta) {
             return null;
         }
@@ -3209,26 +3209,6 @@ restart:
         $var->object($obj);
 
         return $var;
-    }
-
-    private function classPropertyMeta(ClassEntry $class, string $propName): ?VM\ClassProperty
-    {
-        foreach ($class->properties as $property) {
-            if ($property->name === $propName) {
-                return $property;
-            }
-        }
-
-        return null;
-    }
-
-    private function callerClassLc(Frame $frame): ?string
-    {
-        if (null === $frame->block->func || null === $frame->block->func->class) {
-            return null;
-        }
-
-        return strtolower($frame->block->func->class->value);
     }
 
     private function isSubclassOf(string $childLc, string $parentLc): bool

@@ -16,13 +16,13 @@ final class VmPack
     }
 
     /**
-     * @return array<int|string, int|float|string>
+     * @return array<int|string, int|float|string>|false
      */
-    public static function unpack(string $format, string $data, int $offset = 0): array
+    public static function unpack(string $format, string $data, int $offset = 0): array|false
     {
-        $result = \unpack($format, $data, $offset);
+        $result = @\unpack($format, $data, $offset);
         if (false === $result) {
-            throw new \LogicException('unpack() failed');
+            return false;
         }
 
         return $result;

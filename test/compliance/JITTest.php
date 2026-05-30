@@ -41,8 +41,8 @@ class JITTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'array_replace_recursive')) {
                 continue;
             }
-            // ksort/uksort string-key hashtable JIT — KsortJITTest / UksortJITTest (#2271, #3143).
-            if (str_contains($name, 'ksort_jit') || str_contains($name, 'uksort')) {
+            // unpack() insufficient data false + E_WARNING: VM + AOT (#3775); JIT MCJIT execute exit 255.
+            if (str_contains($name, 'unpack_insufficient_data')) {
                 continue;
             }
             // class_uses() is VM-only until JIT lowering (#3119).
