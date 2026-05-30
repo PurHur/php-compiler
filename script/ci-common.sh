@@ -178,6 +178,16 @@ ci_run_root_readme_sync_check() {
 }
 
 # development-status.md drift guard (issues #2067, #2083); default on — opt-out with DEVELOPMENT_STATUS_SYNC_GATE=0.
+
+ci_run_bootstrap_no_m3_emit_helper_guard() {
+  if [[ "${BOOTSTRAP_NO_M3_EMIT_HELPER_GATE:-1}" != "1" ]]; then
+    echo "bootstrap no-m3-emit-helper guard: skipped (BOOTSTRAP_NO_M3_EMIT_HELPER_GATE=0)"
+    return 0
+  fi
+  echo "Bootstrap no-m3-emit-helper guard (#3032)..."
+  bash "${_CI_REPO_ROOT}/script/bootstrap-guard-no-m3-emit-helper.sh"
+}
+
 ci_run_development_status_sync_check() {
   if [[ "${DEVELOPMENT_STATUS_SYNC_GATE:-1}" != "1" ]]; then
     echo "development-status sync: skipped (DEVELOPMENT_STATUS_SYNC_GATE=0 opt-out)"
@@ -463,6 +473,7 @@ ci_run_inventory_checks() {
   ci_run_root_readme_008_sync_check
   ci_run_getting_started_selfhostprobe_sync_check
   ci_run_root_readme_009_sync_check
+  ci_run_bootstrap_no_m3_emit_helper_guard
   ci_run_development_status_sync_check
   ci_run_development_status_007_sync_check
   ci_run_development_status_009_sync_check

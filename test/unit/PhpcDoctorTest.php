@@ -69,7 +69,7 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_TEST_SUBSET_GATE', $result['stdout']);
         $this->assertStringContainsString('BOOTSTRAP_TEST_SUBSET_STRICT', $result['stdout']);
         $this->assertStringContainsString('bootstrap-selfhost-helloworld-probe.sh', $result['stdout']);
-        $this->assertStringContainsString('helloworld_m3_emit_native_entry.php', $result['stdout']);
+        $this->assertStringContainsString('compiler_helloworld_smoke/compile_driver.php', $result['stdout']);
         $this->assertStringContainsString('2. M2 spine', $result['stdout']);
         $this->assertStringContainsString('bootstrap-spine-count.php', $result['stdout']);
         $this->assertStringContainsString('COMPILER_DRIVER_SMOKE_GATE', $result['stdout']);

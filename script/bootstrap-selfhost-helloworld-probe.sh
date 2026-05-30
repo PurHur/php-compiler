@@ -13,18 +13,7 @@ SOURCE="${ROOT}/examples/000-HelloWorld/example.php"
 AOT_OUT="${ROOT}/build/helloworld-aot"
 EMIT_HELPER="${ROOT}/build/selfhost-helloworld-emit"
 COMPILE_DRIVER_BIN="${ROOT}/build/selfhost-helloworld-compile"
-COMPILE_ENTRY="${ROOT}/test/bootstrap-aot/helloworld_compile_m3_emit_native_entry.php"
-EMIT_ENTRY="${ROOT}/test/bootstrap-aot/helloworld_m3_emit_native_entry.php"
 INVENTORY_EMIT_DRIVER="${ROOT}/test/selfhost/compiler_helloworld_smoke/compile_driver.php"
-default_inventory_emit_driver=0
-if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT:-0}" == "1" ]]; then
-  default_inventory_emit_driver=1
-fi
-if [[ -n "${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER+x}" ]]; then
-  USE_INVENTORY_EMIT_DRIVER="${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER}"
-else
-  USE_INVENTORY_EMIT_DRIVER="${default_inventory_emit_driver}"
-fi
 M3_NATIVE_COMPILE=0
 M3_EMIT_PATH="none"
 M3_EMIT_HELPER_LINKED=0
@@ -97,8 +86,8 @@ if [[ ! -f "${SOURCE}" ]]; then
   exit 1
 fi
 
-if [[ ! -f "${EMIT_ENTRY}" ]]; then
-  echo "bootstrap-selfhost-helloworld-probe: missing ${EMIT_ENTRY} (#1768)" >&2
+if [[ ! -f "${INVENTORY_EMIT_DRIVER}" ]]; then
+  echo "bootstrap-selfhost-helloworld-probe: missing ${INVENTORY_EMIT_DRIVER} (#3032)" >&2
   exit 1
 fi
 
@@ -120,13 +109,13 @@ rm -f "${PROBE}" "${EMIT_HELPER}" "${COMPILE_DRIVER_BIN}" "${AOT_OUT}" "${PHP_CO
 # Optional (opt-in) diagnostic: also link a native "compile driver" binary.
 # This is not required for the M3 HelloWorld acceptance; keep it off by default
 # to avoid long/oomy LLVM AOT links in constrained environments.
-if [[ "${BOOTSTRAP_M3_BUILD_COMPILE_DRIVER_BIN:-0}" == "1" && "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" && -f "${COMPILE_ENTRY}" ]]; then
+if [[ "${BOOTSTRAP_M3_BUILD_COMPILE_DRIVER_BIN:-0}" == "1" && "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" && -f "${INVENTORY_EMIT_DRIVER}" ]]; then
   set +e
   echo "bootstrap-selfhost-helloworld-probe: linking helloworld compile driver binary..."
   env PHP_COMPILER_SELFHOST_AOT=1 \
     PHP_COMPILER_M3_COMPILE_DRIVER=1 \
     PHP_COMPILER_EMIT_HELPER_LINK=1 \
-    php "${ROOT}/bin/compile.php" -o "${COMPILE_DRIVER_BIN}" "${COMPILE_ENTRY}" >/dev/null 2>&1
+    php "${ROOT}/bin/compile.php" -o "${COMPILE_DRIVER_BIN}" "${INVENTORY_EMIT_DRIVER}" >/dev/null 2>&1
   cd_link_code=$?
   set -e
   if [[ -x "${COMPILE_DRIVER_BIN}" ]]; then
@@ -140,17 +129,10 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   : "${BOOTSTRAP_M3_RUNTIME_COMPILE:=1}"
   m3_link_env=()
   m3_link_mode="stub"
-  m3_emit_source="${EMIT_ENTRY}"
-  # Default REAL_LOWERING on when LINK_COMPILE_DRIVER=1 (stub-only path fails link — #2571, #2582).
   if [[ "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}" == "1" ]]; then
-    if [[ "${USE_INVENTORY_EMIT_DRIVER}" == "1" && -f "${INVENTORY_EMIT_DRIVER}" ]]; then
-      m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1 PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke)
-      m3_link_mode="inventory compile_driver (no emit-helper TU, #2843)"
-      m3_emit_source="${INVENTORY_EMIT_DRIVER}"
-    else
-      m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1)
-      m3_link_mode="selfhost M3 emit TU (helloworld_m3_emit_native_entry.php)"
-    fi
+    m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1 PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke)
+    m3_link_mode="inventory compile_driver (#3032)"
+    m3_emit_source="${INVENTORY_EMIT_DRIVER}"
   else
     m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1)
     m3_link_mode="selfhost stubs (no PHP_COMPILER_M3_COMPILE_DRIVER)"
@@ -174,9 +156,7 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
         PHP_COMPILER_M3_SOURCE="${SOURCE}"
         PHP_COMPILER_M3_OUT="${AOT_OUT}"
       )
-      if [[ "${USE_INVENTORY_EMIT_DRIVER}" == "1" ]]; then
-        m3_run_env+=(PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1)
-      fi
+      m3_run_env+=(PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1)
       compile_out="$(
         env "${m3_run_env[@]}" "${EMIT_HELPER}" 2>&1
       )"

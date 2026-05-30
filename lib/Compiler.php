@@ -154,7 +154,7 @@ class Compiler {
             $input = PHP_COMPILER_DEBUG_LAST_PHASE_INPUT_FILE;
         }
         if (
-            (null === $input || '' === $input || str_ends_with(str_replace('\\', '/', $input), '/compile_smoke_m3_emit_native_entry.php'))
+            (null === $input || '' === $input || (str_contains(str_replace('\\', '/', (string) $input), '/test/selfhost/') && str_ends_with(str_replace('\\', '/', (string) $input), '/compile_driver.php')))
             && \function_exists('getenv')
         ) {
             $fromSource = getenv('PHP_COMPILER_M3_SOURCE');
@@ -163,7 +163,7 @@ class Compiler {
             }
         }
         if (
-            (null === $input || '' === $input || str_ends_with(str_replace('\\', '/', $input), '/compile_smoke_m3_emit_native_entry.php'))
+            (null === $input || '' === $input || (str_contains(str_replace('\\', '/', (string) $input), '/test/selfhost/') && str_ends_with(str_replace('\\', '/', (string) $input), '/compile_driver.php')))
             && isset($_SERVER['argv'])
             && \is_array($_SERVER['argv'])
             && [] !== $_SERVER['argv']
@@ -1833,6 +1833,7 @@ class Compiler {
                     );
                     if (!$child->static) {
                         $declare->propertyReadonly = (property_exists($child, 'readonly') && $child->readonly)
+                            || (property_exists($child, 'propertyFlags') && $this->isReadonlyPropertyFlags($child->propertyFlags))
                             || $this->isReadonlyPropertyFlags($child->visibility);
                         $declare->propertyVisibility = MethodVisibility::mask($child->visibility);
                     }

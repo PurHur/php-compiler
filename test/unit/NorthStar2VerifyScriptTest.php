@@ -79,6 +79,6 @@ final class NorthStar2VerifyScriptTest extends TestCase
         $source = (string) file_get_contents(dirname(__DIR__, 2).'/script/bootstrap-selfhost-compile-smoke-probe.sh');
         $this->assertStringContainsString('PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1', $source);
         $this->assertStringContainsString('PHP_COMPILER_EMIT_HELPER_LINK=1', $source);
-        $this->assertStringContainsString('compile_smoke_m3_emit_native_entry.php', $source);
+        $this->assertStringContainsString('compiler_compile_smoke/compile_driver.php', $source);
     }
 }
