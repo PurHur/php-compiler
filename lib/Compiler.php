@@ -2733,10 +2733,18 @@ class Compiler {
         if ($resultOperand instanceof Operand\Temporary && [] === $resultOperand->usages) {
             $resultOperand->usages[] = $resultOperand;
         }
+        $dimFetch = $this->findCoalesceArrayDimFetch($expr->left, $block);
+        // ??= on $arr['key']: dim fetch temp is read on the left branch (#3792).
+        if (
+            null !== $dimFetch
+            && $dimFetch->result instanceof Operand\Temporary
+            && [] === $dimFetch->result->usages
+        ) {
+            $dimFetch->result->usages[] = $dimFetch->result;
+        }
         $resultSlot = $this->compileOperand($resultOperand, $block, false);
 
         $checkSlot = $this->compileBoolTemporary($block);
-        $dimFetch = $this->findCoalesceArrayDimFetch($expr->left, $block);
         $issetTarget = null !== $dimFetch
             ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
             : $this->resolveCoalesceIssetTarget($expr->left, $block);

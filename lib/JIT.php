@@ -4641,6 +4641,7 @@ class JIT {
                     $forWrite = OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type;
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $resultOp = $block->getOperand($op->arg1);
+                    $forceBranchMerge = $this->context->coalesceAssignTargets->contains($resultOp);
                     if (null === $op->arg3) {
                         if (Variable::TYPE_STRING === $value->type) {
                             throw new \LogicException('[] is only supported for arrays');
@@ -4698,6 +4699,8 @@ class JIT {
                         $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite);
                         if ($forWrite) {
                             $this->context->setVariableOp($resultOp, $fetched);
+                        } elseif ($forceBranchMerge) {
+                            $this->assignOperand($resultOp, $fetched, true);
                         } else {
                             $this->assignOperand($resultOp, $fetched);
                         }
@@ -4710,10 +4713,12 @@ class JIT {
                             $this->context->constantFromInteger($value->nextFreeElement)
                         );
                     }
-                    $this->assignOperand(
-                        $resultOp,
-                        $value->dimFetch($dim, $resultOp->type, $forWrite)
-                    );
+                    $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite);
+                    if ($forceBranchMerge && !$forWrite) {
+                        $this->assignOperand($resultOp, $fetched, true);
+                    } else {
+                        $this->assignOperand($resultOp, $fetched);
+                    }
                     break;
                 case OpCode::TYPE_INIT_ARRAY:
                     $result = $this->context->getVariableFromOp($block->getOperand($op->arg1));
