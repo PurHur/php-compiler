@@ -13,6 +13,7 @@ use PHPCompiler\VM\Builtin\GeneratorKey;
 use PHPCompiler\VM\Builtin\GeneratorNext;
 use PHPCompiler\VM\Builtin\GeneratorRewind;
 use PHPCompiler\VM\Builtin\GeneratorSend;
+use PHPCompiler\VM\Builtin\GeneratorThrow;
 use PHPCompiler\VM\Builtin\GeneratorValid;
 
 /**
@@ -48,6 +49,10 @@ final class GeneratorState
 
     public Variable $pendingSend;
 
+    public bool $hasPendingThrow = false;
+
+    public Variable $pendingThrow;
+
     public function __construct(
         public readonly \PHPCompiler\VM $vm,
         public readonly Func\PHP $func,
@@ -60,6 +65,8 @@ final class GeneratorState
         $this->returnValue = new Variable();
         $this->pendingSend = new Variable();
         $this->pendingSend->null();
+        $this->pendingThrow = new Variable();
+        $this->pendingThrow->null();
     }
 
     public static function register(Context $ctx): void
@@ -70,6 +77,8 @@ final class GeneratorState
         $entry->methodVisibility['getreturn'] = $pub;
         $entry->methods['send'] = new GeneratorSend();
         $entry->methodVisibility['send'] = $pub;
+        $entry->methods['throw'] = new GeneratorThrow();
+        $entry->methodVisibility['throw'] = $pub;
         $entry->methods['rewind'] = new GeneratorRewind();
         $entry->methodVisibility['rewind'] = $pub;
         $entry->methods['current'] = new GeneratorCurrent();
@@ -117,5 +126,7 @@ final class GeneratorState
         $this->yieldResultSlot = null;
         $this->hasPendingSend = false;
         $this->pendingSend->null();
+        $this->hasPendingThrow = false;
+        $this->pendingThrow->null();
     }
 }
