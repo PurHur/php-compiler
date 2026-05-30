@@ -10,6 +10,7 @@
 namespace PHPCompiler\VM;
 
 use PHPTypes\Type;
+use PHPCompiler\GenericArrayTypeSpec;
 use PHPCompiler\OpCode;
 use PHPCompiler\ext\standard\VmString;
 
@@ -52,6 +53,9 @@ final class Variable {
 
     public ?int $typeConstraint = null;
     public ?string $classConstraint = null;
+
+    /** list&lt;T&gt; / array&lt;K,V&gt; shape when declaration used generic array syntax (#3705). */
+    public ?GenericArrayTypeSpec $genericArrayTypeSpec = null;
 
     /** Set for instance properties so readonly-class writes can be enforced (issue #1360). */
     public ?ObjectEntry $objectPropertyOwner = null;

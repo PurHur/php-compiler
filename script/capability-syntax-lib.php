@@ -351,6 +351,17 @@ function syntaxRowDefinitions(): array
             'probe' => 'declare(strict_types=1); function f(int $x) { return $x; } echo f(1);',
         ],
         [
+            'id' => 'array_type_list',
+            'construct' => 'PHP 8.3+ generic array types `list<T>` / `array<K,V>` (parameters and properties)',
+            'opcodes' => ['TYPE_ARG_RECV', 'TYPE_DECLARE_PROPERTY', 'TYPE_ASSIGN'],
+            'issue' => 3705,
+            'notes' => [
+                'Source rewrite to magic identifier types for php-parser v4; VM list shape check (#3705)',
+                'Zend generic-array RFC not merged in php-src 8.4 — parity target is proposed list/array forms',
+            ],
+            'probe' => 'function f(list $x): void {} f([1]);',
+        ],
+        [
             'id' => 'variable_variables',
             'construct' => 'Variable variables (`$$name`)',
             'opcodes' => ['TYPE_VAR_FETCH'],

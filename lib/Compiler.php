@@ -1429,6 +1429,13 @@ class Compiler {
 
             return;
         }
+        $arraySpec = $this->genericArraySpecFromCfgType($declared);
+        if (null !== $arraySpec) {
+            $block->paramTypeConstraints[$slot] = Variable::TYPE_ARRAY;
+            $block->paramGenericArrayTypeSpecs[$slot] = $arraySpec;
+
+            return;
+        }
         if ($declared instanceof Op\Type\Literal) {
             $declName = strtolower($declared->name);
             if ('mixed' !== $declName) {
@@ -1439,6 +1446,25 @@ class Compiler {
                 }
             }
         }
+    }
+
+    protected function declNameFromCfgType(?Op\Type $declared): ?string
+    {
+        if ($declared instanceof Op\Type\Literal) {
+            return $declared->name;
+        }
+        if ($declared instanceof Op\Type\Reference) {
+            return $this->staticNameFromOperand($declared->declaration);
+        }
+
+        return null;
+    }
+
+    protected function genericArraySpecFromCfgType(?Op\Type $declared): ?GenericArrayTypeSpec
+    {
+        $name = $this->declNameFromCfgType($declared);
+
+        return null !== $name ? GenericArrayTypeSpec::tryParseDeclName($name) : null;
     }
 
     protected function compileClassBody(CfgBlock $block, int $type): Block {
@@ -1452,8 +1478,9 @@ class Compiler {
                     if (!is_null($child->defaultBlock)) {
                         $this->compileOps($child->defaultBlock->children, $result);
                     }
-                    $declared = $child->declaredType instanceof Op\Type\Literal
-                        ? Type::fromDecl($child->declaredType->name)
+                    $propertyDeclName = $this->declNameFromCfgType($child->declaredType);
+                    $declared = null !== $propertyDeclName
+                        ? Type::fromDecl($propertyDeclName)
                         : ($child->type ?? Type::mixed());
                     AttributeNames::assertNoDuplicates(AttributeNames::fromOp($child));
                     $declareType = $child->static
@@ -1463,7 +1490,7 @@ class Compiler {
                         $declareType,
                         $this->compileOperand($child->name, $result, true),
                         is_null($child->defaultVar) ? null : $this->compileOperand($child->defaultVar, $result, true),
-                        $this->compileTypeConstrainedVariable($result, $declared)
+                        $this->compileTypeConstrainedVariable($result, $declared, $propertyDeclName)
                     ));
                     break;
                 case Op\Stmt\ClassMethod::class:
@@ -1567,11 +1594,18 @@ class Compiler {
         }
     }
 
-    protected function compileTypeConstrainedVariable(Block $block, Type $type): int {
+    protected function compileTypeConstrainedVariable(Block $block, Type $type, ?string $declName = null): int {
         $var = new Variable(Variable::TYPE_UNDEFINED);
         $operand = new Operand\Temporary;
         $operand->type = $type;
         $return = $block->registerConstant($operand, $var);
+        $arraySpec = null !== $declName ? GenericArrayTypeSpec::tryParseDeclName($declName) : null;
+        if (null !== $arraySpec) {
+            $var->typeConstraint = Variable::TYPE_ARRAY;
+            $var->genericArrayTypeSpec = $arraySpec;
+
+            return $return;
+        }
         $mappedType = Variable::mapFromType($type);
         if ($mappedType === Variable::TYPE_UNDEFINED) {
             // Mixed
@@ -1580,6 +1614,7 @@ class Compiler {
             $var->classConstraint = $type->userType;
         }
         $var->typeConstraint = $mappedType;
+
         return $return;
     }
 
