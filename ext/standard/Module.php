@@ -295,6 +295,7 @@ class Module extends ModuleAbstract
             new mkdir_(),
             new rmdir_(),
             new chmod_(),
+            new umask_(),
             new rename_(),
             new move_uploaded_file(),
             new is_uploaded_file(),
