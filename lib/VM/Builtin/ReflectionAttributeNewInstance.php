@@ -33,7 +33,7 @@ final class ReflectionAttributeNewInstance extends VmClassMethod
             $ctx->autoloadClass($className);
         }
         if (!isset($ctx->classes[$lc])) {
-            throw new \LogicException('Attribute class '.$className.' does not exist');
+            throw new \LogicException('Attribute class "'.$className.'" not found');
         }
         $classEntry = $ctx->classes[$lc];
         $object = new ObjectEntry($classEntry);
