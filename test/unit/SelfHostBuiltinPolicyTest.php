@@ -70,6 +70,7 @@ final class SelfHostBuiltinPolicyTest extends TestCase
             'ini_get',
             'shell_exec',
             'escapeshellarg',
+            'escapeshellcmd',
             'phpc_run_command',
             'gettype',
             'get_debug_type',

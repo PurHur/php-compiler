@@ -204,6 +204,122 @@ __string__ *__compiler_escapeshellarg(__string__ *arg)
     return result;
 }
 
+/* php_escape_shell_cmd — ext/standard/exec.c (Unix subset, #3417). */
+__string__ *__compiler_escapeshellcmd(__string__ *cmd_in)
+{
+    const char *str;
+    size_t l;
+    size_t x;
+    size_t y;
+    char *out;
+    size_t out_cap;
+    char *grown;
+    const char *p = NULL;
+    __string__ *result;
+
+    if (NULL == cmd_in) {
+        return __string__init(0, "");
+    }
+    str = phpc_strdata(cmd_in);
+    l = phpc_strlen(cmd_in);
+    if (0 == l) {
+        return __string__init(0, "");
+    }
+
+    out_cap = (2 * l) + 1;
+    out = (char *) malloc(out_cap);
+    if (NULL == out) {
+        return NULL;
+    }
+
+    for (x = 0, y = 0; x < l; x++) {
+        switch (str[x]) {
+        case '"':
+        case '\'':
+            if (!p && (p = memchr(str + x + 1, str[x], l - x - 1))) {
+                /* paired quote ahead — leave unescaped */
+            } else if (p && *p == str[x]) {
+                p = NULL;
+            } else {
+                if (y + 2 >= out_cap) {
+                    out_cap = (y + 2) * 2;
+                    grown = (char *) realloc(out, out_cap);
+                    if (NULL == grown) {
+                        free(out);
+
+                        return NULL;
+                    }
+                    out = grown;
+                }
+                out[y++] = '\\';
+            }
+            if (y + 1 >= out_cap) {
+                out_cap = (y + 1) * 2;
+                grown = (char *) realloc(out, out_cap);
+                if (NULL == grown) {
+                    free(out);
+
+                    return NULL;
+                }
+                out = grown;
+            }
+            out[y++] = str[x];
+            break;
+        case '#':
+        case '&':
+        case ';':
+        case '`':
+        case '|':
+        case '*':
+        case '?':
+        case '~':
+        case '<':
+        case '>':
+        case '^':
+        case '(':
+        case ')':
+        case '[':
+        case ']':
+        case '{':
+        case '}':
+        case '$':
+        case '\\':
+        case '\n':
+        case (char) 0xff:
+            if (y + 2 >= out_cap) {
+                out_cap = (y + 2) * 2;
+                grown = (char *) realloc(out, out_cap);
+                if (NULL == grown) {
+                    free(out);
+
+                    return NULL;
+                }
+                out = grown;
+            }
+            out[y++] = '\\';
+            /* fall through */
+        default:
+            if (y + 1 >= out_cap) {
+                out_cap = (y + 1) * 2;
+                grown = (char *) realloc(out, out_cap);
+                if (NULL == grown) {
+                    free(out);
+
+                    return NULL;
+                }
+                out = grown;
+            }
+            out[y++] = str[x];
+            break;
+        }
+    }
+
+    result = __string__init((long long) y, out);
+    free(out);
+
+    return result;
+}
+
 static void phpc_apply_env_hashtable(__hashtable__ *env)
 {
     __strkey_node__ *node;

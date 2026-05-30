@@ -96,6 +96,7 @@ final class SelfHostBuiltinPolicy
         // Required for AOT linker/toolchain discovery (lib/AOT/Linker.php) and bootstrap M5 path.
         'shell_exec' => 'process',
         'escapeshellarg' => 'process',
+        'escapeshellcmd' => 'process',
         'phpc_run_command' => 'process',
     ];
 
