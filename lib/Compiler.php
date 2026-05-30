@@ -1093,6 +1093,7 @@ class Compiler {
             $this->compileOperand($iface->name, $block, true)
         );
         $return->classImplements = $this->interfaceNamesFromOperands($iface->extends);
+        $return->block1 = $this->compileClassBody($iface->stmts, OpCode::TYPE_DECLARE_INTERFACE);
 
         return $return;
     }
@@ -1364,8 +1365,12 @@ class Compiler {
                     $this->compileClassMethodDeclaration($child, $result);
                     break;
                 case Op\Terminal\Const_::class:
-                    if (OpCode::TYPE_DECLARE_CLASS !== $type && OpCode::TYPE_DECLARE_TRAIT !== $type) {
-                        $this->throwCompileLogic('Class constants are only supported on classes and traits for now');
+                    if (
+                        OpCode::TYPE_DECLARE_CLASS !== $type
+                        && OpCode::TYPE_DECLARE_INTERFACE !== $type
+                        && OpCode::TYPE_DECLARE_TRAIT !== $type
+                    ) {
+                        $this->throwCompileLogic('Class constants are only supported on classes, interfaces, and traits for now');
                     }
                     $this->compileOps($child->valueBlock->children, $result);
                     $constOp = new OpCode(
