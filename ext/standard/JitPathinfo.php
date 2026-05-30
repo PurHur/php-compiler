@@ -8,10 +8,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Block;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\OpCode;
+use PHPCfg\Operand;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -25,37 +28,94 @@ final class JitPathinfo
             throw new \LogicException('pathinfo() path must be a string in this compiler build');
         }
         $pathVal = $context->helper->loadValue($path);
-        $flag = 15;
+        $maskConst = 15;
         if (null !== $flags) {
-            $flag = self::resolveFlags($context, $flags);
-        }
-
-        if (15 === $flag) {
-            $literal = $path->compileTimeString ?? null;
-            if (null === $literal) {
+            $resolved = self::tryResolveFlags($context, $flags);
+            if (null === $resolved) {
                 throw new \LogicException(
-                    'pathinfo() with PATHINFO_ALL requires a compile-time string path in this compiler build'
+                    'pathinfo() flags must be a compile-time integer in this compiler build'
                 );
             }
-
-            return self::buildAllArray($context, VmString::pathinfo($literal, 15));
+            $maskConst = $resolved;
+        }
+        $mask = $maskConst & 15;
+        if (0 === $mask) {
+            return self::buildAllArray($context, []);
         }
 
-        if (1 === $flag) {
-            return JitPath::dirname($context, $pathVal);
+        $literal = $path->compileTimeString ?? null;
+        if (null !== $literal) {
+            $result = VmString::pathinfo($literal, $mask);
+            if (\is_array($result)) {
+                return self::buildAllArray($context, $result);
+            }
+
+            return $context->builder->load($context->constantStringFromString((string) $result));
         }
-        if (2 === $flag) {
-            return JitPath::basename($context, $pathVal);
-        }
-        if (4 === $flag) {
-            return self::extension($context, $pathVal);
-        }
-        if (8 === $flag) {
+
+        $bitCount = self::popcountMask($mask);
+        if (1 === $bitCount) {
+            if ($mask & 1) {
+                return JitPath::dirname($context, $pathVal);
+            }
+            if ($mask & 2) {
+                return JitPath::basename($context, $pathVal);
+            }
+            if ($mask & 4) {
+                return self::extension($context, $pathVal);
+            }
+
             return self::filename($context, $pathVal);
         }
 
-        throw new \LogicException(
-            'pathinfo() flags not supported in this compiler build (use 1, 2, 4, 8, or 15)'
+        if (15 === $mask) {
+            throw new \LogicException(
+                'pathinfo() with PATHINFO_ALL requires a compile-time string path in this compiler build'
+            );
+        }
+
+        return self::buildPartialArray($context, $pathVal, $mask);
+    }
+
+    private static function popcountMask(int $mask): int
+    {
+        $count = 0;
+        foreach ([1, 2, 4, 8] as $bit) {
+            if ($mask & $bit) {
+                ++$count;
+            }
+        }
+
+        return $count;
+    }
+
+    private static function buildPartialArray(Context $context, Value $pathVal, int $mask): Value
+    {
+        $ht = HashTableHelper::alloc($context);
+        if ($mask & 1) {
+            self::setArrayStringKey($context, $ht, 'dirname', JitPath::dirname($context, $pathVal));
+        }
+        if ($mask & 2) {
+            self::setArrayStringKey($context, $ht, 'basename', JitPath::basename($context, $pathVal));
+        }
+        if ($mask & 4) {
+            self::setArrayStringKey($context, $ht, 'extension', self::extension($context, $pathVal));
+        }
+        if ($mask & 8) {
+            self::setArrayStringKey($context, $ht, 'filename', self::filename($context, $pathVal));
+        }
+
+        return $ht;
+    }
+
+    private static function setArrayStringKey(Context $context, Value $ht, string $key, Value $value): void
+    {
+        $keyStr = $context->builder->load($context->constantStringFromString($key));
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyString'),
+            $ht,
+            $keyStr,
+            $value
         );
     }
 
@@ -79,7 +139,7 @@ final class JitPathinfo
         return $ht;
     }
 
-    private static function resolveFlags(Context $context, JITVariable $flags): int
+    public static function tryResolveFlags(Context $context, JITVariable $flags): ?int
     {
         $constName = $flags->compileTimeConstantName ?? null;
         if (null !== $constName) {
@@ -87,9 +147,11 @@ final class JitPathinfo
             if (isset(StdlibConstants::CORE_INT_BY_NAME[$lookup])) {
                 return StdlibConstants::CORE_INT_BY_NAME[$lookup];
             }
-            $phpVar = $context->runtime->vmContext->constantFetch($constName);
-            if (null !== $phpVar && \PHPCompiler\VM\Variable::TYPE_INTEGER === $phpVar->type) {
-                return $phpVar->toInt();
+            if (null !== $context->runtime->vmContext) {
+                $phpVar = $context->runtime->vmContext->constantFetch($constName);
+                if (null !== $phpVar && \PHPCompiler\VM\Variable::TYPE_INTEGER === $phpVar->type) {
+                    return $phpVar->toInt();
+                }
             }
         }
 
@@ -102,9 +164,107 @@ final class JitPathinfo
             }
         }
 
-        throw new \LogicException(
-            'pathinfo() flags must be a compile-time integer in this compiler build'
-        );
+        return null;
+    }
+
+    /**
+     * Resolve PATHINFO_* bitmask from CFG when JIT operands are boxed (issue #3772).
+     */
+    public static function tryResolveFlagsFromBlock(Context $context, Block $block, Operand $flagsOp): ?int
+    {
+        $slot = self::operandSlot($block, $flagsOp);
+        if (null === $slot) {
+            return null;
+        }
+
+        return self::slotPathinfoMask($context, $block, $slot, []);
+    }
+
+    /**
+     * @param array<int, true> $visited
+     */
+    private static function slotPathinfoMask(Context $context, Block $block, int $slot, array $visited): ?int
+    {
+        if (isset($visited[$slot])) {
+            return null;
+        }
+        $visited[$slot] = true;
+
+        if (isset($block->constants[$slot])) {
+            $const = $block->constants[$slot];
+            if (\PHPCompiler\VM\Variable::TYPE_INTEGER === $const->type) {
+                return $const->toInt() & 15;
+            }
+        }
+
+        foreach ($block->opCodes as $op) {
+            if ($op->arg1 !== $slot) {
+                continue;
+            }
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                return self::maskFromConstFetch($context, $block, $op);
+            }
+            if (OpCode::TYPE_BITWISE_AND === $op->type
+                || OpCode::TYPE_BITWISE_OR === $op->type
+                || OpCode::TYPE_BITWISE_XOR === $op->type
+            ) {
+                $left = null !== $op->arg2 ? self::slotPathinfoMask($context, $block, $op->arg2, $visited) : null;
+                $right = null !== $op->arg3 ? self::slotPathinfoMask($context, $block, $op->arg3, $visited) : null;
+                if (null === $left || null === $right) {
+                    return null;
+                }
+
+                return match ($op->type) {
+                    OpCode::TYPE_BITWISE_AND => $left & $right,
+                    OpCode::TYPE_BITWISE_OR => $left | $right,
+                    OpCode::TYPE_BITWISE_XOR => $left ^ $right,
+                    default => null,
+                };
+            }
+        }
+
+        return null;
+    }
+
+    private static function maskFromConstFetch(Context $context, Block $block, OpCode $op): ?int
+    {
+        $nameOp = null !== $op->arg3 ? $block->getOperand($op->arg3) : $block->getOperand($op->arg2);
+        if (!$nameOp instanceof Operand\Literal) {
+            return null;
+        }
+        $lookup = strtolower((string) $nameOp->value);
+        if (isset(StdlibConstants::CORE_INT_BY_NAME[$lookup])) {
+            return StdlibConstants::CORE_INT_BY_NAME[$lookup];
+        }
+        if (null === $context->runtime->vmContext) {
+            return null;
+        }
+        $phpVar = $context->runtime->vmContext->constantFetch((string) $nameOp->value);
+        if (null !== $phpVar && \PHPCompiler\VM\Variable::TYPE_INTEGER === $phpVar->type) {
+            return $phpVar->toInt();
+        }
+
+        return null;
+    }
+
+    private static function operandSlot(Block $block, Operand $op): ?int
+    {
+        foreach ($block->opCodes as $opcode) {
+            foreach ([$opcode->arg1, $opcode->arg2, $opcode->arg3] as $slot) {
+                if (null === $slot) {
+                    continue;
+                }
+                try {
+                    if ($block->getOperand($slot) === $op) {
+                        return $slot;
+                    }
+                } catch (\Throwable) {
+                    continue;
+                }
+            }
+        }
+
+        return null;
     }
 
     public static function extension(Context $context, Value $path): Value

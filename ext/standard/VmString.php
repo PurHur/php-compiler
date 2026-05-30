@@ -2670,29 +2670,30 @@ final class VmString
         $extension = self::pathExtension($path);
         $filename = self::pathFilename($path);
 
-        if (15 === $flags) {
-            return [
-                'dirname' => $dirname,
-                'basename' => $basename,
-                'extension' => $extension,
-                'filename' => $filename,
-            ];
+        $mask = $flags & 15;
+        if (0 === $mask) {
+            return [];
         }
 
-        switch ($flags) {
-            case 1:
-                return $dirname;
-            case 2:
-                return $basename;
-            case 4:
-                return $extension;
-            case 8:
-                return $filename;
-            default:
-                throw new \LogicException(
-                    'pathinfo() flags not supported in this compiler build (use 1, 2, 4, 8, or 15)'
-                );
+        $parts = [];
+        if ($mask & 1) {
+            $parts['dirname'] = $dirname;
         }
+        if ($mask & 2) {
+            $parts['basename'] = $basename;
+        }
+        if ($mask & 4) {
+            $parts['extension'] = $extension;
+        }
+        if ($mask & 8) {
+            $parts['filename'] = $filename;
+        }
+
+        if (1 === \count($parts)) {
+            return reset($parts);
+        }
+
+        return $parts;
     }
 
     public static function pathExtension(string $path): string

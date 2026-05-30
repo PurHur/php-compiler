@@ -5883,6 +5883,35 @@ class JIT {
                         );
                         break;
                     }
+                    if (
+                        $this->context->scope->toCall instanceof CoreFunc\Internal
+                        && 'pathinfo' === strtolower($this->context->scope->toCall->getName())
+                        && 2 === count($callArgs)
+                        && isset($callOperands[1])
+                    ) {
+                        $mask = \PHPCompiler\ext\standard\JitPathinfo::tryResolveFlags($this->context, $callArgs[1])
+                            ?? \PHPCompiler\ext\standard\JitPathinfo::tryResolveFlagsFromBlock(
+                                $this->context,
+                                $block,
+                                $callOperands[1]
+                            );
+                        if (null !== $mask) {
+                            $prevStrict = $this->context->callerStrictTypes;
+                            $this->context->callerStrictTypes = $block->strictTypes;
+                            $result = \PHPCompiler\ext\standard\JitPathinfo::invoke(
+                                $this->context,
+                                $callArgs[0],
+                                Variable::fromConstantInt($this->context, $mask)
+                            );
+                            $this->context->callerStrictTypes = $prevStrict;
+                            $this->assignCallResultOperand(
+                                $block->getOperand($op->arg1),
+                                $result,
+                                $this->calleeReturnsByRef($this->context->scope->toCall)
+                            );
+                            break;
+                        }
+                    }
                     $resumeName = $this->context->scope->generatorResumeCallee;
                     $this->context->scope->generatorResumeCallee = null;
                     if (null !== $resumeName) {
@@ -8138,6 +8167,11 @@ class JIT {
 
     private function compileValueBoxedBitwiseOp(int $opcodeType, Variable $left, Variable $right): Variable
     {
+        $folded = $this->context->helper->tryFoldCoreIntBitwise($opcodeType, $left, $right);
+        if (null !== $folded) {
+            return Variable::fromConstantInt($this->context, $folded);
+        }
+
         $leftPtr = Variable::KIND_VARIABLE === $left->kind
             ? $left->value
             : $this->context->helper->loadValue($left);
