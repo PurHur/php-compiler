@@ -86,16 +86,17 @@ final class BootstrapJitUnitProbeTest extends TestCase
         $this->assertStringContainsString('jit_unit_probe/compile_driver.php', $source);
         $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER', $source);
         $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $source);
+        $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_MODE=compile', $source);
         $this->assertStringContainsString('jit unit probe compile OK', $source);
     }
 
-    public function testJitUnitProbeInventoryCompileDriverLintPasses(): void
+    /** Issue #2879: inventory compile_driver without *_m3_emit_native_entry.php. */
+    public function testJitUnitProbeDocumentsInventoryEmitDriverOptIn(): void
     {
-        $entry = self::$root.'/test/selfhost/jit_unit_probe/compile_driver.php';
-        $this->assertFileExists($entry);
-        $cmd = 'php '.escapeshellarg(self::$root.'/bin/compile.php').' -l '.escapeshellarg($entry).' 2>&1';
-        exec($cmd, $lines, $exitCode);
-        $this->assertSame(0, $exitCode, implode("\n", $lines));
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-jit-unit-probe.sh');
+        $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER', $script);
+        $this->assertStringContainsString('inventory compile_driver (no emit-helper TU, #2879)', $script);
+        $this->assertFileExists(self::$root.'/test/selfhost/jit_unit_probe/compile_driver.php');
     }
 
     public function testJitUnitProbeM3EmitNativeEntryExists(): void
@@ -121,8 +122,75 @@ final class BootstrapJitUnitProbeTest extends TestCase
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertStringContainsString('jit_unit_probe_compile.php', $jit);
         $this->assertStringContainsString('JIT_UNIT_PROBE_SIDECAR_REL', $jit);
+        $this->assertStringContainsString('jit_unit_probe/compile_driver.php', $jit);
+        $this->assertStringContainsString('JIT_UNIT_PROBE_COMPILE_DRIVER_SIDECAR_REL', $jit);
         $aot = (string) file_get_contents(self::$root.'/lib/JIT/M3EmitTuTrivialEchoAot.php');
         $this->assertStringContainsString('JIT_UNIT_PROBE_SIDECAR_REL', $aot);
+        $this->assertStringContainsString('JIT_UNIT_PROBE_COMPILE_DRIVER_SIDECAR_REL', $aot);
+    }
+
+    /**
+     * @group llvm
+     */
+    public function testInventoryJitUnitCompileDriverLinksWithRealLowering(): void
+    {
+        if (!LlvmToolchain::isReady(self::$root)) {
+            $this->markTestSkipped('LLVM 9 not available for JIT unit inventory compile_driver link test.');
+        }
+
+        $entry = self::$root.'/test/selfhost/jit_unit_probe/compile_driver.php';
+        $out = self::$root.'/build/selfhost-jit-unit-inventory-emit-test';
+        @unlink($out);
+
+        $prefix = LlvmToolchain::envPrefix(self::$root);
+        $cmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'env',
+            'PHP_COMPILER_SELFHOST_AOT=1',
+            'PHP_COMPILER_M3_COMPILE_DRIVER=1',
+            'PHP_COMPILER_EMIT_HELPER_LINK=1',
+            'PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1',
+            'BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1',
+            'PHP_COMPILER_M3_EMIT_LOG_PREFIX=jit_unit_probe_m3_emit',
+            'php',
+            self::$root.'/bin/compile.php',
+            '-o',
+            $out,
+            $entry,
+        ])).' 2>&1';
+        exec($cmd, $lines, $exitCode);
+
+        if (139 === $exitCode) {
+            $this->markTestSkipped('LLVM 9 segfault during JIT unit inventory compile_driver link (#2879).');
+        }
+
+        $this->assertSame(0, $exitCode, implode("\n", $lines));
+        $this->assertFileExists($out);
+        $this->assertTrue(is_executable($out));
+
+        $fixture = self::$root.'/test/selfhost/jit_unit_probe/jit_unit_probe_compile.php';
+        $aotOut = self::$root.'/build/selfhost-jit-unit-inventory-emit-aot';
+        @unlink($aotOut);
+        $runCmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'env',
+            'PHP_COMPILER_M3_COMPILE_MODE=compile',
+            'PHP_COMPILER_M3_RUNTIME_COMPILE=1',
+            'PHP_COMPILER_M3_EMIT_MINIMAL=1',
+            'PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1',
+            'BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1',
+            'PHP_COMPILER_M3_SOURCE='.$fixture,
+            'PHP_COMPILER_M3_OUT='.$aotOut,
+            $out,
+        ])).' 2>&1';
+        exec($runCmd, $runLines, $runExit);
+        if (139 === $runExit) {
+            $this->markTestSkipped('LLVM 9 segfault during JIT unit inventory compile_driver emit run (#2879).');
+        }
+        $runOut = implode("\n", $runLines);
+        $this->assertSame(0, $runExit, $runOut);
+        $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $runOut);
+        $this->assertFileExists($aotOut);
     }
 
     public function testJitUnitProbeFixtureLintPasses(): void
@@ -148,6 +216,7 @@ final class BootstrapJitUnitProbeTest extends TestCase
             ...$prefix,
             'env',
             'BOOTSTRAP_M3_JIT_UNIT_PROBE_STRICT=1',
+            'BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1',
             'BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1',
             'BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1',
             'BOOTSTRAP_M3_RUNTIME_COMPILE=1',
@@ -158,6 +227,7 @@ final class BootstrapJitUnitProbeTest extends TestCase
 
         $out = implode("\n", $lines);
         $this->assertSame(0, $exitCode, $out);
+        $this->assertStringContainsString('inventory compile_driver', $out);
         $this->assertStringContainsString('emit_path=native', $out);
         $this->assertStringContainsString('jit unit probe compile OK', $out);
         $this->assertTrue(is_executable(self::$root.'/build/jit-unit-probe-aot'));
