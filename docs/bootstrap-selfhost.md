@@ -76,6 +76,25 @@
 
 Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-aot-lint`). Phase C: `make bootstrap-aot-link` (or `php script/bootstrap-aot-lint.php --link`). Phase D: `make bootstrap-aot-link-lib`. Bundled compiler lint: `./script/bootstrap-selfhost-lint.sh`. Live lowering target: `make bootstrap-selfhost-probe` (or `./script/bootstrap-selfhost-compile-probe.sh`; optional `--update-inventory`).
 
+### Minimal harness hosts (no host `make` / `php`) ([#2905](https://github.com/PurHur/php-compiler/issues/2905))
+
+When `make bootstrap-selfhost-link` or `php script/bootstrap-inventory.php` fail with `command not found` on the host, use the gate wrapper (no host `make`/`php` required when Docker works):
+
+```bash
+docker info >/dev/null                    # host preflight — not inside docker-exec
+./script/bootstrap-selfhost-gate.sh link
+./script/bootstrap-selfhost-gate.sh helloworld
+./script/bootstrap-selfhost-gate.sh inventory-check
+```
+
+Inside the dev image (same gates):
+
+```bash
+./script/docker-exec.sh -- bash -lc './script/bootstrap-selfhost-gate.sh link'
+```
+
+Do **not** nest `docker info` or `docker run` inside the `docker-exec` inner command — the container has PHP/LLVM only ([#2674](https://github.com/PurHur/php-compiler/issues/2674), [#2757](https://github.com/PurHur/php-compiler/issues/2757)). Missing Docker CLI on the host: `script/selfhost-preflight.sh` / issue [#2674](https://github.com/PurHur/php-compiler/issues/2674).
+
 ### When to regenerate `docs/bootstrap-inventory.md` ([#830](https://github.com/PurHur/php-compiler/issues/830))
 
 | Change | Command |

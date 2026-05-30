@@ -29,6 +29,21 @@ if [[ "${1:-}" == "--" ]]; then
   shift
 fi
 
+# Hosts sometimes copy/paste `docker info` into the inner shell; the dev image has no docker CLI (#2674, #2757).
+_docker_exec_reject_nested_docker() {
+  local joined=" $* "
+  case "${joined}" in
+    *" docker info"*|*" docker run"*|*" docker exec"*|*" docker start"*|*" docker build"*|\
+    *" docker pull"*|*" docker push"*|*" docker cp"*|*" docker wait"*|*" docker logs"*)
+      echo "docker-exec: environment misuse (not a compiler failure): do not run 'docker' inside docker-exec" >&2
+      echo "docker-exec: run 'docker info' on the host first, then invoke make/php inside the container only." >&2
+      echo "docker-exec: ./script/bootstrap-selfhost-gate.sh link  # no host make/php (#2905)" >&2
+      echo "docker-exec: see issues #2674 and #2757 · tracker #1492" >&2
+      exit 1
+      ;;
+  esac
+}
+
 FORCE_BIND_MOUNT=0
 if [[ "${1:-}" == "--bind" ]]; then
   FORCE_BIND_MOUNT=1
@@ -101,6 +116,10 @@ if [[ ${#SYNC_BACK_PATHS[@]} -eq 0 ]]; then
       _docker_exec_m5_sync_back_paths
       ;;
   esac
+fi
+
+if [[ $# -gt 0 ]]; then
+  _docker_exec_reject_nested_docker "$@"
 fi
 
 quoted=$(printf '%q ' "$@")
