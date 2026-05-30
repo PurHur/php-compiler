@@ -262,6 +262,15 @@ class Block {
         return $this->scope[$operand];
     }
 
+    /** Bind operand to a fresh slot (?: throw arm must not alias merge phi slot, #3802). */
+    public function forceFreshVarSlot(Operand $operand): int
+    {
+        $slot = $this->nextScopeSlot();
+        $this->scope[$operand] = $slot;
+
+        return $slot;
+    }
+
     /** Next unused scope slot (SplObjectStorage::count() can collide after inheritScopeFrom, #1058). */
     private function nextScopeSlot(): int
     {
