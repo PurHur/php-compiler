@@ -396,7 +396,6 @@ class VM {
 
         throw new \LogicException('Undefined property access');
     }
-    }
 
     /**
      * Invoke a closure from a VM builtin (isolated run stack; issue #72).
