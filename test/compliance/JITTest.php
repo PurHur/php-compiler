@@ -53,6 +53,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gc_collect_cycles')) {
                 continue;
             }
+            // enum case ->name / ->value is VM-only until JIT enum case objects (#3420).
+            if (str_contains($name, 'enum_case_name_value')) {
+                continue;
+            }
             // count() on Countable objects is VM-only until JIT object dispatch (#3364).
             if (str_contains($name, 'countable')) {
                 continue;
@@ -71,6 +75,10 @@ class JITTest extends BaseTest {
             }
             // json_validate() MCJIT path unsafe until __compiler_json_validate link is stable (#3101).
             if (str_contains($name, 'json_validate')) {
+                continue;
+            }
+            // (unset) cast reference break is VM-only until JIT TYPE_CAST_UNSET lowering (#3517).
+            if (str_contains($name, 'cast_unset')) {
                 continue;
             }
             // exit/die expression ScriptExit status — VM compliance (#3539).
@@ -95,6 +103,10 @@ class JITTest extends BaseTest {
             }
             // object == structural compare is VM-only until JIT Object_ lowering (#3602).
             if (str_contains($name, 'object_loose_equals')) {
+                continue;
+            }
+            // object === identity compare is VM-only until JIT handle compare is stable (#3622).
+            if (str_contains($name, 'object_identical')) {
                 continue;
             }
             yield $name => $case;

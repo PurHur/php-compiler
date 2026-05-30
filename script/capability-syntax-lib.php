@@ -43,7 +43,7 @@ function syntaxRowDefinitions(): array
             'construct' => 'Enum declarations `enum Foo: string { case Bar = \'x\'; }`',
             'opcodes' => ['TYPE_DECLARE_ENUM', 'TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH'],
             'issue' => 1356,
-            'notes' => ['Backed enum cases as class constants; `Foo::Bar` const-like fetch; `enum_exists` registry; `implements` metadata (#2299); static methods (#2299); `Enum::cases()` VM (#3308)'],
+            'notes' => ['Backed enum cases as class constants; `Foo::Bar` const-like fetch; case `->name` / `->value` (#3420); `enum_exists` registry; `implements` metadata (#2299); static methods (#2299); `Enum::cases()` VM (#3308)'],
             'probe' => 'enum Status: string { case Ok = \'ok\'; public static function tag(): string { return \'ok\'; } } echo Status::tag();',
         ],
         [
@@ -292,6 +292,17 @@ function syntaxRowDefinitions(): array
             'issue' => 1225,
             'notes' => ['Class-scoped storage; `self::` / `static::`; literal property names in JIT'],
             'probe' => 'class C { public static int $n = 1; } echo C::$n;',
+        ],
+        [
+            'id' => 'error_control_operator',
+            'construct' => 'Error-control operator `@` on expressions',
+            'opcodes' => ['TYPE_BEGIN_SILENCE', 'TYPE_END_SILENCE'],
+            'issue' => 3546,
+            'notes' => [
+                'php-cfg ErrorSuppressBlock + Simplifier preserve (#3546)',
+                'VM masks error_reporting; JIT/AOT no-op until native silence',
+            ],
+            'probe' => 'echo @$undefined; @trigger_error("x", E_USER_NOTICE); echo "ok\\n";',
         ],
         [
             'id' => 'unset',
