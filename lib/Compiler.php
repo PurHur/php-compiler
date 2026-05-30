@@ -70,6 +70,12 @@ class Compiler {
     /** @var array<string, array<string, Variable>> compile-time class constants by lc name */
     private array $compileTimeClassConsts = [];
 
+    /** @var array<string, array<string, true>> lowercase class => declared static property names (#3814). */
+    private array $compiledClassStaticProperties = [];
+
+    /** Class being compiled while lowering static property declarations (#3814). */
+    private ?string $currentClassStaticPropertyCompile = null;
+
     public function setBareRethrowLines(array $lines): void
     {
         $this->bareRethrowLines = $lines;
@@ -248,6 +254,8 @@ class Compiler {
         $this->abstractClasses = [];
         $this->abstractEnums = [];
         $this->haltCompilerRemaining = null;
+        $this->compiledClassStaticProperties = [];
+        $this->currentClassStaticPropertyCompile = null;
         $this->seen = new SplObjectStorage;
         $this->ternaryMergeVarSlots = new SplObjectStorage;
         $this->debugWriteLastPhase('Compiler::compile enter');
@@ -1589,11 +1597,29 @@ class Compiler {
                 $this->abstractClasses[strtolower(ltrim($name, '\\'))] = true;
             }
         }
+        $classLc = null;
+        $className = $this->staticNameFromOperand($class->name);
+        if (null !== $className) {
+            $classLc = strtolower(ltrim($className, '\\'));
+            $this->compiledClassStaticProperties[$classLc] = $this->compiledClassStaticProperties[$classLc] ?? [];
+        }
+        $prevClassStaticCompile = $this->currentClassStaticPropertyCompile;
+        $this->currentClassStaticPropertyCompile = $classLc;
         $return->block1 = $this->compileClassBody(
             $class->stmts,
             $type,
-            $this->staticNameFromOperand($class->name)
+            $className
         );
+        $this->currentClassStaticPropertyCompile = $prevClassStaticCompile;
+        if (null !== $classLc && $class instanceof Op\Stmt\Class_ && null !== $class->extends) {
+            $parentName = $this->staticNameFromOperand($class->extends);
+            if (null !== $parentName) {
+                $parentLc = strtolower(ltrim($parentName, '\\'));
+                foreach ($this->compiledClassStaticProperties[$parentLc] ?? [] as $prop => $_) {
+                    $this->compiledClassStaticProperties[$classLc][$prop] = true;
+                }
+            }
+        }
         return $return;
     }
 
@@ -1759,6 +1785,12 @@ class Compiler {
                         ? Type::fromDecl($propertyDeclName)
                         : ($child->type ?? Type::mixed());
                     AttributeNames::assertNoDuplicates(AttributeNames::fromOp($child));
+                    if ($child->static && null !== $this->currentClassStaticPropertyCompile) {
+                        $staticPropName = $this->staticNameFromOperand($child->name);
+                        if (null !== $staticPropName) {
+                            $this->compiledClassStaticProperties[$this->currentClassStaticPropertyCompile][strtolower($staticPropName)] = true;
+                        }
+                    }
                     $declareType = $child->static
                         ? OpCode::TYPE_DECLARE_STATIC_PROPERTY
                         : OpCode::TYPE_DECLARE_PROPERTY;
@@ -2046,7 +2078,7 @@ class Compiler {
         }
         $pseudo = new Op\Expr\Param(
             new Operand\Literal(''),
-            null,
+            new Op\Type\Mixed_(),
             false,
             false,
             $prop->defaultVar,
@@ -2554,7 +2586,7 @@ class Compiler {
                             OpCode::TYPE_STATIC_PROPERTY_FETCH,
                             $fetchSlot,
                             $this->compileOperand($staticPropertyFetch->class, $block, true),
-                            $this->compileOperand($staticPropertyFetch->name, $block, true)
+                            $this->compileStaticPropertyNameSlot($staticPropertyFetch->name, $staticPropertyFetch->class, $block)
                         ),
                         new OpCode(
                             OpCode::TYPE_ASSIGN,
@@ -2717,7 +2749,7 @@ class Compiler {
                     OpCode::TYPE_STATIC_PROPERTY_FETCH,
                     $this->compileOperand($expr->result, $block, false),
                     $this->compileOperand($expr->class, $block, true),
-                    $this->compileOperand($expr->name, $block, true)
+                    $this->compileStaticPropertyNameSlot($expr->name, $expr->class, $block)
                 )];
             case Op\Expr\FirstClassCallable::class:
                 return $this->compileFirstClassCallable($expr, $block);
@@ -4406,6 +4438,30 @@ class Compiler {
         return $slot;
     }
 
+    /**
+     * VarLikeIdentifier `Class::$name` is a declared static property when `$name` exists on the class;
+     * otherwise evaluate the variable `$name` for a runtime property name (Zend zend_compile.c, #3814).
+     */
+    protected function compileStaticPropertyNameSlot(Operand $name, Operand $class, Block $block): int
+    {
+        $literalName = $this->staticNameFromOperand($name);
+        if (null !== $literalName) {
+            $className = $this->literalScopeClassName($class);
+            if (null !== $className) {
+                $lcClass = strtolower(ltrim($className, '\\'));
+                $lcProp = strtolower($literalName);
+                if (isset($this->compiledClassStaticProperties[$lcClass][$lcProp])) {
+                    return $this->compileOperand($name, $block, true);
+                }
+            }
+            $varOperand = new CfgVariable(new Literal($literalName));
+
+            return $this->compileOperand($varOperand, $block, true);
+        }
+
+        return $this->compileOperand($name, $block, true);
+    }
+
     protected function compileOperand(?Operand $operand, Block $block, bool $isRead): ?int {
         if (null === $operand) {
             return null;
@@ -4578,7 +4634,7 @@ class Compiler {
                             OpCode::TYPE_STATIC_PROPERTY_UNSET,
                             null,
                             $this->compileOperand($unsetExpr->class, $block, true),
-                            $this->compileOperand($unsetExpr->name, $block, true)
+                            $this->compileStaticPropertyNameSlot($unsetExpr->name, $unsetExpr->class, $block)
                         );
                         continue;
                     }

@@ -1188,12 +1188,14 @@ restart:
                     if (!isset($this->context->classes[$lcClass])) {
                         return $this->raise("Unknown class for static property fetch: {$rawClass}", $frame);
                     }
-                    $propName = strtolower($frame->scope[$op->arg3]->toString());
+                    $propNameRaw = $frame->scope[$op->arg3]->toString();
+                    $propName = strtolower($propNameRaw);
                     $classEntry = $this->context->classes[$lcClass];
                     if (!isset($classEntry->staticProperties[$propName])) {
                         $classLabel = $classEntry->name;
+
                         return $this->raise(
-                            "Undefined static property {$classLabel}::{$propName}",
+                            "Access to undeclared static property {$classLabel}::\${$propNameRaw}",
                             $frame
                         );
                     }
@@ -1210,13 +1212,14 @@ restart:
                     if (!isset($this->context->classes[$lcClass])) {
                         return $this->raise("Unknown class for static property unset: {$rawClass}", $frame);
                     }
-                    $propName = strtolower($frame->scope[$op->arg3]->toString());
+                    $propNameRaw = $frame->scope[$op->arg3]->toString();
+                    $propName = strtolower($propNameRaw);
                     $classEntry = $this->context->classes[$lcClass];
                     if (!isset($classEntry->staticProperties[$propName])) {
                         $classLabel = $classEntry->name;
 
                         return $this->raise(
-                            "Undefined static property {$classLabel}::{$propName}",
+                            "Access to undeclared static property {$classLabel}::\${$propNameRaw}",
                             $frame
                         );
                     }

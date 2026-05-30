@@ -915,6 +915,38 @@ class Block {
         return $hasArrayAccessClass && $hasObjectDimFetch;
     }
 
+    public static function containsDynamicStaticPropertyOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (
+                    in_array($op->type, [OpCode::TYPE_STATIC_PROPERTY_FETCH, OpCode::TYPE_STATIC_PROPERTY_UNSET], true)
+                    && null !== $op->arg3
+                    && !isset($block->constants[$op->arg3])
+                ) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     /**
      * CFG regions that MCJIT must not execute yet; `bin/jit.php` runs the VM instead (#2114, #167).
      * Simple try/catch without `finally` may pass MCJIT when {@see TryCatchJitExecuteTest} is green.
@@ -924,6 +956,7 @@ class Block {
         return self::containsGeneratorOpcodes($root)
             || self::containsFinallyOpcodes($root)
             || self::containsExceptionHandlingOpcodes($root)
-            || self::containsArrayAccessObjectOpcodes($root);
+            || self::containsArrayAccessObjectOpcodes($root)
+            || self::containsDynamicStaticPropertyOpcodes($root);
     }
 }
