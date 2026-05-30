@@ -646,6 +646,8 @@ restart:
                     return '' === $other->string;
                 case self::TYPE_FLOAT:
                     return 0.0 === $other->float;
+                case self::TYPE_ARRAY:
+                    return 0 === $other->toArray()->getNumElements();
                 default:
                     return false;
             }
@@ -698,9 +700,15 @@ restart:
         if ($other->type === self::TYPE_ARRAY && $self->type === self::TYPE_BOOLEAN) {
             return ($other->toArray()->getNumElements() === 0) !== $self->bool;
         }
+        if ($self->type === self::TYPE_ARRAY && $other->type === self::TYPE_ARRAY) {
+            return $self->toArray()->compareLooseEqual($other->toArray());
+        }
+        if ($self->type === self::TYPE_ARRAY || $other->type === self::TYPE_ARRAY) {
+            return false;
+        }
         try {
             return $self->toNumeric() == $other->toNumeric();
-        } catch (\LogicException) {
+        } catch (\LogicException|\TypeError) {
             return false;
         }
     }
