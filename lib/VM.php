@@ -11,6 +11,7 @@ namespace PHPCompiler;
 
 require_once __DIR__.'/OpCodeNames.php';
 
+use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Func;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ClassEntry;
@@ -988,6 +989,9 @@ restart:
                         $classEntry->readonly = (bool) $frame->block->constants[$op->arg3]->toInt();
                     }
                     $classEntry->attributeNames = $op->attributeNames;
+                    $classEntry->allowsDynamicProperties = AttributeNames::hasAllowDynamicProperties(
+                        $op->attributeNames
+                    );
                     self::defineClass($classEntry, $op->block1);
                     if (null !== $classEntry->parentLc) {
                         $this->inheritFromParent($classEntry);
