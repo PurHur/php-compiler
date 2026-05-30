@@ -166,7 +166,11 @@ final class BuiltinClasses
         $pub = CfgFunc::FLAG_PUBLIC;
         $getMessage = new ThrowableGetMessage();
 
+        $throwable = new ClassEntry('Throwable');
+        $ctx->classes['throwable'] = $throwable;
+
         $error = new ClassEntry('Error');
+        $error->parentLc = 'throwable';
         $error->properties[] = new ClassProperty(BuiltinExceptionSupport::PROP_MESSAGE, null, $strProto);
         $error->methods['getmessage'] = $getMessage;
         $error->methodVisibility['getmessage'] = $pub;

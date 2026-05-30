@@ -629,6 +629,16 @@ restart:
                     if (!isset($classEntry->constants[$constName])) {
                         return $this->raise("Undefined class constant {$className}::{$constName}", $frame);
                     }
+                    if ($classEntry->isEnum) {
+                        $canonical = $classEntry->enumCaseCanonicalNames[$constName]
+                            ?? $frame->scope[$op->arg3]->toString();
+                        $backing = new Variable();
+                        $backing->copyFrom($classEntry->constants[$constName]);
+                        $frame->scope[$op->arg1]->enumCase(
+                            new VM\EnumCaseEntry($classEntry, $canonical, $backing)
+                        );
+                        break;
+                    }
                     $frame->scope[$op->arg1]->copyFrom($classEntry->constants[$constName]);
                     break;
                 case OpCode::TYPE_INSTANCEOF:
@@ -1059,6 +1069,17 @@ restart:
                 case OpCode::TYPE_CLONE:
                     $result = $frame->scope[$op->arg1];
                     $src = $frame->scope[$op->arg2]->resolveIndirect();
+                    if (Variable::TYPE_ENUM_CASE === $src->type) {
+                        $enumCase = $src->toEnumCase();
+                        $message = 'Cannot clone enum case '
+                            .$enumCase->enumClass->name.'::'.$enumCase->caseName;
+                        $catchFrame = $this->dispatchVmError($message, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     if (Variable::TYPE_OBJECT !== $src->type) {
                         throw new \LogicException('clone requires an object');
                     }
@@ -1405,6 +1426,21 @@ restart:
     private function dispatchVmTypeError(\TypeError $error, Frame $frame): ?Frame
     {
         $thrown = VM\BuiltinExceptionSupport::materializeTypeError($this->context, $error->getMessage());
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /**
+     * Bridge VM Error throws (enum clone guard, etc.) into user catch handlers (#3554).
+     */
+    private function dispatchVmError(string $message, Frame $frame): ?Frame
+    {
+        $thrown = VM\BuiltinExceptionSupport::materializeError($this->context, $message);
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
             return $catchFrame;
@@ -2297,11 +2333,15 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_DECLARE_CLASS_CONST:
-                    $name = strtolower($frame->scope[$op->arg1]->toString());
+                    $canonical = $frame->scope[$op->arg1]->toString();
+                    $name = strtolower($canonical);
                     if (!isset($block->constants[$op->arg2])) {
                         throw new \LogicException('Class constant value must be a compile-time constant');
                     }
                     $entry->constants[$name] = $block->constants[$op->arg2];
+                    if ($entry->isEnum) {
+                        $entry->enumCaseCanonicalNames[$name] = $canonical;
+                    }
                     break;
                 case OpCode::TYPE_USE_TRAIT:
                     $this->applyTraitUse($entry, $frame->scope[$op->arg1]->toString());
