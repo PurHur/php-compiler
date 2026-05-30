@@ -5925,6 +5925,12 @@ class JIT {
             if ('__hashtable__*' === $expected && Variable::TYPE_NULL === $return->type) {
                 return $this->context->getTypeFromString('__hashtable__*')->constNull();
             }
+            if ('__hashtable__*' === $expected && Variable::TYPE_HASHTABLE === $return->type) {
+                return $retval;
+            }
+            if ('__hashtable__*' === $expected && 0 !== ($return->type & Variable::IS_NATIVE_ARRAY)) {
+                return JIT\HashTableHelper::materializeNativeArrayForCall($this->context, $return);
+            }
             if ('__string__*' === $expected && Variable::TYPE_VALUE === $return->type) {
                 return $this->context->builder->call(
                     $this->context->lookupFunction('__value__readString'),
@@ -5949,9 +5955,15 @@ class JIT {
         if (Variable::KIND_VALUE === $return->kind) {
             $this->context->builder->store($retval, $valuePtr);
         }
-        if ('long long' === $expected) {
+        if ('long long' === $expected || 'int64' === $expected) {
             return $this->context->builder->call(
                 $this->context->lookupFunction('__value__readLong'),
+                $valuePtr
+            );
+        }
+        if ('double' === $expected) {
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readDouble'),
                 $valuePtr
             );
         }
@@ -6044,6 +6056,8 @@ class JIT {
             case 'long long':
             case 'int64':
                 return $this->context->getTypeFromString('int64')->constInt($longReturn ?? 0, false);
+            case 'double':
+                return $this->context->getTypeFromString('double')->constReal(0.0);
             case 'bool':
             case 'int1':
                 return $this->context->getTypeFromString('bool')->constInt(0, false);
@@ -6268,7 +6282,10 @@ class JIT {
         $type = $this->context->unwrapNullableUnionType($type);
         switch ($type->type) {
             case Type::TYPE_LONG:
-                $callback = 'long long';
+                $callback = 'int64';
+                break;
+            case Type::TYPE_DOUBLE:
+                $callback = 'double';
                 break;
             case Type::TYPE_BOOLEAN:
                 $callback = 'bool';
@@ -6335,7 +6352,9 @@ class JIT {
                 case 'never':
                     return 'void';
                 case 'int':
-                    return 'long long';
+                    return 'int64';
+                case 'float':
+                    return 'double';
                 case 'string':
                     return '__string__*';
                 case 'bool':
