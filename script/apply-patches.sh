@@ -802,7 +802,7 @@ path = Path(sys.argv[1])
 text = path.read_text()
 fcc_case = """            case 'Expr_FirstClassCallable':
                 if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
-                    return [Type::array()];
+                    return [new Type(Type::TYPE_ARRAY)];
                 }
 
                 return [Type::string()];
@@ -892,7 +892,7 @@ anchors = [
     (
         """            case 'Expr_FirstClassCallable':
                 if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
-                    return [Type::array()];
+                    return [new Type(Type::TYPE_ARRAY)];
                 }
 
                 return [Type::string()];
@@ -901,7 +901,7 @@ anchors = [
         throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
         """            case 'Expr_FirstClassCallable':
                 if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
-                    return [Type::array()];
+                    return [new Type(Type::TYPE_ARRAY)];
                 }
 
                 return [Type::string()];

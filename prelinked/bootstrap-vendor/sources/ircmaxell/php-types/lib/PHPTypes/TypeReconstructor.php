@@ -295,7 +295,7 @@ class TypeReconstructor
                 return false;
             case 'Expr_FirstClassCallable':
                 if (\PHPCfg\Op\Expr\FirstClassCallable::KIND_METHOD === $op->kind) {
-                    return [Type::array()];
+                    return [new Type(Type::TYPE_ARRAY)];
                 }
 
                 return [Type::string()];
