@@ -41,6 +41,9 @@ class Native implements Call {
     /** @var array<int, list<string>> LLVM arg index => intersection interface lc names (#3077) */
     public array $paramIntersectionConstraintsByArg = [];
 
+    /** @var array<int, true> LLVM arg index => by-reference formal (issue #3161, #140) */
+    public array $paramByRefByArg = [];
+
     public function __construct(
         Value $function,
         string $name,
@@ -48,7 +51,8 @@ class Native implements Call {
         array $defaultArgs = [],
         ?int $variadicArgIndex = null,
         array $paramTypeConstraintsByArg = [],
-        array $paramIntersectionConstraintsByArg = []
+        array $paramIntersectionConstraintsByArg = [],
+        array $paramByRefByArg = []
     ) {
         $this->function = $function;
         $this->name = $name;
@@ -57,6 +61,7 @@ class Native implements Call {
         $this->variadicArgIndex = $variadicArgIndex;
         $this->paramTypeConstraintsByArg = $paramTypeConstraintsByArg;
         $this->paramIntersectionConstraintsByArg = $paramIntersectionConstraintsByArg;
+        $this->paramByRefByArg = $paramByRefByArg;
     }
 
     public function call(Context $context, Variable ... $args): Value {
@@ -222,6 +227,11 @@ class Native implements Call {
                         );
 
                         return \PHPCompiler\JIT\JitValueBox::pointer($context, $slot);
+                    case Variable::TYPE_NATIVE_LONG:
+                    case Variable::TYPE_NATIVE_BOOL:
+                    case Variable::TYPE_NATIVE_DOUBLE:
+                    case Variable::TYPE_HASHTABLE:
+                        return \PHPCompiler\JIT\JitValueBox::valuePtrFromNativeVariable($context, $arg);
                 }
                 break;
             case '__value__':

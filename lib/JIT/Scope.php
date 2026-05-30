@@ -22,6 +22,9 @@ class Scope {
     /** Resume LLVM symbol when calling a user generator (#3074). */
     public ?string $generatorResumeCallee = null;
 
+    /** Parallel to {@see $args}: CFG operands for the current call (issue #3161). */
+    public array $argOperands = [];
+
     public function __construct() {
         $this->blockStorage = new \SplObjectStorage;
         $this->variables = new \SplObjectStorage;

@@ -1,0 +1,149 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\VM\Variable;
+
+/**
+ * Core PHP engine predefined constants (php-src: main/main.c register_php_constants,
+ * Zend/zend_constants.c).
+ */
+final class VmPhpCoreConstants
+{
+    /**
+     * Names registered in Zend get_defined_constants(true)['Core'] with PHP_ prefix.
+     *
+     * @var list<string>
+     */
+    private const CORE_NAMES = [
+        'PHP_VERSION',
+        'PHP_MAJOR_VERSION',
+        'PHP_MINOR_VERSION',
+        'PHP_RELEASE_VERSION',
+        'PHP_EXTRA_VERSION',
+        'PHP_VERSION_ID',
+        'PHP_ZTS',
+        'PHP_DEBUG',
+        'PHP_OS',
+        'PHP_OS_FAMILY',
+        'PHP_SAPI',
+        'PHP_EXTENSION_DIR',
+        'PHP_PREFIX',
+        'PHP_BINDIR',
+        'PHP_MANDIR',
+        'PHP_LIBDIR',
+        'PHP_DATADIR',
+        'PHP_SYSCONFDIR',
+        'PHP_LOCALSTATEDIR',
+        'PHP_CONFIG_FILE_PATH',
+        'PHP_CONFIG_FILE_SCAN_DIR',
+        'PHP_SHLIB_SUFFIX',
+        'PHP_EOL',
+        'PHP_MAXPATHLEN',
+        'PHP_INT_MAX',
+        'PHP_INT_MIN',
+        'PHP_INT_SIZE',
+        'PHP_FD_SETSIZE',
+        'PHP_FLOAT_DIG',
+        'PHP_FLOAT_EPSILON',
+        'PHP_FLOAT_MAX',
+        'PHP_FLOAT_MIN',
+        'PHP_BINARY',
+        'PHP_OUTPUT_HANDLER_START',
+        'PHP_OUTPUT_HANDLER_WRITE',
+        'PHP_OUTPUT_HANDLER_FLUSH',
+        'PHP_OUTPUT_HANDLER_CLEAN',
+        'PHP_OUTPUT_HANDLER_FINAL',
+        'PHP_OUTPUT_HANDLER_CONT',
+        'PHP_OUTPUT_HANDLER_END',
+        'PHP_OUTPUT_HANDLER_CLEANABLE',
+        'PHP_OUTPUT_HANDLER_FLUSHABLE',
+        'PHP_OUTPUT_HANDLER_REMOVABLE',
+        'PHP_OUTPUT_HANDLER_STDFLAGS',
+        'PHP_OUTPUT_HANDLER_STARTED',
+        'PHP_OUTPUT_HANDLER_DISABLED',
+        'PHP_CLI_PROCESS_TITLE',
+    ];
+
+    public static function fetch(string $name): ?Variable
+    {
+        $canonical = self::canonicalName($name);
+        if (null === $canonical || !\defined($canonical)) {
+            return null;
+        }
+
+        return self::fromPhpValue(\constant($canonical));
+    }
+
+    /**
+     * @return array<string, Variable>
+     */
+    public static function definedCoreEntries(): array
+    {
+        $entries = [];
+        foreach (self::CORE_NAMES as $canonical) {
+            if (!\defined($canonical)) {
+                continue;
+            }
+            $var = self::fromPhpValue(\constant($canonical));
+            if (null !== $var) {
+                $entries[$canonical] = $var;
+            }
+        }
+
+        return $entries;
+    }
+
+    private static function canonicalName(string $name): ?string
+    {
+        $upper = strtoupper($name);
+        if (!str_starts_with($upper, 'PHP_')) {
+            return null;
+        }
+        foreach (self::CORE_NAMES as $canonical) {
+            if (strtoupper($canonical) === $upper) {
+                return $canonical;
+            }
+        }
+        if (\defined($name)) {
+            return $name;
+        }
+        if (\defined($upper)) {
+            return $upper;
+        }
+
+        return null;
+    }
+
+    private static function fromPhpValue(mixed $value): ?Variable
+    {
+        if (\is_int($value)) {
+            $var = new Variable(Variable::TYPE_INTEGER);
+            $var->int($value);
+
+            return $var;
+        }
+        if (\is_float($value)) {
+            $var = new Variable(Variable::TYPE_FLOAT);
+            $var->float($value);
+
+            return $var;
+        }
+        if (\is_bool($value)) {
+            $var = new Variable(Variable::TYPE_BOOLEAN);
+            $var->bool($value);
+
+            return $var;
+        }
+        if (\is_string($value)) {
+            $var = new Variable(Variable::TYPE_STRING);
+            $var->string($value);
+
+            return $var;
+        }
+
+        return null;
+    }
+}

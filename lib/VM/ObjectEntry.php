@@ -31,6 +31,12 @@ class ObjectEntry {
     /** Anonymous function / closure body (issue #72). */
     public ?ClosureState $closureState = null;
 
+    /** Initializer for lazy proxy objects (#3317). */
+    public ?ClosureState $lazyInitializer = null;
+
+    /** True until first property access or method call runs the lazy initializer. */
+    public bool $lazyPending = false;
+
     public function __construct(ClassEntry $class) {
         $this->class = $class;
         $this->id = ++self::$counter;
@@ -50,6 +56,12 @@ class ObjectEntry {
         return array_values($this->properties);
     }
 
+    /** @return array<string, Variable> */
+    public function propertiesWithNames(): array
+    {
+        return $this->properties;
+    }
+
     /** Break property edges and detach generator/closure state after cycle collection (#3113). */
     public function destroyForGc(): void
     {
@@ -62,6 +74,8 @@ class ObjectEntry {
         }
         $this->generatorState = null;
         $this->closureState = null;
+        $this->lazyInitializer = null;
+        $this->lazyPending = false;
     }
 
     public function getProperty(string $name): Variable {
@@ -78,6 +92,16 @@ class ObjectEntry {
         return $this->properties[$name];
     }
 
+    public function issetProperty(string $name): bool
+    {
+        if (!isset($this->properties[$name])) {
+            return false;
+        }
+        $var = $this->properties[$name]->resolveIndirect();
+
+        return !$var->isUndefined() && Variable::TYPE_NULL !== $var->type;
+    }
+
     public function unsetProperty(string $name): void
     {
         if (!isset($this->properties[$name])) {
@@ -86,8 +110,50 @@ class ObjectEntry {
         $this->properties[$name]->null();
     }
 
-    public function getProperties(int $purpose): array {
+    /** @return array<string, Variable> */
+    public function getRawProperties(): array
+    {
+        return $this->properties;
+    }
+
+    public function getProperties(int $purpose, ?\PHPCompiler\VM $vm = null): array {
+        if (ClassEntry::PROP_PURPOSE_DEBUG === $purpose && null !== $vm) {
+            return $vm->getObjectDebugProperties($this);
+        }
+
         return $this->class->getProperties($this->properties, $purpose);
+    }
+
+    /**
+     * Zend {@see compare_objects()} default handler: same class and equal property values (#3602).
+     */
+    public function looseEquals(self $other): bool
+    {
+        if ($this === $other) {
+            return true;
+        }
+        if ($this->class->name !== $other->class->name) {
+            return false;
+        }
+        $names = array_keys($this->properties);
+        foreach (array_keys($other->properties) as $name) {
+            if (!\in_array($name, $names, true)) {
+                $names[] = $name;
+            }
+        }
+        foreach ($names as $name) {
+            $left = isset($this->properties[$name])
+                ? $this->properties[$name]->resolveIndirect()
+                : new Variable(Variable::TYPE_NULL);
+            $right = isset($other->properties[$name])
+                ? $other->properties[$name]->resolveIndirect()
+                : new Variable(Variable::TYPE_NULL);
+            if (!$left->equals($right)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** Shallow clone: new object id, copied instance property values. */
@@ -98,6 +164,8 @@ class ObjectEntry {
         }
         $clone->constructed = $this->constructed;
         $clone->closureState = $this->closureState;
+        $clone->lazyInitializer = $this->lazyInitializer;
+        $clone->lazyPending = $this->lazyPending;
 
         return $clone;
     }

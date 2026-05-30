@@ -26,7 +26,7 @@ final class json_last_error_ extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(\json_last_error());
+        $frame->returnVar->int(VmJson::lastError());
     }
 
     public function call(Context $context, JITVariable ...$args): Value

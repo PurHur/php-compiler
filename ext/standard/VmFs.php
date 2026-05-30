@@ -346,6 +346,16 @@ final class VmFs
         return @fclose($fp);
     }
 
+    public static function flock(int $handle, int $operation): bool
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+
+        return @\flock($fp, $operation);
+    }
+
     public static function feof(int $handle): bool
     {
         $fp = self::lookup($handle);
@@ -477,6 +487,16 @@ final class VmFs
         return 0 === @\fseek($fp, $offset, $whence) ? 0 : -1;
     }
 
+    public static function rewind(int $handle): bool
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+
+        return 0 === @\fseek($fp, 0, \SEEK_SET);
+    }
+
     public static function tempnam(string $directory, string $prefix) {
         $path = @\tempnam($directory, $prefix);
         if (false === $path) {
@@ -484,6 +504,11 @@ final class VmFs
         }
 
         return $path;
+    }
+
+    public static function isValidHandle(int $handle): bool
+    {
+        return isset(self::$handles[$handle]);
     }
 
     private static function lookup(int $handle): mixed

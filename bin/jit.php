@@ -54,9 +54,8 @@ function run(string $filename, string $code, array $options): void
     }
     $block = $runtime->parseAndCompile($code, $filename);
     if (null !== $block && Block::requiresVmLowering($block)) {
-        // JIT EH IR may verify (TryCatchJitCompileTest) but MCJIT execute segfaults (#2114).
-        // Generators in the script entry block still use VM; nested generator bodies use MCJIT resume (#3074).
-        // Fall back to VM semantics rather than producing silent miscompiles or hard crashes.
+        // JIT EH IR may verify (TryCatchJitCompileTest); bin/jit.php VM-fallbacks EH/finally (#2114).
+        // Script-scope yield still uses VM; nested generator bodies use MCJIT resume (#3074, #3115).
     } else {
         $runtime->jit($block);
     }
@@ -77,6 +76,8 @@ if (
     && !(\function_exists('php_compiler_cli_should_skip_entry_driver') && php_compiler_cli_should_skip_entry_driver())
 ) {
     // Use literal require paths so self-host AOT/JIT can fold includes (#54, #1492).
+    require_once __DIR__.'/../src/cli.php';
+    php_compiler_cli_note_invocation_cwd();
     chdir(__DIR__.'/..');
     require_once 'src/cli.php';
     require_once 'src/cli_driver.php';

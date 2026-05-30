@@ -2152,17 +2152,27 @@ long long __compiler_utf8_strlen(__string__ *input)
  * Zend parity for missing array string keys (issue #273).
  * Called from JIT __hashtable__readStringKeyValue when lookup returns NULL.
  */
+void __phpc_last_error_record(int type, const char *msg, size_t msg_len, const char *file, int line);
+
 void __compiler_undefined_array_key_warning_cstr(const char *key, size_t len)
 {
+    char msg[512];
+
     if (!key) {
         return;
     }
-    fprintf(stderr, "Warning: Undefined array key \"%.*s\"\n", (int) len, key);
+    snprintf(msg, sizeof msg, "Undefined array key \"%.*s\"", (int) len, key);
+    __phpc_last_error_record(2, msg, strlen(msg), "", 0);
+    fprintf(stderr, "Warning: %s\n", msg);
 }
 
 void __compiler_undefined_array_key_warning_long(long long key)
 {
-    fprintf(stderr, "Warning: Undefined array key %lld\n", key);
+    char msg[64];
+
+    snprintf(msg, sizeof msg, "Undefined array key %lld", key);
+    __phpc_last_error_record(2, msg, strlen(msg), "", 0);
+    fprintf(stderr, "Warning: %s\n", msg);
 }
 
 extern int __phpc_error_handler_dispatch(int errno, const char *msg, size_t msg_len, int line);
@@ -2172,6 +2182,7 @@ void __compiler_trigger_error(const char *message, size_t len, int level)
     if (!message) {
         return;
     }
+    __phpc_last_error_record(level, message, len, "", 0);
     if (__phpc_error_handler_dispatch(level, message, len, 0)) {
         if (256 == level) {
             abort();
@@ -2197,4 +2208,32 @@ void __compiler_trigger_error(const char *message, size_t len, int level)
     if (256 == level) {
         abort();
     }
+}
+
+/** assert() failure with C string message (issue #3157; ext/standard/assert.c). */
+void __compiler_assert_fail(const char *message, size_t len)
+{
+    if (!message || 0 == len) {
+        __compiler_trigger_error("assert(): assert(false) failed", 29, 512);
+
+        return;
+    }
+    __compiler_trigger_error(message, len, 512);
+}
+
+/** assert() failure with runtime PHP string description. */
+void __compiler_assert_fail_string(__string__ *description)
+{
+    char buf[4096];
+    const char *prefix = "Assertion failed: ";
+    const size_t prefix_len = 19;
+    const char *desc = nf_strdata(description);
+    size_t desc_len = nf_strlen(description);
+    if (desc_len >= sizeof(buf) - prefix_len - 1) {
+        desc_len = sizeof(buf) - prefix_len - 2;
+    }
+    memcpy(buf, prefix, prefix_len);
+    memcpy(buf + prefix_len, desc, desc_len);
+    buf[prefix_len + desc_len] = '\0';
+    __compiler_assert_fail(buf, prefix_len + desc_len);
 }

@@ -1355,7 +1355,7 @@ final class ArrayBuiltinHelper
         $caseUpper = $context->builder->icmp(
             Builder::INT_EQ,
             $case,
-            $i64->constInt(\CASE_UPPER, false)
+            $i64->constInt(\PHPCompiler\ext\standard\StdlibConstants::CASE_UPPER, false)
         );
 
         $nextFree = $context->builder->load($context->builder->structGep($src, $map['nextFreeElement']));

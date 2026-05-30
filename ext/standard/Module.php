@@ -13,9 +13,26 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT;
 use PHPCompiler\ModuleAbstract;
+use PHPCompiler\Runtime;
+use PHPCompiler\VM;
 
 class Module extends ModuleAbstract
 {
+    public function init(Runtime $runtime): void
+    {
+        parent::init($runtime);
+        foreach ([
+            'LOCK_SH' => 1,
+            'LOCK_EX' => 2,
+            'LOCK_UN' => 3,
+            'LOCK_NB' => 4,
+        ] as $name => $value) {
+            $var = new VM\Variable();
+            $var->int($value);
+            $runtime->vmContext->defineConstant($name, $var);
+        }
+    }
+
     public function getFunctions(): array
     {
         return [
@@ -49,6 +66,7 @@ class Module extends ModuleAbstract
             new boolval(),
             new settype(),
             new var_export(),
+            new var_dump_(),
             new gettype(),
             new get_debug_type(),
             new gc_collect_cycles(),
@@ -58,6 +76,7 @@ class Module extends ModuleAbstract
             new intdiv(),
             new ord(),
             new pack(),
+            new unpack(),
             new chr(),
             new strcmp(),
             new levenshtein(),
@@ -78,6 +97,7 @@ class Module extends ModuleAbstract
             new bindec(),
             new is_numeric(),
             new is_scalar(),
+            new is_resource_(),
             new lcfirst(),
             new ucfirst(),
             new ucwords(),
@@ -94,12 +114,14 @@ class Module extends ModuleAbstract
             new str_shuffle(),
             new strpos(),
             new strstr(),
+            new strtok(),
             new strchr(),
             new stristr(),
             new strrchr(),
             new stripos(),
             new strrpos(),
             new substr_count(),
+            new count_chars(),
             new str_word_count(),
             new str_contains(),
             new str_starts_with(),
@@ -130,6 +152,7 @@ class Module extends ModuleAbstract
             new array_multisort(),
             new usort_(),
             new uasort_(),
+            new uksort_(),
             new sprintf_(),
             new array_values(),
             new array_keys(),
@@ -206,6 +229,8 @@ class Module extends ModuleAbstract
             new html_entity_decode(),
             new strip_tags(),
             new header_(),
+            new headers_sent(),
+            new register_shutdown_function(),
             new setcookie(),
             new setrawcookie(),
             new session_start(),
@@ -228,6 +253,7 @@ class Module extends ModuleAbstract
             new serialize(),
             new unserialize(),
             new json_last_error_(),
+            new json_last_error_msg_(),
             new web_int(),
             new web_string(),
             new web_bool(),
@@ -282,11 +308,13 @@ class Module extends ModuleAbstract
             new str_getcsv(),
             new ftell_(),
             new fseek(),
+            new rewind_(),
             new feof_(),
             new fflush_(),
             new fpassthru(),
             new fwrite(),
             new fclose(),
+            new flock(),
             new getenv_(),
             new putenv_(),
             new shell_exec(),
@@ -301,10 +329,13 @@ class Module extends ModuleAbstract
             new ini_get_(),
             new define_(),
             new defined_(),
+            new get_defined_constants_(),
+            new get_defined_vars_(),
             new debug_backtrace(),
             new class_exists_(),
             new class_alias(),
             new enum_exists_(),
+            new get_declared_enums_(),
             new interface_exists_(),
             new trait_exists_(),
             new class_uses_(),
@@ -319,20 +350,26 @@ class Module extends ModuleAbstract
             new get_parent_class_(),
             new is_a_(),
             new is_subclass_of_(),
+            new assert_(),
             new trigger_error_(),
             new set_error_handler_(),
             new restore_error_handler_(),
+            new error_get_last(),
+            new error_clear_last(),
+            new eval_(),
             new phpc_deploy_path(),
             new compiler_is_superglobal_name(),
             new extract_(),
             new compact_(),
             new scandir(),
             new glob_(),
+            new fnmatch(),
             new time(),
             new getmypid(),
             new microtime(),
             new date(),
             new gmdate(),
+            new getdate(),
             new sleep(),
             new spl_autoload_register(),
             new usleep(),
@@ -398,6 +435,15 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p, $i8p, $i64, $i64, $i32);
             $fn = $context->module->addFunction('substr_compare', $ft);
             $context->registerFunction('substr_compare', $fn);
+        }
+        try {
+            $context->lookupFunction('phpc_strtok');
+        } catch (\Throwable $e) {
+            $strPtr = $context->getTypeFromString('__string__*');
+            $i8 = $context->getTypeFromString('int8');
+            $ft = $context->context->functionType($strPtr, false, $strPtr, $strPtr, $i8);
+            $fn = $context->module->addFunction('phpc_strtok', $ft);
+            $context->registerFunction('phpc_strtok', $fn);
         }
         foreach (['strspn', 'strcspn'] as $name) {
             try {
