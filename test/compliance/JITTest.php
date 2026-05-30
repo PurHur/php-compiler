@@ -73,6 +73,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'json_validate')) {
                 continue;
             }
+            // exit/die expression ScriptExit status — VM compliance (#3539).
+            if (str_contains($name, 'exit_expression') || str_contains($name, 'die_expression')) {
+                continue;
+            }
             // class const scalar expressions — VM defineClass eval (#3567); JIT deferred.
             if (str_contains($name, 'class_const_scalar_expr')) {
                 continue;

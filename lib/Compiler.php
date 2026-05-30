@@ -1809,10 +1809,14 @@ class Compiler {
                 $exitExpr = null !== $expr->expr
                     ? $this->compileOperand($expr->expr, $block, true)
                     : null;
+                $resultSlot = null;
+                if ([] !== $expr->result->usages || $block->callResultFeedsReturn($expr->result)) {
+                    $resultSlot = $this->compileOperand($expr->result, $block, false);
+                }
 
                 return [new OpCode(
                     OpCode::TYPE_EXIT,
-                    $this->compileOperand($expr->result, $block, false),
+                    $resultSlot,
                     $exitExpr
                 )];
             case Op\Expr\UnaryMinus::class:
