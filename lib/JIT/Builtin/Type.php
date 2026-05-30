@@ -683,6 +683,9 @@ class Type extends Builtin {
         $fntypeSysGetTempDir = $this->context->context->functionType($strPtr, false);
         $fnSysGetTempDir = $this->context->module->addFunction('__compiler_sys_get_temp_dir', $fntypeSysGetTempDir);
         $this->context->registerFunction('__compiler_sys_get_temp_dir', $fnSysGetTempDir);
+        $fntypeGethostname = $this->context->context->functionType($strPtr, false);
+        $fnGethostname = $this->context->module->addFunction('__compiler_gethostname', $fntypeGethostname);
+        $this->context->registerFunction('__compiler_gethostname', $fnGethostname);
         $fntypeTempnam = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr);
         $fnTempnam = $this->context->module->addFunction('__compiler_tempnam', $fntypeTempnam);
         $this->context->registerFunction('__compiler_tempnam', $fnTempnam);

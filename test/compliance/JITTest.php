@@ -53,6 +53,7 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gc_collect_cycles')) {
                 continue;
             }
+<<<<<<< HEAD
             // enum case ->name / ->value is VM-only until JIT enum case objects (#3420).
             if (str_contains($name, 'enum_case_name_value')) {
                 continue;
@@ -63,6 +64,10 @@ class JITTest extends BaseTest {
             }
             // __halt_compiler() is compile-time only (#3479).
             if (str_contains($name, 'halt_compiler')) {
+=======
+            // gethostname() MCJIT: dedicated GethostnameJITTest (#3465); umbrella JITTest skips until stable.
+            if (str_contains($name, 'gethostname')) {
+>>>>>>> d19f626e (Stdlib: gethostname() — VM + JIT + AOT (#3465))
                 continue;
             }
             // array_walk_recursive() is VM-only until recursive LLVM walk (#3111).
