@@ -1747,6 +1747,16 @@ class Object_ extends Type {
         return isset($this->traitClassLcs[strtolower(ltrim($classLc, '\\'))]);
     }
 
+    /**
+     * Lowercase trait names from DECLARE_TRAIT (trait_exists() JIT, #2312).
+     *
+     * @return list<string>
+     */
+    public function traitClassLowerNames(): array
+    {
+        return array_keys($this->traitClassLcs);
+    }
+
     public function recordTraitMethodSource(int $classId, string $methodLc, string $traitLc): void
     {
         $this->classTraitMethodSources[$classId][strtolower($methodLc)] = strtolower(ltrim($traitLc, '\\'));

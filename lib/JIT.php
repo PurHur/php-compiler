@@ -5953,6 +5953,14 @@ class JIT {
                     $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
                     $this->context->scope->className = strtolower($nameOp->value);
                     $this->context->type->object->markTraitClass($this->context->scope->className);
+                    if (null !== $this->context->runtime->vmContext) {
+                        $lcname = strtolower($nameOp->value);
+                        if (!isset($this->context->runtime->vmContext->classes[$lcname])) {
+                            $traitEntry = new \PHPCompiler\VM\ClassEntry($nameOp->value);
+                            $traitEntry->isTrait = true;
+                            $this->context->runtime->vmContext->classes[$lcname] = $traitEntry;
+                        }
+                    }
                     $this->compileClass($op->block1, $this->context->scope->classId);
                     $this->context->popScope();
                     break;
