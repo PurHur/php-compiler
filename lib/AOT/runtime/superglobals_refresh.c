@@ -2209,6 +2209,9 @@ void __compiler_trigger_error(const char *message, size_t len, int level)
     }
     const char *prefix = "Unknown error";
     switch (level) {
+        case 2:
+            prefix = "Warning";
+            break;
         case 256:
             prefix = "Fatal error";
             break;
