@@ -5723,6 +5723,13 @@ class JIT {
                         );
                         $callArgs = $this->adaptByRefCallArgs($nativeCall, $callArgs, $callOperands);
                     }
+                    if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
+                        $callArgs = $this->adaptByRefCallArgsForInternal(
+                            $this->context->scope->toCall->getName(),
+                            $callArgs,
+                            $callOperands
+                        );
+                    }
                     if (null !== $block->func && '{main}' === $block->func->name) {
                         $toCall = $this->context->scope->toCall;
                         $label = get_class($toCall);
@@ -5770,6 +5777,13 @@ class JIT {
                             $callOperands
                         );
                         $callArgs = $this->adaptByRefCallArgs($nativeCall, $callArgs, $callOperands);
+                    }
+                    if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
+                        $callArgs = $this->adaptByRefCallArgsForInternal(
+                            $this->context->scope->toCall->getName(),
+                            $callArgs,
+                            $callOperands
+                        );
                     }
                     if (
                         $this->context->scope->toCall instanceof CoreFunc\Internal
@@ -8739,6 +8753,26 @@ class JIT {
             return $args;
         }
         foreach ($call->paramByRefByArg as $idx => $_) {
+            if (!isset($args[$idx])) {
+                continue;
+            }
+            $operand = $operands[$idx] ?? null;
+            if (null === $operand) {
+                continue;
+            }
+            $args[$idx] = $this->ensureValueBoxLvalueForByRefPass($operand, $args[$idx]);
+        }
+
+        return $args;
+    }
+
+    private function adaptByRefCallArgsForInternal(string $name, array $args, array $operands): array
+    {
+        $byRef = BuiltinByRefParams::forFunction($name);
+        if ([] === $byRef) {
+            return $args;
+        }
+        foreach ($byRef as $idx) {
             if (!isset($args[$idx])) {
                 continue;
             }

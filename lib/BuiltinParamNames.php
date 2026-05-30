@@ -28,6 +28,12 @@ final class BuiltinParamNames
                 return ['function', 'parameter'];
             case 'headers_sent':
                 return ['file', 'line'];
+            case 'modf':
+                return ['num', 'num2'];
+            case 'frexp':
+                return ['arg1', 'exp'];
+            case 'ldexp':
+                return ['num', 'exp'];
             case 'touch':
                 return ['filename', 'time', 'atime'];
             case 'getenv':
