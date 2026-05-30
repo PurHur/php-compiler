@@ -25,6 +25,49 @@ PHP;
         $this->assertSame(self::EXPECT, $this->runBin('bin/vm.php'));
     }
 
+    /** Issue #3763: invalid length throws ValueError (php-src ext/standard/string.c). */
+    public function testVmInvalidLengthThrowsValueError(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(
+            <<<'PHP'
+<?php
+try {
+    chunk_split('abc', 0);
+} catch (Throwable $e) {
+    echo get_class($e), "\n";
+    echo $e->getMessage(), "\n";
+}
+PHP,
+            'chunk_split_value_error.php'
+        );
+        ob_start();
+        try {
+            $runtime->run($block);
+        } catch (VM\ScriptExit $e) {
+        }
+        $this->assertSame(
+            "ValueError\nchunk_split(): Argument #2 (\$length) must be greater than 0\n",
+            ob_get_clean()
+        );
+    }
+
+    public function testExecuteInvalidLengthThrowsValueError(): void
+    {
+        $runtime = new Runtime();
+        $fn = new ext\standard\chunk_split();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $str = new VM\Variable();
+        $str->string('abc');
+        $len = new VM\Variable();
+        $len->int(0);
+        $frame->calledArgs = [$str, $len];
+        $frame->returnVar = new VM\Variable();
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage('chunk_split(): Argument #2 ($length) must be greater than 0');
+        $fn->execute($frame);
+    }
+
     /**
      * @group llvm
      * @group jit

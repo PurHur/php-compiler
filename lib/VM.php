@@ -2032,6 +2032,8 @@ restart:
             return $this->dispatchVmDivisionByZeroError($e, $callerFrame);
         } catch (\TypeError $e) {
             return $this->dispatchVmTypeError($e, $callerFrame);
+        } catch (\ValueError $e) {
+            return $this->dispatchVmValueError($e, $callerFrame);
         } catch (\Error $e) {
             return $this->dispatchVmError($e->getMessage(), $callerFrame);
         }
@@ -2058,6 +2060,21 @@ restart:
     private function dispatchVmDivisionByZeroError(\DivisionByZeroError $error, Frame $frame): ?Frame
     {
         $thrown = VM\BuiltinExceptionSupport::materializeDivisionByZeroError($this->context, $error->getMessage());
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /**
+     * Bridge native ValueError from stdlib builtins into user catch handlers (#3763).
+     */
+    private function dispatchVmValueError(\ValueError $error, Frame $frame): ?Frame
+    {
+        $thrown = VM\BuiltinExceptionSupport::materializeValueError($this->context, $error->getMessage());
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
             return $catchFrame;
