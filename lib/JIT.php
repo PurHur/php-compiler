@@ -6694,6 +6694,11 @@ class JIT {
                         );
                     }
                     $this->context->type->object->defineProperty($classId, $name->value, $jitType);
+                    $this->context->type->object->definePropertyVisibility(
+                        $classId,
+                        $name->value,
+                        \PHPCompiler\MethodVisibility::mask($op->propertyVisibility)
+                    );
                     if ($op->propertyReadonly) {
                         $this->context->type->object->markPropertyReadonly($classId, $name->value);
                     }
