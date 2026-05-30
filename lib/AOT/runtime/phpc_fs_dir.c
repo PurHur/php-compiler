@@ -227,6 +227,21 @@ int __compiler_mkdir(__string__ *path, long long mode, int recursive)
     return 0;
 }
 
+/** umask() runtime: set mask and return previous value (issue #3226; php-src ext/standard/filestat.c). */
+long long __compiler_umask(long long mask)
+{
+    return (long long) umask((mode_t) mask);
+}
+
+/** umask() with no args: current mask without changing it. */
+long long __compiler_umask_get(void)
+{
+    mode_t old = umask((mode_t) 0777);
+    umask(old);
+
+    return (long long) old;
+}
+
 
 void __phpc_strvec_free(char **items, int count);
 

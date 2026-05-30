@@ -347,6 +347,7 @@ static const char *phpc_builtin_functions[] = {
     "ucfirst",
     "ucwords",
     "uksort",
+    "umask",
     "uniqid",
     "unlink",
     "unpack",
