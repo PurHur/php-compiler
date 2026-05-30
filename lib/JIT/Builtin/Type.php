@@ -30,10 +30,12 @@ class Type extends Builtin {
         $this->value->register();
         $this->object->register();
         $this->hashtable->register();
+        $i8 = $this->context->getTypeFromString('int8');
         $fntypeGetenv = $this->context->context->functionType(
             $this->context->getTypeFromString('void'),
             false,
             $this->context->getTypeFromString('__string__*'),
+            $i8,
             $this->context->getTypeFromString('__value__*')
         );
         $fnGetenv = $this->context->module->addFunction('__compiler_getenv', $fntypeGetenv);
@@ -130,11 +132,14 @@ class Type extends Builtin {
         $i8p = $this->context->getTypeFromString('int8*');
         $i32 = $this->context->getTypeFromString('int32');
         $sizeT = $this->context->getTypeFromString('size_t');
+        $voidTy = $this->context->getTypeFromString('void');
         foreach (
             [
                 'getenv' => [$i8p, false, $i8p],
                 'putenv' => [$i32, false, $i8p],
                 'strlen' => [$sizeT, false, $i8p],
+                '__compiler_env_local_lookup' => [$i8p, false, $i8p],
+                '__compiler_env_register_putenv' => [$voidTy, false, $i8p],
             ] as $libcName => [$ret, $vararg, $param]
         ) {
             $ft = $this->context->context->functionType($ret, $vararg, $param);

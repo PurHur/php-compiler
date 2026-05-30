@@ -30,6 +30,8 @@ final class BuiltinParamNames
                 return ['file', 'line'];
             case 'touch':
                 return ['filename', 'time', 'atime'];
+            case 'getenv':
+                return ['name', 'local_only'];
         }
 
         return null;
