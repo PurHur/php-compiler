@@ -617,13 +617,41 @@ restart:
                     break;
                 case OpCode::TYPE_VAR_FETCH:
                     $dest = $frame->scope[$op->arg1];
-                    $name = $frame->scope[$op->arg2]->resolveIndirect()->toString();
+                    $nameSlot = (int) $op->arg2;
+                    $nameHolder = $frame->scope[$nameSlot]->resolveIndirect();
+                    $nameOperand = $frame->block->operandForScopeSlot($nameSlot);
+                    $nameVarLabel = null !== $nameOperand ? Block::resolveVariableName($nameOperand) : null;
+                    if (
+                        null !== $nameVarLabel
+                        && (Variable::TYPE_NULL === $nameHolder->type || Variable::TYPE_UNDEFINED === $nameHolder->type)
+                    ) {
+                        $this->context->errors->undefinedVariable(
+                            $nameVarLabel,
+                            $this->context,
+                            $frame,
+                            '' !== $frame->scriptPath ? $frame->scriptPath : null
+                        );
+                    }
+                    $name = $nameHolder->toString();
+                    $forWrite = $this->varFetchDestUsedAsAssignLvalue($frame, $op);
+                    if ('' === $name) {
+                        $dest->indirect(new Variable());
+                        break;
+                    }
                     if (Superglobals::isSuperglobalName($name)) {
                         $target = $this->context->ensureSuperglobal($name);
+                    } elseif ($forWrite) {
+                        $target = $frame->block->ensureVariableByRuntimeName($name, $frame);
                     } else {
                         $target = $frame->block->findVariableByRuntimeName($name, $frame);
                         if (null === $target) {
-                            return $this->raise("Undefined variable \${$name}", $frame);
+                            $this->context->errors->undefinedVariable(
+                                $name,
+                                $this->context,
+                                $frame,
+                                '' !== $frame->scriptPath ? $frame->scriptPath : null
+                            );
+                            $target = new Variable();
                         }
                     }
                     $dest->indirect($target);
@@ -2087,6 +2115,18 @@ restart:
     {
         $where = '' !== $frame->scriptPath ? $frame->scriptPath : 'script';
         throw new \LogicException($message.' in '.$where);
+    }
+
+    /** True when the next opcode assigns through this VAR_FETCH destination slot (#3801). */
+    private function varFetchDestUsedAsAssignLvalue(Frame $frame, OpCode $op): bool
+    {
+        $nextIndex = $frame->pos;
+        if ($nextIndex >= $frame->block->nOpCodes) {
+            return false;
+        }
+        $next = $frame->block->opCodes[$nextIndex];
+
+        return OpCode::TYPE_ASSIGN === $next->type && $next->arg2 === $op->arg1;
     }
 
     /**

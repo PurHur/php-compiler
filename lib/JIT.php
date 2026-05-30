@@ -4534,6 +4534,8 @@ class JIT {
                     }
                     $this->assignOperand($aliasOp, $value, $forceAssign);
                     $this->assignOperand($destOp, $value, $forceAssign);
+                    $this->maybeBindNamedVariable($aliasOp);
+                    $this->maybeBindNamedVariable($destOp);
                     foreach ([$block->getOperand($op->arg2), $destOp] as $destOperand) {
                         if (!$this->context->hasVariableOp($destOperand)) {
                             continue;
@@ -4629,8 +4631,9 @@ class JIT {
                     }
                     $nameVar = $this->variableFromBlockSlot($block, $nameSlot);
                     $this->foldVarFetchNameFromAssign($block, $nameSlot, $nameVar);
-                    $target = JIT\VarFetchHelper::resolveTarget($this->context, $block, $nameVar);
-                    if ($this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1)) {
+                    $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
+                    $target = JIT\VarFetchHelper::resolveTarget($this->context, $block, $nameVar, $forWrite);
+                    if ($forWrite) {
                         $this->context->setVariableOp($destOp, $target);
                     } else {
                         $this->assignOperand($destOp, $target, true);
@@ -6892,8 +6895,10 @@ class JIT {
     }
 
     private function assignOperand(Operand $resultOp, Variable $value, bool $force = false): void {
+        $resolvedName = JIT\OperandName::resolve($resultOp);
         if (
             !$force
+            && null === $resolvedName
             && empty($resultOp->usages)
             && !$this->context->scope->variables->contains($resultOp)
         ) {
@@ -8827,6 +8832,18 @@ class JIT {
         }
 
         return null;
+    }
+
+    private function maybeBindNamedVariable(Operand $op): void
+    {
+        if (!$this->context->hasVariableOp($op)) {
+            return;
+        }
+        $name = JIT\OperandName::resolve($op);
+        if (null === $name || '' === $name) {
+            return;
+        }
+        $this->context->bindVariableByName($name, $this->context->getVariableFromOp($op));
     }
 
     /**

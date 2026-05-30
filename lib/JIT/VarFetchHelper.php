@@ -16,19 +16,46 @@ use PHPCfg\Operand;
 
 final class VarFetchHelper
 {
-    public static function resolveTarget(Context $context, Block $block, Variable $nameVar): Variable
+    public static function resolveTarget(Context $context, Block $block, Variable $nameVar, bool $forWrite = false): Variable
     {
         if (null === $nameVar->compileTimeString) {
             throw new \LogicException(
                 'Variable-variable JIT lowering requires a compile-time string name (issue #1226)'
             );
         }
-        $target = self::resolveBinding($context, $block, $context->resolveRefAliasName($nameVar->compileTimeString));
+        $name = $context->resolveRefAliasName($nameVar->compileTimeString);
+        $target = self::resolveBinding($context, $block, $name);
         if (null === $target) {
+            if ($forWrite) {
+                return self::ensureBinding($context, $block, $name);
+            }
             throw new \LogicException('Undefined variable $'.$nameVar->compileTimeString);
         }
 
         return $target;
+    }
+
+    public static function ensureBinding(Context $context, Block $block, string $name): Variable
+    {
+        $existing = self::resolveBinding($context, $block, $name);
+        if (null !== $existing) {
+            return $existing;
+        }
+        $slot = $block->slotIndexForVariableName($name);
+        if (null !== $slot) {
+            foreach ($block->scopedOperands() as $op) {
+                if ($block->slotForOperand($op) !== $slot) {
+                    continue;
+                }
+                if (!$context->hasVariableOp($op)) {
+                    throw new \LogicException('Variable-variable write requires a bound slot for $'.$name);
+                }
+
+                return $context->getVariableFromOp($op);
+            }
+        }
+
+        throw new \LogicException('Variable-variable write requires a compile-time local for $'.$name);
     }
 
     public static function bindingByName(Context $context, Block $block, string $name): ?Variable

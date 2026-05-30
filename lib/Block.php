@@ -398,7 +398,41 @@ class Block {
      */
     public function findVariableByRuntimeName(string $name, Frame $frame): ?Variable
     {
-        return self::findVariableInParentFramesByName($name, $frame);
+        $found = self::findVariableInParentFramesByName($name, $frame);
+        if (null !== $found) {
+            return $found;
+        }
+        for ($f = $frame; null !== $f; $f = $f->parent) {
+            if ($f->block === $this && isset($f->dynamicLocals[$name])) {
+                return $f->dynamicLocals[$name];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Create or return a writable local for `$$name = …` when the resolved name has no slot yet (#3801).
+     */
+    public function ensureVariableByRuntimeName(string $name, Frame $frame): Variable
+    {
+        $found = $this->findVariableByRuntimeName($name, $frame);
+        if (null !== $found) {
+            return $found;
+        }
+        $idx = $this->slotIndexForVariableName($name);
+        if (null !== $idx) {
+            if (!isset($frame->scope[$idx])) {
+                $frame->scope[$idx] = new Variable();
+            }
+
+            return $frame->scope[$idx];
+        }
+        if (!isset($frame->dynamicLocals[$name])) {
+            $frame->dynamicLocals[$name] = new Variable();
+        }
+
+        return $frame->dynamicLocals[$name];
     }
 
     /**
@@ -426,6 +460,9 @@ class Block {
             $idx = $f->block->slotIndexForVariableName($name);
             if (null !== $idx && isset($f->scope[$idx])) {
                 return $f->scope[$idx];
+            }
+            if (isset($f->dynamicLocals[$name])) {
+                return $f->dynamicLocals[$name];
             }
         }
 
