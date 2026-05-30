@@ -173,7 +173,7 @@ BASH;
 
 function bench_compile_warm_note(): string
 {
-    return 'Warm = second compile in same probe process (MCJIT engine cached; #153 on-disk cache N/A until landed)';
+    return 'Warm = second compile in same probe process (MCJIT engine cached); cross-process warm uses .php-compiler-cache/ (#153)';
 }
 
 function bench_compile_format_warm(float $ms, string $phase): string

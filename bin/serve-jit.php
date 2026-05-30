@@ -82,7 +82,7 @@ $executeScript = static function (
 
         $mode = 'jit';
         try {
-            $runtime->jit($block);
+            $runtime->jit($block, $code, $script);
         } catch (\Throwable $e) {
             $mode = 'vm';
             fwrite(
