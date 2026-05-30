@@ -272,6 +272,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'foreach_iterator')) {
                 continue;
             }
+            // gettimeofday() array sec compare is VM-only until boxed array fetch compare (#3208).
+            if (str_contains($name, 'gettimeofday')) {
+                continue;
+            }
             yield $name => $case;
         }
     }

@@ -67,4 +67,23 @@ final class VmDate
 
         return $ht;
     }
+
+    public static function gettimeofdayFloat(): float
+    {
+        return (float) \gettimeofday(true);
+    }
+
+    public static function gettimeofdayArray(): HashTable
+    {
+        /** @var array{sec: int, usec: int, minuteswest: int, dsttime: int} $data */
+        $data = \gettimeofday();
+        $ht = new HashTable();
+        foreach (['sec', 'usec', 'minuteswest', 'dsttime'] as $key) {
+            $var = new Variable(Variable::TYPE_INTEGER);
+            $var->int((int) $data[$key]);
+            $ht->add($key, $var);
+        }
+
+        return $ht;
+    }
 }

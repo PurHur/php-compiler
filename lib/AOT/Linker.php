@@ -20,6 +20,7 @@ final class Linker
         __DIR__.'/runtime/phpc_microtime.c',
         __DIR__.'/runtime/phpc_hrtime.c',
         __DIR__.'/runtime/phpc_getdate.c',
+        __DIR__.'/runtime/phpc_gettimeofday.c',
         __DIR__.'/runtime/phpc_info.c',
         __DIR__.'/runtime/phpc_strnatcmp.c',
         __DIR__.'/runtime/phpc_strnatcasecmp.c',
