@@ -1278,6 +1278,7 @@ restart:
                         $classEntry->readonly = (bool) $frame->block->constants[$op->arg3]->toInt();
                     }
                     $classEntry->attributeNames = $op->attributeNames;
+                    $classEntry->isAbstract = $op->classIsAbstract;
                     $classEntry->allowsDynamicProperties = AttributeNames::hasAllowDynamicProperties(
                         $op->attributeNames
                     );
@@ -1298,6 +1299,9 @@ restart:
                         throw new \LogicException("Attempting to instantiate non-existing class $name");
                     }
                     $class = $this->context->classes[$lcname];
+                    if ($class->isAbstract) {
+                        return $this->raise("Cannot instantiate abstract class {$class->name}", $frame);
+                    }
                     if ($class->isInterface) {
                         throw new \LogicException("Cannot instantiate interface $name");
                     }

@@ -168,6 +168,8 @@ class OpCode {
     public array $classImplements = [];
     /** Declared PHP 8 attribute class names on class/method (#1936). */
     public array $attributeNames = [];
+    /** True when TYPE_DECLARE_CLASS targets an abstract class (#3385). */
+    public bool $classIsAbstract = false;
     /** #[\Deprecated] metadata on function/method/class const declarations (#3569). */
     public ?\PHPCompiler\Compiler\DeprecatedMetadata $deprecatedMetadata = null;
     /** Pipe-separated lowercase catch class names for TYPE_CATCH (#1362). */

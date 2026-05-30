@@ -45,6 +45,8 @@ class Compiler {
     /** Set from the first compile-time abort (#2642, self-host diagnostics). */
     private ?string $compileAbortDetail = null;
 
+    /** @var array<string, true> lowercase abstract class names seen during compile (#3385). */
+    private array $abstractClasses = [];
     /** 1-based source lines lowered from bare `throw;` (#3508). */
     private array $bareRethrowLines = [];
 
@@ -217,6 +219,7 @@ class Compiler {
 
     public function compile(Script $script): ?Block {
         $this->resetCompileAbortDetail();
+        $this->abstractClasses = [];
         $this->seen = new SplObjectStorage;
         $this->debugWriteLastPhase('Compiler::compile enter');
 
@@ -252,6 +255,7 @@ class Compiler {
     public function compileEmitSmoke(Script $script): ?Block
     {
         $this->resetCompileAbortDetail();
+        $this->abstractClasses = [];
         // Inventory-scale sources declare user functions and/or class-like units; emit-smoke only needs {main}
         // — same as compile() without a compile() callee in the M3 emit TU (#2633, #2666).
         if ([] !== $script->functions || $this->emitSmokeScriptHasClassLike($script)) {
@@ -1211,6 +1215,13 @@ class Compiler {
             VM\StringableSupport::assertConcreteClassImplements($class, $className);
         }
         $return->attributeNames = AttributeNames::fromOp($class);
+        $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($class->flags);
+        if ($return->classIsAbstract) {
+            $name = $this->staticNameFromOperand($class->name);
+            if (null !== $name) {
+                $this->abstractClasses[strtolower(ltrim($name, '\\'))] = true;
+            }
+        }
         $return->block1 = $this->compileClassBody($class->stmts, $type);
         return $return;
     }
@@ -1998,6 +2009,13 @@ class Compiler {
                 }
                 return $return;
             case Op\Expr\New_::class:
+                $className = $this->literalScopeClassName($expr->class);
+                if (null !== $className) {
+                    $lc = strtolower(ltrim($className, '\\'));
+                    if (isset($this->abstractClasses[$lc])) {
+                        $this->throwCompileError('Cannot instantiate abstract class '.$className);
+                    }
+                }
                 $return = [
                     new OpCode(
                         OpCode::TYPE_NEW,
