@@ -61,6 +61,11 @@ PHP
         $this->addToAssertionCount(1);
     }
 
+    /**
+     * LLVM module state is process-global; isolate from the linear-yield compile test.
+     *
+     * @runInSeparateProcess
+     */
     public function testKeyedYieldForeachScriptVerifies(): void
     {
         $runtime = new Runtime();
