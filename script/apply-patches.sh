@@ -88,7 +88,7 @@ patch_already_applied() {
       grep -q 'function resolveOp_Expr_ArrowFunction' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
     php-types-closure-unbound-this.patch)
-      grep -q 'file-scope closures' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
+      grep -q "is_string(\$op->extra->value) && '' !== \$op->extra->value" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
     php-types-yield-from.patch)
       grep -q "case 'Expr_YieldFrom':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
@@ -966,6 +966,49 @@ apply_php_types_union_type_overlay() {
   fi
 }
 
+apply_php_types_closure_unbound_this_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  if grep -q "is_string(\$op->extra->value) && '' !== \$op->extra->value" "$target" 2>/dev/null; then
+    echo "Skip php-types-closure-unbound-this.patch (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+old1 = """            } elseif ($op instanceof Operand\\BoundVariable && $op->scope === Operand\\BoundVariable::SCOPE_OBJECT) {
+                $resolved[$op] = $op->type = Type::fromDecl($op->extra->value);
+            } elseif ($op instanceof Operand\\Literal) {"""
+new1 = """            } elseif ($op instanceof Operand\\BoundVariable && $op->scope === Operand\\BoundVariable::SCOPE_OBJECT) {
+                if ($op->extra instanceof Operand\\Literal && is_string($op->extra->value) && '' !== $op->extra->value) {
+                    $resolved[$op] = $op->type = Type::fromDecl($op->extra->value);
+                } else {
+                    $resolved[$op] = $op->type = Type::unknown();
+                }
+            } elseif ($op instanceof Operand\\Literal) {"""
+old2 = """        if ($var instanceof Operand\\BoundVariable && $var->scope === Operand\\BoundVariable::SCOPE_OBJECT) {
+            assert($var->extra instanceof Operand\\Literal);
+
+            return Type::fromDecl($var->extra->value);
+        }"""
+new2 = """        if ($var instanceof Operand\\BoundVariable && $var->scope === Operand\\BoundVariable::SCOPE_OBJECT) {
+            if ($var->extra instanceof Operand\\Literal && is_string($var->extra->value) && '' !== $var->extra->value) {
+                return Type::fromDecl($var->extra->value);
+            }
+
+            return Type::unknown();
+        }"""
+if old1 in text and old2 in text:
+    path.write_text(text.replace(old1, new1, 1).replace(old2, new2, 1))
+    raise SystemExit(0)
+sys.stderr.write("php-types-closure-unbound-this: TypeReconstructor anchor not found\n")
+raise SystemExit(1)
+PY
+  echo "Applied php-types-closure-unbound-this.patch (overlay)"
+}
+
 apply_php_types_first_class_callable_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
   if grep -q 'FirstClassCallable::KIND_METHOD' "$target" 2>/dev/null; then
@@ -980,7 +1023,7 @@ path = Path(sys.argv[1])
 text = path.read_text()
 fcc_case = """            case 'Expr_FirstClassCallable':
                 if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
-                    return [Type::array()];
+                    return [new Type(Type::TYPE_ARRAY)];
                 }
 
                 return [Type::string()];
@@ -1070,7 +1113,7 @@ anchors = [
     (
         """            case 'Expr_FirstClassCallable':
                 if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
-                    return [Type::array()];
+                    return [new Type(Type::TYPE_ARRAY)];
                 }
 
                 return [Type::string()];
@@ -1079,7 +1122,7 @@ anchors = [
         throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
         """            case 'Expr_FirstClassCallable':
                 if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
-                    return [Type::array()];
+                    return [new Type(Type::TYPE_ARRAY)];
                 }
 
                 return [Type::string()];
@@ -1614,6 +1657,10 @@ apply_patch() {
   fi
   if [[ "$(basename "$patch")" == "php-types-magic-script-const.patch" ]]; then
     apply_php_types_magic_script_const_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-types-closure-unbound-this.patch" ]]; then
+    apply_php_types_closure_unbound_this_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-types-first-class-callable.patch" ]]; then

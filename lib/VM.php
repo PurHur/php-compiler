@@ -2905,8 +2905,8 @@ restart:
         if (!$table->keyExists($idx0) || !$table->keyExists($idx1)) {
             throw new \LogicException('Invalid array callable');
         }
-        $receiver = $table->findVariable($idx0)->resolveIndirect();
-        $methodName = $table->findVariable($idx1)->resolveIndirect()->toString();
+        $receiver = $table->findVariable($idx0, false)->resolveIndirect();
+        $methodName = $table->findVariable($idx1, false)->resolveIndirect()->toString();
         if (Variable::TYPE_OBJECT !== $receiver->type) {
             throw new \LogicException('Invalid array callable');
         }

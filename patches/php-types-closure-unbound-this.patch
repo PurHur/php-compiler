@@ -1,6 +1,6 @@
 --- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
-@@ -31,7 +31,12 @@
+@@ -31,7 +31,11 @@
              if (! empty($op->type) && $op->type->type !== Type::TYPE_UNKNOWN) {
                  $resolved[$op] = $op->type;
              } elseif ($op instanceof Operand\BoundVariable && $op->scope === Operand\BoundVariable::SCOPE_OBJECT) {
@@ -8,13 +8,12 @@
 +                if ($op->extra instanceof Operand\Literal && is_string($op->extra->value) && '' !== $op->extra->value) {
 +                    $resolved[$op] = $op->type = Type::fromDecl($op->extra->value);
 +                } else {
-+                    // $this in file-scope closures (e.g. Closure::bind) has no declaring class (#3673).
 +                    $resolved[$op] = $op->type = Type::unknown();
 +                }
              } elseif ($op instanceof Operand\Literal) {
                  $resolved[$op] = $op->type = Type::fromValue($op->value);
              } else {
-@@ -686,8 +691,12 @@
+@@ -699,8 +703,11 @@
              return new Type(Type::TYPE_OBJECT, [], $var->value);
          }
          if ($var instanceof Operand\BoundVariable && $var->scope === Operand\BoundVariable::SCOPE_OBJECT) {
