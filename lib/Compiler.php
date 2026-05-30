@@ -2113,9 +2113,14 @@ class Compiler {
         if (null === $prop->defaultVar) {
             return null;
         }
+        $propertyType = $prop->declaredType ?? new Op\Type\Literal('mixed');
         $pseudo = new Op\Expr\Param(
             new Operand\Literal(''),
+<<<<<<< HEAD
             new Op\Type\Mixed_(),
+=======
+            $propertyType,
+>>>>>>> 175f72aa (Language: merge master into magic methods PR (#146))
             false,
             false,
             $prop->defaultVar,

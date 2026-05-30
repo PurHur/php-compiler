@@ -3,7 +3,11 @@ language: __set on undeclared property write (issue #146)
 --FILE--
 <?php
 class M {
-    public array $bag = [];
+    public $bag;
+
+    function __construct() {
+        $this->bag = [];
+    }
 
     function __set(string $k, mixed $v): void {
         $this->bag[$k] = $v;
