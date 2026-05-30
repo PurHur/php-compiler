@@ -168,7 +168,7 @@ patch_already_applied() {
       grep -q 'null === \$phi->result' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/PhiResolver.php" 2>/dev/null
       ;;
     php-cfg-magic-constants.patch)
-      grep -q 'namespaceStack' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php" 2>/dev/null
+      grep -q 'traitStack' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php" 2>/dev/null
       ;;
     php-cfg-magic-script-const.patch)
       grep -q 'KIND_LINE' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MagicScriptConst.php" 2>/dev/null
@@ -1231,7 +1231,7 @@ apply_php_cfg_magic_constants_overlay() {
     return 1
   fi
   if patch_already_applied "$PATCH_DIR/php-cfg-magic-constants.patch" \
-    && grep -q 'empty($this->traitStack)' "$target" 2>/dev/null; then
+    && grep -q 'traitStack' "$target" 2>/dev/null; then
     echo "Skip php-cfg-magic-constants.patch (already applied)"
     return 0
   fi
