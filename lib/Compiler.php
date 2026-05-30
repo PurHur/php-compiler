@@ -461,6 +461,9 @@ class Compiler {
                         $block = $this->compileNullsafePropertyFetch($child, $block);
                     } elseif ($child instanceof Op\Expr\NullsafeMethodCall) {
                         $block = $this->compileNullsafeMethodCall($child, $block);
+                    } elseif ($this->isNullsafeChainArrayDimFetch($ops, $i)) {
+                        /** @var Op\Expr\ArrayDimFetch $child */
+                        $block = $this->compileNullsafeArrayDimFetch($child, $block);
                     } elseif (
                         $child instanceof Op\Expr\ArrayDimFetch
                         && $i + 1 < $opCount
@@ -2291,6 +2294,82 @@ class Compiler {
             $this->compileOperand($fetch->var, $block, true),
             null !== $fetch->dim ? $this->compileOperand($fetch->dim, $block, true) : null
         ));
+    }
+
+    /**
+     * Array offset immediately after ?-> property/method fetch (issue #3516).
+     *
+     * @param Op[] $ops
+     */
+    private function isNullsafeChainArrayDimFetch(array $ops, int $index): bool
+    {
+        if ($index < 1) {
+            return false;
+        }
+        $fetch = $ops[$index];
+        if (!$fetch instanceof Op\Expr\ArrayDimFetch) {
+            return false;
+        }
+        $prev = $ops[$index - 1];
+        if (!$prev instanceof Op\Expr\NullsafePropertyFetch && !$prev instanceof Op\Expr\NullsafeMethodCall) {
+            return false;
+        }
+
+        return $prev->result === $fetch->var;
+    }
+
+    protected function compileNullsafeArrayDimFetch(Op\Expr\ArrayDimFetch $expr, Block $block): Block
+    {
+        $resultSlot = $this->compileOperand($expr->result, $block, false);
+        $containerSlot = $this->compileOperand($expr->var, $block, true);
+        $dimSlot = null !== $expr->dim ? $this->compileOperand($expr->dim, $block, true) : null;
+
+        $endBlock = new Block($block->orig);
+        $endBlock->inheritUndefinedLocals = true;
+        $endBlock->inheritScopeFrom($block);
+
+        $nullBlock = new Block($block->orig);
+        $nullBlock->inheritUndefinedLocals = true;
+        $nullBlock->inheritScopeFrom($block);
+        $nullLiteral = new Operand\Literal(null);
+        $nullLiteral->type = Type::null();
+        $nullValueSlot = $this->compileOperand($nullLiteral, $nullBlock, true);
+        $nullBlock->addOpCode(new OpCode(
+            OpCode::TYPE_ASSIGN,
+            $resultSlot,
+            $resultSlot,
+            $nullValueSlot
+        ));
+        $nullJump = new OpCode(OpCode::TYPE_JUMP);
+        $nullJump->block1 = $endBlock;
+        $nullBlock->addOpCode($nullJump);
+
+        $fetchBlock = new Block($block->orig);
+        $fetchBlock->inheritUndefinedLocals = true;
+        $fetchBlock->inheritScopeFrom($block);
+        $fetchBlock->addOpCode(new OpCode(
+            OpCode::TYPE_ARRAY_DIM_FETCH,
+            $this->compileOperand($expr->result, $fetchBlock, false),
+            $this->compileOperand($expr->var, $fetchBlock, true),
+            $dimSlot
+        ));
+        $fetchJump = new OpCode(OpCode::TYPE_JUMP);
+        $fetchJump->block1 = $endBlock;
+        $fetchBlock->addOpCode($fetchJump);
+        $endBlock->parents[] = $nullBlock;
+        $endBlock->parents[] = $fetchBlock;
+
+        $nullsafeOp = new OpCode(
+            OpCode::TYPE_NULLSAFE,
+            $resultSlot,
+            $containerSlot
+        );
+        $nullsafeOp->block1 = $nullBlock;
+        $nullsafeOp->block2 = $fetchBlock;
+        $nullsafeOp->block3 = $endBlock;
+        $block->addOpCode($nullsafeOp);
+
+        return $endBlock;
     }
 
     protected function compileNullsafePropertyFetch(Op\Expr\NullsafePropertyFetch $expr, Block $block): Block
