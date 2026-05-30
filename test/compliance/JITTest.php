@@ -149,6 +149,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'spaceship_objects')) {
                 continue;
             }
+            // Return-by-reference MCJIT execute: LLVM verify in ReturnByRefJitCompileTest (#3778).
+            if (str_contains($name, 'return_by_ref_jit')) {
+                continue;
+            }
             // string/number loose == juggling is VM-only until ArrayBuiltinHelper string-long compare (#3644).
             if (str_contains($name, 'loose_numeric_string')) {
                 continue;
