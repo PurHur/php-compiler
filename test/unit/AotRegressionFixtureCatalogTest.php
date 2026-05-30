@@ -29,6 +29,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'stdlib_predefined_constants.phpt',
         'gettype_object_resource.phpt',
         'is_countable.phpt',
+        'crc32c.phpt',
     ];
 
     /**
@@ -83,6 +84,8 @@ final class AotRegressionFixtureCatalogTest extends TestCase
             'loose_numeric_string_eq.php' => ['loose_numeric_string_eq.php'],
             'bool_increment.php' => ['bool_increment.php'],
             'intdiv_division_by_zero.php' => ['intdiv_division_by_zero.php'],
+            'array_union_plus.php' => ['array_union_plus.php'],
+            'match_guard.php' => ['match_guard.php'],
         ];
     }
 
