@@ -509,7 +509,15 @@ restart:
                     $strict = null !== $frame->parent
                         ? $frame->parent->block->strictTypes
                         : $frame->block->strictTypes;
-                    TypeCheck::coercePropertyWrite($arg2, $strict);
+                    try {
+                        TypeCheck::coercePropertyWrite($arg2, $strict);
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                    }
                     break;
                 case OpCode::TYPE_ASSIGN_REF:
                     $lhs = $frame->scope[$op->arg1];
@@ -1281,7 +1289,16 @@ restart:
                     $strict = null !== $frame->parent
                         ? $frame->parent->block->strictTypes
                         : $frame->block->strictTypes;
-                    TypeCheck::coerceParameter($arg1, $strict);
+                    $arraySpec = $frame->block->paramGenericArrayTypeSpecs[$op->arg1] ?? null;
+                    try {
+                        TypeCheck::coerceParameter($arg1, $strict, $arraySpec);
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                    }
                     if (isset($frame->block->paramIntersectionConstraints[$op->arg1])) {
                         TypeCheck::assertParamIntersection(
                             $arg1,

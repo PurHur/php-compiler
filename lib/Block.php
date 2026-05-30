@@ -64,6 +64,9 @@ class Block {
     /** @var array<int, int> scope slot index => Variable::TYPE_* for typed parameters */
     public array $paramTypeConstraints = [];
 
+    /** @var array<int, GenericArrayTypeSpec> generic list/array parameter types (#3705) */
+    public array $paramGenericArrayTypeSpecs = [];
+
     /** @var array<int, list<string>> */
     public array $paramIntersectionConstraints = [];
 
@@ -535,6 +538,9 @@ class Block {
             if (isset($block->paramTypeConstraints[$slot])) {
                 $local->resolveIndirect()->typeConstraint = $block->paramTypeConstraints[$slot];
             }
+            if (isset($block->paramGenericArrayTypeSpecs[$slot])) {
+                $local->resolveIndirect()->genericArrayTypeSpec = $block->paramGenericArrayTypeSpecs[$slot];
+            }
 
             return $local;
         }
@@ -561,6 +567,9 @@ class Block {
         $var = new Variable(Variable::TYPE_NULL);
         if (isset($block->paramTypeConstraints[$slot])) {
             $var->typeConstraint = $block->paramTypeConstraints[$slot];
+        }
+        if (isset($block->paramGenericArrayTypeSpecs[$slot])) {
+            $var->genericArrayTypeSpec = $block->paramGenericArrayTypeSpecs[$slot];
         }
 
         return $var;
