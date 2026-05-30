@@ -26,6 +26,7 @@ final class SelfHostBuiltinPolicy
         'is_bool' => 'numeric',
         'is_string' => 'numeric',
         'is_array' => 'numeric',
+        'is_countable' => 'numeric',
         'is_null' => 'numeric',
         'is_numeric' => 'numeric',
         'time' => 'numeric',
