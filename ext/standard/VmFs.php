@@ -496,6 +496,11 @@ final class VmFs
         return $path;
     }
 
+    public static function isValidHandle(int $handle): bool
+    {
+        return isset(self::$handles[$handle]);
+    }
+
     private static function lookup(int $handle): mixed
     {
         return self::$handles[$handle] ?? null;
