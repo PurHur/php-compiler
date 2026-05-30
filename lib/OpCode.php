@@ -145,6 +145,10 @@ class OpCode {
      * block1 = compiled anonymous function body (VM-only today; JIT still lowers to null).
      */
     const TYPE_CLOSURE = 109;
+    /** Begin `@` error-control: mask E_WARNING/E_NOTICE for wrapped expression (issue #3546). */
+    const TYPE_BEGIN_SILENCE = 111;
+    /** End `@` error-control: restore prior error_reporting (issue #3546). */
+    const TYPE_END_SILENCE = 112;
 
     public int $type;
     public ?int $arg1;

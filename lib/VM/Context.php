@@ -140,6 +140,70 @@ class Context {
                 $var = new Variable(Variable::TYPE_INTEGER);
                 $var->int(\PHPCompiler\ext\standard\VmFnmatch::FNM_CASEFOLD);
                 return $var;
+            case 'e_error':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(1);
+                return $var;
+            case 'e_warning':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(ErrorReporter::E_WARNING);
+                return $var;
+            case 'e_parse':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(4);
+                return $var;
+            case 'e_notice':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(8);
+                return $var;
+            case 'e_core_error':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(16);
+                return $var;
+            case 'e_core_warning':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(32);
+                return $var;
+            case 'e_compile_error':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(64);
+                return $var;
+            case 'e_compile_warning':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(128);
+                return $var;
+            case 'e_user_error':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(ErrorReporter::E_USER_ERROR);
+                return $var;
+            case 'e_user_warning':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(ErrorReporter::E_USER_WARNING);
+                return $var;
+            case 'e_user_notice':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(ErrorReporter::E_USER_NOTICE);
+                return $var;
+            case 'e_strict':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(2048);
+                return $var;
+            case 'e_recoverable_error':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(4096);
+                return $var;
+            case 'e_deprecated':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(8192);
+                return $var;
+            case 'e_user_deprecated':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(ErrorReporter::E_USER_DEPRECATED);
+                return $var;
+            case 'e_all':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(E_ALL);
+                return $var;
         }
         if (isset($this->constants[$name])) {
             return $this->constants[$name];

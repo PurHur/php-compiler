@@ -15,6 +15,7 @@ use SplObjectStorage;
 use PHPCfg\Func as CfgFunc;
 use PHPCfg\Op;
 use PHPCfg\Block as CfgBlock;
+use PHPCfg\ErrorSuppressBlock;
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCfg\Operand\Temporary;
@@ -373,6 +374,12 @@ class Compiler {
             $this->seen[$block] = $new = new Block($block);
             $new->inheritScopeFrom($parent);
             $this->inheritFuncFromParent($new, $parent);
+            if ($block instanceof ErrorSuppressBlock) {
+                $new->inheritUndefinedLocals = true;
+                $new->addOpCode(new OpCode(OpCode::TYPE_BEGIN_SILENCE));
+            } elseif ($this->isErrorSuppressEndBlock($block)) {
+                $new->inheritUndefinedLocals = true;
+            }
             $this->compileBlock($new);
         } else {
             $child = $this->seen[$block];
@@ -1480,6 +1487,9 @@ class Compiler {
 
     protected function compileStmt(Op\Stmt $stmt, Block $block) {
         if ($stmt instanceof Op\Stmt\Jump) {
+            if (null !== $block->orig && $this->isErrorSuppressEndBlock($block->orig)) {
+                $block->addOpCode(new OpCode(OpCode::TYPE_END_SILENCE));
+            }
             $target = $this->compileCfgBranch($stmt->target, $block);
             if (!$this->isRedundantTryEntryJump($block, $target)) {
                 $op = new OpCode(OpCode::TYPE_JUMP);
@@ -1487,6 +1497,9 @@ class Compiler {
                 $block->addOpCode($op);
             }
         } elseif ($stmt instanceof Op\Stmt\JumpIf) {
+            if (null !== $block->orig && $this->isErrorSuppressEndBlock($block->orig)) {
+                $block->addOpCode(new OpCode(OpCode::TYPE_END_SILENCE));
+            }
             $op = new OpCode(OpCode::TYPE_JUMPIF, $this->compileOperand($stmt->cond, $block, true));
             $op->block1 = $this->compileCfgBranch($stmt->if, $block);
             $op->block2 = $this->compileCfgBranch($stmt->else, $block);
@@ -1524,6 +1537,17 @@ class Compiler {
         } else {
             $this->throwCompileLogic("Unknown Stmt Type: " . $stmt->getType());
         }
+    }
+
+    /** php-cfg: {@see ErrorSuppressBlock} jump target where silenced reads are lowered (#3546). */
+    private function isErrorSuppressEndBlock(CfgBlock $block): bool
+    {
+        if (1 !== \count($block->parents)) {
+            return false;
+        }
+        $parent = $block->parents[0];
+
+        return $parent instanceof ErrorSuppressBlock;
     }
 
     /**

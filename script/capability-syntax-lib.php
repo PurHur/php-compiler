@@ -277,6 +277,17 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { public static int $n = 1; } echo C::$n;',
         ],
         [
+            'id' => 'error_control_operator',
+            'construct' => 'Error-control operator `@` on expressions',
+            'opcodes' => ['TYPE_BEGIN_SILENCE', 'TYPE_END_SILENCE'],
+            'issue' => 3546,
+            'notes' => [
+                'php-cfg ErrorSuppressBlock + Simplifier preserve (#3546)',
+                'VM masks error_reporting; JIT/AOT no-op until native silence',
+            ],
+            'probe' => 'echo @$undefined; @trigger_error("x", E_USER_NOTICE); echo "ok\\n";',
+        ],
+        [
             'id' => 'unset',
             'construct' => '`unset()` on variables, array offsets, and object properties',
             'opcodes' => ['TYPE_UNSET', 'TYPE_STATIC_PROPERTY_UNSET'],

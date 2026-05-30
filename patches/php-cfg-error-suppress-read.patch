@@ -1,0 +1,12 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -1192,6 +1192,8 @@
+         $this->block->children[] = new Jump($block, $attrs);
+         $block->addParent($this->block);
+         $this->block = $block;
+         $result = $this->parseExprNode($expr->expr);
++        // Evaluate reads inside the suppress region (issue #3546; Zend ZEND_COMPILE_SILENCE).
++        $result = $this->readVariable($result);
+         $end = new Block();
+         $this->block->children[] = new Jump($end, $attrs);
+         $end->addParent($this->block);
