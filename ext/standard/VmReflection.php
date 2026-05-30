@@ -80,6 +80,26 @@ final class VmReflection
         return null !== $entry && $entry->isInterface;
     }
 
+    /**
+     * get_declared_interfaces() — numerically indexed interface name list (issue #3176).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_interfaces)
+     */
+    public static function declaredInterfacesTable(Context $ctx): \PHPCompiler\VM\HashTable
+    {
+        $result = new \PHPCompiler\VM\HashTable();
+        foreach ($ctx->classes as $lc => $entry) {
+            if (!$entry->isInterface || isset($ctx->classAliases[$lc])) {
+                continue;
+            }
+            $value = new Variable();
+            $value->string($entry->name);
+            $result->append($value);
+        }
+
+        return $result;
+    }
+
     public static function traitExists(Context $ctx, string $traitName): bool
     {
         $entry = self::resolveClassEntry($ctx, $traitName);

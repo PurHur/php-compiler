@@ -334,6 +334,7 @@ class Module extends ModuleAbstract
             new defined_(),
             new get_defined_constants_(),
             new get_defined_vars_(),
+            new get_declared_interfaces_(),
             new debug_backtrace(),
             new class_exists_(),
             new class_alias(),
