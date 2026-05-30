@@ -644,6 +644,12 @@ restart:
                     $arg1 = $frame->scope[$op->arg1];
                     $container = $frame->scope[$op->arg2]->resolveIndirect();
                     $forWrite = OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type;
+                    if ($container->isArrayAccessOffset()) {
+                        if ($forWrite || is_null($op->arg3)) {
+                            throw new \Error('Cannot indirectly modify an element of ArrayAccess');
+                        }
+                        $container = $container->readArrayAccessOffsetValue();
+                    }
                     if (is_null($op->arg3)) {
                         if ($container->type !== Variable::TYPE_ARRAY) {
                             throw new \LogicException('[] is only supported for arrays');

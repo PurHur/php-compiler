@@ -3590,6 +3590,7 @@ class Compiler {
 
     /**
      * True when the fetch result is only used as a write lvalue (assign or unset; issue #103, #1224).
+     * Nested write through a dimension ($obj[$k][] = $v) also requires write fetch on the outer dim (#3446).
      */
     protected function isArrayDimFetchForWrite(Op\Expr\ArrayDimFetch $fetch, Block $block): bool
     {
@@ -3599,6 +3600,13 @@ class Compiler {
             }
             if ($usage instanceof Op\Terminal\Unset_ && $this->unsetTerminalUsesOperand($usage, $fetch->result)) {
                 continue;
+            }
+            if (
+                $usage instanceof Op\Expr\ArrayDimFetch
+                && $usage->var === $fetch->result
+                && $this->isArrayDimFetchForWrite($usage, $block)
+            ) {
+                return true;
             }
 
             return false;
@@ -3621,6 +3629,13 @@ class Compiler {
                 return true;
             }
             if ($next instanceof Op\Terminal\Unset_ && $this->unsetTerminalUsesOperand($next, $fetch->result)) {
+                return true;
+            }
+            if (
+                $next instanceof Op\Expr\ArrayDimFetch
+                && $next->var === $fetch->result
+                && $this->isArrayDimFetchForWrite($next, $block)
+            ) {
                 return true;
             }
 

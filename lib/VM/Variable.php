@@ -476,6 +476,21 @@ final class Variable {
         $this->arrayAccessDimension = $dimension;
     }
 
+    public function isArrayAccessOffset(): bool
+    {
+        return self::TYPE_ARRAYACCESS_OFFSET === $this->type;
+    }
+
+    /** Value from offsetGet for nested read ($obj[$k][$j]) without indirect write (#3446). */
+    public function readArrayAccessOffsetValue(): self
+    {
+        if (self::TYPE_ARRAYACCESS_OFFSET !== $this->type) {
+            throw new \LogicException('Not an ArrayAccess offset');
+        }
+
+        return $this->arrayAccessDimension->read()->resolveIndirect();
+    }
+
     public function stringOffset(
         Variable $parent,
         int $index,
