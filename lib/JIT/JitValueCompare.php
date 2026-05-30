@@ -584,4 +584,75 @@ final class JitValueCompare
                 );
         }
     }
+
+    /**
+     * Loose == between two native {@see __string__} operands (Zend zendi_smart_strcmp parity).
+     */
+    public static function looseEqualStringToString(
+        Context $context,
+        Value $leftStr,
+        Value $rightStr
+    ): Value {
+        $identical = JitStringCompare::identical($context, $leftStr, $rightStr);
+        $leftNumeric = self::stringIsNumeric($context, $leftStr);
+        $rightNumeric = self::stringIsNumeric($context, $rightStr);
+        $bothNumeric = $context->builder->and($leftNumeric, $rightNumeric);
+        $leftDouble = self::stringToDouble($context, $leftStr);
+        $rightDouble = self::stringToDouble($context, $rightStr);
+        $numericEq = $context->builder->fcmp(Builder::REAL_OEQ, $leftDouble, $rightDouble);
+        $numericMatch = $context->builder->and($bothNumeric, $numericEq);
+
+        return $context->builder->or($identical, $numericMatch);
+    }
+
+    private static function stringIsNumeric(Context $context, Value $strPtr): Value
+    {
+        $structName = $strPtr->typeOf()->getElementType()->getName();
+        $map = $context->structFieldMap[$structName];
+        $len = $context->builder->load(
+            $context->builder->structGep($strPtr, $map['length'])
+        );
+        $zero = $len->typeOf()->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $zero);
+
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $endPtrSlot = $context->builder->alloca(
+            $context->getTypeFromString('int8*'),
+            1,
+            'loose_str_is_numeric_end'
+        );
+        $nullEnd = $context->getTypeFromString('int8*')->constNull();
+        $context->builder->store($nullEnd, $endPtrSlot);
+        $context->builder->call($context->lookupFunction('strtod'), $charPtr, $endPtrSlot);
+        $endPtr = $context->builder->load($endPtrSlot);
+        $notConsumed = $context->builder->icmp(Builder::INT_EQ, $endPtr, $charPtr);
+        $i64 = $context->getTypeFromString('int64');
+        $endOffset = $context->builder->sub(
+            $context->builder->ptrToInt($endPtr, $i64),
+            $context->builder->ptrToInt($charPtr, $i64)
+        );
+        $consumedAll = $context->builder->icmp(Builder::INT_EQ, $endOffset, $len);
+        $numeric = $context->builder->and(
+            $context->builder->not($notConsumed),
+            $consumedAll
+        );
+
+        return $context->builder->select($isEmpty, $context->constantFromBool(false), $numeric);
+    }
+
+    private static function stringToDouble(Context $context, Value $strPtr): Value
+    {
+        $structName = $strPtr->typeOf()->getElementType()->getName();
+        $map = $context->structFieldMap[$structName];
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $endPtrSlot = $context->builder->alloca(
+            $context->getTypeFromString('int8*'),
+            1,
+            'loose_str_strtod_end'
+        );
+        $nullEnd = $context->getTypeFromString('int8*')->constNull();
+        $context->builder->store($nullEnd, $endPtrSlot);
+
+        return $context->builder->call($context->lookupFunction('strtod'), $charPtr, $endPtrSlot);
+    }
 }

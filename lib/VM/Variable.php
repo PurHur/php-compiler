@@ -466,6 +466,9 @@ final class Variable {
         if (self::TYPE_OBJECT === $self->type) {
             return $self->object === $other->object;
         }
+        if (self::TYPE_STRING === $self->type) {
+            return $self->string === $other->string;
+        }
 
         return $self->equals($other);
     }
@@ -479,8 +482,6 @@ restart:
                 return $self->integer === $other->integer;
             case TYPE_PAIR_FLOAT_FLOAT:
                 return $self->float === $other->float;
-            case TYPE_PAIR_STRING_STRING:
-                return $self->string === $other->string;
             case TYPE_PAIR_OBJECT_OBJECT:
                 return $self->object->looseEquals($other->object);
             case TYPE_PAIR_BOOLEAN_BOOLEAN:
@@ -562,6 +563,13 @@ restart:
         }
         if ($self->type === self::TYPE_BOOLEAN && $other->type === self::TYPE_STRING) {
             return $other->toBool() === $self->bool;
+        }
+        if ($self->type === self::TYPE_STRING && $other->type === self::TYPE_STRING) {
+            if (is_numeric($self->string) && is_numeric($other->string)) {
+                return self::looseNumericFromString($self->string) == self::looseNumericFromString($other->string);
+            }
+
+            return $self->string == $other->string;
         }
         if ($self->type === self::TYPE_ARRAY && $other->type === self::TYPE_BOOLEAN) {
             return ($self->toArray()->getNumElements() === 0) !== $other->bool;

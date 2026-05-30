@@ -5319,6 +5319,14 @@ final class ArrayBuiltinHelper
     private static function looseEqual(Context $context, Variable $left, Variable $right): Value
     {
         if ($left->type === $right->type) {
+            if (Variable::TYPE_STRING === $left->type) {
+                return JitValueCompare::looseEqualStringToString(
+                    $context,
+                    $context->helper->loadValue($left),
+                    $context->helper->loadValue($right)
+                );
+            }
+
             return self::sameTypeEqual($context, $left, $right);
         }
         if (Variable::TYPE_NATIVE_LONG === $left->type && Variable::TYPE_NATIVE_DOUBLE === $right->type) {
