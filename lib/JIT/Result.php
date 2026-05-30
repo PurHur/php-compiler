@@ -79,6 +79,31 @@ class Result {
         return $cb;
     }
 
+    /**
+     * Write a native pointer into an LLVM module global (MCJIT sg_* refresh, #49).
+     *
+     * @param \FFI\CData|int $pointer void* from JIT alloc or integer address
+     */
+    public function writeGlobalPointer(string $globalName, $pointer): void
+    {
+        if (self::selfHostAotStubEnabled()) {
+            return;
+        }
+        $slotAddr = $this->engine->getGlobalValueAddress($globalName);
+        if (0 === $slotAddr) {
+            return;
+        }
+        $slot = FFI::cast('void**', FFI::new('uintptr_t', false, $slotAddr));
+        if ($pointer instanceof \FFI\CData) {
+            $slot[0] = $pointer;
+
+            return;
+        }
+        if (is_int($pointer)) {
+            $slot[0] = FFI::cast('void*', FFI::new('uintptr_t', false, $pointer));
+        }
+    }
+
     /** Self-host AOT bundles skip FFI pointer casts; use no-op handlers (#816, #557). */
     private static function selfHostAotStubEnabled(): bool
     {
