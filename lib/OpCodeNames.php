@@ -224,6 +224,8 @@ function opcode_type_name(int $type): string
             return 'TYPE_POST_DEC';
         case 117:
             return 'TYPE_PRE_DEC';
+        case 118:
+            return 'TYPE_LOGICAL_XOR';
         default:
             return 'unknown opcode';
     }
