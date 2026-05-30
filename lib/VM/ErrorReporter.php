@@ -181,6 +181,18 @@ final class ErrorReporter
         );
     }
 
+    public function undefinedVariable(
+        string $name,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        if (0 === ($this->errorReporting & self::E_WARNING)) {
+            return;
+        }
+        $this->emitWarning("Undefined variable \${$name}", $context, $frame, $file);
+    }
+
     public function undefinedArrayKey(
         Variable $index,
         ?Context $context = null,

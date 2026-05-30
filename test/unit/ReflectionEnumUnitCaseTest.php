@@ -60,10 +60,10 @@ PHP,
                     continue;
                 }
                 $this->assertSame(['A'], $inner->attributeNames);
-                $this->assertCount(1, $inner->attributeMetadata);
-                $this->assertSame('A', $inner->attributeMetadata[0]->name);
-                $this->assertCount(1, $inner->attributeMetadata[0]->args);
-                $this->assertSame('x', $inner->attributeMetadata[0]->args[0]->toString());
+                $this->assertCount(1, $inner->attributeEntries);
+                $this->assertSame('A', $inner->attributeEntries[0]->name);
+                $this->assertCount(1, $inner->attributeEntries[0]->args);
+                $this->assertSame('x', $inner->attributeEntries[0]->args[0]['value']);
 
                 return;
             }

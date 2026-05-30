@@ -69,6 +69,13 @@ class Frame {
      */
     public array $iterators = [];
 
+    /**
+     * Runtime locals materialized by variable variables when the name is absent from compile-time scope (#3801).
+     *
+     * @var array<string, Variable>
+     */
+    public array $dynamicLocals = [];
+
     public function __construct(?Handler $handler, ?Block $block, ?Frame $parent, Variable ...$scope) {
         $this->handler = $handler;
         $this->block = $block;

@@ -28,12 +28,13 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\ClassReadonly;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
-use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\AttributeMetadata;
+use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\DeprecatedMetadata;
 use PHPCompiler\Compiler\FinalClassExtensionCheck;
-use PHPCompiler\Compiler\ReadonlyClassCompileCheck;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
+use PHPCompiler\Compiler\ParameterMetadata;
+use PHPCompiler\Compiler\ReadonlyClassCompileCheck;
 use PHPCompiler\Compiler\TraitCollisionCheck;
 use PHPCompiler\Web\ConstStringFolder;
 use PHPCompiler\Web\IncludePathResolver;
@@ -43,6 +44,9 @@ class Compiler {
 
     protected ?SplObjectStorage $seen = null;
     protected ?SplObjectStorage $funcs = null;
+
+    /** @var SplObjectStorage<CfgBlock, SplObjectStorage<CfgVariable, int>> ?: merge var slots (#3790) */
+    private SplObjectStorage $ternaryMergeVarSlots;
 
     private ?string $debugLastPhaseInputFile = null;
     private int $debugLastPhaseCounter = 0;
@@ -239,6 +243,7 @@ class Compiler {
         $this->abstractEnums = [];
         $this->haltCompilerRemaining = null;
         $this->seen = new SplObjectStorage;
+        $this->ternaryMergeVarSlots = new SplObjectStorage;
         $this->debugWriteLastPhase('Compiler::compile enter');
 
         Compiler\InheritanceVariance::validateScript(
@@ -330,6 +335,7 @@ class Compiler {
         if (null === $returnType) {
             return;
         }
+        $block->returnDeclaredType = $returnType;
         if ($returnType instanceof Op\Type\Void_) {
             $block->returnTypeVoid = true;
 
@@ -432,6 +438,8 @@ class Compiler {
         if (!$this->seen->contains($block)) {
             $this->seen[$block] = $new = new Block($block);
             $new->inheritScopeFrom($parent);
+            $this->inheritCfgVarSlotsFromSiblingCfgBranches($block, $new);
+            $this->applyTernaryMergeVarSlots($block, $new);
             $this->inheritFuncFromParent($new, $parent);
             if ($block instanceof ErrorSuppressBlock) {
                 $new->inheritUndefinedLocals = true;
@@ -440,9 +448,14 @@ class Compiler {
                 $new->inheritUndefinedLocals = true;
             }
             $this->compileBlock($new);
+            $this->recordTernaryMergeVarSlots($block, $new);
         } else {
             $child = $this->seen[$block];
-            $child->inheritScopeFrom($parent);
+            // Merge blocks already mapped on first branch; sibling inheritScopeFrom
+            // adds duplicate slot indices and breaks ?: echo (#3790).
+            if (\count($block->parents) < 2) {
+                $child->inheritScopeFrom($parent);
+            }
             $this->inheritFuncFromParent($child, $parent);
         }
         $child = $this->seen[$block];
@@ -458,6 +471,136 @@ class Compiler {
             $child->func = $parent->func;
             $child->strictTypes = $parent->strictTypes;
         }
+    }
+
+    /**
+     * ?: / if branches must assign the merge temporary in one scope slot (#3790, #137).
+     */
+    private function inheritCfgVarSlotsFromSiblingCfgBranches(CfgBlock $cfgBlock, Block $compiled): void
+    {
+        foreach ($cfgBlock->children as $child) {
+            if (!$child instanceof Op\Stmt\Jump) {
+                continue;
+            }
+            $merge = $child->target;
+            if (\count($merge->parents) < 2) {
+                continue;
+            }
+            foreach ($merge->parents as $siblingCfg) {
+                if ($siblingCfg === $cfgBlock || !$this->seen->contains($siblingCfg)) {
+                    continue;
+                }
+                $compiled->inheritCfgVarSlotsFrom($this->seen[$siblingCfg]);
+            }
+        }
+    }
+
+    /**
+     * @return list<CfgBlock>
+     */
+    private function ternaryMergeTargets(CfgBlock $branchCfg): array
+    {
+        $merges = [];
+        foreach ($branchCfg->children as $child) {
+            if (!$child instanceof Op\Stmt\Jump) {
+                continue;
+            }
+            $merge = $child->target;
+            if (\count($merge->parents) >= 2) {
+                $merges[] = $merge;
+            }
+        }
+
+        return $merges;
+    }
+
+    private function recordTernaryMergeVarSlots(CfgBlock $branchCfg, Block $compiled): void
+    {
+        foreach ($this->ternaryMergeTargets($branchCfg) as $mergeCfg) {
+            if (!$this->ternaryMergeVarSlots->contains($mergeCfg)) {
+                $this->ternaryMergeVarSlots[$mergeCfg] = new SplObjectStorage();
+            }
+            /** @var SplObjectStorage<CfgVariable, int> $map */
+            $map = $this->ternaryMergeVarSlots[$mergeCfg];
+            foreach ($compiled->eachCfgVarRootSlot() as [$root, $slot]) {
+                if (!$map->contains($root)) {
+                    $map[$root] = $slot;
+                }
+            }
+        }
+    }
+
+    private function applyTernaryMergeVarSlots(CfgBlock $branchCfg, Block $compiled): void
+    {
+        foreach ($this->ternaryMergeTargets($branchCfg) as $mergeCfg) {
+            if (!$this->ternaryMergeVarSlots->contains($mergeCfg)) {
+                continue;
+            }
+            /** @var SplObjectStorage<CfgVariable, int> $map */
+            $map = $this->ternaryMergeVarSlots[$mergeCfg];
+            foreach ($map as $root) {
+                $compiled->prebindCfgVarRoot($root, $map[$root]);
+            }
+        }
+    }
+
+    /** When merge block is already lowered, ?: branch assigns must use its ECHO slot (#3790). */
+    private function branchMergeAssignSlot(Block $branch, Op\Expr\Assign $assign): ?int
+    {
+        if (null === $branch->orig || !$this->isMergeBranchAssign($branch, $assign)) {
+            return null;
+        }
+        foreach ($this->ternaryMergeTargets($branch->orig) as $mergeCfg) {
+            if (!$this->seen->contains($mergeCfg)) {
+                continue;
+            }
+            $echoSlot = $this->mergeEchoSlot($this->seen[$mergeCfg]);
+            if (null !== $echoSlot) {
+                return $echoSlot;
+            }
+        }
+
+        return null;
+    }
+
+    private function isMergeBranchAssign(Block $branch, Op\Expr\Assign $assign): bool
+    {
+        if (null === $branch->orig) {
+            return false;
+        }
+        $children = $branch->orig->children;
+        $jumpIdx = null;
+        foreach ($children as $i => $child) {
+            if ($child instanceof Op\Stmt\Jump) {
+                $jumpIdx = $i;
+                break;
+            }
+        }
+        if (null === $jumpIdx) {
+            return false;
+        }
+        for ($i = $jumpIdx - 1; $i >= 0; --$i) {
+            $child = $children[$i];
+            if ($child instanceof Op\Expr\Assign) {
+                return $child === $assign;
+            }
+            if (!$child instanceof Op\Expr) {
+                break;
+            }
+        }
+
+        return false;
+    }
+
+    private function mergeEchoSlot(Block $merge): ?int
+    {
+        foreach ($merge->opCodes as $op) {
+            if (OpCode::TYPE_ECHO === $op->type) {
+                return $op->arg1;
+            }
+        }
+
+        return null;
     }
 
     protected function compileBlock(Block $block) {
@@ -1227,8 +1370,7 @@ class Compiler {
             OpCode::TYPE_DECLARE_TRAIT,
             $this->compileOperand($trait->name, $block, true)
         );
-        $return->attributeNames = AttributeNames::fromOp($trait);
-        AttributeNames::assertNoDuplicates($return->attributeNames);
+        $this->assignAttributeMetadata($return, $trait);
         $return->block1 = $this->compileClassBody($trait->stmts, OpCode::TYPE_DECLARE_TRAIT);
 
         return $return;
@@ -1310,10 +1452,37 @@ class Compiler {
             $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params, $child->func);
             $declare->block1 = $methodBlock;
         }
-        $declare->attributeNames = AttributeNames::fromOp($child);
-        AttributeNames::assertNoDuplicates($declare->attributeNames);
+        $this->assignAttributeMetadata($declare, $child);
+        $declare->parameterMetadata = $this->parameterMetadataFromParams($child->func->params);
         $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $result->addOpCode($declare);
+    }
+
+    /**
+     * @param list<Op\Expr\Param> $params
+     *
+     * @return list<ParameterMetadata>
+     */
+    protected function parameterMetadataFromParams(array $params): array
+    {
+        $metadata = [];
+        foreach ($params as $param) {
+            if (!($param->name instanceof Operand\Literal) || !is_string($param->name->value)) {
+                continue;
+            }
+            $metadata[] = new ParameterMetadata(
+                $param->name->value,
+                AttributeMetadata::fromOp($param)
+            );
+        }
+
+        return $metadata;
+    }
+
+    protected function assignAttributeMetadata(OpCode $op, Op $cfgOp): void
+    {
+        $op->attributeEntries = AttributeMetadata::fromOp($cfgOp);
+        $op->attributeNames = AttributeNames::fromOp($cfgOp);
     }
 
     protected function compileClassLike(Op\Stmt\ClassLike $class, Block $block): OpCode {
@@ -1345,8 +1514,7 @@ class Compiler {
             $className = $this->staticNameFromOperand($class->name) ?? 'class';
             VM\StringableSupport::assertConcreteClassImplements($class, $className);
         }
-        $return->attributeNames = AttributeNames::fromOp($class);
-        AttributeNames::assertNoDuplicates($return->attributeNames);
+        $this->assignAttributeMetadata($return, $class);
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($class->flags);
         if ($return->classIsAbstract) {
             $name = $this->staticNameFromOperand($class->name);
@@ -1449,6 +1617,9 @@ class Compiler {
         }
         if ($declared instanceof Op\Type\Literal && 'never' === strtolower($declared->name)) {
             $this->throwCompileError('never cannot be used as a parameter type');
+        }
+        if (null !== $declared) {
+            $block->paramDeclaredTypes[$slot] = $declared;
         }
         if ($declared instanceof Op\Type\Intersection) {
             $block->paramTypeConstraints[$slot] = Variable::TYPE_OBJECT;
@@ -1588,7 +1759,7 @@ class Compiler {
         );
         $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $constOp->attributeNames = AttributeNames::fromOp($child);
-        $constOp->attributeMetadata = AttributeMetadata::listFromOp($child);
+        $this->assignAttributeMetadata($constOp, $child);
         AttributeNames::assertNoDuplicates($constOp->attributeNames);
         $result->addOpCode($constOp);
     }
@@ -2178,11 +2349,17 @@ class Compiler {
                     return $ops;
                 }
 
+                $mergeAssignSlot = $this->branchMergeAssignSlot($block, $expr);
+                $destSlot = null !== $mergeAssignSlot
+                    ? $mergeAssignSlot
+                    : $this->compileOperand($expr->var, $block, false);
+                $rhsSlot = $this->compileOperand($expr->expr, $block, true);
+
                 return [new OpCode(
                     OpCode::TYPE_ASSIGN,
                     $this->compileOperand($expr->result, $block, false),
-                    $this->compileOperand($expr->var, $block, false),
-                    $this->compileOperand($expr->expr, $block, true)
+                    $destSlot,
+                    $rhsSlot
                 )];
             case Op\Expr\Exit_::class:
                 $exitExpr = null !== $expr->expr
@@ -2431,10 +2608,22 @@ class Compiler {
             case Op\Expr\InstanceOf_::class:
                 return $this->compileInstanceOf($expr, $block);
             case Op\Expr\AssignRef::class:
+                $bindRefFlags = 0;
+                $dimFetch = $this->unwrapArrayDimFetch($expr->expr)
+                    ?? $this->findArrayDimFetchForResult($expr->expr, $block);
+                $arrayLiteral = null !== $dimFetch
+                    ? ($this->unwrapArrayLiteralExpr($dimFetch->var)
+                        ?? $this->findArrayExprForResult($dimFetch->var, $block))
+                    : null;
+                if (null !== $arrayLiteral) {
+                    // Zend zend_compile_list_assign: ref target from inline array literal (#3799).
+                    $bindRefFlags = 1;
+                }
                 $ops = [new OpCode(
                     OpCode::TYPE_ASSIGN_REF,
                     $this->compileOperand($expr->var, $block, false),
-                    $this->compileOperand($expr->expr, $block, true)
+                    $this->compileOperand($expr->expr, $block, true),
+                    $bindRefFlags ?: null
                 )];
                 if ([] !== $expr->result->usages) {
                     $ops[] = new OpCode(
@@ -2740,10 +2929,18 @@ class Compiler {
         if ($resultOperand instanceof Operand\Temporary && [] === $resultOperand->usages) {
             $resultOperand->usages[] = $resultOperand;
         }
+        $dimFetch = $this->findCoalesceArrayDimFetch($expr->left, $block);
+        // ??= on $arr['key']: dim fetch temp is read on the left branch (#3792).
+        if (
+            null !== $dimFetch
+            && $dimFetch->result instanceof Operand\Temporary
+            && [] === $dimFetch->result->usages
+        ) {
+            $dimFetch->result->usages[] = $dimFetch->result;
+        }
         $resultSlot = $this->compileOperand($resultOperand, $block, false);
 
         $checkSlot = $this->compileBoolTemporary($block);
-        $dimFetch = $this->findCoalesceArrayDimFetch($expr->left, $block);
         $issetTarget = null !== $dimFetch
             ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
             : $this->resolveCoalesceIssetTarget($expr->left, $block);
@@ -3625,7 +3822,10 @@ class Compiler {
     protected function isArrayDimFetchForWrite(Op\Expr\ArrayDimFetch $fetch, Block $block): bool
     {
         foreach ($fetch->result->usages as $usage) {
-            if ($usage instanceof Op\Expr\Assign && $usage->var === $fetch->result) {
+            if (
+                ($usage instanceof Op\Expr\Assign || $usage instanceof Op\Expr\AssignRef)
+                && $usage->var === $fetch->result
+            ) {
                 continue;
             }
             if ($usage instanceof Op\Terminal\Unset_ && $this->unsetTerminalUsesOperand($usage, $fetch->result)) {
@@ -3655,7 +3855,10 @@ class Compiler {
             }
             $next = $children[$i + 1];
 
-            if ($next instanceof Op\Expr\Assign && $next->var === $fetch->result) {
+            if (
+                ($next instanceof Op\Expr\Assign || $next instanceof Op\Expr\AssignRef)
+                && $next->var === $fetch->result
+            ) {
                 return true;
             }
             if ($next instanceof Op\Terminal\Unset_ && $this->unsetTerminalUsesOperand($next, $fetch->result)) {
@@ -3673,6 +3876,55 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * php-cfg Expr::result temporaries omit ->original; match list-destruct fetch by result (#3799).
+     */
+    protected function findArrayDimFetchForResult(Operand $result, Block $block): ?Op\Expr\ArrayDimFetch
+    {
+        foreach ($block->orig->children as $child) {
+            if ($child instanceof Op\Expr\ArrayDimFetch && $child->result === $result) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * php-cfg Expr::result temporaries omit ->original; match inline array literal RHS (#3799).
+     */
+    protected function findArrayExprForResult(Operand $result, Block $block): ?Op\Expr\Array_
+    {
+        foreach ($block->orig->children as $child) {
+            if ($child instanceof Op\Expr\Array_ && $child->result === $result) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * php-cfg lowers short list `[$a, $b] = …` and `[$a, $b]` RHS via Op\Expr\Array_ (#1222).
+     */
+    protected function unwrapArrayLiteralExpr(Operand $operand): ?Op\Expr\Array_
+    {
+        while ($operand instanceof Temporary) {
+            if ($operand->original instanceof Op\Expr\Array_) {
+                return $operand->original;
+            }
+            if (null === $operand->original) {
+                return null;
+            }
+            $operand = $operand->original;
+        }
+        if ($operand instanceof Op\Expr\Array_) {
+            return $operand;
+        }
+
+        return null;
     }
 
     private function unsetTerminalUsesOperand(Op\Terminal\Unset_ $unset, Operand $operand): bool

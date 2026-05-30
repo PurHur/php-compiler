@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM;
+use PHPCompiler\VM\Context;
+use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -13,12 +16,20 @@ use PHPCompiler\VM\Variable;
  */
 final class VmJson
 {
+    /** JSON_ERROR_UNSUPPORTED_TYPE — object without JsonSerializable (Zend ext/json). */
+    public const ERROR_UNSUPPORTED_TYPE = 8;
+
     /** Last JSON_ERROR_* from VM json_* (Zend ext/json/php_json.c). */
     private static int $lastError = 0;
 
     public static function lastError(): int
     {
         return self::$lastError;
+    }
+
+    public static function setLastError(int $code): void
+    {
+        self::$lastError = $code;
     }
 
     public static function lastErrorMsg(): string
@@ -32,6 +43,7 @@ final class VmJson
             0 => 'No error',
             1 => 'Maximum stack depth exceeded',
             4 => 'Syntax error',
+            self::ERROR_UNSUPPORTED_TYPE => 'Type is not supported',
             default => 'Unknown error',
         };
     }
@@ -94,7 +106,7 @@ final class VmJson
         return $var;
     }
 
-    public static function export(Variable $v): mixed
+    public static function export(Variable $v, ?Context $ctx = null, ?VM $vm = null): mixed
     {
         $v = $v->resolveIndirect();
         switch ($v->type) {
@@ -117,14 +129,43 @@ final class VmJson
                             'json_encode() only supports string keys in this compiler build'
                         );
                     }
-                    $out[$k->toString()] = self::export($value);
+                    $out[$k->toString()] = self::export($value, $ctx, $vm);
                 }
 
                 return $out;
+            case Variable::TYPE_OBJECT:
+                if (null === $ctx || null === $vm) {
+                    throw new \LogicException(
+                        'json_encode() value type not supported in this compiler build'
+                    );
+                }
+                $object = $v->toObject();
+                if (!InterfaceCheck::entryImplements($object->class, 'jsonserializable', $ctx)) {
+                    self::$lastError = self::ERROR_UNSUPPORTED_TYPE;
+
+                    throw new VmJsonExportException(self::ERROR_UNSUPPORTED_TYPE);
+                }
+                if (!$vm->hasInstanceMethod($object->class, 'jsonserialize')) {
+                    throw new \Error(
+                        'Call to undefined method '.$object->class->name.'::jsonSerialize()'
+                    );
+                }
+                $serialized = $vm->invokeInstanceMethod($object, 'jsonSerialize')->resolveIndirect();
+
+                return self::export($serialized, $ctx, $vm);
             default:
                 throw new \LogicException(
                     'json_encode() value type not supported in this compiler build'
                 );
         }
+    }
+}
+
+/** json_encode() export failure with a JSON_ERROR_* code (issue #3370). */
+final class VmJsonExportException extends \RuntimeException
+{
+    public function __construct(public readonly int $errorCode)
+    {
+        parent::__construct(VmJson::errorMsgForCode($errorCode));
     }
 }

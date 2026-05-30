@@ -56,10 +56,16 @@ class ClassEntry {
     public bool $allowsDynamicProperties = false;
     /** @var list<string> PHP 8 attribute names on this class (#1936). */
     public array $attributeNames = [];
-    /** @var array<string, list<\PHPCompiler\Compiler\AttributeMetadata>> enum case (lowercase) => attributes (#3800) */
-    public array $enumCaseAttributes = [];
+    /** @var list<\PHPCompiler\Compiler\AttributeEntry> class attributes with ctor args (#3206). */
+    public array $attributeEntries = [];
+    /** @var array<string, list<\PHPCompiler\Compiler\AttributeEntry>> enum case (lowercase) => attributes (#3800). */
+    public array $enumCaseAttributeEntries = [];
     /** @var array<string, list<string>> method (lowercase) => attribute names (#1936). */
     public array $methodAttributeNames = [];
+    /** @var array<string, list<\PHPCompiler\Compiler\AttributeEntry>> method attributes (#3206). */
+    public array $methodAttributeEntries = [];
+    /** @var array<string, list<\PHPCompiler\Compiler\ParameterMetadata>> method (lowercase) => params (#3340). */
+    public array $methodParameterMetadata = [];
     /** @var array<string, string> method (lowercase) => trait FQCN when imported via use Trait (#3416). */
     public array $traitMethodSources = [];
     /** @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata> method (lowercase) => deprecation (#3569). */

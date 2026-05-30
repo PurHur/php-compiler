@@ -28,14 +28,14 @@ final class ReflectionEnumUnitCaseGetAttributes extends VmClassMethod
             throw new \LogicException('ReflectionEnumUnitCase refers to unknown enum in this compiler build');
         }
         $caseLc = strtolower($caseName);
-        $metadata = $entry->enumCaseAttributes[$caseLc] ?? [];
+        $entries = $entry->enumCaseAttributeEntries[$caseLc] ?? [];
         $filter = null;
         if (isset($frame->calledArgs[1])) {
             $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionEnumUnitCase::getAttributes() name');
         }
-        $filtered = ReflectionSupport::filterMetadataByName($metadata, $filter);
+        $filtered = ReflectionSupport::filterEntriesByName($entries, $filter);
         if (null !== $frame->returnVar) {
-            $frame->returnVar->copyFrom(ReflectionSupport::attributesArrayFromMetadata($frame, $filtered));
+            $frame->returnVar->copyFrom(ReflectionSupport::attributesArrayFromEntries($frame, $filtered));
         }
     }
 }

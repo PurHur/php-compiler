@@ -70,6 +70,12 @@ class Block {
     /** @var array<int, list<string>> */
     public array $paramIntersectionConstraints = [];
 
+    /** @var array<int, Op\Type> declared parameter types for reflection (#3355). */
+    public array $paramDeclaredTypes = [];
+
+    /** Declared return type AST for reflection (#3355), or null when untyped. */
+    public ?Op\Type $returnDeclaredType = null;
+
     /** Declared scalar return type for this function (issue #205), or null when untyped. */
     public ?int $returnTypeConstraint = null;
 
@@ -271,6 +277,61 @@ class Block {
     }
 
     /**
+     * Copy cfg Var root slot mappings from a sibling branch (?: / if merge, #3790).
+     */
+    public function inheritCfgVarSlotsFrom(Block $sibling): void
+    {
+        foreach ($sibling->eachCfgVarRootSlot() as [$root, $slot]) {
+            if ($this->scope->contains($root)) {
+                continue;
+            }
+            $this->scope[$root] = $slot;
+            if ($sibling->args->contains($root) || $sibling->isArgSlot($slot)) {
+                $this->args[$root] = $slot;
+            }
+        }
+    }
+
+    /**
+     * @return iterable<array{0: VarOperand, 1: int}>
+     */
+    public function eachCfgVarRootSlot(): iterable
+    {
+        $seenRoots = [];
+        foreach ($this->scope as $operand) {
+            $root = self::cfgVarRoot($operand);
+            if (null === $root) {
+                continue;
+            }
+            $rootId = spl_object_id($root);
+            if (isset($seenRoots[$rootId])) {
+                continue;
+            }
+            $seenRoots[$rootId] = true;
+            yield [$root, $this->scope[$operand]];
+        }
+    }
+
+    /** Pre-bind a cfg Var root before lowering branch assigns (#3790). */
+    public function prebindCfgVarRoot(VarOperand $root, int $slot): void
+    {
+        if (!$this->scope->contains($root)) {
+            $this->scope[$root] = $slot;
+        }
+    }
+
+    private function isArgSlot(int $slot): bool
+    {
+        foreach ($this->args as $op) {
+            if ($this->args[$op] === $slot) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Copy variable slot mappings from a parent block (for synthetic CFG branches).
      */
     public function inheritScopeFrom(Block $parent): void
@@ -297,6 +358,11 @@ class Block {
             $this->returnTypeVoid = $parent->returnTypeVoid;
             $this->returnTypeNever = $parent->returnTypeNever;
             $this->returnTypeStatic = $parent->returnTypeStatic;
+            $this->returnDeclaredType = $parent->returnDeclaredType;
+            $this->paramDeclaredTypes = $parent->paramDeclaredTypes;
+            $this->paramTypeConstraints = $parent->paramTypeConstraints;
+            $this->paramIntersectionConstraints = $parent->paramIntersectionConstraints;
+            $this->paramNames = $parent->paramNames;
         }
     }
 
@@ -398,7 +464,41 @@ class Block {
      */
     public function findVariableByRuntimeName(string $name, Frame $frame): ?Variable
     {
-        return self::findVariableInParentFramesByName($name, $frame);
+        $found = self::findVariableInParentFramesByName($name, $frame);
+        if (null !== $found) {
+            return $found;
+        }
+        for ($f = $frame; null !== $f; $f = $f->parent) {
+            if ($f->block === $this && isset($f->dynamicLocals[$name])) {
+                return $f->dynamicLocals[$name];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Create or return a writable local for `$$name = …` when the resolved name has no slot yet (#3801).
+     */
+    public function ensureVariableByRuntimeName(string $name, Frame $frame): Variable
+    {
+        $found = $this->findVariableByRuntimeName($name, $frame);
+        if (null !== $found) {
+            return $found;
+        }
+        $idx = $this->slotIndexForVariableName($name);
+        if (null !== $idx) {
+            if (!isset($frame->scope[$idx])) {
+                $frame->scope[$idx] = new Variable();
+            }
+
+            return $frame->scope[$idx];
+        }
+        if (!isset($frame->dynamicLocals[$name])) {
+            $frame->dynamicLocals[$name] = new Variable();
+        }
+
+        return $frame->dynamicLocals[$name];
     }
 
     /**
@@ -407,7 +507,8 @@ class Block {
     private static function findVariableInParentFrames(Operand $op, Frame $frame): ?Variable
     {
         $name = self::resolveVariableName($op);
-        if (null === $name) {
+        // php-cfg merge temporaries use empty Var names; do not match other "" slots (#3790).
+        if (null === $name || '' === $name) {
             return null;
         }
 
@@ -426,6 +527,9 @@ class Block {
             $idx = $f->block->slotIndexForVariableName($name);
             if (null !== $idx && isset($f->scope[$idx])) {
                 return $f->scope[$idx];
+            }
+            if (isset($f->dynamicLocals[$name])) {
+                return $f->dynamicLocals[$name];
             }
         }
 
@@ -647,7 +751,7 @@ class Block {
     /**
      * php-cfg may wrap the same Var in distinct Operand objects (e.g. call result vs return expr).
      */
-    private static function cfgVarRoot(Operand $op): ?VarOperand
+    public static function cfgVarRoot(Operand $op): ?VarOperand
     {
         while ($op instanceof Temporary) {
             if (null === $op->original) {

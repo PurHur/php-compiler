@@ -39,13 +39,18 @@ final class ReflectionAttributeNewInstance extends VmClassMethod
         $object = new ObjectEntry($classEntry);
         $thisVar = new Variable(Variable::TYPE_OBJECT);
         $thisVar->object($object);
-        $args = ReflectionSupport::attributeArgsFromReflection($receiver);
+        $callArgs = [$thisVar];
+        foreach (ReflectionSupport::argsFromReflectionObject($receiver) as $spec) {
+            if (null !== $spec['name']) {
+                continue;
+            }
+            $callArgs[] = ReflectionSupport::scalarToVariable($spec['value']);
+        }
         $vm = VM::running();
         if (null === $vm) {
             throw new \LogicException('ReflectionAttribute::newInstance() requires active VM');
         }
         if (null !== $classEntry->constructor) {
-            $callArgs = [$thisVar, ...$args];
             $vm->invokePhpFunction($classEntry->constructor, ...$callArgs);
         } else {
             $object->constructed = true;

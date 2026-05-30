@@ -34,11 +34,22 @@ final class json_encode extends Internal
         if ($argc > 1) {
             throw new \LogicException('json_encode() flags not supported in this compiler build');
         }
-        $value = VmJson::export($frame->calledArgs[0]->resolveIndirect());
+        $ctx = $frame->vmContext;
+        $vm = null !== $ctx ? $ctx->runtime->vm : null;
+        try {
+            $value = VmJson::export($frame->calledArgs[0]->resolveIndirect(), $ctx, $vm);
+        } catch (VmJsonExportException $e) {
+            VmJson::setLastError($e->errorCode);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
         $encoded = \json_encode($value);
         VmJson::syncLastErrorFromHost();
         if (false === $encoded) {
-            throw new \LogicException('json_encode() failed');
+            $frame->returnVar->bool(false);
+
+            return;
         }
         $frame->returnVar->string($encoded);
     }
