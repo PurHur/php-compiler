@@ -65,6 +65,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'json_validate')) {
                 continue;
             }
+            // Stringable __toString in echo/concat is VM-only until magic method JIT (#146, #3296).
+            if (str_contains($name, 'stringable')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
