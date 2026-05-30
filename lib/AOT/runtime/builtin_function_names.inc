@@ -226,6 +226,7 @@ static const char *phpc_builtin_functions[] = {
     "realpath",
     "rename",
     "restore_error_handler",
+    "rewind",
     "rmdir",
     "round",
     "rtrim",
