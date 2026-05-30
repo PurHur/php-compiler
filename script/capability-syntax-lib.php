@@ -289,10 +289,13 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'function_static_local',
-            'construct' => 'Function-local `static $var = <literal>`',
+            'construct' => 'Function-local `static $var` / `static $var = <literal>`',
             'opcodes' => ['TYPE_DECLARE_FUNCTION_STATIC'],
             'issue' => 2286,
-            'notes' => ['Literal int/string init only in v1; VM + JIT + AOT'],
+            'notes' => [
+                'Literal int/string init only in v1; VM + JIT + AOT',
+                'Uninitialized `static $x;` with isset guard — Zend parity (#3533); `static &$x` is not valid PHP syntax (php-src `static_var` grammar)',
+            ],
             'probe' => 'function f(){static $n=0; $n++; return $n;} echo f().f().f();',
         ],
         [
