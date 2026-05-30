@@ -123,6 +123,7 @@ final class Variable {
         $this->releaseArrayRef();
         $this->resetScalars();
         $this->type = self::TYPE_ARRAY;
+        $this->streamResource = false;
         $this->array = $ht;
     }
 
@@ -636,8 +637,10 @@ final class Variable {
                     break;
                 }
                 $this->releaseArrayRef();
+                $this->resetScalars();
                 $var->array->addRef();
                 $this->type = self::TYPE_ARRAY;
+                $this->streamResource = false;
                 $this->array = $var->array;
                 break;
             default:
