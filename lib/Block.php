@@ -79,6 +79,9 @@ class Block {
     /** Declared `: never` return — any return is rejected (issue #1358). */
     public bool $returnTypeNever = false;
 
+    /** Declared `: static` return — late-bound object type (issue #3412). */
+    public bool $returnTypeStatic = false;
+
     /** Parameter index (0-based, excluding $this) that receives a packed trailing-arg array (#197). */
     public ?int $variadicParamIndex = null;
 
@@ -269,6 +272,7 @@ class Block {
             $this->returnTypeConstraint = $parent->returnTypeConstraint;
             $this->returnTypeVoid = $parent->returnTypeVoid;
             $this->returnTypeNever = $parent->returnTypeNever;
+            $this->returnTypeStatic = $parent->returnTypeStatic;
         }
     }
 

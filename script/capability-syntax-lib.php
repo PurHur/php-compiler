@@ -238,6 +238,14 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { public static function id(): string { return static::class; } } echo C::id();',
         ],
         [
+            'id' => 'new_static_return_type',
+            'construct' => '`new static()` and `: static` return type (late-bound class)',
+            'opcodes' => ['TYPE_NEW', 'TYPE_RETURN'],
+            'issue' => 3412,
+            'notes' => ['VM resolveClassScopeName on TYPE_NEW; returnTypeStatic verify (#3412)'],
+            'probe' => 'class B { public static function make(): static { return new static(); } } class C extends B {} echo get_class((new C())->make());',
+        ],
+        [
             'id' => 'magic_const_class_method',
             'construct' => 'Magic constants `__CLASS__`, `__METHOD__`, `__FUNCTION__`',
             'opcodes' => ['TYPE_CONST_FETCH'],

@@ -56,6 +56,27 @@ final class TypeCheck
         throw new \TypeError('A never-returning function must not return');
     }
 
+    public static function assertStaticReturn(
+        Variable $value,
+        string $expectedClassLc,
+        Context $context
+    ): void {
+        $target = $value->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $target->type) {
+            throw new \TypeError(
+                'Return value must be of type static, '.self::typeName($target->type).' given'
+            );
+        }
+        $entry = $target->toObject()->class;
+        if (!InterfaceCheck::entryIsInstanceOf($entry, $expectedClassLc, $context)) {
+            $expectedName = $context->classes[$expectedClassLc]->name ?? $expectedClassLc;
+
+            throw new \TypeError(
+                "Return value must be of type {$expectedName}, {$entry->name} returned"
+            );
+        }
+    }
+
     private static function coerceTypedSlot(Variable $dest, bool $strict, string $kind, ?int $constraint = null): void
     {
         $target = $dest->resolveIndirect();

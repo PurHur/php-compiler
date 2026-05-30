@@ -333,6 +333,14 @@ class Compiler {
 
             return;
         }
+        if ($returnType instanceof Op\Type\Reference) {
+            $refName = $this->staticNameFromOperand($returnType->declaration);
+            if ('static' === strtolower((string) $refName)) {
+                $block->returnTypeStatic = true;
+
+                return;
+            }
+        }
         if ($returnType instanceof Op\Type\Literal) {
             if ('void' === $returnType->name) {
                 $block->returnTypeVoid = true;
@@ -341,6 +349,11 @@ class Compiler {
             }
             if ('never' === $returnType->name) {
                 $block->returnTypeNever = true;
+
+                return;
+            }
+            if ('static' === $returnType->name) {
+                $block->returnTypeStatic = true;
 
                 return;
             }
