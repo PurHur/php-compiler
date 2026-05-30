@@ -155,7 +155,7 @@ ROADMAP Phase 4/5: [#78](https://github.com/PurHur/php-compiler/issues/78), trac
 | Construct | VM | JIT | AOT | Issue | Notes |
 |-----------|:--:|:---:|:---:|-------|-------|
 | `007-ThrowsWeb` reference app | yes | yes | yes | [#2076](https://github.com/PurHur/php-compiler/issues/2076) | #2076 VM serve + caught invalid POST (THROWS_WEB_SMOKE_GATE default #2125); AOT link/execute default #2135 |
-| `throw` / `catch` on invalid POST (web serve) | yes | yes | yes | [#195](https://github.com/PurHur/php-compiler/issues/195) | #195 throw lowering; #57 catch; #2084 compliance PHPT pack; user empty class AOT #2157 |
+| `throw` / `catch` on invalid POST (web serve) | yes | yes | yes | [#195](https://github.com/PurHur/php-compiler/issues/195) | #195 throw lowering; #57 catch; #2084 compliance PHPT pack; empty user class JIT #2167; AOT #2157 |
 | AOT project link (`phpc build --project`) | n/a | n/a | yes | [#2101](https://github.com/PurHur/php-compiler/issues/2101) | ExamplesCompileTest 007 link; THROWSWEB_AOT_LINK_GATE default-on (#2135) |
 | AOT CGI execute (caught throw probe) | n/a | n/a | yes | [#2104](https://github.com/PurHur/php-compiler/issues/2104) | examples-aot-smoke 007 slice; THROWSWEB_AOT_SMOKE_GATE default-on (#2135) |
 
