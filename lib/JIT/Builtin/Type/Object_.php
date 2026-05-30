@@ -60,6 +60,10 @@ class Object_ extends Type {
 
     private ?int $splObjectStorageClassId = null;
 
+    private ?int $weakReferenceClassId = null;
+
+    private ?int $weakMapClassId = null;
+
     /** @var array<int, true> class ids declared readonly (issue #1360) */
     private array $readonlyClassIds = [];
 
@@ -1064,6 +1068,41 @@ class Object_ extends Type {
         return $this->classIdToName[$id];
     }
 
+    public function classIdByName(string $name): ?int
+    {
+        $lc = strtolower($name);
+        foreach ($this->classIdToName as $id => $className) {
+            if (strtolower($className) === $lc) {
+                return $id;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * WeakMap backing __hashtable__ at property slot 0 (#3667).
+     */
+    public function weakMapBackingHashtable(Variable $obj): Variable
+    {
+        if (Variable::TYPE_OBJECT !== $obj->type) {
+            throw new \LogicException('weakMapBackingHashtable requires __object__*');
+        }
+        $objPtr = $this->context->helper->loadValue($obj);
+        $loaded = $this->context->builder->load($this->propertySlotPtr($objPtr, 0));
+        $htPtr = $this->context->builder->pointerCast(
+            $loaded,
+            $this->context->getTypeFromString('__hashtable__*')
+        );
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $htPtr
+        );
+    }
+
     public function hasMethod(int $classId, string $methodLc): bool
     {
         return isset($this->methodVisibility[$classId][strtolower($methodLc)]);
@@ -1256,9 +1295,11 @@ class Object_ extends Type {
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
         }
         if ('weakreference' === $lcname) {
-            $this->defineProperty($id, '__weak_target', Variable::TYPE_NULL);
+            $this->weakReferenceClassId = $id;
+            $this->defineProperty($id, '__weak_target', Variable::TYPE_VALUE);
         }
         if ('weakmap' === $lcname) {
+            $this->weakMapClassId = $id;
             $this->defineProperty($id, '__weak_map', Variable::TYPE_HASHTABLE);
         }
         if ('phpcompiler\\vm\\variable' === $lcname) {

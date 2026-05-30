@@ -415,6 +415,13 @@ class Context {
         $this->functionProxies['splobjectstorage::offsetget'] = new Call\SplObjectStorageMethod('offsetget');
         $this->functionProxies['splobjectstorage::offsetset'] = new Call\SplObjectStorageMethod('offsetset');
 
+        $this->functionProxies['weakreference::create'] = new Call\WeakReferenceCreate();
+        $this->functionProxies['weakreference::get'] = new Call\WeakReferenceGet();
+        $this->functionProxies['weakmap::offsetset'] = new Call\WeakMapMethod('offsetset');
+        $this->functionProxies['weakmap::offsetget'] = new Call\WeakMapMethod('offsetget');
+        $this->functionProxies['weakmap::offsetexists'] = new Call\WeakMapMethod('offsetexists');
+        $this->functionProxies['weakmap::count'] = new Call\WeakMapMethod('count');
+
         $this->functionProxies['reflectionclass::__construct'] = new Call\ReflectionClassConstruct();
         $this->functionProxies['reflectionclass::getname'] = new Call\ReflectionClassGetName();
         $this->functionProxies['reflectionclass::getattributes'] = new Call\ReflectionClassGetAttributes();
