@@ -326,6 +326,7 @@ class Module extends ModuleAbstract
             new sys_get_temp_dir(),
             new tempnam(),
             new getcwd_(),
+            new gethostname(),
             new chdir_(),
             new putenv_(),
             new ini_set_(),
