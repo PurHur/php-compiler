@@ -19,9 +19,9 @@ interface I { public function m(): void; }
 class C implements I {}
 echo "ok\n";
 PHP;
-        $this->expectException(\LogicException::class);
+        $this->expectException(\CompileError::class);
         $this->expectExceptionMessage('abstract method');
-        $runtime->run($runtime->parseAndCompile($code, 'iface_missing.php'));
+        $runtime->parseAndCompile($code, 'iface_missing.php');
     }
 
     public function testAbstractClassInstantiationFails(): void
@@ -32,9 +32,9 @@ PHP;
 abstract class A { public function f(): int { return 1; } }
 new A();
 PHP;
-        $this->expectException(\LogicException::class);
+        $this->expectException(\CompileError::class);
         $this->expectExceptionMessage('Cannot instantiate abstract class A');
-        $runtime->run($runtime->parseAndCompile($code, 'abstract_new.php'));
+        $runtime->parseAndCompile($code, 'abstract_new.php');
     }
 
     public function testTraitConflictFailsAtClassDeclaration(): void
@@ -46,9 +46,9 @@ trait T1 { public function f(): int { return 1; } }
 trait T2 { public function f(): int { return 2; } }
 class C { use T1, T2; }
 PHP;
-        $this->expectException(\LogicException::class);
+        $this->expectException(\CompileError::class);
         $this->expectExceptionMessage('collision with');
-        $runtime->run($runtime->parseAndCompile($code, 'trait_conflict.php'));
+        $runtime->parseAndCompile($code, 'trait_conflict.php');
     }
 
     public function testValidInterfaceImplementationRuns(): void
