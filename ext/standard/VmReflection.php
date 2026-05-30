@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
+use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\InterfaceCheck;
@@ -341,6 +342,73 @@ final class VmReflection
         }
 
         return $ctx->classes[$entry->parentLc]->name;
+    }
+
+    /**
+     * class_parents() — ordered parent class names from immediate parent to root (#3159).
+     *
+     * php-src: ext/standard/class.c — PHP_FUNCTION(class_parents)
+     *
+     * @return list<string>
+     */
+    public static function classParentsList(ClassEntry $entry, Context $ctx): array
+    {
+        $parents = [];
+        $current = $entry;
+        while (null !== $current->parentLc && isset($ctx->classes[$current->parentLc])) {
+            $parent = $ctx->classes[$current->parentLc];
+            $parents[] = $parent->name;
+            $current = $parent;
+        }
+
+        return $parents;
+    }
+
+    /**
+     * class_parents() result as a numerically indexed VM array (#3159).
+     */
+    public static function classParentsArray(ClassEntry $entry, Context $ctx): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (self::classParentsList($entry, $ctx) as $parentName) {
+            $value = new Variable();
+            $value->string($parentName);
+            $ht->append($value);
+        }
+
+        return $result;
+    }
+
+    /**
+     * get_class_vars() — default values for public properties declared on $entry (#3159).
+     *
+     * php-src: ext/standard/class.c — PHP_FUNCTION(get_class_vars)
+     */
+    public static function getClassVarsArray(ClassEntry $entry): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        $classLc = strtolower($entry->name);
+        foreach ($entry->properties as $prop) {
+            if ($prop->declaringClassLc !== $classLc) {
+                continue;
+            }
+            if (!MethodVisibility::isPublic($prop->visibility)) {
+                continue;
+            }
+            $copy = new Variable();
+            if (null !== $prop->default && !$prop->hasRuntimeDefaultInit()) {
+                $copy->copyFrom($prop->default);
+            } else {
+                $copy->copyFrom($prop->getVariable());
+            }
+            $ht->add($prop->name, $copy);
+        }
+
+        return $result;
     }
 
     public static function resolveClassFromArg(Context $ctx, Variable $arg): ClassEntry

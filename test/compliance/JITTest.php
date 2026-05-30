@@ -252,6 +252,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'variable_variables')) {
                 continue;
             }
+            // class_parents()/get_class_vars() MCJIT execute segfaults (#3159); AOT PHPT covers native path.
+            if (str_contains($name, 'class_parents_get_class_vars')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
