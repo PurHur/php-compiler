@@ -59,7 +59,7 @@ final class RuntimeIndirectClosureCall implements Call
             $name = array_key_first($this->candidates);
             assert(is_string($name));
 
-            return $this->dispatchSingleCandidate($context, $targetStr, $name, reset($this->candidates), ...$args);
+            return $this->dispatchSingleCandidate($context, $targetStr, $name, $this->candidates[$name], ...$args);
         }
 
         return $this->dispatchCandidates($context, $targetStr, ...$args);

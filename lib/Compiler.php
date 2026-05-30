@@ -2510,6 +2510,11 @@ class Compiler {
 
     protected function shouldStubClosureForBootstrap(): bool
     {
+        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        if ('1' === $userScript || 'true' === strtolower((string) $userScript)) {
+            return false;
+        }
+
         return '1' === (string) getenv('PHP_COMPILER_VENDOR_PRELINK')
             || '1' === (string) getenv('PHP_COMPILER_SELFHOST_AOT');
     }
