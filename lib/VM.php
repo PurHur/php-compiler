@@ -4018,11 +4018,19 @@ restart:
                 );
             }
             $newName = $adaptation['newName'] ?? null;
+            $newModifier = $adaptation['newModifier'] ?? null;
+            if (null === $newName && null === $newModifier) {
+                continue;
+            }
+            $data = $merged[$methodLc];
+            if (null !== $newModifier) {
+                $data['vis'] = (int) $newModifier;
+            }
             if (null === $newName) {
+                $merged[$methodLc] = $data;
                 continue;
             }
             $newNameLc = strtolower((string) $newName);
-            $data = $merged[$methodLc];
             unset($merged[$methodLc]);
             if (isset($merged[$newNameLc])) {
                 throw new \LogicException('Cannot redefine method ' . $newName);

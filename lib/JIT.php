@@ -7157,11 +7157,19 @@ class JIT {
                 );
             }
             $newName = $adaptation['newName'] ?? null;
+            $newModifier = $adaptation['newModifier'] ?? null;
+            if (null === $newName && null === $newModifier) {
+                continue;
+            }
+            $data = $merged[$methodLc];
+            if (null !== $newModifier) {
+                $data['vis'] = (int) $newModifier;
+            }
             if (null === $newName) {
+                $merged[$methodLc] = $data;
                 continue;
             }
             $newNameLc = strtolower((string) $newName);
-            $data = $merged[$methodLc];
             unset($merged[$methodLc]);
             if (isset($merged[$newNameLc])) {
                 throw new \LogicException('Cannot redefine method ' . $newName);
@@ -7186,10 +7194,11 @@ class JIT {
             }
             $traitMethodSources[$methodLc] = $data['traitName'];
             $traitId = $data['traitId'];
+            $vis = $data['vis'] ?? $object->methodVisibility($traitId, $methodLc);
             $object->defineMethodVisibility(
                 $classId,
                 $methodLc,
-                $object->methodVisibility($traitId, $methodLc)
+                $vis
             );
             if ('__construct' === $methodLc) {
                 $object->markHasConstructor($classId);

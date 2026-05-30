@@ -587,7 +587,7 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'Zend/zend_compile.c trait alias/precedence; VM applyTraitUsesWithAdaptations',
                 'JIT/AOT batch trait use with insteadof/as (#2483, #3238)',
-                'Visibility `as private` deferred to #144',
+                'Visibility `as private|protected` on trait alias (#144)',
             ],
             'probe' => 'trait T { public function f(): int { return 1; } } class C { use T { f as r; } } echo (new C())->r();',
         ],
