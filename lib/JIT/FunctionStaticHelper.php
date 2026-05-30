@@ -36,43 +36,66 @@ final class FunctionStaticHelper
         $doneBlock = BasicBlockHelper::append($context, 'fn_static_done');
         $context->builder->branchIf($isZero, $initBlock, $doneBlock);
         $context->builder->positionAtEnd($initBlock);
-        self::writeDefault($context, $storage->value, $default);
+        self::writeDefault($context, $storage, $default);
         $context->builder->store($i8->constInt(1, false), $flag);
         $context->builder->branch($doneBlock);
         $context->builder->positionAtEnd($doneBlock);
     }
 
-    public static function writeDefault(Context $context, Value $destSlot, Variable $default): void
+    public static function writeDefault(Context $context, Variable $storage, Variable $default): void
     {
+        $destPtr = self::storageValuePtr($context, $storage);
         switch ($default->type) {
             case Variable::TYPE_NATIVE_LONG:
-                JitValueBox::writeLong($context, $destSlot, $default->value);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeLong'),
+                    $destPtr,
+                    $default->value
+                );
                 break;
             case Variable::TYPE_NATIVE_BOOL:
-                JitValueBox::writeBool($context, $destSlot, $default->value);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeLong'),
+                    $destPtr,
+                    $context->builder->zExt($default->value, $context->getTypeFromString('int64'))
+                );
                 break;
             case Variable::TYPE_NATIVE_DOUBLE:
                 $context->builder->call(
                     $context->lookupFunction('__value__writeDouble'),
-                    JitValueBox::pointer($context, $destSlot),
+                    $destPtr,
                     $default->value
                 );
                 break;
             case Variable::TYPE_STRING:
                 $context->builder->call(
                     $context->lookupFunction('__value__writeString'),
-                    JitValueBox::pointer($context, $destSlot),
+                    $destPtr,
                     $default->value
                 );
                 break;
             case Variable::TYPE_VALUE:
+                if ($storage->functionStaticGlobal) {
+                    throw new \LogicException(
+                        'Boxed function static default on global storage not supported yet (#3778)'
+                    );
+                }
                 $srcPtr = $context->helper->loadValue($default);
-                JitValueBox::copyFromPointer($context, $destSlot, $srcPtr);
+                JitValueBox::copyFromPointer($context, $storage->value, $srcPtr);
                 break;
             default:
                 throw new \LogicException(
                     'Unsupported function static default JIT type '.$default->type.' (#2286)'
                 );
         }
+    }
+
+    private static function storageValuePtr(Context $context, Variable $storage): Value
+    {
+        if ($storage->functionStaticGlobal) {
+            return JitValueBox::normalizeValuePtr($context, $context->builder->load($storage->value));
+        }
+
+        return JitValueBox::pointer($context, $storage->value);
     }
 }

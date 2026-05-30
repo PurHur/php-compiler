@@ -1,0 +1,18 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\Test\Unit\JIT;
+
+use PHPCompiler\SourcePreprocessor\PropertyHooks;
+use PHPUnit\Framework\TestCase;
+
+final class PropertyHookDispatchTest extends TestCase
+{
+    public function testHookMethodNamesMatchPreprocessor(): void
+    {
+        self::assertSame('__phpc_property_set_email', PropertyHooks::setHookMethodName('email'));
+        self::assertSame('__phpc_property_get_email', PropertyHooks::getHookMethodName('email'));
+        self::assertSame('email', PropertyHooks::propertyNameFromSetHookMethod('__phpc_property_set_email'));
+    }
+}

@@ -31,6 +31,7 @@ final class LiteralIncludeDiscovery
             return [];
         }
         $code = (string) file_get_contents($entryFile);
+        $code = self::preprocessForCfgParse($runtime, $code);
         $script = $runtime->parser->parse($code, $entryFile);
         $runtime->preprocessor->traverse($script);
 
@@ -52,6 +53,7 @@ final class LiteralIncludeDiscovery
             return [];
         }
         $code = (string) file_get_contents($entryFile);
+        $code = self::preprocessForCfgParse($runtime, $code);
         $script = $runtime->parser->parse($code, $entryFile);
         $runtime->preprocessor->traverse($script);
 
@@ -73,10 +75,9 @@ final class LiteralIncludeDiscovery
                 $seenFiles[$resolved] = true;
                 $paths[] = $resolved;
                 try {
-                    $included = $runtime->parser->parse(
-                        (string) file_get_contents($resolved),
-                        $resolved
-                    );
+                    $includedCode = (string) file_get_contents($resolved);
+                    $includedCode = self::preprocessForCfgParse($runtime, $includedCode);
+                    $included = $runtime->parser->parse($includedCode, $resolved);
                     $runtime->preprocessor->traverse($included);
                 } catch (\Throwable $e) {
                     continue;
@@ -210,5 +211,12 @@ final class LiteralIncludeDiscovery
                 }
             }
         }
+    }
+
+    private static function preprocessForCfgParse(Runtime $runtime, string $code): string
+    {
+        [$code] = $runtime->preprocessSourceForParse($code);
+
+        return $code;
     }
 }

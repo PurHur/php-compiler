@@ -363,6 +363,9 @@ class Compiler {
 
                 return;
             }
+            if ('mixed' === strtolower($returnType->name)) {
+                return;
+            }
             $mapped = Variable::mapFromType(Type::fromDecl($returnType->name));
             if (Variable::TYPE_UNDEFINED !== $mapped) {
                 $block->returnTypeConstraint = $mapped;
@@ -1516,7 +1519,8 @@ class Compiler {
                         $this->compileTypeConstrainedVariable($result, $declared, $propertyDeclName)
                     );
                     if (!$child->static) {
-                        $declare->propertyReadonly = $this->isReadonlyPropertyFlags($child->propertyFlags ?? 0);
+                        $declare->propertyReadonly = $this->isReadonlyPropertyFlags($child->visibility);
+                        $declare->propertyVisibility = MethodVisibility::mask($child->visibility);
                     }
                     $result->addOpCode($declare);
                     break;
@@ -1658,6 +1662,7 @@ class Compiler {
             $this->compileTypeConstrainedVariable($result, $declared)
         );
         $declare->propertyReadonly = $this->isPromotedParamReadonly($param);
+        $declare->propertyVisibility = MethodVisibility::mask($param->promotionFlags);
         $result->addOpCode($declare);
     }
 
@@ -1763,6 +1768,10 @@ class Compiler {
 
     protected function compileFunction(Op\Stmt\Function_ $function, Block $block): OpCode {
         $funcBlock = $this->compileCfgBlock($function->func->cfg, $function->func->params, $function->func);
+        // php-cfg may DCE unreachable yield after return; :Generator still implies generator (#3350).
+        if ($this->funcDeclReturnTypeIsGenerator($function->func)) {
+            $this->markFunctionGenerator($funcBlock);
+        }
         $operand = new Operand\Literal($function->func->name);
         $operand->type = Type::string();
         $return = new OpCode(
@@ -2532,6 +2541,23 @@ class Compiler {
                 $compiled->isGenerator = true;
             }
         }
+    }
+
+    protected function funcDeclReturnTypeIsGenerator(CfgFunc $func): bool
+    {
+        $returnType = $func->returnType;
+        if ($returnType instanceof Op\Type\Literal) {
+            return 'Generator' === $returnType->name;
+        }
+        if ($returnType instanceof Op\Type\Reference) {
+            $decl = $returnType->declaration;
+
+            return $decl instanceof Operand\Literal
+                && is_string($decl->value)
+                && 'Generator' === $decl->value;
+        }
+
+        return false;
     }
 
     /**
@@ -3587,6 +3613,7 @@ class Compiler {
 
     /**
      * True when the fetch result is only used as a write lvalue (assign or unset; issue #103, #1224).
+     * Nested write through a dimension ($obj[$k][] = $v) also requires write fetch on the outer dim (#3446).
      */
     protected function isArrayDimFetchForWrite(Op\Expr\ArrayDimFetch $fetch, Block $block): bool
     {
@@ -3596,6 +3623,13 @@ class Compiler {
             }
             if ($usage instanceof Op\Terminal\Unset_ && $this->unsetTerminalUsesOperand($usage, $fetch->result)) {
                 continue;
+            }
+            if (
+                $usage instanceof Op\Expr\ArrayDimFetch
+                && $usage->var === $fetch->result
+                && $this->isArrayDimFetchForWrite($usage, $block)
+            ) {
+                return true;
             }
 
             return false;
@@ -3618,6 +3652,13 @@ class Compiler {
                 return true;
             }
             if ($next instanceof Op\Terminal\Unset_ && $this->unsetTerminalUsesOperand($next, $fetch->result)) {
+                return true;
+            }
+            if (
+                $next instanceof Op\Expr\ArrayDimFetch
+                && $next->var === $fetch->result
+                && $this->isArrayDimFetchForWrite($next, $block)
+            ) {
                 return true;
             }
 

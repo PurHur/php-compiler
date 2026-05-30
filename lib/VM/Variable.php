@@ -28,6 +28,8 @@ final class Variable {
     const TYPE_STRING_OFFSET = 8;
     /** Zend enum case object for E::Case fetches (#3420, #3554). */
     const TYPE_ENUM_CASE = 9;
+    /** Writable ArrayAccess dimension ($obj[$key] assignment, #3331). */
+    const TYPE_ARRAYACCESS_OFFSET = 10;
 
 
     const NUMERIC = self::TYPE_INTEGER | self::TYPE_FLOAT;
@@ -49,6 +51,7 @@ final class Variable {
     private int $stringOffsetIndex;
     private ?ErrorReporter $stringOffsetReporter = null;
     private ?string $stringOffsetFile = null;
+    private ArrayAccessDimension $arrayAccessDimension;
 
 
     public int $next = -1;
@@ -117,9 +120,31 @@ final class Variable {
     }
 
     public function array(HashTable $ht): void {
-        $this->reset();
+        $this->releaseArrayRef();
+        $this->resetScalars();
         $this->type = self::TYPE_ARRAY;
+        $this->streamResource = false;
         $this->array = $ht;
+    }
+
+    /**
+     * Detach from a shared array HashTable before assignment (Zend zval separation).
+     */
+    public function separateArrayForWrite(): void
+    {
+        if (self::TYPE_INDIRECT === $this->type) {
+            $this->indirect->separateArrayForWrite();
+
+            return;
+        }
+        if (self::TYPE_ARRAY !== $this->type || !isset($this->array)) {
+            return;
+        }
+        if (!$this->array->needsSeparate()) {
+            return;
+        }
+        $this->array->delRef();
+        $this->array = $this->array->duplicate();
     }
 
     public function toArray(): HashTable {
@@ -180,6 +205,8 @@ final class Variable {
                 return (int) $this->string;
             case self::TYPE_OBJECT:
                 return $this->objectToScalarString($vm, 'int')->toInt($vm);
+            case self::TYPE_ARRAYACCESS_OFFSET:
+                return $this->arrayAccessDimension->read()->toInt($vm);
         }
         throw new \LogicException("Cannot convert type {$this->type} to int");
     }
@@ -382,6 +409,8 @@ final class Variable {
                 return $var->bool ? '1' : '';
             case self::TYPE_STRING_OFFSET:
                 return $var->readStringOffset();
+            case self::TYPE_ARRAYACCESS_OFFSET:
+                return $var->arrayAccessDimension->read()->toString();
             case self::TYPE_NULL:
             case self::TYPE_UNDEFINED:
                 return '';
@@ -446,8 +475,22 @@ final class Variable {
     }
 
     public function reset(): void {
+        $this->releaseArrayRef();
+        $this->resetScalars();
         $this->type = self::TYPE_NULL;
         $this->streamResource = false;
+    }
+
+    private function releaseArrayRef(): void
+    {
+        if (self::TYPE_ARRAY === $this->type && isset($this->array)) {
+            $this->array->delRef();
+            unset($this->array);
+        }
+    }
+
+    private function resetScalars(): void
+    {
         unset($this->string);
         unset($this->integer);
         unset($this->float);
@@ -459,6 +502,29 @@ final class Variable {
         unset($this->stringOffsetIndex);
         unset($this->stringOffsetReporter);
         unset($this->stringOffsetFile);
+        unset($this->arrayAccessDimension);
+    }
+
+    public function arrayAccessDimension(ArrayAccessDimension $dimension): void
+    {
+        $this->reset();
+        $this->type = self::TYPE_ARRAYACCESS_OFFSET;
+        $this->arrayAccessDimension = $dimension;
+    }
+
+    public function isArrayAccessOffset(): bool
+    {
+        return self::TYPE_ARRAYACCESS_OFFSET === $this->type;
+    }
+
+    /** Value from offsetGet for nested read ($obj[$k][$j]) without indirect write (#3446). */
+    public function readArrayAccessOffsetValue(): self
+    {
+        if (self::TYPE_ARRAYACCESS_OFFSET !== $this->type) {
+            throw new \LogicException('Not an ArrayAccess offset');
+        }
+
+        return $this->arrayAccessDimension->read()->resolveIndirect();
     }
 
     public function stringOffset(
@@ -532,6 +598,11 @@ final class Variable {
 
             return;
         }
+        if ($this->type === self::TYPE_ARRAYACCESS_OFFSET) {
+            $this->arrayAccessDimension->write($var);
+
+            return;
+        }
         switch ($var->type) {
             case self::TYPE_NULL:
                 $this->null();
@@ -562,12 +633,42 @@ final class Variable {
                 ));
                 break;
             case self::TYPE_ARRAY:
-                $this->array($var->array);
+                if (self::TYPE_ARRAY === $this->type && isset($this->array) && $this->array === $var->array) {
+                    break;
+                }
+                $this->releaseArrayRef();
+                $this->resetScalars();
+                $var->array->addRef();
+                $this->type = self::TYPE_ARRAY;
+                $this->streamResource = false;
+                $this->array = $var->array;
                 break;
             default:
                 var_dump($var);
                 throw new \LogicException("Unsupported type copy: {$var->type}");
         }
+    }
+
+    /**
+     * Deep copy used when duplicating array storage (COW separation, zend_array_dup).
+     */
+    public function duplicateFrom(self $var): void
+    {
+        if (self::TYPE_INDIRECT === $this->type) {
+            $this->indirect->duplicateFrom($var);
+
+            return;
+        }
+        while (self::TYPE_INDIRECT === $var->type) {
+            $var = $var->indirect;
+        }
+        TypedPropertyCheck::assertReadable($var);
+        if (self::TYPE_ARRAY === $var->type) {
+            $this->array($var->array->duplicate());
+
+            return;
+        }
+        $this->copyFrom($var);
     }
 
     public function identicalTo(Variable $other): bool {

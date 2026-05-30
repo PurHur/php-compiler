@@ -39,6 +39,12 @@ class Object_ extends Type {
     private array $interfaceExtendsLc = [];
     /** @var array<string, true> interface lc => registered */
     private array $interfaceClassLcs = [];
+    /** @var array<string, true> trait lc => registered (#3789) */
+    private array $traitClassLcs = [];
+    /** @var array<int, array<string, string>> class id => method lc => trait lc (#3789) */
+    private array $classTraitMethodSources = [];
+    /** @var array<int, array<string, Block>> trait id => method lc => CFG block (#3789) */
+    private array $traitMethodBlocks = [];
     /** @var array<string, list<string>> class lc => transitive interface lc (lazy) */
     private array $classAllInterfacesLc = [];
     private array $properties = [];
@@ -1634,6 +1640,63 @@ class Object_ extends Type {
                 if (!isset($this->classConstants[$classId][$name])) {
                     $this->classConstants[$classId][$name] = $entry;
                 }
+            }
+        }
+    }
+
+    public function markTraitClass(string $classLc): void
+    {
+        $this->traitClassLcs[strtolower(ltrim($classLc, '\\'))] = true;
+    }
+
+    public function isTraitClass(string $classLc): bool
+    {
+        return isset($this->traitClassLcs[strtolower(ltrim($classLc, '\\'))]);
+    }
+
+    public function recordTraitMethodSource(int $classId, string $methodLc, string $traitLc): void
+    {
+        $this->classTraitMethodSources[$classId][strtolower($methodLc)] = strtolower(ltrim($traitLc, '\\'));
+    }
+
+    public function traitMethodSource(int $classId, string $methodLc): ?string
+    {
+        return $this->classTraitMethodSources[$classId][strtolower($methodLc)] ?? null;
+    }
+
+    public function recordTraitMethodBlock(int $traitId, string $methodLc, Block $block): void
+    {
+        $this->traitMethodBlocks[$traitId][strtolower($methodLc)] = $block;
+    }
+
+    public function traitMethodBlock(int $traitId, string $methodLc): ?Block
+    {
+        return $this->traitMethodBlocks[$traitId][strtolower($methodLc)] ?? null;
+    }
+
+    public function inheritTraitConstants(int $classId, int $traitId, string $traitName): void
+    {
+        if (!isset($this->classConstants[$traitId])) {
+            return;
+        }
+        foreach ($this->classConstants[$traitId] as $name => $entry) {
+            if (isset($this->classConstants[$classId][$name])) {
+                throw new \LogicException(
+                    "Trait constant {$traitName}::{$name} conflicts with an existing class constant"
+                );
+            }
+            $this->classConstants[$classId][$name] = $entry;
+        }
+    }
+
+    public function inheritTraitStaticProperties(int $classId, int $traitId): void
+    {
+        if (!isset($this->staticPropertyGlobals[$traitId])) {
+            return;
+        }
+        foreach ($this->staticPropertyGlobals[$traitId] as $name => $entry) {
+            if (!isset($this->staticPropertyGlobals[$classId][$name])) {
+                $this->staticPropertyGlobals[$classId][$name] = $entry;
             }
         }
     }

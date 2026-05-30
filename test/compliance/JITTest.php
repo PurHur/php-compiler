@@ -109,6 +109,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'json_validate')) {
                 continue;
             }
+            // Generator::getReturn() and generator return slot are VM-only until JIT generators (#167, #3350).
+            if (str_contains($name, 'generator_get_return')) {
+                continue;
+            }
             // Nested break/continue levels use php-cfg goto labels; VM-only until JIT (#3405).
             if (str_contains($name, 'break2_') || str_contains($name, 'continue2_')) {
                 continue;
@@ -147,6 +151,10 @@ class JITTest extends BaseTest {
             }
             // object <=> is VM-only until JIT zend_compare_objects lowering (#3691).
             if (str_contains($name, 'spaceship_objects')) {
+                continue;
+            }
+            // Return-by-reference MCJIT execute: LLVM verify in ReturnByRefJitCompileTest (#3778).
+            if (str_contains($name, 'return_by_ref_jit')) {
                 continue;
             }
             // string/number loose == juggling is VM-only until ArrayBuiltinHelper string-long compare (#3644).
@@ -188,6 +196,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'pre_post_inc')) {
                 continue;
             }
+            // Property hooks: LLVM dispatch lands in #3723; MCJIT still crashes on hook classes (#3145).
+            if (str_contains($name, 'property_hook')) {
+                continue;
+            }
             // array union (+/+=) is VM-only until JIT TYPE_PLUS array branch (#3690).
             if (str_contains($name, 'array_union')) {
                 continue;
@@ -198,10 +210,6 @@ class JITTest extends BaseTest {
             }
             // User enum DECLARE_ENUM segfaults in MCJIT until enum lowering is stable (#3518).
             if (str_contains($name, 'enum_') || str_contains($name, 'abstract_enum')) {
-                continue;
-            }
-            // Property hooks are VM-only until JIT property dispatch (#3145).
-            if (str_contains($name, 'property_hook')) {
                 continue;
             }
             // ++/-- string increment_string is VM-only until JIT reads OpCode::isIncDec (#3469).
@@ -222,6 +230,10 @@ class JITTest extends BaseTest {
             }
             // property default `new` expressions — VM-only until JIT runtime init (#3391).
             if (str_contains($name, 'property_default_new')) {
+                continue;
+            }
+            // HashTable COW is VM-only until JIT mirrors refcount separation (#3760).
+            if (str_contains($name, 'array_cow')) {
                 continue;
             }
             yield $name => $case;

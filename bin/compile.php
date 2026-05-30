@@ -149,6 +149,8 @@ function run(string $filename, string $code, array $options): void
         } elseif (str_contains($normalized, 'runtime_compile_smoke/compile_driver.php')) {
             putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=runtime_compile_smoke_m3_emit');
             putenv('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1');
+        } elseif (str_contains($normalized, 'jit_unit_probe/compile_driver.php')) {
+            putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=jit_unit_probe_m3_emit');
         } elseif (str_contains($normalized, 'compile_driver.php')) {
             putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit');
         }

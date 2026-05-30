@@ -94,10 +94,17 @@ final class JitValueBox
         if (Variable::TYPE_VALUE !== $var->type) {
             return self::valuePtrFromNativeVariable($context, $var);
         }
+        if (Variable::KIND_VALUE === $var->kind && $var->functionStaticGlobal) {
+            return self::normalizeValuePtr($context, $context->builder->load($var->value));
+        }
         if (Variable::KIND_VARIABLE === $var->kind) {
             $llvmType = $context->getStringFromType($var->value->typeOf());
             if ('__value__*' === $llvmType) {
-                return self::normalizeValuePtr($context, $var->value);
+                $ptr = $var->functionStaticGlobal
+                    ? $context->builder->load($var->value)
+                    : $var->value;
+
+                return self::normalizeValuePtr($context, $ptr);
             }
             if ('__value__' === $llvmType) {
                 return self::normalizeValuePtr($context, self::pointer($context, $var->value));

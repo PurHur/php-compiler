@@ -15,5 +15,7 @@ class StaticPropertyFetchVMTest extends VMTest
         yield 'static_property_fetch' => self::parsePHPT($path, 'static_property_fetch.phpt');
         $untyped = __DIR__.'/cases/language/static_property_untyped.phpt';
         yield 'static_property_untyped' => self::parsePHPT($untyped, 'static_property_untyped.phpt');
+        $dynamic = __DIR__.'/cases/language/static_property_dynamic.phpt';
+        yield 'static_property_dynamic' => self::parsePHPT($dynamic, 'static_property_dynamic.phpt');
     }
 }

@@ -24,12 +24,25 @@ class ClassProperty {
     /** Per-instance `new` default initializer (issue #3391). */
     public ?Block $defaultInitBlock = null;
     public ?int $defaultInitResultSlot = null;
+    /** PHPCfg visibility flags (issue #145). */
+    public int $visibility;
+    /** Lowercase class that declared this property (issue #145). */
+    public string $declaringClassLc;
 
-    public function __construct(string $name, ?Variable $default, Variable $prototype, bool $readonly = false) {
+    public function __construct(
+        string $name,
+        ?Variable $default,
+        Variable $prototype,
+        bool $readonly = false,
+        int $visibility = \PHPCfg\Func::FLAG_PUBLIC,
+        string $declaringClassLc = ''
+    ) {
         $this->name = $name;
         $this->default = $default;
         $this->prototype = $prototype;
         $this->readonly = $readonly;
+        $this->visibility = $visibility;
+        $this->declaringClassLc = $declaringClassLc;
     }
 
     public function hasRuntimeDefaultInit(): bool
