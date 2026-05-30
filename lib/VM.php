@@ -550,8 +550,10 @@ restart:
                         $this->context->propertyHookSetAborted = false;
                         break;
                     }
-                    if (null !== ($err = $this->enforceReadonlyPropertyWrite($arg2, $frame))) {
-                        return $err;
+                    $catchFrame = $this->enforceReadonlyPropertyWrite($arg2, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
                     }
                     $arg2->copyFrom($arg3);
                     $arg1->copyFrom($arg3);
@@ -570,8 +572,10 @@ restart:
                     break;
                 case OpCode::TYPE_ASSIGN_REF:
                     $lhs = $frame->scope[$op->arg1];
-                    if (null !== ($err = $this->enforceReadonlyPropertyWrite($lhs, $frame))) {
-                        return $err;
+                    $catchFrame = $this->enforceReadonlyPropertyWrite($lhs, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
                     }
                     $rhs = $frame->scope[$op->arg2]->resolveIndirect();
                     $lhs->indirect($rhs);
@@ -2568,20 +2572,44 @@ restart:
         }
     }
 
-    /** Reject readonly property writes; returns a failure exit code or null. */
-    private function enforceReadonlyPropertyWrite(Variable $lvalue, Frame $frame): ?int
+    /** Reject readonly property writes; returns catch frame or throws when uncaught. */
+    private function enforceReadonlyPropertyWrite(Variable $lvalue, Frame $frame): ?Frame
     {
         $target = $lvalue->resolveIndirect();
         $owner = $target->objectPropertyOwner;
-        if (null === $owner || !$owner->class->readonly || !$owner->constructed) {
+        if (null === $owner || !$owner->constructed) {
             return null;
         }
         $prop = $target->objectPropertyName ?? 'property';
+        if (!$this->isReadonlyPropertyWrite($owner->class, $prop)) {
+            return null;
+        }
 
-        return $this->raise(
-            sprintf('Cannot modify readonly property %s::$%s', $owner->class->name, $prop),
-            $frame
+        $thrown = VM\BuiltinExceptionSupport::materializeError(
+            $this->context,
+            sprintf('Cannot modify readonly property %s::$%s', $owner->class->name, $prop)
         );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    private function isReadonlyPropertyWrite(ClassEntry $class, string $propName): bool
+    {
+        if ($class->readonly) {
+            return true;
+        }
+        foreach ($class->properties as $property) {
+            if ($property->name === $propName && $property->readonly) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function markObjectConstructedIfLeavingConstruct(Frame $frame): void
@@ -3256,7 +3284,8 @@ restart:
                     $entry->properties[] = new VM\ClassProperty(
                         $name->toString(),
                         $default,
-                        $frame->scope[$op->arg3]
+                        $frame->scope[$op->arg3],
+                        $op->propertyReadonly
                     );
                     break;
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:

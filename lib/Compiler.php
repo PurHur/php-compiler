@@ -25,6 +25,7 @@ use PHPCfg\Script;
 use PHPTypes\Type;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\ClassReadonly;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
 use PHPCompiler\Compiler\AttributeNames;
@@ -1480,12 +1481,16 @@ class Compiler {
                     $declareType = $child->static
                         ? OpCode::TYPE_DECLARE_STATIC_PROPERTY
                         : OpCode::TYPE_DECLARE_PROPERTY;
-                    $result->addOpCode(new OpCode(
+                    $declare = new OpCode(
                         $declareType,
                         $this->compileOperand($child->name, $result, true),
                         is_null($child->defaultVar) ? null : $this->compileOperand($child->defaultVar, $result, true),
                         $this->compileTypeConstrainedVariable($result, $declared, $propertyDeclName)
-                    ));
+                    );
+                    if (!$child->static) {
+                        $declare->propertyReadonly = $this->isReadonlyPropertyFlags($child->propertyFlags ?? 0);
+                    }
+                    $result->addOpCode($declare);
                     break;
                 case Op\Stmt\ClassMethod::class:
                     $this->compileClassMethodDeclaration($child, $result);
@@ -1618,12 +1623,24 @@ class Compiler {
             : Type::mixed();
         $propName = new Operand\Literal($param->name->value);
         $propName->type = Type::string();
-        $result->addOpCode(new OpCode(
+        $declare = new OpCode(
             OpCode::TYPE_DECLARE_PROPERTY,
             $this->compileOperand($propName, $result, true),
             is_null($param->defaultVar) ? null : $this->compileOperand($param->defaultVar, $result, true),
             $this->compileTypeConstrainedVariable($result, $declared)
-        ));
+        );
+        $declare->propertyReadonly = $this->isPromotedParamReadonly($param);
+        $result->addOpCode($declare);
+    }
+
+    protected function isReadonlyPropertyFlags(int $flags): bool
+    {
+        return 0 !== ($flags & ClassReadonly::MODIFIER_READONLY);
+    }
+
+    protected function isPromotedParamReadonly(Op\Expr\Param $param): bool
+    {
+        return property_exists($param, 'promotionReadonly') && $param->promotionReadonly;
     }
 
     /**

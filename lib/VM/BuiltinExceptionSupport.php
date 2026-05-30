@@ -14,6 +14,7 @@ final class BuiltinExceptionSupport
     public const CLASS_ERROR = 'error';
     public const CLASS_TYPE_ERROR = 'typeerror';
     public const CLASS_DIVISION_BY_ZERO_ERROR = 'divisionbyzeroerror';
+    public const CLASS_THROWABLE = 'throwable';
     public const PROP_MESSAGE = 'message';
 
     public static function materializeTypeError(Context $ctx, string $message): Variable

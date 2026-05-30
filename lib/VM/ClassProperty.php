@@ -18,11 +18,14 @@ class ClassProperty {
     public ?string $setHookMethodLc = null;
     /** Lowercase get-hook method name from property-hooks lowering (#3145), or null. */
     public ?string $getHookMethodLc = null;
+    /** Individual readonly property (issue #3149, promoted readonly #3432). */
+    public bool $readonly = false;
 
-    public function __construct(string $name, ?Variable $default, Variable $prototype) {
+    public function __construct(string $name, ?Variable $default, Variable $prototype, bool $readonly = false) {
         $this->name = $name;
         $this->default = $default;
         $this->prototype = $prototype;
+        $this->readonly = $readonly;
     }
 
     public function getVariable(): Variable {

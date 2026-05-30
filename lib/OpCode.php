@@ -184,6 +184,9 @@ class OpCode {
     /** Pipe-separated lowercase class/interface names for union `instanceof` RHS (#3461). */
     public ?string $instanceofUnionTypes = null;
 
+    /** TYPE_DECLARE_PROPERTY: property is readonly (#3149, #3432). */
+    public bool $propertyReadonly = false;
+
     /**
      * Closure `use ($var)` metadata for TYPE_CLOSURE (issue #72).
      *
