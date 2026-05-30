@@ -1934,7 +1934,11 @@ restart:
         return_value_complete:
         $this->enforceReturnType($frame, $returnValue);
         if (!is_null($frame->returnVar)) {
-            $frame->returnVar->copyFrom($returnValue);
+            if ($this->functionReturnsByRef($frame)) {
+                $frame->returnVar->indirect($returnValue);
+            } else {
+                $frame->returnVar->copyFrom($returnValue);
+            }
         }
         $this->markObjectConstructedIfLeavingConstruct($frame);
         $caller = $this->context->pop();
@@ -3471,6 +3475,14 @@ restart:
                     'Unexpected class body init opcode: '.opcode_type_name($op->type)
                 );
         }
+    }
+
+    private function functionReturnsByRef(Frame $frame): bool
+    {
+        $func = $frame->block->func ?? null;
+
+        return null !== $func
+            && (($func->flags ?? 0) & \PHPCfg\Func::FLAG_RETURNS_REF) !== 0;
     }
 
     private function enforceReturnType(Frame $frame, ?Variable $value): void
