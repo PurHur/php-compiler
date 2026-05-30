@@ -156,6 +156,42 @@ class ObjectEntry {
         return true;
     }
 
+    /**
+     * Zend {@see zend_compare_objects()} / {@see zend_std_compare_objects()} for spaceship (#3691).
+     *
+     * Same class: compare instance properties via {@see Variable::compareSpaceship()}.
+     * Different classes on PHP 8.2: always 1 (not a total order; matches Zend <=>).
+     */
+    public function compareSpaceship(self $other): int
+    {
+        if ($this === $other) {
+            return 0;
+        }
+        if ($this->class->name !== $other->class->name) {
+            return 1;
+        }
+        $names = array_keys($this->properties);
+        foreach (array_keys($other->properties) as $name) {
+            if (!\in_array($name, $names, true)) {
+                $names[] = $name;
+            }
+        }
+        foreach ($names as $name) {
+            $left = isset($this->properties[$name])
+                ? $this->properties[$name]->resolveIndirect()
+                : new Variable(Variable::TYPE_NULL);
+            $right = isset($other->properties[$name])
+                ? $other->properties[$name]->resolveIndirect()
+                : new Variable(Variable::TYPE_NULL);
+            $cmp = Variable::compareSpaceship($left, $right);
+            if (0 !== $cmp) {
+                return $cmp;
+            }
+        }
+
+        return 0;
+    }
+
     /** Shallow clone: new object id, copied instance property values. */
     public function cloneShallow(): self {
         $clone = new self($this->class);
