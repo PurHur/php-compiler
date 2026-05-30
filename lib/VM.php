@@ -1161,6 +1161,9 @@ restart:
                         throw new \LogicException("Attempting to instantiate non-existing class $name");
                     }
                     $class = $this->context->classes[$lcname];
+                    if ($class->isInterface) {
+                        throw new \LogicException("Cannot instantiate interface $name");
+                    }
                     $object = new ObjectEntry($class);
                     $result->object($object);
                     $frame->call = $object->constructor;
@@ -1449,6 +1452,12 @@ restart:
                         if ($this->catchTypesMatch($op, $this->context->pendingException)) {
                             $caught = $this->context->pendingException;
                             $this->context->pendingException = null;
+                            if (null !== $op->arg3) {
+                                if (!isset($frame->scope[$op->arg3])) {
+                                    $frame->scope[$op->arg3] = new Variable();
+                                }
+                                $frame->scope[$op->arg3]->copyFrom($caught);
+                            }
                             $frame = $op->block1->getFrame($this->context, $frame);
                             if (null !== $op->arg3) {
                                 if (!isset($frame->scope[$op->arg3])) {
@@ -1942,16 +1951,12 @@ restart:
     private function objectIsInstanceOfClass(ClassEntry $class, string $typeName): bool
     {
         $want = strtolower(ltrim($typeName, '\\'));
-        $current = $class;
-        while (true) {
-            if (strtolower($current->name) === $want) {
-                return true;
-            }
-            if (null === $current->parentLc || !isset($this->context->classes[$current->parentLc])) {
-                return false;
-            }
-            $current = $this->context->classes[$current->parentLc];
+        $target = $this->context->classes[$want] ?? null;
+        if (null !== $target && $target->isInterface) {
+            return VM\InterfaceCheck::entryImplements($class, $want, $this->context);
         }
+
+        return VM\InterfaceCheck::entryIsInstanceOf($class, $want, $this->context);
     }
 
     private function valueInstanceOfClassName(Variable $value, string $className): bool
