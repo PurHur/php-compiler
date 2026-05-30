@@ -271,9 +271,7 @@ function syntaxRowDefinitions(): array
             'construct' => 'By-reference parameters (`function f(&$x)`)',
             'opcodes' => ['TYPE_ARG_RECV', 'TYPE_ARG_SEND'],
             'issue' => 140,
-            'jit' => false,
-            'aot' => false,
-            'notes' => ['VM aliases caller slots via TYPE_INDIRECT; JIT pointer args deferred'],
+            'notes' => ['VM TYPE_INDIRECT; JIT aliases caller __value__* via paramByRef (#3161)'],
             'probe' => 'function inc(&$n) { $n++; } $x = 1; inc($x); echo $x;',
         ],
         [
@@ -458,7 +456,7 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'throw lowering #195; php-cfg TryCatch overlay (#2084); VM TYPE_TRY/CATCH/THROW/FINALLY',
                 'VM finally-before-catch + return-through-finally (#3081, #3106); TryCatchComplianceTest (10 tests)',
-                'JIT TryCatchHelper IR verify (#3107); bin/jit.php VM fallback via requiresVmLowering (#2114); MCJIT execute unsafe',
+                'JIT TryCatchHelper IR verify (#3107); bin/jit.php VM fallback via requiresVmLowering (#2114); MCJIT execute probe TryCatchJitExecuteTest',
             ],
             'probe' => 'class E {} try { throw new E(); } catch (E $e) { echo "ok"; }',
         ],

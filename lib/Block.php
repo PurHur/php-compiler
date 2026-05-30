@@ -647,13 +647,20 @@ class Block {
         );
     }
 
+    /** Script contains `finally` — JIT lowering still VM-fallback until #2114 phase B. */
+    public static function containsFinallyOpcodes(?self $root): bool
+    {
+        return self::containsOpcodeTypes($root, OpCode::TYPE_FINALLY);
+    }
+
     /**
      * CFG regions that MCJIT must not execute yet; `bin/jit.php` runs the VM instead (#2114, #167).
-     * JIT IR lowering for simple try/catch may still compile and verify — see TryCatchJitCompileTest.
+     * Simple try/catch without `finally` may pass MCJIT when {@see TryCatchJitExecuteTest} is green.
      */
     public static function requiresVmLowering(?self $root): bool
     {
-        return self::containsExceptionHandlingOpcodes($root)
-            || self::containsGeneratorOpcodes($root);
+        return self::containsGeneratorOpcodes($root)
+            || self::containsFinallyOpcodes($root)
+            || self::containsExceptionHandlingOpcodes($root);
     }
 }
