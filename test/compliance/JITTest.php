@@ -65,6 +65,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'json_validate')) {
                 continue;
             }
+            // class const scalar expressions — VM defineClass eval (#3567); JIT deferred.
+            if (str_contains($name, 'class_const_scalar_expr')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
