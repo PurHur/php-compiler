@@ -75,6 +75,9 @@ patch_already_applied() {
     php-types-generics-list-array.patch)
       grep -qF "preg_match('/^(list|array)" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
+    php-types-generic-null-tail.patch)
+      grep -q 'list<T|null> union splits' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      ;;
     php-types-docblock-trailing-text.patch)
       grep -q "stripTrailingDocText" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
@@ -1964,6 +1967,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-array-shape.patch"
   apply_patch "$PATCH_DIR/php-types-generics-fallback.patch"
   apply_patch "$PATCH_DIR/php-types-generics-list-array.patch"
+  apply_patch "$PATCH_DIR/php-types-generic-null-tail.patch"
   apply_patch "$PATCH_DIR/php-types-docblock-trailing-text.patch"
   apply_patch "$PATCH_DIR/php-types-fromdecl-junk-fragments.patch"
   apply_patch "$PATCH_DIR/php-types-ns-func-call.patch"
