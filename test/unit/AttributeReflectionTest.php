@@ -153,8 +153,8 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'attr_missing.php'));
     }
 
-    /** @covers issue #3467 */
-    public function testPlainClassRejectsUndeclaredWrites(): void
+    /** @covers issue #3467, #3253 */
+    public function testPlainClassAllowsUndeclaredWritesWithDeprecation(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -162,9 +162,10 @@ PHP;
 class D {}
 $d = new D;
 $d->x = 1;
+echo $d->x;
 PHP;
-        $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage('Undefined property access');
+        ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'no_dynamic.php'));
+        $this->assertSame('1', ob_get_clean());
     }
 }
