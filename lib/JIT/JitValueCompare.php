@@ -611,9 +611,6 @@ final class JitValueCompare
     }
 
     /**
-     * Loose == between two native {@see __string__} operands (Zend zendi_smart_strcmp parity).
-     */
-    /**
      * Loose == between native {@see __string__} and native long (#3658 int↔string, Zend zend_compare_scalar).
      */
     public static function looseEqualStringToNativeLong(
