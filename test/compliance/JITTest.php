@@ -57,6 +57,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gc_collect_cycles')) {
                 continue;
             }
+            // WeakReference get() return used in locals — MCJIT execute (#3667).
+            if (str_contains($name, 'weak_reference_gc_jit')) {
+                continue;
+            }
             // enum case ->name / ->value is VM-only until JIT enum case objects (#3420).
             if (str_contains($name, 'enum_case_name_value')) {
                 continue;
