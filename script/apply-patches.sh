@@ -321,31 +321,16 @@ apply_php_llvm_memory_buffer_overlay() {
 }
 
 apply_php_cfg_match_overlay() {
-  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local overlay="$ROOT/patches/overlays/php-cfg/match-parser-methods.php"
-  if grep -q 'function parseExpr_Match' "$parser" 2>/dev/null; then
-    echo "Skip php-cfg-match.patch (already applied)"
-    return 0
-  fi
   if [[ ! -f "$overlay" ]]; then
     echo "Skip php-cfg-match.patch (overlay missing)" >&2
     return 1
   fi
-  python3 - "$parser" "$overlay" <<'PY'
-import sys
-from pathlib import Path
-
-parser_path = Path(sys.argv[1])
-overlay_path = Path(sys.argv[2])
-text = parser_path.read_text()
-anchor = "    protected function parseExpr_UnaryMinus(Expr\\UnaryMinus $expr)"
-if anchor not in text:
-    sys.stderr.write("php-cfg-match: parseExpr_UnaryMinus anchor not found in Parser.php\n")
-    sys.exit(1)
-insert = overlay_path.read_text().rstrip("\n") + "\n\n"
-parser_path.write_text(text.replace(anchor, insert + anchor, 1))
-PY
-  echo "Applied php-cfg-match.patch (overlay)"
+  if python3 "$ROOT/script/patch-php-cfg-match.py"; then
+    echo "Applied php-cfg-match.patch (overlay)"
+    return 0
+  fi
+  return 1
 }
 
 apply_php_cfg_arrow_function_overlay() {
