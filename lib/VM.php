@@ -303,6 +303,21 @@ class VM {
     }
 
     /**
+     * Invoke Iterator protocol methods during foreach (Zend zend_iterators.c parity, #3234).
+     */
+    public function invokeForeachInstanceMethod(Frame $_parentFrame, Variable $receiver, string $methodName): Variable
+    {
+        $methodLc = strtolower($methodName);
+        $object = $receiver->toObject();
+        $class = $object->class;
+        if (!isset($class->methods[$methodLc])) {
+            throw new \LogicException("Call to undefined method {$class->name}::{$methodLc}()");
+        }
+
+        return $this->invokePhpFunction($class->methods[$methodLc], $receiver);
+    }
+
+    /**
      * Properties for var_dump / print_r when __debugInfo is defined (Zend parity, #3259).
      *
      * @return array<string, Variable>
@@ -1951,25 +1966,55 @@ restart:
                     throw new \LogicException('yield from requires array or Generator');
                 case OpCode::TYPE_ITER_RESET:
                     $container = $frame->scope[$op->arg1]->resolveIndirect();
-                    $frame->iterators[$op->arg1] = $container;
-                    $this->context->foreachIterators[$op->arg1] = $container;
                     if ($this->variableIsGenerator($container)) {
+                        unset($this->context->foreachObjectAdvance[$op->arg1]);
+                        unset($this->context->objectPropertyIterators[$op->arg1]);
+                        $frame->iterators[$op->arg1] = $container;
+                        $this->context->foreachIterators[$op->arg1] = $container;
                         $container->toObject()->generatorState->rewind();
                         break;
                     }
-                    if (Variable::TYPE_OBJECT === $container->type) {
-                        $iter = new ObjectPropertyIterator($container->toObject());
-                        $iter->reset();
-                        $this->context->objectPropertyIterators[$op->arg1] = $iter;
+                    if (Variable::TYPE_ARRAY === $container->type) {
+                        unset($this->context->foreachObjectAdvance[$op->arg1]);
+                        unset($this->context->objectPropertyIterators[$op->arg1]);
+                        $frame->iterators[$op->arg1] = $container;
+                        $this->context->foreachIterators[$op->arg1] = $container;
+                        $container->toArray()->iterReset();
                         break;
                     }
-                    if (Variable::TYPE_ARRAY !== $container->type) {
-                        throw new \LogicException('Iterator reset requires an array');
+                    if (Variable::TYPE_OBJECT === $container->type) {
+                        try {
+                            unset($this->context->objectPropertyIterators[$op->arg1]);
+                            $iterable = VM\ForeachIterator::resolveTraversableObject($this, $frame, $container);
+                            $frame->iterators[$op->arg1] = $iterable;
+                            $this->context->foreachIterators[$op->arg1] = $iterable;
+                            if ($this->variableIsGenerator($iterable)) {
+                                unset($this->context->foreachObjectAdvance[$op->arg1]);
+                                $iterable->toObject()->generatorState->rewind();
+                                break;
+                            }
+                            $this->context->foreachObjectAdvance[$op->arg1] = false;
+                            $this->invokeForeachInstanceMethod($frame, $iterable, 'rewind');
+                            break;
+                        } catch (\TypeError) {
+                            unset($this->context->foreachObjectAdvance[$op->arg1]);
+                            $iter = new ObjectPropertyIterator($container->toObject());
+                            $iter->reset();
+                            $this->context->objectPropertyIterators[$op->arg1] = $iter;
+                            break;
+                        }
                     }
-                    $container->toArray()->iterReset();
-                    break;
+                    throw new \TypeError('foreach() argument must be of type array|object');
                 case OpCode::TYPE_ITER_VALID:
-                    $container = $this->foreachContainer($frame, $op->arg2);
+                    $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
+                    if ($this->isForeachObjectIteratorSlot((int) $op->arg2)) {
+                        if ($this->context->foreachObjectAdvance[$op->arg2]) {
+                            $this->invokeForeachInstanceMethod($frame, $container, 'next');
+                        }
+                        $valid = $this->invokeForeachInstanceMethod($frame, $container, 'valid');
+                        $frame->scope[$op->arg1]->bool($valid->toBool());
+                        break;
+                    }
                     if ($this->variableIsGenerator($container)) {
                         $frame->scope[$op->arg1]->bool(
                             $this->advanceGeneratorIteration($container->toObject()->generatorState)
@@ -1988,7 +2033,12 @@ restart:
                     $frame->scope[$op->arg1]->bool($container->toArray()->iterValid());
                     break;
                 case OpCode::TYPE_ITER_KEY:
-                    $container = $this->foreachContainer($frame, $op->arg2);
+                    $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
+                    if ($this->isForeachObjectIteratorSlot((int) $op->arg2)) {
+                        $key = $this->invokeForeachInstanceMethod($frame, $container, 'key');
+                        $frame->scope[$op->arg1]->copyFrom($key);
+                        break;
+                    }
                     if ($this->variableIsGenerator($container)) {
                         $frame->scope[$op->arg1]->copyFrom(
                             $container->toObject()->generatorState->currentKey
@@ -2007,7 +2057,18 @@ restart:
                     $frame->scope[$op->arg1]->copyFrom($container->toArray()->iterCurrentKey());
                     break;
                 case OpCode::TYPE_ITER_VALUE:
-                    $container = $this->foreachContainer($frame, $op->arg2);
+                    $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
+                    if ($this->isForeachObjectIteratorSlot((int) $op->arg2)) {
+                        if ((bool) $op->arg3) {
+                            throw new \LogicException(
+                                'foreach by-reference over Iterator objects is not supported in this compiler build'
+                            );
+                        }
+                        $value = $this->invokeForeachInstanceMethod($frame, $container, 'current');
+                        $frame->scope[$op->arg1]->copyFrom($value);
+                        $this->context->foreachObjectAdvance[$op->arg2] = true;
+                        break;
+                    }
                     if ($this->variableIsGenerator($container)) {
                         $frame->scope[$op->arg1]->copyFrom(
                             $container->toObject()->generatorState->currentValue
@@ -3004,10 +3065,12 @@ restart:
             && null !== $container->toObject()->generatorState;
     }
 
-    private function foreachContainer(Frame $frame, int $slot): Variable
+    private function resolveForeachContainer(Frame $frame, int $slot): Variable
     {
-        return ($this->context->foreachIterators[$slot]
-            ?? ($frame->iterators[$slot] ?? $frame->scope[$slot]))->resolveIndirect();
+        $container = $this->context->foreachIterators[$slot]
+            ?? ($frame->iterators[$slot] ?? $frame->scope[$slot]);
+
+        return $container->resolveIndirect();
     }
 
     private function objectForeachIterator(int $slot): ObjectPropertyIterator
@@ -3017,6 +3080,11 @@ restart:
         }
 
         return $this->context->objectPropertyIterators[$slot];
+    }
+
+    private function isForeachObjectIteratorSlot(int $slot): bool
+    {
+        return array_key_exists($slot, $this->context->foreachObjectAdvance);
     }
 
     private function findGeneratorState(Frame $frame): ?GeneratorState
