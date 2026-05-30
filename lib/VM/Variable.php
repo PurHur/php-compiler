@@ -11,6 +11,7 @@ namespace PHPCompiler\VM;
 
 use PHPTypes\Type;
 use PHPCompiler\OpCode;
+use PHPCompiler\ext\standard\VmString;
 
 final class Variable {
     const TYPE_UNDEFINED = -1;
@@ -969,6 +970,70 @@ restart:
             } else {
                 $this->float($result);
             }
+        }
+    }
+
+    /**
+     * ++/-- lowered as Plus/Minus(read, 1) with isIncDec (issue #3469).
+     *
+     * @see Zend/zend_operators.c increment_function() / decrement_function()
+     */
+    public function incDecOp(int $opCode, Variable $left, Variable $right): void
+    {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $result = new self();
+            $result->incDecOp($opCode, $left, $right);
+            $this->indirect->copyFrom($result);
+
+            return;
+        }
+        $left = $left->resolveIndirect();
+        $right = $right->resolveIndirect();
+        $strVar = self::TYPE_STRING === $left->type ? $left : (self::TYPE_STRING === $right->type ? $right : null);
+        if (null !== $strVar) {
+            $this->applyStringIncDec($opCode, $strVar->toString());
+
+            return;
+        }
+        if ($this === $left || $this === $right) {
+            $this->storeNumericOp($opCode, $left->toNumeric(), $right->toNumeric());
+
+            return;
+        }
+        $this->numericOp($opCode, $left, $right);
+    }
+
+    private function applyStringIncDec(int $opCode, string $str): void
+    {
+        if (OpCode::TYPE_PLUS === $opCode) {
+            if (self::isNumericStringForIncDec($str)) {
+                $this->storeNumericStringIncDec($str, 1);
+
+                return;
+            }
+            $this->string(VmString::incrementStringOperator($str));
+
+            return;
+        }
+        if (self::isNumericStringForIncDec($str)) {
+            $this->storeNumericStringIncDec($str, -1);
+
+            return;
+        }
+        $this->string($str);
+    }
+
+    private static function isNumericStringForIncDec(string $str): bool
+    {
+        return '' !== $str && is_numeric($str);
+    }
+
+    private function storeNumericStringIncDec(string $str, int $delta): void
+    {
+        if (str_contains($str, '.') || str_contains(strtolower($str), 'e')) {
+            $this->float((float) $str + $delta);
+        } else {
+            $this->int((int) $str + $delta);
         }
     }
 

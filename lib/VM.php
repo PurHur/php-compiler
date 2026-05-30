@@ -748,7 +748,14 @@ restart:
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
                     try {
-                        $arg1->numericOp($op->type, $arg2, $arg3);
+                        if (
+                            $op->isIncDec
+                            && (OpCode::TYPE_PLUS === $op->type || OpCode::TYPE_MINUS === $op->type)
+                        ) {
+                            $arg1->incDecOp($op->type, $arg2, $arg3);
+                        } else {
+                            $arg1->numericOp($op->type, $arg2, $arg3);
+                        }
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
