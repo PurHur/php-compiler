@@ -29,6 +29,11 @@ final class Superglobals
         self::$activeContext = $context;
     }
 
+    public static function getActiveContext(): ?Context
+    {
+        return self::$activeContext;
+    }
+
     /** Maximum incoming request headers mapped into $_SERVER (issue #77). */
     public const MAX_HTTP_HEADERS = 64;
 
@@ -53,6 +58,7 @@ final class Superglobals
     {
         // Compile-time switch for self-host AOT: avoid class-const NAMES fetch in JIT (#816).
         switch ($name) {
+            case 'GLOBALS':
             case '_GET':
             case '_POST':
             case '_SERVER':

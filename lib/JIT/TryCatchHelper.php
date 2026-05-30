@@ -74,6 +74,7 @@ final class TryCatchHelper
         }
         $arms = self::collectCatchOps($handlerBlock, $tryOpcodeIndex);
         $handler = new TryCatchHandler($mergeBlock, $arms);
+        $handler->postTryOpcodesRemaining = self::countPostTryOpcodes($handlerBlock, $tryOpcodeIndex);
         $context->tryCatch->handlerStack[] = $handler;
         $context->tryCatch->mergeHandlers[spl_object_id($mergeBlock)] = $handler;
 
@@ -99,7 +100,6 @@ final class TryCatchHelper
             $builder->positionAtEnd($tryTail);
             $builder->branch($handler->mergeEntryBb);
         }
-        self::popHandler($context);
         $tryEntry = $context->scope->blockStorage[$tryOp->block1];
         $builder->positionAtEnd($branchBlock);
         if (0 === $context->inlineIncludeDepth) {
@@ -281,6 +281,24 @@ final class TryCatchHelper
         return $dispatch;
     }
 
+    /**
+     * TYPE_CATCH / TYPE_FINALLY after TYPE_TRY are lowered inside beginTry; skip CFG opcodes (#2114).
+     */
+    public static function finishPostTryOpcode(Context $context): void
+    {
+        if ([] === $context->tryCatch->handlerStack) {
+            return;
+        }
+        $handler = $context->tryCatch->handlerStack[array_key_last($context->tryCatch->handlerStack)];
+        if ($handler->postTryOpcodesRemaining <= 0) {
+            return;
+        }
+        --$handler->postTryOpcodesRemaining;
+        if (0 === $handler->postTryOpcodesRemaining) {
+            self::popHandler($context);
+        }
+    }
+
     public static function popHandler(Context $context): void
     {
         if ([] === $context->tryCatch->handlerStack) {
@@ -288,6 +306,22 @@ final class TryCatchHelper
         }
         $handler = array_pop($context->tryCatch->handlerStack);
         unset($context->tryCatch->mergeHandlers[spl_object_id($handler->mergeBlock)]);
+    }
+
+    private static function countPostTryOpcodes(Block $handlerBlock, int $afterTryIndex): int
+    {
+        $count = 0;
+        $n = $handlerBlock->nOpCodes;
+        for ($j = $afterTryIndex + 1; $j < $n; ++$j) {
+            $type = $handlerBlock->opCodes[$j]->type;
+            if (OpCode::TYPE_CATCH === $type || OpCode::TYPE_FINALLY === $type) {
+                ++$count;
+                continue;
+            }
+            break;
+        }
+
+        return $count;
     }
 
     private static function blockSuffix(TryCatchHandler $handler): string
@@ -303,6 +337,9 @@ final class TryCatchHelper
 
 final class TryCatchHandler
 {
+    /** Remaining TYPE_CATCH/TYPE_FINALLY CFG opcodes to skip after beginTry (#2114). */
+    public int $postTryOpcodesRemaining = 0;
+
     public bool $mergeEntryEmitted = false;
 
     public bool $mergeBodyCompiled = false;

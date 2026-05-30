@@ -24,6 +24,8 @@ final class Variable {
     const TYPE_INDIRECT = 7;
     /** Writable single-byte view of a parent string (Zend-style $str[$i]). */
     const TYPE_STRING_OFFSET = 8;
+    /** Zend enum case object for E::Case fetches (#3420, #3554). */
+    const TYPE_ENUM_CASE = 9;
 
 
     const NUMERIC = self::TYPE_INTEGER | self::TYPE_FLOAT;
@@ -35,6 +37,7 @@ final class Variable {
     private float $float;
     private bool $bool;
     private ObjectEntry $object;
+    private EnumCaseEntry $enumCase;
     private Variable $indirect;
     private HashTable $array;
     private Variable $stringOffsetParent;
@@ -50,6 +53,9 @@ final class Variable {
     public ?ObjectEntry $objectPropertyOwner = null;
 
     public ?string $objectPropertyName = null;
+
+    /** Stream handle from fopen()/similar; distinguishes handle ints from plain integers (#3519). */
+    public bool $streamResource = false;
 
     public function __construct(int $type = self::TYPE_NULL) {
         $this->type = $type;
@@ -90,6 +96,11 @@ final class Variable {
         return $var;
     }
 
+    public function isIndirect(): bool
+    {
+        return self::TYPE_INDIRECT === $this->type;
+    }
+
     public function newArray(): HashTable {
         $this->array(new HashTable);
         return $this->array;
@@ -117,6 +128,18 @@ final class Variable {
         $this->reset();
         $this->type = self::TYPE_INTEGER;
         $this->integer = $value;
+        $this->streamResource = false;
+    }
+
+    public function streamHandle(int $value): void
+    {
+        $this->int($value);
+        $this->streamResource = true;
+    }
+
+    public function isStreamResource(): bool
+    {
+        return $this->streamResource && self::TYPE_INTEGER === $this->type;
     }
 
     public function is(int $type): bool {
@@ -249,6 +272,12 @@ final class Variable {
                 return 'Array';
             case self::TYPE_OBJECT:
                 return 'Object';
+            case self::TYPE_ENUM_CASE:
+                if (null !== $var->enumCase->enumClass->backedType) {
+                    return $var->enumCase->backingValue->toString();
+                }
+
+                return $var->enumCase->caseName;
         }
         throw new \LogicException("Cannot convert type {$var->type} to string");
     }
@@ -257,6 +286,24 @@ final class Variable {
         $this->reset();
         $this->type = self::TYPE_OBJECT;
         $this->object = $value;
+    }
+
+    public function enumCase(EnumCaseEntry $value): void
+    {
+        $this->reset();
+        $this->type = self::TYPE_ENUM_CASE;
+        $this->enumCase = $value;
+    }
+
+    public function toEnumCase(): EnumCaseEntry
+    {
+        switch ($this->type) {
+            case self::TYPE_ENUM_CASE:
+                return $this->enumCase;
+            case self::TYPE_INDIRECT:
+                return $this->indirect->toEnumCase();
+        }
+        throw new \LogicException("Cannot convert $this->type to enum case");
     }
 
     public function toObject(): ObjectEntry {
@@ -277,11 +324,13 @@ final class Variable {
 
     public function reset(): void {
         $this->type = self::TYPE_NULL;
+        $this->streamResource = false;
         unset($this->string);
         unset($this->integer);
         unset($this->float);
         unset($this->bool);
         unset($this->object);
+        unset($this->enumCase);
         unset($this->indirect);
         unset($this->stringOffsetParent);
         unset($this->stringOffsetIndex);
@@ -354,6 +403,7 @@ final class Variable {
                 break;
             case self::TYPE_INTEGER:
                 $this->int($var->integer);
+                $this->streamResource = $var->streamResource;
                 break;
             case self::TYPE_FLOAT:
                 $this->float($var->float);
@@ -363,6 +413,15 @@ final class Variable {
                 break;
             case self::TYPE_OBJECT:
                 $this->object($var->object);
+                break;
+            case self::TYPE_ENUM_CASE:
+                $backing = new Variable();
+                $backing->copyFrom($var->enumCase->backingValue);
+                $this->enumCase(new EnumCaseEntry(
+                    $var->enumCase->enumClass,
+                    $var->enumCase->caseName,
+                    $backing
+                ));
                 break;
             case self::TYPE_ARRAY:
                 $this->array($var->array);
@@ -461,6 +520,16 @@ restart:
         }
     }
 
+    private static function throwObjectNumericCompareError(Variable $object): never
+    {
+        $var = $object->resolveIndirect();
+        if (self::TYPE_OBJECT !== $var->type) {
+            throw new \LogicException('Expected object operand for numeric compare error');
+        }
+        $className = $var->object->class->name;
+        throw new \TypeError("Object of class {$className} could not be converted to number");
+    }
+
     public function compareOp(int $opCode, Variable $left, Variable $right): void {
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();
@@ -493,6 +562,8 @@ restart:
             case TYPE_PAIR_NULL_NULL:
                 $this->bool($this->_compareOp($opCode, null, null));
                 break;
+            case TYPE_PAIR_OBJECT_OBJECT:
+                self::throwObjectNumericCompareError($left);
             default:
                 if ($left->type === self::TYPE_INDIRECT) {
                     $left = $left->indirect;
@@ -556,6 +627,8 @@ restart:
             case TYPE_PAIR_NULL_NULL:
                 $this->int(0);
                 break;
+            case TYPE_PAIR_OBJECT_OBJECT:
+                self::throwObjectNumericCompareError($left);
             default:
                 if ($left->type === self::TYPE_INDIRECT) {
                     $left = $left->indirect;
@@ -803,9 +876,9 @@ restart:
 
 /** Precomputed (left * 256 + right) for JIT self-host bundle (no shift/mul in global init). */
 const TYPE_PAIR_INTEGER_INTEGER = 257;
-const TYPE_PAIR_FLOAT_INTEGER = 514;
-const TYPE_PAIR_INTEGER_FLOAT = 260;
-const TYPE_PAIR_FLOAT_FLOAT = 516;
+const TYPE_PAIR_INTEGER_FLOAT = 258;
+const TYPE_PAIR_FLOAT_INTEGER = 513;
+const TYPE_PAIR_FLOAT_FLOAT = 514;
 const TYPE_PAIR_STRING_STRING = 1028;
 const TYPE_PAIR_OBJECT_OBJECT = 1285;
 const TYPE_PAIR_BOOLEAN_BOOLEAN = 771;

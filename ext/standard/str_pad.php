@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -82,10 +83,7 @@ final class str_pad extends Internal
             $padString = $context->builder->load($context->constantStringFromString(' '));
         }
         if (4 === $argc) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[3]->type) {
-                throw new \LogicException('str_pad() pad type must be an integer in this compiler build');
-            }
-            $padType = $context->helper->loadValue($args[3]);
+            $padType = JitLongArg::lower($context, $args[3], 'str_pad() pad type');
         } else {
             $padType = $context->getTypeFromString('int64')->constInt(1, false);
         }

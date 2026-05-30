@@ -244,6 +244,9 @@ class Type extends Builtin {
         $fntypeFclose = $this->context->context->functionType($i32, false, $i64);
         $fnFclose = $this->context->module->addFunction('__compiler_fclose', $fntypeFclose);
         $this->context->registerFunction('__compiler_fclose', $fnFclose);
+        $fntypeIsResource = $this->context->context->functionType($i32, false, $i64);
+        $fnIsResource = $this->context->module->addFunction('__compiler_is_resource', $fntypeIsResource);
+        $this->context->registerFunction('__compiler_is_resource', $fnIsResource);
         $fntypeFlock = $this->context->context->functionType($i32, false, $i64, $i64);
         $fnFlock = $this->context->module->addFunction('__compiler_flock', $fntypeFlock);
         $this->context->registerFunction('__compiler_flock', $fnFlock);
@@ -437,6 +440,16 @@ class Type extends Builtin {
         $fntypeTriggerError = $this->context->context->functionType($void, false, $i8p, $sizeT, $i32);
         $fnTriggerError = $this->context->module->addFunction('__compiler_trigger_error', $fntypeTriggerError);
         $this->context->registerFunction('__compiler_trigger_error', $fnTriggerError);
+        $fntypeAssertFail = $this->context->context->functionType($void, false, $i8p, $sizeT);
+        $fnAssertFail = $this->context->module->addFunction('__compiler_assert_fail', $fntypeAssertFail);
+        $this->context->registerFunction('__compiler_assert_fail', $fnAssertFail);
+        $strPtr = $this->context->getTypeFromString('__string__*');
+        $fntypeAssertFailStr = $this->context->context->functionType($void, false, $strPtr);
+        $fnAssertFailStr = $this->context->module->addFunction(
+            '__compiler_assert_fail_string',
+            $fntypeAssertFailStr
+        );
+        $this->context->registerFunction('__compiler_assert_fail_string', $fnAssertFailStr);
         $i8p = $this->context->getTypeFromString('int8*');
         $i64p = $this->context->getTypeFromString('int64*');
         $libcFns = [

@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #3386 */
+/** @covers issue #3386, #3536 */
 final class InterfaceImplementationCheckTest extends TestCase
 {
     public function testMissingInterfaceMethodFailsAtCompileTime(): void
