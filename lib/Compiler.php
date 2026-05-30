@@ -27,6 +27,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\ClassReadonly;
 use PHPCompiler\JIT\OperandName;
+use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
 use PHPCompiler\Compiler\AttributeMetadata;
 use PHPCompiler\Compiler\AttributeNames;
@@ -1870,6 +1871,7 @@ class Compiler {
                             || (property_exists($child, 'propertyFlags') && $this->isReadonlyPropertyFlags($child->propertyFlags))
                             || $this->isReadonlyPropertyFlags($child->visibility);
                         $declare->propertyVisibility = MethodVisibility::mask($child->visibility);
+                        $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($child);
                     }
                     $result->addOpCode($declare);
                     break;
@@ -2066,6 +2068,7 @@ class Compiler {
         );
         $declare->propertyReadonly = $this->isPromotedParamReadonly($param);
         $declare->propertyVisibility = MethodVisibility::mask($param->promotionFlags);
+        $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($param);
         $result->addOpCode($declare);
     }
 
@@ -2077,6 +2080,18 @@ class Compiler {
     protected function isPromotedParamReadonly(Op\Expr\Param $param): bool
     {
         return property_exists($param, 'promotionReadonly') && $param->promotionReadonly;
+    }
+
+    protected function asymmetricSetVisibilityFromCfgOp(Op $op): int
+    {
+        if (property_exists($op, 'setVisibility') && 0 !== (int) $op->setVisibility) {
+            return (int) $op->setVisibility;
+        }
+        if (property_exists($op, 'promotionSetVisibility') && 0 !== (int) $op->promotionSetVisibility) {
+            return (int) $op->promotionSetVisibility;
+        }
+
+        return AsymmetricVisibilityRewriter::extractSetVisibilityFromAttributes($op->getAttributes());
     }
 
     /**

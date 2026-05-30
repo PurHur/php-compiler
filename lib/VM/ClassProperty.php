@@ -26,6 +26,8 @@ class ClassProperty {
     public ?int $defaultInitResultSlot = null;
     /** PHPCfg visibility flags (issue #145). */
     public int $visibility;
+    /** Asymmetric set visibility; 0 means same as read (#3165). */
+    public int $setVisibility = 0;
     /** Lowercase class that declared this property (issue #145). */
     public string $declaringClassLc;
 
@@ -35,7 +37,8 @@ class ClassProperty {
         Variable $prototype,
         bool $readonly = false,
         int $visibility = \PHPCfg\Func::FLAG_PUBLIC,
-        string $declaringClassLc = ''
+        string $declaringClassLc = '',
+        int $setVisibility = 0
     ) {
         $this->name = $name;
         $this->default = $default;
@@ -43,6 +46,7 @@ class ClassProperty {
         $this->readonly = $readonly;
         $this->visibility = $visibility;
         $this->declaringClassLc = $declaringClassLc;
+        $this->setVisibility = $setVisibility;
     }
 
     public function hasRuntimeDefaultInit(): bool

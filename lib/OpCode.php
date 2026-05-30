@@ -223,6 +223,8 @@ class OpCode {
      * @var list<array<string, mixed>>
      */
     public array $traitAdaptations = [];
+    /** Asymmetric set visibility on TYPE_DECLARE_PROPERTY (#3165); 0 = symmetric with read. */
+    public int $propertySetVisibility = 0;
 
     public function __construct(int $type, ?int $arg1 = null, ?int $arg2 = null, ?int $arg3 = null) {
         $this->type = $type;

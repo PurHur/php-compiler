@@ -24,6 +24,7 @@ use PHPCompiler\VM\Optimizer;
 use PHPCompiler\VM\Context as VMContext;
 use PHPCompiler\VM\ObjectRegistry;
 use PHPCompiler\JIT\Context as JITContext;
+use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Ast\GroupUseStripper;
 use PHPCompiler\Ast\SealedClassAnnotator;
 use PHPCompiler\Ast\SealedClassPreprocessor;
@@ -226,6 +227,7 @@ class Runtime {
     public function parse(string $code, string $filename): Script {
         [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code);
         $this->compiler->setBareRethrowLines($bareRethrowLines);
+        $code = AsymmetricVisibilityRewriter::rewrite($code);
         $code = PipeOperatorDesugar::desugar($code);
         try {
             $script = $this->parser->parse($code, $filename);

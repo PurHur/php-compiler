@@ -280,6 +280,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gettimeofday')) {
                 continue;
             }
+            // PHP 8.4 asymmetric visibility is VM-only until JIT property guards (#3165).
+            if (str_contains($name, 'asymmetric_visibility')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
