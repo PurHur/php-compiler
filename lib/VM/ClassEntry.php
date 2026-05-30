@@ -52,6 +52,10 @@ class ClassEntry {
     public array $staticProperties = [];
     /** Readonly class: instance properties cannot change after construction (issue #1360). */
     public bool $readonly = false;
+    /** Sealed class/interface: only listed types may extend/implement (#3322). */
+    public bool $sealed = false;
+    /** @var list<string> lowercase permitted child FQCNs; empty when sealed = none allowed */
+    public array $sealedPermits = [];
     /** stdClass-style: create public properties on first read/write (#3117). */
     public bool $allowsDynamicProperties = false;
     /** @var list<string> PHP 8 attribute names on this class (#1936). */

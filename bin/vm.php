@@ -36,6 +36,9 @@ function run(string $filename, string $code, array $options): void
             $runtime->run($block);
         } catch (PHPCompiler\VM\ScriptExit $e) {
             exit($e->status);
+        } catch (\LogicException $e) {
+            echo $e->getMessage(), "\n";
+            exit(255);
         }
     }
 }
