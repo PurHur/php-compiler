@@ -689,6 +689,14 @@ restart:
         }
     }
 
+    public static function spaceshipCompare(Variable $left, Variable $right): int
+    {
+        $result = new self();
+        $result->spaceshipOp($left, $right);
+
+        return $result->integer;
+    }
+
     public function spaceshipOp(Variable $left, Variable $right): void {
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();
@@ -724,6 +732,9 @@ restart:
                 break;
             case TYPE_PAIR_OBJECT_OBJECT:
                 self::throwObjectNumericCompareError($left);
+            case TYPE_PAIR_ARRAY_ARRAY:
+                $this->int($left->array->compareSpaceship($right->array));
+                break;
             default:
                 if ($left->type === self::TYPE_INDIRECT) {
                     $left = $left->indirect;
@@ -1056,6 +1067,7 @@ const TYPE_PAIR_STRING_STRING = 1028;
 const TYPE_PAIR_OBJECT_OBJECT = 1285;
 const TYPE_PAIR_BOOLEAN_BOOLEAN = 771;
 const TYPE_PAIR_NULL_NULL = 0;
+const TYPE_PAIR_ARRAY_ARRAY = 1542;
 
 function type_pair(int $left, int $right): int {
     return $left * 256 + $right;

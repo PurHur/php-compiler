@@ -129,6 +129,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'foreach_object_by_ref')) {
                 continue;
             }
+            // array <=> array is VM-only until __hashtable__compareSpaceship JIT lowering (#3672).
+            if (str_contains($name, 'spaceship_array')) {
+                continue;
+            }
             // gettype() object/resource is VM-only until __compiler_gettype JIT path is stable (#3618).
             if (str_contains($name, 'gettype_object_resource')) {
                 continue;
