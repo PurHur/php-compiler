@@ -109,6 +109,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'object_identical')) {
                 continue;
             }
+            // foreach over user objects / stdClass is VM-only until IteratorHelper object walk (#3661).
+            if (str_contains($name, 'foreach_object_by_ref')) {
+                continue;
+            }
             // gettype() object/resource is VM-only until __compiler_gettype JIT path is stable (#3618).
             if (str_contains($name, 'gettype_object_resource')) {
                 continue;
