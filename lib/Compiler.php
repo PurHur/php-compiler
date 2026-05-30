@@ -1833,6 +1833,7 @@ class Compiler {
                     );
                     if (!$child->static) {
                         $declare->propertyReadonly = (property_exists($child, 'readonly') && $child->readonly)
+                            || (property_exists($child, 'propertyFlags') && $this->isReadonlyPropertyFlags($child->propertyFlags))
                             || $this->isReadonlyPropertyFlags($child->visibility);
                         $declare->propertyVisibility = MethodVisibility::mask($child->visibility);
                     }
