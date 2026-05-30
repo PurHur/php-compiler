@@ -23,6 +23,7 @@ use PHPTypes\Type;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\OperandName;
+use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\FinalClassExtensionCheck;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
@@ -41,6 +42,14 @@ class Compiler {
 
     /** Set from the first compile-time abort (#2642, self-host diagnostics). */
     private ?string $compileAbortDetail = null;
+
+    /** 1-based source lines lowered from bare `throw;` (#3508). */
+    private array $bareRethrowLines = [];
+
+    public function setBareRethrowLines(array $lines): void
+    {
+        $this->bareRethrowLines = $lines;
+    }
 
     public function setDebugLastPhaseInputFile(?string $filename): void
     {
@@ -225,6 +234,7 @@ class Compiler {
 
         InterfaceImplementationCheck::validate($script);
         FinalClassExtensionCheck::validate($script);
+        AbstractMethodVisibilityCheck::validate($script);
 
         return $main;
     }
@@ -461,6 +471,9 @@ class Compiler {
                         $block = $this->compileNullsafePropertyFetch($child, $block);
                     } elseif ($child instanceof Op\Expr\NullsafeMethodCall) {
                         $block = $this->compileNullsafeMethodCall($child, $block);
+                    } elseif ($this->isNullsafeChainArrayDimFetch($ops, $i)) {
+                        /** @var Op\Expr\ArrayDimFetch $child */
+                        $block = $this->compileNullsafeArrayDimFetch($child, $block);
                     } elseif (
                         $child instanceof Op\Expr\ArrayDimFetch
                         && $i + 1 < $opCount
@@ -1139,6 +1152,10 @@ class Compiler {
             $readonlySlot
         );
         $return->classImplements = $this->interfaceNamesFromOperands($class->implements);
+        if (VM\StringableSupport::requiresImplementation($return->classImplements)) {
+            $className = $this->staticNameFromOperand($class->name) ?? 'class';
+            VM\StringableSupport::assertConcreteClassImplements($class, $className);
+        }
         $return->attributeNames = AttributeNames::fromOp($class);
         $return->block1 = $this->compileClassBody($class->stmts, $type);
         return $return;
@@ -1230,6 +1247,12 @@ class Compiler {
     protected function applyParamDeclaredType(Op\Expr\Param $param, Block $block, int $slot): void
     {
         $declared = $param->declaredType;
+        if ($declared instanceof Op\Type\Never_) {
+            $this->throwCompileError('never cannot be used as a parameter type');
+        }
+        if ($declared instanceof Op\Type\Literal && 'never' === strtolower($declared->name)) {
+            $this->throwCompileError('never cannot be used as a parameter type');
+        }
         if ($declared instanceof Op\Type\Intersection) {
             $block->paramTypeConstraints[$slot] = Variable::TYPE_OBJECT;
             $block->paramIntersectionConstraints[$slot] = $this->intersectionNamesFromCfgType($declared);
@@ -2311,6 +2334,82 @@ class Compiler {
         ));
     }
 
+    /**
+     * Array offset immediately after ?-> property/method fetch (issue #3516).
+     *
+     * @param Op[] $ops
+     */
+    private function isNullsafeChainArrayDimFetch(array $ops, int $index): bool
+    {
+        if ($index < 1) {
+            return false;
+        }
+        $fetch = $ops[$index];
+        if (!$fetch instanceof Op\Expr\ArrayDimFetch) {
+            return false;
+        }
+        $prev = $ops[$index - 1];
+        if (!$prev instanceof Op\Expr\NullsafePropertyFetch && !$prev instanceof Op\Expr\NullsafeMethodCall) {
+            return false;
+        }
+
+        return $prev->result === $fetch->var;
+    }
+
+    protected function compileNullsafeArrayDimFetch(Op\Expr\ArrayDimFetch $expr, Block $block): Block
+    {
+        $resultSlot = $this->compileOperand($expr->result, $block, false);
+        $containerSlot = $this->compileOperand($expr->var, $block, true);
+        $dimSlot = null !== $expr->dim ? $this->compileOperand($expr->dim, $block, true) : null;
+
+        $endBlock = new Block($block->orig);
+        $endBlock->inheritUndefinedLocals = true;
+        $endBlock->inheritScopeFrom($block);
+
+        $nullBlock = new Block($block->orig);
+        $nullBlock->inheritUndefinedLocals = true;
+        $nullBlock->inheritScopeFrom($block);
+        $nullLiteral = new Operand\Literal(null);
+        $nullLiteral->type = Type::null();
+        $nullValueSlot = $this->compileOperand($nullLiteral, $nullBlock, true);
+        $nullBlock->addOpCode(new OpCode(
+            OpCode::TYPE_ASSIGN,
+            $resultSlot,
+            $resultSlot,
+            $nullValueSlot
+        ));
+        $nullJump = new OpCode(OpCode::TYPE_JUMP);
+        $nullJump->block1 = $endBlock;
+        $nullBlock->addOpCode($nullJump);
+
+        $fetchBlock = new Block($block->orig);
+        $fetchBlock->inheritUndefinedLocals = true;
+        $fetchBlock->inheritScopeFrom($block);
+        $fetchBlock->addOpCode(new OpCode(
+            OpCode::TYPE_ARRAY_DIM_FETCH,
+            $this->compileOperand($expr->result, $fetchBlock, false),
+            $this->compileOperand($expr->var, $fetchBlock, true),
+            $dimSlot
+        ));
+        $fetchJump = new OpCode(OpCode::TYPE_JUMP);
+        $fetchJump->block1 = $endBlock;
+        $fetchBlock->addOpCode($fetchJump);
+        $endBlock->parents[] = $nullBlock;
+        $endBlock->parents[] = $fetchBlock;
+
+        $nullsafeOp = new OpCode(
+            OpCode::TYPE_NULLSAFE,
+            $resultSlot,
+            $containerSlot
+        );
+        $nullsafeOp->block1 = $nullBlock;
+        $nullsafeOp->block2 = $fetchBlock;
+        $nullsafeOp->block3 = $endBlock;
+        $block->addOpCode($nullsafeOp);
+
+        return $endBlock;
+    }
+
     protected function compileNullsafePropertyFetch(Op\Expr\NullsafePropertyFetch $expr, Block $block): Block
     {
         $resultSlot = $this->compileOperand($expr->result, $block, false);
@@ -3168,6 +3267,10 @@ class Compiler {
                     $this->compileOperand($terminal->var, $block, true)
                 )];
             case 'Terminal_Throw':
+                if ($this->isBareRethrowThrow($terminal)) {
+                    return [new OpCode(OpCode::TYPE_RETHROW)];
+                }
+
                 return [new OpCode(
                     OpCode::TYPE_THROW,
                     $this->compileOperand($terminal->expr, $block, true)
@@ -3214,6 +3317,16 @@ class Compiler {
     }
 
 
+
+    private function isBareRethrowThrow(Op\Terminal\Throw_ $terminal): bool
+    {
+        $line = $terminal->getLine();
+        if ($line < 1 || !isset($this->bareRethrowLines[$line])) {
+            return false;
+        }
+
+        return true;
+    }
 
     /**
      * @return OpCode[]

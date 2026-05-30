@@ -24,6 +24,8 @@ final class Variable {
     const TYPE_INDIRECT = 7;
     /** Writable single-byte view of a parent string (Zend-style $str[$i]). */
     const TYPE_STRING_OFFSET = 8;
+    /** Zend enum case object for E::Case fetches (#3420, #3554). */
+    const TYPE_ENUM_CASE = 9;
 
 
     const NUMERIC = self::TYPE_INTEGER | self::TYPE_FLOAT;
@@ -35,6 +37,7 @@ final class Variable {
     private float $float;
     private bool $bool;
     private ObjectEntry $object;
+    private EnumCaseEntry $enumCase;
     private Variable $indirect;
     private HashTable $array;
     private Variable $stringOffsetParent;
@@ -264,6 +267,12 @@ final class Variable {
                 return 'Array';
             case self::TYPE_OBJECT:
                 return 'Object';
+            case self::TYPE_ENUM_CASE:
+                if (null !== $var->enumCase->enumClass->backedType) {
+                    return $var->enumCase->backingValue->toString();
+                }
+
+                return $var->enumCase->caseName;
         }
         throw new \LogicException("Cannot convert type {$var->type} to string");
     }
@@ -272,6 +281,24 @@ final class Variable {
         $this->reset();
         $this->type = self::TYPE_OBJECT;
         $this->object = $value;
+    }
+
+    public function enumCase(EnumCaseEntry $value): void
+    {
+        $this->reset();
+        $this->type = self::TYPE_ENUM_CASE;
+        $this->enumCase = $value;
+    }
+
+    public function toEnumCase(): EnumCaseEntry
+    {
+        switch ($this->type) {
+            case self::TYPE_ENUM_CASE:
+                return $this->enumCase;
+            case self::TYPE_INDIRECT:
+                return $this->indirect->toEnumCase();
+        }
+        throw new \LogicException("Cannot convert $this->type to enum case");
     }
 
     public function toObject(): ObjectEntry {
@@ -298,6 +325,7 @@ final class Variable {
         unset($this->float);
         unset($this->bool);
         unset($this->object);
+        unset($this->enumCase);
         unset($this->indirect);
         unset($this->stringOffsetParent);
         unset($this->stringOffsetIndex);
@@ -380,6 +408,15 @@ final class Variable {
                 break;
             case self::TYPE_OBJECT:
                 $this->object($var->object);
+                break;
+            case self::TYPE_ENUM_CASE:
+                $backing = new Variable();
+                $backing->copyFrom($var->enumCase->backingValue);
+                $this->enumCase(new EnumCaseEntry(
+                    $var->enumCase->enumClass,
+                    $var->enumCase->caseName,
+                    $backing
+                ));
                 break;
             case self::TYPE_ARRAY:
                 $this->array($var->array);
@@ -901,9 +938,9 @@ restart:
 
 /** Precomputed (left * 256 + right) for JIT self-host bundle (no shift/mul in global init). */
 const TYPE_PAIR_INTEGER_INTEGER = 257;
-const TYPE_PAIR_FLOAT_INTEGER = 514;
-const TYPE_PAIR_INTEGER_FLOAT = 260;
-const TYPE_PAIR_FLOAT_FLOAT = 516;
+const TYPE_PAIR_INTEGER_FLOAT = 258;
+const TYPE_PAIR_FLOAT_INTEGER = 513;
+const TYPE_PAIR_FLOAT_FLOAT = 514;
 const TYPE_PAIR_STRING_STRING = 1028;
 const TYPE_PAIR_OBJECT_OBJECT = 1285;
 const TYPE_PAIR_BOOLEAN_BOOLEAN = 771;

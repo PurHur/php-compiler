@@ -11,6 +11,7 @@ namespace PHPCompiler;
 
 require_once __DIR__.'/OpCodeNames.php';
 
+use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Func;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ClassEntry;
@@ -120,6 +121,27 @@ class VM {
         }
 
         return false;
+    }
+
+    /** Coerce a VM value to string, invoking __toString on objects when defined (issue #3296). */
+    public function coerceVariableToString(Variable $var): string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            return $var->toString();
+        }
+        $object = $var->toObject();
+        if (!$this->hasInstanceMethod($object->class, '__tostring')) {
+            return 'Object';
+        }
+        $result = $this->invokeInstanceMethod($object, '__toString')->resolveIndirect();
+        if (Variable::TYPE_STRING !== $result->type) {
+            throw new \LogicException(
+                "{$object->class->name}::__toString() must return a string in this compiler build"
+            );
+        }
+
+        return $result->toString();
     }
 
     /** Invoke a user instance method from VM internals (e.g. __debugInfo, #3259). */
@@ -403,7 +425,9 @@ restart:
                     $frame->scope[$op->arg1]->castFrom(Variable::TYPE_INTEGER, $frame->scope[$op->arg2]);
                     break;
                 case OpCode::TYPE_CAST_STRING:
-                    $frame->scope[$op->arg1]->castFrom(Variable::TYPE_STRING, $frame->scope[$op->arg2]);
+                    $frame->scope[$op->arg1]->string(
+                        $this->coerceVariableToString($frame->scope[$op->arg2])
+                    );
                     break;
                 case OpCode::TYPE_CAST_OBJECT:
                     $dst = $frame->scope[$op->arg1];
@@ -505,7 +529,16 @@ restart:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
-                    $arg1->numericOp($op->type, $arg2, $arg3);
+                    try {
+                        $arg1->numericOp($op->type, $arg2, $arg3);
+                    } catch (\DivisionByZeroError $e) {
+                        $catchFrame = $this->dispatchVmDivisionByZeroError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     break;
                 case OpCode::TYPE_BITWISE_AND:
                 case OpCode::TYPE_BITWISE_OR:
@@ -526,15 +559,15 @@ restart:
                     break;
                 case OpCode::TYPE_CONCAT:
                     $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $frame->scope[$op->arg2]->toString();
-                    $arg3 = $frame->scope[$op->arg3]->toString();
+                    $arg2 = $this->coerceVariableToString($frame->scope[$op->arg2]);
+                    $arg3 = $this->coerceVariableToString($frame->scope[$op->arg3]);
                     $arg1->string($arg2 . $arg3);
                     break;
                 case OpCode::TYPE_ECHO:
-                    VM\OutputBuffer::append($frame->scope[$op->arg1]->toString());
+                    VM\OutputBuffer::append($this->coerceVariableToString($frame->scope[$op->arg1]));
                     break;
                 case OpCode::TYPE_PRINT:
-                    VM\OutputBuffer::append($frame->scope[$op->arg2]->toString());
+                    VM\OutputBuffer::append($this->coerceVariableToString($frame->scope[$op->arg2]));
                     $frame->scope[$op->arg1]->int(1);
                     break;
                 case OpCode::TYPE_COALESCE:
@@ -640,6 +673,16 @@ restart:
                     }
                     if (!isset($classEntry->constants[$constName])) {
                         return $this->raise("Undefined class constant {$className}::{$constName}", $frame);
+                    }
+                    if ($classEntry->isEnum) {
+                        $canonical = $classEntry->enumCaseCanonicalNames[$constName]
+                            ?? $frame->scope[$op->arg3]->toString();
+                        $backing = new Variable();
+                        $backing->copyFrom($classEntry->constants[$constName]);
+                        $frame->scope[$op->arg1]->enumCase(
+                            new VM\EnumCaseEntry($classEntry, $canonical, $backing)
+                        );
+                        break;
                     }
                     $frame->scope[$op->arg1]->copyFrom($classEntry->constants[$constName]);
                     break;
@@ -1000,6 +1043,9 @@ restart:
                         $classEntry->readonly = (bool) $frame->block->constants[$op->arg3]->toInt();
                     }
                     $classEntry->attributeNames = $op->attributeNames;
+                    $classEntry->allowsDynamicProperties = AttributeNames::hasAllowDynamicProperties(
+                        $op->attributeNames
+                    );
                     self::defineClass($classEntry, $op->block1);
                     if (null !== $classEntry->parentLc) {
                         $this->inheritFromParent($classEntry);
@@ -1071,6 +1117,17 @@ restart:
                 case OpCode::TYPE_CLONE:
                     $result = $frame->scope[$op->arg1];
                     $src = $frame->scope[$op->arg2]->resolveIndirect();
+                    if (Variable::TYPE_ENUM_CASE === $src->type) {
+                        $enumCase = $src->toEnumCase();
+                        $message = 'Cannot clone enum case '
+                            .$enumCase->enumClass->name.'::'.$enumCase->caseName;
+                        $catchFrame = $this->dispatchVmError($message, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     if (Variable::TYPE_OBJECT !== $src->type) {
                         throw new \LogicException('clone requires an object');
                     }
@@ -1297,6 +1354,7 @@ restart:
                                 }
                                 $frame->scope[$op->arg3]->copyFrom($caught);
                             }
+                            $frame->activeCatchException = $caught;
                             goto restart;
                         }
                         break;
@@ -1317,6 +1375,18 @@ restart:
                     break;
                 case OpCode::TYPE_THROW:
                     $thrown = $frame->scope[$op->arg1]->resolveIndirect();
+                    $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
+                    $this->raiseUncaughtException($thrown);
+                    break;
+                case OpCode::TYPE_RETHROW:
+                    $thrown = $this->resolveActiveCatchException($frame);
+                    if (null === $thrown) {
+                        throw new \LogicException('Cannot use "throw;" outside of a catch block');
+                    }
                     $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -1458,6 +1528,36 @@ restart:
         return null;
     }
 
+    /**
+     * Bridge native DivisionByZeroError from numeric ops into user catch handlers (#3562, #3371).
+     */
+    private function dispatchVmDivisionByZeroError(\DivisionByZeroError $error, Frame $frame): ?Frame
+    {
+        $thrown = VM\BuiltinExceptionSupport::materializeDivisionByZeroError($this->context, $error->getMessage());
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /**
+     * Bridge VM Error throws (enum clone guard, etc.) into user catch handlers (#3554).
+     */
+    private function dispatchVmError(string $message, Frame $frame): ?Frame
+    {
+        $thrown = VM\BuiltinExceptionSupport::materializeError($this->context, $message);
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
     private function findCatchFrameForThrow(Frame $frame, Variable $thrown): ?Frame
     {
         $this->context->pendingException = $thrown;
@@ -1473,6 +1573,17 @@ restart:
             }
         }
         $this->clearTryCatchUnwindState();
+
+        return null;
+    }
+
+    private function resolveActiveCatchException(Frame $frame): ?Variable
+    {
+        for ($f = $frame; null !== $f; $f = $f->parent) {
+            if (null !== $f->activeCatchException) {
+                return $f->activeCatchException;
+            }
+        }
 
         return null;
     }
@@ -1534,6 +1645,7 @@ restart:
                 }
                 $catchFrame->scope[$op->arg3]->copyFrom($caught);
             }
+            $catchFrame->activeCatchException = $caught;
             $mergeFrame = null;
             if (null !== $op->block2) {
                 $mergeFrame = $op->block2->getFrame($this->context, $handler);
@@ -2341,11 +2453,15 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_DECLARE_CLASS_CONST:
-                    $name = strtolower($frame->scope[$op->arg1]->toString());
+                    $canonical = $frame->scope[$op->arg1]->toString();
+                    $name = strtolower($canonical);
                     if (!isset($block->constants[$op->arg2])) {
                         throw new \LogicException('Class constant value must be a compile-time constant');
                     }
                     $entry->constants[$name] = $block->constants[$op->arg2];
+                    if ($entry->isEnum) {
+                        $entry->enumCaseCanonicalNames[$name] = $canonical;
+                    }
                     break;
                 case OpCode::TYPE_USE_TRAIT:
                     $this->applyTraitUse($entry, $frame->scope[$op->arg1]->toString());

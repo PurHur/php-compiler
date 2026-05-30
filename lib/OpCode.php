@@ -154,6 +154,9 @@ class OpCode {
     /** Pre-decrement: arg1=result, arg2=read, arg3=write (#3552). */
     const TYPE_PRE_DEC = 114;
 
+    /** Bare `throw;` in catch — rethrow active caught exception (#3508). */
+    const TYPE_RETHROW = 115;
+
     public int $type;
     public ?int $arg1;
     public ?int $arg2;

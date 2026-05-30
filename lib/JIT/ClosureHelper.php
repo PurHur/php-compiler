@@ -126,11 +126,100 @@ final class ClosureHelper
     }
 
     /** By-reference bind to enclosing storage; resolved at each invoke (issue #72). */
-    public static function referenceCapture(Variable $src): Variable
+    public static function referenceCapture(Context $context, Variable $src, string $name): Variable
     {
-        $src->addref();
+        if (Variable::TYPE_VALUE === $src->type) {
+            $src->addref();
 
-        return $src;
+            return $src;
+        }
+
+        return self::promoteNativeCaptureForByRef($context, $src, $name);
+    }
+
+    /**
+     * Hoist a native local into a shared {@see __value__} box for closure use (&$x) (issue #3097).
+     *
+     * Rebinds the enclosing name so outer reads/writes share storage with the capture.
+     */
+    private static function promoteNativeCaptureForByRef(Context $context, Variable $src, string $name): Variable
+    {
+        $slot = JitValueBox::alloc($context);
+        $native = $context->builder->load($src->value);
+        switch ($src->type) {
+            case Variable::TYPE_NATIVE_LONG:
+                JitValueBox::writeLong($context, $slot, $native);
+                break;
+            case Variable::TYPE_NATIVE_BOOL:
+                JitValueBox::writeLong(
+                    $context,
+                    $slot,
+                    $context->builder->zExt($native, $context->getTypeFromString('int64'))
+                );
+                break;
+            case Variable::TYPE_NATIVE_DOUBLE:
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeDouble'),
+                    JitValueBox::pointer($context, $slot),
+                    $native
+                );
+                break;
+            case Variable::TYPE_STRING:
+                $owned = $context->builder->call(
+                    $context->lookupFunction('__string__separate'),
+                    $native
+                );
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeString'),
+                    JitValueBox::pointer($context, $slot),
+                    $owned
+                );
+                break;
+            case Variable::TYPE_OBJECT:
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeObject'),
+                    JitValueBox::pointer($context, $slot),
+                    $native
+                );
+                break;
+            case Variable::TYPE_HASHTABLE:
+                $context->refcount->addref($native);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeHashtable'),
+                    JitValueBox::pointer($context, $slot),
+                    $native
+                );
+                break;
+            case Variable::TYPE_NULL:
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeNull'),
+                    JitValueBox::pointer($context, $slot)
+                );
+                break;
+            default:
+                throw new \LogicException(
+                    'Closure use (&$x) cannot capture type '
+                    .Variable::getStringType($src->type)
+                    .' in JIT yet (issue #3097)'
+                );
+        }
+        $box = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+        $box->addref();
+        self::rebindScopedName($context, $name, $box);
+
+        return $box;
+    }
+
+    private static function rebindScopedName(Context $context, string $name, Variable $replacement): void
+    {
+        $context->bindVariableByName($name, $replacement);
+        foreach ($context->scopeStack as $scope) {
+            foreach ($scope->variables as $op) {
+                if ($name === OperandName::resolve($op)) {
+                    $scope->variables[$op] = $replacement;
+                }
+            }
+        }
     }
 
     /** Alias a closure capture slot to live enclosing {@see __value__*} storage (issue #72). */
@@ -172,7 +261,7 @@ final class ClosureHelper
                 continue;
             }
             $captures[] = $spec['byRef']
-                ? self::referenceCapture($src)
+                ? self::referenceCapture($context, $src, $spec['name'])
                 : self::snapshotCapture($context, $src);
         }
 

@@ -6449,17 +6449,22 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     $methodLc = strtolower($name->value);
-                    if ([] !== $op->attributeNames && '' !== $this->context->scope->className) {
-                        $attrNames = [];
-                        foreach ($op->attributeNames as $n) {
-                            $attrNames[] = ltrim($n, '\\');
+                    if ([] !== $op->attributeNames) {
+                        $classLc = '' !== $this->context->scope->className
+                            ? strtolower(ltrim($this->context->scope->className, '\\'))
+                            : strtolower(ltrim($this->context->type->object->classNameForId($this->context->scope->classId), '\\'));
+                        if ('' !== $classLc) {
+                            $attrNames = [];
+                            foreach ($op->attributeNames as $n) {
+                                $attrNames[] = ltrim($n, '\\');
+                            }
+                            AttributeRegistry::emitRegisterMethod(
+                                $this->context,
+                                $classLc,
+                                $methodLc,
+                                $attrNames
+                            );
                         }
-                        AttributeRegistry::emitRegisterMethod(
-                            $this->context,
-                            strtolower(ltrim($this->context->scope->className, '\\')),
-                            $methodLc,
-                            $attrNames
-                        );
                     }
                     if (($this->isBundledSuperglobalsClass($classId) || $this->shouldSkipExternalClassBodyLowering($classId))
                         && 'issuperglobalname' !== $methodLc

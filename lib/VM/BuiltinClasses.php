@@ -33,7 +33,9 @@ final class BuiltinClasses
 {
     public static function register(Context $ctx): void
     {
+        StringableSupport::register($ctx);
         self::registerStdClass($ctx);
+        self::registerCountable($ctx);
         self::registerWeakReference($ctx);
         self::registerWeakMap($ctx);
         self::registerReflection($ctx);
@@ -41,6 +43,14 @@ final class BuiltinClasses
         self::registerThrowableHierarchy($ctx);
         GeneratorState::register($ctx);
         ClosureState::register($ctx);
+    }
+
+    /** Zend zend_interfaces.c — Countable interface (#3364). */
+    private static function registerCountable(Context $ctx): void
+    {
+        $entry = new ClassEntry('Countable');
+        $entry->isInterface = true;
+        $ctx->classes['countable'] = $entry;
     }
 
     private static function registerStdClass(Context $ctx): void
@@ -166,7 +176,11 @@ final class BuiltinClasses
         $pub = CfgFunc::FLAG_PUBLIC;
         $getMessage = new ThrowableGetMessage();
 
+        $throwable = new ClassEntry('Throwable');
+        $ctx->classes['throwable'] = $throwable;
+
         $error = new ClassEntry('Error');
+        $error->parentLc = 'throwable';
         $error->properties[] = new ClassProperty(BuiltinExceptionSupport::PROP_MESSAGE, null, $strProto);
         $error->methods['getmessage'] = $getMessage;
         $error->methodVisibility['getmessage'] = $pub;
@@ -178,5 +192,12 @@ final class BuiltinClasses
         $typeError->methods['getmessage'] = $getMessage;
         $typeError->methodVisibility['getmessage'] = $pub;
         $ctx->classes[BuiltinExceptionSupport::CLASS_TYPE_ERROR] = $typeError;
+
+        $divisionByZero = new ClassEntry('DivisionByZeroError');
+        $divisionByZero->parentLc = BuiltinExceptionSupport::CLASS_ERROR;
+        $divisionByZero->properties[] = new ClassProperty(BuiltinExceptionSupport::PROP_MESSAGE, null, $strProto);
+        $divisionByZero->methods['getmessage'] = $getMessage;
+        $divisionByZero->methodVisibility['getmessage'] = $pub;
+        $ctx->classes[BuiltinExceptionSupport::CLASS_DIVISION_BY_ZERO_ERROR] = $divisionByZero;
     }
 }

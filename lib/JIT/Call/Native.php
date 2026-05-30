@@ -222,6 +222,11 @@ class Native implements Call {
                         );
 
                         return \PHPCompiler\JIT\JitValueBox::pointer($context, $slot);
+                    case Variable::TYPE_NATIVE_LONG:
+                    case Variable::TYPE_NATIVE_BOOL:
+                    case Variable::TYPE_NATIVE_DOUBLE:
+                    case Variable::TYPE_HASHTABLE:
+                        return \PHPCompiler\JIT\JitValueBox::valuePtrFromNativeVariable($context, $arg);
                 }
                 break;
             case '__value__':

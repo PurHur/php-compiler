@@ -53,8 +53,16 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gc_collect_cycles')) {
                 continue;
             }
+            // count() on Countable objects is VM-only until JIT object dispatch (#3364).
+            if (str_contains($name, 'countable')) {
+                continue;
+            }
             // array_walk_recursive() is VM-only until recursive LLVM walk (#3111).
             if (str_contains($name, 'array_walk_recursive')) {
+                continue;
+            }
+            // #[\AllowDynamicProperties] is VM-only until JIT class flag (#3467).
+            if (str_contains($name, 'allow_dynamic_properties')) {
                 continue;
             }
             // preg_last_error_msg() MCJIT path unsafe with preg_match stub runtime (#3110).
@@ -63,6 +71,10 @@ class JITTest extends BaseTest {
             }
             // json_validate() MCJIT path unsafe until __compiler_json_validate link is stable (#3101).
             if (str_contains($name, 'json_validate')) {
+                continue;
+            }
+            // Stringable __toString in echo/concat is VM-only until magic method JIT (#146, #3296).
+            if (str_contains($name, 'stringable')) {
                 continue;
             }
             yield $name => $case;

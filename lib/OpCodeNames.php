@@ -218,6 +218,8 @@ function opcode_type_name(int $type): string
             return 'TYPE_POST_DEC';
         case 114:
             return 'TYPE_PRE_DEC';
+        case 115:
+            return 'TYPE_RETHROW';
         default:
             return 'unknown opcode';
     }

@@ -330,6 +330,7 @@ class Module extends ModuleAbstract
             new class_exists_(),
             new class_alias(),
             new enum_exists_(),
+            new get_declared_enums_(),
             new interface_exists_(),
             new trait_exists_(),
             new class_uses_(),

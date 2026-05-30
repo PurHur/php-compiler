@@ -186,6 +186,8 @@ class Runtime {
     }
 
     public function parse(string $code, string $filename): Script {
+        [$code, $bareRethrowLines] = SourceBareThrowRewriter::rewrite($code);
+        $this->compiler->setBareRethrowLines($bareRethrowLines);
         $script = $this->parser->parse($code, $filename);
         $this->preprocessor->traverse($script);
         if (!$this->isBootstrapVendorPrelinkMode()) {
