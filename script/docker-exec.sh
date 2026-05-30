@@ -77,16 +77,26 @@ if [[ ${#SYNC_BACK_PATHS[@]} -eq 0 ]]; then
 fi
 
 # Self-host bootstrap uses compiled drivers under build/ across multiple docker-exec invocations.
-# In tar-fallback mode the container is ephemeral, so keep the key driver artifacts on the host.
+# In tar-fallback mode the container is ephemeral, so keep the key driver artifacts on the host (#2963).
+_docker_exec_m5_sync_back_paths() {
+  SYNC_BACK_PATHS+=(
+    "build/bin-compile-aot"
+    "build/bin-compile-aot-inventory"
+    "build/selfhost"
+    "build/selfhost-compile-driver"
+    "build/selfhost-native-compile-driver"
+    "build/selfhost-helloworld-compile"
+    "build/selfhost-lib-spine-smoke"
+  )
+}
 if [[ ${#SYNC_BACK_PATHS[@]} -eq 0 ]]; then
   case " $* " in
-    *" script/north-star5-verify.sh "*|*" ./script/north-star5-verify.sh "*|\
-    *" script/bootstrap-vendor-objects.php "*|*" ./script/bootstrap-vendor-objects.php "*|\
-    *" script/bootstrap-vendor-prelink-"*|*" ./script/bootstrap-vendor-prelink-"*|\
-    *" bootstrap-selfhost-driver-smoke "*|*" bootstrap-selfhost-full-revision-probe "*|*" bootstrap-loop-"*)
-      SYNC_BACK_PATHS+=("build/bin-compile-aot")
-      SYNC_BACK_PATHS+=("build/selfhost-compile-driver")
-      SYNC_BACK_PATHS+=("build/selfhost-native-compile-driver")
+    *north-star5-verify*|*north-star3-verify*|\
+    *bootstrap-vendor-objects.php*|*bootstrap-vendor-prelink-*|\
+    *bootstrap-selfhost-link*|*bootstrap-selfhost-driver-smoke*|\
+    *bootstrap-selfhost-lib-spine-smoke*|*bootstrap-selfhost-full-revision-probe*|\
+    *bootstrap-loop-*)
+      _docker_exec_m5_sync_back_paths
       ;;
   esac
 fi
