@@ -572,6 +572,11 @@ class Block {
             } elseif (isset($this->closureCaptureSlots[$pos])) {
                 $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
             } elseif ($this->args->contains($op)) {
+                // Callee parameters are filled by TYPE_ARG_RECV; do not inherit caller locals (#3803).
+                if ($this->isArgRecvParameterSlot($pos)) {
+                    $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    continue;
+                }
                 if (is_null($frame)) {
                     $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
                     continue;
@@ -761,6 +766,18 @@ class Block {
         }
 
         return $op instanceof VarOperand ? $op : null;
+    }
+
+    /** Scope slot receiving TYPE_ARG_RECV (function parameter, not caller local). */
+    private function isArgRecvParameterSlot(int $slot): bool
+    {
+        foreach ($this->opCodes as $op) {
+            if (OpCode::TYPE_ARG_RECV === $op->type && (int) $op->arg1 === $slot) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function resolveVariableName(Operand $op): ?string
