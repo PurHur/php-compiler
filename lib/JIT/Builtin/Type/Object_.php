@@ -549,6 +549,17 @@ class Object_ extends Type {
         return $this->classParentLc[strtolower(ltrim($declaringClassLc, '\\'))] ?? null;
     }
 
+    /** Parent class display name for JIT get_parent_class() when known at compile time (#3483). */
+    public function parentClassDisplayName(string $className): ?string
+    {
+        $parentLc = $this->parentClassLc($className);
+        if (null === $parentLc || !isset($this->classes[$parentLc])) {
+            return null;
+        }
+
+        return $this->classNameForId($this->classes[$parentLc]);
+    }
+
     /**
      * Compile-time extends-chain check for is_a() string form (#3478).
      */
