@@ -936,7 +936,10 @@ class Block {
                 }
                 foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
                     if ($sub instanceof self) {
-                        if (OpCode::TYPE_FUNCDEF === $op->type && $sub === $op->block1) {
+                        if (
+                            (OpCode::TYPE_FUNCDEF === $op->type || OpCode::TYPE_DECLARE_METHOD === $op->type)
+                            && $sub === $op->block1
+                        ) {
                             continue;
                         }
                         $stack[] = $sub;

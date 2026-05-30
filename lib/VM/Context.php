@@ -182,7 +182,7 @@ class Context {
         return null;
     }
 
-    private static function errorReportingConstant(string $name): ?int
+    public static function errorReportingConstant(string $name): ?int
     {
         return match (strtolower($name)) {
             'e_error' => 1,

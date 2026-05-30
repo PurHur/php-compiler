@@ -98,7 +98,13 @@ final class VmPhpCoreConstants
 
     private static function canonicalName(string $name): ?string
     {
+        if (\defined($name)) {
+            return $name;
+        }
         $upper = strtoupper($name);
+        if (\defined($upper)) {
+            return $upper;
+        }
         if (!str_starts_with($upper, 'PHP_')) {
             return null;
         }
@@ -106,12 +112,6 @@ final class VmPhpCoreConstants
             if (strtoupper($canonical) === $upper) {
                 return $canonical;
             }
-        }
-        if (\defined($name)) {
-            return $name;
-        }
-        if (\defined($upper)) {
-            return $upper;
         }
 
         return null;
