@@ -156,6 +156,8 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitFflush.php',
         'ext/standard/JitFilePutContents.php',
         'ext/standard/JitFilemtime.php',
+        'ext/standard/JitFileowner.php',
+        'ext/standard/JitFilegroup.php',
         'ext/standard/JitFileperms.php',
         'ext/standard/JitFilesize.php',
         'ext/standard/JitFiletype.php',

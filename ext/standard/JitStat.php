@@ -52,6 +52,12 @@ final class JitStat
     /** offsetof(struct stat, st_ctim) on Linux x86_64 glibc */
     private const STAT_CTIME_OFFSET = 104;
 
+    /** offsetof(struct stat, st_uid) on Linux x86_64 glibc */
+    private const STAT_UID_OFFSET = 28;
+
+    /** offsetof(struct stat, st_gid) on Linux x86_64 glibc */
+    private const STAT_GID_OFFSET = 32;
+
     private const S_IFMT = 0xF000;
     private const S_IFIFO = 0x1000;
     private const S_IFCHR = 0x2000;
@@ -248,6 +254,18 @@ final class JitStat
     public static function pathFileInodeBoxed(Context $context, Value $str): Value
     {
         return self::pathStatFieldBoxed($context, $str, self::STAT_INO_OFFSET, 'fileinode', true);
+    }
+
+    /** @return Value */
+    public static function pathFileOwnerBoxed(Context $context, Value $str): Value
+    {
+        return self::pathStatFieldBoxed($context, $str, self::STAT_UID_OFFSET, 'fileowner', false);
+    }
+
+    /** @return Value */
+    public static function pathFileGroupBoxed(Context $context, Value $str): Value
+    {
+        return self::pathStatFieldBoxed($context, $str, self::STAT_GID_OFFSET, 'filegroup', false);
     }
 
     /** @return Value */

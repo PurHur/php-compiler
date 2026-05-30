@@ -276,6 +276,8 @@
         "ext/standard/file_get_contents.php",
         "ext/standard/file_put_contents.php",
         "ext/standard/filemtime.php",
+        "ext/standard/fileowner.php",
+        "ext/standard/filegroup.php",
         "ext/standard/fileperms.php",
         "ext/standard/filesize.php",
         "ext/standard/filetype.php",

@@ -355,6 +355,8 @@ class Module extends ModuleAbstract
             new fileatime(),
             new filectime(),
             new fileinode(),
+            new fileowner(),
+            new filegroup(),
             new clearstatcache_(),
             new stat_(),
             new lstat_(),
