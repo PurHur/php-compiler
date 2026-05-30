@@ -24,6 +24,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Compiler\AttributeNames;
+use PHPCompiler\Compiler\DeprecatedMetadata;
 use PHPCompiler\Compiler\FinalClassExtensionCheck;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
 use PHPCompiler\Web\ConstStringFolder;
@@ -1111,6 +1112,7 @@ class Compiler {
             $declare->block1 = $methodBlock;
         }
         $declare->attributeNames = AttributeNames::fromOp($child);
+        $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $result->addOpCode($declare);
     }
 
@@ -1280,11 +1282,13 @@ class Compiler {
                         $this->throwCompileLogic('Class constants are only supported on classes and traits for now');
                     }
                     $this->compileOps($child->valueBlock->children, $result);
-                    $result->addOpCode(new OpCode(
+                    $constOp = new OpCode(
                         OpCode::TYPE_DECLARE_CLASS_CONST,
                         $this->compileOperand($child->name, $result, true),
                         $this->compileOperand($child->value, $result, true)
-                    ));
+                    );
+                    $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
+                    $result->addOpCode($constOp);
                     break;
                 case Op\Stmt\TraitUse::class:
                     if (OpCode::TYPE_DECLARE_CLASS !== $type) {
@@ -1421,6 +1425,7 @@ class Compiler {
             $this->compileOperand($operand, $block, true)
         );
         $return->block1 = $funcBlock;
+        $return->deprecatedMetadata = DeprecatedMetadata::fromOp($function);
         return $return;
     }
 

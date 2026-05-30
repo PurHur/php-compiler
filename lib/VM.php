@@ -15,6 +15,7 @@ use PHPCompiler\Func;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClosureState;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\GeneratorState;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\NamedArgs;
@@ -629,6 +630,15 @@ restart:
                     if (!isset($classEntry->constants[$constName])) {
                         return $this->raise("Undefined class constant {$className}::{$constName}", $frame);
                     }
+                    if (isset($classEntry->constDeprecated[$constName])) {
+                        $this->emitDeprecatedNotice(
+                            $classEntry->constDeprecated[$constName]->formatConstant(
+                                $classEntry->name,
+                                $frame->scope[$op->arg3]->toString()
+                            ),
+                            $frame
+                        );
+                    }
                     $frame->scope[$op->arg1]->copyFrom($classEntry->constants[$constName]);
                     break;
                 case OpCode::TYPE_INSTANCEOF:
@@ -761,7 +771,9 @@ restart:
                     if (isset($this->context->functions[$lcname])) {
                         throw new \LogicException("Duplicate function definition for $lcname()");
                     }
-                    $this->context->declareFunction(new Func\PHP($name, $op->block1));
+                    $func = new Func\PHP($name, $op->block1);
+                    $func->deprecated = $op->deprecatedMetadata;
+                    $this->context->declareFunction($func);
                     break;
                 case OpCode::TYPE_FUNCCALL_INIT:
                     $callee = $frame->scope[$op->arg1]->resolveIndirect();
@@ -834,6 +846,7 @@ restart:
                         $this->markPendingNewObjectConstructed($frame);
                         break;
                     }
+                    $this->emitCallDeprecationNotice($frame);
                     if ($frame->call instanceof Func\PHP && $frame->call->block->isGenerator) {
                         try {
                             $calledArgs = $this->resolveOutgoingCallArgs($frame);
@@ -2146,6 +2159,9 @@ restart:
                 if (isset($trait->methodAttributeNames[$name])) {
                     $entry->methodAttributeNames[$name] = $trait->methodAttributeNames[$name];
                 }
+                if (isset($trait->methodDeprecated[$name])) {
+                    $entry->methodDeprecated[$name] = $trait->methodDeprecated[$name];
+                }
             }
         }
         foreach ($trait->staticProperties as $name => $storage) {
@@ -2160,6 +2176,9 @@ restart:
                 );
             }
             $entry->constants[$name] = $value;
+            if (isset($trait->constDeprecated[$name])) {
+                $entry->constDeprecated[$name] = $trait->constDeprecated[$name];
+            }
         }
     }
 
@@ -2178,6 +2197,9 @@ restart:
             if (!isset($entry->methods[$name])) {
                 $entry->methods[$name] = $method;
                 $entry->methodVisibility[$name] = $parent->methodVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                if (isset($parent->methodDeprecated[$name])) {
+                    $entry->methodDeprecated[$name] = $parent->methodDeprecated[$name];
+                }
             }
         }
         foreach ($parent->staticProperties as $name => $storage) {
@@ -2188,6 +2210,9 @@ restart:
         foreach ($parent->constants as $name => $value) {
             if (!isset($entry->constants[$name])) {
                 $entry->constants[$name] = $value;
+                if (isset($parent->constDeprecated[$name])) {
+                    $entry->constDeprecated[$name] = $parent->constDeprecated[$name];
+                }
             }
         }
         if (null === $entry->constructor && null !== $parent->constructor) {
@@ -2288,8 +2313,12 @@ restart:
                     if ([] !== $op->attributeNames) {
                         $entry->methodAttributeNames[$name] = $op->attributeNames;
                     }
+                    if (null !== $op->deprecatedMetadata) {
+                        $entry->methodDeprecated[$name] = $op->deprecatedMetadata;
+                    }
                     if (null !== $op->block1) {
                         $method = new Func\PHP($entry->name.'::'.$name, $op->block1);
+                        $method->deprecated = $op->deprecatedMetadata;
                         $entry->methods[$name] = $method;
                         if ('__construct' === $name) {
                             $entry->constructor = $method;
@@ -2302,6 +2331,9 @@ restart:
                         throw new \LogicException('Class constant value must be a compile-time constant');
                     }
                     $entry->constants[$name] = $block->constants[$op->arg2];
+                    if (null !== $op->deprecatedMetadata) {
+                        $entry->constDeprecated[$name] = $op->deprecatedMetadata;
+                    }
                     break;
                 case OpCode::TYPE_USE_TRAIT:
                     $this->applyTraitUse($entry, $frame->scope[$op->arg1]->toString());
@@ -2386,6 +2418,36 @@ restart:
         }
         $strict = $block->strictTypes;
         TypeCheck::coerceReturn($value, $strict, $block->returnTypeConstraint);
+    }
+
+    private function emitCallDeprecationNotice(Frame $frame): void
+    {
+        if (null === $frame->call || !($frame->call instanceof Func\PHP)) {
+            return;
+        }
+        $meta = $frame->call->deprecated;
+        if (null === $meta) {
+            return;
+        }
+        $name = $frame->call->getName();
+        if (str_contains($name, '::')) {
+            [$class, $method] = explode('::', $name, 2);
+            $message = $meta->formatMethod($class, $method);
+        } else {
+            $message = $meta->formatFunction($name);
+        }
+        $this->emitDeprecatedNotice($message, $frame);
+    }
+
+    private function emitDeprecatedNotice(string $message, Frame $frame): void
+    {
+        $this->context->errors->triggerError(
+            $message,
+            ErrorReporter::E_USER_DEPRECATED,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $this->context,
+            $frame
+        );
     }
 
 }
