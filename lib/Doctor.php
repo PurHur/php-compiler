@@ -1139,8 +1139,10 @@ final class Doctor
         }
         fwrite(STDOUT, "      Parity:  ./script/check-init-fastcgiweb-parity.sh (INIT_FASTCGIWEB_PARITY_GATE=1 in ci-fast)\n");
 
-        fwrite(STDOUT, "\n  Related:\n");
-        fwrite(STDOUT, "  [📋] FastCGI adapter loop — #173 (FASTCGI_SMOKE_GATE=1 for PHPUnit FastCgi*)\n");
+        fwrite(STDOUT, "  CLI:     ./phpc fcgi --project examples/009-FastCGIWeb (#2427)\n");
+        fwrite(STDOUT, "           ./phpc fcgi --help\n\n");
+        fwrite(STDOUT, "  Related:\n");
+        fwrite(STDOUT, "  [✅] FastCGI adapter loop — #173 (FASTCGI_SMOKE_GATE=1 for PHPUnit FastCgi*)\n");
         fwrite(STDOUT, "  Docs: examples/009-FastCGIWeb/README.md · docs/local-ci-matrix.md\n");
     }
 

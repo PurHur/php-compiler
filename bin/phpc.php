@@ -19,6 +19,7 @@ declare(strict_types=1);
  *   phpc build --project [dir] [--probe]       After link, fail when execute stdout is empty (#792)
  *   phpc deploy [dir] -o <dist> [--from-build]  Bundle binary, public/, assets/, phpc.json
  *   phpc cgi [binary]                           CGI wrapper for AOT binary (issue #665)
+ *   phpc fcgi [--listen host:port] [--project dir] [docroot]  FastCGI worker (#2427, #173)
  *   phpc lint [-r 'code'] [--json] entry.php
  *   phpc lint --project <entry.php> [--json]
  *   phpc lint --all <dir-or-file> [--json]
@@ -64,6 +65,12 @@ php-compiler CLI
       --from-build                              Require existing binary (skip phpc build --project)
   phpc cgi [binary]                             Run AOT binary under CGI env (stdin → REQUEST_BODY)
       PHPC_DEPLOY_ROOT=<dist>                   Resolve bin/app from deploy bundle when binary omitted
+  phpc fcgi [--listen host:port] [--project dir] [docroot]
+                                              Long-lived FastCGI worker (#2427; adapter #173)
+      --listen host:port                        TCP bind (default 127.0.0.1:9000)
+      --project [dir]                           phpc.json public/ + optional AOT binary
+      --binary path                             Force AOT binary path
+      phpc fcgi --help                          Full flags and examples
   phpc lint [-r 'code'] [--json] <entry.php>    Report unsupported syntax (line-accurate)
   phpc lint --project <entry.php> [--json]    Entry + literal include/require chain
   phpc lint --all <dir-or-file> [--json]      All .php under a tree (aggregated)
@@ -165,11 +172,8 @@ switch ($command) {
             fwrite(STDERR, "phpc fcgi: run composer install first\n");
             exit(1);
         }
-        $fcgiArgs = [];
-        while ([] !== $args) {
-            $fcgiArgs[] = array_shift($args);
-        }
-        exit(runProcess(array_merge($php, array_merge([$repoRoot.'/bin/fcgi.php'], $fcgiArgs)), $repoRoot));
+        require $repoRoot.'/vendor/autoload.php';
+        exit(\PHPCompiler\Cli\PhpcFcgi::main($args));
 
     case 'build':
         if ([] !== $args && '--project' === $args[0]) {
