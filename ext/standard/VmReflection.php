@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -281,6 +282,43 @@ final class VmReflection
         }
 
         return strtolower($value->toObject()->class->name) === strtolower($className);
+    }
+
+    /**
+     * is_a() / is_subclass_of() object operand — walk extends chain (#3478).
+     *
+     * php-src: ext/standard/class.c — instanceof_function / instanceof_function_ex
+     */
+    public static function isInstanceOf(Context $ctx, ClassEntry $entry, string $className): bool
+    {
+        return InterfaceCheck::entryIsInstanceOf($entry, strtolower(ltrim($className, '\\')), $ctx);
+    }
+
+    public static function isInstanceOfObject(Context $ctx, Variable $object, string $className): bool
+    {
+        $object = $object->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $object->type) {
+            return false;
+        }
+
+        return self::isInstanceOf($ctx, $object->toObject()->class, $className);
+    }
+
+    /**
+     * is_subclass_of() class-string operand — strict subclass (excludes same class).
+     */
+    public static function isSubclassOf(Context $ctx, string $childName, string $parentName): bool
+    {
+        $child = self::resolveClassEntry($ctx, $childName);
+        if (null === $child) {
+            return false;
+        }
+        $parentLc = strtolower(ltrim($parentName, '\\'));
+        if (strtolower($child->name) === $parentLc) {
+            return false;
+        }
+
+        return InterfaceCheck::entryIsInstanceOf($child, $parentLc, $ctx);
     }
 
     /**

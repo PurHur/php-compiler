@@ -550,6 +550,73 @@ class Object_ extends Type {
     }
 
     /**
+     * Compile-time extends-chain check for is_a() string form (#3478).
+     */
+    public function classIsInstanceOf(string $childName, string $parentName): bool
+    {
+        return $this->classEntryIsInstanceOfLc(
+            strtolower(ltrim($childName, '\\')),
+            strtolower(ltrim($parentName, '\\'))
+        );
+    }
+
+    /**
+     * Compile-time strict-subclass check for is_subclass_of() string form (#3478).
+     */
+    public function classIsSubclassOf(string $childName, string $parentName): bool
+    {
+        $childLc = strtolower(ltrim($childName, '\\'));
+        $parentLc = strtolower(ltrim($parentName, '\\'));
+        if ($childLc === $parentLc) {
+            return false;
+        }
+
+        return $this->classEntryIsInstanceOfLc($childLc, $parentLc);
+    }
+
+    /**
+     * @return list<int> class ids whose instances satisfy instanceof $className
+     */
+    public function classIdsInstanceOf(string $className): array
+    {
+        $wantLc = strtolower(ltrim($className, '\\'));
+        $ids = [];
+        foreach ($this->classIdToName as $id => $name) {
+            if ($this->classEntryIsInstanceOfLc(strtolower(ltrim($name, '\\')), $wantLc)) {
+                $ids[] = $id;
+            }
+        }
+        if (isset($this->classes[$wantLc])) {
+            $expectedId = $this->classes[$wantLc];
+            if (!in_array($expectedId, $ids, true)) {
+                $ids[] = $expectedId;
+            }
+        }
+
+        return $ids;
+    }
+
+    private function classEntryIsInstanceOfLc(string $classLc, string $wantLc): bool
+    {
+        $visited = [];
+        $current = $classLc;
+        while (true) {
+            if (isset($visited[$current])) {
+                return false;
+            }
+            $visited[$current] = true;
+            if ($current === $wantLc) {
+                return true;
+            }
+            $parent = $this->classParentLc[$current] ?? null;
+            if (null === $parent) {
+                return false;
+            }
+            $current = $parent;
+        }
+    }
+
+    /**
      * @param list<string> $interfaceLcs lowercase interface names
      */
     public function setClassInterfaces(string $className, array $interfaceLcs): void
@@ -1610,21 +1677,15 @@ class Object_ extends Type {
 
     public function emitInstanceOf(Variable $expr, string $className): Variable
     {
-        $expectedId = $this->lookup($className);
         $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
         $objMap = $this->context->structFieldMap['__object__'];
-        $expectedClassId = $this->context->constantFromInteger($expectedId, 'int64');
 
         if (Variable::TYPE_OBJECT === $expr->type) {
             $obj = $this->context->helper->loadValue($expr);
             $classId = $this->context->builder->load(
                 $this->context->builder->structGep($obj, $objMap['class_id'])
             );
-            $match = $this->context->builder->icmp(
-                PHPLLVM\Builder::INT_EQ,
-                $classId,
-                $expectedClassId
-            );
+            $match = $this->emitClassIdInstanceOf($classId, $className);
 
             return new Variable(
                 $this->context,
@@ -1649,11 +1710,7 @@ class Object_ extends Type {
             $classId = $this->context->builder->load(
                 $this->context->builder->structGep($obj, $objMap['class_id'])
             );
-            $matches = $this->context->builder->icmp(
-                PHPLLVM\Builder::INT_EQ,
-                $classId,
-                $expectedClassId
-            );
+            $matches = $this->emitClassIdInstanceOf($classId, $className);
             $match = $this->context->builder->and($isObject, $matches);
 
             return new Variable(
@@ -1670,6 +1727,38 @@ class Object_ extends Type {
             Variable::KIND_VALUE,
             $falseVal
         );
+    }
+
+    private function emitClassIdInstanceOf(PHPLLVM\Value $classId, string $className): PHPLLVM\Value
+    {
+        $matchingIds = $this->classIdsInstanceOf($className);
+        if ([] === $matchingIds) {
+            $expectedId = $this->lookup($className);
+
+            return $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $classId,
+                $this->context->constantFromInteger($expectedId, 'int64')
+            );
+        }
+        if (1 === \count($matchingIds)) {
+            return $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $classId,
+                $this->context->constantFromInteger($matchingIds[0], 'int64')
+            );
+        }
+        $match = null;
+        foreach ($matchingIds as $id) {
+            $cmp = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $classId,
+                $this->context->constantFromInteger($id, 'int64')
+            );
+            $match = null === $match ? $cmp : $this->context->builder->or($match, $cmp);
+        }
+
+        return $match;
     }
 
     /**
