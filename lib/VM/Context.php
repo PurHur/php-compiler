@@ -134,6 +134,10 @@ class Context {
             $var->int($stdlibInt);
             return $var;
         }
+        $phpCore = \PHPCompiler\ext\standard\VmPhpCoreConstants::fetch($name);
+        if (null !== $phpCore) {
+            return $phpCore;
+        }
         if (isset($this->constants[$name])) {
             return $this->constants[$name];
         }
