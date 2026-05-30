@@ -31,8 +31,14 @@ final class ReflectionClassGetAttributes extends VmClassMethod
             $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionClass::getAttributes() name');
         }
         $names = ReflectionSupport::filterByName($entry->attributeNames, $filter);
+        $entries = ReflectionSupport::filterEntriesByName($entry->attributeEntries, $filter);
+        if ([] !== $entries) {
+            $out = ReflectionSupport::attributesArrayFromEntries($frame, $entries);
+        } else {
+            $out = ReflectionSupport::attributesArray($frame, $names);
+        }
         if (null !== $frame->returnVar) {
-            $frame->returnVar->copyFrom(ReflectionSupport::attributesArray($frame, $names));
+            $frame->returnVar->copyFrom($out);
         }
     }
 }

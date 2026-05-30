@@ -28,11 +28,13 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\ClassReadonly;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
+use PHPCompiler\Compiler\AttributeMetadata;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\DeprecatedMetadata;
 use PHPCompiler\Compiler\FinalClassExtensionCheck;
-use PHPCompiler\Compiler\ReadonlyClassCompileCheck;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
+use PHPCompiler\Compiler\ParameterMetadata;
+use PHPCompiler\Compiler\ReadonlyClassCompileCheck;
 use PHPCompiler\Compiler\TraitCollisionCheck;
 use PHPCompiler\Web\ConstStringFolder;
 use PHPCompiler\Web\IncludePathResolver;
@@ -1227,8 +1229,7 @@ class Compiler {
             OpCode::TYPE_DECLARE_TRAIT,
             $this->compileOperand($trait->name, $block, true)
         );
-        $return->attributeNames = AttributeNames::fromOp($trait);
-        AttributeNames::assertNoDuplicates($return->attributeNames);
+        $this->assignAttributeMetadata($return, $trait);
         $return->block1 = $this->compileClassBody($trait->stmts, OpCode::TYPE_DECLARE_TRAIT);
 
         return $return;
@@ -1310,10 +1311,37 @@ class Compiler {
             $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params, $child->func);
             $declare->block1 = $methodBlock;
         }
-        $declare->attributeNames = AttributeNames::fromOp($child);
-        AttributeNames::assertNoDuplicates($declare->attributeNames);
+        $this->assignAttributeMetadata($declare, $child);
+        $declare->parameterMetadata = $this->parameterMetadataFromParams($child->func->params);
         $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $result->addOpCode($declare);
+    }
+
+    /**
+     * @param list<Op\Expr\Param> $params
+     *
+     * @return list<ParameterMetadata>
+     */
+    protected function parameterMetadataFromParams(array $params): array
+    {
+        $metadata = [];
+        foreach ($params as $param) {
+            if (!($param->name instanceof Operand\Literal) || !is_string($param->name->value)) {
+                continue;
+            }
+            $metadata[] = new ParameterMetadata(
+                $param->name->value,
+                AttributeMetadata::fromOp($param)
+            );
+        }
+
+        return $metadata;
+    }
+
+    protected function assignAttributeMetadata(OpCode $op, Op $cfgOp): void
+    {
+        $op->attributeEntries = AttributeMetadata::fromOp($cfgOp);
+        $op->attributeNames = AttributeNames::fromOp($cfgOp);
     }
 
     protected function compileClassLike(Op\Stmt\ClassLike $class, Block $block): OpCode {
@@ -1345,8 +1373,7 @@ class Compiler {
             $className = $this->staticNameFromOperand($class->name) ?? 'class';
             VM\StringableSupport::assertConcreteClassImplements($class, $className);
         }
-        $return->attributeNames = AttributeNames::fromOp($class);
-        AttributeNames::assertNoDuplicates($return->attributeNames);
+        $this->assignAttributeMetadata($return, $class);
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($class->flags);
         if ($return->classIsAbstract) {
             $name = $this->staticNameFromOperand($class->name);
