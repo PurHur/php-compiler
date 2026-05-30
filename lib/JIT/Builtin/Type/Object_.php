@@ -1315,6 +1315,35 @@ class Object_ extends Type {
         return $this->methodVisibility[$classId][strtolower($methodLc)] ?? \PHPCfg\Func::FLAG_PUBLIC;
     }
 
+    /**
+     * @return list<string> lowercase method names declared on this class id
+     */
+    public function declaredMethodNames(int $classId): array
+    {
+        return array_keys($this->methodVisibility[$classId] ?? []);
+    }
+
+    /**
+     * Walk parent chain and copy parent method visibility slots missing on $childId (#101).
+     */
+    public function inheritMethodVisibilityFromParent(int $childId, string $childLc): void
+    {
+        $parentLc = $this->parentClassLc($childLc);
+        if (null === $parentLc || !isset($this->classes[$parentLc])) {
+            return;
+        }
+        $parentId = $this->classes[$parentLc];
+        foreach ($this->declaredMethodNames($parentId) as $methodLc) {
+            if (!isset($this->methodVisibility[$childId][$methodLc])) {
+                $this->methodVisibility[$childId][$methodLc] = $this->methodVisibility[$parentId][$methodLc];
+            }
+        }
+        $grandparent = $this->parentClassLc($parentLc);
+        if (null !== $grandparent) {
+            $this->inheritMethodVisibilityFromParent($childId, $parentLc);
+        }
+    }
+
     public function markHasConstructor(int $classId): void
     {
         $this->hasConstructor[$classId] = true;
