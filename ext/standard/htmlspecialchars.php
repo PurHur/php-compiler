@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -80,10 +81,6 @@ final class htmlspecialchars extends Internal
             );
         }
 
-        if ($argc >= 2 && JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-            throw new \LogicException('htmlspecialchars() flags must be an integer in this compiler build');
-        }
-
         $literal = null;
         if (JITVariable::TYPE_VALUE !== $args[0]->type) {
             $maybeLiteral = $args[0]->compileTimeString ?? null;
@@ -103,7 +100,7 @@ final class htmlspecialchars extends Internal
         $str = JitStringArg::lower($context, $args[0], 'htmlspecialchars() string');
         $flags = $context->getTypeFromString('int64')->constInt(ENT_QUOTES | ENT_SUBSTITUTE, false);
         if ($argc >= 2) {
-            $flags = $context->helper->loadValue($args[1]);
+            $flags = JitLongArg::lower($context, $args[1], 'htmlspecialchars() flags');
         }
 
         return JitHtmlspecialchars::escape($context, $str, $flags);

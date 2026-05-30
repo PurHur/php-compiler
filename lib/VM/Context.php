@@ -124,22 +124,12 @@ class Context {
                 $var = new Variable(Variable::TYPE_INTEGER);
                 $var->int(\PHPCompiler\ext\standard\VmFilter::INPUT_POST);
                 return $var;
-            case 'fnm_noescape':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmFnmatch::FNM_NOESCAPE);
-                return $var;
-            case 'fnm_pathname':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmFnmatch::FNM_PATHNAME);
-                return $var;
-            case 'fnm_period':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmFnmatch::FNM_PERIOD);
-                return $var;
-            case 'fnm_casefold':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmFnmatch::FNM_CASEFOLD);
-                return $var;
+        }
+        $stdlibInt = \PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[strtolower($name)] ?? null;
+        if (null !== $stdlibInt) {
+            $var = new Variable(Variable::TYPE_INTEGER);
+            $var->int($stdlibInt);
+            return $var;
         }
         if (isset($this->constants[$name])) {
             return $this->constants[$name];
