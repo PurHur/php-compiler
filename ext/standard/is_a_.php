@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * is_a() — exact class match (no inheritance chain yet; issue #1220).
+ * is_a() — extends-chain instance check (php-src ext/standard/class.c, issue #3478).
  */
 final class is_a_ extends Internal
 {
@@ -28,6 +28,7 @@ final class is_a_ extends Internal
         if (2 !== \count($frame->calledArgs) && 3 !== \count($frame->calledArgs)) {
             throw new \LogicException('is_a() requires two or three arguments');
         }
+        $ctx = VmReflection::requireContext($frame);
         $className = VmReflection::stringArg($frame->calledArgs[1], 'is_a() class name');
         $allowString = false;
         if (3 === \count($frame->calledArgs)) {
@@ -36,9 +37,11 @@ final class is_a_ extends Internal
         $subject = $frame->calledArgs[0]->resolveIndirect();
         $matches = false;
         if (Variable::TYPE_OBJECT === $subject->type) {
-            $matches = VmReflection::isSameClass($subject, $className);
+            $matches = VmReflection::isInstanceOfObject($ctx, $subject, $className);
         } elseif ($allowString && Variable::TYPE_STRING === $subject->type) {
-            $matches = strtolower($subject->toString()) === strtolower($className);
+            $child = VmReflection::resolveClassEntry($ctx, $subject->toString());
+            $matches = null !== $child
+                && VmReflection::isInstanceOf($ctx, $child, $className);
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($matches);
@@ -67,11 +70,15 @@ final class is_a_ extends Internal
                 'is_a() subject class name'
             );
             $i1 = $context->getTypeFromString('int1');
-            $match = strtolower($subjectName) === strtolower($className);
+            $match = ReflectionBuiltinHelper::classIsInstanceOfLiteral(
+                $context,
+                $subjectName,
+                $className
+            );
 
             return $context->builder->select(
                 $allowString,
-                $i1->constInt($match ? 1 : 0, false),
+                $match,
                 $i1->constInt(0, false)
             );
         }

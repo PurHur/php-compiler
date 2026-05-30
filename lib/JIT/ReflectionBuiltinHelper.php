@@ -94,6 +94,22 @@ final class ReflectionBuiltinHelper
         return self::objectBuiltin($context)->emitInstanceOf($value, $className);
     }
 
+    public static function classIsInstanceOfLiteral(Context $context, string $childName, string $parentName): Value
+    {
+        $match = self::objectBuiltin($context)->classIsInstanceOf($childName, $parentName);
+        $i1 = $context->getTypeFromString('int1');
+
+        return $i1->constInt($match ? 1 : 0, false);
+    }
+
+    public static function classIsSubclassOfLiteral(Context $context, string $childName, string $parentName): Value
+    {
+        $match = self::objectBuiltin($context)->classIsSubclassOf($childName, $parentName);
+        $i1 = $context->getTypeFromString('int1');
+
+        return $i1->constInt($match ? 1 : 0, false);
+    }
+
     public static function getClassName(Context $context, Variable $object): Value
     {
         if (Variable::TYPE_OBJECT !== $object->type && Variable::TYPE_VALUE !== $object->type) {
