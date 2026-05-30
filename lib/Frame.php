@@ -50,6 +50,11 @@ class Frame {
     /** Pending closure call: captures bound when the callee frame is entered (issue #72). */
     public ?VM\ClosureState $closureCall = null;
 
+    /**
+     * When set, writes to this instance property name use backing storage (inside a hook body, #3145).
+     */
+    public ?string $propertyHookRawProperty = null;
+
     /** Set when TYPE_YIELD suspends; runFrames returns GENERATOR_YIELD. */
     public bool $generatorYield = false;
 

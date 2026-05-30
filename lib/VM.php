@@ -450,6 +450,14 @@ restart:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
+                    if ($this->dispatchPropertySetHookAssign($arg2, $arg3, $frame)) {
+                        $arg1->copyFrom($arg3);
+                        break;
+                    }
+                    if ($this->context->propertyHookSetAborted) {
+                        $this->context->propertyHookSetAborted = false;
+                        break;
+                    }
                     if (null !== ($err = $this->enforceReadonlyPropertyWrite($arg2, $frame))) {
                         return $err;
                     }
@@ -1364,7 +1372,12 @@ restart:
                     }
                     $propertyObject = $var->toObject();
                     VM\LazyObjectSupport::ensureInitialized($this, $propertyObject);
-                    $result->indirect($propertyObject->getProperty($name));
+                    $hookValue = $this->fetchPropertyWithHooks($propertyObject, $name, $frame);
+                    if (null !== $hookValue) {
+                        $result->copyFrom($hookValue);
+                    } else {
+                        $result->indirect($propertyObject->getProperty($name));
+                    }
                     break;
                 case OpCode::TYPE_INIT_ARRAY:
                     $result = $frame->scope[$op->arg1];
@@ -1710,6 +1723,9 @@ restart:
                     break;
                 case OpCode::TYPE_THROW:
                     $thrown = $frame->scope[$op->arg1]->resolveIndirect();
+                    if ($this->frameIsPropertySetHook($frame)) {
+                        $this->context->propertyHookSetAborted = true;
+                    }
                     $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -2284,6 +2300,141 @@ restart:
         }
 
         return VM\InterfaceCheck::entryIsInstanceOf($entry, $className, $this->context);
+    }
+
+    private function frameIsPropertySetHook(Frame $frame): bool
+    {
+        $func = $frame->block->func ?? null;
+        if (null === $func) {
+            return false;
+        }
+        $name = strtolower($func->name);
+
+        return str_contains($name, '__phpc_property_set_');
+    }
+
+    private function isPropertyHookRawWrite(Frame $frame, string $propName): bool
+    {
+        if ($propName === $frame->propertyHookRawProperty) {
+            return true;
+        }
+        $func = $frame->block->func ?? null;
+        if (null === $func || null === $func->class) {
+            return false;
+        }
+        $methodLc = strtolower($func->name);
+        $wantSet = strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($propName));
+
+        return $methodLc === $wantSet || $methodLc === strtolower($func->class.'::'.$wantSet);
+    }
+
+    private function linkPropertyHooks(ClassEntry $entry, VM\ClassProperty $prop): void
+    {
+        $setLc = strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($prop->name));
+        if (isset($entry->methods[$setLc])) {
+            $prop->setHookMethodLc = $setLc;
+        }
+        $getLc = strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($prop->name));
+        if (isset($entry->methods[$getLc])) {
+            $prop->getHookMethodLc = $getLc;
+        }
+    }
+
+    private function classPropertyMeta(ObjectEntry $object, string $propertyName): ?VM\ClassProperty
+    {
+        foreach ($object->class->properties as $prop) {
+            if ($prop->name === $propertyName) {
+                return $prop;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Invoke set hook instead of direct assign when applicable (#3145).
+     */
+    private function dispatchPropertySetHookAssign(Variable $lvalue, Variable $value, Frame $frame): bool
+    {
+        $target = $lvalue->resolveIndirect();
+        $owner = $target->objectPropertyOwner;
+        $propName = $target->objectPropertyName;
+        if (null === $owner || null === $propName || $this->isPropertyHookRawWrite($frame, $propName)) {
+            return false;
+        }
+        $meta = $this->classPropertyMeta($owner, $propName);
+        if (null === $meta || null === $meta->setHookMethodLc) {
+            return false;
+        }
+        if (!isset($owner->class->methods[$meta->setHookMethodLc])) {
+            return false;
+        }
+        $func = $owner->class->methods[$meta->setHookMethodLc];
+        if (!$func instanceof Func\PHP) {
+            return false;
+        }
+        $this->context->propertyHookSetAborted = false;
+        $thisVar = new Variable();
+        $thisVar->object($owner);
+        $this->invokePhpFunctionWithPropertyHookRaw($func, $propName, $frame, $thisVar, $value->resolveIndirect());
+        if ($this->context->propertyHookSetAborted) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function fetchPropertyWithHooks(ObjectEntry $object, string $name, Frame $frame): ?Variable
+    {
+        if ($this->isPropertyHookRawWrite($frame, $name)) {
+            return null;
+        }
+        $meta = $this->classPropertyMeta($object, $name);
+        if (null === $meta || null === $meta->getHookMethodLc) {
+            return null;
+        }
+        if (!isset($object->class->methods[$meta->getHookMethodLc])) {
+            return null;
+        }
+        $func = $object->class->methods[$meta->getHookMethodLc];
+        if (!$func instanceof Func\PHP) {
+            return null;
+        }
+        $thisVar = new Variable();
+        $thisVar->object($object);
+
+        return $this->invokePhpFunctionWithPropertyHookRaw($func, $name, $frame, $thisVar);
+    }
+
+    private function invokePhpFunctionWithPropertyHookRaw(Func\PHP $func, string $rawProperty, Frame $parentFrame, Variable ...$args): Variable
+    {
+        $savedStack = $this->context->swapRunStack(null);
+        try {
+            $child = $func->getFrame($this->context, $parentFrame);
+            $child->propertyHookRawProperty = $rawProperty;
+            $child->calledArgs = $args;
+            if (
+                [] !== $args
+                && null !== $func->block->func
+                && null !== $func->block->func->class
+            ) {
+                $thisIdx = $func->block->slotIndexForVariableName('this');
+                if (null !== $thisIdx) {
+                    $child->scope[$thisIdx] = $args[0];
+                }
+            }
+            $out = new Variable();
+            $child->returnVar = $out;
+            $this->context->push($child);
+            $result = $this->runFrames();
+            if (self::SUCCESS !== $result) {
+                throw new \LogicException('Property hook invocation failed in this compiler build');
+            }
+
+            return $out->resolveIndirect();
+        } finally {
+            $this->context->swapRunStack($savedStack);
+        }
     }
 
     /** Reject readonly property writes; returns a failure exit code or null. */
@@ -3047,6 +3198,9 @@ restart:
                         'Other class body types are not jittable for now: '.opcode_type_name($op->type)
                     );
             }
+        }
+        foreach ($entry->properties as $prop) {
+            $this->linkPropertyHooks($entry, $prop);
         }
     }
 
