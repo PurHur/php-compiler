@@ -1366,7 +1366,7 @@ function throwsWebNorthStarDefinitions(): array
             'jit' => 'yes',
             'aot' => 'yes',
             'issue' => 195,
-            'notes' => ['#195 throw lowering; #57 catch; #2084 compliance PHPT pack; user empty class AOT #2157'],
+            'notes' => ['#195 throw lowering; #57 catch; #2084 compliance PHPT pack; empty user class JIT #2167; AOT #2157'],
         ],
         [
             'construct' => 'AOT project link (`phpc build --project`)',
