@@ -2430,26 +2430,43 @@ final class VmString
         return self::byteSlice($path, 0, $last);
     }
 
-    public static function basename(string $path): string
+    public static function basename(string $path, string $suffix = ''): string
     {
         $len = self::byteLength($path);
         if (0 === $len) {
-            return '';
+            return self::stripBasenameSuffix('', $suffix);
         }
         $end = $len;
         while ($end > 0 && ('/' === $path[$end - 1] || '\\' === $path[$end - 1])) {
             --$end;
         }
         if (0 === $end) {
-            return '';
+            return self::stripBasenameSuffix('', $suffix);
         }
         for ($i = $end - 1; $i >= 0; --$i) {
             if ('/' === $path[$i] || '\\' === $path[$i]) {
-                return self::byteSlice($path, $i + 1, $end - $i - 1);
+                return self::stripBasenameSuffix(
+                    self::byteSlice($path, $i + 1, $end - $i - 1),
+                    $suffix
+                );
             }
         }
 
-        return self::byteSlice($path, 0, $end);
+        return self::stripBasenameSuffix(self::byteSlice($path, 0, $end), $suffix);
+    }
+
+    private static function stripBasenameSuffix(string $base, string $suffix): string
+    {
+        $suffixLen = self::byteLength($suffix);
+        if ($suffixLen > 0) {
+            $baseLen = self::byteLength($base);
+            if ($baseLen >= $suffixLen
+                && self::compareBytes($base, $suffix, $suffixLen, $baseLen - $suffixLen)) {
+                return self::byteSlice($base, 0, $baseLen - $suffixLen);
+            }
+        }
+
+        return $base;
     }
 
     /**
