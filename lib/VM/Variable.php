@@ -222,7 +222,87 @@ final class Variable {
             case self::TYPE_INDIRECT:
                 return $this->indirect->toNumeric($vm);
         }
-        throw new \LogicException("Not implemented numeric conversion: $this->type");
+        throw new \TypeError(sprintf(
+            'Unsupported operand types: %s',
+            self::operandZendTypeName($this)
+        ));
+    }
+
+    /** Zend zend_operators.c type name for operand TypeError messages (#3695). */
+    private static function operandZendTypeName(Variable $var): string
+    {
+        switch ($var->type) {
+            case self::TYPE_INTEGER:
+                return 'int';
+            case self::TYPE_FLOAT:
+                return 'float';
+            case self::TYPE_BOOLEAN:
+                return 'bool';
+            case self::TYPE_STRING:
+                return 'string';
+            case self::TYPE_NULL:
+                return 'null';
+            case self::TYPE_ARRAY:
+                return 'array';
+            case self::TYPE_OBJECT:
+            case self::TYPE_ENUM_CASE:
+                return 'object';
+            default:
+                return 'mixed';
+        }
+    }
+
+    private static function numericOpOperatorSymbol(int $opCode): string
+    {
+        switch ($opCode) {
+            case OpCode::TYPE_PLUS:
+                return '+';
+            case OpCode::TYPE_MINUS:
+                return '-';
+            case OpCode::TYPE_MUL:
+                return '*';
+            case OpCode::TYPE_DIV:
+                return '/';
+            case OpCode::TYPE_MODULO:
+                return '%';
+            case OpCode::TYPE_POW:
+                return '**';
+            default:
+                return '?';
+        }
+    }
+
+    private static function throwUnsupportedOperandTypes(int $opCode, Variable $left, Variable $right): void
+    {
+        throw new \TypeError(sprintf(
+            'Unsupported operand types: %s %s %s',
+            self::operandZendTypeName($left),
+            self::numericOpOperatorSymbol($opCode),
+            self::operandZendTypeName($right)
+        ));
+    }
+
+    private static function operandsValidForNumericOp(Variable $left, Variable $right): bool
+    {
+        if (self::TYPE_ARRAY === $left->type || self::TYPE_ARRAY === $right->type) {
+            return false;
+        }
+        if (self::TYPE_STRING === $left->type && !is_numeric($left->string)) {
+            return false;
+        }
+        if (self::TYPE_STRING === $right->type && !is_numeric($right->string)) {
+            return false;
+        }
+        if (self::TYPE_STRING_OFFSET === $left->type
+            || self::TYPE_STRING_OFFSET === $right->type
+            || self::TYPE_UNDEFINED === $left->type
+            || self::TYPE_UNDEFINED === $right->type
+            || self::TYPE_ENUM_CASE === $left->type
+            || self::TYPE_ENUM_CASE === $right->type) {
+            return false;
+        }
+
+        return true;
     }
 
 
@@ -846,6 +926,9 @@ restart:
             }
 
             return;
+        }
+        if (!self::operandsValidForNumericOp($left, $right)) {
+            self::throwUnsupportedOperandTypes($opCode, $left, $right);
         }
         // In-place ops (e.g. $i++ → PLUS($i,$i,1)) alias $this with an operand (#1228).
         if ($this === $left || $this === $right) {
