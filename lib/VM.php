@@ -1101,6 +1101,7 @@ restart:
                     }
                     $classEntry->interfaces = $op->classImplements;
                     self::defineClass($classEntry, $op->block1);
+                    VM\EnumSupport::ensureBuiltinCasesMethod($classEntry);
                     $this->context->classes[$lcname] = $classEntry;
                     $this->context->enums[$lcname] = true;
                     break;
@@ -1160,6 +1161,15 @@ restart:
                     $result = $frame->scope[$op->arg1];
                     $var = $frame->scope[$op->arg2]->resolveIndirect();
                     $name = $frame->scope[$op->arg3]->toString();
+                    if (Variable::TYPE_ENUM_CASE === $var->type) {
+                        try {
+                            $prop = $var->toEnumCase()->fetchProperty($name);
+                        } catch (\LogicException $e) {
+                            return $this->raise($e->getMessage(), $frame);
+                        }
+                        $result->copyFrom($prop);
+                        break;
+                    }
                     if ($var->type !== Variable::TYPE_OBJECT) {
                         throw new \LogicException("Unsupported property fetch on non-object");
                     }
@@ -2607,6 +2617,10 @@ restart:
                     $entry->constants[$name] = $block->constants[$op->arg2];
                     if ($entry->isEnum) {
                         $entry->enumCaseCanonicalNames[$name] = $canonical;
+                        $entry->enumCases[] = [
+                            'name' => $canonical,
+                            'value' => clone $block->constants[$op->arg2],
+                        ];
                     }
                     break;
                 case OpCode::TYPE_USE_TRAIT:

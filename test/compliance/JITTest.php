@@ -77,6 +77,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'stringable')) {
                 continue;
             }
+            // Enum::cases() is VM-only until JIT enum case lowering (#3308).
+            if (str_contains($name, 'enum_cases')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
