@@ -22,6 +22,7 @@ use PhpParser\ParserFactory;
 use PHPTypes\State;
 use PHPCompiler\VM\Optimizer;
 use PHPCompiler\VM\Context as VMContext;
+use PHPCompiler\VM\ObjectRegistry;
 use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\Ast\GroupUseStripper;
 use PHPCompiler\Web\Superglobals;
@@ -51,6 +52,7 @@ class Runtime {
     private static ?string $lastParseFailure = null;
 
     public function __construct(int $mode = self::MODE_NORMAL) {
+        ObjectRegistry::reset();
         self::clearLastParseFailure();
         $this->mode = $mode;
         $this->initParsePipeline();

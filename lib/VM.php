@@ -1440,6 +1440,8 @@ restart:
         $this->markObjectConstructedIfLeavingConstruct($frame);
         $caller = $this->context->pop();
         if (null !== $caller) {
+            $caller->callArgs = [];
+            $caller->callArgEntries = [];
             $frame = $caller;
             goto restart;
         }
