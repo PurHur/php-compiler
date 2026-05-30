@@ -34,6 +34,7 @@ final class SelfHostBuiltinPolicy
         'getdate' => 'numeric',
         'uniqid' => 'numeric',
         'getmypid' => 'numeric',
+        'getrusage' => 'numeric',
         'pi' => 'numeric',
     ];
 

@@ -371,6 +371,7 @@ class Module extends ModuleAbstract
             new fnmatch(),
             new time(),
             new getmypid(),
+            new getrusage(),
             new microtime(),
             new date(),
             new gmdate(),

@@ -121,6 +121,7 @@ static const char *phpc_builtin_functions[] = {
     "getcwd",
     "getenv",
     "getmypid",
+    "getrusage",
     "gettype",
     "glob",
     "gmdate",

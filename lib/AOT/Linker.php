@@ -36,11 +36,9 @@ final class Linker
         __DIR__.'/runtime/strtr.c',
         __DIR__.'/runtime/filter_validate.c',
         __DIR__.'/runtime/phpc_fs_dir.c',
-<<<<<<< HEAD
         __DIR__.'/runtime/phpc_count_chars.c',
-=======
         __DIR__.'/runtime/phpc_gethostname.c',
->>>>>>> d19f626e (Stdlib: gethostname() — VM + JIT + AOT (#3465))
+        __DIR__.'/runtime/phpc_getrusage.c',
         __DIR__.'/runtime/phpc_upload_temp.c',
         __DIR__.'/runtime/phpc_session_id_storage.c',
         __DIR__.'/runtime/phpc_session_name_storage.c',
@@ -79,6 +77,7 @@ final class Linker
     private const RUNTIME_HOST_LIBC_BASENAMES = [
         'phpc_fs_dir.c',
         'phpc_gethostname.c',
+        'phpc_getrusage.c',
         'phpc_upload_temp.c',
         'preg_match.c',
         'password_crypto.c',
