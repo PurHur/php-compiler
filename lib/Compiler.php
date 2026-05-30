@@ -228,11 +228,8 @@ class Compiler {
 
     public function compile(Script $script): ?Block {
         $this->resetCompileAbortDetail();
-<<<<<<< HEAD
         $this->abstractClasses = [];
-=======
         $this->haltCompilerRemaining = null;
->>>>>>> ca700cd7 (Language: __halt_compiler() compile-stop + trailing bytes (#3479))
         $this->seen = new SplObjectStorage;
         $this->debugWriteLastPhase('Compiler::compile enter');
 

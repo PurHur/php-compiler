@@ -53,17 +53,16 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gc_collect_cycles')) {
                 continue;
             }
-<<<<<<< HEAD
             // enum case ->name / ->value is VM-only until JIT enum case objects (#3420).
             if (str_contains($name, 'enum_case_name_value')) {
                 continue;
             }
             // count() on Countable objects is VM-only until JIT object dispatch (#3364).
             if (str_contains($name, 'countable')) {
-=======
+                continue;
+            }
             // __halt_compiler() is compile-time only (#3479).
             if (str_contains($name, 'halt_compiler')) {
->>>>>>> ca700cd7 (Language: __halt_compiler() compile-stop + trailing bytes (#3479))
                 continue;
             }
             // array_walk_recursive() is VM-only until recursive LLVM walk (#3111).

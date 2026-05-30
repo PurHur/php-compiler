@@ -209,6 +209,9 @@ patch_already_applied() {
       grep -q 'new Op\\Expr\\PostInc' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
         && [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/PostInc.php" ]]
       ;;
+    php-cfg-halt-compiler.patch)
+      grep -q 'new Op\\Stmt\\HaltCompiler' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-cfg-assignop-coalesce.patch)
       grep -q "'Expr_AssignOp_Coalesce'" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
@@ -1871,6 +1874,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-incdec-expr.patch"
   apply_patch "$PATCH_DIR/php-cfg-yield-keyed.patch"
   apply_patch "$PATCH_DIR/php-cfg-match.patch"
+  apply_patch "$PATCH_DIR/php-cfg-halt-compiler.patch"
   apply_patch "$PATCH_DIR/php-cfg-assignop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-cfg-first-class-callable.patch"
   apply_patch "$PATCH_DIR/php-cfg-arrow-function.patch"
