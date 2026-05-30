@@ -960,10 +960,32 @@ class Block {
         );
     }
 
+    /**
+     * Top-level script scope only (skips nested TYPE_FUNCDEF bodies; issue #3074).
+     * EH inside generator resume functions is lowered via GeneratorHelper + TryCatchHelper.
+     */
+    public static function containsExceptionHandlingOpcodesInScriptScope(?self $root): bool
+    {
+        return self::containsOpcodeTypesSkippingFuncDefs(
+            $root,
+            OpCode::TYPE_TRY,
+            OpCode::TYPE_CATCH,
+            OpCode::TYPE_FINALLY,
+            OpCode::TYPE_THROW,
+            OpCode::TYPE_RETHROW
+        );
+    }
+
     /** Script contains `finally` — JIT lowering still VM-fallback until #2114 phase B. */
     public static function containsFinallyOpcodes(?self $root): bool
     {
         return self::containsOpcodeTypes($root, OpCode::TYPE_FINALLY);
+    }
+
+    /** Top-level script scope only (skips nested TYPE_FUNCDEF bodies; issue #3074). */
+    public static function containsFinallyOpcodesInScriptScope(?self $root): bool
+    {
+        return self::containsOpcodeTypesSkippingFuncDefs($root, OpCode::TYPE_FINALLY);
     }
 
     /**
@@ -1100,8 +1122,8 @@ class Block {
     public static function requiresVmLowering(?self $root): bool
     {
         return self::containsGeneratorOpcodesInScriptScope($root)
-            || self::containsFinallyOpcodes($root)
-            || self::containsExceptionHandlingOpcodes($root)
+            || self::containsFinallyOpcodesInScriptScope($root)
+            || self::containsExceptionHandlingOpcodesInScriptScope($root)
             || self::containsArrayAccessObjectOpcodes($root)
             || self::containsDynamicStaticPropertyOpcodes($root)
             || self::containsTypedNonVoidReturnOpcodes($root);

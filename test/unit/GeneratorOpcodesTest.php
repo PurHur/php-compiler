@@ -27,7 +27,6 @@ PHP
         $this->assertNotNull($block);
         $this->assertTrue(Block::containsGeneratorOpcodes($block));
         $this->assertFalse(Block::requiresVmLowering($block));
-        $this->assertTrue(Block::containsGeneratorOpcodes($block));
         $this->assertFalse(Block::containsGeneratorOpcodesInScriptScope($block));
     }
 

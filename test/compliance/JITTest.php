@@ -240,6 +240,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'string_increment')) {
                 continue;
             }
+            // Generator foreach MCJIT resume (#3074); execute needs jit-runtime-probe (#98) — GeneratorJITTest + GeneratorJitCompileTest.
+            if (str_contains($name, 'generator_jit')) {
+                continue;
+            }
             // Negative string offsets: VM (#3751); MCJIT StringOffsetHelper still segfaults (#198).
             if (str_contains($name, 'string_negative_offset')) {
                 continue;
