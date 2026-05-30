@@ -4368,15 +4368,97 @@ class JIT {
 
         return $exit;
     }
-    
+
+    /**
+     * Compile opcodes before yield from to evaluate the container (e.g. inner() call).
+     *
+     * @return JIT\Variable container variable for yield from
+     */
+    public function compileGeneratorYieldFromSetup(
+        \PHPLLVM\Value\Function_ $func,
+        Block $block,
+        \PHPLLVM\BasicBlock $entryBlock,
+        OpCode $yieldFromOp,
+        ?string $innerResumeName = null
+    ): JIT\Variable {
+        $yfIdx = null;
+        foreach ($block->opCodes as $i => $op) {
+            if ($op === $yieldFromOp) {
+                $yfIdx = $i;
+                break;
+            }
+        }
+        if (null === $yfIdx) {
+            throw new \LogicException('yield from opcode not found in generator block');
+        }
+        if (
+            $this->generatorYieldFromPrefixNeedsCompile($block, $yfIdx, $innerResumeName)
+        ) {
+            $savedStorage = $this->context->scope->blockStorage;
+            $this->context->scope->blockStorage = new \SplObjectStorage();
+            $exit = $this->compileBlockInternal($func, $block, $yfIdx, $entryBlock);
+            $this->context->builder->positionAtEnd($exit);
+            $this->context->scope->blockStorage = $savedStorage;
+        }
+        if (null === $yieldFromOp->arg2) {
+            throw new \LogicException('yield from missing container operand');
+        }
+
+        return $this->context->getVariableFromOp($block->getOperand($yieldFromOp->arg2));
+    }
+
+    /**
+     * Compile prefix opcodes before yield from when the container is produced by call/assign (#3074).
+     * Inline array literals keep the prior path (container read without prefix compileBlockInternal).
+     */
+    private function generatorYieldFromPrefixNeedsCompile(Block $block, int $yfIdx, ?string $innerResumeName): bool
+    {
+        if (null !== $innerResumeName) {
+            return true;
+        }
+        if ($yfIdx <= 0 || !JIT\GeneratorHelper::prefixOpcodesSafeForYieldFromInit($block, $yfIdx)) {
+            return false;
+        }
+        for ($i = 0; $i < $yfIdx; ++$i) {
+            $type = $block->opCodes[$i]->type;
+            if (OpCode::TYPE_FUNCCALL_INIT === $type || OpCode::TYPE_ASSIGN === $type) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Compile opcodes in [$startIndex, $limit) for generator resume prefix segments (#3074).
+     */
+    public function compileGeneratorResumePrefix(
+        PHPLLVM\Value\Function_ $func,
+        Block $block,
+        int $startIndex,
+        int $limit,
+        PHPLLVM\BasicBlock $entryBlock
+    ): PHPLLVM\BasicBlock {
+        return $this->compileBlockInternal(
+            $func,
+            $block,
+            $limit,
+            $entryBlock,
+            $startIndex,
+            true
+        );
+    }
+
     private function compileBlockInternal(
         PHPLLVM\Value $func,
         Block $block,
         ?int $limit = null,
         ?PHPLLVM\BasicBlock $entryBlock = null,
+        int $startIndex = 0,
+        bool $allowRecompile = false,
         Variable ...$args
     ): PHPLLVM\BasicBlock {
-        if ($this->context->scope->blockStorage->contains($block)) {
+        if (!$allowRecompile && $this->context->scope->blockStorage->contains($block)) {
             return $this->context->scope->blockStorage[$block];
         }
         if (null !== $block->func) {
@@ -4483,7 +4565,7 @@ class JIT {
             }
         }
 
-        for ($i = 0, $length = null !== $limit ? $limit : count($block->opCodes); $i < $length; $i++) {
+        for ($i = $startIndex, $length = null !== $limit ? $limit : count($block->opCodes); $i < $length; ++$i) {
             $op = $block->opCodes[$i];
             if (
                 null !== $block->func

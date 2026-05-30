@@ -57,17 +57,15 @@ patch_already_applied() {
       grep -q 'instanceof \\PhpParser\\Comment' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
     php-types-docblock-first-token.patch)
-      # Upstream php-types has had a few variants of this regex; we only care that
-      # @var/@return capture stops before trailing docblock '*' / prose (not \\S+ greed).
-      if grep -qF "(@var\\s+(.+?)(?:\\s*\\*\\/|\\s*$))m" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
-        && grep -qF "(@return\\s+(.+?)(?:\\s*\\*\\/|\\s*$))m" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null; then
-        return 0
-      fi
-      grep -qF "(@var\\s+([^\\s*][^\\s]*))" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
-        && grep -qF "(@return\\s+([^\\s*][^\\s]*))" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      grep -qF "(@var\\s+(.+?)(?:\\s*\\*\\/|\\s*$))m" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
+        && grep -qF "(@return\\s+(.+?)(?:\\s*\\*\\/|\\s*$))m" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
     php-types-array-shape.patch)
-      grep -qF "preg_match('/^array\\\\{" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      grep -qF "preg_match('/array\\\\{/i', \$decl)" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
+        && ! grep -qF "preg_match('/\\^array\\\\{/i', \$decl)" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      ;;
+    php-types-iterable-generic.patch)
+      grep -qE "preg_match\('/\^\(list\|array\|iterable\)" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
     php-types-generics-fallback.patch)
       grep -q "non-empty-string" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
@@ -207,6 +205,10 @@ patch_already_applied() {
       ;;
     php-cfg-typed-class-const.patch)
       grep -q 'public ?Type \\$declaredType' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php" 2>/dev/null
+      ;;
+    php-cfg-asymmetric-visibility.patch)
+      grep -q 'setVisibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null \
+        && grep -q 'promotionSetVisibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null
       ;;
     php-cfg-assertion-expr-property.patch)
       grep -q 'public \\$expr;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assertion.php" 2>/dev/null
@@ -1190,6 +1192,114 @@ PY
   echo "Applied php-types-magic-script-const.patch (overlay)"
 }
 
+apply_php_types_incdec_type_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  if grep -q "case 'Expr_PostInc':" "$target" 2>/dev/null; then
+    echo "Skip php-types-incdec-type.patch (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+incdec_case = """            case 'Expr_PostInc':
+            case 'Expr_PostDec':
+            case 'Expr_PreInc':
+            case 'Expr_PreDec':
+                if ($resolved->contains($op->read)) {
+                    return [$resolved[$op->read]];
+                }
+
+                return false;
+"""
+anchors = [
+    (
+        """            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+        """            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+""" + incdec_case + """        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+    ),
+    (
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [new Type(Type::TYPE_ARRAY)];
+                }
+
+                return [Type::string()];
+        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [new Type(Type::TYPE_ARRAY)];
+                }
+
+                return [Type::string()];
+""" + incdec_case + """        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+    ),
+    (
+        """            case 'Expr_Yield':
+            case 'Expr_YieldFrom':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+        """            case 'Expr_Yield':
+            case 'Expr_YieldFrom':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+""" + incdec_case + """        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+    ),
+    (
+        """            case 'Expr_Yield':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+        """            case 'Expr_Yield':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+""" + incdec_case + """        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+    ),
+]
+for old, new in anchors:
+    if old in text:
+        path.write_text(text.replace(old, new, 1))
+        raise SystemExit(0)
+sys.stderr.write("php-types-incdec-type: TypeReconstructor anchor not found\n")
+raise SystemExit(1)
+PY
+  echo "Applied php-types-incdec-type.patch (overlay)"
+}
+
 apply_php_types_str_bool_fns_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php"
   if grep -q "'str_contains' => \['bool'" "$target" 2>/dev/null; then
@@ -1309,6 +1419,128 @@ if 'stripTrailingDocText' not in text:
 path.write_text(text)
 PY
   echo "Applied php-types-docblock-trailing-text.patch (overlay)"
+}
+
+apply_php_types_docblock_full_type_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  if patch_already_applied "$PATCH_DIR/php-types-docblock-first-token.patch"; then
+    echo "Skip php-types-docblock-first-token.patch (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+replacements = [
+    (
+        "                if (preg_match('(@var\\s+(\\S+))', $comment, $match)) {",
+        "                if (preg_match('(@var\\s+(.+?)(?:\\s*\\*\\/|\\s*$))m', $comment, $match)) {",
+    ),
+    (
+        "                if (preg_match('(@var\\s+([^\\s*][^\\s]*))', $comment, $match)) {",
+        "                if (preg_match('(@var\\s+(.+?)(?:\\s*\\*\\/|\\s*$))m', $comment, $match)) {",
+    ),
+    (
+        "                if (preg_match('(@return\\s+(\\S+))', $comment, $match)) {",
+        "                if (preg_match('(@return\\s+(.+?)(?:\\s*\\*\\/|\\s*$))m', $comment, $match)) {",
+    ),
+    (
+        "                if (preg_match('(@return\\s+([^\\s*][^\\s]*))', $comment, $match)) {",
+        "                if (preg_match('(@return\\s+(.+?)(?:\\s*\\*\\/|\\s*$))m', $comment, $match)) {",
+    ),
+]
+for old, new in replacements:
+    if old in text:
+        path.write_text(text.replace(old, new, 1))
+        raise SystemExit(0)
+sys.stderr.write("php-types-docblock-first-token: extractTypeFromComment anchor not found\n")
+raise SystemExit(1)
+PY
+  echo "Applied php-types-docblock-first-token.patch (overlay)"
+}
+
+apply_php_types_generic_null_tail_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  if patch_already_applied "$PATCH_DIR/php-types-generic-null-tail.patch"; then
+    echo "Skip php-types-generic-null-tail.patch (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+needle = "        $decl = self::stripTrailingDocText($decl);\n"
+insert = needle + (
+    "        $trimmedDecl = trim($decl);\n"
+    "        // list<T|null> union splits may pass a trailing \"null>\" fragment (#2276).\n"
+    "        if (str_ends_with($trimmedDecl, '>') && !str_contains($trimmedDecl, '<')) {\n"
+    "            $trimmedDecl = rtrim(substr($trimmedDecl, 0, -1));\n"
+    "            $decl = $trimmedDecl;\n"
+    "        }\n"
+)
+if needle not in text:
+    sys.stderr.write("php-types-generic-null-tail: stripTrailingDocText line not found\n")
+    raise SystemExit(1)
+if 'list<T|null> union splits' in text:
+    raise SystemExit(0)
+path.write_text(text.replace(needle, insert, 1))
+PY
+  echo "Applied php-types-generic-null-tail.patch (overlay)"
+}
+
+apply_php_types_iterable_generic_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  if grep -qE "preg_match\('/\^\(list\|array\|iterable\)" "$target" 2>/dev/null; then
+    echo "Skip php-types-iterable-generic.patch (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+old = "        if (preg_match('/^(list|array)\\s*</i', trim($decl))) {\n            return new self(self::TYPE_ARRAY);\n        }\n"
+new = "        if (preg_match('/^(list|array|iterable)\\s*</i', trim($decl))) {\n            return new self(self::TYPE_ARRAY);\n        }\n"
+if old not in text:
+    sys.stderr.write("php-types-iterable-generic: list|array generic anchor not found\n")
+    raise SystemExit(1)
+path.write_text(text.replace(old, new, 1))
+PY
+  echo "Applied php-types-iterable-generic.patch (overlay)"
+}
+
+apply_php_types_array_shape_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  if grep -qF "preg_match('/array\\{/i', \$decl)" "$target" 2>/dev/null \
+    && ! grep -qF "preg_match('/^array\\{/i', \$decl)" "$target" 2>/dev/null; then
+    echo "Skip php-types-array-shape.patch (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+old = "        if (preg_match('/^array\\\\{/i', $decl)) {\n            return new self(self::TYPE_ARRAY);\n        }\n"
+new = "        if (preg_match('/array\\\\{/i', $decl)) {\n            return new self(self::TYPE_ARRAY);\n        }\n"
+if old in text:
+    path.write_text(text.replace(old, new, 1))
+    raise SystemExit(0)
+needle = "        if (strpos($decl, '|') !== false || strpos($decl, '&') !== false || strpos($decl, '(') !== false) {\n"
+insert = "        if (preg_match('/array\\\\{/i', $decl)) {\n            return new self(self::TYPE_ARRAY);\n        }\n" + needle
+if needle in text and "preg_match('/array\\\\{/i', $decl)" not in text:
+    path.write_text(text.replace(needle, insert, 1))
+    raise SystemExit(0)
+sys.stderr.write("php-types-array-shape: anchor not found\n")
+raise SystemExit(1)
+PY
+  echo "Applied php-types-array-shape.patch (overlay)"
 }
 
 apply_php_types_fromdecl_junk_fragments_overlay() {
@@ -1780,8 +2012,28 @@ apply_patch() {
     apply_php_types_str_bool_fns_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-types-docblock-first-token.patch" ]]; then
+    apply_php_types_docblock_full_type_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-types-iterable-generic.patch" ]]; then
+    apply_php_types_iterable_generic_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-types-array-shape.patch" ]]; then
+    apply_php_types_array_shape_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-types-docblock-trailing-text.patch" ]]; then
     apply_php_types_docblock_trailing_text_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-types-generic-null-tail.patch" ]]; then
+    apply_php_types_generic_null_tail_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-types-incdec-type.patch" ]]; then
+    apply_php_types_incdec_type_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-types-fromdecl-junk-fragments.patch" ]]; then
@@ -1922,6 +2174,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-no-closure-preg-replace-callback.patch"
   apply_patch "$PATCH_DIR/php-cfg-property-type.patch"
   apply_patch "$PATCH_DIR/php-cfg-typed-class-const.patch"
+  apply_patch "$PATCH_DIR/php-cfg-asymmetric-visibility.patch"
   apply_patch "$PATCH_DIR/php-cfg-assertion-expr-property.patch"
   apply_patch "$PATCH_DIR/php-cfg-yield-from.patch"
   apply_patch "$PATCH_DIR/php-cfg-incdec-expr.patch"
@@ -1960,7 +2213,6 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-binaryop-spaceship.patch"
   apply_patch "$PATCH_DIR/php-types-str-bool-fns.patch"
   apply_patch "$PATCH_DIR/php-types-str-incdec.patch"
-  apply_patch "$PATCH_DIR/php-types-incdec-type.patch"
   apply_patch "$PATCH_DIR/php-types-str-split-string-array.patch"
   apply_patch "$PATCH_DIR/php-types-readfile-int-false.patch"
   apply_patch "$PATCH_DIR/php-types-stream-context-array-return.patch"
@@ -1980,17 +2232,19 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-fromvalue-null.patch"
   apply_patch "$PATCH_DIR/php-types-doc-comment-string.patch"
   apply_patch "$PATCH_DIR/php-types-docblock-first-token.patch"
+  apply_patch "$PATCH_DIR/php-types-iterable-generic.patch"
   apply_patch "$PATCH_DIR/php-types-array-shape.patch"
   apply_patch "$PATCH_DIR/php-types-generics-fallback.patch"
   apply_patch "$PATCH_DIR/php-types-generics-list-array.patch"
-  apply_patch "$PATCH_DIR/php-types-generic-null-tail.patch"
   apply_patch "$PATCH_DIR/php-types-docblock-trailing-text.patch"
+  apply_patch "$PATCH_DIR/php-types-generic-null-tail.patch"
   apply_patch "$PATCH_DIR/php-types-fromdecl-junk-fragments.patch"
   apply_patch "$PATCH_DIR/php-types-ns-func-call.patch"
   apply_patch "$PATCH_DIR/php-types-arrow-function.patch"
   apply_patch "$PATCH_DIR/php-types-closure-unbound-this.patch"
   apply_patch "$PATCH_DIR/php-types-magic-script-const.patch"
   apply_patch "$PATCH_DIR/php-types-first-class-callable.patch"
+  apply_patch "$PATCH_DIR/php-types-incdec-type.patch"
   apply_patch "$PATCH_DIR/php-types-never-type.patch"
   apply_patch "$PATCH_DIR/php-types-intersection-type.patch"
   apply_patch "$PATCH_DIR/php-types-union-type.patch"

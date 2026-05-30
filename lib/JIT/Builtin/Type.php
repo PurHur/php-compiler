@@ -377,7 +377,25 @@ class Type extends Builtin {
         $fntypePhpUname = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnPhpUname = $this->context->module->addFunction('__compiler_php_uname', $fntypePhpUname);
         $this->context->registerFunction('__compiler_php_uname', $fnPhpUname);
+        $fntypeVersionCompare = $this->context->context->functionType($i64, false, $strPtr, $strPtr);
+        $fnVersionCompare = $this->context->module->addFunction(
+            '__compiler_version_compare',
+            $fntypeVersionCompare
+        );
+        $this->context->registerFunction('__compiler_version_compare', $fnVersionCompare);
+        $fntypeExtensionLoaded = $this->context->context->functionType($i32, false, $strPtr);
+        $fnExtensionLoaded = $this->context->module->addFunction(
+            '__compiler_extension_loaded',
+            $fntypeExtensionLoaded
+        );
+        $this->context->registerFunction('__compiler_extension_loaded', $fnExtensionLoaded);
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $fntypeLoadedExtensions = $this->context->context->functionType($htPtr, false, $i32);
+        $fnLoadedExtensions = $this->context->module->addFunction(
+            '__compiler_get_loaded_extensions',
+            $fntypeLoadedExtensions
+        );
+        $this->context->registerFunction('__compiler_get_loaded_extensions', $fnLoadedExtensions);
         $fntypeGettimeofdayArray = $this->context->context->functionType($htPtr, false);
         $fnGettimeofdayArray = $this->context->module->addFunction(
             '__compiler_gettimeofday_array',

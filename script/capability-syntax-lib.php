@@ -226,8 +226,8 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'VM GeneratorState + foreach; keyed yield (#3085)',
                 'MCJIT/AOT resume lowering for nested generator funcs (#3074, #3115); script-scope yield blocked',
-                'linear yield only (no yield from / try in generator JIT yet); see docs/generators-jit-aot.md',
-                '`yield from` generator path supported on VM (#167)',
+                'JIT linear `yield` + packed-array `yield from`; `yield from` generator + try/catch in generator JIT deferred',
+                'see docs/generators-jit-aot.md',
                 'AOT fixture generator_yield.phpt',
             ],
             'probe' => 'function g() { yield 1; yield 2; } foreach (g() as $v) echo $v;',
@@ -674,6 +674,18 @@ function syntaxRowDefinitions(): array
                 'MCJIT execute still segfaults when hook body calls str_contains (follow-up)',
             ],
             'probe' => 'class U { public string $e { set (string $v) { $this->e = $v; } } } $o = new U(); $o->e = "a@b"; echo $o->e;',
+        ],
+        [
+            'id' => 'asymmetric_visibility',
+            'construct' => 'PHP 8.4 asymmetric property visibility (public private(set), etc.)',
+            'opcodes' => ['TYPE_DECLARE_PROPERTY', 'TYPE_PROPERTY_FETCH', 'TYPE_ASSIGN'],
+            'issue' => 3165,
+            'jit' => false,
+            'notes' => [
+                'Ast\\AsymmetricVisibilityRewriter normalizes private(set) for php-parser 4.x; VM enforces set visibility (#3165)',
+                'php-src: Zend/zend_compile.c ZEND_ACC_*_SET; JIT/AOT follow-up',
+            ],
+            'probe' => 'class D { public private(set) string $n = "x"; } $d = new D(); echo $d->n; $d->n = "y";',
         ],
         [
             'id' => 'php8_attribute_reflection',

@@ -355,10 +355,8 @@ class Block {
         }
     }
 
-    /**
-     * @return iterable<array{0: VarOperand, 1: int}>
-     */
-    public function eachCfgVarRootSlot(): iterable
+    /** Yields [VarOperand root, int scope slot] pairs. */
+    public function eachCfgVarRootSlot(): \Generator
     {
         $seenRoots = [];
         foreach ($this->scope as $operand) {
@@ -482,10 +480,8 @@ class Block {
         return null;
     }
 
-    /**
-     * @return iterable<array{0: string, 1: int}> variable name and scope slot
-     */
-    public function eachNamedScopeSlot(): iterable
+    /** Yields [variable name, scope slot] pairs. */
+    public function eachNamedScopeSlot(): \Generator
     {
         $seen = [];
         foreach ($this->scope as $operand) {
@@ -936,7 +932,10 @@ class Block {
                 }
                 foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
                     if ($sub instanceof self) {
-                        if (OpCode::TYPE_FUNCDEF === $op->type && $sub === $op->block1) {
+                        if (
+                            (OpCode::TYPE_FUNCDEF === $op->type || OpCode::TYPE_DECLARE_METHOD === $op->type)
+                            && $sub === $op->block1
+                        ) {
                             continue;
                         }
                         $stack[] = $sub;
@@ -961,10 +960,32 @@ class Block {
         );
     }
 
+    /**
+     * Top-level script scope only (skips nested TYPE_FUNCDEF bodies; issue #3074).
+     * EH inside generator resume functions is lowered via GeneratorHelper + TryCatchHelper.
+     */
+    public static function containsExceptionHandlingOpcodesInScriptScope(?self $root): bool
+    {
+        return self::containsOpcodeTypesSkippingFuncDefs(
+            $root,
+            OpCode::TYPE_TRY,
+            OpCode::TYPE_CATCH,
+            OpCode::TYPE_FINALLY,
+            OpCode::TYPE_THROW,
+            OpCode::TYPE_RETHROW
+        );
+    }
+
     /** Script contains `finally` — JIT lowering still VM-fallback until #2114 phase B. */
     public static function containsFinallyOpcodes(?self $root): bool
     {
         return self::containsOpcodeTypes($root, OpCode::TYPE_FINALLY);
+    }
+
+    /** Top-level script scope only (skips nested TYPE_FUNCDEF bodies; issue #3074). */
+    public static function containsFinallyOpcodesInScriptScope(?self $root): bool
+    {
+        return self::containsOpcodeTypesSkippingFuncDefs($root, OpCode::TYPE_FINALLY);
     }
 
     /**
@@ -1042,15 +1063,69 @@ class Block {
     }
 
     /**
+     * User functions/methods with non-void declared return types — MCJIT execute segfaults (#55, #2055).
+     * LLVM IR verify passes ({@see FunctionReturnTypeJitCompileTest}); AOT execute is OK.
+     */
+    public static function containsTypedNonVoidReturnOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            if (null !== $block->func && self::cfgFuncHasTypedNonVoidReturn($block->func)) {
+                return true;
+            }
+            foreach ($block->opCodes as $op) {
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static function cfgFuncHasTypedNonVoidReturn(Func $func): bool
+    {
+        $returnType = $func->returnType;
+        if (null === $returnType) {
+            return false;
+        }
+        if ($returnType instanceof Op\Type\Void_ || $returnType instanceof Op\Type\Never_) {
+            return false;
+        }
+        if ($returnType instanceof Op\Type\Mixed_) {
+            return false;
+        }
+        if ($returnType instanceof Op\Type\Literal) {
+            $name = strtolower($returnType->name);
+
+            return 'void' !== $name && 'never' !== $name && 'mixed' !== $name;
+        }
+
+        return true;
+    }
+
+    /**
      * CFG regions that MCJIT must not execute yet; `bin/jit.php` runs the VM instead (#2114, #167).
      * Simple try/catch without `finally` may pass MCJIT when {@see TryCatchJitExecuteTest} is green.
      */
     public static function requiresVmLowering(?self $root): bool
     {
         return self::containsGeneratorOpcodesInScriptScope($root)
-            || self::containsFinallyOpcodes($root)
-            || self::containsExceptionHandlingOpcodes($root)
+            || self::containsFinallyOpcodesInScriptScope($root)
+            || self::containsExceptionHandlingOpcodesInScriptScope($root)
             || self::containsArrayAccessObjectOpcodes($root)
-            || self::containsDynamicStaticPropertyOpcodes($root);
+            || self::containsDynamicStaticPropertyOpcodes($root)
+            || self::containsTypedNonVoidReturnOpcodes($root);
     }
 }

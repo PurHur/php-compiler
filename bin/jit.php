@@ -55,6 +55,7 @@ function run(string $filename, string $code, array $options): void
     $block = $runtime->parseAndCompile($code, $filename);
     if (null !== $block && Block::requiresVmLowering($block)) {
         // JIT EH IR may verify (TryCatchJitCompileTest); bin/jit.php VM-fallbacks EH/finally (#2114).
+        // Non-void declared return types: MCJIT execute segfaults until #2055; VM matches Zend (#55, #58).
         // Script-scope yield still uses VM; nested generator bodies use MCJIT resume (#3074, #3115).
     } else {
         $runtime->jit($block, $code, $filename);

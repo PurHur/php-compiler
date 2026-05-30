@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+@@ -429,7 +429,7 @@
+         if (preg_match('/^(positive|negative|non-zero)-int$/', $pseudo)) {
+             return new self(self::TYPE_LONG);
+         }
+-        if (preg_match('/^(list|array)\s*</i', trim($decl))) {
++        if (preg_match('/^(list|array|iterable)\s*</i', trim($decl))) {
+             return new self(self::TYPE_ARRAY);
+         }
+         $regex = '(^([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\\\\)*[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*$)';

@@ -1,0 +1,26 @@
+diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php
+@@ -36,6 +36,9 @@ class Property extends Stmt
+     /** php-parser Stmt\Property flags (includes MODIFIER_READONLY, issue #3149). */
+     public int $propertyFlags = 0;
+ 
++    /** PHP 8.4 asymmetric set visibility (0 = same as read; issue #3165). */
++    public int $setVisibility = 0;
++
+     public function __construct(Operand $name, int $visibility, bool $static, Op\Type $declaredType, Operand $defaultVar = null, Block $defaultBlock = null, array $attributes = [])
+     {
+         parent::__construct($attributes);
+diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php
+@@ -37,6 +37,9 @@ class Param extends Expr
+     /** Constructor promotion: MODIFIER_READONLY on the promoted property (#3149). */
+     public bool $promotionReadonly = false;
+ 
++    /** Constructor promotion: asymmetric set visibility (#3165). */
++    public int $promotionSetVisibility = 0;
++
+     public function __construct(Operand $name, Op\Type $declaredType, bool $byRef, bool $variadic, Operand $defaultVar = null, Block $defaultBlock = null, array $attributes = [])
+     {
+         parent::__construct($attributes);

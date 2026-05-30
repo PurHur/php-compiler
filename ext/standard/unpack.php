@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -41,6 +42,25 @@ final class unpack extends Internal
             $offset = $offsetVar->toInt();
         }
         $result = VmPack::unpack($fmtVar->toString(), $dataVar->toString(), $offset);
+        if (false === $result) {
+            if (null !== $frame->vmContext) {
+                $last = error_get_last();
+                $message = 'unpack() failed';
+                if (\is_array($last) && isset($last['message'])) {
+                    $message = $last['message'];
+                }
+                $frame->vmContext->errors->triggerError(
+                    $message,
+                    ErrorReporter::E_WARNING,
+                    '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                    $frame->vmContext,
+                    $frame
+                );
+            }
+            $frame->returnVar->bool(false);
+
+            return;
+        }
         $frame->returnVar->array(self::importResult($result));
     }
 

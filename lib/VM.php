@@ -764,6 +764,15 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
+                    if (null !== ($msg = $this->asymmetricPropertyWriteMessage($arg2, $frame))) {
+                        $thrown = $this->logicExceptionVariable($msg);
+                        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        $this->raiseUncaughtException($thrown);
+                    }
                     $arg2->copyFrom($arg3);
                     $arg1->copyFrom($arg3);
                     $strict = null !== $frame->parent
@@ -801,6 +810,15 @@ restart:
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
                         goto restart;
+                    }
+                    if (null !== ($msg = $this->asymmetricPropertyWriteMessage($lhs, $frame))) {
+                        $thrown = $this->logicExceptionVariable($msg);
+                        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        $this->raiseUncaughtException($thrown);
                     }
                     $rhs = $frame->scope[$op->arg2]->resolveIndirect();
                     $lhs->indirect($rhs);
@@ -3138,6 +3156,78 @@ restart:
         return false;
     }
 
+    /** Reject asymmetric set visibility violations (#3165); returns message or null. */
+    private function asymmetricPropertyWriteMessage(Variable $lvalue, Frame $frame): ?string
+    {
+        $target = $lvalue->resolveIndirect();
+        $owner = $target->objectPropertyOwner;
+        if (null === $owner) {
+            return null;
+        }
+        $propName = $target->objectPropertyName ?? '';
+        if ('' === $propName) {
+            return null;
+        }
+        $meta = $this->classPropertyMeta($owner, $propName);
+        if (null === $meta) {
+            return null;
+        }
+        $setVis = PropertyVisibility::effectiveSetVisibility($meta->visibility, $meta->setVisibility);
+        $readVis = MethodVisibility::mask($meta->visibility);
+        if ($setVis === $readVis) {
+            return null;
+        }
+        try {
+            PropertyVisibility::assertWritable(
+                $setVis,
+                $this->callerClassLc($frame),
+                strtolower($owner->class->name),
+                $owner->class->name,
+                $propName,
+                fn (string $child, string $parent): bool => $this->isSubclassOf($child, $parent)
+            );
+        } catch (\LogicException $e) {
+            return $e->getMessage();
+        }
+
+        return null;
+    }
+
+    private function logicExceptionVariable(string $message): Variable
+    {
+        $lc = 'logicexception';
+        if (!isset($this->context->classes[$lc])) {
+            $entry = new ClassEntry('LogicException');
+            $msgProto = new Variable(Variable::TYPE_STRING);
+            $entry->properties[] = new VM\ClassProperty('message', null, $msgProto);
+            $this->context->classes[$lc] = $entry;
+        }
+        $obj = new ObjectEntry($this->context->classes[$lc]);
+        $obj->constructed = true;
+        $obj->getProperty('message')->string($message);
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($obj);
+
+        return $var;
+    }
+
+    private function isSubclassOf(string $childLc, string $parentLc): bool
+    {
+        $current = $childLc;
+        while (isset($this->context->classes[$current])) {
+            $parent = $this->context->classes[$current]->parentLc;
+            if (null === $parent) {
+                return false;
+            }
+            if ($parent === $parentLc) {
+                return true;
+            }
+            $current = $parent;
+        }
+
+        return false;
+    }
+
     private function markObjectConstructedIfLeavingConstruct(Frame $frame): void
     {
         if (!$this->isConstructFrame($frame)) {
@@ -4229,7 +4319,8 @@ restart:
                         $frame->scope[$op->arg3],
                         $op->propertyReadonly,
                         MethodVisibility::mask($op->propertyVisibility),
-                        strtolower($entry->name)
+                        strtolower($entry->name),
+                        (int) ($op->propertySetVisibility ?? 0)
                     );
                     break;
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:

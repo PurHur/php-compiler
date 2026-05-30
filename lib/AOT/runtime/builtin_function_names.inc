@@ -48,6 +48,7 @@ static const char *phpc_builtin_functions[] = {
     "atan2",
     "base64_decode",
     "base64_encode",
+    "base_convert",
     "basename",
     "bin2hex",
     "bindec",

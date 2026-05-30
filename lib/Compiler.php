@@ -27,6 +27,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\ClassReadonly;
 use PHPCompiler\JIT\OperandName;
+use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
 use PHPCompiler\Compiler\AttributeMetadata;
 use PHPCompiler\Compiler\AttributeNames;
@@ -36,6 +37,8 @@ use PHPCompiler\Compiler\InterfaceImplementationCheck;
 use PHPCompiler\Compiler\ParameterMetadata;
 use PHPCompiler\Compiler\ReadonlyClassCompileCheck;
 use PHPCompiler\Compiler\TraitCollisionCheck;
+use PHPCompiler\Compiler\ClassCompileRegistry;
+use PHPCompiler\Compiler\OverrideValidator;
 use PHPCompiler\Web\ConstStringFolder;
 use PHPCompiler\Web\IncludePathResolver;
 use PHPCompiler\Web\Superglobals;
@@ -75,6 +78,8 @@ class Compiler {
 
     /** Class being compiled while lowering static property declarations (#3814). */
     private ?string $currentClassStaticPropertyCompile = null;
+
+    private ClassCompileRegistry $classCompileRegistry;
 
     public function setBareRethrowLines(array $lines): void
     {
@@ -256,6 +261,7 @@ class Compiler {
         $this->haltCompilerRemaining = null;
         $this->compiledClassStaticProperties = [];
         $this->currentClassStaticPropertyCompile = null;
+        $this->classCompileRegistry = new ClassCompileRegistry();
         $this->seen = new SplObjectStorage;
         $this->ternaryMergeVarSlots = new SplObjectStorage;
         $this->debugWriteLastPhase('Compiler::compile enter');
@@ -296,6 +302,7 @@ class Compiler {
         $this->resetCompileAbortDetail();
         $this->abstractClasses = [];
         $this->abstractEnums = [];
+        $this->classCompileRegistry = new ClassCompileRegistry();
         // Inventory-scale sources declare user functions and/or class-like units; emit-smoke only needs {main}
         // — same as compile() without a compile() callee in the M3 emit TU (#2633, #2666).
         if ([] !== $script->functions || $this->emitSmokeScriptHasClassLike($script)) {
@@ -332,6 +339,7 @@ class Compiler {
 
     public function compileFunc(string $name, CfgFunc $func): Func {
         $this->resetCompileAbortDetail();
+        $this->classCompileRegistry = new ClassCompileRegistry();
         $this->seen = new SplObjectStorage;
 
         $funcBlock = $this->compileCfgBlock($func->cfg, $func->params, $func);
@@ -1424,12 +1432,20 @@ class Compiler {
 
     protected function compileInterface(Op\Stmt\Interface_ $iface, Block $block): OpCode
     {
+        $name = $this->staticNameFromOperand($iface->name);
+        if (null === $name) {
+            $this->throwCompileError('Interface name must be a compile-time class reference');
+        }
+        $extends = $this->interfaceNamesFromOperands($iface->extends);
+        OverrideValidator::validateClassBody($iface->stmts, $name, null, $extends, $this->classCompileRegistry);
+        $this->classCompileRegistry->registerInterface($name, $extends, $iface->stmts);
+
         $return = new OpCode(
             OpCode::TYPE_DECLARE_INTERFACE,
             $this->compileOperand($iface->name, $block, true)
         );
         AttributeNames::assertNoDuplicates(AttributeNames::fromOp($iface));
-        $return->classImplements = $this->interfaceNamesFromOperands($iface->extends);
+        $return->classImplements = $extends;
         $this->applySealedMetadataFromOp($iface, $return);
         $return->block1 = $this->compileClassBody(
             $iface->stmts,
@@ -1442,6 +1458,13 @@ class Compiler {
 
     protected function compileTrait(Op\Stmt\Trait_ $trait, Block $block): OpCode
     {
+        $name = $this->staticNameFromOperand($trait->name);
+        if (null === $name) {
+            $this->throwCompileError('Trait name must be a compile-time class reference');
+        }
+        OverrideValidator::validateClassBody($trait->stmts, $name, null, [], $this->classCompileRegistry);
+        $this->classCompileRegistry->registerTrait($name, $trait->stmts);
+
         $return = new OpCode(
             OpCode::TYPE_DECLARE_TRAIT,
             $this->compileOperand($trait->name, $block, true)
@@ -1572,6 +1595,26 @@ class Compiler {
         } else {
             $this->throwCompileLogic('Unsupported class type: ' . get_class($class));
         }
+        $className = $this->staticNameFromOperand($class->name);
+        if (null === $className) {
+            $this->throwCompileError('Class name must be a compile-time class reference');
+        }
+        $parentLc = null;
+        if ($class instanceof Op\Stmt\Class_ && null !== $class->extends) {
+            $parentName = $this->staticNameFromOperand($class->extends);
+            if (null === $parentName) {
+                $this->throwCompileError('Parent class name must be a compile-time class reference');
+            }
+            $parentLc = strtolower(ltrim($parentName, '\\'));
+        }
+        $interfaceLcs = $this->interfaceNamesFromOperands($class->implements);
+        OverrideValidator::validateClassBody(
+            $class->stmts,
+            $className,
+            $parentLc,
+            $interfaceLcs,
+            $this->classCompileRegistry
+        );
         $parentSlot = null;
         if ($class instanceof Op\Stmt\Class_ && null !== $class->extends) {
             $parentSlot = $this->compileOperand($class->extends, $block, true);
@@ -1587,26 +1630,18 @@ class Compiler {
             $parentSlot,
             $readonlySlot
         );
-        $return->classImplements = $this->interfaceNamesFromOperands($class->implements);
+        $return->classImplements = $interfaceLcs;
         if (VM\StringableSupport::requiresImplementation($return->classImplements)) {
-            $className = $this->staticNameFromOperand($class->name) ?? 'class';
             VM\StringableSupport::assertConcreteClassImplements($class, $className);
         }
         $this->assignAttributeMetadata($return, $class);
         $this->applySealedMetadataFromOp($class, $return);
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($class->flags);
         if ($return->classIsAbstract) {
-            $name = $this->staticNameFromOperand($class->name);
-            if (null !== $name) {
-                $this->abstractClasses[strtolower(ltrim($name, '\\'))] = true;
-            }
+            $this->abstractClasses[strtolower(ltrim($className, '\\'))] = true;
         }
-        $classLc = null;
-        $className = $this->staticNameFromOperand($class->name);
-        if (null !== $className) {
-            $classLc = strtolower(ltrim($className, '\\'));
-            $this->compiledClassStaticProperties[$classLc] = $this->compiledClassStaticProperties[$classLc] ?? [];
-        }
+        $classLc = strtolower(ltrim($className, '\\'));
+        $this->compiledClassStaticProperties[$classLc] = $this->compiledClassStaticProperties[$classLc] ?? [];
         $prevClassStaticCompile = $this->currentClassStaticPropertyCompile;
         $this->currentClassStaticPropertyCompile = $classLc;
         $return->block1 = $this->compileClassBody(
@@ -1615,15 +1650,13 @@ class Compiler {
             $className
         );
         $this->currentClassStaticPropertyCompile = $prevClassStaticCompile;
-        if (null !== $classLc && $class instanceof Op\Stmt\Class_ && null !== $class->extends) {
-            $parentName = $this->staticNameFromOperand($class->extends);
-            if (null !== $parentName) {
-                $parentLc = strtolower(ltrim($parentName, '\\'));
-                foreach ($this->compiledClassStaticProperties[$parentLc] ?? [] as $prop => $_) {
-                    $this->compiledClassStaticProperties[$classLc][$prop] = true;
-                }
+        if ($class instanceof Op\Stmt\Class_ && null !== $class->extends && null !== $parentLc) {
+            foreach ($this->compiledClassStaticProperties[$parentLc] ?? [] as $prop => $_) {
+                $this->compiledClassStaticProperties[$classLc][$prop] = true;
             }
         }
+        $this->classCompileRegistry->registerClass($className, $parentLc, $interfaceLcs, $class->stmts);
+
         return $return;
     }
 
@@ -1817,8 +1850,12 @@ class Compiler {
                             }
                             $defaultSlot = $this->compileOperand($child->defaultVar, $result, true);
                             if (!isset($result->constants[$defaultSlot])) {
+                                $propName = '?';
+                                if ($child->name instanceof Operand\Literal && is_string($child->name->value)) {
+                                    $propName = $child->name->value;
+                                }
                                 $this->throwCompileLogic(
-                                    'Property default must be a compile-time constant (#3803)'
+                                    'Property default must be a compile-time constant (#3803): $'.$propName
                                 );
                             }
                         }
@@ -1834,6 +1871,7 @@ class Compiler {
                             || (property_exists($child, 'propertyFlags') && $this->isReadonlyPropertyFlags($child->propertyFlags))
                             || $this->isReadonlyPropertyFlags($child->visibility);
                         $declare->propertyVisibility = MethodVisibility::mask($child->visibility);
+                        $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($child);
                     }
                     $result->addOpCode($declare);
                     break;
@@ -2030,6 +2068,7 @@ class Compiler {
         );
         $declare->propertyReadonly = $this->isPromotedParamReadonly($param);
         $declare->propertyVisibility = MethodVisibility::mask($param->promotionFlags);
+        $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($param);
         $result->addOpCode($declare);
     }
 
@@ -2041,6 +2080,18 @@ class Compiler {
     protected function isPromotedParamReadonly(Op\Expr\Param $param): bool
     {
         return property_exists($param, 'promotionReadonly') && $param->promotionReadonly;
+    }
+
+    protected function asymmetricSetVisibilityFromCfgOp(Op $op): int
+    {
+        if (property_exists($op, 'setVisibility') && 0 !== (int) $op->setVisibility) {
+            return (int) $op->setVisibility;
+        }
+        if (property_exists($op, 'promotionSetVisibility') && 0 !== (int) $op->promotionSetVisibility) {
+            return (int) $op->promotionSetVisibility;
+        }
+
+        return AsymmetricVisibilityRewriter::extractSetVisibilityFromAttributes($op->getAttributes());
     }
 
     /**
@@ -2140,7 +2191,13 @@ class Compiler {
         }
         $slot = $this->compileOperand($param->defaultVar, $block, true);
         if (!isset($block->constants[$slot])) {
-            $this->throwCompileLogic('Parameter default must be a compile-time constant (#3803)');
+            $paramName = '?';
+            if ($param->name instanceof Operand\Literal && is_string($param->name->value)) {
+                $paramName = $param->name->value;
+            }
+            $this->throwCompileLogic(
+                'Parameter default must be a compile-time constant (#3803): $'.$paramName
+            );
         }
 
         return $slot;
@@ -2180,10 +2237,13 @@ class Compiler {
             return null;
         }
         $children = $param->defaultBlock->children;
-        if (1 !== \count($children)) {
+        if ([] === $children) {
             return null;
         }
-        $expr = $children[0];
+        $expr = $children[\count($children) - 1];
+        if (!$expr instanceof Op\Expr) {
+            return null;
+        }
         if ($expr instanceof Op\Expr\ConstFetch) {
             $vm = $this->tryFoldGlobalConstFetch($expr);
             if (null !== $vm) {
@@ -2195,6 +2255,106 @@ class Compiler {
             if (null !== $vm) {
                 return $block->registerConstant($param->defaultVar, $vm);
             }
+        }
+        if ($expr instanceof Op\Expr\Array_) {
+            $vm = $this->tryBuildCompileTimeArrayFromExpr($expr);
+            if (null !== $vm) {
+                return $block->registerConstant($param->defaultVar, $vm);
+            }
+        }
+        if ($expr instanceof Op\Expr\UnaryMinus || $expr instanceof Op\Expr\UnaryPlus) {
+            $vm = $this->tryFoldUnaryLiteralDefault($expr);
+            if (null !== $vm) {
+                return $block->registerConstant($param->defaultVar, $vm);
+            }
+        }
+        $vm = $this->tryFoldCompileTimeExprDefault($expr, $block, $children);
+        if (null !== $vm) {
+            return $block->registerConstant($param->defaultVar, $vm);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<Op> $defaultBlockChildren
+     */
+    protected function tryFoldCompileTimeExprDefault(Op\Expr $expr, Block $block, array $defaultBlockChildren = []): ?Variable
+    {
+        if ($expr instanceof Op\Expr\ConstFetch) {
+            return $this->tryFoldGlobalConstFetch($expr);
+        }
+        if ($expr instanceof Op\Expr\ClassConstFetch) {
+            return $this->tryFoldClassConstFetchDefault($expr, $block);
+        }
+        if ($expr instanceof Op\Expr\Array_) {
+            return $this->tryBuildCompileTimeArrayFromExpr($expr);
+        }
+        if ($expr instanceof Op\Expr\UnaryMinus || $expr instanceof Op\Expr\UnaryPlus) {
+            return $this->tryFoldUnaryLiteralDefault($expr);
+        }
+        if ($expr instanceof Op\Expr\BinaryOp\BitwiseOr || $expr instanceof Op\Expr\BinaryOp\BitwiseAnd) {
+            $left = $this->tryFoldCompileTimeOperandDefault($expr->left, $block, $defaultBlockChildren);
+            $right = $this->tryFoldCompileTimeOperandDefault($expr->right, $block, $defaultBlockChildren);
+            if (null === $left || null === $right || !$left->is(Variable::TYPE_INTEGER) || !$right->is(Variable::TYPE_INTEGER)) {
+                return null;
+            }
+            $value = new Variable(Variable::TYPE_INTEGER);
+            $combined = $expr instanceof Op\Expr\BinaryOp\BitwiseOr
+                ? ($left->toInt() | $right->toInt())
+                : ($left->toInt() & $right->toInt());
+            $value->int($combined);
+
+            return $value;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<Op> $defaultBlockChildren
+     */
+    protected function tryFoldCompileTimeOperandDefault(Operand $operand, Block $block, array $defaultBlockChildren = []): ?Variable
+    {
+        $vm = $this->vmVariableFromCfgLiteralOperand($operand);
+        if (null !== $vm) {
+            return $vm;
+        }
+        foreach ($defaultBlockChildren as $child) {
+            if (!$child instanceof Op\Expr) {
+                continue;
+            }
+            if (!property_exists($child, 'result') || $child->result !== $operand) {
+                continue;
+            }
+            $vm = $this->tryFoldCompileTimeExprDefault($child, $block, $defaultBlockChildren);
+            if (null !== $vm) {
+                return $vm;
+            }
+        }
+
+        return null;
+    }
+
+    protected function tryFoldUnaryLiteralDefault(Op\Expr\UnaryMinus|Op\Expr\UnaryPlus $expr): ?Variable
+    {
+        $vm = $this->vmVariableFromCfgLiteralOperand($expr->expr);
+        if (null === $vm) {
+            return null;
+        }
+        if ($vm->is(Variable::TYPE_INTEGER)) {
+            $value = new Variable(Variable::TYPE_INTEGER);
+            $n = $vm->toInt();
+            $value->int($expr instanceof Op\Expr\UnaryMinus ? -$n : $n);
+
+            return $value;
+        }
+        if ($vm->is(Variable::TYPE_FLOAT)) {
+            $value = new Variable(Variable::TYPE_FLOAT);
+            $n = $vm->toFloat();
+            $value->float($expr instanceof Op\Expr\UnaryMinus ? -$n : $n);
+
+            return $value;
         }
 
         return null;
@@ -2231,6 +2391,13 @@ class Compiler {
 
             return $v;
         }
+        $errorInt = \PHPCompiler\VM\Context::errorReportingConstant($name);
+        if (null !== $errorInt) {
+            $v = new Variable(Variable::TYPE_INTEGER);
+            $v->int($errorInt);
+
+            return $v;
+        }
 
         return null;
     }
@@ -2247,11 +2414,37 @@ class Compiler {
             return null;
         }
         $lcConst = strtolower($constName);
-        if (!isset($this->compileTimeClassConsts[$lcClass][$lcConst])) {
+        if (isset($this->compileTimeClassConsts[$lcClass][$lcConst])) {
+            $value = new Variable();
+            $value->copyFrom($this->compileTimeClassConsts[$lcClass][$lcConst]);
+
+            return $value;
+        }
+
+        return $this->tryFoldExternalClassConstFetch($className, $constName);
+    }
+
+    protected function tryFoldExternalClassConstFetch(string $className, string $constName): ?Variable
+    {
+        if ('phpcfg\\func' !== strtolower(ltrim($className, '\\'))) {
             return null;
         }
-        $value = new Variable();
-        $value->copyFrom($this->compileTimeClassConsts[$lcClass][$lcConst]);
+        $flags = [
+            'FLAG_PUBLIC' => \PHPCfg\Func::FLAG_PUBLIC,
+            'FLAG_PROTECTED' => \PHPCfg\Func::FLAG_PROTECTED,
+            'FLAG_PRIVATE' => \PHPCfg\Func::FLAG_PRIVATE,
+            'FLAG_STATIC' => \PHPCfg\Func::FLAG_STATIC,
+            'FLAG_ABSTRACT' => \PHPCfg\Func::FLAG_ABSTRACT,
+            'FLAG_FINAL' => \PHPCfg\Func::FLAG_FINAL,
+            'FLAG_RETURNS_REF' => \PHPCfg\Func::FLAG_RETURNS_REF,
+            'FLAG_CLOSURE' => \PHPCfg\Func::FLAG_CLOSURE,
+        ];
+        $lcConst = strtoupper($constName);
+        if (!isset($flags[$lcConst])) {
+            return null;
+        }
+        $value = new Variable(Variable::TYPE_INTEGER);
+        $value->int($flags[$lcConst]);
 
         return $value;
     }
