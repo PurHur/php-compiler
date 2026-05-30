@@ -70,6 +70,7 @@ final class Linker
         __DIR__.'/runtime/phpc_attr_registry.c',
         __DIR__.'/runtime/phpc_reflection_attr.c',
         __DIR__.'/runtime/phpc_cli_argv.c',
+        __DIR__.'/runtime/phpc_weakref.c',
     ];
 
     private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt';
