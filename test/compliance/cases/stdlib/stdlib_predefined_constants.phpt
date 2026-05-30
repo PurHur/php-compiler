@@ -1,5 +1,5 @@
 --TEST--
-stdlib STR_PAD_* / ENT_* / CASE_* / M_* predefined constants (#3535, #3638, #3660)
+stdlib STR_PAD_* / ENT_* / CASE_* / M_* / PATHINFO_* predefined constants (#3535, #3638, #3660, #3651)
 --FILE--
 <?php
 echo str_pad('hi', 5, ' ', STR_PAD_LEFT), "\n";
@@ -9,6 +9,8 @@ echo isset($constants['Core']['STR_PAD_LEFT']) && $constants['Core']['STR_PAD_LE
 echo isset($constants['Core']['ENT_QUOTES']) && $constants['Core']['ENT_QUOTES'] === 3 ? "ent_ok\n" : "ent_bad\n";
 echo isset($constants['Core']['CASE_LOWER']) && $constants['Core']['CASE_LOWER'] === 0 ? "case_lo_ok\n" : "case_lo_bad\n";
 echo isset($constants['Core']['CASE_UPPER']) && $constants['Core']['CASE_UPPER'] === 1 ? "case_up_ok\n" : "case_up_bad\n";
+echo isset($constants['Core']['PATHINFO_EXTENSION']) && $constants['Core']['PATHINFO_EXTENSION'] === 4 ? "pathinfo_ext_ok\n" : "pathinfo_ext_bad\n";
+echo isset($constants['Core']['PATHINFO_ALL']) && $constants['Core']['PATHINFO_ALL'] === 15 ? "pathinfo_all_ok\n" : "pathinfo_all_bad\n";
 $hi = array_change_key_case(array('Ab' => 1), CASE_UPPER);
 echo $hi['AB'], "\n";
 echo defined('M_PI') && defined('M_E') && defined('M_LOG2E') ? "math_defined_ok\n" : "math_defined_bad\n";
@@ -23,6 +25,8 @@ pad_ok
 ent_ok
 case_lo_ok
 case_up_ok
+pathinfo_ext_ok
+pathinfo_all_ok
 1
 math_defined_ok
 pi_ok

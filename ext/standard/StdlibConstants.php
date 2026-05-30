@@ -57,6 +57,13 @@ final class StdlibConstants
     public const CASE_LOWER = 0;
     public const CASE_UPPER = 1;
 
+    /** pathinfo() component flags (ext/standard/basic_functions.c). */
+    public const PATHINFO_DIRNAME = 1;
+    public const PATHINFO_BASENAME = 2;
+    public const PATHINFO_EXTENSION = 4;
+    public const PATHINFO_FILENAME = 8;
+    public const PATHINFO_ALL = 15;
+
     /** Lowercase name => int value for VM\Context::constantFetch(). */
     public const CORE_INT_BY_NAME = [
         'str_pad_left' => self::STR_PAD_LEFT,
@@ -78,6 +85,11 @@ final class StdlibConstants
         'php_round_half_odd' => self::PHP_ROUND_HALF_ODD,
         'case_lower' => self::CASE_LOWER,
         'case_upper' => self::CASE_UPPER,
+        'pathinfo_dirname' => self::PATHINFO_DIRNAME,
+        'pathinfo_basename' => self::PATHINFO_BASENAME,
+        'pathinfo_extension' => self::PATHINFO_EXTENSION,
+        'pathinfo_filename' => self::PATHINFO_FILENAME,
+        'pathinfo_all' => self::PATHINFO_ALL,
         'fnm_noescape' => VmFnmatch::FNM_NOESCAPE,
         'fnm_pathname' => VmFnmatch::FNM_PATHNAME,
         'fnm_period' => VmFnmatch::FNM_PERIOD,
@@ -128,6 +140,11 @@ final class StdlibConstants
         'php_round_half_odd',
         'case_lower',
         'case_upper',
+        'pathinfo_dirname',
+        'pathinfo_basename',
+        'pathinfo_extension',
+        'pathinfo_filename',
+        'pathinfo_all',
         'fnm_noescape',
         'fnm_pathname',
         'fnm_period',

@@ -81,10 +81,21 @@ final class JitPathinfo
 
     private static function resolveFlags(Context $context, JITVariable $flags): int
     {
-        if (JITVariable::TYPE_NATIVE_LONG !== $flags->type) {
-            throw new \LogicException('pathinfo() flags must be an integer in this compiler build');
+        $constName = $flags->compileTimeConstantName ?? null;
+        if (null !== $constName) {
+            $lookup = strtolower($constName);
+            if (isset(StdlibConstants::CORE_INT_BY_NAME[$lookup])) {
+                return StdlibConstants::CORE_INT_BY_NAME[$lookup];
+            }
+            $phpVar = $context->runtime->vmContext->constantFetch($constName);
+            if (null !== $phpVar && \PHPCompiler\VM\Variable::TYPE_INTEGER === $phpVar->type) {
+                return $phpVar->toInt();
+            }
         }
-        if (JITVariable::KIND_VALUE === $flags->kind) {
+
+        if (JITVariable::TYPE_NATIVE_LONG === $flags->type
+            && JITVariable::KIND_VALUE === $flags->kind
+        ) {
             $lib = $context->llvm->lib;
             if (null !== $lib->LLVMIsAConstantInt($flags->value->value)) {
                 return (int) $lib->LLVMConstIntGetZExtValue($flags->value->value);
