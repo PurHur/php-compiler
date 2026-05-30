@@ -503,6 +503,8 @@ class Compiler {
                         && $this->isPropertyFetchOnlyUnsetVar($child, $ops[$i + 1])
                     ) {
                         break;
+                    } elseif ($this->isLoweredByFollowingCoalesce($child, $ops, $i)) {
+                        break;
                     } else {
                         if ($this->needsCfgSplitBeforeStringDimFetch($child, $block, $ops, $i)) {
                             $block = $this->splitCfgBlockAfterStringKeyedArray($block);
@@ -1492,6 +1494,7 @@ class Compiler {
         } elseif ($stmt instanceof Op\Stmt\TryCatch) {
             $merge = $this->compileCfgBranch($stmt->end, $block);
             $try = $this->compileCfgBranch($stmt->try, $block);
+            $try->inheritUndefinedLocals = true;
             $tryOp = new OpCode(OpCode::TYPE_TRY);
             $tryOp->block1 = $try;
             $tryOp->block2 = $merge;
@@ -1940,6 +1943,13 @@ class Compiler {
                 return [$this->compileIncludeOp($expr, $block)];
             case Op\Expr\Isset_::class:
                 return $this->compileIsset($expr, $block);
+            case Op\Expr\Throw_::class:
+                $this->compileOrigExprForOperand($expr->expr, $block);
+
+                return [new OpCode(
+                    OpCode::TYPE_THROW,
+                    $this->compileOperand($expr->expr, $block, true)
+                )];
             case Op\Iterator\Valid::class:
                 return [new OpCode(
                     OpCode::TYPE_ITER_VALID,
@@ -2152,6 +2162,90 @@ class Compiler {
         );
     }
 
+    /**
+     * ?? right branch: evaluate RHS expr ops only when the left is null (#3462).
+     */
+    private function compileCoalesceRhsValue(Operand $rhs, Block $targetBlock, Block $entryBlock): ?int
+    {
+        $exprOp = $this->findOrigExprOpForOperand($rhs, $entryBlock);
+        if (null !== $exprOp) {
+            foreach ($this->compileExpr($exprOp, $targetBlock) as $op) {
+                $targetBlock->addOpCode($op);
+            }
+            if ($exprOp instanceof Op\Expr\Throw_) {
+                return null;
+            }
+        }
+
+        return $this->compileOperand($rhs, $targetBlock, true);
+    }
+
+    /**
+     * php-cfg emits RHS expr ops (New_, Throw_, …) before Coalesce; lower them on the ?? branch (#3462).
+     *
+     * @param Op[] $ops
+     */
+    private function isLoweredByFollowingCoalesce(Op $op, array $ops, int $index): bool
+    {
+        if (!$op instanceof Op\Expr) {
+            return false;
+        }
+        $count = count($ops);
+        for ($j = $index + 1; $j < $count; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Expr\BinaryOp\Coalesce) {
+                return $this->exprOpFeedsCoalesceRhs($op, $next);
+            }
+            if (!$next instanceof Op\Expr\Throw_) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    private function exprOpFeedsCoalesceRhs(Op\Expr $op, Op\Expr\BinaryOp\Coalesce $coalesce): bool
+    {
+        if ($this->operandsChainEqual($op->result, $coalesce->right)) {
+            return true;
+        }
+        $rhsRoot = $this->unwrapOperandChain($coalesce->right);
+        if ($rhsRoot instanceof Op\Expr\Throw_ && $this->operandsChainEqual($op->result, $rhsRoot->expr)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function compileOrigExprForOperand(Operand $operand, Block $block): void
+    {
+        $exprOp = $this->findOrigExprOpForOperand($operand, $block);
+        if (null === $exprOp) {
+            return;
+        }
+        foreach ($this->compileExpr($exprOp, $block) as $op) {
+            $block->addOpCode($op);
+        }
+    }
+
+    private function findOrigExprOpForOperand(Operand $operand, Block $block): ?Op\Expr
+    {
+        $root = $this->unwrapOperandChain($operand);
+        if ($root instanceof Op\Expr) {
+            return $root;
+        }
+        if (null === $block->orig) {
+            return null;
+        }
+        foreach ($block->orig->children as $child) {
+            if ($child instanceof Op\Expr && $this->operandsChainEqual($child->result, $operand)) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
     protected function compileCoalesce(
         Op\Expr\BinaryOp\Coalesce $expr,
         Block $block,
@@ -2201,7 +2295,7 @@ class Compiler {
         $rightBlock->syntheticCfgBranch = true;
         $rightBlock->inheritUndefinedLocals = true;
         $rightBlock->inheritScopeFrom($block);
-        $rightSlot = $this->compileOperand($expr->right, $rightBlock, true);
+        $rightSlot = $this->compileCoalesceRhsValue($expr->right, $rightBlock, $block);
         $coalesceAssignTarget = $resultOverride ?? $expr->result;
         if (
             null !== $dimFetch
@@ -2209,12 +2303,14 @@ class Compiler {
         ) {
             $this->compileArrayDimFetchWrite($dimFetch, $rightBlock);
         }
-        $rightBlock->addOpCode(new OpCode(
-            OpCode::TYPE_ASSIGN,
-            $resultSlot,
-            $resultSlot,
-            $rightSlot
-        ));
+        if (null !== $rightSlot) {
+            $rightBlock->addOpCode(new OpCode(
+                OpCode::TYPE_ASSIGN,
+                $resultSlot,
+                $resultSlot,
+                $rightSlot
+            ));
+        }
 
         $leftBlock = new Block($block->orig);
         $leftBlock->syntheticCfgBranch = true;
