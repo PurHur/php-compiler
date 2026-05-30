@@ -11,6 +11,62 @@
 
 > **Stable line (2026)** — First maintained **stable** release of this fork: demo-ready VM + AOT for a **web-capable PHP subset**, reference examples **000–009**, and an experimental **self-host** path (compiler compiling its own `lib/`). Not full Zend PHP compatibility — see [what’s missing](https://purhur.github.io/php-compiler/docs/pages/missing-implementation.html).
 
+**Snapshot (`master` @ `158fe6a9`, 30 May 2026):** VM + AOT for shipped examples ✅ · **321** builtins · self-host spine **745/952** · M0 smoke reproducible in Docker — details below.
+
+---
+
+## Current implementation status (May 2026)
+
+| Area | State | Notes |
+|------|--------|--------|
+| **VM (`phpc run`)** | ✅ Production-shaped for dev/CI | Broadest language coverage; reference executor and JIT/AOT fallback |
+| **AOT (`phpc build`)** | ✅ For curated subset | Standalone binaries for examples **000–009** and small CGI apps; not arbitrary Composer stacks |
+| **JIT (`bin/jit.php`)** | 🚧 Partial | LLVM IR for many constructs; **MCJIT execute** still flaky ([#98](https://github.com/PurHur/php-compiler/issues/98)); EH scripts VM-fallback ([#2114](https://github.com/PurHur/php-compiler/issues/2114)) |
+| **Language wave 3** | ✅ Closed batch | **12/12** language + **13/13** stdlib tracker items ([#1380](https://github.com/PurHur/php-compiler/issues/1380)); closures, try/catch, generators (VM), `parent::class`, backed enums (VM), intersection AOT checks |
+| **Self-host north star** | 🚧 ~85% | Compiler rebuilding its own `lib/` without Zend — tracker [#1492](https://github.com/PurHur/php-compiler/issues/1492) |
+
+### What you can rely on today
+
+- **`phpc` CLI** — `run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`, `doctor` on the **web-capable PHP 8 subset** documented in [`docs/capabilities-syntax.md`](docs/capabilities-syntax.md).
+- **Examples 000–009** — VM smoke green via `./phpc test --fast`; AOT link/execute when LLVM 9 is present (`make examples-aot-smoke`).
+- **003-MiniWebApp** — router, templates, forms, JSON API; native AOT execute on supported routes.
+- **009-FastCGIWeb** — FastCGI record codec + VM listener ([#3261](https://github.com/PurHur/php-compiler/pull/3261)).
+- **Local/Docker CI** — merge gates run on the host or in `php-compiler:22.04-dev` (remote GHA disabled on this fork).
+
+### Self-host ladder (experimental)
+
+Counts from `php script/bootstrap-spine-count.php` (literal `require_once` in `compiler_lib_spine_smoke` vs Phase A inventory).
+
+| Milestone | Status | What it means |
+|-----------|--------|----------------|
+| **M0–M1** | ✅ | `compiler_minimal` + compile-smoke bundles link and run natively |
+| **M2** | 🚧 **745/952** | Spine grows toward full `lib/` inventory; native spine link green on maintained Docker CI when patches + LLVM are wired |
+| **M3** | 🚧 | HelloWorld + **inventory emit** strict native ✅ ([#3070](https://github.com/PurHur/php-compiler/pull/3070)); production `bin/compile.php` inventory path without thin TU open ([#3024](https://github.com/PurHur/php-compiler/issues/3024)) |
+| **M4** | 🚧 | Gen-2→gen-3 recompile + full revision probe green on CI; `make north-star4-verify` may exit 0 with documented partial blockers on some fresh clones |
+| **M5** | 🚧 | Vendor prelink **3/3** ✅; committed `.o` cold boot ✅; Zend still default when `build/` is empty ([#1416](https://github.com/PurHur/php-compiler/issues/1416)) |
+
+**Reproduce M0 smoke on a clean clone (verified May 2026):**
+
+```bash
+make docker-build-22   # once
+./script/docker-exec.sh -- bash -lc \
+  'composer install --ignore-platform-reqs -q \
+   && script/apply-patches.sh \
+   && make bootstrap-selfhost-link'
+./build/selfhost   # → compiler_minimal bundle OK
+```
+
+Deeper ladder: [`docs/bootstrap-selfhost.md`](docs/bootstrap-selfhost.md) · [`docs/GETTING-STARTED.md` §6–7](docs/GETTING-STARTED.md) · `make north-star4-verify`.
+
+### Still open (high signal)
+
+- **Not Zend PHP** — no full `ext-*` ecosystem, frameworks, or unmodified Composer apps at AOT runtime
+- **Generator / enum native AOT** — VM yes; native lowering open ([#3074](https://github.com/PurHur/php-compiler/issues/3074), [#3076](https://github.com/PurHur/php-compiler/issues/3076))
+- **JIT MCJIT execute** — SIGSEGV in probe ([#98](https://github.com/PurHur/php-compiler/issues/98))
+- **Fresh host PHP 8.3+** — use `composer install --ignore-platform-reqs` or Docker; locked dev deps target PHP 8.1–8.2
+
+Live matrices: [status site](https://purhur.github.io/php-compiler/docs/pages/index.html) · [development status](https://purhur.github.io/php-compiler/development-status.html) · [gap tables](https://purhur.github.io/php-compiler/docs/pages/missing-implementation.html).
+
 ---
 
 ## Lineage & disclaimer
@@ -72,7 +128,7 @@ composer install
 |------|---------|----------------|
 | **Hello, native** | `./phpc build -o /tmp/hello examples/000-HelloWorld/example.php && /tmp/hello` | Standalone executable, no `php` at runtime |
 | **Web app (VM)** | `./phpc serve examples/003-MiniWebApp` → open `http://127.0.0.1:8080/` | Router, templates, JSON API |
-| **Self-host smoke** | `script/apply-patches.sh && make bootstrap-selfhost-link` | `compiler_minimal bundle OK` (experimental) |
+| **Self-host smoke (M0)** | Docker: see [Current implementation status](#current-implementation-status-may-2026) | `compiler_minimal bundle OK` (needs LLVM 9 + patches) |
 
 Presenter walkthrough: [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) · public overview: [status site](https://purhur.github.io/php-compiler/docs/pages/index.html).
 
@@ -199,14 +255,7 @@ Full matrices (auto-generated): [`docs/capabilities.md`](docs/capabilities.md) (
 
 **Self-host (experimental, not “stable app” scope)**
 
-| Milestone | Status |
-|-----------|--------|
-| M0–M1 bundled compiler smoke | ✅ |
-| M2 spine **726/726** + `bin/vm.php` in link | ✅ |
-| M3 HelloWorld + **inventory emit** strict native | ✅ ([#3070](https://github.com/PurHur/php-compiler/pull/3070)) |
-| M4 gen-2→gen-3 without Zend on compile | ✅ |
-| M5 vendor prelink + Zend-free gen-0 seed | 🚧 ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
-| Native `bin/compile.php` inventory path (no thin TU) | 🚧 ([#3024](https://github.com/PurHur/php-compiler/issues/3024)) |
+See [Current implementation status](#current-implementation-status-may-2026) for the full M0–M5 ladder. Summary: M0 smoke ✅ in Docker; M2 **745/952** spine toward inventory; M3 inventory emit ✅ / production `bin/compile.php` 🚧 ([#3024](https://github.com/PurHur/php-compiler/issues/3024)); M4/M5 partial on fresh trees ([#1492](https://github.com/PurHur/php-compiler/issues/1492)).
 
 **What we do not target in v1.0**
 
@@ -238,7 +287,7 @@ Regenerate maintainer matrices after builtin changes: `php script/capability-mat
 - **LLVM 9** for JIT/AOT — bundled into `.llvm/` by `./script/install-llvm9.sh` or first `./script/ci-local.sh`
 
 ```bash
-composer install
+composer install --ignore-platform-reqs   # if host PHP is 8.3+ (locked deps target 8.1–8.2)
 script/apply-patches.sh    # php-cfg overlays; required before compile
 ./script/install-llvm9.sh  # optional until you run full CI or phpc build
 ```
@@ -273,7 +322,7 @@ Merge quality is enforced **locally or in Docker** (GitHub Actions / CircleCI ar
 |------|---------|
 | Fast iteration | `./phpc test --fast` or `./script/ci-fast.sh` |
 | Full gate | `./script/ci-local.sh` or `make test` |
-| Bootstrap / self-host | `make bootstrap-selfhost-link`, `make bootstrap-wave-check` |
+| Bootstrap / self-host | `make bootstrap-selfhost-link`, `make north-star4-verify`, `make bootstrap-wave-check` |
 
 Contributor matrices (regenerate when builtins change):
 
