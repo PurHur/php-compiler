@@ -61,6 +61,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'array_walk_recursive')) {
                 continue;
             }
+            // #[\AllowDynamicProperties] is VM-only until JIT class flag (#3467).
+            if (str_contains($name, 'allow_dynamic_properties')) {
+                continue;
+            }
             // preg_last_error_msg() MCJIT path unsafe with preg_match stub runtime (#3110).
             if (str_contains($name, 'preg_last_error_msg')) {
                 continue;
