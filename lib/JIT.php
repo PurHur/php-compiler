@@ -6902,6 +6902,7 @@ class JIT {
                     , $this->context->helper->loadValue($value)
                     
                 );
+                    $result->compileTimeConstantName = $value->compileTimeConstantName;
     
                     return;
                 case Variable::TYPE_NATIVE_DOUBLE:
