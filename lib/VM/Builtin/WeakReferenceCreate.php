@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\WeakRefRegistry;
 use PHPCompiler\VM\WeakRefSupport;
 
 /** WeakReference::create() — VM stub (#1366). */
@@ -35,6 +36,7 @@ final class WeakReferenceCreate extends VmClassMethod
         $ref = new Variable(Variable::TYPE_OBJECT);
         $ref->object($entry);
         WeakRefSupport::targetSlot($entry)->indirect($object);
+        WeakRefRegistry::registerWeakRef($object->toObject()->id, WeakRefSupport::targetSlot($entry), $entry);
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom($ref);
         }

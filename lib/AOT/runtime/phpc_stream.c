@@ -139,6 +139,16 @@ __string__ *__compiler_fread(int64_t handle, int64_t length)
     return result;
 }
 
+int __compiler_is_resource(int64_t handle)
+{
+    /* fopen() handles start at 3; 1/2 are stdio aliases in phpc_resolve_stream (#3519). */
+    if (handle <= 2) {
+        return 0;
+    }
+
+    return NULL != phpc_resolve_stream(handle) ? 1 : 0;
+}
+
 int __compiler_fclose(int64_t handle)
 {
     FILE *fp;

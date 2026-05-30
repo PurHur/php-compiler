@@ -10,10 +10,16 @@ use PHPCompiler\VM\Builtin\DateTimeFormat;
 use PHPCompiler\VM\Builtin\DateTimeGetTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeSetTimezone;
 use PHPCompiler\VM\Builtin\DateTimeZoneConstruct;
+use PHPCompiler\VM\Builtin\ExceptionConstruct;
+use PHPCompiler\VM\Builtin\ExceptionGetCode;
+use PHPCompiler\VM\Builtin\ExceptionGetFile;
+use PHPCompiler\VM\Builtin\ExceptionGetLine;
+use PHPCompiler\VM\Builtin\ExceptionGetMessage;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetName;
 use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethod;
+use PHPCompiler\VM\Builtin\ReflectionClassNewLazyProxy;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
 use PHPCompiler\VM\Builtin\WeakMapConstruct;
 use PHPCompiler\VM\Builtin\WeakMapCount;
@@ -24,21 +30,33 @@ use PHPCompiler\VM\Builtin\WeakMapOffsetUnset;
 use PHPCompiler\VM\Builtin\WeakReferenceConstruct;
 use PHPCompiler\VM\Builtin\WeakReferenceCreate;
 use PHPCompiler\VM\Builtin\WeakReferenceGet;
+use PHPCompiler\VM\ExceptionSupport;
 
 /**
- * Register VM builtin classes stdClass, WeakReference, WeakMap, and Reflection* (#1366, #1936, #3117).
+ * Register VM builtin classes stdClass, WeakReference, WeakMap, Reflection*, and Throwable* (#1366, #1936, #3117, #195, #3371).
  */
 final class BuiltinClasses
 {
     public static function register(Context $ctx): void
     {
+        StringableSupport::register($ctx);
         self::registerStdClass($ctx);
+        self::registerCountable($ctx);
         self::registerWeakReference($ctx);
         self::registerWeakMap($ctx);
         self::registerReflection($ctx);
         self::registerDateTime($ctx);
+        self::registerExceptions($ctx);
         GeneratorState::register($ctx);
         ClosureState::register($ctx);
+    }
+
+    /** Zend zend_interfaces.c — Countable interface (#3364). */
+    private static function registerCountable(Context $ctx): void
+    {
+        $entry = new ClassEntry('Countable');
+        $entry->isInterface = true;
+        $ctx->classes['countable'] = $entry;
     }
 
     private static function registerStdClass(Context $ctx): void
@@ -74,6 +92,11 @@ final class BuiltinClasses
         $arrayProto = new Variable(Variable::TYPE_ARRAY);
         $entry->properties[] = new ClassProperty(
             WeakRefSupport::MAP_PROPERTY,
+            null,
+            $arrayProto
+        );
+        $entry->properties[] = new ClassProperty(
+            WeakRefSupport::MAP_KEYS_PROPERTY,
             null,
             $arrayProto
         );
@@ -123,6 +146,8 @@ final class BuiltinClasses
         $rc->methodVisibility['getattributes'] = $pub;
         $rc->methods['getmethod'] = new ReflectionClassGetMethod();
         $rc->methodVisibility['getmethod'] = $pub;
+        $rc->methods['newlazyproxy'] = new ReflectionClassNewLazyProxy();
+        $rc->methodVisibility['newlazyproxy'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS] = $rc;
     }
 
@@ -156,5 +181,85 @@ final class BuiltinClasses
             $dt->methodVisibility[$name] = $pub;
         }
         $ctx->classes[DateTimeSupport::CLASS_DATETIME] = $dt;
+    }
+
+    private static function registerExceptions(Context $ctx): void
+    {
+        $throwable = new ClassEntry('Throwable');
+        $throwable->isInterface = true;
+        $ctx->classes[ExceptionSupport::CLASS_THROWABLE] = $throwable;
+
+        self::registerThrowableClass($ctx, 'Exception', ExceptionSupport::CLASS_EXCEPTION);
+        self::registerThrowableClass($ctx, 'Error', ExceptionSupport::CLASS_ERROR);
+        self::registerThrowableClass($ctx, 'TypeError', ExceptionSupport::CLASS_TYPE_ERROR, ExceptionSupport::CLASS_ERROR);
+        self::registerThrowableClass($ctx, 'ValueError', ExceptionSupport::CLASS_VALUE_ERROR, ExceptionSupport::CLASS_ERROR);
+        self::registerThrowableClass(
+            $ctx,
+            'ArgumentCountError',
+            ExceptionSupport::CLASS_ARGUMENT_COUNT_ERROR,
+            ExceptionSupport::CLASS_TYPE_ERROR
+        );
+        self::registerThrowableClass($ctx, 'ParseError', ExceptionSupport::CLASS_PARSE_ERROR, ExceptionSupport::CLASS_ERROR);
+        self::registerThrowableClass(
+            $ctx,
+            'UnhandledMatchError',
+            ExceptionSupport::CLASS_UNHANDLED_MATCH_ERROR,
+            ExceptionSupport::CLASS_ERROR
+        );
+        self::registerThrowableClass(
+            $ctx,
+            'ArithmeticError',
+            ExceptionSupport::CLASS_ARITHMETIC_ERROR,
+            ExceptionSupport::CLASS_ERROR
+        );
+        self::registerThrowableClass(
+            $ctx,
+            'DivisionByZeroError',
+            ExceptionSupport::CLASS_DIVISION_BY_ZERO_ERROR,
+            ExceptionSupport::CLASS_ARITHMETIC_ERROR
+        );
+        self::registerThrowableClass(
+            $ctx,
+            'AssertionError',
+            ExceptionSupport::CLASS_ASSERTION_ERROR,
+            ExceptionSupport::CLASS_ERROR
+        );
+    }
+
+    private static function registerThrowableClass(
+        Context $ctx,
+        string $name,
+        string $lcKey,
+        ?string $parentLc = null
+    ): void {
+        $strProto = new Variable(Variable::TYPE_STRING);
+        $intProto = new Variable(Variable::TYPE_INTEGER);
+        $pub = CfgFunc::FLAG_PUBLIC;
+
+        $entry = new ClassEntry($name);
+        if (null !== $parentLc) {
+            $entry->parentLc = $parentLc;
+        } else {
+            $entry->interfaces = [ExceptionSupport::CLASS_THROWABLE];
+        }
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_MESSAGE, null, $strProto);
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_CODE, null, $intProto);
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_FILE, null, $strProto);
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_LINE, null, $intProto);
+        $entry->constructor = new ExceptionConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+        foreach (
+            [
+                'getmessage' => new ExceptionGetMessage(),
+                'getcode' => new ExceptionGetCode(),
+                'getfile' => new ExceptionGetFile(),
+                'getline' => new ExceptionGetLine(),
+            ] as $methodName => $method
+        ) {
+            $entry->methods[$methodName] = $method;
+            $entry->methodVisibility[$methodName] = $pub;
+        }
+        $ctx->classes[$lcKey] = $entry;
     }
 }

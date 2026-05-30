@@ -14,12 +14,15 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * gettype() for scalar values supported by this compiler (subset of PHP).
+ * gettype() — Zend type labels (ext/standard/basic_functions.c parity, #3618).
+ *
+ * @see https://github.com/php/php-src/blob/master/ext/standard/basic_functions.c PHP_FUNCTION(gettype)
  */
 final class gettype extends Internal
 {
@@ -41,6 +44,16 @@ final class gettype extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        if (Variable::TYPE_OBJECT === $v->type || Variable::TYPE_ENUM_CASE === $v->type) {
+            $frame->returnVar->string('object');
+
+            return;
+        }
+        if ($v->isStreamResource()) {
+            $frame->returnVar->string('resource');
+
+            return;
+        }
         if (!isset(self::VM_NAMES[$v->type])) {
             throw new \LogicException('gettype() does not support this value type in this compiler build');
         }
@@ -57,61 +70,45 @@ final class gettype extends Internal
         }
         if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY
             || JITVariable::TYPE_HASHTABLE === $args[0]->type) {
-            $label = 'array';
-        } else {
-            if (JITVariable::TYPE_STRING === $args[0]->type) {
+            return $context->builder->load($context->constantStringFromString('array'));
+        }
+        if (JITVariable::TYPE_OBJECT === $args[0]->type) {
+            return $context->builder->load($context->constantStringFromString('object'));
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $args[0]->type) {
+            return self::jitGettypeLong($context, $args[0]);
+        }
+        if (JITVariable::TYPE_STRING === $args[0]->type) {
             $this->jitString($context, $args[0], 'gettype() argument #1');
         }
         switch ($args[0]->type) {
-                case JITVariable::TYPE_NATIVE_LONG:
-                    $label = 'integer';
-                    break;
-                case JITVariable::TYPE_NATIVE_DOUBLE:
-                    $label = 'double';
-                    break;
-                case JITVariable::TYPE_NATIVE_BOOL:
-                    $label = 'boolean';
-                    break;
-                case JITVariable::TYPE_STRING:
-                    $label = 'string';
-                    break;
-                case JITVariable::TYPE_NULL:
-                    $label = 'NULL';
-                    break;
-                case JITVariable::TYPE_VALUE:
-                    return self::jitGettypeBoxed($context, $args[0]);
-                default:
-                    throw new \LogicException('gettype() does not support this value type in this compiler build');
-            }
+            case JITVariable::TYPE_NATIVE_DOUBLE:
+                return $context->builder->load($context->constantStringFromString('double'));
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return $context->builder->load($context->constantStringFromString('boolean'));
+            case JITVariable::TYPE_STRING:
+                return $context->builder->load($context->constantStringFromString('string'));
+            case JITVariable::TYPE_NULL:
+                return $context->builder->load($context->constantStringFromString('NULL'));
+            case JITVariable::TYPE_VALUE:
+                return JitGettype::boxed($context, $args[0]);
+            default:
+                throw new \LogicException('gettype() does not support this value type in this compiler build');
         }
-
-        return $context->builder->load($context->constantStringFromString($label));
     }
 
-    private static function jitGettypeBoxed(Context $context, JITVariable $arg): Value
+    private static function jitGettypeLong(Context $context, JITVariable $arg): Value
     {
-        $loaded = $context->helper->loadValue($arg);
-        $typeField = $context->structFieldMap['__value__']['type'];
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($loaded, $typeField)
+        $handle = $context->builder->truncOrBitCast(
+            JitLongArg::lower($context, $arg, 'gettype() argument #1'),
+            $context->getTypeFromString('int64')
         );
-        $i8 = $context->getTypeFromString('int8');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $result = $context->builder->load($context->constantStringFromString('unknown'));
-        foreach ([
-            JITVariable::TYPE_NULL => 'NULL',
-            JITVariable::TYPE_NATIVE_LONG => 'integer',
-            JITVariable::TYPE_NATIVE_DOUBLE => 'double',
-            JITVariable::TYPE_NATIVE_BOOL => 'boolean',
-            JITVariable::TYPE_STRING => 'string',
-            JITVariable::TYPE_HASHTABLE => 'array',
-        ] as $jitType => $name) {
-            $expected = $i8->constInt($jitType, false);
-            $isType = $context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $typeByte, $expected);
-            $candidate = $context->builder->load($context->constantStringFromString($name));
-            $result = $context->builder->select($isType, $candidate, $result);
-        }
+        $isResource = JitIsResource::invoke($context, $handle);
 
-        return $result;
+        return $context->builder->select(
+            $isResource,
+            $context->builder->load($context->constantStringFromString('resource')),
+            $context->builder->load($context->constantStringFromString('integer'))
+        );
     }
 }

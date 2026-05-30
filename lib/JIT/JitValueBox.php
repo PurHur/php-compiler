@@ -92,7 +92,7 @@ final class JitValueBox
             return self::normalizeValuePtr($context, self::pointer($context, $storage));
         }
         if (Variable::TYPE_VALUE !== $var->type) {
-            throw new \LogicException('valuePtrFromVariable requires TYPE_VALUE');
+            return self::valuePtrFromNativeVariable($context, $var);
         }
         if (Variable::KIND_VARIABLE === $var->kind) {
             $llvmType = $context->getStringFromType($var->value->typeOf());
@@ -195,7 +195,10 @@ final class JitValueBox
             $context->builder->structGep($srcPtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
-        $destPtr = self::pointer($context, $destSlot);
+        $destTy = $context->getStringFromType($destSlot->typeOf());
+        $destPtr = '__value__*' === $destTy
+            ? self::normalizeValuePtr($context, $destSlot)
+            : self::pointer($context, $destSlot);
 
         $tag = 'v'.(string) self::$copySeq++;
         $stringBlock = BasicBlockHelper::append($context, 'value_copy_string_'.$tag);
@@ -365,5 +368,71 @@ final class JitValueBox
             $i64->constInt(0, false)
         );
         $context->builder->store($boolByte, $firstByte);
+    }
+
+    /**
+     * Box a native JIT variable into a temporary {@see __value__*} (closure alias stores, issue #3097).
+     */
+    public static function valuePtrFromNativeVariable(Context $context, Variable $var): Value
+    {
+        $slot = self::alloc($context);
+        $native = $context->builder->load($var->value);
+        switch ($var->type) {
+            case Variable::TYPE_NATIVE_LONG:
+                self::writeLong($context, $slot, $native);
+                break;
+            case Variable::TYPE_NATIVE_BOOL:
+                self::writeLong(
+                    $context,
+                    $slot,
+                    $context->builder->zExt($native, $context->getTypeFromString('int64'))
+                );
+                break;
+            case Variable::TYPE_NATIVE_DOUBLE:
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeDouble'),
+                    self::pointer($context, $slot),
+                    $native
+                );
+                break;
+            case Variable::TYPE_STRING:
+                $owned = $context->builder->call(
+                    $context->lookupFunction('__string__separate'),
+                    $native
+                );
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeString'),
+                    self::pointer($context, $slot),
+                    $owned
+                );
+                break;
+            case Variable::TYPE_OBJECT:
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeObject'),
+                    self::pointer($context, $slot),
+                    $native
+                );
+                break;
+            case Variable::TYPE_HASHTABLE:
+                $context->refcount->addref($native);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeHashtable'),
+                    self::pointer($context, $slot),
+                    $native
+                );
+                break;
+            case Variable::TYPE_NULL:
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeNull'),
+                    self::pointer($context, $slot)
+                );
+                break;
+            default:
+                throw new \LogicException(
+                    'valuePtrFromNativeVariable unsupported type: '.Variable::getStringType($var->type)
+                );
+        }
+
+        return self::normalizeValuePtr($context, self::pointer($context, $slot));
     }
 }

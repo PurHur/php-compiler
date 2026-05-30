@@ -35,10 +35,19 @@ final class unserialize extends Internal
         if (Variable::TYPE_STRING !== $payloadVar->type) {
             throw new \LogicException('unserialize() first argument must be a string in this compiler build');
         }
+        $options = null;
         if ($argc > 1) {
-            throw new \LogicException('unserialize() options not supported in this compiler build');
+            $optionsVar = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_ARRAY !== $optionsVar->type) {
+                throw new \LogicException('unserialize() options must be an array in this compiler build');
+            }
+            $options = self::extractUnserializeOptions($optionsVar);
         }
-        $decoded = VmSerialize::unserializePayload($frame->vmContext, $payloadVar->toString());
+        $decoded = VmSerialize::unserializePayload(
+            $frame->vmContext,
+            $payloadVar->toString(),
+            $options
+        );
         if (false === $decoded) {
             $frame->returnVar->bool(false);
 
@@ -106,5 +115,41 @@ final class unserialize extends Internal
         }
 
         throw new \LogicException('unserialize() result type not supported in this compiler build');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function extractUnserializeOptions(Variable $optionsVar): array
+    {
+        $options = [];
+        foreach ($optionsVar->toArray()->iterateKeyed(true) as [$keyVar, $value]) {
+            $keyVar = $keyVar->resolveIndirect();
+            $key = Variable::TYPE_STRING === $keyVar->type
+                ? $keyVar->toString()
+                : (string) $keyVar->toInt();
+            if ('allowed_classes' !== $key) {
+                throw new \LogicException(
+                    'unserialize() option '.$key.' not supported in this compiler build'
+                );
+            }
+            $resolved = $value->resolveIndirect();
+            if (Variable::TYPE_BOOLEAN === $resolved->type) {
+                $options['allowed_classes'] = $resolved->toBool();
+            } elseif (Variable::TYPE_ARRAY === $resolved->type) {
+                $allowed = [];
+                foreach ($resolved->toArray()->iterate(true) as $entry) {
+                    $entry = $entry->resolveIndirect();
+                    if (Variable::TYPE_STRING === $entry->type) {
+                        $allowed[] = $entry->toString();
+                    }
+                }
+                $options['allowed_classes'] = $allowed;
+            } else {
+                throw new \LogicException('allowed_classes must be of type bool or array');
+            }
+        }
+
+        return $options;
     }
 }

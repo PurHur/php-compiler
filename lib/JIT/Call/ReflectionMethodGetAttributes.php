@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\ReflectionNative;
+use PHPCompiler\JIT\Builtin\ReflectionRuntime;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -17,18 +19,20 @@ final class ReflectionMethodGetAttributes implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
+        ReflectionRuntime::ensureLinked($context);
+        ReflectionNative::registerDeclarations($context);
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
-        $objPtr = $context->builder->pointerCast($obj, $context->getTypeFromString('__object__*'));
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
+        $objArg = $context->builder->pointerCast($obj, $i8p);
 
         $outClassLen = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $classCstr = $context->builder->call($context->lookupFunction('phpc_reflect_get_method_class'), $objPtr, $outClassLen);
+        $classCstr = $context->builder->call($context->lookupFunction('phpc_reflect_get_method_class'), $objArg, $outClassLen);
         $outMethodLen = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $methodCstr = $context->builder->call($context->lookupFunction('phpc_reflect_get_method_name'), $objPtr, $outMethodLen);
+        $methodCstr = $context->builder->call($context->lookupFunction('phpc_reflect_get_method_name'), $objArg, $outMethodLen);
         $classNull = $context->builder->icmp(Builder::INT_EQ, $classCstr, $classCstr->typeOf()->constNull());
         $methodNull = $context->builder->icmp(Builder::INT_EQ, $methodCstr, $methodCstr->typeOf()->constNull());
-        $anyNull = $context->builder->or_($classNull, $methodNull);
+        $anyNull = $context->builder->or($classNull, $methodNull);
         $empty = $context->builder->pointerCast($context->constantFromString(''), $i8p);
         $classSafe = $context->builder->select($anyNull, $empty, $classCstr);
         $methodSafe = $context->builder->select($anyNull, $empty, $methodCstr);
@@ -71,9 +75,12 @@ final class ReflectionMethodGetAttributes implements Call
         );
         $attrClassId = $context->type->object->lookup('ReflectionAttribute');
         $attrObj = $context->type->object->allocate($attrClassId);
-        $context->builder->call(
-            $context->lookupFunction('phpc_reflect_set_attr_name'),
-            $context->builder->pointerCast($attrObj, $context->getTypeFromString('__object__*')),
+        ReflectionSetup::markConstructed($context, $attrObj);
+        ReflectionSetup::emitSetStringPropertyFromCstr(
+            $context,
+            $attrObj,
+            'ReflectionAttribute',
+            'name',
             $context->builder->pointerCast($namePtr, $i8p),
             $nameLen
         );
