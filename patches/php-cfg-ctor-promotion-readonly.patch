@@ -1,0 +1,22 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php
+@@ -34,6 +34,9 @@ class Param extends Expr
+     /** Constructor property promotion visibility (PhpParser Class_ flags), or 0. */
+     public $promotionFlags = 0;
+ 
++    /** Constructor property promotion readonly (PhpParser Class_::MODIFIER_READONLY). */
++    public $promotionReadonly = false;
++
+     // A helper
+     public $function;
+ 
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -1864,6 +1864,7 @@
+                 $this->mapAttributes($param)
+             );
+             $p->promotionFlags = $param->flags & Stmt\Class_::VISIBILITY_MODIFIER_MASK;
++            $p->promotionReadonly = 0 !== ($param->flags & Stmt\Class_::MODIFIER_READONLY);
+             $p->result->original = new Operand\Variable(new Operand\Literal($p->name->value));
+             $p->function = $func;
+         }
