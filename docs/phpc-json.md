@@ -20,7 +20,7 @@ Paths are relative to the directory that contains `phpc.json` (unless they start
 
 ### `entry`
 
-Front controller or main script. For multi-file apps, list supporting classes in `includes[]` and keep `entry` as the bootstrap file (often `public/index.php`).
+Front controller or main script (often `public/index.php`). For multi-file apps, declare `autoload.psr-4` so `phpc build --project` discovers referenced classes via `ProjectGraph` ([#1762](https://github.com/PurHur/php-compiler/issues/1762)); use `includes[]` for files not reachable through PSR-4 or literal `require` discovery.
 
 ### `binary`
 
@@ -36,7 +36,7 @@ Directory of static files (CSS, images) copied into the deploy bundle. Separate 
 
 ### `includes`
 
-Ordered list of additional `.php` files compiled and linked **before** `entry`. Order matters for link-time symbol resolution (classes and functions used by the entry script must appear earlier in the list).
+Ordered list of additional `.php` files compiled and linked **before** `entry`. PSR-4 paths from `autoload` are merged automatically by `ProjectGraph::resolve()`; use `includes[]` for bootstrap files, procedural helpers, or classes not referenced statically from the entry graph. Order matters for link-time symbol resolution when symbols overlap.
 
 Runtime template `include` / `require` paths (for example `include __DIR__ . '/layout.php'`) are **not** listed here; the compiler discovers literals via `LiteralIncludeDiscovery` when bundling.
 
