@@ -186,6 +186,8 @@ class OpCode {
 
     /** TYPE_DECLARE_PROPERTY: property is readonly (#3149, #3432). */
     public bool $propertyReadonly = false;
+    /** TYPE_DECLARE_PROPERTY: PHPCfg visibility flags (#145). */
+    public int $propertyVisibility = 0;
 
     /**
      * Closure `use ($var)` metadata for TYPE_CLOSURE (issue #72).
