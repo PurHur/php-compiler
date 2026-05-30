@@ -41,6 +41,7 @@ class String_ extends Type {
             static inline function __string__rawurldecode(__string__*): __string__*;
             static inline function __string__nl2br(__string__*, int8): __string__*;
             static inline function __string__ucwords(__string__*): __string__*;
+            static inline function __string__ucwords_ex(__string__*, __string__*): __string__*;
             static inline function __string__wordwrap(__string__*, int64, __string__*, int8): __string__*;
         }
         $this->pointer = $this->context->getTypeFromString('__string__*');

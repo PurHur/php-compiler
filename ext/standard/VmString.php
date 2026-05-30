@@ -1915,6 +1915,14 @@ final class VmString
     /** ucwords() for byte strings — uppercase first letter after default whitespace (TRIM_DEFAULT). */
     public static function asciiUcwords(string $string): string
     {
+        return self::asciiUcwordsEx($string, self::TRIM_DEFAULT);
+    }
+
+    /**
+     * ucwords() with explicit separator mask (ext/standard/string.c php_ucwords_ex parity; ASCII letters).
+     */
+    public static function asciiUcwordsEx(string $string, string $separators): string
+    {
         if ('' === $string) {
             return '';
         }
@@ -1930,7 +1938,7 @@ final class VmString
                 }
             }
             $out .= $ch;
-            $atWordStart = self::isTagWhitespace($ch);
+            $atWordStart = str_contains($separators, $ch);
         }
 
         return $out;
