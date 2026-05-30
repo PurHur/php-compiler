@@ -5360,6 +5360,7 @@ class JIT {
                     return $origBasicBlock;
                 case OpCode::TYPE_CATCH:
                     if ([] !== $this->context->tryCatch->handlerStack) {
+                        JIT\TryCatchHelper::finishPostTryOpcode($this->context);
                         break;
                     }
                     if (null !== $op->block1) {
@@ -5369,6 +5370,7 @@ class JIT {
                     return $origBasicBlock;
                 case OpCode::TYPE_FINALLY:
                     if ([] !== $this->context->tryCatch->handlerStack) {
+                        JIT\TryCatchHelper::finishPostTryOpcode($this->context);
                         break;
                     }
                     if (null !== $op->block1) {
