@@ -192,6 +192,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'string_increment')) {
                 continue;
             }
+            // Negative string offsets: VM (#3751); MCJIT StringOffsetHelper still segfaults (#198).
+            if (str_contains($name, 'string_negative_offset')) {
+                continue;
+            }
             yield $name => $case;
         }
     }

@@ -629,7 +629,12 @@ restart:
                     $arg3 = $frame->scope[$op->arg3];
                     if ($container->type === Variable::TYPE_STRING) {
                         $offset = new Variable(Variable::TYPE_STRING_OFFSET);
-                        $offset->stringOffset($container, $arg3->toInt());
+                        $offset->stringOffset(
+                            $container,
+                            $arg3->toInt(),
+                            $this->context->errors,
+                            '' !== $frame->scriptPath ? $frame->scriptPath : null
+                        );
                         $arg1->indirect($offset);
                     } elseif ($container->type === Variable::TYPE_ARRAY) {
                         if ($this->context->isGlobalsTable($container)) {
