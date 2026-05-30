@@ -438,6 +438,10 @@ final class Variable {
         if ($self->type !== $other->type) {
             return false;
         }
+        if (self::TYPE_OBJECT === $self->type) {
+            return $self->object === $other->object;
+        }
+
         return $self->equals($other);
     }
 
@@ -453,7 +457,7 @@ restart:
             case TYPE_PAIR_STRING_STRING:
                 return $self->string === $other->string;
             case TYPE_PAIR_OBJECT_OBJECT:
-                return $self->object === $other->object;
+                return $self->object->looseEquals($other->object);
             case TYPE_PAIR_BOOLEAN_BOOLEAN:
                 return $self->bool === $other->bool;
             case TYPE_PAIR_NULL_NULL:

@@ -89,6 +89,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'enum_cases')) {
                 continue;
             }
+            // object == structural compare is VM-only until JIT Object_ lowering (#3602).
+            if (str_contains($name, 'object_loose_equals')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
