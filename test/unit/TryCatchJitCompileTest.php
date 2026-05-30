@@ -97,6 +97,7 @@ PHP
         $this->assertNotNull($block);
         $this->assertTrue(Block::containsExceptionHandlingOpcodes($block));
         $this->assertFalse(Block::containsGeneratorOpcodes($block));
+        $this->assertFalse(Block::containsFinallyOpcodes($block));
         $this->assertTrue(Block::requiresVmLowering($block));
     }
 }

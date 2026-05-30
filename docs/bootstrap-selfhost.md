@@ -143,6 +143,8 @@ CI: `./script/ci-fast.sh` runs `--check` by default (`BOOTSTRAP_VENDOR_INVENTORY
 ./script/docker-exec.sh -- bash -lc 'make bootstrap-selfhost-probe && ./script/bootstrap-selfhost-link.sh'
 ```
 
+On harness hosts where `docker-exec` prints `bind-mount incomplete; copying repo via tar…`, M5 ladders that run **multiple** `./script/docker-exec.sh` steps auto-sync `build/bin-compile-aot`, `build/bin-compile-aot-inventory`, and related driver binaries back to the host ([#2963](https://github.com/PurHur/php-compiler/issues/2963)). Override with explicit paths: `./script/docker-exec.sh --sync-back build/foo -- …`.
+
 Self-host native link requires `PHP_COMPILER_SELFHOST_AOT=1` (set by `./script/bootstrap-selfhost-link.sh` and `make bootstrap-selfhost-probe`). `PHP_COMPILER_JIT_PROGRESS_FILE` is optional progress logging for segfault triage only — it does not enable JIT stubs.
 
 ## Self-host `JIT\Result` / FFI policy
