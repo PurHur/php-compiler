@@ -45,30 +45,44 @@
                 $testBlock = $nextBlock;
             }
             $this->block = $matchBlock;
-            $this->block->children[] = new Op\Expr\Assign(
-                $result,
-                $this->readVariable($this->parseExprNode($arm->body)),
-                $attrs
-            );
-            $this->block->children[] = new Jump($endBlock, $attrs);
-            $endBlock->addParent($this->block);
+            $this->lowerMatchArmBody($arm->body, $result, $attrs, $endBlock);
             $chainBlock = $afterArmBlock;
             $this->block = $chainBlock;
         }
 
         if (null !== $defaultArm) {
-            $this->block->children[] = new Op\Expr\Assign(
-                $result,
-                $this->readVariable($this->parseExprNode($defaultArm->body)),
-                $attrs
-            );
-            $this->block->children[] = new Jump($endBlock, $attrs);
-            $endBlock->addParent($this->block);
+            $this->lowerMatchArmBody($defaultArm->body, $result, $attrs, $endBlock);
         }
 
         $this->block = $endBlock;
 
         return $result;
+    }
+
+    /**
+     * Match arm value: assign to result or throw (issue #3398).
+     */
+    private function lowerMatchArmBody($body, Temporary $result, array $attrs, Block $endBlock): void
+    {
+        if ($body instanceof Expr\Throw_) {
+            $this->block->children[] = new Op\Terminal\Throw_(
+                $this->readVariable($this->parseExprNode($body->expr)),
+                $attrs
+            );
+            $dead = $this->block->create();
+            $dead->dead = true;
+            $this->block = $dead;
+
+            return;
+        }
+
+        $this->block->children[] = new Op\Expr\Assign(
+            $result,
+            $this->readVariable($this->parseExprNode($body)),
+            $attrs
+        );
+        $this->block->children[] = new Jump($endBlock, $attrs);
+        $endBlock->addParent($this->block);
     }
 
     /**
