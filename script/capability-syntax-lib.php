@@ -582,10 +582,11 @@ function syntaxRowDefinitions(): array
             'construct' => 'Trait use adaptations (`as` rename, `insteadof` precedence)',
             'opcodes' => ['TYPE_USE_TRAIT', 'TYPE_TRAIT_USE_ADAPTATION'],
             'issue' => 3238,
-            'jit' => false,
-            'aot' => false,
+            'jit' => true,
+            'aot' => true,
             'notes' => [
                 'Zend/zend_compile.c trait alias/precedence; VM applyTraitUsesWithAdaptations',
+                'JIT/AOT batch trait use with insteadof/as (#2483, #3238)',
                 'Visibility `as private` deferred to #144',
             ],
             'probe' => 'trait T { public function f(): int { return 1; } } class C { use T { f as r; } } echo (new C())->r();',
