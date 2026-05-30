@@ -487,7 +487,14 @@ class Block {
                 ) {
                     $scope[$pos] = $frame->scope[$pos];
                 } else {
-                    $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    $name = self::resolveVariableName($op);
+                    if (null !== $name && $this->declaresGlobalName($name)) {
+                        $local = new Variable(Variable::TYPE_NULL);
+                        $local->indirect($context->ensureGlobal($name));
+                        $scope[$pos] = $local;
+                    } else {
+                        $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    }
                 }
             }
         }
@@ -635,17 +642,25 @@ class Block {
             OpCode::TYPE_TRY,
             OpCode::TYPE_CATCH,
             OpCode::TYPE_FINALLY,
-            OpCode::TYPE_THROW
+            OpCode::TYPE_THROW,
+            OpCode::TYPE_RETHROW
         );
+    }
+
+    /** Script contains `finally` — JIT lowering still VM-fallback until #2114 phase B. */
+    public static function containsFinallyOpcodes(?self $root): bool
+    {
+        return self::containsOpcodeTypes($root, OpCode::TYPE_FINALLY);
     }
 
     /**
      * CFG regions that MCJIT must not execute yet; `bin/jit.php` runs the VM instead (#2114, #167).
-     * JIT IR lowering for simple try/catch may still compile and verify — see TryCatchJitCompileTest.
+     * Simple try/catch without `finally` may pass MCJIT when {@see TryCatchJitExecuteTest} is green.
      */
     public static function requiresVmLowering(?self $root): bool
     {
-        return self::containsExceptionHandlingOpcodes($root)
-            || self::containsGeneratorOpcodes($root);
+        return self::containsGeneratorOpcodes($root)
+            || self::containsFinallyOpcodes($root)
+            || self::containsExceptionHandlingOpcodes($root);
     }
 }

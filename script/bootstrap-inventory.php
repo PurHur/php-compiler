@@ -79,11 +79,21 @@ if ($check) {
     if ($committedNorm !== $markdownNorm) {
         fwrite(STDERR, "Stale {$outFile}; regenerate with:\n");
         fwrite(STDERR, "  php script/bootstrap-inventory.php\n");
-        fwrite(STDERR, "Live probe sidecar (optional): docs/bootstrap-inventory-live-probe.md\n");
+        $parsed = bootstrapParseInventoryMarkdown($committedNorm);
+        $diffLines = bootstrapDiffInventoryReport($parsed, $report);
+        if ($diffLines !== []) {
+            fwrite(STDERR, "\nDiff:\n");
+            foreach ($diffLines as $line) {
+                fwrite(STDERR, $line."\n");
+            }
+        }
+        fwrite(STDERR, "\nLive probe sidecar (optional): docs/bootstrap-inventory-live-probe.md\n");
         fwrite(STDERR, "  php script/bootstrap-selfhost-compile-probe.php --update-inventory\n");
         fwrite(STDERR, "  php script/bootstrap-inventory.php\n");
         exit(1);
     }
+    $phaseA = (int) ($report['phase_a']['phase_a_inventory_files'] ?? 0);
+    fwrite(STDOUT, "OK {$phaseA}/{$phaseA}\n");
     exit(0);
 }
 

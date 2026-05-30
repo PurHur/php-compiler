@@ -96,6 +96,11 @@ final class Variable {
         return $var;
     }
 
+    public function isIndirect(): bool
+    {
+        return self::TYPE_INDIRECT === $this->type;
+    }
+
     public function newArray(): HashTable {
         $this->array(new HashTable);
         return $this->array;
@@ -871,9 +876,9 @@ restart:
 
 /** Precomputed (left * 256 + right) for JIT self-host bundle (no shift/mul in global init). */
 const TYPE_PAIR_INTEGER_INTEGER = 257;
-const TYPE_PAIR_FLOAT_INTEGER = 514;
-const TYPE_PAIR_INTEGER_FLOAT = 260;
-const TYPE_PAIR_FLOAT_FLOAT = 516;
+const TYPE_PAIR_INTEGER_FLOAT = 258;
+const TYPE_PAIR_FLOAT_INTEGER = 513;
+const TYPE_PAIR_FLOAT_FLOAT = 514;
 const TYPE_PAIR_STRING_STRING = 1028;
 const TYPE_PAIR_OBJECT_OBJECT = 1285;
 const TYPE_PAIR_BOOLEAN_BOOLEAN = 771;

@@ -242,6 +242,20 @@ final class VmReflection
         return $result;
     }
 
+    /**
+     * Parent class FQCN for get_parent_class() / class_parents() (issue #3483).
+     *
+     * php-src: ext/standard/class.c — PHP_FUNCTION(get_parent_class)
+     */
+    public static function parentClassName(ClassEntry $entry, Context $ctx): ?string
+    {
+        if (null === $entry->parentLc || !isset($ctx->classes[$entry->parentLc])) {
+            return null;
+        }
+
+        return $ctx->classes[$entry->parentLc]->name;
+    }
+
     public static function resolveClassFromArg(Context $ctx, Variable $arg): ClassEntry
     {
         $arg = $arg->resolveIndirect();
