@@ -2965,6 +2965,27 @@ restart:
             return $frame->callArgs;
         }
 
+        if (null !== $frame->magicCallMethodName) {
+            $methodName = $frame->magicCallMethodName;
+            $frame->magicCallMethodName = null;
+            [$paramNames, $variadicIndex] = $this->calleeParamMetadata($frame->call);
+            $userArgs = [] === $frame->callArgEntries
+                ? []
+                : NamedArgs::resolve($frame->callArgEntries, $paramNames, $variadicIndex);
+            $nameVar = new Variable(Variable::TYPE_STRING);
+            $nameVar->string($methodName);
+            $argsVar = new Variable();
+            $argsVar->newArray();
+            $packed = $argsVar->toArray();
+            foreach ($userArgs as $i => $arg) {
+                $copy = new Variable();
+                $copy->copyFrom($arg);
+                $packed->addIndex($i, $copy);
+            }
+
+            return array_merge($frame->callArgs, [$nameVar, $argsVar]);
+        }
+
         [$paramNames, $variadicIndex] = $this->calleeParamMetadata($frame->call);
         $userArgs = [] === $frame->callArgEntries
             ? []
@@ -3200,7 +3221,32 @@ restart:
         }
         $frame->staticCallClass = $this->context->classes[$lcClass]->name;
         $methodLc = strtolower($methodName);
-        [$class, $methodLc] = $this->resolveStaticMethod($lcClass, $methodLc);
+        try {
+            [$class, $methodLc] = $this->resolveStaticMethod($lcClass, $methodLc);
+        } catch (\LogicException $e) {
+            $magicClass = $this->findMagicCallStaticClass($lcClass);
+            if (null === $magicClass) {
+                throw $e;
+            }
+            $frame->magicCallMethodName = $methodName;
+            $vis = $magicClass->methodVisibility['__callstatic'] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            $callerClassLc = null;
+            if (null !== $frame->block->func && null !== $frame->block->func->class) {
+                $callerClassLc = strtolower($frame->block->func->class->value);
+            }
+            MethodVisibility::assertCallable(
+                $vis,
+                $callerClassLc,
+                strtolower($magicClass->name),
+                $magicClass->name,
+                '__callStatic'
+            );
+            $frame->call = $magicClass->methods['__callstatic'];
+            $frame->callArgs = [];
+            $frame->callArgEntries = [];
+
+            return;
+        }
         $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = null;
         if (null !== $frame->block->func && null !== $frame->block->func->class) {
@@ -3518,6 +3564,30 @@ restart:
                 $entry->properties[] = $property;
             }
         }
+    }
+
+    /**
+     * Walk the class hierarchy for __callStatic (Zend zend_std_get_static_method slow path, #3273).
+     */
+    protected function findMagicCallStaticClass(string $lcClass): ?ClassEntry
+    {
+        $visited = [];
+        while (!isset($visited[$lcClass])) {
+            $visited[$lcClass] = true;
+            if (!isset($this->context->classes[$lcClass])) {
+                break;
+            }
+            $class = $this->context->classes[$lcClass];
+            if (isset($class->methods['__callstatic'])) {
+                return $class;
+            }
+            if (null === $class->parentLc) {
+                break;
+            }
+            $lcClass = $class->parentLc;
+        }
+
+        return null;
     }
 
     /**

@@ -55,6 +55,9 @@ class Frame {
      */
     public ?string $propertyHookRawProperty = null;
 
+    /** Original method name when dispatching via __call / __callStatic (#146, #3273). */
+    public ?string $magicCallMethodName = null;
+
     /** Set when TYPE_YIELD suspends; runFrames returns GENERATOR_YIELD. */
     public bool $generatorYield = false;
 
