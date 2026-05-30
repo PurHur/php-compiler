@@ -46,6 +46,9 @@ class ObjectEntry {
     /** Backed scalar for backed enums; null for unit enums (#3404). */
     public ?Variable $enumCaseValue = null;
 
+    /** PHP 8.1 fiber callback state (issue #3130). */
+    public ?FiberState $fiberState = null;
+
     public function __construct(ClassEntry $class) {
         $this->class = $class;
         $this->id = ++self::$counter;
@@ -85,6 +88,7 @@ class ObjectEntry {
         $this->closureState = null;
         $this->lazyInitializer = null;
         $this->lazyPending = false;
+        $this->fiberState = null;
     }
 
     public function hasProperty(string $name): bool
