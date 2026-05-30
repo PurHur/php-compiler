@@ -1144,7 +1144,9 @@ restart:
                     );
                     $this->applyClosureBinding($new, $frame->closureCall);
                     $frame->closureCall = null;
-                    $new->calledClass = $this->inferCalledClass($frame);
+                    if (null === $new->calledClass || '' === $new->calledClass) {
+                        $new->calledClass = $this->inferCalledClass($frame);
+                    }
                     $new->returnVar = null;
                     if ($op->type === OpCode::TYPE_FUNCCALL_EXEC_RETURN) {
                         $new->returnVar = $this->scopeSlot($frame, (int) $op->arg1);
