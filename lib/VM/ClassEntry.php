@@ -29,6 +29,8 @@ class ClassEntry {
     public bool $isInterface = false;
     /** True for `trait` declarations (#2312). */
     public bool $isTrait = false;
+    /** True for `abstract class` declarations (#3385). */
+    public bool $isAbstract = false;
     /** @var array<string, string> trait FQCN => FQCN from direct `use Trait;` (#3119) */
     public array $usedTraits = [];
     /** @var list<string> */
@@ -56,6 +58,10 @@ class ClassEntry {
     public array $attributeNames = [];
     /** @var array<string, list<string>> method (lowercase) => attribute names (#1936). */
     public array $methodAttributeNames = [];
+    /** @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata> method (lowercase) => deprecation (#3569). */
+    public array $methodDeprecated = [];
+    /** @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata> constant (lowercase) => deprecation (#3569). */
+    public array $constDeprecated = [];
 
     public function __construct(string $name) {
         $this->name = $name;

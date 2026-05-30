@@ -22,6 +22,11 @@ final class ErrorReporter
     private int $errorReporting;
     private bool $displayErrors;
 
+    /** Nesting depth for `@` error-control (issue #3546). */
+    private int $silenceDepth = 0;
+
+    private int $savedErrorReporting = 0;
+
     /** @var list<array{0: ?string, 1: int}> */
     private array $handlerStack = [];
 
@@ -54,6 +59,31 @@ final class ErrorReporter
     public function setDisplayErrors(bool $display): void
     {
         $this->displayErrors = $display;
+    }
+
+    public function beginSilence(): void
+    {
+        if (0 === $this->silenceDepth) {
+            $this->savedErrorReporting = $this->errorReporting;
+            $this->errorReporting = 0;
+        }
+        ++$this->silenceDepth;
+    }
+
+    public function endSilence(): void
+    {
+        if ($this->silenceDepth <= 0) {
+            return;
+        }
+        --$this->silenceDepth;
+        if (0 === $this->silenceDepth) {
+            $this->errorReporting = $this->savedErrorReporting;
+        }
+    }
+
+    public function isSilenced(): bool
+    {
+        return $this->silenceDepth > 0;
     }
 
     /**

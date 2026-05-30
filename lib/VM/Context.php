@@ -79,6 +79,9 @@ class Context {
     /** @var array<int, Variable> foreach iterator container cache (issue #167, #1885). */
     public array $foreachIterators = [];
 
+    /** @var array<int, ObjectPropertyIterator> foreach object property walk (#3661). */
+    public array $objectPropertyIterators = [];
+
     public function __construct(Runtime $runtime) {
         $this->runtime = $runtime;
         $this->errors = new ErrorReporter();
@@ -138,10 +141,39 @@ class Context {
         if (null !== $phpCore) {
             return $phpCore;
         }
+        $errorInt = self::errorReportingConstant($name);
+        if (null !== $errorInt) {
+            $var = new Variable(Variable::TYPE_INTEGER);
+            $var->int($errorInt);
+            return $var;
+        }
         if (isset($this->constants[$name])) {
             return $this->constants[$name];
         }
         return null;
+    }
+
+    private static function errorReportingConstant(string $name): ?int
+    {
+        return match (strtolower($name)) {
+            'e_error' => 1,
+            'e_warning' => ErrorReporter::E_WARNING,
+            'e_parse' => 4,
+            'e_notice' => 8,
+            'e_core_error' => 16,
+            'e_core_warning' => 32,
+            'e_compile_error' => 64,
+            'e_compile_warning' => 128,
+            'e_user_error' => ErrorReporter::E_USER_ERROR,
+            'e_user_warning' => ErrorReporter::E_USER_WARNING,
+            'e_user_notice' => ErrorReporter::E_USER_NOTICE,
+            'e_strict' => 2048,
+            'e_recoverable_error' => 4096,
+            'e_deprecated' => 8192,
+            'e_user_deprecated' => ErrorReporter::E_USER_DEPRECATED,
+            'e_all' => E_ALL,
+            default => null,
+        };
     }
 
     public function isUserConstantDefined(string $name): bool

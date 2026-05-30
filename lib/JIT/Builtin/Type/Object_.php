@@ -1507,6 +1507,25 @@ class Object_ extends Type {
         ];
     }
 
+    public function inheritInterfaceConstants(int $classId, string $className): void
+    {
+        $classLc = strtolower(ltrim($className, '\\'));
+        foreach ($this->allInterfacesForClassLc($classLc) as $ifaceLc) {
+            if ($ifaceLc === $classLc) {
+                continue;
+            }
+            $ifaceId = $this->lookup($ifaceLc);
+            if (!isset($this->classConstants[$ifaceId])) {
+                continue;
+            }
+            foreach ($this->classConstants[$ifaceId] as $name => $entry) {
+                if (!isset($this->classConstants[$classId][$name])) {
+                    $this->classConstants[$classId][$name] = $entry;
+                }
+            }
+        }
+    }
+
     public function resolveClassId(Operand $classOp): int
     {
         if (!$classOp instanceof Literal) {
@@ -2142,6 +2161,32 @@ class Object_ extends Type {
             }
         }
         throw new \LogicException("Could not find property $name for class $classId");
+    }
+
+    /**
+     * isset($obj->prop) for a literal property name (issue #3603).
+     */
+    public function propertyIsSet(PHPLLVM\Value $obj, string $class, string $name): PHPLLVM\Value
+    {
+        $classId = $this->lookup('' !== $class ? $class : 'stdclass');
+        $i1 = $this->context->getTypeFromString('int1');
+        if (!$this->hasProperty($classId, $name)) {
+            return $i1->constInt(0, false);
+        }
+        $prop = $this->propertyFetch($obj, $class, $name);
+        if (Variable::TYPE_VALUE === $prop->type) {
+            $valueMap = $this->context->structFieldMap['__value__'];
+            $typeByte = $this->context->builder->load(
+                $this->context->builder->structGep($prop->value, $valueMap['type'])
+            );
+            $nullType = $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false);
+
+            return $this->context->builder->icmp(PHPLLVM\Builder::INT_NE, $typeByte, $nullType);
+        }
+        $loaded = $this->context->helper->loadValue($prop);
+        $nullPtr = $this->context->getTypeFromString('void*')->constNull();
+
+        return $this->context->builder->icmp(PHPLLVM\Builder::INT_NE, $loaded, $nullPtr);
     }
 
     public function storeInstanceProperty(

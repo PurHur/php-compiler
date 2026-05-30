@@ -1,0 +1,21 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php
+@@ -12,6 +12,7 @@
+ namespace PHPCfg\Visitor;
+ 
+ use PHPCfg\AbstractVisitor;
+ use PHPCfg\Block;
++use PHPCfg\ErrorSuppressBlock;
+ use PHPCfg\Func;
+ use PHPCfg\Op;
+ use PHPCfg\Operand;
+@@ -61,6 +62,9 @@
+                 if (! $target || ! isset($target->children[0]) || ! $target->children[0] instanceof Op\Stmt\Jump) {
+                     continue;
+                 }
++                if ($target instanceof ErrorSuppressBlock) {
++                    continue;
++                }
+                 if ($this->removed->contains($target)) {
+                     // short circuit
+                     $results[$key] = $target->children[0]->target;

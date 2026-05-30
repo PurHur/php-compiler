@@ -5678,18 +5678,9 @@ class JIT {
                 case OpCode::TYPE_DECLARE_INTERFACE:
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
-                    if ($this->shouldUseSelfHostJitStubs()) {
-                        $this->context->type->object->declareClass($nameOp);
-                        $this->context->type->object->markInterfaceClass($nameOp->value);
-                        if ([] !== $op->classImplements) {
-                            $this->context->type->object->setInterfaceExtends(
-                                $nameOp->value,
-                                $op->classImplements
-                            );
-                        }
-                        break;
-                    }
-                    $this->context->type->object->declareClass($nameOp);
+                    $this->context->pushScope();
+                    $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
+                    $this->context->scope->className = strtolower($nameOp->value);
                     $this->context->type->object->markInterfaceClass($nameOp->value);
                     if ([] !== $op->classImplements) {
                         $this->context->type->object->setInterfaceExtends(
@@ -5697,6 +5688,14 @@ class JIT {
                             $op->classImplements
                         );
                     }
+                    if (null !== $op->block1) {
+                        $this->compileClass($op->block1, $this->context->scope->classId);
+                    }
+                    $this->context->type->object->inheritInterfaceConstants(
+                        $this->context->scope->classId,
+                        $nameOp->value
+                    );
+                    $this->context->popScope();
                     break;
                 case OpCode::TYPE_DECLARE_TRAIT:
                     $nameOp = $block->getOperand($op->arg1);
@@ -5765,6 +5764,10 @@ class JIT {
                             $op->classImplements
                         );
                     }
+                    $this->context->type->object->inheritInterfaceConstants(
+                        $this->context->scope->classId,
+                        $nameOp->value
+                    );
                     $this->context->popScope();
                     break;
                 case OpCode::TYPE_NEW:
@@ -5857,6 +5860,10 @@ class JIT {
                             $this->context->scope->variables[$result] = $fetched;
                         }
                     }
+                    break;
+                case OpCode::TYPE_BEGIN_SILENCE:
+                case OpCode::TYPE_END_SILENCE:
+                    // VM-only silence today; JIT/AOT ignore (#3546).
                     break;
                 default:
                     throw new \LogicException("Unknown JIT opcode: ". opcode_type_name($op->type));

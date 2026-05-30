@@ -34,6 +34,10 @@ final class StdlibConstants
     public const PHP_ROUND_HALF_EVEN = 3;
     public const PHP_ROUND_HALF_ODD = 4;
 
+    /** array_change_key_case() mode flags (ext/standard/array.c). */
+    public const CASE_LOWER = 0;
+    public const CASE_UPPER = 1;
+
     /** Lowercase name => int value for VM\Context::constantFetch(). */
     public const CORE_INT_BY_NAME = [
         'str_pad_left' => self::STR_PAD_LEFT,
@@ -53,6 +57,8 @@ final class StdlibConstants
         'php_round_half_down' => self::PHP_ROUND_HALF_DOWN,
         'php_round_half_even' => self::PHP_ROUND_HALF_EVEN,
         'php_round_half_odd' => self::PHP_ROUND_HALF_ODD,
+        'case_lower' => self::CASE_LOWER,
+        'case_upper' => self::CASE_UPPER,
         'fnm_noescape' => VmFnmatch::FNM_NOESCAPE,
         'fnm_pathname' => VmFnmatch::FNM_PATHNAME,
         'fnm_period' => VmFnmatch::FNM_PERIOD,
@@ -78,6 +84,8 @@ final class StdlibConstants
         'php_round_half_down',
         'php_round_half_even',
         'php_round_half_odd',
+        'case_lower',
+        'case_upper',
         'fnm_noescape',
         'fnm_pathname',
         'fnm_period',

@@ -43,7 +43,7 @@ function syntaxRowDefinitions(): array
             'construct' => 'Enum declarations `enum Foo: string { case Bar = \'x\'; }`',
             'opcodes' => ['TYPE_DECLARE_ENUM', 'TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH'],
             'issue' => 1356,
-            'notes' => ['Backed enum cases as class constants; `Foo::Bar` const-like fetch; `enum_exists` registry; `implements` metadata (#2299); static methods (#2299); `Enum::cases()` VM (#3308)'],
+            'notes' => ['Backed enum cases as class constants; `Foo::Bar` const-like fetch; case `->name` / `->value` (#3420); `enum_exists` registry; `implements` metadata (#2299); static methods (#2299); `Enum::cases()` VM (#3308)'],
             'probe' => 'enum Status: string { case Ok = \'ok\'; public static function tag(): string { return \'ok\'; } } echo Status::tag();',
         ],
         [
@@ -294,6 +294,17 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { public static int $n = 1; } echo C::$n;',
         ],
         [
+            'id' => 'error_control_operator',
+            'construct' => 'Error-control operator `@` on expressions',
+            'opcodes' => ['TYPE_BEGIN_SILENCE', 'TYPE_END_SILENCE'],
+            'issue' => 3546,
+            'notes' => [
+                'php-cfg ErrorSuppressBlock + Simplifier preserve (#3546)',
+                'VM masks error_reporting; JIT/AOT no-op until native silence',
+            ],
+            'probe' => 'echo @$undefined; @trigger_error("x", E_USER_NOTICE); echo "ok\\n";',
+        ],
+        [
             'id' => 'unset',
             'construct' => '`unset()` on variables, array offsets, and object properties',
             'opcodes' => ['TYPE_UNSET', 'TYPE_STATIC_PROPERTY_UNSET'],
@@ -394,6 +405,18 @@ function syntaxRowDefinitions(): array
                 'PhpParser Stmt_GroupUse; NameResolver registers aliases; GroupUseStripper before PHPCfg',
             ],
             'probe' => 'namespace N { class A {} } namespace U { use N\\{A}; echo (new A()) ? 1 : 0; }',
+        ],
+        [
+            'id' => 'heredoc_flexible_indent',
+            'construct' => 'Flexible heredoc/nowdoc indentation stripping (PHP 7.3+)',
+            'opcodes' => [],
+            'issue' => 3636,
+            'notes' => [
+                'php-parser Emulative FlexibleDocStringEmulator + parseDocString stripIndentation (#3636)',
+                'Indented closing label sets docIndentation column; basic heredoc/nowdoc #178',
+                'Zend/zend_language_scanner.l flexible heredoc/nowdoc parity',
+            ],
+            'probe' => "echo <<<EOT\n    hello\n    EOT;",
         ],
         [
             'id' => 'never_return',
@@ -666,6 +689,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'array_argument_unpack' => '/\.\.\.\s*\$/',
         'multi_catch' => '/catch\s*\([^)]*\|/',
         'try_catch_throw' => '/\btry\s*\{/',
+        'heredoc_flexible_indent' => '/<<<\s*\w+\s*\r?\n\s+\S/',
     ];
 
     $scan = [];

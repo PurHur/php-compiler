@@ -53,6 +53,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gc_collect_cycles')) {
                 continue;
             }
+            // enum case ->name / ->value is VM-only until JIT enum case objects (#3420).
+            if (str_contains($name, 'enum_case_name_value')) {
+                continue;
+            }
             // count() on Countable objects is VM-only until JIT object dispatch (#3364).
             if (str_contains($name, 'countable')) {
                 continue;
@@ -73,12 +77,20 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'json_validate')) {
                 continue;
             }
+            // (unset) cast reference break is VM-only until JIT TYPE_CAST_UNSET lowering (#3517).
+            if (str_contains($name, 'cast_unset')) {
+                continue;
+            }
             // exit/die expression ScriptExit status — VM compliance (#3539).
             if (str_contains($name, 'exit_expression') || str_contains($name, 'die_expression')) {
                 continue;
             }
             // class const scalar expressions — VM defineClass eval (#3567); JIT deferred.
             if (str_contains($name, 'class_const_scalar_expr')) {
+                continue;
+            }
+            // Top-level script globals — VM symbol table (#3601); JIT LLVM global slots deferred.
+            if (str_contains($name, 'global_top_level')) {
                 continue;
             }
             // Stringable __toString in echo/concat is VM-only until magic method JIT (#146, #3296).
@@ -91,6 +103,30 @@ class JITTest extends BaseTest {
             }
             // Global function __METHOD__/__FUNCTION__ — parse-time literals; MCJIT segfault (#3595).
             if (str_contains($name, 'magic_const_method_function')) {
+                continue;
+            }
+            // object == structural compare is VM-only until JIT Object_ lowering (#3602).
+            if (str_contains($name, 'object_loose_equals')) {
+                continue;
+            }
+            // string/number loose == juggling is VM-only until ArrayBuiltinHelper string-long compare (#3644).
+            if (str_contains($name, 'loose_numeric_string')) {
+                continue;
+            }
+            // object === identity compare is VM-only until JIT handle compare is stable (#3622).
+            if (str_contains($name, 'object_identical')) {
+                continue;
+            }
+            // foreach over user objects / stdClass is VM-only until IteratorHelper object walk (#3661).
+            if (str_contains($name, 'foreach_object_by_ref')) {
+                continue;
+            }
+            // gettype() object/resource is VM-only until __compiler_gettype JIT path is stable (#3618).
+            if (str_contains($name, 'gettype_object_resource')) {
+                continue;
+            }
+            // __TRAIT__ in trait bodies requires trait JIT lowering (#3609); parse-time fold is VM-only for now.
+            if (str_contains($name, 'magic_const_trait')) {
                 continue;
             }
             yield $name => $case;

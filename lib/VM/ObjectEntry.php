@@ -92,6 +92,16 @@ class ObjectEntry {
         return $this->properties[$name];
     }
 
+    public function issetProperty(string $name): bool
+    {
+        if (!isset($this->properties[$name])) {
+            return false;
+        }
+        $var = $this->properties[$name]->resolveIndirect();
+
+        return !$var->isUndefined() && Variable::TYPE_NULL !== $var->type;
+    }
+
     public function unsetProperty(string $name): void
     {
         if (!isset($this->properties[$name])) {
@@ -112,6 +122,38 @@ class ObjectEntry {
         }
 
         return $this->class->getProperties($this->properties, $purpose);
+    }
+
+    /**
+     * Zend {@see compare_objects()} default handler: same class and equal property values (#3602).
+     */
+    public function looseEquals(self $other): bool
+    {
+        if ($this === $other) {
+            return true;
+        }
+        if ($this->class->name !== $other->class->name) {
+            return false;
+        }
+        $names = array_keys($this->properties);
+        foreach (array_keys($other->properties) as $name) {
+            if (!\in_array($name, $names, true)) {
+                $names[] = $name;
+            }
+        }
+        foreach ($names as $name) {
+            $left = isset($this->properties[$name])
+                ? $this->properties[$name]->resolveIndirect()
+                : new Variable(Variable::TYPE_NULL);
+            $right = isset($other->properties[$name])
+                ? $other->properties[$name]->resolveIndirect()
+                : new Variable(Variable::TYPE_NULL);
+            if (!$left->equals($right)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** Shallow clone: new object id, copied instance property values. */
