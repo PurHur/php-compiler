@@ -6731,10 +6731,20 @@ class JIT {
                     );
             }
         }
+        if ($value->isJitGenerator) {
+            $this->context->setVariableOp($resultOp, $value);
+            $resolved = JIT\OperandName::resolve($resultOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName($resolved, $value);
+            }
+
+            return;
+        }
         if (
             $force
             && Variable::KIND_VALUE === $result->kind
             && Variable::TYPE_STRING !== $result->type
+            && !$value->isJitGenerator
         ) {
             // ?? left branch fetch binds a superglobal lvalue; force-assign needs a stack slot (#866).
             $slot = JIT\JitValueBox::alloc($this->context);
@@ -7466,6 +7476,11 @@ class JIT {
             $dest->objectPropertyReceiver = null;
             $dest->objectPropertyName = null;
             $dest->objectPropertyClassName = null;
+            if (JIT\GeneratorHelper::isGeneratorVariable($src)) {
+                $dest->generatorStatePtr = $src->generatorStatePtr;
+                $dest->generatorResumeName = $src->generatorResumeName;
+                $dest->isJitGenerator = $src->isJitGenerator;
+            }
 
             return;
         }
