@@ -572,11 +572,12 @@ class VM {
 
     private function runFrames(): int
     {
+        $previous = self::$running;
         self::$running = $this;
         try {
             return $this->runFramesInner();
         } finally {
-            self::$running = null;
+            self::$running = $previous;
         }
     }
 

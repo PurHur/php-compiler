@@ -92,6 +92,67 @@ PHP;
         $this->assertSame('ok', ob_get_clean());
     }
 
+    /** @covers issue #3206 */
+    public function testReflectionAttributeNewInstance(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+#[Attribute]
+class Route {
+    public function __construct(public string $path) {}
+}
+#[Route('/home')]
+class C {}
+$a = (new ReflectionClass(C::class))->getAttributes()[0];
+$o = $a->newInstance();
+echo $o->path;
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'attr_new_instance.php'));
+        $this->assertSame('/home', ob_get_clean());
+    }
+
+    /** @covers issue #3206 */
+    public function testReflectionAttributeNewInstanceReturnsDistinctObjects(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+#[Attribute]
+class Route {
+    public function __construct(public string $path) {}
+}
+#[Route('/home')]
+class C {}
+$a = (new ReflectionClass(C::class))->getAttributes()[0];
+$o1 = $a->newInstance();
+$o2 = $a->newInstance();
+echo ($o1 === $o2) ? 'same' : 'distinct';
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'attr_new_instance_distinct.php'));
+        $this->assertSame('distinct', ob_get_clean());
+    }
+
+    /** @covers issue #3206 */
+    public function testReflectionAttributeNewInstanceMissingClass(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+#[Attribute]
+class A {}
+#[NonExistentAttribute]
+class B {}
+$attr = (new ReflectionClass(B::class))->getAttributes()[0];
+$attr->newInstance();
+PHP;
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Attribute class "NonExistentAttribute" not found');
+        $runtime->run($runtime->parseAndCompile($code, 'attr_missing.php'));
+    }
+
     /** @covers issue #3467 */
     public function testPlainClassRejectsUndeclaredWrites(): void
     {
