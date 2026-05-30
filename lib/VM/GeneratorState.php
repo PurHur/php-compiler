@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCfg\Func as CfgFunc;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
+use PHPCompiler\VM\Builtin\GeneratorGetReturn;
 
 /**
  * VM state for a user generator (`function g() { yield $v; }`, issue #167).
@@ -28,6 +30,11 @@ final class GeneratorState
 
     public Variable $yieldFromContainer;
 
+    /** True after the generator body has returned (void or value). */
+    public bool $hasReturned = false;
+
+    public Variable $returnValue;
+
     public function __construct(
         public readonly \PHPCompiler\VM $vm,
         public readonly Func\PHP $func,
@@ -37,11 +44,29 @@ final class GeneratorState
         $this->currentKey = new Variable();
         $this->currentValue = new Variable();
         $this->yieldFromContainer = new Variable();
+        $this->returnValue = new Variable();
     }
 
     public static function register(Context $ctx): void
     {
-        $ctx->classes['generator'] = new ClassEntry('Generator');
+        $entry = new ClassEntry('Generator');
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $entry->methods['getreturn'] = new GeneratorGetReturn();
+        $entry->methodVisibility['getreturn'] = $pub;
+        $ctx->classes['generator'] = $entry;
+    }
+
+    public function markReturned(?Variable $value = null): void
+    {
+        $this->done = true;
+        $this->frame = null;
+        $this->hasCurrent = false;
+        $this->hasReturned = true;
+        if (null !== $value) {
+            $this->returnValue->copyFrom($value);
+        } else {
+            $this->returnValue->null();
+        }
     }
 
     public function wrapObject(): ObjectEntry
@@ -60,5 +85,7 @@ final class GeneratorState
         $this->frame = null;
         $this->autoKey = 0;
         $this->yieldFromActive = false;
+        $this->hasReturned = false;
+        $this->returnValue->null();
     }
 }

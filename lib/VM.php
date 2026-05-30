@@ -1965,9 +1965,7 @@ restart:
         $this->markObjectConstructedIfLeavingConstruct($frame);
         $gen = $this->findGeneratorState($frame);
         if (null !== $gen) {
-            $gen->done = true;
-            $gen->frame = null;
-            $gen->hasCurrent = false;
+            $gen->markReturned(null);
             goto nextframe;
         }
         if ($frame->ephemeral && null !== $frame->parent) {
@@ -1978,6 +1976,12 @@ restart:
 
         return_value_complete:
         $this->enforceReturnType($frame, $returnValue);
+        $gen = $this->findGeneratorState($frame);
+        if (null !== $gen) {
+            $gen->markReturned($returnValue);
+            $this->markObjectConstructedIfLeavingConstruct($frame);
+            goto nextframe;
+        }
         if (!is_null($frame->returnVar)) {
             if ($this->functionReturnsByRef($frame)) {
                 $frame->returnVar->indirect($returnValue);
@@ -2791,7 +2795,9 @@ restart:
         }
         $gen->frame = null;
         if (self::SUCCESS === $result) {
-            $gen->done = true;
+            if (!$gen->hasReturned) {
+                $gen->markReturned(null);
+            }
         }
 
         return false;
