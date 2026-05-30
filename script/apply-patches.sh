@@ -209,6 +209,9 @@ patch_already_applied() {
       grep -q 'new Op\\Expr\\PostInc' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
         && [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/PostInc.php" ]]
       ;;
+    php-cfg-halt-compiler.patch)
+      grep -q 'new Op\\Stmt\\HaltCompiler' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-cfg-assignop-coalesce.patch)
       grep -q "'Expr_AssignOp_Coalesce'" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
@@ -260,7 +263,7 @@ patch_already_applied() {
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TraitUse.php" ]]
       ;;
     php-cfg-throw-expr.patch)
-      [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Throw_.php" ]]
+      grep -q 'return new Op\\Expr\\Throw_' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-types-never-type.patch)
       grep -q 'Op\\Type\\Never_' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
@@ -1379,6 +1382,86 @@ apply_php_cfg_magic_constants_overlay() {
   echo "Applied php-cfg-magic-constants.patch (overlay)"
 }
 
+apply_php_cfg_halt_compiler_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/HaltCompiler.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg"
+  if grep -q 'new Op\\Stmt\\HaltCompiler' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-halt-compiler.patch (already applied)"
+    return 0
+  fi
+  if [[ ! -f "$overlay/Op/Stmt/HaltCompiler.php" || ! -f "$overlay/halt-compiler-parser-method.php" ]]; then
+    echo "Skip php-cfg-halt-compiler.patch (overlay files missing)" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$op")"
+  cp "$overlay/Op/Stmt/HaltCompiler.php" "$op"
+  python3 - "$parser" "$overlay/halt-compiler-parser-method.php" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+text = parser_path.read_text()
+old = """    protected function parseStmt_HaltCompiler(Stmt\\HaltCompiler $node)
+    {
+        $this->block->children[] = new Op\\Terminal\\Echo_(
+            $this->readVariable(new Operand\\Literal($node->remaining)),
+            $this->mapAttributes($node)
+        );
+    }"""
+new = method_path.read_text()
+if old not in text:
+    sys.stderr.write("php-cfg-halt-compiler: parseStmt_HaltCompiler stub not found in Parser.php\n")
+    sys.exit(1)
+parser_path.write_text(text.replace(old, new.rstrip("\n"), 1))
+PY
+  echo "Applied php-cfg-halt-compiler.patch (overlay)"
+}
+
+apply_php_cfg_throw_expr_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Throw_.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg"
+  if grep -q 'return new Op\\Expr\\Throw_' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-throw-expr.patch (already applied)"
+    return 0
+  fi
+  if [[ ! -f "$overlay/Op/Expr/Throw_.php" || ! -f "$overlay/throw-expr-parser-method.php" ]]; then
+    echo "Skip php-cfg-throw-expr.patch (overlay files missing)" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$op")"
+  cp "$overlay/Op/Expr/Throw_.php" "$op"
+  python3 - "$parser" "$overlay/throw-expr-parser-method.php" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+text = parser_path.read_text()
+new = method_path.read_text().rstrip("\n")
+terminal = re.compile(
+    r"    protected function parseExpr_Throw\(Expr\\Throw_ \$expr\)\s*\{"
+    r".*?\n    \}\n",
+    re.S,
+)
+if "return new Op\\Expr\\Throw_" in text:
+    sys.exit(0)
+match = terminal.search(text)
+if match:
+    parser_path.write_text(text[: match.start()] + new + "\n" + text[match.end() :])
+else:
+    anchor = "    protected function parseStmt_Trait(Stmt\\Trait_ $node)"
+    if anchor not in text:
+        sys.stderr.write("php-cfg-throw-expr: insert anchor not found in Parser.php\n")
+        sys.exit(1)
+    parser_path.write_text(text.replace(anchor, new + "\n" + anchor, 1))
+PY
+  echo "Applied php-cfg-throw-expr.patch (overlay)"
+}
+
 apply_php_cfg_trycatch_overlay() {
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TryCatch.php"
@@ -1687,6 +1770,14 @@ apply_patch() {
     apply_php_cfg_trycatch_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-halt-compiler.patch" ]]; then
+    apply_php_cfg_halt_compiler_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-throw-expr.patch" ]]; then
+    apply_php_cfg_throw_expr_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-llvm-memory-buffer-bitcode.patch" ]]; then
     apply_php_llvm_memory_buffer_overlay
     return $?
@@ -1783,6 +1874,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-incdec-expr.patch"
   apply_patch "$PATCH_DIR/php-cfg-yield-keyed.patch"
   apply_patch "$PATCH_DIR/php-cfg-match.patch"
+  apply_patch "$PATCH_DIR/php-cfg-halt-compiler.patch"
   apply_patch "$PATCH_DIR/php-cfg-assignop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-cfg-first-class-callable.patch"
   apply_patch "$PATCH_DIR/php-cfg-arrow-function.patch"

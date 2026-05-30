@@ -70,6 +70,7 @@ class Module extends ModuleAbstract
             new gettype(),
             new get_debug_type(),
             new gc_collect_cycles(),
+            new halt_compiler_(),
             new strval(),
             new int_min(),
             new int_max(),
