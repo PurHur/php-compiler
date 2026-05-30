@@ -1,0 +1,18 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -304,6 +304,14 @@
+                 }
+ 
+                 return [Type::string()];
++            case 'Expr_PostInc':
++            case 'Expr_PostDec':
++            case 'Expr_PreInc':
++            case 'Expr_PreDec':
++                if ($resolved->contains($op->read)) {
++                    return [$resolved[$op->read]];
++                }
++
++                return false;
+         }
+ 
+         throw new \LogicException('Unknown variable op found: '.$op->getType());
