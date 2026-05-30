@@ -87,6 +87,9 @@ patch_already_applied() {
     php-types-yield-from.patch)
       grep -q "case 'Expr_YieldFrom':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
+    php-types-incdec-type.patch)
+      grep -q "case 'Expr_PostInc':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
+      ;;
     php-types-str-bool-fns.patch)
       grep -q "'str_contains' => \['bool'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
@@ -186,6 +189,10 @@ patch_already_applied() {
       ;;
     php-cfg-match.patch)
       grep -q 'function parseExpr_Match' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
+    php-cfg-incdec-expr.patch)
+      grep -q 'new Op\\Expr\\PostInc' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        && [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/PostInc.php" ]]
       ;;
     php-cfg-assignop-coalesce.patch)
       grep -q "'Expr_AssignOp_Coalesce'" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
@@ -378,6 +385,87 @@ insert = method_path.read_text().rstrip("\n") + "\n\n"
 parser_path.write_text(text.replace(anchor, insert + anchor, 1))
 PY
   echo "Applied php-cfg-yield-from.patch (overlay)"
+}
+
+apply_php_cfg_incdec_expr_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg"
+  if grep -q 'new Op\\Expr\\PostInc' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-incdec-expr.patch (already applied)"
+    return 0
+  fi
+  for class in PostInc PreInc PostDec PreDec; do
+    if [[ ! -f "$overlay/Op/Expr/${class}.php" ]]; then
+      echo "Skip php-cfg-incdec-expr.patch (overlay ${class}.php missing)" >&2
+      return 1
+    fi
+    mkdir -p "$(dirname "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/${class}.php")"
+    cp "$overlay/Op/Expr/${class}.php" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/${class}.php"
+  done
+  python3 - "$parser" "$overlay/incdec-parser-methods.php" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+text = parser_path.read_text()
+new_methods = method_path.read_text()
+
+if 'new Op\\Expr\\PostInc' in text:
+    parser_path.write_text(text)
+    raise SystemExit(0)
+
+old = """    protected function parseExpr_PostDec(Expr\\PostDec $expr)
+    {
+        $var = $this->parseExprNode($expr->var);
+        $read = $this->readVariable($var);
+        $write = $this->writeVariable($var);
+        $this->block->children[] = $op = new Op\\Expr\\BinaryOp\\Minus($read, new Operand\\Literal(1), $this->mapAttributes($expr));
+        $this->block->children[] = new Op\\Expr\\Assign($write, $op->result, $this->mapAttributes($expr));
+
+        return $read;
+    }
+
+    protected function parseExpr_PostInc(Expr\\PostInc $expr)
+    {
+        $var = $this->parseExprNode($expr->var);
+        $read = $this->readVariable($var);
+        $write = $this->writeVariable($var);
+        $this->block->children[] = $op = new Op\\Expr\\BinaryOp\\Plus($read, new Operand\\Literal(1), $this->mapAttributes($expr));
+        $this->block->children[] = new Op\\Expr\\Assign($write, $op->result, $this->mapAttributes($expr));
+
+        return $read;
+    }
+
+    protected function parseExpr_PreDec(Expr\\PreDec $expr)
+    {
+        $var = $this->parseExprNode($expr->var);
+        $read = $this->readVariable($var);
+        $write = $this->writeVariable($var);
+        $this->block->children[] = $op = new Op\\Expr\\BinaryOp\\Minus($read, new Operand\\Literal(1), $this->mapAttributes($expr));
+        $this->block->children[] = new Op\\Expr\\Assign($write, $op->result, $this->mapAttributes($expr));
+
+        return $op->result;
+    }
+
+    protected function parseExpr_PreInc(Expr\\PreInc $expr)
+    {
+        $var = $this->parseExprNode($expr->var);
+        $read = $this->readVariable($var);
+        $write = $this->writeVariable($var);
+        $this->block->children[] = $op = new Op\\Expr\\BinaryOp\\Plus($read, new Operand\\Literal(1), $this->mapAttributes($expr));
+        $this->block->children[] = new Op\\Expr\\Assign($write, $op->result, $this->mapAttributes($expr));
+
+        return $op->result;
+    }"""
+
+if old not in text:
+    sys.stderr.write("php-cfg-incdec-expr: Parser.php anchor not found\n")
+    raise SystemExit(1)
+
+parser_path.write_text(text.replace(old, new_methods.rstrip('\n'), 1))
+PY
+  echo "Applied php-cfg-incdec-expr.patch (overlay)"
 }
 
 apply_php_cfg_yield_keyed_overlay() {
@@ -1382,6 +1470,10 @@ apply_patch() {
     apply_php_cfg_yield_from_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-incdec-expr.patch" ]]; then
+    apply_php_cfg_incdec_expr_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-yield-keyed.patch" ]]; then
     apply_php_cfg_yield_keyed_overlay
     return $?
@@ -1540,6 +1632,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-property-type.patch"
   apply_patch "$PATCH_DIR/php-cfg-assertion-expr-property.patch"
   apply_patch "$PATCH_DIR/php-cfg-yield-from.patch"
+  apply_patch "$PATCH_DIR/php-cfg-incdec-expr.patch"
   apply_patch "$PATCH_DIR/php-cfg-yield-keyed.patch"
   apply_patch "$PATCH_DIR/php-cfg-match.patch"
   apply_patch "$PATCH_DIR/php-cfg-assignop-coalesce.patch"
@@ -1567,6 +1660,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-binaryop-spaceship.patch"
   apply_patch "$PATCH_DIR/php-types-str-bool-fns.patch"
   apply_patch "$PATCH_DIR/php-types-str-incdec.patch"
+  apply_patch "$PATCH_DIR/php-types-incdec-type.patch"
   apply_patch "$PATCH_DIR/php-types-str-split-string-array.patch"
   apply_patch "$PATCH_DIR/php-types-readfile-int-false.patch"
   apply_patch "$PATCH_DIR/php-types-stream-context-array-return.patch"

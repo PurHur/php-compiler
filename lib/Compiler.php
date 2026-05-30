@@ -1654,6 +1654,16 @@ class Compiler {
         $this->throwCompileLogic("Unknown CastOp Type: " . $expr->getType());
     }
 
+    protected function compileIncDecExpr(Op\Expr $expr, Block $block, int $opcode): array
+    {
+        return [new OpCode(
+            $opcode,
+            $this->compileOperand($expr->result, $block, false),
+            $this->compileOperand($expr->read, $block, true),
+            $this->compileOperand($expr->write, $block, false),
+        )];
+    }
+
     protected function getOpCodeTypeFromUnaryOp(Op\Expr $expr): int {
         if ($expr instanceof Op\Expr\UnaryMinus) {
             return OpCode::TYPE_UNARY_MINUS;
@@ -1785,6 +1795,14 @@ class Compiler {
                     $this->compileOperand($expr->result, $block, false),
                     $exitExpr
                 )];
+            case Op\Expr\PostInc::class:
+                return $this->compileIncDecExpr($expr, $block, OpCode::TYPE_POST_INC);
+            case Op\Expr\PreInc::class:
+                return $this->compileIncDecExpr($expr, $block, OpCode::TYPE_PRE_INC);
+            case Op\Expr\PostDec::class:
+                return $this->compileIncDecExpr($expr, $block, OpCode::TYPE_POST_DEC);
+            case Op\Expr\PreDec::class:
+                return $this->compileIncDecExpr($expr, $block, OpCode::TYPE_PRE_DEC);
             case Op\Expr\UnaryMinus::class:
             case Op\Expr\UnaryPlus::class:
             case Op\Expr\BitwiseNot::class:

@@ -484,6 +484,18 @@ restart:
                         break;
                     }
                     break;
+                case OpCode::TYPE_POST_INC:
+                    $this->executeIncDec($frame, $op, true, false);
+                    break;
+                case OpCode::TYPE_PRE_INC:
+                    $this->executeIncDec($frame, $op, true, true);
+                    break;
+                case OpCode::TYPE_POST_DEC:
+                    $this->executeIncDec($frame, $op, false, false);
+                    break;
+                case OpCode::TYPE_PRE_DEC:
+                    $this->executeIncDec($frame, $op, false, true);
+                    break;
                 case OpCode::TYPE_PLUS:
                 case OpCode::TYPE_MINUS:
                 case OpCode::TYPE_MUL:
@@ -1391,6 +1403,38 @@ restart:
         }
 
         return $target->getFrame($this->context, $frame);
+    }
+
+    /**
+     * Pre/post increment/decrement with Zend bool preservation (#3552).
+     */
+    private function executeIncDec(Frame $frame, OpCode $op, bool $increment, bool $prefix): void
+    {
+        $read = $frame->scope[$op->arg2];
+        $write = $frame->scope[$op->arg3];
+        $result = $frame->scope[$op->arg1];
+        $working = new Variable();
+        $working->copyFrom($read->resolveIndirect());
+        if ($prefix) {
+            if ($increment) {
+                $working->applyIncrement();
+            } else {
+                $working->applyDecrement();
+            }
+            $write->copyFrom($working);
+            $result->copyFrom($working);
+
+            return;
+        }
+        $old = new Variable();
+        $old->copyFrom($working);
+        if ($increment) {
+            $working->applyIncrement();
+        } else {
+            $working->applyDecrement();
+        }
+        $write->copyFrom($working);
+        $result->copyFrom($old);
     }
 
     protected function raise(string $message, Frame $frame): int

@@ -145,6 +145,14 @@ class OpCode {
      * block1 = compiled anonymous function body (VM-only today; JIT still lowers to null).
      */
     const TYPE_CLOSURE = 109;
+    /** Post-increment: arg1=result, arg2=read, arg3=write (#3552). */
+    const TYPE_POST_INC = 111;
+    /** Pre-increment: arg1=result, arg2=read, arg3=write (#3552). */
+    const TYPE_PRE_INC = 112;
+    /** Post-decrement: arg1=result, arg2=read, arg3=write (#3552). */
+    const TYPE_POST_DEC = 113;
+    /** Pre-decrement: arg1=result, arg2=read, arg3=write (#3552). */
+    const TYPE_PRE_DEC = 114;
 
     public int $type;
     public ?int $arg1;

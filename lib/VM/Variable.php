@@ -745,6 +745,73 @@ restart:
         }
     }
 
+    /**
+     * Zend increment_function() on a single value (issue #3552).
+     */
+    public function applyIncrement(): void
+    {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $copy = new self();
+            $copy->copyFrom($this->indirect);
+            $copy->applyIncrement();
+            $this->indirect->copyFrom($copy);
+
+            return;
+        }
+        switch ($this->type) {
+            case self::TYPE_BOOLEAN:
+                return;
+            case self::TYPE_NULL:
+                $this->int(1);
+
+                return;
+            case self::TYPE_INTEGER:
+                ++$this->integer;
+
+                return;
+            case self::TYPE_FLOAT:
+                $this->float += 1;
+
+                return;
+            default:
+                $one = new self();
+                $one->int(1);
+                $this->numericOp(OpCode::TYPE_PLUS, $this, $one);
+        }
+    }
+
+    /**
+     * Zend decrement_function() on a single value (issue #3552).
+     */
+    public function applyDecrement(): void
+    {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $copy = new self();
+            $copy->copyFrom($this->indirect);
+            $copy->applyDecrement();
+            $this->indirect->copyFrom($copy);
+
+            return;
+        }
+        switch ($this->type) {
+            case self::TYPE_BOOLEAN:
+            case self::TYPE_NULL:
+                return;
+            case self::TYPE_INTEGER:
+                --$this->integer;
+
+                return;
+            case self::TYPE_FLOAT:
+                $this->float -= 1;
+
+                return;
+            default:
+                $one = new self();
+                $one->int(1);
+                $this->numericOp(OpCode::TYPE_MINUS, $this, $one);
+        }
+    }
+
     public function unaryOp(int $opCode, Variable $expr): void {
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();

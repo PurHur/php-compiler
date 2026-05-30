@@ -5132,6 +5132,18 @@ class JIT {
                     );
                     $this->assignOperandValue($block->getOperand($op->arg1), $powResult);
                     break;
+                case OpCode::TYPE_POST_INC:
+                    $this->compileIncDecOp($block, $op, true, false);
+                    break;
+                case OpCode::TYPE_PRE_INC:
+                    $this->compileIncDecOp($block, $op, true, true);
+                    break;
+                case OpCode::TYPE_POST_DEC:
+                    $this->compileIncDecOp($block, $op, false, false);
+                    break;
+                case OpCode::TYPE_PRE_DEC:
+                    $this->compileIncDecOp($block, $op, false, true);
+                    break;
                 case OpCode::TYPE_MUL:
                 case OpCode::TYPE_PLUS:
                 case OpCode::TYPE_MINUS:
@@ -7368,6 +7380,39 @@ class JIT {
                     'Cannot infer JIT variable type from LLVM type: '
                     .$this->context->getStringFromType($value->typeOf())
                 );
+        }
+    }
+
+    private function compileIncDecOp(Block $block, OpCode $op, bool $increment, bool $prefix): void
+    {
+        $this->maybeRefreshIncludeBindingsBeforeUse();
+        $readOp = $this->operandAt($block, $op->arg2, 'inc/dec read');
+        $writeOp = $this->operandAt($block, $op->arg3, 'inc/dec write');
+        $resultOp = $this->operandAt($block, $op->arg1, 'inc/dec result');
+        $read = $this->context->getVariableFromOp($readOp);
+
+        if (Variable::TYPE_NATIVE_BOOL === $read->type) {
+            $this->assignOperand($writeOp, $read, true);
+            $this->assignOperand($resultOp, $read, true);
+
+            return;
+        }
+
+        if (!$prefix) {
+            $this->assignOperand($resultOp, $read, true);
+        }
+
+        $arithOp = new OpCode($increment ? OpCode::TYPE_PLUS : OpCode::TYPE_MINUS);
+        $oneVar = new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $this->context->constantFromInteger(1)
+        );
+        $newVal = $this->context->helper->binaryOp($arithOp, $read, $oneVar);
+        $this->assignOperand($writeOp, $newVal, true);
+        if ($prefix) {
+            $this->assignOperand($resultOp, $newVal, true);
         }
     }
 
