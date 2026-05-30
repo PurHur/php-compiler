@@ -50,14 +50,11 @@ class Frame {
     /** Pending closure call: captures bound when the callee frame is entered (issue #72). */
     public ?VM\ClosureState $closureCall = null;
 
-<<<<<<< HEAD
     /**
      * When set, writes to this instance property name use backing storage (inside a hook body, #3145).
      */
     public ?string $propertyHookRawProperty = null;
 
-=======
->>>>>>> 4c6bd1c5 (Language: __callStatic magic dispatch on static call slow path (#3273))
     /** Original method name when dispatching via __call / __callStatic (#146, #3273). */
     public ?string $magicCallMethodName = null;
 
