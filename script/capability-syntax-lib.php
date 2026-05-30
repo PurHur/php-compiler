@@ -43,7 +43,7 @@ function syntaxRowDefinitions(): array
             'construct' => 'Enum declarations `enum Foo: string { case Bar = \'x\'; }`',
             'opcodes' => ['TYPE_DECLARE_ENUM', 'TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH'],
             'issue' => 1356,
-            'notes' => ['Backed enum cases as class constants; `Foo::Bar` const-like fetch; `enum_exists` registry; `implements` metadata (#2299); static methods (#2299); `Enum::cases()` VM (#3308)'],
+            'notes' => ['Backed enum cases as class constants; `Foo::Bar` const-like fetch; case `->name` / `->value` (#3420); `enum_exists` registry; `implements` metadata (#2299); static methods (#2299); `Enum::cases()` VM (#3308)'],
             'probe' => 'enum Status: string { case Ok = \'ok\'; public static function tag(): string { return \'ok\'; } } echo Status::tag();',
         ],
         [
