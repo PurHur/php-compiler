@@ -1805,6 +1805,9 @@ restart:
                     } else {
                         $gen->currentKey->int($gen->autoKey++);
                     }
+                    if (null !== $op->arg1) {
+                        $gen->yieldResultSlot = $op->arg1;
+                    }
                     $gen->hasCurrent = true;
                     $gen->frame = $frame;
                     $frame->generatorYield = true;
@@ -2184,7 +2187,20 @@ restart:
             return $this->dispatchVmValueError($e, $callerFrame);
         } catch (\Error $e) {
             return $this->dispatchVmError($e->getMessage(), $callerFrame);
+        } catch (VM\GeneratorUncaughtThrow $e) {
+            return $this->dispatchUncaughtGeneratorThrow($e->thrown, $callerFrame);
         }
+    }
+
+    private function dispatchUncaughtGeneratorThrow(Variable $thrown, Frame $callerFrame): ?Frame
+    {
+        $catchFrame = $this->findCatchFrameForThrow($callerFrame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
     }
 
     /**
@@ -2925,11 +2941,94 @@ restart:
         return null;
     }
 
+    /**
+     * Resume a generator (Generator::send / ::next / ::rewind / foreach), optionally injecting a send value.
+     */
+    public function resumeGenerator(GeneratorState $gen, ?Variable $sendValue = null): bool
+    {
+        if ($gen->done) {
+            return false;
+        }
+        if (null !== $sendValue) {
+            $gen->pendingSend->copyFrom($sendValue);
+            $gen->hasPendingSend = true;
+        }
+
+        return $this->advanceGeneratorIteration($gen);
+    }
+
+    /** Generator::throw() — inject Throwable at yield suspension (Zend zend_generators.c). */
+    public function throwGenerator(GeneratorState $gen, Variable $exception): bool
+    {
+        if ($gen->done) {
+            throw new \Exception('Cannot throw to a closed generator');
+        }
+        if (null === $gen->frame) {
+            throw new \Exception('Cannot throw to an uninitialized generator');
+        }
+        $gen->pendingThrow->copyFrom($exception);
+        $gen->hasPendingThrow = true;
+
+        return $this->advanceGeneratorIteration($gen);
+    }
+
+    private function applyGeneratorPendingSend(GeneratorState $gen): void
+    {
+        if (!$gen->hasPendingSend || null === $gen->frame || null === $gen->yieldResultSlot) {
+            return;
+        }
+        if (!isset($gen->frame->scope[$gen->yieldResultSlot])) {
+            return;
+        }
+        $gen->frame->scope[$gen->yieldResultSlot]->copyFrom($gen->pendingSend);
+        $gen->hasPendingSend = false;
+    }
+
+    private function applyGeneratorPendingThrow(GeneratorState $gen): void
+    {
+        if (!$gen->hasPendingThrow || null === $gen->frame) {
+            return;
+        }
+        $thrown = new Variable();
+        $thrown->copyFrom($gen->pendingThrow);
+        $gen->hasPendingThrow = false;
+        $catchFrame = $this->findCatchFrameForGeneratorThrow($gen, $thrown);
+        if (null !== $catchFrame) {
+            $catchFrame->generatorState = $gen;
+            $gen->frame = $catchFrame;
+
+            return;
+        }
+        $gen->frame = null;
+        $gen->markReturned(null);
+        throw new VM\GeneratorUncaughtThrow($thrown);
+    }
+
+    /** Catch handlers inside the generator function only (not caller try/catch). */
+    private function findCatchFrameForGeneratorThrow(GeneratorState $gen, Variable $thrown): ?Frame
+    {
+        $this->context->pendingException = $thrown;
+        for ($handler = $gen->frame; null !== $handler; $handler = $handler->parent) {
+            if ($handler->generatorState !== $gen && $this->findGeneratorState($handler) !== $gen) {
+                break;
+            }
+            $catchFrame = $this->dispatchCatchForHandlerFrame($handler);
+            if (null !== $catchFrame) {
+                return $catchFrame;
+            }
+        }
+        $this->clearTryCatchUnwindState();
+
+        return null;
+    }
+
     private function advanceGeneratorIteration(GeneratorState $gen): bool
     {
         if ($gen->done) {
             return false;
         }
+        $this->applyGeneratorPendingSend($gen);
+        $this->applyGeneratorPendingThrow($gen);
         if (null === $gen->frame) {
             $gen->frame = $gen->func->getFrame($this->context, null);
             $gen->frame->calledArgs = $gen->calledArgs;

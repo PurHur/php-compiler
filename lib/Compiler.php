@@ -2958,7 +2958,9 @@ class Compiler {
 
                 return [new OpCode(
                     OpCode::TYPE_YIELD,
-                    null,
+                    [] !== $expr->result->usages
+                        ? $this->compileOperand($expr->result, $block, false)
+                        : null,
                     null !== $expr->value
                         ? $this->compileOperand($expr->value, $block, true)
                         : (null !== $expr->key
