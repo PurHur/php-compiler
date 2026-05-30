@@ -182,5 +182,12 @@ final class BuiltinClasses
         $typeError->methods['getmessage'] = $getMessage;
         $typeError->methodVisibility['getmessage'] = $pub;
         $ctx->classes[BuiltinExceptionSupport::CLASS_TYPE_ERROR] = $typeError;
+
+        $divisionByZero = new ClassEntry('DivisionByZeroError');
+        $divisionByZero->parentLc = BuiltinExceptionSupport::CLASS_ERROR;
+        $divisionByZero->properties[] = new ClassProperty(BuiltinExceptionSupport::PROP_MESSAGE, null, $strProto);
+        $divisionByZero->methods['getmessage'] = $getMessage;
+        $divisionByZero->methodVisibility['getmessage'] = $pub;
+        $ctx->classes[BuiltinExceptionSupport::CLASS_DIVISION_BY_ZERO_ERROR] = $divisionByZero;
     }
 }
