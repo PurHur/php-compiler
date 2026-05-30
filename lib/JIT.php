@@ -221,6 +221,20 @@ class JIT {
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
 
+    /** User script AOT via bin/compile.php: real closure lowering (#3725). */
+    private function shouldStubClosureLowering(): bool
+    {
+        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        if ('1' === $userScript || 'true' === strtolower((string) $userScript)) {
+            return false;
+        }
+        if ($this->shouldUseVendorPrelinkJitStubs()) {
+            return true;
+        }
+
+        return $this->shouldUseSelfHostJitStubs();
+    }
+
     /** Bundle-only PHP constants (spine smoke defines; bin/compile.php AOT folds false — #2600). */
     /**
      * Fold OpCode::* class constants when php-cfg scopes the class as Type (#2666).
@@ -5477,7 +5491,7 @@ class JIT {
                     $this->compileBlock($op->block1, $nameOp->value);
                     break;
                 case OpCode::TYPE_CLOSURE:
-                    if ($this->shouldUseSelfHostJitStubs() || null === $op->block1) {
+                    if ($this->shouldStubClosureLowering() || null === $op->block1) {
                         // Bootstrap / vendor prelink: closures are not executable yet; represent as null.
                         $nullVar = new Variable(
                             $this->context,
@@ -6995,6 +7009,7 @@ class JIT {
                         $valueRef,
                         $objVal
                     );
+                    $result->closureCall = $value->closureCall;
 
                     return;
                 case Variable::TYPE_VALUE:
@@ -7434,10 +7449,12 @@ class JIT {
             $dest->objectPropertyReceiver = null;
             $dest->objectPropertyName = null;
             $dest->objectPropertyClassName = null;
-
-            return;
+        } else {
+            $this->copyObjectPropertyBacking($dest, $src);
         }
-        $this->copyObjectPropertyBacking($dest, $src);
+        if (null !== $src->closureCall) {
+            $dest->closureCall = $src->closureCall;
+        }
     }
 
     private function copyObjectPropertyBacking(Variable $dest, Variable $src): void
