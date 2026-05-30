@@ -257,6 +257,18 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { public const array X = [1, 2]; } echo C::X[0];',
         ],
         [
+            'id' => 'class_const_object',
+            'construct' => 'Class constants with `new` object expressions (PHP 8.3)',
+            'opcodes' => ['TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH', 'TYPE_NEW'],
+            'issue' => 3196,
+            'jit' => false,
+            'notes' => [
+                'Zend zend_compile_const_expr / zend_constants.c — materialize at class definition; shared identity on fetch',
+                'VM: ClassConstMaterializer + defineClass const-init opcodes; JIT compile lowers metadata (execute follow-up)',
+            ],
+            'probe' => 'class C { public const X = new stdClass(); } echo (C::X instanceof stdClass && C::X === C::X) ? "1" : "0";',
+        ],
+        [
             'id' => 'late_static_binding',
             'construct' => 'Late static binding `static::method()` / `static::class`',
             'opcodes' => ['TYPE_STATICCALL_INIT', 'TYPE_CLASS_CONST_FETCH'],
@@ -468,6 +480,17 @@ function syntaxRowDefinitions(): array
             'probe' => '$fn = strlen(...); echo $fn("x");',
         ],
         [
+            'id' => 'pipe_operator',
+            'construct' => 'PHP 8.4+ pipe operator (`|>`)',
+            'opcodes' => ['TYPE_FUNCCALL_INIT', 'TYPE_FUNCCALL_EXEC_RETURN'],
+            'issue' => 3243,
+            'notes' => [
+                'Ast\\PipeOperatorDesugar before php-parser (#3243); lowers $lhs |> f(...) to f($lhs, ...)',
+                'Zend/zend_compile.c pipe expression; requires first-class callable (#1363)',
+            ],
+            'probe' => 'echo "hi" |> strtoupper(...);',
+        ],
+        [
             'id' => 'use_function_const_import',
             'construct' => '`use function` / `use const` imports',
             'opcodes' => ['TYPE_FUNCCALL_INIT', 'TYPE_CONST_FETCH'],
@@ -529,17 +552,30 @@ function syntaxRowDefinitions(): array
         [
             'id' => 'trait_use_simple',
             'construct' => 'Simple `use Trait;` in class body',
-            'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_USE_TRAIT', 'TYPE_DECLARE_METHOD'],
+            'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_USE_TRAIT', 'TYPE_TRAIT_USE_ADAPTATION', 'TYPE_DECLARE_METHOD'],
             'issue' => 2314,
             'jit' => true,
             'aot' => true,
             'notes' => [
                 'php-cfg-trait-use.patch; VM merges trait methods into class',
                 'JIT/AOT alias trait-merged methods onto using class (#3789)',
-                'TraitUseAdaptation (alias/insteadof) is #144',
+                'TraitUseAdaptation alias/insteadof on VM (#3238); visibility `as` deferred #144',
                 'Horizontal trait method collision fatals at compile time (#3416)',
             ],
             'probe' => 'trait T { public function m(): int { return 1; } } class C { use T; } echo (new C())->m();',
+        ],
+        [
+            'id' => 'trait_use_adaptation',
+            'construct' => 'Trait use adaptations (`as` rename, `insteadof` precedence)',
+            'opcodes' => ['TYPE_USE_TRAIT', 'TYPE_TRAIT_USE_ADAPTATION'],
+            'issue' => 3238,
+            'jit' => false,
+            'aot' => false,
+            'notes' => [
+                'Zend/zend_compile.c trait alias/precedence; VM applyTraitUsesWithAdaptations',
+                'Visibility `as private` deferred to #144',
+            ],
+            'probe' => 'trait T { public function f(): int { return 1; } } class C { use T { f as r; } } echo (new C())->r();',
         ],
         [
             'id' => 'array_argument_unpack',

@@ -272,6 +272,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'magic_call_static')) {
                 continue;
             }
+            // Object class constants: VM-only until JIT execute path is stable (#3196).
+            if (str_contains($name, 'class_const_object')) {
+                continue;
+            }
             // Object foreach is VM-only until IteratorHelper gains Iterator protocol (#3234).
             if (str_contains($name, 'foreach_iterator')) {
                 continue;

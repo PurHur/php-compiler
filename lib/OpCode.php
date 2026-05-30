@@ -130,6 +130,12 @@ class OpCode {
     const TYPE_DECLARE_TRAIT = 106;
     /** Import trait methods into a class body (`use SomeTrait;`, issue #2314). */
     const TYPE_USE_TRAIT = 107;
+    /**
+     * Trait use adaptations (`insteadof` / `as`) for the preceding TYPE_USE_TRAIT group (#3238).
+     *
+     * @see traitAdaptations
+     */
+    const TYPE_TRAIT_USE_ADAPTATION = 119;
     /** Suspend generator and expose value/key to foreach (issue #167). arg2=value slot, arg3=key slot. */
     const TYPE_YIELD = 108;
     /**
@@ -208,6 +214,15 @@ class OpCode {
 
     /** Lowered from ++/-- (issue #3469); enables Zend increment_string on strings. */
     public bool $isIncDec = false;
+    /**
+     * Trait use adaptation entries for TYPE_TRAIT_USE_ADAPTATION (#3238).
+     *
+     * Each element: alias `{kind: alias, trait: ?string, method: string, newName: ?string}`
+     * or precedence `{kind: precedence, trait: string, method: string, insteadof: list<string>}`.
+     *
+     * @var list<array<string, mixed>>
+     */
+    public array $traitAdaptations = [];
 
     public function __construct(int $type, ?int $arg1 = null, ?int $arg2 = null, ?int $arg3 = null) {
         $this->type = $type;
