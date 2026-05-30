@@ -517,7 +517,16 @@ restart:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
-                    $arg1->numericOp($op->type, $arg2, $arg3);
+                    try {
+                        $arg1->numericOp($op->type, $arg2, $arg3);
+                    } catch (\DivisionByZeroError $e) {
+                        $catchFrame = $this->dispatchVmDivisionByZeroError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     break;
                 case OpCode::TYPE_BITWISE_AND:
                 case OpCode::TYPE_BITWISE_OR:
@@ -1466,6 +1475,21 @@ restart:
     private function dispatchVmTypeError(\TypeError $error, Frame $frame): ?Frame
     {
         $thrown = VM\BuiltinExceptionSupport::materializeTypeError($this->context, $error->getMessage());
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /**
+     * Bridge native DivisionByZeroError from numeric ops into user catch handlers (#3562, #3371).
+     */
+    private function dispatchVmDivisionByZeroError(\DivisionByZeroError $error, Frame $frame): ?Frame
+    {
+        $thrown = VM\BuiltinExceptionSupport::materializeDivisionByZeroError($this->context, $error->getMessage());
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
             return $catchFrame;
