@@ -141,6 +141,10 @@ class Context {
                 $var->int(\PHPCompiler\ext\standard\VmFnmatch::FNM_CASEFOLD);
                 return $var;
         }
+        $phpCore = \PHPCompiler\ext\standard\VmPhpCoreConstants::fetch($name);
+        if (null !== $phpCore) {
+            return $phpCore;
+        }
         if (isset($this->constants[$name])) {
             return $this->constants[$name];
         }

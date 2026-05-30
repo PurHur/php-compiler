@@ -92,6 +92,9 @@ final class VmConstants
             }
             $entries[$outName] = $value;
         }
+        foreach (VmPhpCoreConstants::definedCoreEntries() as $coreName => $value) {
+            $entries[$coreName] = $value;
+        }
 
         return $entries;
     }
