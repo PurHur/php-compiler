@@ -1016,8 +1016,12 @@ class JIT {
         $args = [];
         $rawTypes = [];
         $argVars = [];
+        $returnsByRef = false;
         if (!is_null($block->func)) {
-            $callbackType = $this->cfgFunctionReturnCallbackType($block->func) ?? '__value__';
+            $returnsByRef = $this->cfgFunctionReturnsByRef($block->func);
+            $callbackType = $returnsByRef
+                ? '__value__*'
+                : ($this->cfgFunctionReturnCallbackType($block->func) ?? '__value__');
             if ('__construct' === strtolower($block->func->name)) {
                 $callbackType = 'void';
             }
@@ -1102,6 +1106,9 @@ class JIT {
                     $block->paramNames,
                     $block->variadicParamIndex
                 );
+            }
+            if ($returnsByRef) {
+                $this->markFunctionReturnsByRef($lcname, $funcName ?? '');
             }
         }
 
@@ -4506,7 +4513,21 @@ class JIT {
                     $forceCoalesce = $this->context->coalesceAssignTargets->contains($destOp);
                     $forceAssign = $forceCoalesce
                         || $this->assignOperandsUsedByLiteralInclude($block, $op);
-                    $this->assignOperand($block->getOperand($op->arg2), $value, $forceAssign);
+                    $aliasOp = $block->getOperand($op->arg2);
+                    if (
+                        $this->context->hasVariableOp($aliasOp)
+                        && $this->context->hasVariableOp($block->getOperand($op->arg3))
+                    ) {
+                        $aliasVar = $this->context->getVariableFromOp($aliasOp);
+                        $srcVar = $this->context->getVariableFromOp($block->getOperand($op->arg3));
+                        if ($aliasVar === $srcVar) {
+                            if ([] !== $destOp->usages || $this->context->scope->variables->contains($destOp)) {
+                                $this->assignOperand($destOp, $value, $forceAssign);
+                            }
+                            break;
+                        }
+                    }
+                    $this->assignOperand($aliasOp, $value, $forceAssign);
                     $this->assignOperand($destOp, $value, $forceAssign);
                     foreach ([$block->getOperand($op->arg2), $destOp] as $destOperand) {
                         if (!$this->context->hasVariableOp($destOperand)) {
@@ -4532,6 +4553,12 @@ class JIT {
                     if (null !== $srcName) {
                         if ($this->context->hasVariableOp($srcOp)) {
                             $srcVar = $this->context->getVariableFromOp($srcOp);
+                            if (Variable::TYPE_VALUE === $srcVar->type && null === $srcVar->valueBoxAliasPtr) {
+                                $srcVar->valueBoxAliasPtr = JIT\JitValueBox::valuePtrFromVariable(
+                                    $this->context,
+                                    $srcVar
+                                );
+                            }
                             $this->context->bindVariableByName($destName, $srcVar);
                             $this->context->setVariableOp($destOp, $srcVar);
                             break;
@@ -4543,6 +4570,12 @@ class JIT {
                         throw new \LogicException('Reference assignment requires a bound source variable');
                     }
                     $srcVar = $this->context->getVariableFromOp($srcOp);
+                    if (Variable::TYPE_VALUE === $srcVar->type && null === $srcVar->valueBoxAliasPtr) {
+                        $srcVar->valueBoxAliasPtr = JIT\JitValueBox::valuePtrFromVariable(
+                            $this->context,
+                            $srcVar
+                        );
+                    }
                     $this->context->bindVariableByName($destName, $srcVar);
                     $this->context->setVariableOp($destOp, $srcVar);
                     break;
@@ -5485,6 +5518,11 @@ class JIT {
                     }
                     if ($this->isVoidLlvmFunction($func)) {
                         $this->context->builder->returnVoid();
+                    } elseif ($this->cfgFunctionReturnsByRef($block->func)) {
+                        $return->addref();
+                        $this->context->builder->returnValue(
+                            JIT\JitValueBox::valuePtrFromVariable($this->context, $return)
+                        );
                     } else {
                         $return->addref();
                         $retval = $this->context->helper->loadValue($return);
@@ -5705,7 +5743,11 @@ class JIT {
                     $result = $this->context->scope->toCall->call($this->context, ...$callArgs);
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
                     $this->context->callerStrictTypes = $prevStrict;
-                    $this->assignOperandValue($block->getOperand($op->arg1), $result);
+                    $this->assignCallResultOperand(
+                        $block->getOperand($op->arg1),
+                        $result,
+                        $this->calleeReturnsByRef($this->context->scope->toCall)
+                    );
                     break;
                 case OpCode::TYPE_DECLARE_GLOBAL_CONST:
                     $nameOp = $block->getOperand($op->arg1);
@@ -6444,6 +6486,60 @@ class JIT {
         }
 
         return $callback;
+    }
+
+    private function cfgFunctionReturnsByRef(?\PHPCfg\Func $cfgFunc): bool
+    {
+        return null !== $cfgFunc
+            && (($cfgFunc->flags ?? 0) & \PHPCfg\Func::FLAG_RETURNS_REF) !== 0;
+    }
+
+    /** @param string ...$names logical / proxy function names */
+    private function markFunctionReturnsByRef(string ...$names): void
+    {
+        foreach ($names as $name) {
+            $lc = strtolower($name);
+            if ('' !== $lc) {
+                $this->context->functionReturnsRef[$lc] = true;
+            }
+        }
+    }
+
+    private function calleeReturnsByRef(?JIT\Call $toCall): bool
+    {
+        if (null === $toCall) {
+            return false;
+        }
+        if ($toCall instanceof JIT\Call\Native || $toCall instanceof JIT\Call\Vararg) {
+            return isset($this->context->functionReturnsRef[strtolower($toCall->name)]);
+        }
+
+        return false;
+    }
+
+    private function assignCallResultOperand(Operand $result, PHPLLVM\Value $llvmResult, bool $returnsByRef): void
+    {
+        if (!$returnsByRef) {
+            $this->assignOperandValue($result, $llvmResult);
+
+            return;
+        }
+        if (empty($result->usages) && !$this->context->scope->variables->contains($result)) {
+            return;
+        }
+        $refVar = new Variable(
+            $this->context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VALUE,
+            $llvmResult
+        );
+        $refVar->addref();
+        if (!$this->context->hasVariableOp($result)) {
+            $this->context->setVariableOp($result, $refVar);
+
+            return;
+        }
+        $this->context->setVariableOp($result, $refVar);
     }
 
     /**
@@ -8828,16 +8924,40 @@ class JIT {
     private function ensureJitFunctionStatic(string $storageKey): Variable
     {
         if (!isset($this->context->jitFunctionStaticVariables[$storageKey])) {
-            $slot = JIT\JitValueBox::alloc($this->context);
-            $this->context->jitFunctionStaticVariables[$storageKey] = new Variable(
+            $globalName = 'phpc_fn_static_val_'.substr(hash('sha256', $storageKey), 0, 16);
+            $ptrTy = $this->context->getTypeFromString('__value__*');
+            $global = $this->context->module->addGlobal($ptrTy, $globalName);
+            $global->setInitializer($ptrTy->constNull());
+            $this->initJitFunctionStaticValueGlobal($global);
+            $staticVar = new Variable(
                 $this->context,
                 Variable::TYPE_VALUE,
-                Variable::KIND_VARIABLE,
-                $slot
+                Variable::KIND_VALUE,
+                $global
             );
+            $staticVar->functionStaticGlobal = true;
+            $this->context->jitFunctionStaticVariables[$storageKey] = $staticVar;
         }
 
         return $this->context->jitFunctionStaticVariables[$storageKey];
+    }
+
+    private function initJitFunctionStaticValueGlobal(PHPLLVM\Value $global): void
+    {
+        $restore = $this->context->builder->getInsertBlock();
+        $this->context->builder->positionAtEnd($this->context->initBlock);
+        $valueType = $this->context->getTypeFromString('__value__');
+        $heapVal = $this->context->memory->malloc($valueType);
+        $heapPtr = $this->context->builder->pointerCast(
+            $heapVal,
+            $this->context->getTypeFromString('__value__*')
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeNull'),
+            $heapPtr
+        );
+        $this->context->builder->store($heapPtr, $global);
+        $this->context->builder->positionAtEnd($restore);
     }
 
     private static function operandSlotRank(\PHPCfg\Operand $op): int
