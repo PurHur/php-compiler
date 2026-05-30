@@ -194,6 +194,6 @@ class Analyzer
             }
         }
 
-        return $size;
+        return $size > 0 ? $size : null;
     }
 }

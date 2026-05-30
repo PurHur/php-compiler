@@ -307,7 +307,7 @@ final class Variable {
             // see if it can be converted into a native array
             if (!$context->analyzer->canEscape($op)) {
                 $size = $context->analyzer->computeStaticArraySize($op);
-                if (!is_null($size) && !$context->analyzer->hasDynamicArrayAppend($op, $size)) {
+                if (!is_null($size) && $size > 0 && !$context->analyzer->hasDynamicArrayAppend($op, $size)) {
                     $subTypes = $op->type->subTypes ?? [];
                     $origType = self::homogeneousNativeElementType($subTypes);
                     if (null !== $origType) {

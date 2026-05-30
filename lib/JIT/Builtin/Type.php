@@ -500,6 +500,9 @@ class Type extends Builtin {
         $fntypeStrtr = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr);
         $fnStrtr = $this->context->module->addFunction('__compiler_strtr', $fntypeStrtr);
         $this->context->registerFunction('__compiler_strtr', $fnStrtr);
+        $fntypeStrtrArray = $this->context->context->functionType($strPtr, false, $strPtr, $htPtr);
+        $fnStrtrArray = $this->context->module->addFunction('__compiler_strtr_array', $fntypeStrtrArray);
+        $this->context->registerFunction('__compiler_strtr_array', $fnStrtrArray);
         $fntypeMergeRecursiveOverlay = $this->context->context->functionType(
             $this->context->getTypeFromString('void'),
             false,
