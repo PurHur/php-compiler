@@ -265,6 +265,61 @@ class Block {
     }
 
     /**
+     * Copy cfg Var root slot mappings from a sibling branch (?: / if merge, #3790).
+     */
+    public function inheritCfgVarSlotsFrom(Block $sibling): void
+    {
+        foreach ($sibling->eachCfgVarRootSlot() as [$root, $slot]) {
+            if ($this->scope->contains($root)) {
+                continue;
+            }
+            $this->scope[$root] = $slot;
+            if ($sibling->args->contains($root) || $sibling->isArgSlot($slot)) {
+                $this->args[$root] = $slot;
+            }
+        }
+    }
+
+    /**
+     * @return iterable<array{0: VarOperand, 1: int}>
+     */
+    public function eachCfgVarRootSlot(): iterable
+    {
+        $seenRoots = [];
+        foreach ($this->scope as $operand) {
+            $root = self::cfgVarRoot($operand);
+            if (null === $root) {
+                continue;
+            }
+            $rootId = spl_object_id($root);
+            if (isset($seenRoots[$rootId])) {
+                continue;
+            }
+            $seenRoots[$rootId] = true;
+            yield [$root, $this->scope[$operand]];
+        }
+    }
+
+    /** Pre-bind a cfg Var root before lowering branch assigns (#3790). */
+    public function prebindCfgVarRoot(VarOperand $root, int $slot): void
+    {
+        if (!$this->scope->contains($root)) {
+            $this->scope[$root] = $slot;
+        }
+    }
+
+    private function isArgSlot(int $slot): bool
+    {
+        foreach ($this->args as $op) {
+            if ($this->args[$op] === $slot) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Copy variable slot mappings from a parent block (for synthetic CFG branches).
      */
     public function inheritScopeFrom(Block $parent): void
@@ -401,7 +456,8 @@ class Block {
     private static function findVariableInParentFrames(Operand $op, Frame $frame): ?Variable
     {
         $name = self::resolveVariableName($op);
-        if (null === $name) {
+        // php-cfg merge temporaries use empty Var names; do not match other "" slots (#3790).
+        if (null === $name || '' === $name) {
             return null;
         }
 
@@ -624,7 +680,7 @@ class Block {
     /**
      * php-cfg may wrap the same Var in distinct Operand objects (e.g. call result vs return expr).
      */
-    private static function cfgVarRoot(Operand $op): ?VarOperand
+    public static function cfgVarRoot(Operand $op): ?VarOperand
     {
         while ($op instanceof Temporary) {
             if (null === $op->original) {

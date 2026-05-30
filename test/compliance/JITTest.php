@@ -113,6 +113,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'generator_get_return')) {
                 continue;
             }
+            // ?: merge branch slot unification is VM-only until JIT CFG merge (#3790).
+            if (str_contains($name, 'ternary_func_call')) {
+                continue;
+            }
             // Nested break/continue levels use php-cfg goto labels; VM-only until JIT (#3405).
             if (str_contains($name, 'break2_') || str_contains($name, 'continue2_')) {
                 continue;
