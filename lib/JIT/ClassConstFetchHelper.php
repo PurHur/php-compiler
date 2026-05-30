@@ -197,9 +197,9 @@ final class ClassConstFetchHelper
 
     private static function stringDataPtr(Context $context, Value $strPtr): Value
     {
-        $off = $context->structFieldIndex($strPtr, 'value');
+        $map = $context->structFieldMap['__string__'];
 
-        return $context->builder->structGep($strPtr, $off);
+        return $context->builder->structGep($strPtr, $map['value']);
     }
 
     private static function messageDataPtr(Context $context, string $message): Value
