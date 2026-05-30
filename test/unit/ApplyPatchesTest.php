@@ -48,4 +48,20 @@ final class ApplyPatchesTest extends TestCase
             'php-types-union-type must lower Op\\Type\\Union_ in resolveOpType (M2 spine compile)'
         );
     }
+
+    public function testPhpCfgEnumParserPassesImplementsArrayNotBlock(): void
+    {
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        if (!is_readable($parser)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $body = file_get_contents($parser);
+        self::assertIsString($body);
+        self::assertMatchesRegularExpression(
+            '/function parseStmt_Enum[\s\S]*?parseExprList\(\$node->implements\)/',
+            $body,
+            'parseStmt_Enum must pass implements[] to Op\\Stmt\\Enum_ ctor (#3083, #3419)'
+        );
+    }
 }

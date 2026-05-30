@@ -11,6 +11,14 @@ if [[ ! -d "$VENDOR_LLVM" ]]; then
   exit 1
 fi
 
+# Class parseStmt_Class also uses parseExprList($node->implements); scope checks to parseStmt_Enum (#3083, #3419).
+php_cfg_enum_implements_parser_applied() {
+  local parser="${1:-$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php}"
+  [[ -f "$parser" ]] || return 1
+  grep -A30 'function parseStmt_Enum' "$parser" 2>/dev/null \
+    | grep -q 'parseExprList($node->implements)'
+}
+
 patch_already_applied() {
   local patch="$1"
   case "$(basename "$patch")" in
@@ -198,11 +206,11 @@ patch_already_applied() {
       ;;
     php-cfg-enum.patch)
       grep -q 'parseStmt_Enum' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
-        && grep -q 'parseExprList($node->implements)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+        && php_cfg_enum_implements_parser_applied
       ;;
     php-cfg-enum-implements.patch)
       grep -q 'public $implements' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php" 2>/dev/null \
-        && grep -q 'parseExprList($node->implements)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+        && php_cfg_enum_implements_parser_applied
       ;;
     php-cfg-enum-class-method.patch)
       grep -q 'elseif ($stmt instanceof Stmt\\ClassMethod)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
@@ -218,6 +226,9 @@ patch_already_applied() {
       ;;
     php-cfg-intersection-type.patch)
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Intersection.php" ]]
+      ;;
+    php-cfg-instanceof-union.patch)
+      grep -q 'parseInstanceofClassUnion' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-union-type.patch)
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Union_.php" ]]
@@ -417,7 +428,12 @@ from pathlib import Path
 
 parser_path = Path(sys.argv[1])
 text = parser_path.read_text()
-if 'parseExprList($node->implements)' in text:
+enum_block = re.search(
+    r'protected function parseStmt_Enum\(Stmt\\Enum_ \$node\)\s*\{.*?\n    \}\n',
+    text,
+    re.S,
+)
+if enum_block and 'parseExprList($node->implements)' in enum_block.group(0):
     raise SystemExit(0)
 pattern = re.compile(
     r"(        \$this->block->children\[\] = new Op\\Stmt\\Enum_\(\n"
@@ -455,7 +471,7 @@ apply_php_cfg_enum_overlay() {
   mkdir -p "$(dirname "$op")"
   cp "$overlay/Op/Stmt/Enum_.php" "$op"
   if grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null \
-    && grep -q 'parseExprList($node->implements)' "$parser" 2>/dev/null \
+    && php_cfg_enum_implements_parser_applied "$parser" \
     && grep -A25 'function parseStmt_Enum' "$parser" | grep -q 'Stmt\\ClassMethod'; then
     echo "Skip php-cfg-enum.patch (already applied)"
     return 0
@@ -492,7 +508,7 @@ apply_php_cfg_enum_implements_overlay() {
     return 1
   fi
   cp "$overlay/Op/Stmt/Enum_.php" "$op"
-  if grep -q 'parseExprList($node->implements)' "$parser" 2>/dev/null \
+  if php_cfg_enum_implements_parser_applied "$parser" \
     && grep -q 'public $implements' "$op" 2>/dev/null; then
     echo "Skip php-cfg-enum-implements.patch (already applied)"
     return 0
@@ -555,6 +571,72 @@ if 'Op\\\\Type\\\\Intersection' not in printer:
     printer_path.write_text(printer)
 PY
   echo "Applied php-cfg-intersection-type.patch (overlay)"
+}
+
+apply_php_cfg_instanceof_union_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local instanceof_op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/InstanceOf_.php"
+  local methods="$PATCH_DIR/overlays/php-cfg/instanceof-union-parser-methods.php"
+  if grep -q 'parseInstanceofClassUnion' "$parser" 2>/dev/null \
+    && grep -q 'classUnion' "$instanceof_op" 2>/dev/null; then
+    echo "Skip php-cfg-instanceof-union.patch (already applied)"
+    return 0
+  fi
+  python3 - "$parser" "$instanceof_op" "$methods" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+instanceof_path = Path(sys.argv[2])
+methods_path = Path(sys.argv[3])
+methods = methods_path.read_text()
+
+parser = parser_path.read_text()
+if 'parseInstanceofClassUnion' not in parser:
+    anchor = "    protected function parseExpr_Instanceof(Expr\\Instanceof_ $expr)"
+    if anchor not in parser:
+        sys.stderr.write("php-cfg-instanceof-union: parseExpr_Instanceof anchor not found\\n")
+        raise SystemExit(1)
+    parser = parser.replace(anchor, methods + anchor, 1)
+    old_body = """        $var = $this->readVariable($this->parseExprNode($expr->expr));
+        $class = $this->readVariable($this->parseExprNode($expr->class));"""
+    new_body = """        $var = $this->readVariable($this->parseExprNode($expr->expr));
+        $union = $this->parseInstanceofClassUnion($expr->class);
+        if (null !== $union) {
+            $class = $this->readVariable(new Literal(''));
+            $op = new Op\\Expr\\InstanceOf_($var, $class, $this->mapAttributes($expr));
+            $op->classUnion = $union;
+
+            return $op;
+        }
+        $class = $this->readVariable($this->parseExprNode($expr->class));"""
+    if old_body not in parser:
+        sys.stderr.write("php-cfg-instanceof-union: instanceof body anchor not found\\n")
+        raise SystemExit(1)
+    parser = parser.replace(old_body, new_body, 1)
+    parser_path.write_text(parser)
+
+instanceof_src = instanceof_path.read_text()
+if 'classUnion' not in instanceof_src:
+    anchor = "use PhpCfg\\Operand;"
+    insert = "use PhpCfg\\Operand;\nuse PHPCfg\\Op\\Type;"
+    if anchor not in instanceof_src:
+        sys.stderr.write("php-cfg-instanceof-union: Operand import anchor not found\\n")
+        raise SystemExit(1)
+    instanceof_src = instanceof_src.replace(anchor, insert, 1)
+    prop_anchor = "    public $class;\n"
+    prop_insert = """    public $class;
+
+    /** @var null|Type\\Union_ union RHS for $obj instanceof (A|B) (#3461) */
+    public $classUnion = null;
+"""
+    if prop_anchor not in instanceof_src:
+        sys.stderr.write("php-cfg-instanceof-union: class property anchor not found\\n")
+        raise SystemExit(1)
+    instanceof_src = instanceof_src.replace(prop_anchor, prop_insert, 1)
+    instanceof_path.write_text(instanceof_src)
+PY
+  echo "Applied php-cfg-instanceof-union.patch (overlay)"
 }
 
 apply_php_cfg_union_type_overlay() {
@@ -1398,6 +1480,10 @@ apply_patch() {
     apply_php_cfg_intersection_type_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-instanceof-union.patch" ]]; then
+    apply_php_cfg_instanceof_union_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-attribute-groups.patch" ]]; then
     apply_php_cfg_attribute_groups_overlay
     return $?
@@ -1546,10 +1632,12 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-spread.patch"
   apply_patch "$PATCH_DIR/php-cfg-never-type.patch"
   apply_patch "$PATCH_DIR/php-cfg-intersection-type.patch"
+  apply_patch "$PATCH_DIR/php-cfg-instanceof-union.patch"
   apply_patch "$PATCH_DIR/php-cfg-union-type.patch"
   apply_patch "$PATCH_DIR/php-cfg-ctor-promotion.patch"
   apply_patch "$PATCH_DIR/php-cfg-attribute-groups.patch"
   apply_patch "$PATCH_DIR/php-cfg-trait-use.patch"
+  apply_patch "$PATCH_DIR/php-cfg-is-resource-no-assertion.patch"
 fi
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then

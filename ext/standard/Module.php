@@ -13,9 +13,26 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT;
 use PHPCompiler\ModuleAbstract;
+use PHPCompiler\Runtime;
+use PHPCompiler\VM;
 
 class Module extends ModuleAbstract
 {
+    public function init(Runtime $runtime): void
+    {
+        parent::init($runtime);
+        foreach ([
+            'LOCK_SH' => 1,
+            'LOCK_EX' => 2,
+            'LOCK_UN' => 3,
+            'LOCK_NB' => 4,
+        ] as $name => $value) {
+            $var = new VM\Variable();
+            $var->int($value);
+            $runtime->vmContext->defineConstant($name, $var);
+        }
+    }
+
     public function getFunctions(): array
     {
         return [
@@ -79,6 +96,7 @@ class Module extends ModuleAbstract
             new bindec(),
             new is_numeric(),
             new is_scalar(),
+            new is_resource_(),
             new lcfirst(),
             new ucfirst(),
             new ucwords(),
@@ -102,6 +120,7 @@ class Module extends ModuleAbstract
             new stripos(),
             new strrpos(),
             new substr_count(),
+            new count_chars(),
             new str_word_count(),
             new str_contains(),
             new str_starts_with(),
@@ -209,6 +228,8 @@ class Module extends ModuleAbstract
             new html_entity_decode(),
             new strip_tags(),
             new header_(),
+            new headers_sent(),
+            new register_shutdown_function(),
             new setcookie(),
             new setrawcookie(),
             new session_start(),
@@ -286,11 +307,13 @@ class Module extends ModuleAbstract
             new str_getcsv(),
             new ftell_(),
             new fseek(),
+            new rewind_(),
             new feof_(),
             new fflush_(),
             new fpassthru(),
             new fwrite(),
             new fclose(),
+            new flock(),
             new getenv_(),
             new putenv_(),
             new shell_exec(),
@@ -305,10 +328,13 @@ class Module extends ModuleAbstract
             new ini_get_(),
             new define_(),
             new defined_(),
+            new get_defined_constants_(),
+            new get_defined_vars_(),
             new debug_backtrace(),
             new class_exists_(),
             new class_alias(),
             new enum_exists_(),
+            new get_declared_enums_(),
             new interface_exists_(),
             new trait_exists_(),
             new class_uses_(),
@@ -323,17 +349,20 @@ class Module extends ModuleAbstract
             new get_parent_class_(),
             new is_a_(),
             new is_subclass_of_(),
+            new assert_(),
             new trigger_error_(),
             new set_error_handler_(),
             new restore_error_handler_(),
             new error_get_last(),
             new error_clear_last(),
+            new eval_(),
             new phpc_deploy_path(),
             new compiler_is_superglobal_name(),
             new extract_(),
             new compact_(),
             new scandir(),
             new glob_(),
+            new fnmatch(),
             new time(),
             new getmypid(),
             new microtime(),

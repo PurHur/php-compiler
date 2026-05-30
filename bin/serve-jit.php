@@ -26,6 +26,7 @@ require __DIR__.'/../vendor/autoload.php';
 use PHPCompiler\Block;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM\OutputBuffer;
+use PHPCompiler\VM\ShutdownQueue;
 use PHPCompiler\VM\ScriptExit;
 use PHPCompiler\ext\standard\VmSession;
 use PHPCompiler\Web\DevServer;
@@ -47,6 +48,7 @@ DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv
     ResponseContext::reset();
     VmSession::reset();
     OutputBuffer::reset();
+    ShutdownQueue::reset();
 
     $cacheKey = realpath($script);
     if (false === $cacheKey) {

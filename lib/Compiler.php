@@ -23,7 +23,10 @@ use PHPTypes\Type;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\OperandName;
+use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
 use PHPCompiler\Compiler\AttributeNames;
+use PHPCompiler\Compiler\FinalClassExtensionCheck;
+use PHPCompiler\Compiler\InterfaceImplementationCheck;
 use PHPCompiler\Web\ConstStringFolder;
 use PHPCompiler\Web\IncludePathResolver;
 use PHPCompiler\Web\Superglobals;
@@ -39,6 +42,14 @@ class Compiler {
 
     /** Set from the first compile-time abort (#2642, self-host diagnostics). */
     private ?string $compileAbortDetail = null;
+
+    /** 1-based source lines lowered from bare `throw;` (#3508). */
+    private array $bareRethrowLines = [];
+
+    public function setBareRethrowLines(array $lines): void
+    {
+        $this->bareRethrowLines = $lines;
+    }
 
     public function setDebugLastPhaseInputFile(?string $filename): void
     {
@@ -207,6 +218,13 @@ class Compiler {
         $this->seen = new SplObjectStorage;
         $this->debugWriteLastPhase('Compiler::compile enter');
 
+        Compiler\InheritanceVariance::validateScript(
+            $script,
+            function (string $detail): void {
+                $this->throwCompileError($detail);
+            }
+        );
+
         /** @var mixed $main */
         $main = $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
         if (!$main instanceof Block) {
@@ -220,6 +238,10 @@ class Compiler {
         }
 
         $this->seen = null;
+
+        InterfaceImplementationCheck::validate($script);
+        FinalClassExtensionCheck::validate($script);
+        AbstractMethodVisibilityCheck::validate($script);
 
         return $main;
     }
@@ -456,6 +478,9 @@ class Compiler {
                         $block = $this->compileNullsafePropertyFetch($child, $block);
                     } elseif ($child instanceof Op\Expr\NullsafeMethodCall) {
                         $block = $this->compileNullsafeMethodCall($child, $block);
+                    } elseif ($this->isNullsafeChainArrayDimFetch($ops, $i)) {
+                        /** @var Op\Expr\ArrayDimFetch $child */
+                        $block = $this->compileNullsafeArrayDimFetch($child, $block);
                     } elseif (
                         $child instanceof Op\Expr\ArrayDimFetch
                         && $i + 1 < $opCount
@@ -1134,6 +1159,10 @@ class Compiler {
             $readonlySlot
         );
         $return->classImplements = $this->interfaceNamesFromOperands($class->implements);
+        if (VM\StringableSupport::requiresImplementation($return->classImplements)) {
+            $className = $this->staticNameFromOperand($class->name) ?? 'class';
+            VM\StringableSupport::assertConcreteClassImplements($class, $className);
+        }
         $return->attributeNames = AttributeNames::fromOp($class);
         $return->block1 = $this->compileClassBody($class->stmts, $type);
         return $return;
@@ -1225,6 +1254,12 @@ class Compiler {
     protected function applyParamDeclaredType(Op\Expr\Param $param, Block $block, int $slot): void
     {
         $declared = $param->declaredType;
+        if ($declared instanceof Op\Type\Never_) {
+            $this->throwCompileError('never cannot be used as a parameter type');
+        }
+        if ($declared instanceof Op\Type\Literal && 'never' === strtolower($declared->name)) {
+            $this->throwCompileError('never cannot be used as a parameter type');
+        }
         if ($declared instanceof Op\Type\Intersection) {
             $block->paramTypeConstraints[$slot] = Variable::TYPE_OBJECT;
             $block->paramIntersectionConstraints[$slot] = $this->intersectionNamesFromCfgType($declared);
@@ -1271,8 +1306,8 @@ class Compiler {
                     $this->compileClassMethodDeclaration($child, $result);
                     break;
                 case Op\Terminal\Const_::class:
-                    if (OpCode::TYPE_DECLARE_CLASS !== $type) {
-                        $this->throwCompileLogic('Class constants are only supported on classes for now');
+                    if (OpCode::TYPE_DECLARE_CLASS !== $type && OpCode::TYPE_DECLARE_TRAIT !== $type) {
+                        $this->throwCompileLogic('Class constants are only supported on classes and traits for now');
                     }
                     $this->compileOps($child->valueBlock->children, $result);
                     $result->addOpCode(new OpCode(
@@ -1495,14 +1530,15 @@ class Compiler {
             $block->addOpCode($tryOp);
             foreach ($stmt->catches as $i => $catchBlock) {
                 $compiledCatch = $this->compileCfgBranch($catchBlock, $block);
+                $compiledCatch->inheritUndefinedLocals = true;
                 $catchOp = new OpCode(OpCode::TYPE_CATCH);
                 $catchOp->block1 = $compiledCatch;
                 $catchOp->block2 = $merge;
                 $catchOp->catchTypes = $this->encodeCatchTypeList($stmt->catchTypes[$i] ?? []);
-                $catchVar = $stmt->catchVars[$i] ?? null;
-                $catchOp->arg3 = null !== $catchVar
-                    ? $compiledCatch->slotForOperand($catchVar)
-                    : null;
+                $catchOp->arg3 = $this->resolveCatchVarSlot(
+                    $compiledCatch,
+                    $stmt->catchVars[$i] ?? null
+                );
                 $block->addOpCode($catchOp);
             }
             if (null !== $stmt->finally) {
@@ -2287,6 +2323,82 @@ class Compiler {
         ));
     }
 
+    /**
+     * Array offset immediately after ?-> property/method fetch (issue #3516).
+     *
+     * @param Op[] $ops
+     */
+    private function isNullsafeChainArrayDimFetch(array $ops, int $index): bool
+    {
+        if ($index < 1) {
+            return false;
+        }
+        $fetch = $ops[$index];
+        if (!$fetch instanceof Op\Expr\ArrayDimFetch) {
+            return false;
+        }
+        $prev = $ops[$index - 1];
+        if (!$prev instanceof Op\Expr\NullsafePropertyFetch && !$prev instanceof Op\Expr\NullsafeMethodCall) {
+            return false;
+        }
+
+        return $prev->result === $fetch->var;
+    }
+
+    protected function compileNullsafeArrayDimFetch(Op\Expr\ArrayDimFetch $expr, Block $block): Block
+    {
+        $resultSlot = $this->compileOperand($expr->result, $block, false);
+        $containerSlot = $this->compileOperand($expr->var, $block, true);
+        $dimSlot = null !== $expr->dim ? $this->compileOperand($expr->dim, $block, true) : null;
+
+        $endBlock = new Block($block->orig);
+        $endBlock->inheritUndefinedLocals = true;
+        $endBlock->inheritScopeFrom($block);
+
+        $nullBlock = new Block($block->orig);
+        $nullBlock->inheritUndefinedLocals = true;
+        $nullBlock->inheritScopeFrom($block);
+        $nullLiteral = new Operand\Literal(null);
+        $nullLiteral->type = Type::null();
+        $nullValueSlot = $this->compileOperand($nullLiteral, $nullBlock, true);
+        $nullBlock->addOpCode(new OpCode(
+            OpCode::TYPE_ASSIGN,
+            $resultSlot,
+            $resultSlot,
+            $nullValueSlot
+        ));
+        $nullJump = new OpCode(OpCode::TYPE_JUMP);
+        $nullJump->block1 = $endBlock;
+        $nullBlock->addOpCode($nullJump);
+
+        $fetchBlock = new Block($block->orig);
+        $fetchBlock->inheritUndefinedLocals = true;
+        $fetchBlock->inheritScopeFrom($block);
+        $fetchBlock->addOpCode(new OpCode(
+            OpCode::TYPE_ARRAY_DIM_FETCH,
+            $this->compileOperand($expr->result, $fetchBlock, false),
+            $this->compileOperand($expr->var, $fetchBlock, true),
+            $dimSlot
+        ));
+        $fetchJump = new OpCode(OpCode::TYPE_JUMP);
+        $fetchJump->block1 = $endBlock;
+        $fetchBlock->addOpCode($fetchJump);
+        $endBlock->parents[] = $nullBlock;
+        $endBlock->parents[] = $fetchBlock;
+
+        $nullsafeOp = new OpCode(
+            OpCode::TYPE_NULLSAFE,
+            $resultSlot,
+            $containerSlot
+        );
+        $nullsafeOp->block1 = $nullBlock;
+        $nullsafeOp->block2 = $fetchBlock;
+        $nullsafeOp->block3 = $endBlock;
+        $block->addOpCode($nullsafeOp);
+
+        return $endBlock;
+    }
+
     protected function compileNullsafePropertyFetch(Op\Expr\NullsafePropertyFetch $expr, Block $block): Block
     {
         $resultSlot = $this->compileOperand($expr->result, $block, false);
@@ -2604,6 +2716,23 @@ class Compiler {
         return $operand instanceof Operand\Literal ? $operand : null;
     }
 
+    /**
+     * Scope slot for the local alias created by `global $name` (#3413).
+     *
+     * php-cfg may pass writeVariable(Literal('x')) rather than a Variable operand.
+     */
+    protected function compileGlobalImportSlot(Operand $var, string $globalName, Block $block): int
+    {
+        if ($var instanceof Operand\Variable) {
+            return $block->getVarSlot($var, false);
+        }
+        $nameLiteral = new Operand\Literal($globalName);
+        $nameLiteral->type = Type::string();
+        $local = new Operand\Variable($nameLiteral);
+
+        return $block->getVarSlot($local, false);
+    }
+
     protected function resolveSimpleVariableName(Operand $var): string
     {
         while ($var instanceof Temporary) {
@@ -2821,6 +2950,46 @@ class Compiler {
         }
 
         return implode('|', $encoded);
+    }
+
+    /**
+     * php-cfg catch vars are registered on the handler block; the catch body may use
+     * a distinct operand for the same name (#195, #2084, #3445).
+     */
+    protected function resolveCatchVarSlot(Block $compiledCatch, ?Operand $catchVar): ?int
+    {
+        if (null === $catchVar) {
+            return null;
+        }
+        $slot = $compiledCatch->slotForOperand($catchVar);
+        if (null !== $slot) {
+            return $slot;
+        }
+        $name = $this->resolveCatchVariableName($catchVar);
+        if (null !== $name) {
+            return $compiledCatch->slotIndexForVariableName($name);
+        }
+
+        return null;
+    }
+
+    protected function resolveCatchVariableName(?Operand $catchVar): ?string
+    {
+        while ($catchVar instanceof Operand\Temporary && null !== $catchVar->original) {
+            $catchVar = $catchVar->original;
+        }
+        if (!$catchVar instanceof Operand\Variable) {
+            return null;
+        }
+        $nameOp = $catchVar->name;
+        while ($nameOp instanceof Operand\Temporary && null !== $nameOp->original) {
+            $nameOp = $nameOp->original;
+        }
+        if ($nameOp instanceof Literal && is_string($nameOp->value)) {
+            return $nameOp->value;
+        }
+
+        return null;
     }
 
     /**
@@ -3104,6 +3273,10 @@ class Compiler {
                     $this->compileOperand($terminal->var, $block, true)
                 )];
             case 'Terminal_Throw':
+                if ($this->isBareRethrowThrow($terminal)) {
+                    return [new OpCode(OpCode::TYPE_RETHROW)];
+                }
+
                 return [new OpCode(
                     OpCode::TYPE_THROW,
                     $this->compileOperand($terminal->expr, $block, true)
@@ -3139,7 +3312,7 @@ class Compiler {
                 $nameSlot = $block->registerConstant($nameOperand, $nameVar);
                 return [new OpCode(
                     OpCode::TYPE_DECLARE_GLOBAL,
-                    $this->compileOperand($terminal->var, $block, false),
+                    $this->compileGlobalImportSlot($terminal->var, $globalName, $block),
                     $nameSlot
                 )];
             case 'Terminal_StaticVar':
@@ -3151,17 +3324,65 @@ class Compiler {
 
 
 
+    private function isBareRethrowThrow(Op\Terminal\Throw_ $terminal): bool
+    {
+        $line = $terminal->getLine();
+        if ($line < 1 || !isset($this->bareRethrowLines[$line])) {
+            return false;
+        }
+
+        return true;
+    }
+
     /**
      * @return OpCode[]
      */
     protected function compileInstanceOf(Op\Expr\InstanceOf_ $expr, Block $block): array
     {
+        $union = $expr->classUnion ?? null;
+        if ($union instanceof Op\Type\Union_) {
+            $names = $this->instanceofUnionNamesFromCfgType($union);
+            $op = new OpCode(
+                OpCode::TYPE_INSTANCEOF,
+                $this->compileOperand($expr->result, $block, false),
+                $this->compileOperand($expr->expr, $block, true),
+                null
+            );
+            $op->instanceofUnionTypes = $this->encodeCatchTypeList($names);
+
+            return [$op];
+        }
+
         return [new OpCode(
             OpCode::TYPE_INSTANCEOF,
             $this->compileOperand($expr->result, $block, false),
             $this->compileOperand($expr->expr, $block, true),
             $this->compileOperand($expr->class, $block, true)
         )];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function instanceofUnionNamesFromCfgType(Op\Type\Union_ $union): array
+    {
+        $invalid = ['int', 'string', 'float', 'bool', 'array', 'callable', 'iterable', 'object', 'mixed', 'never', 'void', 'null'];
+        $names = [];
+        foreach ($union->types as $type) {
+            if (!$type instanceof Op\Type\Literal) {
+                $this->throwCompileLogic('instanceof union type members must be class or interface names');
+            }
+            $name = $type->name;
+            if (in_array(strtolower($name), $invalid, true)) {
+                $this->throwCompileLogic('Type '.$name.' cannot be used in instanceof');
+            }
+            $names[] = $name;
+        }
+        if (count($names) < 2) {
+            $this->throwCompileLogic('instanceof union requires at least two class or interface names');
+        }
+
+        return $names;
     }
 
     /**

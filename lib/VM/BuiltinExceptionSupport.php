@@ -1,0 +1,63 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\VM;
+
+/**
+ * Minimal Throwable / Error / TypeError VM registration for runtime TypeError dispatch (#3445, #3371).
+ *
+ * php-src: Zend/zend_exceptions.c
+ */
+final class BuiltinExceptionSupport
+{
+    public const CLASS_ERROR = 'error';
+    public const CLASS_TYPE_ERROR = 'typeerror';
+    public const CLASS_DIVISION_BY_ZERO_ERROR = 'divisionbyzeroerror';
+    public const PROP_MESSAGE = 'message';
+
+    public static function materializeTypeError(Context $ctx, string $message): Variable
+    {
+        if (!isset($ctx->classes[self::CLASS_TYPE_ERROR])) {
+            throw new \LogicException('TypeError builtin class is not registered');
+        }
+        $entry = $ctx->classes[self::CLASS_TYPE_ERROR];
+        $obj = new ObjectEntry($entry);
+        $obj->getProperty(self::PROP_MESSAGE)->string($message);
+        $obj->constructed = true;
+        $var = new Variable();
+        $var->object($obj);
+
+        return $var;
+    }
+
+    public static function materializeError(Context $ctx, string $message): Variable
+    {
+        if (!isset($ctx->classes[self::CLASS_ERROR])) {
+            throw new \LogicException('Error builtin class is not registered');
+        }
+        $entry = $ctx->classes[self::CLASS_ERROR];
+        $obj = new ObjectEntry($entry);
+        $obj->getProperty(self::PROP_MESSAGE)->string($message);
+        $obj->constructed = true;
+        $var = new Variable();
+        $var->object($obj);
+
+        return $var;
+    }
+
+    public static function materializeDivisionByZeroError(Context $ctx, string $message): Variable
+    {
+        if (!isset($ctx->classes[self::CLASS_DIVISION_BY_ZERO_ERROR])) {
+            throw new \LogicException('DivisionByZeroError builtin class is not registered');
+        }
+        $entry = $ctx->classes[self::CLASS_DIVISION_BY_ZERO_ERROR];
+        $obj = new ObjectEntry($entry);
+        $obj->getProperty(self::PROP_MESSAGE)->string($message);
+        $obj->constructed = true;
+        $var = new Variable();
+        $var->object($obj);
+
+        return $var;
+    }
+}

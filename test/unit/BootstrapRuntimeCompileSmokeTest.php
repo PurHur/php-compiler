@@ -179,6 +179,14 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('emitParseAndCompileWithTrivialFallback', $aot);
     }
 
+    /** Issue #3023: tail phi must use afterRecord predecessor, not compileBb. */
+    public function testM3EmitParseAndCompileDefaultPhiUsesAfterRecordTail(): void
+    {
+        $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
+        $this->assertStringContainsString('$phi->addIncoming($block, $afterRecordBb)', $emit);
+        $this->assertStringContainsString('shouldEmitRuntimeSpineDiagnosticStub', $emit);
+    }
+
     /** Runtime.php CFG uses bare init* names; emit TU must match them (#2568). */
     public function testM3EmitTuRuntimeMethodFromModulesMatchesBareCfgFuncNames(): void
     {

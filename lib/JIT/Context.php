@@ -50,6 +50,12 @@ class Context {
     /** User function CFG block while compiling its body (func_get_args / func_num_args, #197). */
     public ?Block $jitEnclosingBlock = null;
 
+    /** CFG block currently being lowered (get_defined_vars snapshot, #3135). */
+    public ?Block $jitCurrentBlock = null;
+
+    /** Most recent closure call proxy from TYPE_CLOSURE (register_shutdown_function, #3120). */
+    public ?Call $lastClosureCallProxy = null;
+
     /** Call-site file strict_types while lowering FUNCCALL (issues #156, #1229). */
     public bool $callerStrictTypes = false;
 
@@ -102,7 +108,7 @@ class Context {
 
     public TryCatchState $tryCatch;
 
-    /** ?? result operands that must receive branch assigns even when php-cfg marks them dead (#99). */
+    /** ?? / ?-> result operands that must receive branch assigns even when php-cfg marks them dead (#99, #3219). */
     public \SplObjectStorage $coalesceAssignTargets;
 
     /** Nested compile-time include inlining depth (issue #568). */
@@ -868,6 +874,23 @@ class Context {
         }
     }
 
+    /**
+     * Temporarily position the builder at __shutdown__ (register_shutdown_function, issue #3120).
+     *
+     * @param callable(self): void $emit
+     */
+    public function emitInShutdown(callable $emit): void
+    {
+        $oldBuilder = $this->builder;
+        $this->builder = $this->context->builderCreate();
+        $this->builder->positionAtEnd($this->shutdownBlock);
+        try {
+            $emit($this);
+        } finally {
+            $this->builder = $oldBuilder;
+        }
+    }
+
     public function makeVariableFromOp(
         PHPLLVM\Value\Function_ $func,
         PHPLLVM\BasicBlock $basicBlock,
@@ -967,6 +990,7 @@ class Context {
                 throw new \LogicException("Unknown variable referenced: " . get_class($op));
             }
         }
+
         return $this->scope->variables[$op];
     }
 
