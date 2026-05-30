@@ -164,6 +164,8 @@ class OpCode {
     public array $classImplements = [];
     /** Declared PHP 8 attribute class names on class/method (#1936). */
     public array $attributeNames = [];
+    /** #[\Deprecated] metadata on function/method/class const declarations (#3569). */
+    public ?\PHPCompiler\Compiler\DeprecatedMetadata $deprecatedMetadata = null;
     /** Pipe-separated lowercase catch class names for TYPE_CATCH (#1362). */
     public ?string $catchTypes = null;
     /** Pipe-separated lowercase class/interface names for union `instanceof` RHS (#3461). */
