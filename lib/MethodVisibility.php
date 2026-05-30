@@ -32,9 +32,13 @@ final class MethodVisibility
         ?string $callerClassLc,
         string $declaringClassLc,
         string $declaringClassDisplay,
-        string $methodName
+        string $methodName,
+        bool $parentScopeAllows = false
     ): void {
         if (self::isPublic($visibilityFlags)) {
+            return;
+        }
+        if ($parentScopeAllows) {
             return;
         }
         if ($callerClassLc === null) {
@@ -60,9 +64,13 @@ final class MethodVisibility
     public static function needsRuntimeCheck(
         int $visibilityFlags,
         ?string $callerClassLc,
-        string $declaringClassLc
+        string $declaringClassLc,
+        bool $parentScopeAllows = false
     ): bool {
         if (self::isPublic($visibilityFlags)) {
+            return false;
+        }
+        if ($parentScopeAllows) {
             return false;
         }
         if ($callerClassLc === null) {
@@ -70,6 +78,29 @@ final class MethodVisibility
         }
 
         return $callerClassLc !== $declaringClassLc;
+    }
+
+    /**
+     * parent:: dispatch from a subclass (Zend scope resolution, issue #3453).
+     */
+    public static function parentScopeAllows(
+        int $visibilityFlags,
+        ?string $callerClassLc,
+        string $resolvedParentLc,
+        string $methodDeclaringClassLc,
+        callable $isSameOrSubclassOf
+    ): bool {
+        if (null === $callerClassLc) {
+            return false;
+        }
+        if (($visibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0) {
+            return $methodDeclaringClassLc === $resolvedParentLc;
+        }
+        if (($visibilityFlags & CfgFunc::FLAG_PROTECTED) !== 0) {
+            return $isSameOrSubclassOf($callerClassLc, $methodDeclaringClassLc);
+        }
+
+        return true;
     }
 
     private static function deny(int $visibilityFlags, string $className, string $methodName): void
