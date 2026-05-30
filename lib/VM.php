@@ -2109,9 +2109,12 @@ restart:
             }
         }
         foreach ($trait->constants as $name => $value) {
-            if (!isset($entry->constants[$name])) {
-                $entry->constants[$name] = $value;
+            if (isset($entry->constants[$name])) {
+                throw new \LogicException(
+                    "Trait constant {$trait->name}::{$name} conflicts with an existing class constant"
+                );
             }
+            $entry->constants[$name] = $value;
         }
     }
 
