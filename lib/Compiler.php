@@ -603,6 +603,31 @@ class Compiler {
         return null;
     }
 
+    /** ?: branch throw `new` must not reuse merge phi / echo slot (#3802). */
+    private function mergeEchoSlotForBranch(Block $branch): ?int
+    {
+        if (null === $branch->orig) {
+            return null;
+        }
+        foreach ($this->ternaryMergeTargets($branch->orig) as $mergeCfg) {
+            if ($this->seen->contains($mergeCfg)) {
+                $slot = $this->mergeEchoSlot($this->seen[$mergeCfg]);
+                if (null !== $slot) {
+                    return $slot;
+                }
+            }
+            if ($this->ternaryMergeVarSlots->contains($mergeCfg)) {
+                /** @var SplObjectStorage<CfgVariable, int> $map */
+                $map = $this->ternaryMergeVarSlots[$mergeCfg];
+                foreach ($map as $root) {
+                    return $map[$root];
+                }
+            }
+        }
+
+        return null;
+    }
+
     protected function compileBlock(Block $block) {
         $this->compileOps($block->orig->children, $block);
     }
@@ -725,6 +750,10 @@ class Compiler {
                     ) {
                         break;
                     } elseif ($this->isLoweredByFollowingCoalesce($child, $ops, $i)) {
+                        break;
+                    } elseif ($this->isLoweredByFollowingThrow($child, $ops, $i)) {
+                        break;
+                    } elseif ($this->isUnreachableAfterThrow($child, $ops, $i)) {
                         break;
                     } elseif (
                         $child instanceof Op\Expr\PropertyFetch
@@ -2527,10 +2556,11 @@ class Compiler {
                         $this->throwCompileError($msg);
                     }
                 }
+                $resultSlot = $this->compileOperand($expr->result, $block, false);
                 $return = [
                     new OpCode(
                         OpCode::TYPE_NEW,
-                        $this->compileOperand($expr->result, $block, false),
+                        $resultSlot,
                         $this->compileOperand($expr->class, $block, true),
                     )
                 ];
@@ -2574,12 +2604,7 @@ class Compiler {
             case Op\Expr\Isset_::class:
                 return $this->compileIsset($expr, $block);
             case Op\Expr\Throw_::class:
-                $this->compileOrigExprForOperand($expr->expr, $block);
-
-                return [new OpCode(
-                    OpCode::TYPE_THROW,
-                    $this->compileOperand($expr->expr, $block, true)
-                )];
+                return $this->compileThrowExpression($expr, $block);
             case Op\Iterator\Valid::class:
                 return [new OpCode(
                     OpCode::TYPE_ITER_VALID,
@@ -2836,11 +2861,15 @@ class Compiler {
     {
         $exprOp = $this->findOrigExprOpForOperand($rhs, $entryBlock);
         if (null !== $exprOp) {
+            if ($exprOp instanceof Op\Expr\Throw_) {
+                foreach ($this->compileThrowExpression($exprOp, $targetBlock, $entryBlock) as $op) {
+                    $targetBlock->addOpCode($op);
+                }
+
+                return null;
+            }
             foreach ($this->compileExpr($exprOp, $targetBlock) as $op) {
                 $targetBlock->addOpCode($op);
-            }
-            if ($exprOp instanceof Op\Expr\Throw_) {
-                return null;
             }
         }
 
@@ -2882,6 +2911,149 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * php-cfg emits inner expr ops (New_, …) before Throw_; lower them inside compileExpr(Throw_) (#3802).
+     *
+     * @param Op[] $ops
+     */
+    private function isLoweredByFollowingThrow(Op $op, array $ops, int $index): bool
+    {
+        if (!$op instanceof Op\Expr) {
+            return false;
+        }
+        $count = count($ops);
+        for ($j = $index + 1; $j < $count; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Expr\Throw_) {
+                return $this->exprOpFeedsThrowOperand($op, $next);
+            }
+            if (!$next instanceof Op\Expr) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    private function exprOpFeedsThrowOperand(Op\Expr $op, Op\Expr\Throw_ $throw): bool
+    {
+        return $this->operandsChainEqual($op->result, $throw->expr);
+    }
+
+    /**
+     * Ops after throw-expr in the same CFG block are unreachable (?: arm, &&/|| RHS, = throw …) (#3802).
+     *
+     * @param Op[] $ops
+     */
+    private function isUnreachableAfterThrow(Op $op, array $ops, int $index): bool
+    {
+        for ($j = $index - 1; $j >= 0; --$j) {
+            if ($ops[$j] instanceof Op\Expr\Throw_) {
+                return true;
+            }
+            if (!$ops[$j] instanceof Op\Expr) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    private function findThrowInnerExprOp(Op\Expr\Throw_ $throw, Block $block): ?Op\Expr
+    {
+        $root = $this->unwrapOperandChain($throw->expr);
+        if ($root instanceof Op\Expr) {
+            return $root;
+        }
+
+        return $this->findOrigExprOpForOperand($throw->expr, $block);
+    }
+
+    /**
+     * @return list<OpCode>
+     */
+    private function compileThrowExpression(Op\Expr\Throw_ $expr, Block $block, Block ...$extraSearchBlocks): array
+    {
+        $newOp = $this->findNewExprForThrowOperand($expr, $block, ...$extraSearchBlocks);
+        $ops = [];
+        $throwSlot = null;
+        if (null !== $newOp) {
+            foreach ($this->compileNewExprForThrow($newOp, $block) as $innerOpcode) {
+                $ops[] = $innerOpcode;
+            }
+            $throwSlot = $this->compileOperand($newOp->result, $block, true);
+        } else {
+            $innerOp = $this->findThrowInnerExprOp($expr, $block);
+            if (null !== $innerOp) {
+                foreach ($this->compileExpr($innerOp, $block) as $innerOpcode) {
+                    $ops[] = $innerOpcode;
+                }
+            }
+        }
+        if (null === $throwSlot) {
+            $throwSlot = $this->compileOperand($expr->expr, $block, true);
+        }
+        $ops[] = new OpCode(
+            OpCode::TYPE_THROW,
+            $throwSlot
+        );
+
+        return $ops;
+    }
+
+    private function findNewExprForThrowOperand(Op\Expr\Throw_ $throw, Block ...$searchBlocks): ?Op\Expr\New_
+    {
+        foreach ($searchBlocks as $searchBlock) {
+            if (null === $searchBlock->orig) {
+                continue;
+            }
+            foreach ($searchBlock->orig->children as $child) {
+                if ($child instanceof Op\Expr\New_ && $this->operandsChainEqual($child->result, $throw->expr)) {
+                    return $child;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<OpCode>
+     */
+    private function compileNewExprForThrow(Op\Expr\New_ $expr, Block $block): array
+    {
+        $className = $this->literalScopeClassName($expr->class);
+        if (null !== $className) {
+            $lc = strtolower(ltrim($className, '\\'));
+            if (isset($this->abstractClasses[$lc])) {
+                $msg = isset($this->abstractEnums[$lc])
+                    ? 'Cannot instantiate enum '.$className
+                    : 'Cannot instantiate abstract class '.$className;
+                $this->throwCompileError($msg);
+            }
+        }
+        $resultSlot = $block->forceFreshVarSlot($expr->result);
+        $mergeEcho = $this->mergeEchoSlotForBranch($block);
+        if (null !== $mergeEcho && $resultSlot === $mergeEcho) {
+            $resultSlot = $block->forceFreshVarSlot($expr->result);
+        }
+        $return = [
+            new OpCode(
+                OpCode::TYPE_NEW,
+                $resultSlot,
+                $this->compileOperand($expr->class, $block, true),
+            ),
+        ];
+        foreach ($this->compileCallArgSends($expr->args, $block) as $send) {
+            $return[] = $send;
+        }
+        $return[] = new OpCode(
+            OpCode::TYPE_FUNCCALL_EXEC_NORETURN
+        );
+
+        return $return;
     }
 
     private function compileOrigExprForOperand(Operand $operand, Block $block): void
