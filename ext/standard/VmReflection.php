@@ -53,6 +53,26 @@ final class VmReflection
         return isset($ctx->enums[strtolower($enumName)]);
     }
 
+    /**
+     * get_declared_enums() — user enum class names (issue #3538).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_enums)
+     */
+    public static function declaredEnumsTable(Context $ctx): \PHPCompiler\VM\HashTable
+    {
+        $result = new \PHPCompiler\VM\HashTable();
+        foreach ($ctx->classes as $lc => $entry) {
+            if (!$entry->isEnum || isset($ctx->classAliases[$lc])) {
+                continue;
+            }
+            $value = new Variable();
+            $value->string($entry->name);
+            $result->append($value);
+        }
+
+        return $result;
+    }
+
     public static function interfaceExists(Context $ctx, string $interfaceName): bool
     {
         $entry = self::resolveClassEntry($ctx, $interfaceName);
@@ -220,6 +240,20 @@ final class VmReflection
         }
 
         return $result;
+    }
+
+    /**
+     * Parent class FQCN for get_parent_class() / class_parents() (issue #3483).
+     *
+     * php-src: ext/standard/class.c — PHP_FUNCTION(get_parent_class)
+     */
+    public static function parentClassName(ClassEntry $entry, Context $ctx): ?string
+    {
+        if (null === $entry->parentLc || !isset($ctx->classes[$entry->parentLc])) {
+            return null;
+        }
+
+        return $ctx->classes[$entry->parentLc]->name;
     }
 
     public static function resolveClassFromArg(Context $ctx, Variable $arg): ClassEntry

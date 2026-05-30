@@ -11,6 +11,7 @@ namespace PHPCompiler\JIT\Builtin\Type;
 
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
+use PHPCompiler\Block;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Refcount;
 use PHPCompiler\JIT\Builtin\Type;
@@ -549,6 +550,17 @@ class Object_ extends Type {
         return $this->classParentLc[strtolower(ltrim($declaringClassLc, '\\'))] ?? null;
     }
 
+    /** Parent class display name for JIT get_parent_class() when known at compile time (#3483). */
+    public function parentClassDisplayName(string $className): ?string
+    {
+        $parentLc = $this->parentClassLc($className);
+        if (null === $parentLc || !isset($this->classes[$parentLc])) {
+            return null;
+        }
+
+        return $this->classNameForId($this->classes[$parentLc]);
+    }
+
     /**
      * Compile-time extends-chain check for is_a() string form (#3478).
      */
@@ -751,6 +763,28 @@ class Object_ extends Type {
     }
 
     /**
+     * Canonical enum class names from DECLARE_ENUM (issue #3538).
+     *
+     * @return list<string>
+     */
+    public function allDeclaredEnumNames(): array
+    {
+        $names = [];
+        foreach (array_keys($this->enums) as $enumLc) {
+            $resolved = null;
+            foreach ($this->classIdToName as $name) {
+                if (strtolower(ltrim($name, '\\')) === $enumLc) {
+                    $resolved = $name;
+                    break;
+                }
+            }
+            $names[] = $resolved ?? $enumLc;
+        }
+
+        return $names;
+    }
+
+    /**
      * Lowercase registry keys for JIT enum_exists() runtime compare (#1373).
      *
      * @return list<string>
@@ -843,6 +877,93 @@ class Object_ extends Type {
         return $result;
     }
 
+    /**
+     * After shallow clone, invoke user __clone() when the class defines it (Zend #3170).
+     */
+    public function invokeCloneMagicIfPresent(Block $block, PHPLLVM\Value $cloned): void
+    {
+        $cloneClassIds = [];
+        foreach ($this->methodVisibility as $classId => $methods) {
+            if (isset($methods['__clone'])) {
+                $cloneClassIds[] = $classId;
+            }
+        }
+        if ([] === $cloneClassIds) {
+            return;
+        }
+        if (1 === count($cloneClassIds)) {
+            $onlyId = $cloneClassIds[0];
+            $objMap = $this->context->structFieldMap['__object__'];
+            $classId = $this->context->builder->load(
+                $this->context->builder->structGep($cloned, $objMap['class_id'])
+            );
+            $fn = $this->context->builder->getInsertBlock()->getParent();
+            assert($fn instanceof PHPLLVM\Value\Function_);
+            $entry = $this->context->builder->getInsertBlock();
+            $callBlock = $fn->appendBasicBlock('clone_magic_single_call');
+            $done = $fn->appendBasicBlock('clone_magic_single_done');
+            $expected = $this->context->constantFromInteger($onlyId, 'int64');
+            $isId = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $classId, $expected);
+            $this->context->builder->branchIf($isId, $callBlock, $done);
+            $this->context->builder->positionAtEnd($callBlock);
+            $this->emitCloneMagicCallForClass($block, $cloned, $onlyId);
+            $this->context->builder->branch($done);
+            $this->context->builder->positionAtEnd($done);
+
+            return;
+        }
+        $objMap = $this->context->structFieldMap['__object__'];
+        $classId = $this->context->builder->load(
+            $this->context->builder->structGep($cloned, $objMap['class_id'])
+        );
+        $fn = $this->context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof PHPLLVM\Value\Function_);
+        $entry = $this->context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock('clone_magic_done');
+        $fallback = $fn->appendBasicBlock('clone_magic_unknown');
+        $caseBlocks = [];
+        foreach ($cloneClassIds as $id) {
+            $caseBlocks[] = $fn->appendBasicBlock('clone_magic_class_'.$id);
+        }
+        $checkBlock = $entry;
+        foreach ($cloneClassIds as $i => $id) {
+            $this->context->builder->positionAtEnd($checkBlock);
+            $expected = $this->context->constantFromInteger($id, 'int64');
+            $isId = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $classId, $expected);
+            $nextCheck = $i + 1 < count($cloneClassIds)
+                ? $fn->appendBasicBlock('clone_magic_try_'.($i + 1))
+                : $fallback;
+            $this->context->builder->branchIf($isId, $caseBlocks[$i], $nextCheck);
+            $this->context->builder->positionAtEnd($caseBlocks[$i]);
+            $this->emitCloneMagicCallForClass($block, $cloned, $id);
+            $this->context->builder->branch($done);
+            $checkBlock = $nextCheck;
+        }
+        $this->context->builder->positionAtEnd($fallback);
+        $this->context->builder->branch($done);
+        $this->context->builder->positionAtEnd($done);
+    }
+
+    private function emitCloneMagicCallForClass(Block $block, PHPLLVM\Value $cloned, int $classId): void
+    {
+        $className = $this->classNameForId($classId);
+        $proxyName = strtolower($className).'::'.'__clone';
+        if (!$this->context->functionIsRegistered($proxyName)) {
+            return;
+        }
+        $objVar = new Variable(
+            $this->context,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $cloned
+        );
+        $toCall = $this->context->resolveFunctionProxy($proxyName);
+        $prevStrict = $this->context->callerStrictTypes;
+        $this->context->callerStrictTypes = $block->strictTypes;
+        $toCall->call($this->context, $objVar);
+        $this->context->callerStrictTypes = $prevStrict;
+    }
+
     private function copyPropertySlots(
         PHPLLVM\Value $dest,
         PHPLLVM\Value $src,
@@ -850,6 +971,7 @@ class Object_ extends Type {
         PHPLLVM\LLVMAbstract\BasicBlock $continue
     ): void {
         if (!isset($this->properties[$classId]) || [] === $this->properties[$classId]) {
+            $this->copyConstructedFlag($dest, $src);
             $this->context->builder->branch($continue);
 
             return;
@@ -862,7 +984,21 @@ class Object_ extends Type {
             $value = $this->propertyFetch($src, $className, $propName);
             $this->propertyStore($this->propertySlotPtr($dest, $slotIndex), $value, $propType);
         }
+        $this->copyConstructedFlag($dest, $src);
         $this->context->builder->branch($continue);
+    }
+
+    /** Preserve post-construct state on clone (Zend zend_clones.c; issue #3430). */
+    private function copyConstructedFlag(PHPLLVM\Value $dest, PHPLLVM\Value $src): void
+    {
+        $map = $this->context->structFieldMap['__object__'];
+        $constructed = $this->context->builder->load(
+            $this->context->builder->structGep($src, $map['constructed'])
+        );
+        $this->context->builder->store(
+            $constructed,
+            $this->context->builder->structGep($dest, $map['constructed'])
+        );
     }
 
     public function classNameForId(int $id): string
@@ -1015,6 +1151,16 @@ class Object_ extends Type {
         $this->classIdToName[$id] = $lcname;
         $this->ensureExternalClassConstants($id, $lcname);
         $this->seedExternalClassProperties($id, $lcname);
+        if ('reflectionattribute' === $lcname) {
+            $this->defineProperty($id, 'name', Variable::TYPE_VALUE);
+        }
+        if ('reflectionclass' === $lcname) {
+            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
+        }
+        if ('reflectionmethod' === $lcname) {
+            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
+            $this->defineProperty($id, 'method', Variable::TYPE_STRING);
+        }
         if ('phpcompiler\vm\context' === $lcname) {
             $this->defineProperty($id, 'runtime', Variable::TYPE_OBJECT);
             $this->defineProperty($id, 'errors', Variable::TYPE_OBJECT);
@@ -1281,6 +1427,35 @@ class Object_ extends Type {
     public function methodVisibility(int $classId, string $methodLc): int
     {
         return $this->methodVisibility[$classId][strtolower($methodLc)] ?? \PHPCfg\Func::FLAG_PUBLIC;
+    }
+
+    /**
+     * @return list<string> lowercase method names declared on this class id
+     */
+    public function declaredMethodNames(int $classId): array
+    {
+        return array_keys($this->methodVisibility[$classId] ?? []);
+    }
+
+    /**
+     * Walk parent chain and copy parent method visibility slots missing on $childId (#101).
+     */
+    public function inheritMethodVisibilityFromParent(int $childId, string $childLc): void
+    {
+        $parentLc = $this->parentClassLc($childLc);
+        if (null === $parentLc || !isset($this->classes[$parentLc])) {
+            return;
+        }
+        $parentId = $this->classes[$parentLc];
+        foreach ($this->declaredMethodNames($parentId) as $methodLc) {
+            if (!isset($this->methodVisibility[$childId][$methodLc])) {
+                $this->methodVisibility[$childId][$methodLc] = $this->methodVisibility[$parentId][$methodLc];
+            }
+        }
+        $grandparent = $this->parentClassLc($parentLc);
+        if (null !== $grandparent) {
+            $this->inheritMethodVisibilityFromParent($childId, $parentLc);
+        }
     }
 
     public function markHasConstructor(int $classId): void
@@ -1762,6 +1937,32 @@ class Object_ extends Type {
     }
 
     /**
+     * @param list<string> $classNames
+     */
+    public function emitInstanceOfUnion(Variable $expr, array $classNames): Variable
+    {
+        $i1 = $this->context->getTypeFromString('int1');
+        $acc = $i1->constInt(0, false);
+        foreach ($classNames as $name) {
+            if ('' === $name) {
+                continue;
+            }
+            $check = $this->emitInstanceOf($expr, $name);
+            $bool = Variable::TYPE_NATIVE_BOOL === $check->type
+                ? $check->value
+                : $this->context->helper->loadValue($check);
+            $acc = $this->context->builder->or($acc, $bool);
+        }
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_BOOL,
+            Variable::KIND_VALUE,
+            $acc
+        );
+    }
+
+    /**
      * @param array{type: int, value: int|float|bool|string|null} $entry
      */
     private function jitConstantFromEntry(array $entry): Variable
@@ -1821,6 +2022,32 @@ class Object_ extends Type {
             default:
                 throw new \LogicException('Class constant value must be a scalar compile-time constant');
         }
+    }
+
+    public function propertySlotFor(PHPLLVM\Value $obj, string $class, string $name): PHPLLVM\Value
+    {
+        $classId = $this->lookup('' !== $class ? $class : 'stdclass');
+        $nameId = $this->propNameMap[$name] ?? null;
+        $hasProp = false;
+        if (null !== $nameId) {
+            foreach ($this->properties[$classId] as $propset) {
+                if ($propset[0] === $nameId) {
+                    $hasProp = true;
+                    break;
+                }
+            }
+        }
+        if (!$hasProp) {
+            $this->defineProperty($classId, $name, $this->externalPropertyJitType($class, $name));
+            $nameId = $this->propNameMap[$name];
+        }
+        foreach ($this->properties[$classId] as $propset) {
+            if ($propset[0] === $nameId) {
+                return $this->propertySlotPtr($obj, $propset[3]);
+            }
+        }
+
+        throw new \LogicException('Property slot not found: '.$class.'::$'.$name);
     }
 
     public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name): Variable
