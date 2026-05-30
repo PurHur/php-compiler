@@ -370,6 +370,10 @@ final class Variable {
                 // todo: raise notice
                 return 'Array';
             case self::TYPE_OBJECT:
+                if (EnumCaseSupport::isEnumCase($var->object)) {
+                    return EnumCaseSupport::toString($var->object);
+                }
+
                 return 'Object';
             case self::TYPE_ENUM_CASE:
                 if (null !== $var->enumCase->enumClass->backedType) {

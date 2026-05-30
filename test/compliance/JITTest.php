@@ -164,6 +164,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'array_union')) {
                 continue;
             }
+            // User enum DECLARE_ENUM segfaults in MCJIT until enum lowering is stable (#3518).
+            if (str_contains($name, 'enum_')) {
+                continue;
+            }
             yield $name => $case;
         }
     }

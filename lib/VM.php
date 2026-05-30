@@ -18,6 +18,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\CastSupport;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClosureState;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\GeneratorState;
 use PHPCompiler\VM\HashTable;
@@ -135,6 +136,9 @@ class VM {
             return $var->toString();
         }
         $object = $var->toObject();
+        if (EnumCaseSupport::isEnumCase($object)) {
+            return EnumCaseSupport::toString($object);
+        }
         if (!$this->hasInstanceMethod($object->class, '__tostring')) {
             return 'Object';
         }
@@ -192,6 +196,9 @@ class VM {
             return $var->toString();
         }
         $object = $var->toObject();
+        if (EnumCaseSupport::isEnumCase($object)) {
+            return EnumCaseSupport::toString($object);
+        }
         if (!$this->hasInstanceMethod($object->class, '__tostring')) {
             throw new \Error("Object of class {$object->class->name} could not be converted to string");
         }
@@ -922,16 +929,6 @@ restart:
                             ),
                             $frame
                         );
-                    }
-                    if ($classEntry->isEnum) {
-                        $canonical = $classEntry->enumCaseCanonicalNames[$constName]
-                            ?? $frame->scope[$op->arg3]->toString();
-                        $backing = new Variable();
-                        $backing->copyFrom($classEntry->constants[$constName]);
-                        $frame->scope[$op->arg1]->enumCase(
-                            new VM\EnumCaseEntry($classEntry, $canonical, $backing)
-                        );
-                        break;
                     }
                     $frame->scope[$op->arg1]->copyFrom($classEntry->constants[$constName]);
                     break;
@@ -3014,18 +3011,30 @@ restart:
                 case OpCode::TYPE_DECLARE_CLASS_CONST:
                     $canonical = $frame->scope[$op->arg1]->toString();
                     $name = strtolower($canonical);
-                    $entry->constants[$name] = VM\ClassConstExpr::resolveValue(
-                        $frame,
-                        $block,
-                        $op->arg2
-                    );
                     if ($entry->isEnum) {
+                        if (!isset($block->constants[$op->arg2])) {
+                            throw new \LogicException('Class constant value must be a compile-time constant');
+                        }
+                        $entry->constants[$name] = EnumCaseSupport::createCase(
+                            $entry,
+                            $canonical,
+                            $block->constants[$op->arg2]
+                        );
                         $entry->enumCaseCanonicalNames[$name] = $canonical;
                         $entry->enumCases[] = [
                             'name' => $canonical,
                             'value' => clone $block->constants[$op->arg2],
                         ];
+                        if (null !== $op->deprecatedMetadata) {
+                            $entry->constDeprecated[$name] = $op->deprecatedMetadata;
+                        }
+                        break;
                     }
+                    $entry->constants[$name] = VM\ClassConstExpr::resolveValue(
+                        $frame,
+                        $block,
+                        $op->arg2
+                    );
                     if (null !== $op->deprecatedMetadata) {
                         $entry->constDeprecated[$name] = $op->deprecatedMetadata;
                     }
