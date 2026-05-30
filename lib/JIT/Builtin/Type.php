@@ -244,6 +244,9 @@ class Type extends Builtin {
         $fntypeFclose = $this->context->context->functionType($i32, false, $i64);
         $fnFclose = $this->context->module->addFunction('__compiler_fclose', $fntypeFclose);
         $this->context->registerFunction('__compiler_fclose', $fnFclose);
+        $fntypeFlock = $this->context->context->functionType($i32, false, $i64, $i64);
+        $fnFlock = $this->context->module->addFunction('__compiler_flock', $fntypeFlock);
+        $this->context->registerFunction('__compiler_flock', $fnFlock);
         $fntypeFpassthru = $this->context->context->functionType($i64, false, $i64);
         $fnFpassthru = $this->context->module->addFunction('__compiler_fpassthru', $fntypeFpassthru);
         $this->context->registerFunction('__compiler_fpassthru', $fnFpassthru);
@@ -480,6 +483,11 @@ class Type extends Builtin {
             $this->context->context->functionType($htPtr, false)
         );
         $this->context->registerFunction('__phpc_pending_header_list', $fnPendingList);
+        $fnFnmatch = $this->context->module->addFunction(
+            '__phpc_fnmatch',
+            $this->context->context->functionType($i32, false, $strPtr, $strPtr, $i32)
+        );
+        $this->context->registerFunction('__phpc_fnmatch', $fnFnmatch);
         $fnGlobVec = $this->context->module->addFunction(
             '__phpc_glob_vec',
             $this->context->context->functionType($i32, false, $strPtr, $i32, $i8pppPtr)

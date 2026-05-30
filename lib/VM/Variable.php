@@ -461,6 +461,16 @@ restart:
         }
     }
 
+    private static function throwObjectNumericCompareError(Variable $object): never
+    {
+        $var = $object->resolveIndirect();
+        if (self::TYPE_OBJECT !== $var->type) {
+            throw new \LogicException('Expected object operand for numeric compare error');
+        }
+        $className = $var->object->class->name;
+        throw new \TypeError("Object of class {$className} could not be converted to number");
+    }
+
     public function compareOp(int $opCode, Variable $left, Variable $right): void {
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();
@@ -493,6 +503,8 @@ restart:
             case TYPE_PAIR_NULL_NULL:
                 $this->bool($this->_compareOp($opCode, null, null));
                 break;
+            case TYPE_PAIR_OBJECT_OBJECT:
+                self::throwObjectNumericCompareError($left);
             default:
                 if ($left->type === self::TYPE_INDIRECT) {
                     $left = $left->indirect;
@@ -556,6 +568,8 @@ restart:
             case TYPE_PAIR_NULL_NULL:
                 $this->int(0);
                 break;
+            case TYPE_PAIR_OBJECT_OBJECT:
+                self::throwObjectNumericCompareError($left);
             default:
                 if ($left->type === self::TYPE_INDIRECT) {
                     $left = $left->indirect;

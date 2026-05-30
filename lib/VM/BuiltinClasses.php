@@ -15,6 +15,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethod;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
+use PHPCompiler\VM\Builtin\ThrowableGetMessage;
 use PHPCompiler\VM\Builtin\WeakMapConstruct;
 use PHPCompiler\VM\Builtin\WeakMapCount;
 use PHPCompiler\VM\Builtin\WeakMapOffsetExists;
@@ -37,6 +38,7 @@ final class BuiltinClasses
         self::registerWeakMap($ctx);
         self::registerReflection($ctx);
         self::registerDateTime($ctx);
+        self::registerThrowableHierarchy($ctx);
         GeneratorState::register($ctx);
         ClosureState::register($ctx);
     }
@@ -156,5 +158,25 @@ final class BuiltinClasses
             $dt->methodVisibility[$name] = $pub;
         }
         $ctx->classes[DateTimeSupport::CLASS_DATETIME] = $dt;
+    }
+
+    private static function registerThrowableHierarchy(Context $ctx): void
+    {
+        $strProto = new Variable(Variable::TYPE_STRING);
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $getMessage = new ThrowableGetMessage();
+
+        $error = new ClassEntry('Error');
+        $error->properties[] = new ClassProperty(BuiltinExceptionSupport::PROP_MESSAGE, null, $strProto);
+        $error->methods['getmessage'] = $getMessage;
+        $error->methodVisibility['getmessage'] = $pub;
+        $ctx->classes[BuiltinExceptionSupport::CLASS_ERROR] = $error;
+
+        $typeError = new ClassEntry('TypeError');
+        $typeError->parentLc = BuiltinExceptionSupport::CLASS_ERROR;
+        $typeError->properties[] = new ClassProperty(BuiltinExceptionSupport::PROP_MESSAGE, null, $strProto);
+        $typeError->methods['getmessage'] = $getMessage;
+        $typeError->methodVisibility['getmessage'] = $pub;
+        $ctx->classes[BuiltinExceptionSupport::CLASS_TYPE_ERROR] = $typeError;
     }
 }
