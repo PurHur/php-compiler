@@ -140,6 +140,14 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C {} echo ((new C()) instanceof C) ? "yes" : "no";',
         ],
         [
+            'id' => 'instanceof_union',
+            'construct' => '`instanceof` union RHS `(A|B)`',
+            'opcodes' => ['TYPE_INSTANCEOF'],
+            'issue' => 3461,
+            'notes' => ['php-cfg parses BitwiseOr of class names from php-parser; VM + JIT union OR (#3461)'],
+            'probe' => 'interface A {} interface B {} class C implements A, B {} echo ((new C) instanceof (A|B)) ? "1" : "0";',
+        ],
+        [
             'id' => 'match_expr',
             'construct' => '`match` expression',
             'opcodes' => ['TYPE_IDENTICAL', 'TYPE_JUMPIF', 'TYPE_ASSIGN'],

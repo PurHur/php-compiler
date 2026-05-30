@@ -632,17 +632,22 @@ restart:
                     $frame->scope[$op->arg1]->copyFrom($classEntry->constants[$constName]);
                     break;
                 case OpCode::TYPE_INSTANCEOF:
-                    $value = $frame->scope[$op->arg2]->resolveIndirect();
-                    $className = strtolower($frame->scope[$op->arg3]->toString());
+                    $value = $frame->scope[$op->arg2];
                     $matches = false;
-                    if (Variable::TYPE_OBJECT === $value->type) {
-                        $entry = $value->toObject()->class;
-                        $target = $this->context->classes[$className] ?? null;
-                        if (null !== $target && $target->isInterface) {
-                            $matches = VM\InterfaceCheck::entryImplements($entry, $className, $this->context);
-                        } else {
-                            $matches = VM\InterfaceCheck::entryIsInstanceOf($entry, $className, $this->context);
+                    $unionEncoded = $op->instanceofUnionTypes;
+                    if (null !== $unionEncoded && '' !== $unionEncoded) {
+                        foreach (explode('|', $unionEncoded) as $typeName) {
+                            if ('' === $typeName) {
+                                continue;
+                            }
+                            if ($this->valueInstanceOfClassName($value, $typeName)) {
+                                $matches = true;
+                                break;
+                            }
                         }
+                    } else {
+                        $className = strtolower($frame->scope[$op->arg3]->toString());
+                        $matches = $this->valueInstanceOfClassName($value, $className);
                     }
                     $frame->scope[$op->arg1]->bool($matches);
                     break;
@@ -1724,6 +1729,22 @@ restart:
             }
             $current = $this->context->classes[$current->parentLc];
         }
+    }
+
+    private function valueInstanceOfClassName(Variable $value, string $className): bool
+    {
+        $resolved = $value->resolveIndirect();
+        $className = strtolower(ltrim($className, '\\'));
+        if (Variable::TYPE_OBJECT !== $resolved->type) {
+            return false;
+        }
+        $entry = $resolved->toObject()->class;
+        $target = $this->context->classes[$className] ?? null;
+        if (null !== $target && $target->isInterface) {
+            return VM\InterfaceCheck::entryImplements($entry, $className, $this->context);
+        }
+
+        return VM\InterfaceCheck::entryIsInstanceOf($entry, $className, $this->context);
     }
 
     /** Reject readonly property writes; returns a failure exit code or null. */
