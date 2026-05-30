@@ -697,6 +697,12 @@ restart:
         }
     }
 
+    /** Alias for {@see compareSpaceship()} used by ObjectEntry property walks (#3691). */
+    public static function compareSpaceship(Variable $left, Variable $right): int
+    {
+        return self::spaceshipCompare($left, $right);
+    }
+
     public static function spaceshipCompare(Variable $left, Variable $right): int
     {
         $result = new self();
@@ -739,7 +745,8 @@ restart:
                 $this->int(0);
                 break;
             case TYPE_PAIR_OBJECT_OBJECT:
-                self::throwObjectNumericCompareError($left);
+                $this->int($left->object->compareSpaceship($right->object));
+                break;
             case TYPE_PAIR_ARRAY_ARRAY:
                 $this->int($left->array->compareSpaceship($right->array));
                 break;
