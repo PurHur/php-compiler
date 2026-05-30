@@ -1,8 +1,13 @@
 --TEST--
-language: echo object without __toString (issue #71, match VM)
+language: echo object without __toString throws Error (issue #3564, Zend parity)
 --FILE--
 <?php
 class C {}
-echo new C(), "\n";
+try {
+    echo new C();
+    echo "no error\n";
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
 --EXPECT--
-Object
+Object of class C could not be converted to string
