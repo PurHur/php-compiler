@@ -754,6 +754,12 @@ restart:
                             : $op->block2
                     )->getFrame($this->context, $frame);
                     goto restart;
+                case OpCode::TYPE_BEGIN_SILENCE:
+                    $this->context->errors->beginSilence();
+                    break;
+                case OpCode::TYPE_END_SILENCE:
+                    $this->context->errors->endSilence();
+                    break;
                 case OpCode::TYPE_EXIT:
                     $exitArg = null;
                     if (null !== $op->arg2) {

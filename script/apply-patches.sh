@@ -148,6 +148,12 @@ patch_already_applied() {
     php-cfg-nullsafe-parser.patch)
       grep -q 'function parseExpr_NullsafePropertyFetch' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
+    php-cfg-error-suppress-read.patch)
+      grep -q 'ZEND_COMPILE_SILENCE' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
+    php-cfg-error-suppress-simplifier.patch)
+      grep -q 'instanceof ErrorSuppressBlock' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php" 2>/dev/null
+      ;;
     php-cfg-strict-types.patch)
       grep -q 'public \$strictTypes' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php" 2>/dev/null
       ;;
@@ -1601,6 +1607,8 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-cfg-nullsafe.patch"
   apply_patch "$PATCH_DIR/php-cfg-nullsafe-parser.patch"
+  apply_patch "$PATCH_DIR/php-cfg-error-suppress-read.patch"
+  apply_patch "$PATCH_DIR/php-cfg-error-suppress-simplifier.patch"
   apply_patch "$PATCH_DIR/php-cfg-strict-types.patch"
   apply_patch "$PATCH_DIR/php-cfg-trycatch.patch"
   apply_patch "$PATCH_DIR/php-cfg-phi-resolver-null.patch"

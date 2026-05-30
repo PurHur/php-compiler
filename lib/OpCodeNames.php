@@ -208,8 +208,14 @@ function opcode_type_name(int $type): string
             return 'TYPE_YIELD';
         case 109:
             return 'TYPE_CLOSURE';
+        case 110:
+            return 'TYPE_YIELD_FROM';
         case 111:
             return 'TYPE_RETHROW';
+        case 112:
+            return 'TYPE_BEGIN_SILENCE';
+        case 113:
+            return 'TYPE_END_SILENCE';
         default:
             return 'unknown opcode';
     }
