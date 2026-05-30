@@ -82,6 +82,16 @@ class Context {
     /** @var array<int, ObjectPropertyIterator> foreach object property walk (#3661). */
     public array $objectPropertyIterators = [];
 
+    /**
+     * Handler frames for active try regions (block with TYPE_TRY/CATCH), innermost last (#3521).
+     *
+     * @var list<Frame>
+     */
+    public array $activeTryHandlerFrames = [];
+
+    /** @var array<int, true> merge block object id => pop one try handler on entry */
+    public array $tryMergeBlockIds = [];
+
     public function __construct(Runtime $runtime) {
         $this->runtime = $runtime;
         $this->errors = new ErrorReporter();
