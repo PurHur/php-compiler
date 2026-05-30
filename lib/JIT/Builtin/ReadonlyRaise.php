@@ -54,7 +54,8 @@ final class ReadonlyRaise
             $flag->setInitializer($i8->constInt(0, false));
         }
         if (null === $context->module->getNamedGlobal('phpc_jit_pending_msg')) {
-            $context->module->addGlobal($msgTy, 'phpc_jit_pending_msg');
+            $msgGlobal = $context->module->addGlobal($msgTy, 'phpc_jit_pending_msg');
+            $msgGlobal->setInitializer($msgTy->constNull());
         }
     }
 

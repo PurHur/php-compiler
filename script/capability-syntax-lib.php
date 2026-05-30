@@ -647,6 +647,20 @@ function syntaxRowDefinitions(): array
             'probe' => 'readonly class R { public int $x = 0; } $o = new R(); $o->x = 1;',
         ],
         [
+            'id' => 'readonly_property',
+            'construct' => 'readonly properties (per-property)',
+            'opcodes' => ['TYPE_DECLARE_PROPERTY', 'TYPE_NEW', 'TYPE_ASSIGN', 'TYPE_PROPERTY_FETCH'],
+            'issue' => 3149,
+            'jit' => false,
+            'aot' => true,
+            'notes' => [
+                'php-cfg readonly / propertyFlags MODIFIER_READONLY; VM/JIT reject writes after __construct',
+                'JIT ReadonlyClassGuard IR + ReadonlyPropertyTest; MCJIT execute raise path harness-deferred (JITTest skip)',
+                'php-src: Zend/zend_object_handlers.c zend_std_write_property',
+            ],
+            'probe' => 'class C { public readonly int $x = 1; } $c = new C(); $c->x = 2;',
+        ],
+        [
             'id' => 'property_hooks',
             'construct' => 'Property hooks (`get` / `set` on properties)',
             'opcodes' => ['TYPE_ASSIGN', 'TYPE_PROPERTY_FETCH', 'TYPE_DECLARE_METHOD'],
