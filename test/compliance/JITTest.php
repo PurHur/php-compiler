@@ -121,8 +121,8 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'json_validate')) {
                 continue;
             }
-            // Per-property readonly MCJIT execute still segfaults on raise path (#3149); IR in ReadonlyPropertyTest.
-            if (str_contains($name, 'readonly_property')) {
+            // Uncaught readonly property write: MCJIT exit 255 segfaults (#3149); caught path in readonly_property_jit.phpt.
+            if (str_contains($name, 'readonly_property_write')) {
                 continue;
             }
             // JsonSerializable json_encode() needs VM method dispatch (#3370).
