@@ -304,6 +304,7 @@ class Module extends ModuleAbstract
             new str_getcsv(),
             new ftell_(),
             new fseek(),
+            new rewind_(),
             new feof_(),
             new fflush_(),
             new fpassthru(),
