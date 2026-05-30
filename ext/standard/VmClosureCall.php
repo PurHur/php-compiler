@@ -53,6 +53,14 @@ final class VmClosureCall
         return $context->runtime->vm->invokeClosure($closure, ...$copies);
     }
 
+    /**
+     * Invoke a closure without copying arguments (array_walk &$value; issue #3627).
+     */
+    public static function invokeDirect(Context $context, ClosureState $closure, Variable ...$args): Variable
+    {
+        return $context->runtime->vm->invokeClosure($closure, ...$args);
+    }
+
     public static function invokeOne(Context $context, ClosureState $closure, Variable $arg): Variable
     {
         return self::invoke($context, $closure, $arg);
