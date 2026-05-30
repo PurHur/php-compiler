@@ -18,7 +18,7 @@ class JITTest extends BaseTest {
     public static function providePHPTests(): \Generator
     {
         foreach (parent::providePHPTests() as $name => $case) {
-            // ?-> on objects needs JIT class/property support (#308); VM compliance covers it.
+            // ?-> LLVM lowering verified in NullsafeJitCompileTest (#3219); MCJIT execute needs jit-runtime-probe (#98).
             if (str_contains(strtolower($case[0]), 'nullsafe')) {
                 continue;
             }
