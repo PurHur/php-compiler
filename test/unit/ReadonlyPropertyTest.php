@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\Block;
 use PHPCompiler\LlvmToolchain;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
@@ -79,6 +80,44 @@ PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'mutable_prop.php'));
         $this->assertSame('2', ob_get_clean());
+    }
+
+    public function testReadonlyPropertyDeclRequiresVmLoweringForBinJit(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(
+            <<<'PHP'
+<?php
+class C {
+    public readonly int $x = 1;
+}
+$c = new C();
+echo $c->x;
+PHP,
+            'readonly_prop_vm_lower.php'
+        );
+        $this->assertNotNull($block);
+        $this->assertTrue(Block::containsReadonlyPropertyOpcodes($block));
+        $this->assertTrue(Block::requiresVmLowering($block));
+    }
+
+    public function testMutablePropertyDeclDoesNotRequireVmLoweringForBinJit(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(
+            <<<'PHP'
+<?php
+class C {
+    public int $x = 1;
+}
+$c = new C();
+echo $c->x;
+PHP,
+            'mutable_prop_vm_lower.php'
+        );
+        $this->assertNotNull($block);
+        $this->assertFalse(Block::containsReadonlyPropertyOpcodes($block));
+        $this->assertFalse(Block::requiresVmLowering($block));
     }
 
     public function testReadonlyPropertyFlagFromPhpCfg(): void
