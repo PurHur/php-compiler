@@ -213,6 +213,7 @@ static const char *phpc_builtin_functions[] = {
     "metaphone",
     "method_exists",
     "microtime",
+    "gettimeofday",
     "min",
     "mkdir",
     "move_uploaded_file",

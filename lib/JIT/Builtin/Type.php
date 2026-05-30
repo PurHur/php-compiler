@@ -377,6 +377,19 @@ class Type extends Builtin {
         $fntypePhpUname = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnPhpUname = $this->context->module->addFunction('__compiler_php_uname', $fntypePhpUname);
         $this->context->registerFunction('__compiler_php_uname', $fnPhpUname);
+        $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $fntypeGettimeofdayArray = $this->context->context->functionType($htPtr, false);
+        $fnGettimeofdayArray = $this->context->module->addFunction(
+            '__compiler_gettimeofday_array',
+            $fntypeGettimeofdayArray
+        );
+        $this->context->registerFunction('__compiler_gettimeofday_array', $fnGettimeofdayArray);
+        $fntypeGettimeofdayFloat = $this->context->context->functionType($double, false);
+        $fnGettimeofdayFloat = $this->context->module->addFunction(
+            '__compiler_gettimeofday_float',
+            $fntypeGettimeofdayFloat
+        );
+        $this->context->registerFunction('__compiler_gettimeofday_float', $fnGettimeofdayFloat);
         $i64 = $this->context->getTypeFromString('int64');
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
         $fntypeHrtimeNs = $this->context->context->functionType($i64, false);

@@ -386,6 +386,7 @@ class Module extends ModuleAbstract
             new getmypid(),
             new getrusage(),
             new microtime(),
+            new gettimeofday(),
             new hrtime(),
             new phpversion(),
             new php_sapi_name(),
