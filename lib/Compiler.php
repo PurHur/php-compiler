@@ -1190,6 +1190,7 @@ class Compiler {
             OpCode::TYPE_DECLARE_INTERFACE,
             $this->compileOperand($iface->name, $block, true)
         );
+        AttributeNames::assertNoDuplicates(AttributeNames::fromOp($iface));
         $return->classImplements = $this->interfaceNamesFromOperands($iface->extends);
         $return->block1 = $this->compileClassBody($iface->stmts, OpCode::TYPE_DECLARE_INTERFACE);
 
@@ -1203,6 +1204,7 @@ class Compiler {
             $this->compileOperand($trait->name, $block, true)
         );
         $return->attributeNames = AttributeNames::fromOp($trait);
+        AttributeNames::assertNoDuplicates($return->attributeNames);
         $return->block1 = $this->compileClassBody($trait->stmts, OpCode::TYPE_DECLARE_TRAIT);
 
         return $return;
@@ -1223,6 +1225,7 @@ class Compiler {
             $this->compileOperand($enum->name, $block, true),
             $backedTypeSlot
         );
+        AttributeNames::assertNoDuplicates(AttributeNames::fromOp($enum));
         $return->classImplements = $this->interfaceNamesFromOperands($enum->implements);
         $return->block1 = $this->compileEnumBody($enum->stmts);
 
@@ -1235,6 +1238,7 @@ class Compiler {
         foreach ($block->children as $child) {
             if ($child instanceof Op\Terminal\Const_) {
                 $this->compileOps($child->valueBlock->children, $result);
+                AttributeNames::assertNoDuplicates(AttributeNames::fromOp($child));
                 $result->addOpCode(new OpCode(
                     OpCode::TYPE_DECLARE_CLASS_CONST,
                     $this->compileOperand($child->name, $result, true),
@@ -1280,6 +1284,7 @@ class Compiler {
             $declare->block1 = $methodBlock;
         }
         $declare->attributeNames = AttributeNames::fromOp($child);
+        AttributeNames::assertNoDuplicates($declare->attributeNames);
         $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $result->addOpCode($declare);
     }
@@ -1314,6 +1319,7 @@ class Compiler {
             VM\StringableSupport::assertConcreteClassImplements($class, $className);
         }
         $return->attributeNames = AttributeNames::fromOp($class);
+        AttributeNames::assertNoDuplicates($return->attributeNames);
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($class->flags);
         if ($return->classIsAbstract) {
             $name = $this->staticNameFromOperand($class->name);
@@ -1449,6 +1455,7 @@ class Compiler {
                     $declared = $child->declaredType instanceof Op\Type\Literal
                         ? Type::fromDecl($child->declaredType->name)
                         : ($child->type ?? Type::mixed());
+                    AttributeNames::assertNoDuplicates(AttributeNames::fromOp($child));
                     $declareType = $child->static
                         ? OpCode::TYPE_DECLARE_STATIC_PROPERTY
                         : OpCode::TYPE_DECLARE_PROPERTY;
@@ -1471,6 +1478,7 @@ class Compiler {
                         $this->throwCompileLogic('Class constants are only supported on classes, interfaces, and traits for now');
                     }
                     $this->compileOps($child->valueBlock->children, $result);
+                    AttributeNames::assertNoDuplicates(AttributeNames::fromOp($child));
                     $constOp = new OpCode(
                         OpCode::TYPE_DECLARE_CLASS_CONST,
                         $this->compileOperand($child->name, $result, true),
