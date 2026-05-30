@@ -352,6 +352,7 @@ class Module extends ModuleAbstract
             new restore_error_handler_(),
             new error_get_last(),
             new error_clear_last(),
+            new eval_(),
             new phpc_deploy_path(),
             new compiler_is_superglobal_name(),
             new extract_(),
