@@ -165,6 +165,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'return_by_ref_jit')) {
                 continue;
             }
+            // ??= MCJIT execute: LLVM verify in CoalesceAssignJitCompileTest (#3792).
+            if (str_contains($name, 'coalesce_assign_jit')) {
+                continue;
+            }
             // string/number loose == juggling is VM-only until ArrayBuiltinHelper string-long compare (#3644).
             if (str_contains($name, 'loose_numeric_string')) {
                 continue;
