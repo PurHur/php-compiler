@@ -199,6 +199,9 @@ patch_already_applied() {
       grep -q 'public \\$type;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null \
         && grep -q 'function __construct(Operand \\$name, int \\$visibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null
       ;;
+    php-cfg-typed-class-const.patch)
+      grep -q 'public ?Type \\$declaredType' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php" 2>/dev/null
+      ;;
     php-cfg-assertion-expr-property.patch)
       grep -q 'public \\$expr;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assertion.php" 2>/dev/null
       ;;
@@ -1861,6 +1864,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-no-arrow-function.patch"
   apply_patch "$PATCH_DIR/php-cfg-no-closure-preg-replace-callback.patch"
   apply_patch "$PATCH_DIR/php-cfg-property-type.patch"
+  apply_patch "$PATCH_DIR/php-cfg-typed-class-const.patch"
   apply_patch "$PATCH_DIR/php-cfg-assertion-expr-property.patch"
   apply_patch "$PATCH_DIR/php-cfg-yield-from.patch"
   apply_patch "$PATCH_DIR/php-cfg-incdec-expr.patch"

@@ -1521,6 +1521,19 @@ class Object_ extends Type {
     public function defineClassConst(int $classId, string $name, VMVariable $value): void
     {
         $key = strtolower($name);
+        if (VMVariable::TYPE_ARRAY === $value->type) {
+            $table = $value->toArray();
+            if (!$table instanceof \PHPCompiler\VM\HashTable) {
+                throw new \LogicException('Class constant array must be a HashTable');
+            }
+            $this->classConstants[$classId][$key] = [
+                'type' => Variable::TYPE_HASHTABLE,
+                'value' => null,
+                'vmTable' => $table,
+            ];
+
+            return;
+        }
         $this->classConstants[$classId][$key] = [
             'type' => Variable::fromVMVariable($value->type),
             'value' => $this->compileTimeValueFromVm($value),
@@ -2037,6 +2050,12 @@ class Object_ extends Type {
                     Variable::KIND_VARIABLE,
                     $slot
                 );
+            case Variable::TYPE_HASHTABLE:
+                if (!isset($entry['vmTable']) || !$entry['vmTable'] instanceof \PHPCompiler\VM\HashTable) {
+                    throw new \LogicException('Missing VM table for class constant array');
+                }
+
+                return HashTableHelper::variableFromVmHashTable($this->context, $entry['vmTable']);
             default:
                 throw new \LogicException('Unsupported class constant type for JIT');
         }

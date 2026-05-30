@@ -1,0 +1,36 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php
+@@ -11,6 +11,7 @@ declare(strict_types=1);
+ 
+ namespace PHPCfg\Op\Terminal;
+ 
++use PHPCfg\Op\Type;
+ use PHPCfg\Block;
+ use PHPCfg\Op\Terminal;
+ use PHPCfg\Operand;
+@@ -22,6 +23,9 @@ class Const_ extends Terminal
+ 
+     public $valueBlock;
+ 
++    /** PHP 8.3+ typed class constant declaration; null when untyped. */
++    public ?Type $declaredType = null;
++
+     public function __construct(Operand $name, Operand $value, Block $valueBlock, array $attributes = [])
+     {
+         parent::__construct($attributes);
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -256,11 +256,13 @@ class Parser extends ParserAbstract
+             $value = $this->parseExprNode($const->value);
+             $this->block = $tmp;
+ 
+-            $this->block->children[] = new Op\Terminal\Const_(
++            $constOp = new Op\Terminal\Const_(
+                 $this->parseExprNode($const->name),
+                 $value, $valueBlock,
+                 $this->mapAttributes($node)
+             );
++            $constOp->declaredType = null !== $node->type ? $this->parseTypeNode($node->type) : null;
++            $this->block->children[] = $constOp;
+         }
+     }
