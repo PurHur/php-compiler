@@ -561,6 +561,10 @@ class Compiler {
     /** When merge block is already lowered, ?: branch assigns must use its ECHO slot (#3790). */
     private function branchMergeAssignSlot(Block $branch, Op\Expr\Assign $assign): ?int
     {
+        // Match arm `default => expr` assigns to a Temporary result — not a named merge var (#3787).
+        if (null === Block::resolveVariableName($assign->var)) {
+            return null;
+        }
         if (null === $branch->orig || !$this->isMergeBranchAssign($branch, $assign)) {
             return null;
         }
