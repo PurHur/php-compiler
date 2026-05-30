@@ -21,8 +21,6 @@ final class UnsupportedRegistryTest extends TestCase
     {
         return [
             'yield from' => ['Expr_YieldFrom', 167],
-            'closure' => ['Expr_Closure', 72],
-            'arrow function' => ['Expr_ArrowFunction', 142],
         ];
     }
 
@@ -47,6 +45,12 @@ final class UnsupportedRegistryTest extends TestCase
         $this->assertNull(UnsupportedRegistry::trackingIssueForKind('Expr_PostInc'));
         $this->assertNull(UnsupportedRegistry::trackingIssueForKind('Expr_PreDec'));
         $this->assertNull(UnsupportedRegistry::trackingIssueForKind('Expr_PostDec'));
+    }
+
+    public function testClosureAndArrowNoLongerTrackedAsUnsupported(): void
+    {
+        $this->assertNull(UnsupportedRegistry::trackingIssueForKind('Expr_Closure'));
+        $this->assertNull(UnsupportedRegistry::trackingIssueForKind('Expr_ArrowFunction'));
     }
 
     /**

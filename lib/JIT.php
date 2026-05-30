@@ -190,7 +190,7 @@ class JIT {
             $this->context->coalesceAssignTargets = new \SplObjectStorage();
             // Each queued CFG function gets a fresh try/catch stack — dispatch BBs are per-LLVM-function (#3012).
             $this->context->tryCatch->reset();
-            $this->compileBlockInternal($run[0], $run[1], null, null, ...$run[2]);
+            $this->compileBlockInternal($run[0], $run[1], null, null, 0, false, ...$run[2]);
         }
     }
 
@@ -4344,7 +4344,7 @@ class JIT {
             --$limit;
         }
 
-        return $this->compileBlockInternal($func, $block, $limit, null, ...$args);
+        return $this->compileBlockInternal($func, $block, $limit, null, 0, false, ...$args);
     }
 
     /**
@@ -5418,7 +5418,7 @@ class JIT {
                     $match = $this->context->castToBool(
                         $this->context->helper->loadValue($matchVar)
                     );
-                    $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                    $this->compileBlockInternal($func, $op->block1, null, null, 0, false, ...$args);
                     $caseEntry = $this->context->scope->blockStorage[$op->block1];
                     $nextBb = JIT\BasicBlockHelper::append($this->context, 'switch_next_case');
                     $builder->positionAtEnd($branchBlock);
@@ -5431,7 +5431,7 @@ class JIT {
                 case OpCode::TYPE_JUMP:
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
-                    $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                    $this->compileBlockInternal($func, $op->block1, null, null, 0, false, ...$args);
                     $targetEntry = $this->context->scope->blockStorage[$op->block1];
                     if ($this->context->inlineIncludeDepth > 0) {
                         // Use the merge block itself (not getInsertBlock — callee may be cached) (#846, #784).
@@ -5481,7 +5481,7 @@ class JIT {
                         if ($this->context->inlineIncludeDepth > 0) {
                             JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
                         }
-                        $merged = $this->compileBlockInternal($func, $op->block3, null, $mergeBb, ...$args);
+                        $merged = $this->compileBlockInternal($func, $op->block3, null, $mergeBb, 0, false, ...$args);
                         unset($this->context->coalesceAssignTargets[$coalesceResult]);
                         if ($this->context->inlineIncludeDepth > 0) {
                             // Do not set inlineIncludeExitBlock to the ?? merge block (#866, #784).
@@ -5523,7 +5523,7 @@ class JIT {
                             $builder->branch($mergeBb);
                         }
                         $builder->positionAtEnd($mergeBb);
-                        $merged = $this->compileBlockInternal($func, $op->block3, null, $mergeBb, ...$args);
+                        $merged = $this->compileBlockInternal($func, $op->block3, null, $mergeBb, 0, false, ...$args);
                         unset($this->context->coalesceAssignTargets[$nullsafeResult]);
 
                         return $merged;
@@ -5548,12 +5548,12 @@ class JIT {
                         $savedIncludeExit = $this->context->inlineIncludeExitBlock;
                         $this->context->inlineIncludeExitBlock = null;
                     }
-                    $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                    $this->compileBlockInternal($func, $op->block1, null, null, 0, false, ...$args);
                     if ($this->context->inlineIncludeDepth > 0) {
                         $exitAfterIfBranch = $this->context->inlineIncludeExitBlock;
                         $this->context->inlineIncludeExitBlock = null;
                     }
-                    $this->compileBlockInternal($func, $op->block2, null, null, ...$args);
+                    $this->compileBlockInternal($func, $op->block2, null, null, 0, false, ...$args);
                     if ($this->context->inlineIncludeDepth > 0) {
                         $this->context->inlineIncludeExitBlock = $exitAfterIfBranch
                             ?? $this->context->inlineIncludeExitBlock
@@ -5577,7 +5577,7 @@ class JIT {
                         break;
                     }
                     if (null !== $op->block1) {
-                        $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                        $this->compileBlockInternal($func, $op->block1, null, null, 0, false, ...$args);
                     }
 
                     return $origBasicBlock;
@@ -5587,7 +5587,7 @@ class JIT {
                         break;
                     }
                     if (null !== $op->block1) {
-                        $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                        $this->compileBlockInternal($func, $op->block1, null, null, 0, false, ...$args);
                     }
 
                     return $origBasicBlock;
