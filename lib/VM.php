@@ -2376,10 +2376,14 @@ restart:
         if (null === $func || null === $func->class) {
             return false;
         }
-        $methodLc = strtolower($func->name);
+        $className = $func->class->value ?? null;
+        if (!is_string($className) || '' === $className) {
+            return false;
+        }
+        $methodLc = strtolower((string) $func->name);
         $wantSet = strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($propName));
 
-        return $methodLc === $wantSet || $methodLc === strtolower($func->class->value.'::'.$wantSet);
+        return $methodLc === $wantSet || $methodLc === strtolower($className.'::'.$wantSet);
     }
 
     private function linkPropertyHooks(ClassEntry $entry, VM\ClassProperty $prop): void
