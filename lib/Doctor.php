@@ -227,7 +227,7 @@ final class Doctor
         fwrite(STDOUT, "   BOOTSTRAP_RUNTIME_COMPILE_SMOKE_STRICT_GATE=".(self::gateEnabled('BOOTSTRAP_RUNTIME_COMPILE_SMOKE_STRICT_GATE', $runtimeSmokeStrictDefault) ? '1' : '0')." (default {$runtimeSmokeStrictDefault}) — opt-in strict runtime emit ([#2294](https://github.com/PurHur/php-compiler/issues/2294))\n");
         fwrite(STDOUT, "   BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 BOOTSTRAP_M3_RUNTIME_COMPILE=1 ./script/bootstrap-selfhost-helloworld-probe.sh\n");
         fwrite(STDOUT, "   BOOTSTRAP_M3_HELLOWORLD_STRICT=1 … helloworld-probe.sh  (no Zend fallback; #1493)\n");
-        fwrite(STDOUT, "   Emit TU: test/bootstrap-aot/helloworld_m3_emit_native_entry.php (#1768)\n\n");
+        fwrite(STDOUT, "   Emit TU: test/selfhost/compiler_helloworld_smoke/compile_driver.php (#1768)\n\n");
 
         fwrite(STDOUT, "4. Presenter / fast CI\n");
         fwrite(STDOUT, "   NORTH_STAR2_VERIFY_GATE=".(self::gateEnabled('NORTH_STAR2_VERIFY_GATE', $ns2Default) ? '1' : '0')." (default {$ns2Default}) — ci-fast\n");
@@ -1099,6 +1099,18 @@ final class Doctor
             'make examples-fastcgiweb-smoke · examples-web-smoke.sh --fastcgi-only · ci-fast when gate=1 (#2351)',
             '#2351'
         );
+        $fcgiSmokeDefault = $defaults['FASTCGI_SMOKE_GATE'] ?? '0';
+        $fcgiSmokeOn = self::gateEnabled('FASTCGI_SMOKE_GATE', $fcgiSmokeDefault);
+        self::printSessionsWebGateRow(
+            1,
+            'FastCGI PHPUnit adapter',
+            'FASTCGI_SMOKE_GATE',
+            $fcgiSmokeDefault,
+            $fcgiSmokeOn,
+            false,
+            'FASTCGI_SMOKE_GATE=1 ./script/ci-local.sh --filter FastCgiRecordTest|FastCgiTest (#173, #1899)',
+            '#173'
+        );
         $aotStatus = $aotOn && $llvmReady ? '✅' : '📋';
         $aotExecuteNote = $llvmReady
             ? ($aotOn ? '#2352 · FASTCGI_WEB_AOT_SMOKE_GATE=1' : '#2352 · opt-in default 0')
@@ -1127,8 +1139,10 @@ final class Doctor
         }
         fwrite(STDOUT, "      Parity:  ./script/check-init-fastcgiweb-parity.sh (INIT_FASTCGIWEB_PARITY_GATE=1 in ci-fast)\n");
 
-        fwrite(STDOUT, "\n  Related:\n");
-        fwrite(STDOUT, "  [📋] FastCGI adapter loop — #173\n");
+        fwrite(STDOUT, "  CLI:     ./phpc fcgi --project examples/009-FastCGIWeb (#2427)\n");
+        fwrite(STDOUT, "           ./phpc fcgi --help\n\n");
+        fwrite(STDOUT, "  Related:\n");
+        fwrite(STDOUT, "  [✅] FastCGI adapter loop — #173 (FASTCGI_SMOKE_GATE=1 for PHPUnit FastCgi*)\n");
         fwrite(STDOUT, "  Docs: examples/009-FastCGIWeb/README.md · docs/local-ci-matrix.md\n");
     }
 

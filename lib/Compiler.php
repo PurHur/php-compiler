@@ -154,7 +154,7 @@ class Compiler {
             $input = PHP_COMPILER_DEBUG_LAST_PHASE_INPUT_FILE;
         }
         if (
-            (null === $input || '' === $input || str_ends_with(str_replace('\\', '/', $input), '/compile_smoke_m3_emit_native_entry.php'))
+            (null === $input || '' === $input || (str_contains(str_replace('\\', '/', (string) $input), '/test/selfhost/') && str_ends_with(str_replace('\\', '/', (string) $input), '/compile_driver.php')))
             && \function_exists('getenv')
         ) {
             $fromSource = getenv('PHP_COMPILER_M3_SOURCE');
@@ -163,7 +163,7 @@ class Compiler {
             }
         }
         if (
-            (null === $input || '' === $input || str_ends_with(str_replace('\\', '/', $input), '/compile_smoke_m3_emit_native_entry.php'))
+            (null === $input || '' === $input || (str_contains(str_replace('\\', '/', (string) $input), '/test/selfhost/') && str_ends_with(str_replace('\\', '/', (string) $input), '/compile_driver.php')))
             && isset($_SERVER['argv'])
             && \is_array($_SERVER['argv'])
             && [] !== $_SERVER['argv']
@@ -561,6 +561,10 @@ class Compiler {
     /** When merge block is already lowered, ?: branch assigns must use its ECHO slot (#3790). */
     private function branchMergeAssignSlot(Block $branch, Op\Expr\Assign $assign): ?int
     {
+        // Match arm `default => expr` assigns to a Temporary result — not a named merge var (#3787).
+        if (null === Block::resolveVariableName($assign->var)) {
+            return null;
+        }
         if (null === $branch->orig || !$this->isMergeBranchAssign($branch, $assign)) {
             return null;
         }
@@ -1572,13 +1576,11 @@ class Compiler {
         if ($class instanceof Op\Stmt\Class_ && null !== $class->extends) {
             $parentSlot = $this->compileOperand($class->extends, $block, true);
         }
-        $readonlyVar = new Variable(Variable::TYPE_INTEGER);
-        $readonlyVar->int(
-            VM\ClassReadonly::fromClassFlags($class->flags) ? 1 : 0
-        );
-        $readonlyOperand = new Operand\Temporary;
-        $readonlyOperand->type = Type::int();
-        $readonlySlot = $block->registerConstant($readonlyOperand, $readonlyVar);
+        $classFlagsVar = new Variable(Variable::TYPE_INTEGER);
+        $classFlagsVar->int(VM\ClassFlags::pack($class->flags));
+        $classFlagsOperand = new Operand\Temporary;
+        $classFlagsOperand->type = Type::int();
+        $readonlySlot = $block->registerConstant($classFlagsOperand, $classFlagsVar);
         $return = new OpCode(
             $type,
             $this->compileOperand($class->name, $block, true),
@@ -1828,7 +1830,9 @@ class Compiler {
                         $this->compileTypeConstrainedVariable($result, $declared, $propertyDeclName)
                     );
                     if (!$child->static) {
-                        $declare->propertyReadonly = $this->isReadonlyPropertyFlags($child->visibility);
+                        $declare->propertyReadonly = (property_exists($child, 'readonly') && $child->readonly)
+                            || (property_exists($child, 'propertyFlags') && $this->isReadonlyPropertyFlags($child->propertyFlags))
+                            || $this->isReadonlyPropertyFlags($child->visibility);
                         $declare->propertyVisibility = MethodVisibility::mask($child->visibility);
                     }
                     $result->addOpCode($declare);
@@ -2046,6 +2050,22 @@ class Compiler {
         if (null !== $arraySpec) {
             $var->typeConstraint = Variable::TYPE_ARRAY;
             $var->genericArrayTypeSpec = $arraySpec;
+            $var->declaredTypeLabel = $declName;
+
+            return $return;
+        }
+        if (Type::TYPE_UNION === $type->type) {
+            $members = [];
+            foreach ($type->subTypes as $sub) {
+                $mapped = Variable::mapFromType($sub);
+                if (Variable::TYPE_UNDEFINED !== $mapped) {
+                    $members[] = $mapped;
+                }
+            }
+            if ([] !== $members) {
+                $var->unionTypeConstraints = $members;
+                $var->declaredTypeLabel = $type->toString();
+            }
 
             return $return;
         }
@@ -2057,6 +2077,7 @@ class Compiler {
             $var->classConstraint = $type->userType;
         }
         $var->typeConstraint = $mappedType;
+        $var->declaredTypeLabel = $type->toString();
 
         return $return;
     }
@@ -2090,6 +2111,7 @@ class Compiler {
         if (null === $prop->defaultVar) {
             return null;
         }
+        $propertyType = $prop->declaredType ?? new Op\Type\Literal('mixed');
         $pseudo = new Op\Expr\Param(
             new Operand\Literal(''),
             new Op\Type\Mixed_(),
@@ -2492,6 +2514,8 @@ class Compiler {
             return OpCode::TYPE_SHIFT_LEFT;
         } elseif ($expr instanceof Op\Expr\BinaryOp\ShiftRight) {
             return OpCode::TYPE_SHIFT_RIGHT;
+        } elseif ($expr instanceof Op\Expr\BinaryOp\LogicalXor) {
+            return OpCode::TYPE_LOGICAL_XOR;
         }
         $this->throwCompileLogic("Unknown BinaryOp Type: " . $expr->getType());
     }
@@ -2936,7 +2960,9 @@ class Compiler {
 
                 return [new OpCode(
                     OpCode::TYPE_YIELD,
-                    null,
+                    [] !== $expr->result->usages
+                        ? $this->compileOperand($expr->result, $block, false)
+                        : null,
                     null !== $expr->value
                         ? $this->compileOperand($expr->value, $block, true)
                         : (null !== $expr->key

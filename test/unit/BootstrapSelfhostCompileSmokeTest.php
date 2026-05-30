@@ -122,7 +122,7 @@ final class BootstrapSelfhostCompileSmokeTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_M3_LINK_COMPILE_DRIVER', $source);
         $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER', $source);
         $this->assertStringContainsString('inventory compile_driver', $source);
-        $this->assertStringContainsString('compile_smoke_m3_emit_native_entry.php', $source);
+        $this->assertStringContainsString('compiler_compile_smoke/compile_driver.php', $source);
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER=1', $source);
         $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $source);
     }
@@ -136,13 +136,14 @@ final class BootstrapSelfhostCompileSmokeTest extends TestCase
         $this->assertSame(0, $exitCode, implode("\n", $lines));
     }
 
-    public function testCompilePhpPreservesSelfhostAotForM3NativeEmitEntry(): void
+    /** Issue #3032: compile-smoke probe links inventory compile_driver only. */
+    public function testCompilePhpPreservesSelfhostAotForCompileSmokeInventoryEmitDriver(): void
     {
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
-        $this->assertStringContainsString('compile_smoke_m3_emit_native_entry.php', $compile);
+        $this->assertStringContainsString('compiler_compile_smoke/compile_driver.php', $compile);
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER', $compile);
-        $this->assertStringContainsString('PHP_COMPILER_EMIT_HELPER_LINK=1', $compile);
-        $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_TU=1', $compile);
+        $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1', $compile);
+        $this->assertStringNotContainsString('m3_emit_native_entry', $compile);
     }
 
     public function testCompileSmokeProbeSetsEmitHelperLinkEnv(): void

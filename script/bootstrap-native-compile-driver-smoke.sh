@@ -19,7 +19,7 @@ export PHP_COMPILER_M3_OUT="${ROOT}/build/bin-compile-aot"
 if [[ "${BOOTSTRAP_NATIVE_COMPILE_DRIVER_SKIP_LINK:-0}" != "1" ]]; then
   rm -f "${PHP_COMPILER_M3_OUT}"
   # Build the emit-helper compile driver explicitly (argv `-o OUT SOURCE.php`).
-  EMIT_ENTRY="${ROOT}/test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php"
+  EMIT_ENTRY="${ROOT}/test/selfhost/compiler_helloworld_smoke/compile_driver.php"
   env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1 \
     php "${ROOT}/bin/compile.php" -o "${PHP_COMPILER_M3_OUT}" "${EMIT_ENTRY}" >/dev/null
 fi

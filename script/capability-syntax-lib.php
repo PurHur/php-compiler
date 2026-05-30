@@ -97,6 +97,18 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { public int $x = 1; public function __clone() { $this->x = 2; } } $a = new C(); $b = clone $a; echo $b->x;',
         ],
         [
+            'id' => 'magic_methods',
+            'construct' => 'Magic methods `__get` / `__set` / `__call` / `__toString`',
+            'opcodes' => [],
+            'issue' => 146,
+            'jit' => false,
+            'notes' => [
+                'Zend zend_object_handlers.c: zend_std_read_property, zend_std_write_property, zend_std_get_method, __toString cast',
+                'VM slow path on undeclared property read/write and missing method call; __callStatic (#3273); JIT deopt/fallback',
+            ],
+            'probe' => 'class M { function __get(string $k): string { return $k; } } echo (new M)->foo;',
+        ],
+        [
             'id' => 'private_methods',
             'construct' => 'Private methods',
             'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_METHODCALL_INIT'],
@@ -210,12 +222,13 @@ function syntaxRowDefinitions(): array
             'opcodes' => ['TYPE_YIELD', 'TYPE_ITER_RESET', 'TYPE_ITER_VALID', 'TYPE_ITER_VALUE'],
             'issue' => 167,
             'jit' => true,
-            'aot' => false,
+            'aot' => true,
             'notes' => [
                 'VM GeneratorState + foreach; keyed yield (#3085)',
-                'MCJIT resume lowering for nested generator funcs (#3074); script-scope requiresVmLowering',
+                'MCJIT/AOT resume lowering for nested generator funcs (#3074, #3115); script-scope yield blocked',
                 'JIT linear `yield` + packed-array `yield from`; `yield from` generator + try/catch in generator JIT deferred',
                 'see docs/generators-jit-aot.md',
+                'AOT fixture generator_yield.phpt',
             ],
             'probe' => 'function g() { yield 1; yield 2; } foreach (g() as $v) echo $v;',
         ],
@@ -306,6 +319,19 @@ function syntaxRowDefinitions(): array
             'issue' => 1222,
             'notes' => ['Packed and string-keyed arrays; VM + JIT lowering'],
             'probe' => '$a = [1, 2, 3]; foreach ($a as &$v) { $v *= 2; } echo $a[0], $a[1], $a[2];',
+        ],
+        [
+            'id' => 'foreach_iterator',
+            'construct' => 'foreach over Iterator / IteratorAggregate objects',
+            'opcodes' => ['TYPE_ITER_RESET', 'TYPE_ITER_VALID', 'TYPE_ITER_KEY', 'TYPE_ITER_VALUE'],
+            'issue' => 3234,
+            'jit' => false,
+            'aot' => false,
+            'notes' => [
+                'VM calls rewind/valid/current/key/next (Zend zend_iterators.c parity)',
+                'IteratorAggregate::getIterator(); TypeError for non-iterable objects',
+            ],
+            'probe' => null,
         ],
         [
             'id' => 'ref_param',
@@ -752,6 +778,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'instance_methods' => '/function\s+\w+\s*\(/',
         'construct_method' => '/function\s+__construct\s*\(/',
         'clone_magic' => '/function\s+__clone\s*\(/',
+        'magic_methods' => '/function\s+__get\s*\(|function\s+__call\s*\(|function\s+__toString\s*\(/',
         'private_methods' => '/\bprivate\s+function\b/',
         'method_return_types' => '/function\s+\w+\([^)]*\)\s*:\s*(?:string|void|int)/',
         'property_fetch' => '/\$this->\w+/',
@@ -988,11 +1015,11 @@ function webNorthStarDefinitions(): array
         ],
         [
             'construct' => 'FastCGI loop',
-            'vm' => 'no',
-            'jit' => 'no',
-            'aot' => 'no',
+            'vm' => 'partial',
+            'jit' => 'n/a',
+            'aot' => 'partial',
             'issue' => 173,
-            'notes' => [],
+            'notes' => ['bin/fcgi.php + phpc fcgi; FASTCGI_SMOKE_GATE=1 (#173, #1899)'],
         ],
     ];
 }
@@ -1365,7 +1392,7 @@ function throwsWebNorthStarDefinitions(): array
             'jit' => 'yes',
             'aot' => 'yes',
             'issue' => 195,
-            'notes' => ['#195 throw lowering; #57 catch; #2084 compliance PHPT pack; user empty class AOT #2157'],
+            'notes' => ['#195 throw lowering; #57 catch; #2084 compliance PHPT pack; empty user class JIT #2167; AOT #2157'],
         ],
         [
             'construct' => 'AOT project link (`phpc build --project`)',

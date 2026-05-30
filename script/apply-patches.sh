@@ -274,6 +274,11 @@ patch_already_applied() {
     php-cfg-ctor-promotion-readonly.patch)
       grep -q 'promotionReadonly' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null
       ;;
+    php-cfg-property-readonly.patch)
+      # Legacy patch adds $readonly; upstream overlay uses propertyFlags (#3149).
+      grep -q 'public $readonly = false' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null \
+        || grep -q 'propertyFlags' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null
+      ;;
     php-cfg-attribute-groups.patch)
       grep -q "attrGroups'\] = \$expr->attrGroups" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
@@ -281,7 +286,9 @@ patch_already_applied() {
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TraitUse.php" ]]
       ;;
     php-cfg-throw-expr.patch)
-      grep -q 'return new Op\\Expr\\Throw_' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      grep -q 'return new Op\\Expr\\Throw_' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        || grep -q 'parseExpr_Throw' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        || [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Throw_.php" ]]
       ;;
     php-types-never-type.patch)
       grep -q 'Op\\Type\\Never_' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
@@ -1935,6 +1942,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-union-type.patch"
   apply_patch "$PATCH_DIR/php-cfg-ctor-promotion.patch"
   apply_patch "$PATCH_DIR/php-cfg-ctor-promotion-readonly.patch"
+  apply_patch "$PATCH_DIR/php-cfg-property-readonly.patch"
   apply_patch "$PATCH_DIR/php-cfg-attribute-groups.patch"
   apply_patch "$PATCH_DIR/php-cfg-trait-use.patch"
   apply_patch "$PATCH_DIR/php-cfg-throw-expr.patch"

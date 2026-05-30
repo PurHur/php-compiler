@@ -303,6 +303,21 @@ class VM {
     }
 
     /**
+     * Invoke Iterator protocol methods during foreach (Zend zend_iterators.c parity, #3234).
+     */
+    public function invokeForeachInstanceMethod(Frame $_parentFrame, Variable $receiver, string $methodName): Variable
+    {
+        $methodLc = strtolower($methodName);
+        $object = $receiver->toObject();
+        $class = $object->class;
+        if (!isset($class->methods[$methodLc])) {
+            throw new \LogicException("Call to undefined method {$class->name}::{$methodLc}()");
+        }
+
+        return $this->invokePhpFunction($class->methods[$methodLc], $receiver);
+    }
+
+    /**
      * Properties for var_dump / print_r when __debugInfo is defined (Zend parity, #3259).
      *
      * @return array<string, Variable>
@@ -344,6 +359,64 @@ class VM {
         $thisVar = new Variable(Variable::TYPE_OBJECT);
         $thisVar->object($object);
         $this->invokePhpFunction($class->methods['__clone'], $thisVar);
+    }
+
+    /**
+     * Zend zend_std_read_property / __get slow path (#146).
+     */
+    protected function invokeMagicGet(ObjectEntry $object, string $name): Variable
+    {
+        if (!$this->hasInstanceMethod($object->class, '__get')) {
+            throw new \LogicException('Undefined property access');
+        }
+        $nameVar = new Variable(Variable::TYPE_STRING);
+        $nameVar->string($name);
+
+        return $this->invokeInstanceMethod($object, '__get', $nameVar);
+    }
+
+    /**
+     * Zend zend_std_write_property / __set slow path (#146).
+     */
+    protected function invokeMagicSet(ObjectEntry $object, string $name, Variable $value): void
+    {
+        if (!$this->hasInstanceMethod($object->class, '__set')) {
+            throw new \LogicException('Undefined property access');
+        }
+        $nameVar = new Variable(Variable::TYPE_STRING);
+        $nameVar->string($name);
+        $valueCopy = new Variable();
+        $valueCopy->copyFrom($value);
+        $this->invokeInstanceMethod($object, '__set', $nameVar, $valueCopy);
+    }
+
+    /**
+     * Resolve an instance property write lvalue, including __set / dynamic properties (#146).
+     */
+    protected function fetchObjectPropertyWriteLvalue(ObjectEntry $object, string $name, Frame $frame): Variable
+    {
+        if ($object->hasProperty($name)) {
+            return $object->getProperty($name);
+        }
+        if ($this->hasInstanceMethod($object->class, '__set')) {
+            $proxy = new Variable();
+            $proxy->magicSetTarget = $object;
+            $proxy->magicSetName = $name;
+
+            return $proxy;
+        }
+        if (!$object->class->allowsDynamicProperties) {
+            $scriptPath = $frame->scriptPath;
+            $this->context->errors->deprecatedDynamicProperty(
+                $object->class->name,
+                $name,
+                '' !== $scriptPath && '-' !== $scriptPath ? $scriptPath : null,
+                $this->context,
+                $frame
+            );
+        }
+
+        return $object->allocateProperty($name);
     }
 
     /**
@@ -499,11 +572,12 @@ class VM {
 
     private function runFrames(): int
     {
+        $previous = self::$running;
         self::$running = $this;
         try {
             return $this->runFramesInner();
         } finally {
-            self::$running = null;
+            self::$running = $previous;
         }
     }
 
@@ -577,6 +651,12 @@ restart:
                     }
                     if ($this->context->propertyHookSetAborted) {
                         $this->context->propertyHookSetAborted = false;
+                        break;
+                    }
+                    $writeTarget = $arg2->resolveIndirect();
+                    if (null !== $writeTarget->magicSetTarget && null !== $writeTarget->magicSetName) {
+                        $this->invokeMagicSet($writeTarget->magicSetTarget, $writeTarget->magicSetName, $arg3);
+                        $arg1->copyFrom($arg3);
                         break;
                     }
                     $catchFrame = $this->enforcePropertyVisibilityWrite($arg2, $frame);
@@ -826,7 +906,7 @@ restart:
                             $propName = $keyVar->is(Variable::TYPE_INTEGER)
                                 ? (string) $keyVar->toInt()
                                 : $keyVar->toString();
-                            $object->getProperty($propName)->copyFrom($valueVar);
+                            $object->allocateProperty($propName)->copyFrom($valueVar);
                         }
                     }
                     break;
@@ -861,6 +941,12 @@ restart:
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
                     $arg1->bool(!$arg2->equals($arg3));
+                    break;
+                case OpCode::TYPE_LOGICAL_XOR:
+                    $arg1 = $frame->scope[$op->arg1];
+                    $arg2 = $frame->scope[$op->arg2];
+                    $arg3 = $frame->scope[$op->arg3];
+                    $arg1->bool($arg2->toBool($this) !== $arg3->toBool($this));
                     break;
                 case OpCode::TYPE_SMALLER:
                 case OpCode::TYPE_GREATER:
@@ -1551,7 +1637,9 @@ restart:
                         $classEntry->parentLc = $parentLc;
                     }
                     if (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
-                        $classEntry->readonly = (bool) $frame->block->constants[$op->arg3]->toInt();
+                        $classFlags = $frame->block->constants[$op->arg3]->toInt();
+                        $classEntry->readonly = VM\ClassFlags::isReadonly($classFlags);
+                        $classEntry->isAbstract = VM\ClassFlags::isAbstract($classFlags);
                     }
                     if ($op->isSealed) {
                         $classEntry->sealed = true;
@@ -1569,6 +1657,7 @@ restart:
                         $this->inheritFromParent($classEntry);
                     }
                     $this->inheritFromInterfaces($classEntry);
+                    VM\ClassValidator::finalizeClassDefinition($classEntry, $this->context);
                     $this->context->classes[$lcname] = $classEntry;
                     break;
                 case OpCode::TYPE_NEW:
@@ -1598,6 +1687,11 @@ restart:
                     }
                     if ($class->isInterface) {
                         throw new \LogicException("Cannot instantiate interface $name");
+                    }
+                    try {
+                        VM\ClassValidator::assertInstantiable($class);
+                    } catch (\LogicException $e) {
+                        return $this->raise($e->getMessage(), $frame);
                     }
                     $object = new ObjectEntry($class);
                     $this->initInstancePropertyDefaults($object);
@@ -1636,12 +1730,31 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
-                    $hookValue = $this->fetchPropertyWithHooks($propertyObject, $name, $frame);
-                    if (null !== $hookValue) {
-                        $result->copyFrom($hookValue);
-                    } else {
-                        $result->indirect($propertyObject->getProperty($name));
+                    if ($propertyObject->hasProperty($name)) {
+                        $hookValue = $this->fetchPropertyWithHooks($propertyObject, $name, $frame);
+                        if (null !== $hookValue) {
+                            $result->copyFrom($hookValue);
+                        } else {
+                            $result->indirect($propertyObject->getProperty($name));
+                        }
+                        break;
                     }
+                    $forWrite = $frame->pos < $frame->block->nOpCodes
+                        && OpCode::TYPE_ASSIGN === $frame->block->opCodes[$frame->pos]->type
+                        && (int) $frame->block->opCodes[$frame->pos]->arg2 === (int) $op->arg1;
+                    if ($forWrite) {
+                        $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
+                        break;
+                    }
+                    if ($this->hasInstanceMethod($propertyObject->class, '__get')) {
+                        $result->copyFrom($this->invokeMagicGet($propertyObject, $name));
+                        break;
+                    }
+                    if ($propertyObject->class->allowsDynamicProperties) {
+                        $result->indirect($propertyObject->allocateProperty($name));
+                        break;
+                    }
+                    throw new \LogicException('Undefined property access');
                     break;
                 case OpCode::TYPE_INIT_ARRAY:
                     $result = $frame->scope[$op->arg1];
@@ -1805,6 +1918,9 @@ restart:
                     } else {
                         $gen->currentKey->int($gen->autoKey++);
                     }
+                    if (null !== $op->arg1) {
+                        $gen->yieldResultSlot = $op->arg1;
+                    }
                     $gen->hasCurrent = true;
                     $gen->frame = $frame;
                     $frame->generatorYield = true;
@@ -1858,25 +1974,55 @@ restart:
                     throw new \LogicException('yield from requires array or Generator');
                 case OpCode::TYPE_ITER_RESET:
                     $container = $frame->scope[$op->arg1]->resolveIndirect();
-                    $frame->iterators[$op->arg1] = $container;
-                    $this->context->foreachIterators[$op->arg1] = $container;
                     if ($this->variableIsGenerator($container)) {
+                        unset($this->context->foreachObjectAdvance[$op->arg1]);
+                        unset($this->context->objectPropertyIterators[$op->arg1]);
+                        $frame->iterators[$op->arg1] = $container;
+                        $this->context->foreachIterators[$op->arg1] = $container;
                         $container->toObject()->generatorState->rewind();
                         break;
                     }
-                    if (Variable::TYPE_OBJECT === $container->type) {
-                        $iter = new ObjectPropertyIterator($container->toObject());
-                        $iter->reset();
-                        $this->context->objectPropertyIterators[$op->arg1] = $iter;
+                    if (Variable::TYPE_ARRAY === $container->type) {
+                        unset($this->context->foreachObjectAdvance[$op->arg1]);
+                        unset($this->context->objectPropertyIterators[$op->arg1]);
+                        $frame->iterators[$op->arg1] = $container;
+                        $this->context->foreachIterators[$op->arg1] = $container;
+                        $container->toArray()->iterReset();
                         break;
                     }
-                    if (Variable::TYPE_ARRAY !== $container->type) {
-                        throw new \LogicException('Iterator reset requires an array');
+                    if (Variable::TYPE_OBJECT === $container->type) {
+                        try {
+                            unset($this->context->objectPropertyIterators[$op->arg1]);
+                            $iterable = VM\ForeachIterator::resolveTraversableObject($this, $frame, $container);
+                            $frame->iterators[$op->arg1] = $iterable;
+                            $this->context->foreachIterators[$op->arg1] = $iterable;
+                            if ($this->variableIsGenerator($iterable)) {
+                                unset($this->context->foreachObjectAdvance[$op->arg1]);
+                                $iterable->toObject()->generatorState->rewind();
+                                break;
+                            }
+                            $this->context->foreachObjectAdvance[$op->arg1] = false;
+                            $this->invokeForeachInstanceMethod($frame, $iterable, 'rewind');
+                            break;
+                        } catch (\TypeError) {
+                            unset($this->context->foreachObjectAdvance[$op->arg1]);
+                            $iter = new ObjectPropertyIterator($container->toObject());
+                            $iter->reset();
+                            $this->context->objectPropertyIterators[$op->arg1] = $iter;
+                            break;
+                        }
                     }
-                    $container->toArray()->iterReset();
-                    break;
+                    throw new \TypeError('foreach() argument must be of type array|object');
                 case OpCode::TYPE_ITER_VALID:
-                    $container = $this->foreachContainer($frame, $op->arg2);
+                    $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
+                    if ($this->isForeachObjectIteratorSlot((int) $op->arg2)) {
+                        if ($this->context->foreachObjectAdvance[$op->arg2]) {
+                            $this->invokeForeachInstanceMethod($frame, $container, 'next');
+                        }
+                        $valid = $this->invokeForeachInstanceMethod($frame, $container, 'valid');
+                        $frame->scope[$op->arg1]->bool($valid->toBool());
+                        break;
+                    }
                     if ($this->variableIsGenerator($container)) {
                         $frame->scope[$op->arg1]->bool(
                             $this->advanceGeneratorIteration($container->toObject()->generatorState)
@@ -1895,7 +2041,12 @@ restart:
                     $frame->scope[$op->arg1]->bool($container->toArray()->iterValid());
                     break;
                 case OpCode::TYPE_ITER_KEY:
-                    $container = $this->foreachContainer($frame, $op->arg2);
+                    $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
+                    if ($this->isForeachObjectIteratorSlot((int) $op->arg2)) {
+                        $key = $this->invokeForeachInstanceMethod($frame, $container, 'key');
+                        $frame->scope[$op->arg1]->copyFrom($key);
+                        break;
+                    }
                     if ($this->variableIsGenerator($container)) {
                         $frame->scope[$op->arg1]->copyFrom(
                             $container->toObject()->generatorState->currentKey
@@ -1914,7 +2065,18 @@ restart:
                     $frame->scope[$op->arg1]->copyFrom($container->toArray()->iterCurrentKey());
                     break;
                 case OpCode::TYPE_ITER_VALUE:
-                    $container = $this->foreachContainer($frame, $op->arg2);
+                    $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
+                    if ($this->isForeachObjectIteratorSlot((int) $op->arg2)) {
+                        if ((bool) $op->arg3) {
+                            throw new \LogicException(
+                                'foreach by-reference over Iterator objects is not supported in this compiler build'
+                            );
+                        }
+                        $value = $this->invokeForeachInstanceMethod($frame, $container, 'current');
+                        $frame->scope[$op->arg1]->copyFrom($value);
+                        $this->context->foreachObjectAdvance[$op->arg2] = true;
+                        break;
+                    }
                     if ($this->variableIsGenerator($container)) {
                         $frame->scope[$op->arg1]->copyFrom(
                             $container->toObject()->generatorState->currentValue
@@ -2184,7 +2346,20 @@ restart:
             return $this->dispatchVmValueError($e, $callerFrame);
         } catch (\Error $e) {
             return $this->dispatchVmError($e->getMessage(), $callerFrame);
+        } catch (VM\GeneratorUncaughtThrow $e) {
+            return $this->dispatchUncaughtGeneratorThrow($e->thrown, $callerFrame);
         }
+    }
+
+    private function dispatchUncaughtGeneratorThrow(Variable $thrown, Frame $callerFrame): ?Frame
+    {
+        $catchFrame = $this->findCatchFrameForThrow($callerFrame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
     }
 
     /**
@@ -2898,10 +3073,12 @@ restart:
             && null !== $container->toObject()->generatorState;
     }
 
-    private function foreachContainer(Frame $frame, int $slot): Variable
+    private function resolveForeachContainer(Frame $frame, int $slot): Variable
     {
-        return ($this->context->foreachIterators[$slot]
-            ?? ($frame->iterators[$slot] ?? $frame->scope[$slot]))->resolveIndirect();
+        $container = $this->context->foreachIterators[$slot]
+            ?? ($frame->iterators[$slot] ?? $frame->scope[$slot]);
+
+        return $container->resolveIndirect();
     }
 
     private function objectForeachIterator(int $slot): ObjectPropertyIterator
@@ -2911,6 +3088,11 @@ restart:
         }
 
         return $this->context->objectPropertyIterators[$slot];
+    }
+
+    private function isForeachObjectIteratorSlot(int $slot): bool
+    {
+        return array_key_exists($slot, $this->context->foreachObjectAdvance);
     }
 
     private function findGeneratorState(Frame $frame): ?GeneratorState
@@ -2925,11 +3107,94 @@ restart:
         return null;
     }
 
+    /**
+     * Resume a generator (Generator::send / ::next / ::rewind / foreach), optionally injecting a send value.
+     */
+    public function resumeGenerator(GeneratorState $gen, ?Variable $sendValue = null): bool
+    {
+        if ($gen->done) {
+            return false;
+        }
+        if (null !== $sendValue) {
+            $gen->pendingSend->copyFrom($sendValue);
+            $gen->hasPendingSend = true;
+        }
+
+        return $this->advanceGeneratorIteration($gen);
+    }
+
+    /** Generator::throw() — inject Throwable at yield suspension (Zend zend_generators.c). */
+    public function throwGenerator(GeneratorState $gen, Variable $exception): bool
+    {
+        if ($gen->done) {
+            throw new \Exception('Cannot throw to a closed generator');
+        }
+        if (null === $gen->frame) {
+            throw new \Exception('Cannot throw to an uninitialized generator');
+        }
+        $gen->pendingThrow->copyFrom($exception);
+        $gen->hasPendingThrow = true;
+
+        return $this->advanceGeneratorIteration($gen);
+    }
+
+    private function applyGeneratorPendingSend(GeneratorState $gen): void
+    {
+        if (!$gen->hasPendingSend || null === $gen->frame || null === $gen->yieldResultSlot) {
+            return;
+        }
+        if (!isset($gen->frame->scope[$gen->yieldResultSlot])) {
+            return;
+        }
+        $gen->frame->scope[$gen->yieldResultSlot]->copyFrom($gen->pendingSend);
+        $gen->hasPendingSend = false;
+    }
+
+    private function applyGeneratorPendingThrow(GeneratorState $gen): void
+    {
+        if (!$gen->hasPendingThrow || null === $gen->frame) {
+            return;
+        }
+        $thrown = new Variable();
+        $thrown->copyFrom($gen->pendingThrow);
+        $gen->hasPendingThrow = false;
+        $catchFrame = $this->findCatchFrameForGeneratorThrow($gen, $thrown);
+        if (null !== $catchFrame) {
+            $catchFrame->generatorState = $gen;
+            $gen->frame = $catchFrame;
+
+            return;
+        }
+        $gen->frame = null;
+        $gen->markReturned(null);
+        throw new VM\GeneratorUncaughtThrow($thrown);
+    }
+
+    /** Catch handlers inside the generator function only (not caller try/catch). */
+    private function findCatchFrameForGeneratorThrow(GeneratorState $gen, Variable $thrown): ?Frame
+    {
+        $this->context->pendingException = $thrown;
+        for ($handler = $gen->frame; null !== $handler; $handler = $handler->parent) {
+            if ($handler->generatorState !== $gen && $this->findGeneratorState($handler) !== $gen) {
+                break;
+            }
+            $catchFrame = $this->dispatchCatchForHandlerFrame($handler);
+            if (null !== $catchFrame) {
+                return $catchFrame;
+            }
+        }
+        $this->clearTryCatchUnwindState();
+
+        return null;
+    }
+
     private function advanceGeneratorIteration(GeneratorState $gen): bool
     {
         if ($gen->done) {
             return false;
         }
+        $this->applyGeneratorPendingSend($gen);
+        $this->applyGeneratorPendingThrow($gen);
         if (null === $gen->frame) {
             $gen->frame = $gen->func->getFrame($this->context, null);
             $gen->frame->calledArgs = $gen->calledArgs;
@@ -3139,11 +3404,15 @@ restart:
 
     protected function declaringClassLc(Frame $frame): string
     {
-        if (null === $frame->block->func || null === $frame->block->func->class) {
-            throw new \LogicException('self:: used outside of class scope');
+        if (null !== $frame->block->func && null !== $frame->block->func->class) {
+            return strtolower($frame->block->func->class->value);
+        }
+        // Bound closure scope (Closure::bind/bindTo $newScope) — #3673.
+        if (null !== $frame->calledClass && '' !== $frame->calledClass) {
+            return strtolower($frame->calledClass);
         }
 
-        return strtolower($frame->block->func->class->value);
+        throw new \LogicException('self:: used outside of class scope');
     }
 
     protected function lateStaticClassLc(Frame $frame): string
@@ -3187,6 +3456,14 @@ restart:
         }
         $class = $object->class;
         if (!isset($class->methods[$methodLc])) {
+            if (isset($class->methods['__call'])) {
+                $frame->magicCallMethodName = $methodName;
+                $frame->call = $class->methods['__call'];
+                $frame->callArgs = [$receiver];
+                $frame->callArgEntries = [];
+
+                return;
+            }
             throw new \LogicException("Call to undefined method {$class->name}::{$methodLc}()");
         }
         $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
@@ -3251,6 +3528,9 @@ restart:
         $callerClassLc = null;
         if (null !== $frame->block->func && null !== $frame->block->func->class) {
             $callerClassLc = strtolower($frame->block->func->class->value);
+        }
+        if (null === $callerClassLc && null !== $frame->calledClass && '' !== $frame->calledClass) {
+            $callerClassLc = strtolower($frame->calledClass);
         }
         $parentScopeAllows = false;
         if ($this->isParentClassDispatch($frame, $lcClass)) {
@@ -3428,6 +3708,11 @@ restart:
             }
             if (isset($trait->methodParameterMetadata[$name])) {
                 $entry->methodParameterMetadata[$name] = $trait->methodParameterMetadata[$name];
+            }
+        }
+        foreach ($trait->abstractMethods as $name => $_) {
+            if (!isset($entry->methods[$name]) && !isset($entry->abstractMethods[$name])) {
+                $entry->abstractMethods[$name] = true;
             }
         }
         foreach ($trait->staticProperties as $name => $storage) {
@@ -3711,9 +3996,12 @@ restart:
                         $method = new Func\PHP($entry->name.'::'.$name, $op->block1);
                         $method->deprecated = $op->deprecatedMetadata;
                         $entry->methods[$name] = $method;
+                        unset($entry->abstractMethods[$name]);
                         if ('__construct' === $name) {
                             $entry->constructor = $method;
                         }
+                    } else {
+                        $entry->abstractMethods[$name] = true;
                     }
                     break;
                 case OpCode::TYPE_DECLARE_CLASS_CONST:

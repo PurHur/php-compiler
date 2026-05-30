@@ -10,21 +10,30 @@ use PHPCompiler\VM\Variable as VMVariable;
 /**
  * Supported vs deferred array_map() callback forms (issue #1154).
  *
- * JIT/AOT lowers null (identity copy) and compile-time string stdlib builtins only.
- * Closures, array callables ([Class::class, 'method']), and invokable objects stay
- * deferred until user-function / callable JIT lands ([#142](https://github.com/PurHur/php-compiler/issues/142)).
+ * JIT/AOT lowers null (identity copy), compile-time string stdlib builtins, and closure/arrow
+ * callbacks with native int/double returns ([#142](https://github.com/PurHur/php-compiler/issues/142)).
+ * Array callables ([Class::class, 'method']) and invokable objects stay deferred (#1154).
  */
 final class ArrayMapCallbackPolicy
 {
     public const DEFERRED_SUMMARY =
-        'array_map callbacks: null or compile-time string builtins only; closures and [class, method] callables deferred';
+        'array_map callbacks: null, compile-time string builtins, closure/arrow (int/double); [class, method] callables deferred';
 
-    public const DEFERRED_KINDS = 'closures, array callables, and invokable objects';
+    public const DEFERRED_KINDS = 'array callables and invokable objects';
 
-    public const JIT_SUBSET = 'null or compile-time string stdlib builtin names';
+    public const JIT_SUBSET = 'null, compile-time string stdlib builtin names, or closure/arrow callbacks';
+
+    public static function isClosureJitLowerable(JITVariable $callback): bool
+    {
+        return null !== $callback->closureCall;
+    }
 
     public static function isJitLowerable(JITVariable $callback): bool
     {
+        if (self::isClosureJitLowerable($callback)) {
+            return true;
+        }
+
         return self::isJitLowerableScalar(
             $callback->type,
             $callback->isNullConstant,

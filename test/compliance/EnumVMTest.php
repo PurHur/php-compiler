@@ -16,6 +16,7 @@ final class EnumVMTest extends BaseTest
         foreach (
             [
                 'enum_basic.phpt',
+                'backed_enum_decl.phpt',
                 'enum_case_name_value.phpt',
                 'enum_cases.phpt',
                 'enum_instanceof.phpt',

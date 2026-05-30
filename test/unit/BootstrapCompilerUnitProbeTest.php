@@ -25,7 +25,7 @@ final class BootstrapCompilerUnitProbeTest extends TestCase
         $this->assertStringContainsString('emit_path=', $source);
         $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER', $source);
         $this->assertStringContainsString('inventory compile_driver', $source);
-        $this->assertStringContainsString('compiler_unit_probe_m3_emit_native_entry.php', $source);
+        $this->assertStringContainsString('compiler_unit_probe/compile_driver.php', $source);
         $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $source);
         $this->assertStringContainsString('compiler unit probe compile OK', $source);
     }
@@ -39,21 +39,13 @@ final class BootstrapCompilerUnitProbeTest extends TestCase
         $this->assertFileExists(self::$root.'/test/selfhost/compiler_unit_probe/compile_driver.php');
     }
 
-    public function testCompilerUnitProbeM3EmitNativeEntryExists(): void
-    {
-        $entry = self::$root.'/test/bootstrap-aot/compiler_unit_probe_m3_emit_native_entry.php';
-        $this->assertFileExists($entry);
-        $source = (string) file_get_contents($entry);
-        $this->assertStringContainsString('compile_smoke_m3_emit', $source);
-        $this->assertStringContainsString('lib/Compiler.php', $source);
-    }
-
-    public function testCompilePhpRecognizesCompilerUnitProbeM3EmitEntry(): void
+    /** Issue #3032: bin/compile.php wires inventory compile_driver, not *_m3_emit_native_entry.php. */
+    public function testCompilePhpRecognizesCompilerUnitProbeInventoryEmitDriver(): void
     {
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
-        $this->assertStringContainsString('compiler_unit_probe_m3_emit_native_entry.php', $compile);
-        $this->assertStringContainsString('PHP_COMPILER_EMIT_HELPER_LINK=1', $compile);
-        $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_TU=1', $compile);
+        $this->assertStringContainsString('compile_driver.php', $compile);
+        $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1', $compile);
+        $this->assertStringNotContainsString('m3_emit_native_entry', $compile);
     }
 
     public function testJitCachesCompilerUnitProbeFixtureSidecar(): void
@@ -62,7 +54,7 @@ final class BootstrapCompilerUnitProbeTest extends TestCase
         $this->assertStringContainsString('compiler_unit_probe_compile.php', $jit);
         $this->assertStringContainsString('COMPILER_UNIT_PROBE_SIDECAR_REL', $jit);
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
-        $this->assertStringContainsString('PHP_COMPILER_M3_COMPILER_UNIT_PROBE_EMIT', $compile);
+        $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER', $compile);
         $aot = (string) file_get_contents(self::$root.'/lib/JIT/M3EmitTuTrivialEchoAot.php');
         $this->assertStringContainsString('COMPILER_UNIT_PROBE_SIDECAR_REL', $aot);
     }

@@ -136,6 +136,33 @@ return_bool:
         $rightValue = $this->loadValue($right);
         $leftType = $this->operandJitType($left);
         $rightType = $this->operandJitType($right);
+        if (OpCode::TYPE_LOGICAL_XOR === $opcode->type) {
+            $zeroI64 = $this->context->getTypeFromString('int64')->constInt(0, false);
+            if (Variable::TYPE_NATIVE_BOOL === $leftType) {
+                $leftTruth = $leftValue;
+            } elseif (Variable::TYPE_STRING === $leftType) {
+                $leftLen = $this->context->builder->call(
+                    $this->context->lookupFunction('__string__strlen'),
+                    $leftValue
+                );
+                $leftTruth = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $leftLen, $zeroI64);
+            } else {
+                $leftTruth = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $leftValue, $zeroI64);
+            }
+            if (Variable::TYPE_NATIVE_BOOL === $rightType) {
+                $rightTruth = $rightValue;
+            } elseif (Variable::TYPE_STRING === $rightType) {
+                $rightLen = $this->context->builder->call(
+                    $this->context->lookupFunction('__string__strlen'),
+                    $rightValue
+                );
+                $rightTruth = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $rightLen, $zeroI64);
+            } else {
+                $rightTruth = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $rightValue, $zeroI64);
+            }
+            $result = $this->context->builder->xor($leftTruth, $rightTruth);
+            goto return_bool;
+        }
         if (
             OpCode::TYPE_EQUAL === $opcode->type
             || OpCode::TYPE_IDENTICAL === $opcode->type

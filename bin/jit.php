@@ -55,7 +55,7 @@ function run(string $filename, string $code, array $options): void
     $block = $runtime->parseAndCompile($code, $filename);
     if (null !== $block && Block::requiresVmLowering($block)) {
         // JIT EH IR may verify (TryCatchJitCompileTest); bin/jit.php VM-fallbacks EH/finally (#2114).
-        // Script-scope `yield` still uses VM; nested generator bodies use MCJIT resume lowering (#3074).
+        // Script-scope yield still uses VM; nested generator bodies use MCJIT resume (#3074, #3115).
     } else {
         $runtime->jit($block);
     }

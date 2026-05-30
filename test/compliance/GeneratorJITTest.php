@@ -19,6 +19,7 @@ final class GeneratorJITTest extends BaseTest
 {
     public static function providePHPTests(): \Generator
     {
+        // VM execute lives in GeneratorVMTest; this suite is compile-lint only (#3074).
         if (false) {
             yield;
         }

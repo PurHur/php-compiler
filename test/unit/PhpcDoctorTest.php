@@ -69,7 +69,7 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_TEST_SUBSET_GATE', $result['stdout']);
         $this->assertStringContainsString('BOOTSTRAP_TEST_SUBSET_STRICT', $result['stdout']);
         $this->assertStringContainsString('bootstrap-selfhost-helloworld-probe.sh', $result['stdout']);
-        $this->assertStringContainsString('helloworld_m3_emit_native_entry.php', $result['stdout']);
+        $this->assertStringContainsString('compiler_helloworld_smoke/compile_driver.php', $result['stdout']);
         $this->assertStringContainsString('2. M2 spine', $result['stdout']);
         $this->assertStringContainsString('bootstrap-spine-count.php', $result['stdout']);
         $this->assertStringContainsString('COMPILER_DRIVER_SMOKE_GATE', $result['stdout']);
@@ -212,6 +212,7 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('#2135', $result['stdout']);
         $this->assertStringContainsString('009-FastCGIWeb CI gates', $result['stdout']);
         $this->assertStringContainsString('009-FastCGIWeb', $result['stdout']);
+        $this->assertStringContainsString('FASTCGI_SMOKE_GATE', $result['stdout']);
         $this->assertStringContainsString('FASTCGI_WEB_SMOKE_GATE', $result['stdout']);
         $this->assertStringContainsString('FASTCGI_WEB_AOT_SMOKE_GATE', $result['stdout']);
         $this->assertStringContainsString('FASTCGI_WEB_DEPLOY_SMOKE_GATE', $result['stdout']);

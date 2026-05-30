@@ -407,9 +407,9 @@ class Runtime {
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_begin');
         $context = $this->loadJitContext();
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_loadjitcontext_done');
-        if (null !== $block && Block::containsGeneratorOpcodes($block)) {
-            // AOT lowering for generator suspension is not implemented yet; VM-only + jit.php fallback exist (#167).
-            throw new \LogicException('Generators (yield) are not supported in AOT yet (issue #167).');
+        // Generator bodies use GeneratorHelper resume lowering; script-scope yield still blocked (#3115).
+        if (null !== $block && Block::containsGeneratorOpcodesInScriptScope($block)) {
+            throw new \LogicException('yield in the main script is not supported in AOT yet (issue #3115).');
         }
         $context->setMain($this->loadJit()->compile($block));
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compile_done');

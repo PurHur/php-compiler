@@ -5303,6 +5303,7 @@ class JIT {
                     break;
                 case OpCode::TYPE_EQUAL:
                 case OpCode::TYPE_NOT_EQUAL:
+                case OpCode::TYPE_LOGICAL_XOR:
                 case OpCode::TYPE_SPACESHIP:
                     $this->maybeRefreshIncludeBindingsBeforeUse();
                     $this->assignOperand(
@@ -5722,6 +5723,13 @@ class JIT {
                         );
                         $callArgs = $this->adaptByRefCallArgs($nativeCall, $callArgs, $callOperands);
                     }
+                    if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
+                        $callArgs = $this->adaptByRefCallArgsForInternal(
+                            $this->context->scope->toCall->getName(),
+                            $callArgs,
+                            $callOperands
+                        );
+                    }
                     if (null !== $block->func && '{main}' === $block->func->name) {
                         $toCall = $this->context->scope->toCall;
                         $label = get_class($toCall);
@@ -5770,6 +5778,13 @@ class JIT {
                         );
                         $callArgs = $this->adaptByRefCallArgs($nativeCall, $callArgs, $callOperands);
                     }
+                    if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
+                        $callArgs = $this->adaptByRefCallArgsForInternal(
+                            $this->context->scope->toCall->getName(),
+                            $callArgs,
+                            $callOperands
+                        );
+                    }
                     if (
                         $this->context->scope->toCall instanceof CoreFunc\Internal
                         && 'sprintf' === strtolower($this->context->scope->toCall->getName())
@@ -5793,7 +5808,7 @@ class JIT {
                             $this,
                             $resumeName
                         );
-                        $this->assignOperand($block->getOperand($op->arg1), $genVar);
+                        $this->assignOperandForced($block->getOperand($op->arg1), $genVar);
                         break;
                     }
                     $prevStrict = $this->context->callerStrictTypes;
@@ -7031,10 +7046,20 @@ class JIT {
                     );
             }
         }
+        if ($value->isJitGenerator) {
+            $this->context->setVariableOp($resultOp, $value);
+            $resolved = JIT\OperandName::resolve($resultOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName($resolved, $value);
+            }
+
+            return;
+        }
         if (
             $force
             && Variable::KIND_VALUE === $result->kind
             && Variable::TYPE_STRING !== $result->type
+            && !$value->isJitGenerator
         ) {
             // ?? left branch fetch binds a superglobal lvalue; force-assign needs a stack slot (#866).
             $slot = JIT\JitValueBox::alloc($this->context);
@@ -7175,6 +7200,12 @@ class JIT {
             $this->copyValueBoxJitFlags($result, $value, $force);
             $result->compileTimeConstantName = $value->compileTimeConstantName;
             $this->syncCompileTimeString($result, $value, $force);
+            if ($value->isJitGenerator) {
+                $resolved = JIT\OperandName::resolve($resultOp);
+                if (null !== $resolved && '' !== $resolved) {
+                    $this->context->bindVariableByName($resolved, $result);
+                }
+            }
 
             return;
         } elseif ($result->type === Variable::TYPE_VALUE) {
@@ -7773,6 +7804,11 @@ class JIT {
         } else {
             $this->copyObjectPropertyBacking($dest, $src);
         }
+        if (JIT\GeneratorHelper::isGeneratorVariable($src)) {
+            $dest->generatorStatePtr = $src->generatorStatePtr;
+            $dest->generatorResumeName = $src->generatorResumeName;
+            $dest->isJitGenerator = $src->isJitGenerator;
+        }
         if (null !== $src->closureCall) {
             $dest->closureCall = $src->closureCall;
         }
@@ -7788,6 +7824,7 @@ class JIT {
         $dest->closureCall = $src->closureCall;
         $dest->generatorStatePtr = $src->generatorStatePtr;
         $dest->generatorResumeName = $src->generatorResumeName;
+        $dest->isJitGenerator = $src->isJitGenerator;
     }
 
     /**
@@ -7798,7 +7835,7 @@ class JIT {
         Variable $src,
         ?Operand $srcOp
     ): void {
-        $destPtr = JIT\JitValueBox::pointer($this->context, $destField);
+        $destPtr = JIT\JitValueBox::normalizeValuePtr($this->context, $destField);
         if (JIT\Variable::TYPE_STRING === $src->type) {
             $this->context->builder->call(
                 $this->context->lookupFunction('__value__writeString'),
@@ -8716,6 +8753,26 @@ class JIT {
             return $args;
         }
         foreach ($call->paramByRefByArg as $idx => $_) {
+            if (!isset($args[$idx])) {
+                continue;
+            }
+            $operand = $operands[$idx] ?? null;
+            if (null === $operand) {
+                continue;
+            }
+            $args[$idx] = $this->ensureValueBoxLvalueForByRefPass($operand, $args[$idx]);
+        }
+
+        return $args;
+    }
+
+    private function adaptByRefCallArgsForInternal(string $name, array $args, array $operands): array
+    {
+        $byRef = BuiltinByRefParams::forFunction($name);
+        if ([] === $byRef) {
+            return $args;
+        }
+        foreach ($byRef as $idx) {
             if (!isset($args[$idx])) {
                 continue;
             }

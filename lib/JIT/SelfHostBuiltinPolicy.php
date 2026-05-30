@@ -6,7 +6,7 @@ namespace PHPCompiler\JIT;
 
 final class SelfHostBuiltinPolicy
 {
-    /** Self-host / JIT: array_map() lowers null and compile-time string builtins only (#1154). */
+    /** Self-host / JIT: array_map() lowers null, string builtins, and closure callbacks (#142, #1154). */
     public const ARRAY_MAP_CALLBACK_DEFERRED_NOTE = ArrayMapCallbackPolicy::DEFERRED_SUMMARY;
 
     /** @var array<string, string> */
@@ -78,6 +78,7 @@ final class SelfHostBuiltinPolicy
         'is_writable' => 'filesystem', 'file_get_contents' => 'filesystem', 'file_put_contents' => 'filesystem',
         'filemtime' => 'filesystem', 'fileperms' => 'filesystem', 'filesize' => 'filesystem', 'filetype' => 'filesystem',
         'mkdir' => 'filesystem', 'unlink' => 'filesystem', 'rmdir' => 'filesystem', 'realpath' => 'filesystem',
+        'chmod' => 'filesystem', 'umask' => 'filesystem',
         'glob' => 'filesystem', 'scandir' => 'filesystem', 'fnmatch' => 'filesystem',
         'fopen' => 'filesystem', 'fread' => 'filesystem', 'fwrite' => 'filesystem', 'fgetc' => 'filesystem', 'fgets' => 'filesystem',
         'fgetcsv' => 'filesystem',
@@ -131,7 +132,7 @@ final class SelfHostBuiltinPolicy
         'in_array' => 'array', 'array_search' => 'array', 'array_fill' => 'array', 'array_slice' => 'array', 'array_splice' => 'array',
         'array_key_exists' => 'array', 'array_key_first' => 'array', 'array_key_last' => 'array',
         'array_is_list' => 'array', 'array_map' => 'array', 'array_count' => 'array',
-        // array_map: null + compile-time string builtins only; closures deferred (#1154)
+        // array_map: null + string builtins + closure/arrow (#142); [class,method] deferred (#1154)
         'array_push' => 'array', 'array_pop' => 'array', 'array_shift' => 'array', 'array_unshift' => 'array',
         'array_reverse' => 'array', 'array_filter' => 'array', 'array_walk' => 'array',
         'array_walk_recursive' => 'array', 'array_reduce' => 'array', 'array_combine' => 'array', 'array_fill_keys' => 'array', 'array_pad' => 'array', 'array_flip' => 'array', 'array_change_key_case' => 'array',
@@ -141,7 +142,7 @@ final class SelfHostBuiltinPolicy
         'ksort' => 'array', 'krsort' => 'array', 'asort' => 'array', 'arsort' => 'array',
         'array_multisort' => 'array',
         'usort' => 'array', 'uasort' => 'array', 'uksort' => 'array',
-        'compact' => 'array', 'extract' => 'array', 'defined' => 'array', 'define' => 'array',
+        'compact' => 'array', 'extract' => 'array', 'defined' => 'array', 'define' => 'array', 'constant' => 'array',
         'get_defined_constants' => 'array', 'get_defined_vars' => 'array', 'get_declared_interfaces' => 'array',
         'class_exists' => 'array', 'enum_exists' => 'array', 'get_declared_enums' => 'array', 'function_exists' => 'array', 'method_exists' => 'array',
         'property_exists' => 'array',

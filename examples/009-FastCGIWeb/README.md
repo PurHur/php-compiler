@@ -26,6 +26,20 @@ curl -s http://127.0.0.1:8080/example.php
 curl -s http://127.0.0.1:8080/example.php/ping
 ```
 
+## FastCGI worker (production-style)
+
+Long-lived TCP listener (adapter [#173](https://github.com/PurHur/php-compiler/issues/173), CLI [#2427](https://github.com/PurHur/php-compiler/issues/2427)):
+
+```console
+./phpc fcgi --help
+./phpc fcgi --project examples/009-FastCGIWeb
+# optional AOT after build:
+./phpc build --project examples/009-FastCGIWeb
+./phpc fcgi --project examples/009-FastCGIWeb
+```
+
+Point nginx `fastcgi_pass` at `127.0.0.1:9000` (or your `--listen` address). Deploy bundle notes: [docs/deploy-web-aot.md](../../docs/deploy-web-aot.md) ([#445](https://github.com/PurHur/php-compiler/issues/445)).
+
 ## AOT + deploy
 
 ```console
@@ -46,7 +60,7 @@ Production nginx + `PHPC_DEPLOY_ROOT`: [docs/deploy-web-aot.md](../../docs/deplo
 | AOT `phpc build --project` | ✅ when LLVM ready (`ExamplesCompileTest`) |
 | AOT CGI execute | ✅ opt-in `FASTCGI_WEB_AOT_SMOKE_GATE=1` ([#2352](https://github.com/PurHur/php-compiler/issues/2352)); `EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh` |
 | Deploy CGI smoke | ✅ opt-in `FASTCGI_WEB_DEPLOY_SMOKE_GATE=1` ([#2359](https://github.com/PurHur/php-compiler/issues/2359)); `make examples-fastcgiweb-deploy-smoke` |
-| FastCGI adapter execute | 📋 blocked on [#173](https://github.com/PurHur/php-compiler/issues/173) |
+| FastCGI adapter execute | ✅ `phpc fcgi --project .` ([#173](https://github.com/PurHur/php-compiler/issues/173), [#2427](https://github.com/PurHur/php-compiler/issues/2427)); `FASTCGI_SMOKE_GATE=1` for PHPUnit |
 | CI serve smoke | ✅ opt-in `FASTCGI_WEB_SMOKE_GATE=1` ([#2351](https://github.com/PurHur/php-compiler/issues/2351)); `make examples-fastcgiweb-smoke` |
 
 ## Related

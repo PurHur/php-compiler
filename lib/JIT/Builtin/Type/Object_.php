@@ -1313,6 +1313,7 @@ class Object_ extends Type {
         }
         if ('generator' === $lcname) {
             $this->defineProperty($id, GeneratorHelper::TARGET_PROPERTY, Variable::TYPE_STRING);
+            $this->defineProperty($id, GeneratorHelper::STATE_PROPERTY, Variable::TYPE_NATIVE_LONG);
         }
         if ('splobjectstorage' === $lcname) {
             $this->splObjectStorageClassId = $id;

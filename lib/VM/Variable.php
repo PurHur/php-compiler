@@ -59,6 +59,12 @@ final class Variable {
     public ?int $typeConstraint = null;
     public ?string $classConstraint = null;
 
+    /** Scalar VM type members for union declared types (issue #169). */
+    public ?array $unionTypeConstraints = null;
+
+    /** Display label for property TypeError messages, e.g. `int|string`. */
+    public ?string $declaredTypeLabel = null;
+
     /** list&lt;T&gt; / array&lt;K,V&gt; shape when declaration used generic array syntax (#3705). */
     public ?GenericArrayTypeSpec $genericArrayTypeSpec = null;
 
@@ -69,6 +75,11 @@ final class Variable {
 
     /** Stream handle from fopen()/similar; distinguishes handle ints from plain integers (#3519). */
     public bool $streamResource = false;
+
+    /** Lvalue proxy for __set dispatch when the property slot does not exist (#146). */
+    public ?ObjectEntry $magicSetTarget = null;
+
+    public ?string $magicSetName = null;
 
     public function __construct(int $type = self::TYPE_NULL) {
         $this->type = $type;

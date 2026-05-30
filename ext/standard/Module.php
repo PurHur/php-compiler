@@ -48,7 +48,10 @@ class Module extends ModuleAbstract
             new deg2rad(),
             new rad2deg(),
             new log(),
+            new log10(),
             new exp(),
+            new expm1(),
+            new log1p(),
             new sin(),
             new cos(),
             new tan(),
@@ -59,6 +62,9 @@ class Module extends ModuleAbstract
             new hypot(),
             new atan2(),
             new fmod(),
+            new modf(),
+            new ldexp(),
+            new frexp(),
             new fdiv(),
             new intval(),
             new floatval(),
@@ -295,6 +301,7 @@ class Module extends ModuleAbstract
             new mkdir_(),
             new rmdir_(),
             new chmod_(),
+            new umask_(),
             new rename_(),
             new move_uploaded_file(),
             new is_uploaded_file(),
@@ -335,6 +342,7 @@ class Module extends ModuleAbstract
             new ini_get_(),
             new define_(),
             new defined_(),
+            new constant_(),
             new get_defined_constants_(),
             new get_defined_vars_(),
             new get_declared_interfaces_(),
@@ -641,7 +649,7 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('fabs', $ft);
             $context->registerFunction('fabs', $fn);
         }
-        foreach (['ceil', 'floor', 'round', 'sqrt', 'log', 'exp', 'sin', 'cos', 'tan', 'pow', 'hypot', 'atan2', 'fmod'] as $name) {
+        foreach (['ceil', 'floor', 'round', 'sqrt', 'log', 'log10', 'exp', 'expm1', 'log1p', 'sin', 'cos', 'tan', 'pow', 'hypot', 'atan2', 'fmod'] as $name) {
             try {
                 $context->lookupFunction($name);
             } catch (\Throwable $e) {
@@ -652,6 +660,21 @@ class Module extends ModuleAbstract
             }
         }
         $i32 = $context->getTypeFromString('int32');
+        $doublePtr = $context->getTypeFromString('double*');
+        $i32Ptr = $context->getTypeFromString('int32*');
+        foreach ([
+            'ldexp' => [$double, $i32],
+            'modf' => [$double, $doublePtr],
+            'frexp' => [$double, $i32Ptr],
+        ] as $name => $params) {
+            try {
+                $context->lookupFunction($name);
+            } catch (\Throwable $e) {
+                $ft = $context->context->functionType($double, false, ...$params);
+                $fn = $context->module->addFunction($name, $ft);
+                $context->registerFunction($name, $fn);
+            }
+        }
         foreach (['isnan', 'isfinite', 'isinf'] as $name) {
             try {
                 $context->lookupFunction($name);

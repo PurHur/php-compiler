@@ -7,7 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\GenericArrayTypeSpec;
 
 /**
- * Scalar type coercion for typed parameters (issue #156).
+ * Scalar type coercion for typed parameters (issue #156) and typed properties (#169).
  */
 final class TypeCheck
 {
@@ -32,10 +32,16 @@ final class TypeCheck
 
     public static function coercePropertyWrite(Variable $dest, bool $strict): void
     {
-        self::coerceTypedSlot($dest, $strict, 'Property');
         $target = $dest->resolveIndirect();
-        if (null !== $target->genericArrayTypeSpec) {
-            self::assertGenericArrayShape($target, $target->genericArrayTypeSpec, 'Property');
+        if (null !== $target->unionTypeConstraints) {
+            self::coerceUnionPropertyWrite($target, $strict);
+
+            return;
+        }
+        self::coerceTypedSlot($dest, $strict, 'Property', null, true);
+        $resolved = $dest->resolveIndirect();
+        if (null !== $resolved->genericArrayTypeSpec) {
+            self::assertGenericArrayShape($resolved, $resolved->genericArrayTypeSpec, 'Property');
         }
     }
 
@@ -77,8 +83,38 @@ final class TypeCheck
         }
     }
 
-    private static function coerceTypedSlot(Variable $dest, bool $strict, string $kind, ?int $constraint = null): void
+    private static function coerceUnionPropertyWrite(Variable $target, bool $strict): void
     {
+        $constraints = $target->unionTypeConstraints ?? [];
+        if ([] === $constraints) {
+            return;
+        }
+        foreach ($constraints as $constraint) {
+            $trial = clone $target;
+            try {
+                self::coerceTypedSlot($trial, $strict, 'Property', $constraint, true);
+                $target->copyFrom($trial);
+
+                return;
+            } catch (\TypeError $e) {
+                continue;
+            }
+        }
+
+        throw self::propertyTypeError(
+            $target,
+            $target->declaredTypeLabel ?? 'mixed',
+            $target
+        );
+    }
+
+    private static function coerceTypedSlot(
+        Variable $dest,
+        bool $strict,
+        string $kind,
+        ?int $constraint = null,
+        bool $propertyWrite = false
+    ): void {
         $target = $dest->resolveIndirect();
         $constraint ??= $target->typeConstraint;
         if (null === $constraint) {
@@ -87,7 +123,7 @@ final class TypeCheck
         $value = $target;
         if ($strict) {
             if (!self::isExactType($value, $constraint)) {
-                throw new \TypeError(self::strictMessage($constraint, $value, $kind));
+                throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite);
             }
 
             return;
@@ -95,7 +131,11 @@ final class TypeCheck
         if (self::isExactType($value, $constraint)) {
             return;
         }
-        self::weakCoerceInPlace($target, $constraint, $value, $kind);
+        try {
+            self::weakCoerceInPlace($target, $constraint, $value, $kind, $propertyWrite);
+        } catch (\TypeError $e) {
+            throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite);
+        }
     }
 
     private static function isExactType(Variable $value, int $constraint): bool
@@ -103,8 +143,13 @@ final class TypeCheck
         return $value->type === $constraint;
     }
 
-    private static function weakCoerceInPlace(Variable $dest, int $constraint, Variable $value, string $kind): void
-    {
+    private static function weakCoerceInPlace(
+        Variable $dest,
+        int $constraint,
+        Variable $value,
+        string $kind,
+        bool $propertyWrite = false
+    ): void {
         switch ($constraint) {
             case Variable::TYPE_INTEGER:
                 $dest->int(self::coerceToInt($value, $kind));
@@ -116,10 +161,18 @@ final class TypeCheck
                 $dest->bool(self::coerceToBool($value, $kind));
                 return;
             case Variable::TYPE_STRING:
+                if (Variable::TYPE_ARRAY === $value->type || Variable::TYPE_OBJECT === $value->type) {
+                    throw new \TypeError(self::strictMessage($constraint, $value, $kind));
+                }
                 $dest->string($value->toString());
                 return;
             case Variable::TYPE_ARRAY:
                 if (Variable::TYPE_ARRAY === $value->type) {
+                    return;
+                }
+                break;
+            case Variable::TYPE_NULL:
+                if (Variable::TYPE_NULL === $value->type) {
                     return;
                 }
                 break;
@@ -199,6 +252,44 @@ final class TypeCheck
                 throw new \TypeError("{$kind} must be of type bool, string given");
         }
         throw new \TypeError("{$kind} must be of type bool");
+    }
+
+    private static function typedSlotError(
+        Variable $target,
+        int $constraint,
+        Variable $value,
+        string $kind,
+        bool $propertyWrite
+    ): \TypeError {
+        if ($propertyWrite && 'Property' === $kind) {
+            return self::propertyTypeError($target, self::typeName($constraint), $value);
+        }
+
+        return new \TypeError(self::strictMessage($constraint, $value, $kind));
+    }
+
+    private static function propertyTypeError(
+        Variable $target,
+        string $expectedType,
+        Variable $value
+    ): \TypeError {
+        $owner = $target->objectPropertyOwner;
+        $propName = $target->objectPropertyName ?? 'property';
+        if (null !== $owner) {
+            return new \TypeError(sprintf(
+                'Cannot assign %s to property %s::$%s of type %s',
+                self::typeName($value->type),
+                $owner->class->name,
+                $propName,
+                $expectedType
+            ));
+        }
+
+        return new \TypeError(self::strictMessage(
+            $target->typeConstraint ?? Variable::TYPE_INTEGER,
+            $value,
+            'Property'
+        ));
     }
 
     private static function strictMessage(int $constraint, Variable $value, string $kind = 'Argument'): string

@@ -20,6 +20,9 @@ final class GeneratorHelper
 {
     public const TARGET_PROPERTY = '__generator_resume';
 
+    /** int64 property holding {@see __generator_state__*} bits (#3115). */
+    public const STATE_PROPERTY = '__generator_state';
+
     private static bool $typesRegistered = false;
 
     public static function ensureTypes(Context $context): void
@@ -79,7 +82,9 @@ final class GeneratorHelper
 
     public static function isGeneratorVariable(Variable $var): bool
     {
-        return null !== $var->generatorStatePtr;
+        return null !== $var->generatorStatePtr
+            || null !== $var->generatorResumeName
+            || $var->isJitGenerator;
     }
 
     /**
@@ -376,10 +381,17 @@ final class GeneratorHelper
         $obj = $context->type->object->allocate($classId);
         $context->type->object->markObjectConstructed($obj);
         self::storeResumeName($context, $obj, $resumeInternalName);
+        $stateBits = $context->builder->ptrtoint(
+            $statePtr,
+            $context->getTypeFromString('int64')
+        );
+        $stateBitsVar = new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $stateBits);
+        $context->type->object->storeInstanceProperty($obj, 'Generator', self::STATE_PROPERTY, $stateBitsVar);
 
         $var = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
         $var->generatorStatePtr = $statePtr;
         $var->generatorResumeName = $resumeInternalName;
+        $var->isJitGenerator = true;
 
         return $var;
     }

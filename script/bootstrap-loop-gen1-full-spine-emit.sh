@@ -12,8 +12,8 @@ source "$(dirname "$0")/php-env.sh"
 ci_apply_llvm_memory_env
 
 FULL_SPINE_ENTRY="test/selfhost/compiler_lib_spine_smoke/main.php"
-EMIT_ENTRY="test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php"
-EMIT_ENTRY_ABS="${ROOT}/test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php"
+EMIT_ENTRY="test/selfhost/compiler_helloworld_smoke/compile_driver.php"
+EMIT_ENTRY_ABS="${ROOT}/test/selfhost/compiler_helloworld_smoke/compile_driver.php"
 EMIT_HELPER="build/bootstrap-loop-gen1-full-spine-emit-helper"
 GEN2_OUT="build/bootstrap-loop-gen2-full-spine"
 

@@ -44,12 +44,12 @@ Supporting fixes from #1402:
 | `Compiler::compileIsset` / `compileCoalesce` / `resolveIsset` / `requireOperandSlot` | PHP CFG via `m3CompileDriverCompilerPhpLoweringSuffixes` (emit-TU chain parity on compile-driver link) |
 | `Compiler::compileGlobalConst` / `compileIncludeOp` / `compileSwitchAsJumpIfChain` | PHP CFG via `m3CompileDriverCompilerPhpLoweringSuffixes` (emit-TU chain parity on compile-driver link) |
 | `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |
-| `helloworld_compile_smoke` | Deny-listed for link (LLVM 9); compile_driver bundle keeps stub; runtime emit via `helloworld_m3_emit_native_entry.php` / `compile_smoke_m3_emit_native_entry.php` + `PHP_COMPILER_EMIT_HELPER_LINK=1` (#1768, #1983) |
+| `helloworld_compile_smoke` | Deny-listed for link (LLVM 9); compile_driver bundle keeps stub; runtime emit via `compiler_helloworld_smoke/compile_driver.php` / `compiler_compile_smoke/compile_driver.php` + `PHP_COMPILER_EMIT_HELPER_LINK=1` (#1768, #1983) |
 | Native emit runtime | `BOOTSTRAP_M3_RUNTIME_COMPILE=1` + `PHP_COMPILER_M3_EMIT_MINIMAL=1` skips eager `loadJitCompileModuleFuncs` during smoke emit |
 | `runtime_ctor_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_ctor_smoke.php`; int exit (#1514) |
 | `runtime_parse_compile_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_parse_compile_smoke.php` |
 
-**Runtime emit:** compile driver uses env dispatch (`PHP_COMPILER_M3_COMPILE_MODE=compile`, `PHP_COMPILER_M3_SOURCE`, `PHP_COMPILER_M3_OUT`) so AOT entry avoids top-level `__DIR__` concat (#1493). Probe with `BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1` links `compile_driver.php` with `PHP_COMPILER_M3_COMPILE_DRIVER=1` (not the separate emit-helper TU). With `BOOTSTRAP_M3_RUNTIME_COMPILE=1`, compile-driver **link** is OK; runtime still returns stubbed `helloworld_compile_smoke` (no `compile OK` stdout) until LLVM 9 real-lowering is safe. Separate `helloworld_m3_emit_native_entry.php` + `PHP_COMPILER_EMIT_HELPER_LINK=1` links intermittently but the emit binary segfaults in `internal_1` / `__string__separate` at startup (#1514).
+**Runtime emit:** compile driver uses env dispatch (`PHP_COMPILER_M3_COMPILE_MODE=compile`, `PHP_COMPILER_M3_SOURCE`, `PHP_COMPILER_M3_OUT`) so AOT entry avoids top-level `__DIR__` concat (#1493). Probe with `BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1` links `compile_driver.php` with `PHP_COMPILER_M3_COMPILE_DRIVER=1` (not the separate emit-helper TU). With `BOOTSTRAP_M3_RUNTIME_COMPILE=1`, compile-driver **link** is OK; runtime still returns stubbed `helloworld_compile_smoke` (no `compile OK` stdout) until LLVM 9 real-lowering is safe. Separate `compiler_helloworld_smoke/compile_driver.php` + `PHP_COMPILER_EMIT_HELPER_LINK=1` links intermittently but the emit binary segfaults in `internal_1` / `__string__separate` at startup (#1514).
 
 **Probe findings (2026-05):**
 

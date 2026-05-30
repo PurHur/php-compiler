@@ -162,7 +162,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `BOOTSTRAP_VM_UNIT_PROBE_GATE` | `0` | `ci-local.sh` (LLVM tail, after JIT unit probe) | `bootstrap-selfhost-vm-unit-probe.sh` — M3 `vm_unit_probe` native link (+ optional `BOOTSTRAP_VM_UNIT_PROBE_RUN=1` VM echo run) ([#2354](https://github.com/PurHur/php-compiler/issues/2354)); set `1` for opt-in gate; default-on follow-up [#2368](https://github.com/PurHur/php-compiler/issues/2368) |
 | `BOOTSTRAP_PARSER_UNIT_PROBE_GATE` | `1` | `ci-local.sh` (LLVM tail, after VM unit probe) | `bootstrap-selfhost-parser-unit-probe.sh` — M3 `parser_unit_probe` CFG parse front-end native link ([#2409](https://github.com/PurHur/php-compiler/issues/2409), opt-in wiring [#2417](https://github.com/PurHur/php-compiler/issues/2417), default-on [#2419](https://github.com/PurHur/php-compiler/issues/2419)); set `0` to skip during LLVM iteration |
 | `BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE` | `1` | `ci-local.sh` (LLVM tail, after parser unit probe) | `bootstrap-selfhost-types-unit-probe.sh` — M3 `types_unit_probe` native link + run ([#2430](https://github.com/PurHur/php-compiler/issues/2430), opt-in wiring [#2433](https://github.com/PurHur/php-compiler/issues/2433), default-on [#2436](https://github.com/PurHur/php-compiler/issues/2436)); set `0` to skip during LLVM iteration |
-| `BOOTSTRAP_M3_EMIT_TU_EXECUTE_GATE` | `0` | `ci-local.sh` (LLVM tail, after PHPTypes unit probe) | `vendor/bin/phpunit --group selfhost-m3-emit` via `bootstrap-m3-emit-tu-execute.sh` — `runtime_m3_emit_native_entry.php` link/compile/run ([#2444](https://github.com/PurHur/php-compiler/issues/2444)); set `1` for opt-in; default-on after [#2442](https://github.com/PurHur/php-compiler/issues/2442) green |
+| `BOOTSTRAP_M3_EMIT_TU_EXECUTE_GATE` | `0` | `ci-local.sh` (LLVM tail, after PHPTypes unit probe) | `vendor/bin/phpunit --group selfhost-m3-emit` via `bootstrap-m3-emit-tu-execute.sh` — `runtime_compile_smoke/compile_driver.php` link/compile/run ([#2444](https://github.com/PurHur/php-compiler/issues/2444)); set `1` for opt-in; default-on after [#2442](https://github.com/PurHur/php-compiler/issues/2442) green |
 | `CI_FAST_BOOTSTRAP` | `0` | `ci-fast.sh` | Optional llvm tail: bootstrap aot-lint + probe + wave-check when LLVM 9 present |
 | `JIT_PREFLIGHT_GATE` | `0` | `ci-fast.sh` | Early MCJIT probe after `composer install` ([#728](https://github.com/PurHur/php-compiler/issues/728)) |
 | `NORTH_STAR2_VERIFY_GATE` | `1` | `ci-fast.sh` | `./script/north-star2-verify.sh` presenter when script exists ([#1928](https://github.com/PurHur/php-compiler/issues/1928), [#2051](https://github.com/PurHur/php-compiler/issues/2051)); set `0` to opt out (no LLVM / doc-only iteration) |
@@ -311,12 +311,15 @@ Progressive ladder (VM serve → AOT execute → deploy CGI). VM serve smoke is 
 
 | Stage | Variable | Default | When enabled |
 |-------|----------|---------|--------------|
+| FastCGI PHPUnit adapter | `FASTCGI_SMOKE_GATE` | `0` | `FASTCGI_SMOKE_GATE=1 ./script/ci-local.sh --filter 'FastCgiRecordTest\|FastCgiTest'` ([#173](https://github.com/PurHur/php-compiler/issues/173), [#1899](https://github.com/PurHur/php-compiler/issues/1899)) |
+| FastCGI worker CLI | _(n/a)_ | — | `./phpc fcgi --project examples/009-FastCGIWeb` · `./phpc fcgi --help` ([#2427](https://github.com/PurHur/php-compiler/issues/2427)) |
 | VM health + PATH_INFO | `FASTCGI_WEB_SMOKE_GATE` | `0` | `make examples-fastcgiweb-smoke` · `ci-fast` when `=1` ([#2351](https://github.com/PurHur/php-compiler/issues/2351)) |
 | AOT execute | `FASTCGI_WEB_AOT_SMOKE_GATE` | `0` | `EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh` ([#2352](https://github.com/PurHur/php-compiler/issues/2352)) |
 | Deploy CGI | `FASTCGI_WEB_DEPLOY_SMOKE_GATE` | `0` | `FASTCGI_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all` ([#2359](https://github.com/PurHur/php-compiler/issues/2359)); `make examples-fastcgiweb-deploy-smoke` (009 only) |
 
 ```bash
 ./phpc doctor --gates | grep -E 'FASTCGI|009-FastCGIWeb'
+FASTCGI_SMOKE_GATE=1 ./script/ci-local.sh --filter 'FastCgiRecordTest|FastCgiTest'
 FASTCGI_WEB_SMOKE_GATE=1 make examples-fastcgiweb-smoke
 FASTCGI_WEB_SMOKE_GATE=1 ./script/examples-web-smoke.sh --fastcgi-only
 FASTCGI_WEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh

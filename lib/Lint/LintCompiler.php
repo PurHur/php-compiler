@@ -90,7 +90,7 @@ final class LintCompiler extends Compiler
         }
     }
 
-    protected function compileClassBody(CfgBlock $block, int $type): Block
+    protected function compileClassBody(CfgBlock $block, int $type, ?string $className = null): Block
     {
         $result = new Block($block);
         foreach ($block->children as $child) {

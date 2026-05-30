@@ -6,15 +6,8 @@ cd "${ROOT}"
 ENTRY="test/selfhost/bootstrap_loop_smoke/main.php"
 GEN1="build/bootstrap-loop-gen1"
 EMIT_HELPER="build/bootstrap-loop-gen1-compile"
-EMIT_ENTRY="test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php"
-EMIT_ENTRY_ABS="${ROOT}/test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php"
 # bootstrap_loop_smoke/compile_driver.php delegates here; link helloworld bundle directly (#2893).
 INVENTORY_EMIT_DRIVER="${ROOT}/test/selfhost/compiler_helloworld_smoke/compile_driver.php"
-# Inventory compile_driver emit-helper runtime segfaults at {main} (#2540); thin emit TU works.
-USE_INVENTORY_EMIT_DRIVER="${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER:-0}"
-if [[ "${BOOTSTRAP_M3_EMIT_HELPER_TU:-0}" == "1" ]]; then
-  USE_INVENTORY_EMIT_DRIVER=0
-fi
 GEN2_SOURCE="test/bootstrap-aot/compiler_smoke_standalone.php"
 GEN2_OUT="build/bootstrap-loop-gen2"
 GEN2_EXPECT_STDOUT_RE="compiler smoke"
@@ -86,8 +79,8 @@ export PHP_COMPILER_SELFHOST_AOT=1
 export PHP_COMPILER_JIT_PROGRESS_FILE="build/.last-jit-func-bootstrap-loop-gen1"
 rm -f "${GEN1}" "${EMIT_HELPER}" "${GEN2_OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}"
 
-if [[ ! -f "${EMIT_ENTRY}" ]]; then
-  echo "bootstrap-loop-gen1-link: missing ${ROOT}/${EMIT_ENTRY} (#1983)" >&2
+if [[ ! -f "${INVENTORY_EMIT_DRIVER}" ]]; then
+  echo "bootstrap-loop-gen1-link: missing ${INVENTORY_EMIT_DRIVER} (#3032)" >&2
   exit 1
 fi
 
@@ -96,25 +89,15 @@ if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   : "${BOOTSTRAP_M4_RUNTIME_COMPILE:=1}"
   m4_link_env=()
   m4_link_mode="stub"
-  m4_emit_entry="${EMIT_ENTRY}"
-  # Default REAL_LOWERING on when LINK_COMPILE_DRIVER=1 so emit helper links with
-  # PHP_COMPILER_M3_COMPILE_DRIVER (stub-only path always fails link — #2571).
   if [[ "${BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING:-${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}}" == "1" ]]; then
-    if [[ "${USE_INVENTORY_EMIT_DRIVER}" == "1" && -f "${INVENTORY_EMIT_DRIVER}" ]]; then
-      m4_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1 PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke)
-      m4_link_mode="inventory compile_driver (helloworld compile_driver, #2893)"
-      m4_emit_entry="${INVENTORY_EMIT_DRIVER}"
-    else
-      m4_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1)
-      m4_link_mode="selfhost M3 emit TU (compile_smoke_m3_emit_native_entry.php)"
-      # bin/compile.php bootstrap-aot gate matches /test/bootstrap-aot/ in normalized paths (#1983).
-      m4_emit_entry="${EMIT_ENTRY_ABS}"
-    fi
+    m4_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1 PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke)
+    m4_link_mode="inventory compile_driver (#3032)"
+    m4_emit_entry="${INVENTORY_EMIT_DRIVER}"
   else
     m4_link_env=(env PHP_COMPILER_SELFHOST_AOT=1)
     m4_link_mode="selfhost stubs (no PHP_COMPILER_M3_COMPILE_DRIVER)"
   fi
-  echo "==> link gen-1 emit helper (emit TU by default; BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 for inventory bisect)"
+  echo "==> link gen-1 emit helper (inventory compile_driver, #3032)"
   rm -f "${EMIT_HELPER}" "build/.last-jit-func-bootstrap-loop-gen1-emit"
   export PHP_COMPILER_JIT_PROGRESS_FILE="build/.last-jit-func-bootstrap-loop-gen1-emit"
   set +e
@@ -126,9 +109,7 @@ if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
     if [[ "${BOOTSTRAP_M4_RUNTIME_COMPILE:-1}" == "1" ]]; then
       set +e
       m4_run_env=(PHP_COMPILER_M3_COMPILE_MODE=compile PHP_COMPILER_M3_RUNTIME_COMPILE=1 PHP_COMPILER_M3_EMIT_MINIMAL=1 PHP_COMPILER_M3_SOURCE="${ROOT}/${GEN2_SOURCE}" PHP_COMPILER_M3_OUT="${ROOT}/${GEN2_OUT}")
-      if [[ "${USE_INVENTORY_EMIT_DRIVER}" == "1" ]]; then
-        m4_run_env+=(PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1)
-      fi
+      m4_run_env+=(PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1)
       compile_out="$(
         env "${m4_run_env[@]}" "./${EMIT_HELPER}" 2>&1
       )"

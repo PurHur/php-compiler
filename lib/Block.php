@@ -1001,9 +1001,9 @@ class Block {
      */
     public static function requiresVmLowering(?self $root): bool
     {
-        return self::containsFinallyOpcodes($root)
+        return self::containsGeneratorOpcodesInScriptScope($root)
+            || self::containsFinallyOpcodes($root)
             || self::containsExceptionHandlingOpcodes($root)
-            || self::containsGeneratorOpcodesInScriptScope($root)
             || self::containsArrayAccessObjectOpcodes($root)
             || self::containsDynamicStaticPropertyOpcodes($root);
     }

@@ -272,6 +272,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'magic_call_static')) {
                 continue;
             }
+            // Object foreach is VM-only until IteratorHelper gains Iterator protocol (#3234).
+            if (str_contains($name, 'foreach_iterator')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
