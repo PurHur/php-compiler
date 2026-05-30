@@ -1766,6 +1766,10 @@ class Compiler {
 
     protected function compileFunction(Op\Stmt\Function_ $function, Block $block): OpCode {
         $funcBlock = $this->compileCfgBlock($function->func->cfg, $function->func->params, $function->func);
+        // php-cfg may DCE unreachable yield after return; :Generator still implies generator (#3350).
+        if ($this->funcDeclReturnTypeIsGenerator($function->func)) {
+            $this->markFunctionGenerator($funcBlock);
+        }
         $operand = new Operand\Literal($function->func->name);
         $operand->type = Type::string();
         $return = new OpCode(
@@ -2535,6 +2539,23 @@ class Compiler {
                 $compiled->isGenerator = true;
             }
         }
+    }
+
+    protected function funcDeclReturnTypeIsGenerator(CfgFunc $func): bool
+    {
+        $returnType = $func->returnType;
+        if ($returnType instanceof Op\Type\Literal) {
+            return 'Generator' === $returnType->name;
+        }
+        if ($returnType instanceof Op\Type\Reference) {
+            $decl = $returnType->declaration;
+
+            return $decl instanceof Operand\Literal
+                && is_string($decl->value)
+                && 'Generator' === $decl->value;
+        }
+
+        return false;
     }
 
     /**
