@@ -504,6 +504,21 @@ restart:
         throw new \LogicException("Equals comparison between {$self->type} and {$other->type} not implemented");
     }
 
+    /**
+     * Zend compare_function: non-numeric strings compare as 0 against numbers (zend_operators.c).
+     */
+    private static function looseNumericFromString(string $s): int|float
+    {
+        if (!is_numeric($s)) {
+            return 0;
+        }
+        if (((string) (int) $s) === $s) {
+            return (int) $s;
+        }
+
+        return (float) $s;
+    }
+
     private function looseEqual(Variable $self, Variable $other): bool {
         if ($self->type === self::TYPE_NULL) {
             switch ($other->type) {
@@ -531,10 +546,16 @@ restart:
             return ($self->integer !== 0) === $other->bool;
         }
         if ($self->type === self::TYPE_STRING && $other->type === self::TYPE_INTEGER) {
-            return is_numeric($self->string) && (int) $self->string == $other->integer;
+            return $other->integer == self::looseNumericFromString($self->string);
         }
         if ($self->type === self::TYPE_INTEGER && $other->type === self::TYPE_STRING) {
-            return is_numeric($other->string) && $self->integer == (int) $other->string;
+            return $self->integer == self::looseNumericFromString($other->string);
+        }
+        if ($self->type === self::TYPE_STRING && $other->type === self::TYPE_FLOAT) {
+            return $other->float == self::looseNumericFromString($self->string);
+        }
+        if ($self->type === self::TYPE_FLOAT && $other->type === self::TYPE_STRING) {
+            return $self->float == self::looseNumericFromString($other->string);
         }
         if ($self->type === self::TYPE_STRING && $other->type === self::TYPE_BOOLEAN) {
             return $self->toBool() === $other->bool;
