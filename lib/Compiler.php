@@ -2007,7 +2007,9 @@ class Compiler {
             $propSlot = $this->compileOperand($propName, $block, true);
             $fetchTmp = new Temporary();
             $fetchSlot = $block->getVarSlot($fetchTmp, false);
-            $paramSlot = $this->compileOperand($param->result, $block, true);
+            // Param slot is already registered by compileParam(); do not mark as arg read or
+            // getFrame fails on method entry (callArgs holds $this only) (#3816).
+            $paramSlot = $this->compileOperand($param->result, $block, false);
             $block->addOpCode(new OpCode(
                 OpCode::TYPE_PROPERTY_FETCH,
                 $fetchSlot,
