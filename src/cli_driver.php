@@ -227,6 +227,7 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                     }
                     $includePath = (string) $argv[$i];
                     ++$i;
+                    $includePath = php_compiler_cli_resolve_user_path($includePath);
                     if (!is_file($includePath)) {
                         die("Could not open include file {$includePath}\n");
                     }
@@ -252,11 +253,12 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                         }
                         die("Unsupported bare argument {$opt}\n");
                     }
-                    if (! file_exists($opt)) {
+                    $scriptPath = php_compiler_cli_resolve_user_path($opt);
+                    if (! file_exists($scriptPath)) {
                         die("Could not open file {$opt}\n");
                     }
-                    $execCode = file_get_contents($opt);
-                    $execFile = $opt;
+                    $execCode = file_get_contents($scriptPath);
+                    $execFile = realpath($scriptPath) ?: $scriptPath;
             }
         }
         php_compiler_cli_note_progress('php:cli_dispatch_parse_done');

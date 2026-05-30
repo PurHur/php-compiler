@@ -25,17 +25,28 @@ final class AttributeRegistry
             $ft = $context->context->functionType($void, false, $i8p, $i8pp, $sizeT);
             $fn = $context->module->addFunction('phpc_attr_register_class_attrs', $ft);
             $context->registerFunction('phpc_attr_register_class_attrs', $fn);
+        } else {
+            $context->registerFunction(
+                'phpc_attr_register_class_attrs',
+                $context->module->getNamedFunction('phpc_attr_register_class_attrs')
+            );
         }
         if (null === $context->module->getNamedFunction('phpc_attr_register_method_attrs')) {
             $ft = $context->context->functionType($void, false, $i8p, $i8p, $i8pp, $sizeT);
             $fn = $context->module->addFunction('phpc_attr_register_method_attrs', $ft);
             $context->registerFunction('phpc_attr_register_method_attrs', $fn);
+        } else {
+            $context->registerFunction(
+                'phpc_attr_register_method_attrs',
+                $context->module->getNamedFunction('phpc_attr_register_method_attrs')
+            );
         }
     }
 
     /** @param list<string> $names */
     public static function emitRegisterClass(Context $context, string $classLc, array $names): void
     {
+        ReflectionRuntime::ensureLinked($context);
         self::registerDeclarations($context);
         if ([] === $names) {
             return;
@@ -52,6 +63,7 @@ final class AttributeRegistry
     /** @param list<string> $names */
     public static function emitRegisterMethod(Context $context, string $classLc, string $methodLc, array $names): void
     {
+        ReflectionRuntime::ensureLinked($context);
         self::registerDeclarations($context);
         if ([] === $names) {
             return;

@@ -146,6 +146,9 @@ class OpCode {
      */
     const TYPE_CLOSURE = 109;
 
+    /** Bare `throw;` in catch — rethrow active caught exception (#3508). */
+    const TYPE_RETHROW = 111;
+
     public int $type;
     public ?int $arg1;
     public ?int $arg2;
@@ -163,6 +166,8 @@ class OpCode {
     public array $attributeNames = [];
     /** Pipe-separated lowercase catch class names for TYPE_CATCH (#1362). */
     public ?string $catchTypes = null;
+    /** Pipe-separated lowercase class/interface names for union `instanceof` RHS (#3461). */
+    public ?string $instanceofUnionTypes = null;
 
     /**
      * Closure `use ($var)` metadata for TYPE_CLOSURE (issue #72).

@@ -74,4 +74,36 @@ PHP,
         }
         $this->fail('TYPE_DECLARE_CLASS not found');
     }
+
+    /** @covers issue #3467 */
+    public function testAllowDynamicPropertiesPermitsUndeclaredWrites(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+#[\AllowDynamicProperties]
+class C {}
+$o = new C;
+$o->dynamic = 'ok';
+echo $o->dynamic;
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'allow_dynamic.php'));
+        $this->assertSame('ok', ob_get_clean());
+    }
+
+    /** @covers issue #3467 */
+    public function testPlainClassRejectsUndeclaredWrites(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class D {}
+$d = new D;
+$d->x = 1;
+PHP;
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Undefined property access');
+        $runtime->run($runtime->parseAndCompile($code, 'no_dynamic.php'));
+    }
 }

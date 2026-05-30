@@ -53,6 +53,9 @@ class Frame {
     /** Set when TYPE_YIELD suspends; runFrames returns GENERATOR_YIELD. */
     public bool $generatorYield = false;
 
+    /** Exception object bound for bare `throw;` in this catch body (#3508). */
+    public ?Variable $activeCatchException = null;
+
     /**
      * Foreach iterator container cache keyed by scope slot.
      * php-cfg SSA temps may alias (issue #1885); ITER_* must not rely on rereading the slot.

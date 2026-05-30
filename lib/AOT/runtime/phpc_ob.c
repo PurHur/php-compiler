@@ -19,6 +19,8 @@ void __value__writeBool(struct __value__ *out, int value);
 void __value__writeString(struct __value__ *out, struct __string__ *str);
 struct __string__ *__string__init(long long len, const char *value);
 
+int __phpc_sapi_output_started = 0;
+
 static int ob_active_index(void)
 {
     return __phpc_ob_level > 0 ? __phpc_ob_level - 1 : -1;
@@ -29,6 +31,7 @@ static void ob_append_bytes(const char *data, size_t len)
     int idx = ob_active_index();
     if (idx < 0) {
         if (data && len > 0) {
+            __phpc_sapi_output_started = 1;
             fwrite(data, 1, len, stdout);
         }
         return;
@@ -136,4 +139,11 @@ int __phpc_ob_end_flush(struct __value__ *out)
     __phpc_ob_storage[idx][0] = '\0';
     __value__writeBool(out, 1);
     return 1;
+}
+
+volatile int __phpc_shutdown_registered = 0;
+
+void __phpc_shutdown_mark_registered(void)
+{
+    __phpc_shutdown_registered = 1;
 }
