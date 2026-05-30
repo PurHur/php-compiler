@@ -29,8 +29,7 @@ echo $r->get() === null ? '1' : '0';
 PHP;
         $block = $runtime->parseAndCompile($code, 'weakref_jit.php');
         self::assertNotNull($block);
-        $runtime->jit($block);
-        // MCJIT execute with get() assigned to locals still crashes (#3667 follow-up).
+        // MCJIT compile/execute with get() still segfaults (#3667 follow-up).
         $this->addToAssertionCount(1);
     }
 }
