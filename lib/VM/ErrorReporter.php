@@ -18,6 +18,7 @@ final class ErrorReporter
     public const E_USER_WARNING = 512;
     public const E_USER_NOTICE = 1024;
     public const E_USER_DEPRECATED = 16384;
+    public const E_DEPRECATED = 8192;
 
     private int $errorReporting;
     private bool $displayErrors;
@@ -221,6 +222,35 @@ final class ErrorReporter
             return;
         }
         $line = "Warning: {$message}";
+        if (null !== $file && '' !== $file) {
+            $line .= " in {$file}";
+        }
+        $line .= "\n";
+        if ($this->displayErrors) {
+            fwrite(STDERR, $line);
+        }
+    }
+
+    public function deprecatedDynamicProperty(
+        string $className,
+        string $propertyName,
+        ?string $file = null,
+        ?Context $context = null,
+        ?Frame $frame = null
+    ): void {
+        $message = sprintf(
+            'Creation of dynamic property %s::$%s is deprecated',
+            $className,
+            $propertyName
+        );
+        if (0 === ($this->errorReporting & self::E_DEPRECATED)) {
+            return;
+        }
+        $this->recordLastError(self::E_DEPRECATED, $message, $file, 0);
+        if ($this->dispatchUserHandler($context, $frame, self::E_DEPRECATED, $message, $file, 0)) {
+            return;
+        }
+        $line = "Deprecated: {$message}";
         if (null !== $file && '' !== $file) {
             $line .= " in {$file}";
         }
