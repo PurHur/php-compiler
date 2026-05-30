@@ -52,7 +52,7 @@ Runtime template `include` / `require` paths (for example `include __DIR__ . '/l
 }
 ```
 
-`phpc serve` registers a VM class autoloader from `autoload.psr-4` before compiling the entry script. `phpc lint --project` also lints PHP files under mapped directories. AOT project builds still require explicit `includes[]` until static discovery lands ([#155](https://github.com/PurHur/php-compiler/issues/155)).
+`phpc serve` registers a VM class autoloader from `autoload.psr-4` before compiling the entry script. `phpc lint --project` also lints PHP files under mapped directories. `phpc build --project` walks static class references (`new`, `extends`, `::class`, etc.) and adds matching PSR-4 paths to the link graph without hand-listed `includes[]` ([#1762](https://github.com/PurHur/php-compiler/issues/1762)); literal `require` paths from the entry still need `includes[]` when not reachable via autoload.
 
 ## Examples
 
