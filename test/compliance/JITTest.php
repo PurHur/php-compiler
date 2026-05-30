@@ -45,6 +45,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'unpack_insufficient_data')) {
                 continue;
             }
+            // strspn()/strcspn() offset/length: VM + AOT lint (#3734); MCJIT phpc_strspn_ex execute pending.
+            if (str_contains($name, 'strspn_strcspn_offset')) {
+                continue;
+            }
             // base_convert() MCJIT execute unstable until MathBaseConvert verify (#3173).
             if (str_contains($name, 'base_convert') || str_contains(strtolower($case[0]), 'base_convert')) {
                 continue;

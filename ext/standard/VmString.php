@@ -761,15 +761,48 @@ final class VmString
         return 0;
     }
 
-    public static function strspn(string $str, string $mask): int
+    /**
+     * @return array{0: int, 1: int} start offset and segment length (php_spn_common_handler)
+     */
+    private static function normalizeSpnBounds(int $strLen, int $start, ?int $length): array
+    {
+        $remainLen = $strLen;
+        if ($start < 0) {
+            $start += $remainLen;
+            if ($start < 0) {
+                $start = 0;
+            }
+        } elseif ($start > $remainLen) {
+            $start = $remainLen;
+        }
+        $remainLen -= $start;
+        if (null === $length) {
+            $length = $remainLen;
+        } elseif ($length < 0) {
+            $length += $remainLen;
+            if ($length < 0) {
+                $length = 0;
+            }
+        } elseif ($length > $remainLen) {
+            $length = $remainLen;
+        }
+
+        return [$start, $length];
+    }
+
+    public static function strspn(string $str, string $mask, int $offset = 0, ?int $length = null): int
     {
         if ('' === $mask) {
             throw new \ValueError('strspn(): Argument #2 ($characters) must not be empty');
         }
         $slen = self::byteLength($str);
         $mlen = self::byteLength($mask);
+        [$start, $len] = self::normalizeSpnBounds($slen, $offset, $length);
+        if (0 === $len) {
+            return 0;
+        }
         $count = 0;
-        for ($i = 0; $i < $slen; ++$i) {
+        for ($i = $start; $i < $start + $len; ++$i) {
             if (!self::byteInSet($str[$i], $mask, $mlen)) {
                 break;
             }
@@ -779,15 +812,19 @@ final class VmString
         return $count;
     }
 
-    public static function strcspn(string $str, string $mask): int
+    public static function strcspn(string $str, string $mask, int $offset = 0, ?int $length = null): int
     {
         if ('' === $mask) {
             throw new \ValueError('strcspn(): Argument #2 ($characters) must not be empty');
         }
         $slen = self::byteLength($str);
         $mlen = self::byteLength($mask);
+        [$start, $len] = self::normalizeSpnBounds($slen, $offset, $length);
+        if (0 === $len) {
+            return 0;
+        }
         $count = 0;
-        for ($i = 0; $i < $slen; ++$i) {
+        for ($i = $start; $i < $start + $len; ++$i) {
             if (self::byteInSet($str[$i], $mask, $mlen)) {
                 break;
             }
