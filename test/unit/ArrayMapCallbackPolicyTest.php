@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
+use PHPCompiler\JIT\Call\Native;
 use PHPCompiler\JIT\SelfHostBuiltinPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VMVariable;
@@ -43,6 +44,14 @@ final class ArrayMapCallbackPolicyTest extends TestCase
             false,
             null
         ));
+    }
+
+    public function testClosureCallbackWithProxyIsJitLowerable(): void
+    {
+        $callback = (new \ReflectionClass(JITVariable::class))->newInstanceWithoutConstructor();
+        $callback->closureCall = $this->createMock(Native::class);
+        $this->assertTrue(ArrayMapCallbackPolicy::isClosureJitLowerable($callback));
+        $this->assertTrue(ArrayMapCallbackPolicy::isJitLowerable($callback));
     }
 
     public function testVmSupportedTypes(): void

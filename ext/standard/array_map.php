@@ -24,8 +24,8 @@ use PHPLLVM\Value;
 /**
  * array_map() for list arrays with null or string builtin callbacks (subset of PHP).
  *
- * JIT/AOT: only null and compile-time string builtin names are lowered. Closures, arrow
- * functions, and [class, method] callables are deferred — see ArrayMapCallbackPolicy (#1154).
+ * JIT/AOT: null, compile-time string builtins, and closure/arrow callbacks with native int/double
+ * returns are lowered (issue #142). [class, method] and invokable object callables deferred (#1154).
  */
 final class array_map extends Internal
 {
@@ -89,6 +89,10 @@ final class array_map extends Internal
 
         if (!ArrayMapCallbackPolicy::isJitLowerable($args[0])) {
             throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
+        }
+
+        if (ArrayMapCallbackPolicy::isClosureJitLowerable($args[0])) {
+            return ArrayBuiltinHelper::buildMapArrayWithClosure($context, $args[0], $args[1]);
         }
 
         if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
