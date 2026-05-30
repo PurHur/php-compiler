@@ -116,6 +116,49 @@ final class GeneratorHelper
         return $points;
     }
 
+    private static function opcodeIndex(Block $block, OpCode $target): int
+    {
+        foreach ($block->opCodes as $i => $op) {
+            if ($op === $target) {
+                return $i;
+            }
+        }
+
+        throw new \LogicException('Generator resume point opcode missing from block');
+    }
+
+    /**
+     * @param list<array{kind: string, op: OpCode, block: Block}> $points
+     */
+    private static function resumePrefixStart(Block $block, array $points, int $pointIndex): int
+    {
+        if (0 === $pointIndex) {
+            return 0;
+        }
+        $prevOp = $points[$pointIndex - 1]['op'];
+
+        return self::opcodeIndex($block, $prevOp) + 1;
+    }
+
+    private static function compileYieldPrefix(
+        \PHPCompiler\JIT $jit,
+        \PHPLLVM\Value\Function_ $func,
+        Block $block,
+        int $startIndex,
+        int $yieldIdx,
+        \PHPLLVM\BasicBlock $caseBlock
+    ): void {
+        if ($startIndex >= $yieldIdx) {
+            return;
+        }
+        $context = $jit->context;
+        $savedStorage = $context->scope->blockStorage;
+        $context->scope->blockStorage = new \SplObjectStorage();
+        $exit = $jit->compileGeneratorResumePrefix($func, $block, $startIndex, $yieldIdx, $caseBlock);
+        $context->builder->positionAtEnd($exit);
+        $context->scope->blockStorage = $savedStorage;
+    }
+
     public static function compileResumeFunction(
         \PHPCompiler\JIT $jit,
         string $internalName,
@@ -168,7 +211,19 @@ final class GeneratorHelper
             $context->builder->positionAtEnd($caseBlocks[$i]);
             $point = $points[$i];
             $pointBlock = $point['block'];
+            $yieldIdx = self::opcodeIndex($pointBlock, $point['op']);
+            $prefixStart = self::resumePrefixStart($pointBlock, $points, $i);
             if ('yield' === $point['kind']) {
+                if ($prefixStart < $yieldIdx) {
+                    self::compileYieldPrefix(
+                        $jit,
+                        $func,
+                        $pointBlock,
+                        $prefixStart,
+                        $yieldIdx,
+                        $caseBlocks[$i]
+                    );
+                }
                 self::emitYieldPoint($jit, $pointBlock, $point['op'], $stateParam, $i + 1);
             } else {
                 self::emitYieldFromPoint(

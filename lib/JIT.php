@@ -4429,14 +4429,36 @@ class JIT {
         return false;
     }
 
+    /**
+     * Compile opcodes in [$startIndex, $limit) for generator resume prefix segments (#3074).
+     */
+    public function compileGeneratorResumePrefix(
+        PHPLLVM\Value\Function_ $func,
+        Block $block,
+        int $startIndex,
+        int $limit,
+        PHPLLVM\BasicBlock $entryBlock
+    ): PHPLLVM\BasicBlock {
+        return $this->compileBlockInternal(
+            $func,
+            $block,
+            $limit,
+            $entryBlock,
+            $startIndex,
+            true
+        );
+    }
+
     private function compileBlockInternal(
         PHPLLVM\Value $func,
         Block $block,
         ?int $limit = null,
         ?PHPLLVM\BasicBlock $entryBlock = null,
+        int $startIndex = 0,
+        bool $allowRecompile = false,
         Variable ...$args
     ): PHPLLVM\BasicBlock {
-        if ($this->context->scope->blockStorage->contains($block)) {
+        if (!$allowRecompile && $this->context->scope->blockStorage->contains($block)) {
             return $this->context->scope->blockStorage[$block];
         }
         if (null !== $block->func) {
@@ -4543,7 +4565,7 @@ class JIT {
             }
         }
 
-        for ($i = 0, $length = null !== $limit ? $limit : count($block->opCodes); $i < $length; $i++) {
+        for ($i = $startIndex, $length = null !== $limit ? $limit : count($block->opCodes); $i < $length; ++$i) {
             $op = $block->opCodes[$i];
             if (
                 null !== $block->func

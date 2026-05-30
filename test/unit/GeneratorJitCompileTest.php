@@ -223,5 +223,39 @@ PHP
         $this->assertArrayHasKey('outer', $context->generatorCreators);
         $this->addToAssertionCount(1);
     }
+
+    /**
+     * Resume cases compile prefix opcodes between yield points (assign before yield).
+     *
+     * @runInSeparateProcess
+     */
+    public function testComputedYieldPrefixForeachScriptVerifies(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+function gen(): Generator {
+    $x = 5;
+    yield $x;
+    $x = 10;
+    yield $x;
+}
+foreach (gen() as $v) {
+    echo $v;
+}
+PHP
+            ,
+            'generator_jit_computed_yield.php'
+        );
+        $this->assertNotNull($block);
+        $this->assertFalse(Block::requiresVmLowering($block));
+        $runtime->jitCompileBlock($block);
+        $context = $runtime->loadJitContext();
+        $verify = new \ReflectionMethod($context, 'compileCommon');
+        $verify->setAccessible(true);
+        $verify->invoke($context);
+        $this->assertArrayHasKey('gen', $context->generatorCreators);
+        $this->addToAssertionCount(1);
+    }
 }
 
