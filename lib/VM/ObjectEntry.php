@@ -37,6 +37,15 @@ class ObjectEntry {
     /** True until first property access or method call runs the lazy initializer. */
     public bool $lazyPending = false;
 
+    /** True for backed/unit enum case singleton objects (#3518). */
+    public bool $isEnumCase = false;
+
+    /** Case name as declared (`Active`), not lowercased. */
+    public ?string $enumCaseName = null;
+
+    /** Backed scalar for backed enums; null for unit enums (#3404). */
+    public ?Variable $enumCaseValue = null;
+
     public function __construct(ClassEntry $class) {
         $this->class = $class;
         $this->id = ++self::$counter;
@@ -79,6 +88,9 @@ class ObjectEntry {
     }
 
     public function getProperty(string $name): Variable {
+        if ($this->isEnumCase) {
+            return EnumCaseSupport::getProperty($this, $name);
+        }
         if (!isset($this->properties[$name])) {
             if (!$this->class->allowsDynamicProperties) {
                 throw new \LogicException("Undefined property access");
