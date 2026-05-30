@@ -7,7 +7,8 @@ declare(strict_types=1);
  * HTTP/1.1 dev server with MCJIT per script (issues #207, #2257).
  *
  * Compiles and JIT-links each PHP entry script once, then refreshes CGI superglobals
- * per request via Runtime::syncJitSuperglobals() before run().
+ * per request via Runtime::syncJitSuperglobals() before run(). When MCJIT compile fails
+ * for a script, falls back to VM for that script without stopping the server (#207).
  *
  * Usage: php bin/serve-jit.php [host:port] [docroot]
  * Example: php bin/serve-jit.php 127.0.0.1:8080 examples/001-SimpleWeb
@@ -41,10 +42,14 @@ $projectDir = ProjectManifest::resolveProjectDir($docrootArg);
 $manifest = null !== $projectDir ? ProjectManifest::loadManifest($projectDir) : null;
 $docroot = ProjectManifest::resolvePublicDir($docrootArg);
 
-/** @var array<string, array{0: Runtime, 1: ?Block}> */
-$jitCache = [];
-
-DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv) use (&$jitCache): array {
+/**
+ * @param array<string, array{mode: 'jit'|'vm', runtime: Runtime, block: Block}> $jitCache
+ */
+$executeScript = static function (
+    string $script,
+    array $cgiEnv,
+    array &$jitCache
+): array {
     ResponseContext::reset();
     VmSession::reset();
     OutputBuffer::reset();
@@ -71,23 +76,43 @@ DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv
         [$bootProjectDir, $bootManifest] = ProjectBootstrap::resolveFromScript($script);
         ProjectBootstrap::prepare($runtime, $bootProjectDir, $bootManifest);
         $block = $runtime->parseAndCompile($code, $script);
+        if (null === $block) {
+            throw new \RuntimeException('Could not compile script');
+        }
+
+        $mode = 'jit';
         try {
             $runtime->jit($block);
         } catch (\Throwable $e) {
-            throw new \RuntimeException('JIT compile failed: '.$e->getMessage(), 0, $e);
+            $mode = 'vm';
+            fwrite(
+                STDERR,
+                'serve-jit: JIT compile failed for '.$script.', falling back to VM: '.$e->getMessage()."\n"
+            );
         }
-        $jitCache[$cacheKey] = [$runtime, $block];
+        $jitCache[$cacheKey] = ['mode' => $mode, 'runtime' => $runtime, 'block' => $block];
     }
 
-    [$runtime, $block] = $jitCache[$cacheKey];
+    $entry = $jitCache[$cacheKey];
+    $runtime = $entry['runtime'];
+    $block = $entry['block'];
 
     ob_start();
     try {
-        $runtime->syncJitSuperglobals(
-            $cgiEnv['QUERY_STRING'] ?? null,
-            $cgiEnv['REQUEST_BODY'] ?? null,
-            $cgiEnv['SCRIPT_FILENAME'] ?? null
-        );
+        if ('jit' === $entry['mode']) {
+            $runtime->syncJitSuperglobals(
+                $cgiEnv['QUERY_STRING'] ?? null,
+                $cgiEnv['REQUEST_BODY'] ?? null,
+                $cgiEnv['SCRIPT_FILENAME'] ?? null
+            );
+        } else {
+            Superglobals::populateFromEnvironment(
+                $runtime->vmContext,
+                $cgiEnv['QUERY_STRING'] ?? '',
+                $cgiEnv['REQUEST_BODY'] ?? '',
+                $cgiEnv['SCRIPT_FILENAME'] ?? null
+            );
+        }
         $runtime->run($block);
         $output = ob_get_clean();
         if (VmSession::isActive()) {
@@ -123,4 +148,11 @@ DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv
     }
 
     return [$status, $contentType, $output, $responseHeaders];
+};
+
+/** @var array<string, array{mode: 'jit'|'vm', runtime: Runtime, block: Block}> */
+$jitCache = [];
+
+DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv) use (&$jitCache, $executeScript): array {
+    return $executeScript($script, $cgiEnv, $jitCache);
 }, $manifest, $projectDir);
