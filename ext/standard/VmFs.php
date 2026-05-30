@@ -513,6 +513,49 @@ final class VmFs
         return $path;
     }
 
+    /**
+     * stream_get_contents() — read remaining bytes (ext/standard/file.c, #3142).
+     *
+     * @return string|false
+     */
+    public static function streamGetContents(int $handle, int $maxlength = -1, int $offset = -1)
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        if ($offset < -1) {
+            return false;
+        }
+        if ($offset >= 0 && 0 !== @\fseek($fp, $offset, \SEEK_SET)) {
+            return false;
+        }
+        if ($maxlength < 0) {
+            $data = @\stream_get_contents($fp);
+        } elseif (0 === $maxlength) {
+            return '';
+        } else {
+            $data = @\stream_get_contents($fp, $maxlength);
+        }
+        if (false === $data) {
+            return false;
+        }
+
+        return $data;
+    }
+
+    /**
+     * get_resource_type() for fopen() stream handles (#3142).
+     */
+    public static function getResourceType(int $handle): ?string
+    {
+        if (!isset(self::$handles[$handle])) {
+            return null;
+        }
+
+        return 'stream';
+    }
+
     public static function isValidHandle(int $handle): bool
     {
         return isset(self::$handles[$handle]);

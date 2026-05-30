@@ -289,6 +289,24 @@ class Type extends Builtin {
         $fntypeFseek = $this->context->context->functionType($i64, false, $i64, $i64, $i64);
         $fnFseek = $this->context->module->addFunction('__compiler_fseek', $fntypeFseek);
         $this->context->registerFunction('__compiler_fseek', $fnFseek);
+        $fntypeStreamGetContents = $this->context->context->functionType(
+            $strPtr,
+            false,
+            $i64,
+            $i64,
+            $i64
+        );
+        $fnStreamGetContents = $this->context->module->addFunction(
+            '__compiler_stream_get_contents',
+            $fntypeStreamGetContents
+        );
+        $this->context->registerFunction('__compiler_stream_get_contents', $fnStreamGetContents);
+        $fntypeGetResourceType = $this->context->context->functionType($strPtr, false, $i64);
+        $fnGetResourceType = $this->context->module->addFunction(
+            '__compiler_get_resource_type',
+            $fntypeGetResourceType
+        );
+        $this->context->registerFunction('__compiler_get_resource_type', $fnGetResourceType);
         $fntypeMkdir = $this->context->context->functionType(
             $i32,
             false,

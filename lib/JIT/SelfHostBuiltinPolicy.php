@@ -92,6 +92,8 @@ final class SelfHostBuiltinPolicy
         'fputcsv' => 'filesystem',
         'ftell' => 'filesystem', 'fseek' => 'filesystem', 'fclose' => 'filesystem', 'flock' => 'filesystem',
         'is_resource' => 'filesystem',
+        'get_resource_type' => 'filesystem',
+        'stream_get_contents' => 'filesystem',
         'feof' => 'filesystem', 'fflush' => 'filesystem', 'rewind' => 'filesystem', 'fpassthru' => 'filesystem',
         'pathinfo' => 'filesystem', 'readfile' => 'filesystem', 'readlink' => 'filesystem', 'rename' => 'filesystem',
         'is_uploaded_file' => 'filesystem', 'move_uploaded_file' => 'filesystem', 'touch' => 'filesystem',

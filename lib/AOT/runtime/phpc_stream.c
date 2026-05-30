@@ -539,3 +539,89 @@ __hashtable__ *__compiler_fgetcsv(
         return result;
     }
 }
+
+static __string__ *phpc_read_stream_bytes(FILE *fp, int64_t maxlength)
+{
+    char chunk[4096];
+    char *buf = NULL;
+    size_t len = 0;
+    size_t cap = 0;
+    __string__ *result;
+
+    while (maxlength < 0 || (int64_t) len < maxlength) {
+        size_t to_read = sizeof(chunk);
+        if (maxlength >= 0) {
+            int64_t remaining = maxlength - (int64_t) len;
+            if (remaining <= 0) {
+                break;
+            }
+            if ((size_t) remaining < to_read) {
+                to_read = (size_t) remaining;
+            }
+        }
+        size_t got = fread(chunk, 1, to_read, fp);
+        if (0 == got) {
+            if (ferror(fp)) {
+                free(buf);
+
+                return NULL;
+            }
+            break;
+        }
+        if (len + got + 1 > cap) {
+            size_t new_cap = cap < 4096 ? 4096 : cap * 2;
+            while (len + got + 1 > new_cap) {
+                new_cap *= 2;
+            }
+            char *grown = (char *) realloc(buf, new_cap);
+            if (NULL == grown) {
+                free(buf);
+
+                return NULL;
+            }
+            buf = grown;
+            cap = new_cap;
+        }
+        memcpy(buf + len, chunk, got);
+        len += got;
+    }
+    if (0 == len) {
+        free(buf);
+
+        return __string__init(0, "");
+    }
+    result = __string__init((long long) len, buf);
+    free(buf);
+
+    return result;
+}
+
+__string__ *__compiler_stream_get_contents(int64_t handle, int64_t maxlength, int64_t offset)
+{
+    FILE *fp;
+
+    if (offset < -1) {
+        return NULL;
+    }
+    fp = phpc_resolve_stream(handle);
+    if (NULL == fp) {
+        return NULL;
+    }
+    if (offset >= 0 && 0 != fseek(fp, (long) offset, SEEK_SET)) {
+        return NULL;
+    }
+    if (0 == maxlength) {
+        return __string__init(0, "");
+    }
+
+    return phpc_read_stream_bytes(fp, maxlength);
+}
+
+__string__ *__compiler_get_resource_type(int64_t handle)
+{
+    if (0 == __compiler_is_resource(handle)) {
+        return NULL;
+    }
+
+    return __string__init(6, "stream");
+}

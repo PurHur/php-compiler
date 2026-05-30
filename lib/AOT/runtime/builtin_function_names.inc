@@ -139,6 +139,7 @@ static const char *phpc_builtin_functions[] = {
     "getdate",
     "getenv",
     "gethostname",
+    "get_resource_type",
     "getmypid",
     "getrusage",
     "gettype",
@@ -314,6 +315,7 @@ static const char *phpc_builtin_functions[] = {
     "strcmp",
     "strcspn",
     "stream_context_create",
+    "stream_get_contents",
     "strip_tags",
     "stripos",
     "stripslashes",
@@ -366,4 +368,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 358;
+static const size_t phpc_builtin_functions_count = 367;
