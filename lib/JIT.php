@@ -4890,9 +4890,16 @@ class JIT {
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
                 case OpCode::TYPE_INSTANCEOF:
+                    $expr = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $unionEncoded = $op->instanceofUnionTypes;
+                    if (null !== $unionEncoded && '' !== $unionEncoded) {
+                        $types = array_values(array_filter(explode('|', $unionEncoded), static fn (string $t): bool => '' !== $t));
+                        $result = $this->context->type->object->emitInstanceOfUnion($expr, $types);
+                        $this->assignOperand($block->getOperand($op->arg1), $result);
+                        break;
+                    }
                     $classOp = $block->getOperand($op->arg3);
                     assert($classOp instanceof Operand\Literal);
-                    $expr = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $result = $this->context->type->object->emitInstanceOf($expr, $classOp->value);
                     $this->assignOperand($block->getOperand($op->arg1), $result);
                     break;

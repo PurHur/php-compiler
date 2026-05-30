@@ -1838,6 +1838,32 @@ class Object_ extends Type {
     }
 
     /**
+     * @param list<string> $classNames
+     */
+    public function emitInstanceOfUnion(Variable $expr, array $classNames): Variable
+    {
+        $i1 = $this->context->getTypeFromString('int1');
+        $acc = $i1->constInt(0, false);
+        foreach ($classNames as $name) {
+            if ('' === $name) {
+                continue;
+            }
+            $check = $this->emitInstanceOf($expr, $name);
+            $bool = Variable::TYPE_NATIVE_BOOL === $check->type
+                ? $check->value
+                : $this->context->helper->loadValue($check);
+            $acc = $this->context->builder->or($acc, $bool);
+        }
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_BOOL,
+            Variable::KIND_VALUE,
+            $acc
+        );
+    }
+
+    /**
      * @param array{type: int, value: int|float|bool|string|null} $entry
      */
     private function jitConstantFromEntry(array $entry): Variable

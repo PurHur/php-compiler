@@ -3339,12 +3339,50 @@ class Compiler {
      */
     protected function compileInstanceOf(Op\Expr\InstanceOf_ $expr, Block $block): array
     {
+        $union = $expr->classUnion ?? null;
+        if ($union instanceof Op\Type\Union_) {
+            $names = $this->instanceofUnionNamesFromCfgType($union);
+            $op = new OpCode(
+                OpCode::TYPE_INSTANCEOF,
+                $this->compileOperand($expr->result, $block, false),
+                $this->compileOperand($expr->expr, $block, true),
+                null
+            );
+            $op->instanceofUnionTypes = $this->encodeCatchTypeList($names);
+
+            return [$op];
+        }
+
         return [new OpCode(
             OpCode::TYPE_INSTANCEOF,
             $this->compileOperand($expr->result, $block, false),
             $this->compileOperand($expr->expr, $block, true),
             $this->compileOperand($expr->class, $block, true)
         )];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function instanceofUnionNamesFromCfgType(Op\Type\Union_ $union): array
+    {
+        $invalid = ['int', 'string', 'float', 'bool', 'array', 'callable', 'iterable', 'object', 'mixed', 'never', 'void', 'null'];
+        $names = [];
+        foreach ($union->types as $type) {
+            if (!$type instanceof Op\Type\Literal) {
+                $this->throwCompileLogic('instanceof union type members must be class or interface names');
+            }
+            $name = $type->name;
+            if (in_array(strtolower($name), $invalid, true)) {
+                $this->throwCompileLogic('Type '.$name.' cannot be used in instanceof');
+            }
+            $names[] = $name;
+        }
+        if (count($names) < 2) {
+            $this->throwCompileLogic('instanceof union requires at least two class or interface names');
+        }
+
+        return $names;
     }
 
     /**

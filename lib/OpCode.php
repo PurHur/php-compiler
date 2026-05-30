@@ -166,6 +166,8 @@ class OpCode {
     public array $attributeNames = [];
     /** Pipe-separated lowercase catch class names for TYPE_CATCH (#1362). */
     public ?string $catchTypes = null;
+    /** Pipe-separated lowercase class/interface names for union `instanceof` RHS (#3461). */
+    public ?string $instanceofUnionTypes = null;
 
     /**
      * Closure `use ($var)` metadata for TYPE_CLOSURE (issue #72).
