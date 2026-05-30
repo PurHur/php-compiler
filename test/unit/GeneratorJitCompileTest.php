@@ -187,5 +187,41 @@ PHP
         $this->assertArrayHasKey('outer', $context->generatorCreators);
         $this->addToAssertionCount(1);
     }
+
+    /**
+     * @runInSeparateProcess
+     */
+    public function testDynamicYieldFromGeneratorForeachScriptVerifies(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+function inner(): Generator {
+    yield 1;
+    yield 2;
+}
+function outer(): Generator {
+    $g = inner();
+    yield from $g;
+    yield 3;
+}
+foreach (outer() as $v) {
+    echo $v;
+}
+PHP
+            ,
+            'generator_jit_dyn_yield_from.php'
+        );
+        $this->assertNotNull($block);
+        $this->assertFalse(Block::requiresVmLowering($block));
+        $runtime->jitCompileBlock($block);
+        $context = $runtime->loadJitContext();
+        $verify = new \ReflectionMethod($context, 'compileCommon');
+        $verify->setAccessible(true);
+        $verify->invoke($context);
+        $this->assertArrayHasKey('inner', $context->generatorCreators);
+        $this->assertArrayHasKey('outer', $context->generatorCreators);
+        $this->addToAssertionCount(1);
+    }
 }
 

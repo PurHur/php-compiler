@@ -91,16 +91,16 @@ final class GeneratorHelper
     }
 
     /**
-     * @return list<array{kind: string, op: OpCode}>
+     * @return list<array{kind: string, op: OpCode, block: Block}>
      */
     public static function collectResumePoints(Block $block): array
     {
         $points = [];
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_YIELD === $op->type) {
-                $points[] = ['kind' => 'yield', 'op' => $op];
+                $points[] = ['kind' => 'yield', 'op' => $op, 'block' => $block];
             } elseif (OpCode::TYPE_YIELD_FROM === $op->type) {
-                $points[] = ['kind' => 'yield_from', 'op' => $op];
+                $points[] = ['kind' => 'yield_from', 'op' => $op, 'block' => $block];
             } elseif (OpCode::TYPE_RETURN === $op->type || OpCode::TYPE_RETURN_VOID === $op->type) {
                 break;
             } elseif (
@@ -167,12 +167,13 @@ final class GeneratorHelper
         for ($i = 0; $i < $n; ++$i) {
             $context->builder->positionAtEnd($caseBlocks[$i]);
             $point = $points[$i];
+            $pointBlock = $point['block'];
             if ('yield' === $point['kind']) {
-                self::emitYieldPoint($jit, $block, $point['op'], $stateParam, $i + 1);
+                self::emitYieldPoint($jit, $pointBlock, $point['op'], $stateParam, $i + 1);
             } else {
                 self::emitYieldFromPoint(
                     $jit,
-                    $block,
+                    $pointBlock,
                     $point['op'],
                     $stateParam,
                     $i
@@ -329,10 +330,12 @@ final class GeneratorHelper
 
         $context->builder->positionAtEnd($initBb);
         $containerVar = $jit->compileGeneratorYieldFromSetup($fn, $block, $initBb, $op, $innerResumeName);
-        if (null !== $innerResumeName) {
-            if (!self::isGeneratorVariable($containerVar) || null === $containerVar->generatorStatePtr) {
-                throw new \LogicException('yield from generator call did not produce a JIT Generator (issue #3074)');
-            }
+        $effectiveResumeName = $innerResumeName ?? $containerVar->generatorResumeName;
+        if (
+            null !== $effectiveResumeName
+            && self::isGeneratorVariable($containerVar)
+            && null !== $containerVar->generatorStatePtr
+        ) {
             $innerState = $containerVar->generatorStatePtr;
             $context->builder->store(
                 self::castGeneratorStateToHtPtr($context, $innerState),
@@ -373,14 +376,14 @@ final class GeneratorHelper
         $context->builder->branchIf($isGen, $genIterBb, $arrayIterBb);
 
         $context->builder->positionAtEnd($genIterBb);
-        if (null !== $innerResumeName) {
+        if (null !== $effectiveResumeName) {
             self::emitYieldFromGeneratorIter(
                 $context,
                 $stateParam,
                 $htField,
                 $activeField,
                 $isGenField,
-                $innerResumeName,
+                $effectiveResumeName,
                 $resumeIp,
                 $fn
             );

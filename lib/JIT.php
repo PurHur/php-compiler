@@ -4392,9 +4392,7 @@ class JIT {
             throw new \LogicException('yield from opcode not found in generator block');
         }
         if (
-            null !== $innerResumeName
-            && $yfIdx > 0
-            && JIT\GeneratorHelper::prefixOpcodesSafeForYieldFromInit($block, $yfIdx)
+            $this->generatorYieldFromPrefixNeedsCompile($block, $yfIdx, $innerResumeName)
         ) {
             $savedStorage = $this->context->scope->blockStorage;
             $this->context->scope->blockStorage = new \SplObjectStorage();
@@ -4407,6 +4405,28 @@ class JIT {
         }
 
         return $this->context->getVariableFromOp($block->getOperand($yieldFromOp->arg2));
+    }
+
+    /**
+     * Compile prefix opcodes before yield from when the container is produced by call/assign (#3074).
+     * Inline array literals keep the prior path (container read without prefix compileBlockInternal).
+     */
+    private function generatorYieldFromPrefixNeedsCompile(Block $block, int $yfIdx, ?string $innerResumeName): bool
+    {
+        if (null !== $innerResumeName) {
+            return true;
+        }
+        if ($yfIdx <= 0 || !JIT\GeneratorHelper::prefixOpcodesSafeForYieldFromInit($block, $yfIdx)) {
+            return false;
+        }
+        for ($i = 0; $i < $yfIdx; ++$i) {
+            $type = $block->opCodes[$i]->type;
+            if (OpCode::TYPE_FUNCCALL_INIT === $type || OpCode::TYPE_ASSIGN === $type) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function compileBlockInternal(
