@@ -28,6 +28,8 @@ final class BuiltinParamNames
                 return ['function', 'parameter'];
             case 'headers_sent':
                 return ['file', 'line'];
+            case 'touch':
+                return ['filename', 'time', 'atime'];
         }
 
         return null;

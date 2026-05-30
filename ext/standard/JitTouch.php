@@ -12,13 +12,14 @@ use PHPLLVM\Value;
 final class JitTouch
 {
     /** @return Value */
-    public static function invoke(Context $context, Value $pathStr, Value $mtimeLong): Value
+    public static function invoke(Context $context, Value $pathStr, Value $mtimeLong, Value $atimeLong): Value
     {
         $i32 = $context->getTypeFromString('int32');
         $ret = $context->builder->call(
             $context->lookupFunction('__compiler_touch'),
             $pathStr,
-            $mtimeLong
+            $mtimeLong,
+            $atimeLong
         );
         $one = $i32->constInt(1, false);
 

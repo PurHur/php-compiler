@@ -326,6 +326,7 @@ class Type extends Builtin {
             $i32,
             false,
             $this->context->getTypeFromString('__string__*'),
+            $i64,
             $i64
         );
         $fnTouch = $this->context->module->addFunction('__compiler_touch', $fntypeTouch);
