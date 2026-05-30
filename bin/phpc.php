@@ -14,6 +14,7 @@ declare(strict_types=1);
  *   phpc run --project [dir] [--cgi-env KEY=VAL] [--cgi-env-file path] [--deploy-root dist]
  *   phpc build [-o outfile] entry.php
  *   phpc build --project [dir] [--dry-run]     AOT compile from phpc.json entry/binary
+ *   phpc build --project [dir] [--jit] [-o out]  Emit JIT launcher (bin/jit.php entry; #1801)
  *   phpc build --project [dir] [--list-units]  Grep-friendly entry/units/binary summary (no LLVM)
  *   phpc build --project [dir] [--print-includes]  Manifest link order (no LLVM)
  *   phpc build --project [dir] [--probe]       After link, fail when execute stdout is empty (#792)
@@ -54,6 +55,8 @@ php-compiler CLI
       --require-nonempty-stdout                Exit 2 when stdout is empty (AOT debug #772)
   phpc build [-o out] <entry.php>               AOT compile to a native binary
   phpc build --project [dir] [--dry-run]        Build from phpc.json entry + binary paths
+      --jit                                     Emit executable JIT launcher (not AOT link; #1801)
+      -o <path>                                 Output path (AOT binary or JIT launcher)
       --dry-run                                 List entry + includes graph; exit before LLVM
       --list-units                              Print entry, units, binary on stderr; no LLVM (#847)
       --print-includes                          Print includes[] then entry (absolute paths); no LLVM
@@ -183,26 +186,50 @@ switch ($command) {
             $printIncludes = false;
             $probe = false;
             $verbose = false;
+            $jit = false;
+            $outputPath = null;
             $projectDir = '.';
-            foreach ($args as $arg) {
+            $i = 0;
+            $argc = count($args);
+            while ($i < $argc) {
+                $arg = $args[$i];
                 if ('--dry-run' === $arg) {
                     $dryRun = true;
+                    ++$i;
                     continue;
                 }
                 if ('--list-units' === $arg) {
                     $listUnits = true;
+                    ++$i;
                     continue;
                 }
                 if ('--print-includes' === $arg) {
                     $printIncludes = true;
+                    ++$i;
                     continue;
                 }
                 if ('--probe' === $arg) {
                     $probe = true;
+                    ++$i;
                     continue;
                 }
                 if ('--verbose' === $arg) {
                     $verbose = true;
+                    ++$i;
+                    continue;
+                }
+                if ('--jit' === $arg) {
+                    $jit = true;
+                    ++$i;
+                    continue;
+                }
+                if ('-o' === $arg || '--output' === $arg) {
+                    if ($i + 1 >= $argc) {
+                        fwrite(STDERR, "phpc build --project: missing value for {$arg}\n");
+                        exit(1);
+                    }
+                    $outputPath = $args[$i + 1];
+                    $i += 2;
                     continue;
                 }
                 if (str_starts_with($arg, '-')) {
@@ -210,6 +237,11 @@ switch ($command) {
                     exit(1);
                 }
                 $projectDir = $arg;
+                ++$i;
+            }
+            if ($jit && $probe) {
+                fwrite(STDERR, "phpc build --project: --jit and --probe are mutually exclusive\n");
+                exit(1);
             }
             if (!is_file($repoRoot.'/vendor/autoload.php')) {
                 fwrite(STDERR, "phpc build --project: run composer install first\n");
@@ -223,7 +255,25 @@ switch ($command) {
             if ($listUnits) {
                 exit(\PHPCompiler\Cli\PhpcBuild::printListUnits($projectDir));
             }
-            exit(buildFromProject($repoRoot, $php, $projectDir, $dryRun, $verbose, $probe));
+            if ($jit) {
+                if ($dryRun) {
+                    exit(\PHPCompiler\Cli\PhpcBuild::preflightProjectJit($projectDir));
+                }
+                $verbose = \PHPCompiler\Cli\PhpcBuild::verboseEnabled($verbose);
+                if ($verbose) {
+                    \PHPCompiler\Cli\PhpcBuild::emitVerboseProjectGraph($projectDir);
+                }
+                $result = \PHPCompiler\Cli\PhpcBuild::buildProjectJit(
+                    $repoRoot,
+                    $projectDir,
+                    $outputPath,
+                    $verbose
+                );
+                \PHPCompiler\Cli\PhpcBuild::emitJitBuildOutput($result, $verbose);
+
+                exit($result['exit']);
+            }
+            exit(buildFromProject($repoRoot, $php, $projectDir, $dryRun, $verbose, $probe, $outputPath));
         }
         if ([] === $args) {
             fwrite(STDERR, "phpc build: missing entry.php (or use: phpc build --project [dir])\n");
@@ -494,7 +544,8 @@ function buildFromProject(
     string $projectDir,
     bool $dryRun = false,
     bool $verbose = false,
-    bool $probe = false
+    bool $probe = false,
+    ?string $outputOverride = null
 ): int {
     if (!is_file($repoRoot.'/vendor/autoload.php')) {
         fwrite(STDERR, "phpc build --project: run composer install first\n");
@@ -518,7 +569,9 @@ function buildFromProject(
     }
 
     $entry = \PHPCompiler\Web\ProjectManifest::resolveEntryPath($projectDir);
-    $output = \PHPCompiler\Web\ProjectManifest::resolveBinaryOutputPath($projectDir);
+    $output = null !== $outputOverride && '' !== $outputOverride
+        ? \PHPCompiler\Cli\InvokeCwd::resolve($outputOverride)
+        : \PHPCompiler\Web\ProjectManifest::resolveBinaryOutputPath($projectDir);
     if (null === $entry || null === $output) {
         fwrite(STDERR, "phpc build --project: could not resolve entry or binary from phpc.json\n");
         return 1;
