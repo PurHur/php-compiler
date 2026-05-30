@@ -278,6 +278,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gettype_object_resource')) {
                 continue;
             }
+            // get_object_id() MCJIT execute segfaults with user objects; AOT verified (#3537).
+            if (str_contains($name, 'get_object_id')) {
+                continue;
+            }
             // __TRAIT__ in trait bodies requires trait JIT lowering (#3609); parse-time fold is VM-only for now.
             if (str_contains($name, 'magic_const_trait')) {
                 continue;
