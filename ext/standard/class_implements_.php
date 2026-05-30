@@ -36,7 +36,7 @@ final class class_implements_ extends Internal
         $autoload = true;
         if ($argc >= 2) {
             $flag = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOL !== $flag->type) {
+            if (Variable::TYPE_BOOLEAN !== $flag->type) {
                 throw new \LogicException('class_implements() autoload flag must be a boolean in this compiler build');
             }
             $autoload = $flag->toBool();
