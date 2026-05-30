@@ -173,6 +173,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'coalesce_assign_jit')) {
                 continue;
             }
+            // Chained ?? MCJIT: VM-only until nested coalesce JIT (#3798).
+            if (str_contains($name, 'coalesce_chain')) {
+                continue;
+            }
             // string/number loose == juggling is VM-only until ArrayBuiltinHelper string-long compare (#3644).
             if (str_contains($name, 'loose_numeric_string')) {
                 continue;
