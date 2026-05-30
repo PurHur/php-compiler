@@ -367,6 +367,13 @@ class Type extends Builtin {
         $fnPhpUname = $this->context->module->addFunction('__compiler_php_uname', $fntypePhpUname);
         $this->context->registerFunction('__compiler_php_uname', $fnPhpUname);
         $i64 = $this->context->getTypeFromString('int64');
+        $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $fntypeHrtimeNs = $this->context->context->functionType($i64, false);
+        $fnHrtimeNs = $this->context->module->addFunction('__compiler_hrtime_ns', $fntypeHrtimeNs);
+        $this->context->registerFunction('__compiler_hrtime_ns', $fnHrtimeNs);
+        $fntypeHrtimePair = $this->context->context->functionType($htPtr, false);
+        $fnHrtimePair = $this->context->module->addFunction('__compiler_hrtime_pair', $fntypeHrtimePair);
+        $this->context->registerFunction('__compiler_hrtime_pair', $fnHrtimePair);
         $fntypePasswordHash = $this->context->context->functionType($strPtr, false, $strPtr, $i64);
         $fnPasswordHash = $this->context->module->addFunction('__compiler_password_hash', $fntypePasswordHash);
         $this->context->registerFunction('__compiler_password_hash', $fnPasswordHash);

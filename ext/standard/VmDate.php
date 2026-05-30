@@ -39,6 +39,14 @@ final class VmDate
         return \microtime($asFloat);
     }
 
+    /**
+     * @return int|array{0: int, 1: int}
+     */
+    public static function hrtime(bool $asNumber = false)
+    {
+        return \hrtime($asNumber);
+    }
+
     public static function getdate(?int $timestamp = null): HashTable
     {
         $raw = \getdate($timestamp ?? self::time());

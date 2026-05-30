@@ -31,6 +31,7 @@ final class SelfHostBuiltinPolicy
         'is_numeric' => 'numeric',
         'time' => 'numeric',
         'microtime' => 'numeric',
+        'hrtime' => 'numeric',
         'getdate' => 'numeric',
         'uniqid' => 'numeric',
         'getmypid' => 'numeric',
