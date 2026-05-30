@@ -4,10 +4,13 @@ language: magic methods __get __call __toString combined (issue #146)
 <?php
 class M {
     function __get(string $k): string {
-        return $k;
+        return "get:$k";
+    }
+    function __set(string $k, mixed $v): void {
+        echo "set:$k=$v\n";
     }
     function __call(string $name, array $args): string {
-        return $name;
+        return "call:$name";
     }
     function __toString(): string {
         return 'M';
@@ -15,9 +18,11 @@ class M {
 }
 $m = new M;
 echo $m->foo, "\n";
-echo $m->bar('x'), "\n";
+$m->bar = 1;
+echo $m->baz('x'), "\n";
 echo $m, "\n";
 --EXPECT--
-foo
-bar
+get:foo
+set:bar=1
+call:baz
 M
