@@ -48,7 +48,10 @@ class Module extends ModuleAbstract
             new deg2rad(),
             new rad2deg(),
             new log(),
+            new log10(),
             new exp(),
+            new expm1(),
+            new log1p(),
             new sin(),
             new cos(),
             new tan(),
@@ -59,6 +62,9 @@ class Module extends ModuleAbstract
             new hypot(),
             new atan2(),
             new fmod(),
+            new modf(),
+            new ldexp(),
+            new frexp(),
             new fdiv(),
             new intval(),
             new floatval(),
@@ -643,7 +649,7 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('fabs', $ft);
             $context->registerFunction('fabs', $fn);
         }
-        foreach (['ceil', 'floor', 'round', 'sqrt', 'log', 'exp', 'sin', 'cos', 'tan', 'pow', 'hypot', 'atan2', 'fmod'] as $name) {
+        foreach (['ceil', 'floor', 'round', 'sqrt', 'log', 'log10', 'exp', 'expm1', 'log1p', 'sin', 'cos', 'tan', 'pow', 'hypot', 'atan2', 'fmod'] as $name) {
             try {
                 $context->lookupFunction($name);
             } catch (\Throwable $e) {
@@ -654,6 +660,21 @@ class Module extends ModuleAbstract
             }
         }
         $i32 = $context->getTypeFromString('int32');
+        $doublePtr = $context->getTypeFromString('double*');
+        $i32Ptr = $context->getTypeFromString('int32*');
+        foreach ([
+            'ldexp' => [$double, $i32],
+            'modf' => [$double, $doublePtr],
+            'frexp' => [$double, $i32Ptr],
+        ] as $name => $params) {
+            try {
+                $context->lookupFunction($name);
+            } catch (\Throwable $e) {
+                $ft = $context->context->functionType($double, false, ...$params);
+                $fn = $context->module->addFunction($name, $ft);
+                $context->registerFunction($name, $fn);
+            }
+        }
         foreach (['isnan', 'isfinite', 'isinf'] as $name) {
             try {
                 $context->lookupFunction($name);
