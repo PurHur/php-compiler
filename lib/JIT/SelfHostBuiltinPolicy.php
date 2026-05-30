@@ -142,7 +142,7 @@ final class SelfHostBuiltinPolicy
         'ksort' => 'array', 'krsort' => 'array', 'asort' => 'array', 'arsort' => 'array',
         'array_multisort' => 'array',
         'usort' => 'array', 'uasort' => 'array', 'uksort' => 'array',
-        'compact' => 'array', 'extract' => 'array', 'defined' => 'array', 'define' => 'array',
+        'compact' => 'array', 'extract' => 'array', 'defined' => 'array', 'define' => 'array', 'constant' => 'array',
         'get_defined_constants' => 'array', 'get_defined_vars' => 'array', 'get_declared_interfaces' => 'array',
         'class_exists' => 'array', 'enum_exists' => 'array', 'get_declared_enums' => 'array', 'function_exists' => 'array', 'method_exists' => 'array',
         'property_exists' => 'array',
