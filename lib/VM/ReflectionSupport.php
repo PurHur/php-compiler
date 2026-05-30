@@ -9,7 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
 /**
- * Build ReflectionAttribute stubs from compile-time metadata (#1936, #3206, #3340).
+ * Build ReflectionAttribute stubs from compile-time metadata (#1936, #3206, #3340, #3800).
  */
 final class ReflectionSupport
 {
@@ -24,6 +24,8 @@ final class ReflectionSupport
     public const REFLECTION_CONSTANT = 'reflectionconstant';
 
     public const REFLECTION_ATTRIBUTE = 'reflectionattribute';
+
+    public const REFLECTION_ENUM_UNIT_CASE = 'reflectionenumunitcase';
 
     public const REFLECTION_PARAMETER = 'reflectionparameter';
 
@@ -47,6 +49,8 @@ final class ReflectionSupport
 
     /** Serialized attribute ctor args on ReflectionAttribute instances (#3206). */
     public const PROP_ATTR_ARGS = 'args';
+
+    public const PROP_ENUM_CASE_NAME = 'case';
 
     public const PROP_FUNC_NAME = 'funcName';
 
@@ -284,11 +288,35 @@ final class ReflectionSupport
         return $obj;
     }
 
+    public static function requireReflectionEnumUnitCase(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('ReflectionEnumUnitCase method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (strtolower($obj->class->name) !== self::REFLECTION_ENUM_UNIT_CASE) {
+            throw new \LogicException('Expected ReflectionEnumUnitCase instance');
+        }
+
+        return $obj;
+    }
+
     public static function classNameFromReflection(ObjectEntry $reflection): string
     {
         $nameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
         if (Variable::TYPE_STRING !== $nameVar->type) {
             throw new \LogicException('ReflectionClass missing target class name');
+        }
+
+        return $nameVar->toString();
+    }
+
+    public static function enumCaseNameFromReflection(ObjectEntry $reflection): string
+    {
+        $nameVar = $reflection->getProperty(self::PROP_ENUM_CASE_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $nameVar->type) {
+            throw new \LogicException('ReflectionEnumUnitCase missing case name');
         }
 
         return $nameVar->toString();

@@ -7,7 +7,7 @@ namespace PHPCompiler\Compiler;
 use PHPCfg\Op;
 
 /**
- * Extract declared PHP 8 attribute metadata from CFG op attrGroups (#1936, #3206, #3340).
+ * Extract declared PHP 8 attribute metadata from CFG op attrGroups (#1936, #3206, #3340, #3800).
  */
 final class AttributeMetadata
 {

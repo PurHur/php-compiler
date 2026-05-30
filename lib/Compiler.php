@@ -1738,7 +1738,11 @@ class Compiler {
             $valueSlot = $this->compileOperand($child->value, $result, true);
         }
         $typeSlot = null;
-        if (null !== $child->declaredType && $child->declaredType instanceof Op\Type\Literal) {
+        if (
+            property_exists($child, 'declaredType')
+            && null !== $child->declaredType
+            && $child->declaredType instanceof Op\Type\Literal
+        ) {
             $declared = Type::fromDecl($child->declaredType->name);
             if (Variable::TYPE_UNDEFINED !== Variable::mapFromType($declared)) {
                 $typeSlot = $this->compileTypeConstrainedVariable($result, $declared);
@@ -1754,7 +1758,9 @@ class Compiler {
             $typeSlot
         );
         $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
-        AttributeNames::assertNoDuplicates(AttributeNames::fromOp($child));
+        $constOp->attributeNames = AttributeNames::fromOp($child);
+        $this->assignAttributeMetadata($constOp, $child);
+        AttributeNames::assertNoDuplicates($constOp->attributeNames);
         $result->addOpCode($constOp);
     }
 

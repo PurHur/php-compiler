@@ -58,6 +58,8 @@ class ClassEntry {
     public array $attributeNames = [];
     /** @var list<\PHPCompiler\Compiler\AttributeEntry> class attributes with ctor args (#3206). */
     public array $attributeEntries = [];
+    /** @var array<string, list<\PHPCompiler\Compiler\AttributeEntry>> enum case (lowercase) => attributes (#3800). */
+    public array $enumCaseAttributeEntries = [];
     /** @var array<string, list<string>> method (lowercase) => attribute names (#1936). */
     public array $methodAttributeNames = [];
     /** @var array<string, list<\PHPCompiler\Compiler\AttributeEntry>> method attributes (#3206). */
