@@ -1285,6 +1285,7 @@ restart:
                                 }
                                 $frame->scope[$op->arg3]->copyFrom($caught);
                             }
+                            $frame->activeCatchException = $caught;
                             goto restart;
                         }
                         break;
@@ -1305,6 +1306,18 @@ restart:
                     break;
                 case OpCode::TYPE_THROW:
                     $thrown = $frame->scope[$op->arg1]->resolveIndirect();
+                    $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
+                    $this->raiseUncaughtException($thrown);
+                    break;
+                case OpCode::TYPE_RETHROW:
+                    $thrown = $this->resolveActiveCatchException($frame);
+                    if (null === $thrown) {
+                        throw new \LogicException('Cannot use "throw;" outside of a catch block');
+                    }
                     $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -1433,6 +1446,17 @@ restart:
         return null;
     }
 
+    private function resolveActiveCatchException(Frame $frame): ?Variable
+    {
+        for ($f = $frame; null !== $f; $f = $f->parent) {
+            if (null !== $f->activeCatchException) {
+                return $f->activeCatchException;
+            }
+        }
+
+        return null;
+    }
+
     /** Align handler position to the first TYPE_CATCH after TYPE_TRY (issue #1362). */
     private function rewindHandlerToCatchChain(Frame $handler): void
     {
@@ -1490,6 +1514,7 @@ restart:
                 }
                 $catchFrame->scope[$op->arg3]->copyFrom($caught);
             }
+            $catchFrame->activeCatchException = $caught;
             $mergeFrame = null;
             if (null !== $op->block2) {
                 $mergeFrame = $op->block2->getFrame($this->context, $handler);
