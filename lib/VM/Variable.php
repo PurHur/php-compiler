@@ -59,6 +59,12 @@ final class Variable {
     public ?int $typeConstraint = null;
     public ?string $classConstraint = null;
 
+    /** Scalar VM type members for union declared types (issue #169). */
+    public ?array $unionTypeConstraints = null;
+
+    /** Display label for property TypeError messages, e.g. `int|string`. */
+    public ?string $declaredTypeLabel = null;
+
     /** list&lt;T&gt; / array&lt;K,V&gt; shape when declaration used generic array syntax (#3705). */
     public ?GenericArrayTypeSpec $genericArrayTypeSpec = null;
 

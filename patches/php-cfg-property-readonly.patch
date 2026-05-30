@@ -1,0 +1,32 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php
+@@ -33,6 +33,9 @@
+ 
+     public $declaredType;
+ 
++    /** PhpParser Class_::MODIFIER_READONLY on the property declaration. */
++    public $readonly = false;
++
+     public function __construct(Operand $name, int $visibility, bool $static, Op\Type $declaredType, Operand $defaultVar = null, Block $defaultBlock = null, array $attributes = [])
+     {
+         parent::__construct($attributes);
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -621,7 +621,7 @@
+                 $defaultVar = null;
+                 $defaultBlock = null;
+             }
+-            $this->block->children[] = new Op\Stmt\Property(
++            $cfgProp = new Op\Stmt\Property(
+                 $this->parseExprNode($prop->name),
+                 $visibility,
+                 (bool) $static,
+@@ -630,6 +630,8 @@
+                 $defaultBlock,
+                 $this->mapAttributes($node)
+             );
++            $cfgProp->readonly = 0 !== ($node->flags & Node\Stmt\Class_::MODIFIER_READONLY);
++            $this->block->children[] = $cfgProp;
+         }
+     }
+ 
