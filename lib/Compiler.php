@@ -50,6 +50,8 @@ class Compiler {
     private array $abstractClasses = [];
     /** 1-based source lines lowered from bare `throw;` (#3508). */
     private array $bareRethrowLines = [];
+    /** Trailing source bytes after __halt_compiler(); (issue #3479). */
+    private ?string $haltCompilerRemaining = null;
 
     public function setBareRethrowLines(array $lines): void
     {
@@ -190,6 +192,12 @@ class Compiler {
         }
     }
 
+    /** Bytes after the first __halt_compiler(); in the compiled script, if any (#3479). */
+    public function getHaltCompilerRemaining(): ?string
+    {
+        return $this->haltCompilerRemaining;
+    }
+
     /**
      * Marks the CFG construct that halted compilation before throwing LogicException (#2642).
      *
@@ -220,7 +228,11 @@ class Compiler {
 
     public function compile(Script $script): ?Block {
         $this->resetCompileAbortDetail();
+<<<<<<< HEAD
         $this->abstractClasses = [];
+=======
+        $this->haltCompilerRemaining = null;
+>>>>>>> ca700cd7 (Language: __halt_compiler() compile-stop + trailing bytes (#3479))
         $this->seen = new SplObjectStorage;
         $this->debugWriteLastPhase('Compiler::compile enter');
 
@@ -1677,6 +1689,11 @@ class Compiler {
             }
         } elseif ($stmt instanceof Op\Stmt\Switch_) {
             $this->compileSwitchAsJumpIfChain($stmt, $block);
+        } elseif ($stmt instanceof Op\Stmt\HaltCompiler) {
+            if (null === $this->haltCompilerRemaining) {
+                $this->haltCompilerRemaining = $stmt->remaining;
+            }
+            $block->addOpCode(new OpCode(OpCode::TYPE_RETURN_VOID));
         } else {
             $this->throwCompileLogic("Unknown Stmt Type: " . $stmt->getType());
         }

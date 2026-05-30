@@ -1379,6 +1379,43 @@ apply_php_cfg_magic_constants_overlay() {
   echo "Applied php-cfg-magic-constants.patch (overlay)"
 }
 
+apply_php_cfg_halt_compiler_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/HaltCompiler.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg"
+  if grep -q 'new Op\\Stmt\\HaltCompiler' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-halt-compiler.patch (already applied)"
+    return 0
+  fi
+  if [[ ! -f "$overlay/Op/Stmt/HaltCompiler.php" || ! -f "$overlay/halt-compiler-parser-method.php" ]]; then
+    echo "Skip php-cfg-halt-compiler.patch (overlay files missing)" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$op")"
+  cp "$overlay/Op/Stmt/HaltCompiler.php" "$op"
+  python3 - "$parser" "$overlay/halt-compiler-parser-method.php" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+text = parser_path.read_text()
+old = """    protected function parseStmt_HaltCompiler(Stmt\\HaltCompiler $node)
+    {
+        $this->block->children[] = new Op\\Terminal\\Echo_(
+            $this->readVariable(new Operand\\Literal($node->remaining)),
+            $this->mapAttributes($node)
+        );
+    }"""
+new = method_path.read_text()
+if old not in text:
+    sys.stderr.write("php-cfg-halt-compiler: parseStmt_HaltCompiler stub not found in Parser.php\n")
+    sys.exit(1)
+parser_path.write_text(text.replace(old, new.rstrip("\n"), 1))
+PY
+  echo "Applied php-cfg-halt-compiler.patch (overlay)"
+}
+
 apply_php_cfg_trycatch_overlay() {
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TryCatch.php"
@@ -1685,6 +1722,10 @@ apply_patch() {
   fi
   if [[ "$(basename "$patch")" == "php-cfg-trycatch.patch" ]]; then
     apply_php_cfg_trycatch_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-halt-compiler.patch" ]]; then
+    apply_php_cfg_halt_compiler_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-llvm-memory-buffer-bitcode.patch" ]]; then
