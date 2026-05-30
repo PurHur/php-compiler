@@ -211,11 +211,30 @@ class Block {
     }
 
     public function getVarSlot(Operand $operand, bool $isRead): int {
-        if (!$this->scope->contains($operand)) {
-            $name = self::resolveVariableName($operand);
-            if (null !== $name) {
-                $existing = $this->slotIndexForVariableName($name);
-                if (null !== $existing) {
+        if ($this->scope->contains($operand)) {
+            if ($isRead && null !== self::resolveVariableName($operand)) {
+                $this->args[$operand] = $this->scope[$operand];
+            }
+
+            return $this->scope[$operand];
+        }
+        $name = self::resolveVariableName($operand);
+        if (null !== $name) {
+            $existing = $this->slotIndexForVariableName($name);
+            if (null !== $existing) {
+                $this->scope[$operand] = $existing;
+                if ($isRead) {
+                    $this->args[$operand] = $existing;
+                }
+
+                return $existing;
+            }
+        }
+        $cfgVar = self::cfgVarRoot($operand);
+        if (null !== $cfgVar) {
+            foreach ($this->scope as $scopedOp) {
+                if (self::cfgVarRoot($scopedOp) === $cfgVar) {
+                    $existing = $this->scope[$scopedOp];
                     $this->scope[$operand] = $existing;
                     if ($isRead) {
                         $this->args[$operand] = $existing;
@@ -224,26 +243,13 @@ class Block {
                     return $existing;
                 }
             }
-            $cfgVar = self::cfgVarRoot($operand);
-            if (null !== $cfgVar) {
-                foreach ($this->scope as $scopedOp) {
-                    if (self::cfgVarRoot($scopedOp) === $cfgVar) {
-                        $existing = $this->scope[$scopedOp];
-                        $this->scope[$operand] = $existing;
-                        if ($isRead) {
-                            $this->args[$operand] = $existing;
-                        }
-
-                        return $existing;
-                    }
-                }
-            }
-            $next = $this->nextScopeSlot();
+        }
+        $next = $this->nextScopeSlot();
             $this->scope[$operand] = $next;
             if ($isRead) {
                 $this->args[$operand] = $next;
             }
-        }
+
         return $this->scope[$operand];
     }
 
@@ -442,7 +448,8 @@ class Block {
         foreach ($this->scope as $op) {
             $pos = $this->scope[$op];
             // php-cfg may register the same slot under multiple Operand keys (#1885).
-            if (isset($scope[$pos])) {
+            // Variable reads in args must still resolve (#3787 merge + literal arm).
+            if (isset($scope[$pos]) && !$this->args->contains($op)) {
                 continue;
             }
             if (null !== $frame && 'this' === self::resolveVariableName($op)) {
@@ -456,7 +463,7 @@ class Block {
                 }
             }
 
-            if (isset($this->constants[$pos])) {
+            if (isset($this->constants[$pos]) && !$this->args->contains($op)) {
                 $scope[$pos] = $this->constants[$pos];
             } elseif (isset($this->closureCaptureSlots[$pos])) {
                 $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
@@ -465,10 +472,14 @@ class Block {
                     $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
                     continue;
                 }
+                // {main} top-level names always live in the global table (#3601, #3787).
+                if (self::usesMainScriptGlobalSlot($op, $this)) {
+                    $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
+                    continue;
+                }
                 $found = false;
-                $parent = $cfgMerge
-                    ? $this->findSlot($op, $frame)
-                    : $frame->block->findSlot($op, $frame);
+                // Resolve reads from the jump parent block, not the merge block's scope (#3787).
+                $parent = $frame->block->findSlot($op, $frame);
                 if (!is_null($parent)) {
                     $scope[$pos] = $parent;
                     $found = true;
@@ -525,7 +536,8 @@ class Block {
                         $local = new Variable(Variable::TYPE_NULL);
                         $local->indirect($context->ensureGlobal($name));
                         $scope[$pos] = $local;
-                    } elseif (null === $frame) {
+                    } elseif (null === $frame || self::usesMainScriptGlobalSlot($op, $this)) {
+                        // {main} locals live in the global table on every CFG block (#3601, #3787).
                         $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
                     } else {
                         $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
@@ -542,6 +554,17 @@ class Block {
             $return->returnVar = $frame->returnVar;
         }
         return $return;
+    }
+
+    /** Top-level script variable (not superglobal) — always indirect through global table (#3787). */
+    private static function usesMainScriptGlobalSlot(Operand $op, self $block): bool
+    {
+        if (!$block->isMainScript()) {
+            return false;
+        }
+        $name = self::resolveVariableName($op);
+
+        return null !== $name && !Superglobals::isSuperglobalName($name);
     }
 
     /**
