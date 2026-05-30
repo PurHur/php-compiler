@@ -42,6 +42,14 @@ class Compiler {
     /** Set from the first compile-time abort (#2642, self-host diagnostics). */
     private ?string $compileAbortDetail = null;
 
+    /** 1-based source lines lowered from bare `throw;` (#3508). */
+    private array $bareRethrowLines = [];
+
+    public function setBareRethrowLines(array $lines): void
+    {
+        $this->bareRethrowLines = $lines;
+    }
+
     public function setDebugLastPhaseInputFile(?string $filename): void
     {
         $this->debugLastPhaseInputFile = $filename;
@@ -3154,6 +3162,10 @@ class Compiler {
                     $this->compileOperand($terminal->var, $block, true)
                 )];
             case 'Terminal_Throw':
+                if ($this->isBareRethrowThrow($terminal)) {
+                    return [new OpCode(OpCode::TYPE_RETHROW)];
+                }
+
                 return [new OpCode(
                     OpCode::TYPE_THROW,
                     $this->compileOperand($terminal->expr, $block, true)
@@ -3200,6 +3212,16 @@ class Compiler {
     }
 
 
+
+    private function isBareRethrowThrow(Op\Terminal\Throw_ $terminal): bool
+    {
+        $line = $terminal->getLine();
+        if ($line < 1 || !isset($this->bareRethrowLines[$line])) {
+            return false;
+        }
+
+        return true;
+    }
 
     /**
      * @return OpCode[]
