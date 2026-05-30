@@ -14,6 +14,7 @@ use PHPCompiler\VM\Builtin\ReflectionAttributeGetName;
 use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethod;
+use PHPCompiler\VM\Builtin\ReflectionClassNewLazyProxy;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
 use PHPCompiler\VM\Builtin\ThrowableGetMessage;
 use PHPCompiler\VM\Builtin\WeakMapConstruct;
@@ -140,6 +141,8 @@ final class BuiltinClasses
         $rc->methodVisibility['getattributes'] = $pub;
         $rc->methods['getmethod'] = new ReflectionClassGetMethod();
         $rc->methodVisibility['getmethod'] = $pub;
+        $rc->methods['newlazyproxy'] = new ReflectionClassNewLazyProxy();
+        $rc->methodVisibility['newlazyproxy'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS] = $rc;
     }
 

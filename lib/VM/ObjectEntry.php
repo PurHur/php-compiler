@@ -31,6 +31,12 @@ class ObjectEntry {
     /** Anonymous function / closure body (issue #72). */
     public ?ClosureState $closureState = null;
 
+    /** Initializer for lazy proxy objects (#3317). */
+    public ?ClosureState $lazyInitializer = null;
+
+    /** True until first property access or method call runs the lazy initializer. */
+    public bool $lazyPending = false;
+
     public function __construct(ClassEntry $class) {
         $this->class = $class;
         $this->id = ++self::$counter;
@@ -68,6 +74,8 @@ class ObjectEntry {
         }
         $this->generatorState = null;
         $this->closureState = null;
+        $this->lazyInitializer = null;
+        $this->lazyPending = false;
     }
 
     public function getProperty(string $name): Variable {
@@ -114,6 +122,8 @@ class ObjectEntry {
         }
         $clone->constructed = $this->constructed;
         $clone->closureState = $this->closureState;
+        $clone->lazyInitializer = $this->lazyInitializer;
+        $clone->lazyPending = $this->lazyPending;
 
         return $clone;
     }

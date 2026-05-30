@@ -1079,7 +1079,9 @@ restart:
                     if ($var->type !== Variable::TYPE_OBJECT) {
                         throw new \LogicException("Unsupported property fetch on non-object");
                     }
-                    $result->indirect($var->toObject()->getProperty($name));
+                    $propertyObject = $var->toObject();
+                    VM\LazyObjectSupport::ensureInitialized($this, $propertyObject);
+                    $result->indirect($propertyObject->getProperty($name));
                     break;
                 case OpCode::TYPE_INIT_ARRAY:
                     $result = $frame->scope[$op->arg1];
@@ -2155,6 +2157,9 @@ restart:
     {
         $methodLc = strtolower($methodName);
         $object = $receiver->toObject();
+        if ($object->lazyPending) {
+            VM\LazyObjectSupport::ensureInitialized($this, $object);
+        }
         if (null !== $object->closureState && '__invoke' === $methodLc) {
             $this->initClosureCall($frame, $object->closureState);
 
