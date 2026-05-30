@@ -190,6 +190,12 @@ final class BuiltinClasses
         $ctx->classes[ExceptionSupport::CLASS_THROWABLE] = $throwable;
 
         self::registerThrowableClass($ctx, 'Exception', ExceptionSupport::CLASS_EXCEPTION);
+        self::registerThrowableClass(
+            $ctx,
+            'LogicException',
+            ExceptionSupport::CLASS_LOGIC_EXCEPTION,
+            ExceptionSupport::CLASS_EXCEPTION
+        );
         self::registerThrowableClass($ctx, 'Error', ExceptionSupport::CLASS_ERROR);
         self::registerThrowableClass($ctx, 'TypeError', ExceptionSupport::CLASS_TYPE_ERROR, ExceptionSupport::CLASS_ERROR);
         self::registerThrowableClass($ctx, 'ValueError', ExceptionSupport::CLASS_VALUE_ERROR, ExceptionSupport::CLASS_ERROR);

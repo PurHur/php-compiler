@@ -418,6 +418,7 @@ nextframe:
             return self::SUCCESS;
         }
 restart:
+        $this->popTryHandlerIfAtMergeBlock($frame);
         if ($this->context->pendingReturnDispatch) {
             $this->context->pendingReturnDispatch = false;
             $frame = $this->context->pendingReturnResumeFrame;
@@ -1660,6 +1661,10 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_TRY:
+                    $this->context->activeTryHandlerFrames[] = $frame;
+                    if (null !== $op->block2) {
+                        $this->context->tryMergeBlockIds[spl_object_id($op->block2)] = true;
+                    }
                     $frame = $op->block1->getFrame($this->context, $frame);
                     goto restart;
                 case OpCode::TYPE_CATCH:
@@ -1907,13 +1912,18 @@ restart:
     private function findCatchFrameForThrow(Frame $frame, Variable $thrown): ?Frame
     {
         $this->context->pendingException = $thrown;
-        for ($handler = $frame->parent ?? $frame; null !== $handler; $handler = $handler->parent) {
-            $this->rewindHandlerToCatchChain($handler);
-            $finallyFrame = $this->enterFinallyHandlerForUnwind($handler);
-            if (null !== $finallyFrame) {
-                return $finallyFrame;
+        $handlers = $this->context->activeTryHandlerFrames;
+        for ($i = \count($handlers) - 1; $i >= 0; --$i) {
+            $handler = $handlers[$i];
+            $catchFrame = $this->dispatchCatchForHandlerFrame($handler);
+            if (null !== $catchFrame) {
+                \array_splice($this->context->activeTryHandlerFrames, $i);
+
+                return $catchFrame;
             }
-            $catchFrame = $this->enterMatchingCatchHandler($handler);
+        }
+        for ($handler = $frame->parent ?? $frame; null !== $handler; $handler = $handler->parent) {
+            $catchFrame = $this->dispatchCatchForHandlerFrame($handler);
             if (null !== $catchFrame) {
                 return $catchFrame;
             }
@@ -1921,6 +1931,32 @@ restart:
         $this->clearTryCatchUnwindState();
 
         return null;
+    }
+
+    private function dispatchCatchForHandlerFrame(Frame $handler): ?Frame
+    {
+        $this->rewindHandlerToCatchChain($handler);
+        $finallyFrame = $this->enterFinallyHandlerForUnwind($handler);
+        if (null !== $finallyFrame) {
+            return $finallyFrame;
+        }
+
+        return $this->enterMatchingCatchHandler($handler);
+    }
+
+    private function popTryHandlerIfAtMergeBlock(Frame $frame): void
+    {
+        if (null === $frame->block) {
+            return;
+        }
+        $id = spl_object_id($frame->block);
+        if (!isset($this->context->tryMergeBlockIds[$id])) {
+            return;
+        }
+        unset($this->context->tryMergeBlockIds[$id]);
+        if ([] !== $this->context->activeTryHandlerFrames) {
+            \array_pop($this->context->activeTryHandlerFrames);
+        }
     }
 
     private function resolveActiveCatchException(Frame $frame): ?Variable

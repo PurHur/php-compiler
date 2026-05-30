@@ -16,6 +16,7 @@ final class ExceptionSupport
 {
     public const CLASS_THROWABLE = 'throwable';
     public const CLASS_EXCEPTION = 'exception';
+    public const CLASS_LOGIC_EXCEPTION = 'logicexception';
     public const CLASS_ERROR = 'error';
     public const CLASS_TYPE_ERROR = 'typeerror';
     public const CLASS_VALUE_ERROR = 'valueerror';
