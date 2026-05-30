@@ -3,18 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="php-compiler — compile PHP to native binaries with VM, LLVM 9 JIT, and AOT. v1.0 stable line: web-capable PHP subset, phpc CLI, examples 000–009.">
-  <title>php-compiler — compile PHP to native binaries</title>
+  <meta name="description" content="php-compiler — a PHP-in-PHP compiler with VM, LLVM 9 JIT, and AOT. v1.0 stable line plus an experimental path where the compiler compiles its own lib/ tree.">
+  <title>A compiler for PHP in PHP that compiles itself</title>
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="php-compiler">
-  <meta property="og:title" content="php-compiler — compile PHP to native binaries">
-  <meta property="og:description" content="CFG-based PHP compiler: VM, LLVM 9 JIT, and AOT executables without Zend at runtime. v1.0 stable subset for CLI and CGI web apps.">
+  <meta property="og:title" content="A compiler for PHP in PHP that compiles itself">
+  <meta property="og:description" content="CFG-based PHP compiler: VM, LLVM 9 JIT, and AOT. Ship native binaries with phpc; experimental self-host compiles compiler_minimal from lib/ without Zend at runtime.">
   <meta property="og:url" content="https://purhur.github.io/php-compiler/docs/pages/index.html">
   <meta property="og:image" content="https://purhur.github.io/php-compiler/docs/pages/img/og-card.svg">
   <meta property="og:image:alt" content="php-compiler logo">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="php-compiler — compile PHP to native binaries">
-  <meta name="twitter:description" content="VM, LLVM JIT, and AOT for a web-capable PHP subset. Ship native binaries with phpc build.">
+  <meta name="twitter:title" content="A compiler for PHP in PHP that compiles itself">
+  <meta name="twitter:description" content="VM, LLVM JIT, and AOT for a web-capable PHP subset. Try self-host smoke: compiler_minimal bundle OK.">
   <meta name="twitter:image" content="https://purhur.github.io/php-compiler/docs/pages/img/og-card.svg">
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='55' rx='42' ry='32' fill='%23777BB4'/><ellipse cx='50' cy='48' rx='38' ry='28' fill='%234F5B93'/><circle cx='35' cy='42' r='4' fill='%231a1a2e'/><circle cx='65' cy='42' r='4' fill='%231a1a2e'/></svg>">
@@ -47,13 +47,15 @@
   <div id="top" class="hero">
     <div>
       <span class="badge badge--live">v1.0 stable</span>
-      <span class="badge">May 2026</span>
+      <span class="badge">30 May 2026</span>
       <span class="badge">LLVM 9</span>
-      <h1>Compile PHP to native binaries</h1>
+      <h1>A compiler for PHP in PHP that compiles itself</h1>
       <p class="lead">
         <strong>php-compiler</strong> is a CFG-based compiler with a bytecode <strong>VM</strong>,
         <strong>LLVM&nbsp;9 JIT</strong>, and <strong>AOT</strong> linking. Ship CLI tools and small web apps
         that run <strong>without Zend PHP at runtime</strong> after <code>phpc build</code> or <code>phpc deploy</code>.
+        The <strong>north star</strong> is the compiler rebuilding its own <code>lib/</code> tree — today you can
+        reproduce the <strong>M0 smoke</strong> (<code>compiler_minimal bundle OK</code>) on a clean clone with Docker and LLVM&nbsp;9.
       </p>
       <div class="callout callout--stable">
         <strong>Stable line (2026).</strong>
@@ -66,7 +68,7 @@
         <span class="badge badge--live">VM + JIT + AOT</span>
         <span class="badge badge--live">Closures · try/catch</span>
         <span class="badge badge--live">321 builtins</span>
-        <span class="badge badge--live">Spine 726/726</span>
+        <span class="badge badge--live">Spine 745/952</span>
         <span class="badge badge--live">M3 inventory emit</span>
         <span class="badge badge--wip">MCJIT execute</span>
       </div>
@@ -186,10 +188,14 @@ composer install
         </article>
         <article class="demo-card demo-card--optional">
           <span class="demo-card__step">4</span>
-          <h3>Self-host smoke</h3>
-          <pre><code>script/apply-patches.sh
-make bootstrap-selfhost-link</code></pre>
-          <p>Expect <code>compiler_minimal bundle OK</code> (experimental).</p>
+          <h3>Self-host smoke (M0)</h3>
+          <pre><code>make docker-build-22   # once
+./script/docker-exec.sh -- bash -lc \
+  'composer install --ignore-platform-reqs -q \
+   && script/apply-patches.sh \
+   && make bootstrap-selfhost-link'
+./build/selfhost</code></pre>
+          <p>Expect <code>compiler_minimal bundle OK</code> — native link of a minimal <code>lib/</code> bundle (experimental). Needs LLVM&nbsp;9; full M4 loop is heavier — <a href="https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md#7-optional-north-star-4--m4-strict-bootstrap-loop">GETTING-STARTED §7</a>.</p>
         </article>
       </div>
       <p class="demo-disclaimer">
@@ -362,15 +368,16 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
           <div class="progress-fill" data-width="85" style="width: 0"></div>
         </div>
         <p class="overall-progress__note">
-          <code>master</code> @ <a href="https://github.com/PurHur/php-compiler/commit/7816b0bc">7816b0bc</a> (May 2026, LLVM 9):
-          spine <strong>726/726</strong>;
-          M3 HelloWorld + <strong>inventory emit</strong> strict native ✅
-          (<a href="https://github.com/PurHur/php-compiler/pull/3070">#3070</a>);
-          gen-2→gen-3 + full revision probe ✅;
-          vendor prelink <strong>3/3</strong> ✅; Zend-free gen-0 seed ✅.
+          <code>master</code> @ <a href="https://github.com/PurHur/php-compiler/commit/c33f10ef">c33f10ef</a> (30 May 2026, LLVM 9).
+          Verified on a clean clone: <code>make bootstrap-selfhost-link</code> → <code>compiler_minimal bundle OK</code>
+          (Docker + prelinked gen-0 driver).
+          Spine SSOT: <code>php script/bootstrap-spine-count.php</code> → <strong>745/952</strong> literal
+          <code>require_once</code> units toward full inventory (M2 in progress).
+          CI/harness targets report gen-2→gen-3 and inventory emit green when patches + LLVM are fully wired;
+          fresh trees may need <code>./script/docker-exec.sh</code> and <code>script/apply-patches.sh</code> before M4 presenters.
           Next: production <code>bin/compile.php</code> inventory emit without thin TU
           (<a href="https://github.com/PurHur/php-compiler/issues/3024">#3024</a>).
-          Presenter: <code>make north-star5-verify</code>.
+          Presenter: <code>make north-star4-verify</code> (partial OK) · <code>make north-star5-verify</code>.
         </p>
       </div>
     </section>
@@ -391,7 +398,8 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
         <li class="is-done">
           <span class="ladder__marker" aria-hidden="true">✓</span>
           <h4>M2</h4>
-          <p>Spine <strong>726/726</strong> native link with real <code>bin/vm.php</code>
+          <p>Spine <strong>745/952</strong> literal <code>require_once</code> toward full inventory; native link smoke
+            for the bundled spine when LLVM + patches are green
             (<a href="https://github.com/PurHur/php-compiler/issues/2868">#2868</a>,
             <a href="https://github.com/PurHur/php-compiler/issues/2652">#2652</a>).</p>
         </li>
@@ -406,7 +414,8 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
         <li class="is-done">
           <span class="ladder__marker" aria-hidden="true">✓</span>
           <h4>M4</h4>
-          <p>Gen-2→gen-3 spine <strong>726/726</strong> without Zend on compile; full revision probe ✅
+          <p>Gen-2→gen-3 recompile + full revision probe — green on maintained Docker CI;
+            <code>make north-star4-verify</code> exits 0 with documented partial blockers on some fresh clones
             (<a href="https://github.com/PurHur/php-compiler/pull/3058">#3058</a>).</p>
         </li>
         <li class="is-wip">
@@ -467,7 +476,7 @@ make test</code></pre>
       <a href="capability-comparison.html">PHP compare</a> ·
       <a href="https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md">Getting started</a>
     </p>
-    <p class="footer-meta">Site: docs/pages/ · Updated May 2026 · <code>master</code> @ 7816b0bc</p>
+    <p class="footer-meta">Site: docs/pages/ · Updated 30 May 2026 · <code>master</code> @ c33f10ef · M0 smoke verified on clean clone</p>
   </footer>
 
   <script src="js/main.js" defer></script>

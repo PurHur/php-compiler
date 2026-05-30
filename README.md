@@ -1,5 +1,7 @@
 # php-compiler
 
+> **AI-assisted project.** Most ongoing development, documentation, and tooling on this fork is **AI-heavy** (agent workflows, automated CI gates, bulk refactors). The **original idea and base architecture** — a PHP-in-PHP compiler with VM, JIT, and native compilation — come from [**Anthony Ferrara’s ircmaxell/php-compiler**](https://github.com/ircmaxell/php-compiler) (human-authored, MIT). Treat this repository as a maintained continuation, not a claim that every line was hand-written by a single author.
+
 **Compile PHP to native binaries** — a CFG-based compiler with a bytecode **VM**, **LLVM 9 JIT**, and **AOT** linking. Ship CLI tools and small web apps that run **without Zend PHP at runtime** after `phpc build` or `phpc deploy`.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
