@@ -48,6 +48,7 @@ final class Linker
         __DIR__.'/runtime/phpc_json_decode.c',
         __DIR__.'/runtime/phpc_unserialize.c',
         __DIR__.'/runtime/phpc_stream.c',
+        __DIR__.'/runtime/phpc_gettype.c',
         __DIR__.'/runtime/phpc_process.c',
         __DIR__.'/runtime/preg_match.c',
         __DIR__.'/runtime/phpc_pack.c',
