@@ -161,6 +161,10 @@ final class Variable {
     }
 
     public function toInt(?\PHPCompiler\VM $vm = null): int {
+        if (self::TYPE_INDIRECT === $this->type) {
+            return $this->indirect->toInt($vm);
+        }
+        TypedPropertyCheck::assertReadable($this);
         switch ($this->type) {
             case self::TYPE_NULL:
                 return 0;
@@ -173,10 +177,9 @@ final class Variable {
             case self::TYPE_STRING:
                 return (int) $this->string;
             case self::TYPE_OBJECT:
-                return $this->objectToScalarString($vm, 'int')->toInt();
-            case self::TYPE_INDIRECT:
-                return $this->indirect->toInt($vm);
+                return $this->objectToScalarString($vm, 'int')->toInt($vm);
         }
+        throw new \LogicException("Cannot convert type {$this->type} to int");
     }
 
     public function float(float $value): void {
@@ -186,9 +189,13 @@ final class Variable {
     }
 
     public function toFloat(?\PHPCompiler\VM $vm = null): float {
+        if (self::TYPE_INDIRECT === $this->type) {
+            return $this->indirect->toFloat($vm);
+        }
+        TypedPropertyCheck::assertReadable($this);
         switch ($this->type) {
             case self::TYPE_NULL:
-                return 0;
+                return 0.0;
             case self::TYPE_INTEGER:
                 return (float) $this->integer;
             case self::TYPE_FLOAT:
@@ -198,13 +205,16 @@ final class Variable {
             case self::TYPE_STRING:
                 return (float) $this->string;
             case self::TYPE_OBJECT:
-                return $this->objectToScalarString($vm, 'float')->toFloat();
-            case self::TYPE_INDIRECT:
-                return $this->indirect->toFloat($vm);
+                return $this->objectToScalarString($vm, 'float')->toFloat($vm);
         }
+        throw new \LogicException("Cannot convert type {$this->type} to float");
     }
 
     public function toNumeric(?\PHPCompiler\VM $vm = null) {
+        if (self::TYPE_INDIRECT === $this->type) {
+            return $this->indirect->toNumeric($vm);
+        }
+        TypedPropertyCheck::assertReadable($this);
         switch ($this->type) {
             case self::TYPE_NULL:
                 return 0;
@@ -223,9 +233,7 @@ final class Variable {
                 }
                 return (float) $this->string;
             case self::TYPE_OBJECT:
-                return $this->objectToScalarString($vm, 'int')->toNumeric();
-            case self::TYPE_INDIRECT:
-                return $this->indirect->toNumeric($vm);
+                return $this->objectToScalarString($vm, 'int')->toNumeric($vm);
         }
         throw new \TypeError(sprintf(
             'Unsupported operand types: %s',
@@ -323,13 +331,17 @@ final class Variable {
     }
 
     public function toBool(?\PHPCompiler\VM $vm = null): bool {
+        if (self::TYPE_INDIRECT === $this->type) {
+            return $this->indirect->toBool($vm);
+        }
+        TypedPropertyCheck::assertReadable($this);
         switch ($this->type) {
             case self::TYPE_NULL:
                 return false;
             case self::TYPE_INTEGER:
                 return 0 !== $this->integer;
             case self::TYPE_FLOAT:
-                return 0 !== $this->float;
+                return 0.0 !== $this->float;
             case self::TYPE_BOOLEAN:
                 return $this->bool;
             case self::TYPE_STRING:
@@ -343,10 +355,9 @@ final class Variable {
                     return true;
                 }
 
-                return $this->objectToScalarString($vm, 'bool')->toBool();
-            case self::TYPE_INDIRECT:
-                return $this->indirect->toBool($vm);
+                return $this->objectToScalarString($vm, 'bool')->toBool($vm);
         }
+        throw new \LogicException("Cannot convert type {$this->type} to bool");
     }
 
     public function string(string $value): void {
@@ -357,6 +368,7 @@ final class Variable {
 
     public function toString(): string {
         $var = $this->resolveIndirect();
+        TypedPropertyCheck::assertReadable($var);
         switch ($var->type) {
             case self::TYPE_STRING:
                 return $var->string;
@@ -415,11 +427,12 @@ final class Variable {
     }
 
     public function toObject(): ObjectEntry {
-        switch ($this->type) {
-            case self::TYPE_OBJECT:
-                return $this->object;
-            case self::TYPE_INDIRECT:
-                return $this->indirect->toObject();
+        if (self::TYPE_INDIRECT === $this->type) {
+            return $this->indirect->toObject();
+        }
+        TypedPropertyCheck::assertReadable($this);
+        if (self::TYPE_OBJECT === $this->type) {
+            return $this->object;
         }
         throw new \LogicException("Cannot convert $this->type to Object");
     }
@@ -503,6 +516,7 @@ final class Variable {
             // destroy the indirection
             $var = $var->indirect;
         }
+        TypedPropertyCheck::assertReadable($var);
         if ($this->type === self::TYPE_STRING_OFFSET) {
             $this->writeStringOffset($var);
 

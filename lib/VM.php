@@ -26,12 +26,21 @@ use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ObjectPropertyIterator;
 use PHPCompiler\VM\TypeCheck;
+use PHPCompiler\VM\TypedPropertyReadSignal;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
 
 class VM {
     const SUCCESS = 1;
     const FAILURE = 2;
+
+    private static ?self $running = null;
+
+    /** @internal Active VM during runFrames (#3429 typed property errors). */
+    public static function running(): ?self
+    {
+        return self::$running;
+    }
 
     /** Generator body suspended at `yield` (issue #167). */
     const GENERATOR_YIELD = 3;
@@ -461,6 +470,45 @@ class VM {
 
     private function runFrames(): int
     {
+        self::$running = $this;
+        try {
+            return $this->runFramesInner();
+        } finally {
+            self::$running = null;
+        }
+    }
+
+    /**
+     * Build a catchable VM Error object for engine-thrown failures (#3429).
+     */
+    public function makeEngineError(string $message, string $className = 'Error'): Variable
+    {
+        $lc = strtolower($className);
+        if (!isset($this->context->classes[$lc])) {
+            throw new \LogicException("Engine error class {$className} is not registered");
+        }
+        $obj = new ObjectEntry($this->context->classes[$lc]);
+        $obj->constructed = true;
+        $obj->getProperty('message')->string($message);
+        $thrown = new Variable();
+        $thrown->object($obj);
+
+        return $thrown;
+    }
+
+    private function dispatchEngineThrow(Frame $frame, Variable $thrown): ?Frame
+    {
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    private function runFramesInner(): int
+    {
 nextframe:
         $frame = $this->context->pop();
 
@@ -483,7 +531,8 @@ restart:
 
         while ($frame->pos < $frame->block->nOpCodes) {
             $op = $frame->block->opCodes[$frame->pos++];
-            switch ($op->type) {
+            try {
+                switch ($op->type) {
                 case OpCode::TYPE_TYPE_ASSERT:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
@@ -1797,27 +1846,34 @@ restart:
                     if ($this->frameIsPropertySetHook($frame)) {
                         $this->context->propertyHookSetAborted = true;
                     }
-                    $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+                    $catchFrame = $this->dispatchEngineThrow($frame, $thrown);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
                         goto restart;
                     }
-                    $this->raiseUncaughtException($thrown);
                     break;
                 case OpCode::TYPE_RETHROW:
                     $thrown = $this->resolveActiveCatchException($frame);
                     if (null === $thrown) {
                         throw new \LogicException('Cannot use "throw;" outside of a catch block');
                     }
-                    $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+                    $catchFrame = $this->dispatchEngineThrow($frame, $thrown);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
                         goto restart;
                     }
-                    $this->raiseUncaughtException($thrown);
                     break;
                 default:
                     throw new \LogicException("VM OpCode Not Implemented: " . opcode_type_name($op->type));
+                }
+            } catch (TypedPropertyReadSignal $signal) {
+                $catchFrame = $this->dispatchEngineThrow($frame, $signal->errorObject);
+                if (null !== $catchFrame) {
+                    $frame = $catchFrame;
+                    goto restart;
+                }
+
+                return self::FAILURE;
             }
             if ($frame->generatorYield) {
                 $frame->generatorYield = false;
