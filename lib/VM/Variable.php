@@ -547,9 +547,17 @@ restart:
             return ($self->integer !== 0) === $other->bool;
         }
         if ($self->type === self::TYPE_STRING && $other->type === self::TYPE_INTEGER) {
+            if ('' === $self->string) {
+                return false;
+            }
+
             return $other->integer == self::looseNumericFromString($self->string);
         }
         if ($self->type === self::TYPE_INTEGER && $other->type === self::TYPE_STRING) {
+            if ('' === $other->string) {
+                return false;
+            }
+
             return $self->integer == self::looseNumericFromString($other->string);
         }
         if ($self->type === self::TYPE_STRING && $other->type === self::TYPE_FLOAT) {

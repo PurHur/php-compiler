@@ -39,8 +39,10 @@ final class LooseNumericStringEqualsTest extends TestCase
         $this->assertFalse(self::intVar(1)->equals(self::strVar('2')));
     }
 
-    public function testEmptyStringEqualsZero(): void
+    public function testEmptyStringNotLooselyEqualToInteger(): void
     {
-        $this->assertTrue(self::intVar(0)->equals(self::strVar('')));
+        $this->assertFalse(self::intVar(0)->equals(self::strVar('')));
+        $this->assertFalse(self::strVar('')->equals(self::intVar(0)));
+        $this->assertFalse(self::intVar(1)->equals(self::strVar('')));
     }
 }
