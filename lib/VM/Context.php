@@ -79,6 +79,9 @@ class Context {
     /** @var array<int, Variable> foreach iterator container cache (issue #167, #1885). */
     public array $foreachIterators = [];
 
+    /** @var array<int, ObjectPropertyIterator> foreach object property walk (#3661). */
+    public array $objectPropertyIterators = [];
+
     public function __construct(Runtime $runtime) {
         $this->runtime = $runtime;
         $this->errors = new ErrorReporter();

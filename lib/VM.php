@@ -23,6 +23,7 @@ use PHPCompiler\VM\GeneratorState;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ObjectPropertyIterator;
 use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
@@ -1555,16 +1556,28 @@ restart:
                         $container->toObject()->generatorState->rewind();
                         break;
                     }
+                    if (Variable::TYPE_OBJECT === $container->type) {
+                        $iter = new ObjectPropertyIterator($container->toObject());
+                        $iter->reset();
+                        $this->context->objectPropertyIterators[$op->arg1] = $iter;
+                        break;
+                    }
                     if (Variable::TYPE_ARRAY !== $container->type) {
                         throw new \LogicException('Iterator reset requires an array');
                     }
                     $container->toArray()->iterReset();
                     break;
                 case OpCode::TYPE_ITER_VALID:
-                    $container = ($this->context->foreachIterators[$op->arg2] ?? ($frame->iterators[$op->arg2] ?? $frame->scope[$op->arg2]))->resolveIndirect();
+                    $container = $this->foreachContainer($frame, $op->arg2);
                     if ($this->variableIsGenerator($container)) {
                         $frame->scope[$op->arg1]->bool(
                             $this->advanceGeneratorIteration($container->toObject()->generatorState)
+                        );
+                        break;
+                    }
+                    if (Variable::TYPE_OBJECT === $container->type) {
+                        $frame->scope[$op->arg1]->bool(
+                            $this->objectForeachIterator($op->arg2)->valid()
                         );
                         break;
                     }
@@ -1574,10 +1587,16 @@ restart:
                     $frame->scope[$op->arg1]->bool($container->toArray()->iterValid());
                     break;
                 case OpCode::TYPE_ITER_KEY:
-                    $container = ($this->context->foreachIterators[$op->arg2] ?? ($frame->iterators[$op->arg2] ?? $frame->scope[$op->arg2]))->resolveIndirect();
+                    $container = $this->foreachContainer($frame, $op->arg2);
                     if ($this->variableIsGenerator($container)) {
                         $frame->scope[$op->arg1]->copyFrom(
                             $container->toObject()->generatorState->currentKey
+                        );
+                        break;
+                    }
+                    if (Variable::TYPE_OBJECT === $container->type) {
+                        $frame->scope[$op->arg1]->copyFrom(
+                            $this->objectForeachIterator($op->arg2)->currentKey()
                         );
                         break;
                     }
@@ -1587,11 +1606,24 @@ restart:
                     $frame->scope[$op->arg1]->copyFrom($container->toArray()->iterCurrentKey());
                     break;
                 case OpCode::TYPE_ITER_VALUE:
-                    $container = ($this->context->foreachIterators[$op->arg2] ?? ($frame->iterators[$op->arg2] ?? $frame->scope[$op->arg2]))->resolveIndirect();
+                    $container = $this->foreachContainer($frame, $op->arg2);
                     if ($this->variableIsGenerator($container)) {
                         $frame->scope[$op->arg1]->copyFrom(
                             $container->toObject()->generatorState->currentValue
                         );
+                        break;
+                    }
+                    if (Variable::TYPE_OBJECT === $container->type) {
+                        $byRef = (bool) $op->arg3;
+                        if ($byRef) {
+                            $frame->scope[$op->arg1]->indirect(
+                                $this->objectForeachIterator($op->arg2)->currentValue(true)
+                            );
+                        } else {
+                            $frame->scope[$op->arg1]->copyFrom(
+                                $this->objectForeachIterator($op->arg2)->currentValue(false)
+                            );
+                        }
                         break;
                     }
                     if (Variable::TYPE_ARRAY !== $container->type) {
@@ -2199,6 +2231,21 @@ restart:
 
         return Variable::TYPE_OBJECT === $container->type
             && null !== $container->toObject()->generatorState;
+    }
+
+    private function foreachContainer(Frame $frame, int $slot): Variable
+    {
+        return ($this->context->foreachIterators[$slot]
+            ?? ($frame->iterators[$slot] ?? $frame->scope[$slot]))->resolveIndirect();
+    }
+
+    private function objectForeachIterator(int $slot): ObjectPropertyIterator
+    {
+        if (!isset($this->context->objectPropertyIterators[$slot])) {
+            throw new \LogicException('Object foreach iterator not initialized');
+        }
+
+        return $this->context->objectPropertyIterators[$slot];
     }
 
     private function findGeneratorState(Frame $frame): ?GeneratorState
