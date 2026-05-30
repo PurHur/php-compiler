@@ -96,6 +96,7 @@ class Module extends ModuleAbstract
             new bindec(),
             new is_numeric(),
             new is_scalar(),
+            new is_countable(),
             new lcfirst(),
             new ucfirst(),
             new ucwords(),

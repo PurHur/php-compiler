@@ -143,6 +143,7 @@ static const char *phpc_builtin_functions[] = {
     "is_a",
     "is_array",
     "is_bool",
+    "is_countable",
     "is_dir",
     "is_double",
     "is_executable",
