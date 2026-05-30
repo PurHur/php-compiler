@@ -355,10 +355,8 @@ class Block {
         }
     }
 
-    /**
-     * @return iterable<array{0: VarOperand, 1: int}>
-     */
-    public function eachCfgVarRootSlot(): iterable
+    /** Yields [VarOperand root, int scope slot] pairs. */
+    public function eachCfgVarRootSlot(): \Generator
     {
         $seenRoots = [];
         foreach ($this->scope as $operand) {
@@ -482,10 +480,8 @@ class Block {
         return null;
     }
 
-    /**
-     * @return iterable<array{0: string, 1: int}> variable name and scope slot
-     */
-    public function eachNamedScopeSlot(): iterable
+    /** Yields [variable name, scope slot] pairs. */
+    public function eachNamedScopeSlot(): \Generator
     {
         $seen = [];
         foreach ($this->scope as $operand) {
