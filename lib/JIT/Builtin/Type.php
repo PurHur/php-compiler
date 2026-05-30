@@ -77,6 +77,16 @@ class Type extends Builtin {
         );
         $fnPack = $this->context->module->addFunction('__compiler_pack', $fntypePack);
         $this->context->registerFunction('__compiler_pack', $fnPack);
+        $fntypeUnpack = $this->context->context->functionType(
+            $this->context->getTypeFromString('void'),
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('int64'),
+            $this->context->getTypeFromString('__value__*')
+        );
+        $fnUnpack = $this->context->module->addFunction('__compiler_unpack', $fntypeUnpack);
+        $this->context->registerFunction('__compiler_unpack', $fnUnpack);
         $fntypeIniSet = $this->context->context->functionType(
             $this->context->getTypeFromString('void'),
             false,

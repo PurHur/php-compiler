@@ -76,6 +76,7 @@ class Module extends ModuleAbstract
             new intdiv(),
             new ord(),
             new pack(),
+            new unpack(),
             new chr(),
             new strcmp(),
             new levenshtein(),
