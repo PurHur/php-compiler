@@ -34,7 +34,8 @@ Color::from('missing');
 PHP;
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile($code, 'enum_from_invalid.php');
-        $this->expectException(\ValueError::class);
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('"missing" is not a valid backing value for enum "Color"');
         $runtime->run($block);
     }
 }
