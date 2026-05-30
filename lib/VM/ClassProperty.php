@@ -21,16 +21,13 @@ class ClassProperty {
     public ?string $getHookMethodLc = null;
     /** Individual readonly property (issue #3149, promoted readonly #3432). */
     public bool $readonly = false;
-<<<<<<< HEAD
     /** Per-instance `new` default initializer (issue #3391). */
     public ?Block $defaultInitBlock = null;
     public ?int $defaultInitResultSlot = null;
-=======
     /** PHPCfg visibility flags (issue #145). */
     public int $visibility;
     /** Lowercase class that declared this property (issue #145). */
     public string $declaringClassLc;
->>>>>>> 6580fb89 (VM: enforce protected/private property visibility (#145))
 
     public function __construct(
         string $name,
