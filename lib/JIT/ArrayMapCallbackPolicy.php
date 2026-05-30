@@ -21,7 +21,7 @@ final class ArrayMapCallbackPolicy
 
     public const DEFERRED_KINDS = 'array callables and invokable objects';
 
-    public const JIT_SUBSET = 'null or compile-time string stdlib builtin names';
+    public const JIT_SUBSET = 'null, compile-time string stdlib builtin names, or closure/arrow callbacks';
 
     public static function isClosureJitLowerable(JITVariable $callback): bool
     {
