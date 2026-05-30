@@ -28,6 +28,9 @@ class MagicStringResolver extends NodeVisitorAbstract
     /** @var list<string> */
     protected $namespaceStack = [];
 
+    /** @var list<string> */
+    protected $traitStack = [];
+
     public function enterNode(Node $node)
     {
         $this->repairComments($node);
@@ -46,6 +49,9 @@ class MagicStringResolver extends NodeVisitorAbstract
                 );
             }
             $this->classStack[] = $node->namespacedName->toString();
+            if ($node instanceof Node\Stmt\Trait_) {
+                $this->traitStack[] = $node->namespacedName->toString();
+            }
             if (! empty($node->extends) && ! is_array($node->extends)) {
                 // Should always be fully qualified
                 $this->parentStack[] = $node->extends->toString();
@@ -76,10 +82,11 @@ class MagicStringResolver extends NodeVisitorAbstract
                 return new Node\Scalar\String_(end($this->classStack), $node->getAttributes());
             }
         } elseif ($node instanceof Node\Scalar\MagicConst\Trait_) {
-            // Traits can't nest, so this works...
-            if (! empty($this->classStack)) {
-                return new Node\Scalar\String_(end($this->classStack), $node->getAttributes());
+            if (! empty($this->traitStack)) {
+                return new Node\Scalar\String_(end($this->traitStack), $node->getAttributes());
             }
+
+            return new Node\Scalar\String_('', $node->getAttributes());
         } elseif ($node instanceof Node\Scalar\MagicConst\Namespace_) {
             if (! empty($this->namespaceStack)) {
                 return new Node\Scalar\String_(end($this->namespaceStack), $node->getAttributes());
@@ -100,6 +107,9 @@ class MagicStringResolver extends NodeVisitorAbstract
             if (! empty($this->methodStack)) {
                 return new Node\Scalar\String_(end($this->methodStack), $node->getAttributes());
             }
+            if (! empty($this->functionStack)) {
+                return new Node\Scalar\String_(end($this->functionStack), $node->getAttributes());
+            }
         }
     }
 
@@ -110,6 +120,9 @@ class MagicStringResolver extends NodeVisitorAbstract
         } elseif ($node instanceof Node\Stmt\ClassLike) {
             assert(end($this->classStack) === $node->namespacedName->toString());
             array_pop($this->classStack);
+            if ($node instanceof Node\Stmt\Trait_) {
+                array_pop($this->traitStack);
+            }
             array_pop($this->parentStack);
         } elseif ($node instanceof Node\Stmt\Function_) {
             assert(end($this->functionStack) === $node->namespacedName->toString());

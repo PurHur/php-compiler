@@ -225,6 +225,10 @@ final class IncludeHelper
             $context->builder->branch($resumeBb);
         }
         $context->builder->positionAtEnd($resumeBb);
+        // Caller opcodes after this include must lower into resumeBb, not preIncludeBb (#475).
+        if ($context->scope->blockStorage->contains($callerBlock)) {
+            $context->scope->blockStorage[$callerBlock] = $resumeBb;
+        }
 
         if (null !== $resultOperand) {
             $jit->assignIncludeResult($resultOperand);

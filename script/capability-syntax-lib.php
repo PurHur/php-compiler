@@ -43,7 +43,7 @@ function syntaxRowDefinitions(): array
             'construct' => 'Enum declarations `enum Foo: string { case Bar = \'x\'; }`',
             'opcodes' => ['TYPE_DECLARE_ENUM', 'TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH'],
             'issue' => 1356,
-            'notes' => ['Backed enum cases as class constants; `Foo::Bar` const-like fetch; `enum_exists` registry; `implements` metadata (#2299); static methods (#2299)'],
+            'notes' => ['Backed enum cases as class constants; `Foo::Bar` const-like fetch; case `->name` / `->value` (#3420); `enum_exists` registry; `implements` metadata (#2299); static methods (#2299); `Enum::cases()` VM (#3308)'],
             'probe' => 'enum Status: string { case Ok = \'ok\'; public static function tag(): string { return \'ok\'; } } echo Status::tag();',
         ],
         [
@@ -74,6 +74,17 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { private string $x; public function __construct(string $x = "a") { $this->x = $x; } public function get(): string { return $this->x; } } echo (new C())->get();',
         ],
         [
+            'id' => 'clone_magic',
+            'construct' => '`clone` + `__clone()` magic method',
+            'opcodes' => ['TYPE_CLONE', 'TYPE_DECLARE_METHOD'],
+            'issue' => 3170,
+            'notes' => [
+                'Zend zend_std_clone_object: shallow copy then __clone when defined',
+                'VM invokePhpFunction; JIT invokeCloneMagicIfPresent after cloneObject',
+            ],
+            'probe' => 'class C { public int $x = 1; public function __clone() { $this->x = 2; } } $a = new C(); $b = clone $a; echo $b->x;',
+        ],
+        [
             'id' => 'private_methods',
             'construct' => 'Private methods',
             'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_METHODCALL_INIT'],
@@ -102,8 +113,8 @@ function syntaxRowDefinitions(): array
             'construct' => 'Method return types (`: string` / `: void`)',
             'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_RETURN', 'TYPE_RETURN_VOID'],
             'issue' => 55,
-            'jit' => false,
-            'notes' => ['Router `dispatch(): void`; JIT non-void deferred (#55)'],
+            'jit' => true,
+            'notes' => ['#55 native `: string`/`: int`/`: bool`/`: float`/`: array`/`: ?T` LLVM returns; MCJIT execute #2055'],
             'probe' => 'class C { public function f(): string { return "ok"; } public function g(): void {} } echo (new C())->f();',
         ],
         [
@@ -138,6 +149,14 @@ function syntaxRowDefinitions(): array
             'issue' => 138,
             'notes' => [],
             'probe' => 'class C {} echo ((new C()) instanceof C) ? "yes" : "no";',
+        ],
+        [
+            'id' => 'instanceof_union',
+            'construct' => '`instanceof` union RHS `(A|B)`',
+            'opcodes' => ['TYPE_INSTANCEOF'],
+            'issue' => 3461,
+            'notes' => ['php-cfg parses BitwiseOr of class names from php-parser; VM + JIT union OR (#3461)'],
+            'probe' => 'interface A {} interface B {} class C implements A, B {} echo ((new C) instanceof (A|B)) ? "1" : "0";',
         ],
         [
             'id' => 'match_expr',
@@ -263,9 +282,7 @@ function syntaxRowDefinitions(): array
             'construct' => 'By-reference parameters (`function f(&$x)`)',
             'opcodes' => ['TYPE_ARG_RECV', 'TYPE_ARG_SEND'],
             'issue' => 140,
-            'jit' => false,
-            'aot' => false,
-            'notes' => ['VM aliases caller slots via TYPE_INDIRECT; JIT pointer args deferred'],
+            'notes' => ['VM TYPE_INDIRECT; JIT aliases caller __value__* via paramByRef (#3161)'],
             'probe' => 'function inc(&$n) { $n++; } $x = 1; inc($x); echo $x;',
         ],
         [
@@ -275,6 +292,17 @@ function syntaxRowDefinitions(): array
             'issue' => 1225,
             'notes' => ['Class-scoped storage; `self::` / `static::`; literal property names in JIT'],
             'probe' => 'class C { public static int $n = 1; } echo C::$n;',
+        ],
+        [
+            'id' => 'error_control_operator',
+            'construct' => 'Error-control operator `@` on expressions',
+            'opcodes' => ['TYPE_BEGIN_SILENCE', 'TYPE_END_SILENCE'],
+            'issue' => 3546,
+            'notes' => [
+                'php-cfg ErrorSuppressBlock + Simplifier preserve (#3546)',
+                'VM masks error_reporting; JIT/AOT no-op until native silence',
+            ],
+            'probe' => 'echo @$undefined; @trigger_error("x", E_USER_NOTICE); echo "ok\\n";',
         ],
         [
             'id' => 'unset',
@@ -289,10 +317,13 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'function_static_local',
-            'construct' => 'Function-local `static $var = <literal>`',
+            'construct' => 'Function-local `static $var` / `static $var = <literal>`',
             'opcodes' => ['TYPE_DECLARE_FUNCTION_STATIC'],
             'issue' => 2286,
-            'notes' => ['Literal int/string init only in v1; VM + JIT + AOT'],
+            'notes' => [
+                'Literal int/string init only in v1; VM + JIT + AOT',
+                'Uninitialized `static $x;` with isset guard — Zend parity (#3533); `static &$x` is not valid PHP syntax (php-src `static_var` grammar)',
+            ],
             'probe' => 'function f(){static $n=0; $n++; return $n;} echo f().f().f();',
         ],
         [
@@ -376,6 +407,18 @@ function syntaxRowDefinitions(): array
             'probe' => 'namespace N { class A {} } namespace U { use N\\{A}; echo (new A()) ? 1 : 0; }',
         ],
         [
+            'id' => 'heredoc_flexible_indent',
+            'construct' => 'Flexible heredoc/nowdoc indentation stripping (PHP 7.3+)',
+            'opcodes' => [],
+            'issue' => 3636,
+            'notes' => [
+                'php-parser Emulative FlexibleDocStringEmulator + parseDocString stripIndentation (#3636)',
+                'Indented closing label sets docIndentation column; basic heredoc/nowdoc #178',
+                'Zend/zend_language_scanner.l flexible heredoc/nowdoc parity',
+            ],
+            'probe' => "echo <<<EOT\n    hello\n    EOT;",
+        ],
+        [
             'id' => 'never_return',
             'construct' => '`never` return type',
             'opcodes' => ['TYPE_EXIT', 'TYPE_RETURN', 'TYPE_RETURN_VOID'],
@@ -426,9 +469,9 @@ function syntaxRowDefinitions(): array
         [
             'id' => 'serialize_magic',
             'construct' => '`__serialize` / `__unserialize` magic methods',
-            'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_METHODCALL_INIT', 'TYPE_METHODCALL_EXEC_RETURN'],
+            'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_METHODCALL_INIT', 'TYPE_FUNCCALL_EXEC_RETURN'],
             'issue' => 1365,
-            'notes' => ['serialize()/unserialize() call __serialize/__unserialize when present; VM via VmSerialize'],
+            'notes' => ['serialize()/unserialize() call __serialize/__unserialize when present; VM via VmSerialize (#3368)'],
             'probe' => 'class B { private int $n = 0; public function __construct(int $n = 0) { $this->n = $n; } public function __serialize(): array { return ["n" => $this->n]; } public function __unserialize(array $d): void { $this->n = $d["n"]; } public function get(): int { return $this->n; } } $r = unserialize(serialize(new B(3))); echo $r->get();',
         ],
         [
@@ -447,7 +490,7 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'throw lowering #195; php-cfg TryCatch overlay (#2084); VM TYPE_TRY/CATCH/THROW/FINALLY',
                 'VM finally-before-catch + return-through-finally (#3081, #3106); TryCatchComplianceTest (10 tests)',
-                'JIT TryCatchHelper IR verify (#3107); bin/jit.php VM fallback via requiresVmLowering (#2114); MCJIT execute unsafe',
+                'JIT TryCatchHelper IR verify (#3107); bin/jit.php VM fallback via requiresVmLowering (#2114); MCJIT execute probe TryCatchJitExecuteTest',
             ],
             'probe' => 'class E {} try { throw new E(); } catch (E $e) { echo "ok"; }',
         ],
@@ -475,11 +518,13 @@ function syntaxRowDefinitions(): array
             'id' => 'weak_reference_weak_map',
             'construct' => 'WeakReference / WeakMap',
             'opcodes' => [],
-            'issue' => 1366,
+            'issue' => 3282,
             'jit' => false,
             'notes' => [
-                'VM stub: WeakReference::create/get via indirect target slot (unset clears get); not cycle-collecting GC weak refs',
-                'WeakMap uses object-id string keys; JIT may compile references but method bodies are VM-only',
+                'VM: WeakReference::create/get via indirect target slot; unset clears get immediately',
+                'GC-backed weak refs via WeakRefRegistry — referent collected by gc_collect_cycles() clears get()',
+                'WeakMap uses object-id string keys; entries removed when key object is collected',
+                'JIT may compile references but method bodies are VM-only',
             ],
             'probe' => 'class Box {} $o = new Box(); $r = WeakReference::create($o); unset($o); echo $r->get() === null ? "1" : "0";',
         ],
@@ -622,6 +667,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'class_new' => '/\b(?:class\s+\w+|new\s+\w+)/',
         'instance_methods' => '/function\s+\w+\s*\(/',
         'construct_method' => '/function\s+__construct\s*\(/',
+        'clone_magic' => '/function\s+__clone\s*\(/',
         'private_methods' => '/\bprivate\s+function\b/',
         'method_return_types' => '/function\s+\w+\([^)]*\)\s*:\s*(?:string|void|int)/',
         'property_fetch' => '/\$this->\w+/',
@@ -643,6 +689,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'array_argument_unpack' => '/\.\.\.\s*\$/',
         'multi_catch' => '/catch\s*\([^)]*\|/',
         'try_catch_throw' => '/\btry\s*\{/',
+        'heredoc_flexible_indent' => '/<<<\s*\w+\s*\r?\n\s+\S/',
     ];
 
     $scan = [];
@@ -962,10 +1009,10 @@ function miniWebAppOopNorthStarDefinitions(): array
         [
             'construct' => 'Method return types (`: string` / `: void`)',
             'vm' => 'yes',
-            'jit' => 'no',
-            'aot' => 'partial',
+            'jit' => 'yes',
+            'aot' => 'yes',
             'issue' => 55,
-            'notes' => ['#55 JIT non-void return types; VM `: void` on Router::dispatch'],
+            'notes' => ['#55 native scalar/array returns; nullable via __value__*; MCJIT execute #2055'],
         ],
     ];
 }

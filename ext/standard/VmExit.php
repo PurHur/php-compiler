@@ -5,13 +5,19 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\ScriptExit;
+use PHPCompiler\VM\ShutdownQueue;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Web\Superglobals;
 
 /** VM lowering for exit/die (issue #269). */
 final class VmExit
 {
     public static function terminate(?Variable $arg): never
     {
+        $ctx = Superglobals::getActiveContext();
+        if (null !== $ctx) {
+            ShutdownQueue::run($ctx);
+        }
         throw new ScriptExit(self::resolveStatus($arg));
     }
 

@@ -82,6 +82,33 @@ echo "\n";
         );
     }
 
+    /** Issue #3462: ($x ?? throw new Ex()) — RHS only when LHS is null. */
+    public function testNullCoalesceThrow(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+class Ex {
+    public string $m;
+    public function __construct(string $m) { $this->m = $m; }
+}
+try {
+    echo ($missing ?? throw new Ex("missing")), "\n";
+} catch (Ex $e) {
+    echo "caught:", $e->m, "\n";
+}
+$ok = 1;
+$hit = 0;
+try {
+    echo ($ok ?? throw new Ex("no")), "\n";
+} catch (Ex $e) {
+    $hit = 1;
+}
+echo $hit, "\n";
+',
+            "caught:missing\n1\n0\n"
+        );
+    }
+
     private function assertVmOutput(string $code, string $expected): void
     {
         $runtime = new Runtime();
