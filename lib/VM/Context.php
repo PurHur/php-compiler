@@ -137,6 +137,12 @@ class Context {
             $var->int($stdlibInt);
             return $var;
         }
+        $stdlibFloat = \PHPCompiler\ext\standard\StdlibConstants::CORE_FLOAT_BY_NAME[strtolower($name)] ?? null;
+        if (null !== $stdlibFloat) {
+            $var = new Variable(Variable::TYPE_FLOAT);
+            $var->float($stdlibFloat);
+            return $var;
+        }
         $phpCore = \PHPCompiler\ext\standard\VmPhpCoreConstants::fetch($name);
         if (null !== $phpCore) {
             return $phpCore;
