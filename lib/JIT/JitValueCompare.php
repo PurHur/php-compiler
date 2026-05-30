@@ -183,6 +183,55 @@ final class JitValueCompare
         return self::notLooseEqualValueToNativeLong($context, $boxed, $nativeLong);
     }
 
+    /**
+     * Loose == between {@see __hashtable__*} and native bool (Zend: empty array == false).
+     */
+    public static function looseEqualHashtableToBool(
+        Context $context,
+        Value $hashtable,
+        Value $bool
+    ): Value {
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $hashtable
+        );
+        $sizeT = $context->getTypeFromString('size_t');
+        $isEmpty = $context->builder->icmp(
+            Builder::INT_EQ,
+            $num,
+            $sizeT->constInt(0, false)
+        );
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+        $trueVal = $i1->constInt(1, false);
+        $notBool = $context->builder->select($bool, $falseVal, $trueVal);
+
+        return $context->builder->select($isEmpty, $notBool, $bool);
+    }
+
+    /**
+     * Loose == between a JIT array operand (native or hashtable) and native bool.
+     */
+    public static function looseEqualArrayToBool(
+        Context $context,
+        Variable $array,
+        Value $bool
+    ): Value {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
+            $i1 = $context->getTypeFromString('int1');
+            $falseVal = $i1->constInt(0, false);
+            $trueVal = $i1->constInt(1, false);
+            if (0 === $array->nextFreeElement) {
+                return $context->builder->select($bool, $falseVal, $trueVal);
+            }
+
+            return $bool;
+        }
+        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+
+        return self::looseEqualHashtableToBool($context, $ht, $bool);
+    }
+
 
     /** True when a boxed operand is unset: null {@see __value__*} or a null-tagged box (#1086). */
     public static function valueBoxIsNull(Context $context, Variable $boxed): Value
