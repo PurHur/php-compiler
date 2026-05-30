@@ -872,6 +872,7 @@ class Object_ extends Type {
         PHPLLVM\LLVMAbstract\BasicBlock $continue
     ): void {
         if (!isset($this->properties[$classId]) || [] === $this->properties[$classId]) {
+            $this->copyConstructedFlag($dest, $src);
             $this->context->builder->branch($continue);
 
             return;
@@ -884,7 +885,21 @@ class Object_ extends Type {
             $value = $this->propertyFetch($src, $className, $propName);
             $this->propertyStore($this->propertySlotPtr($dest, $slotIndex), $value, $propType);
         }
+        $this->copyConstructedFlag($dest, $src);
         $this->context->builder->branch($continue);
+    }
+
+    /** Preserve post-construct state on clone (Zend zend_clones.c; issue #3430). */
+    private function copyConstructedFlag(PHPLLVM\Value $dest, PHPLLVM\Value $src): void
+    {
+        $map = $this->context->structFieldMap['__object__'];
+        $constructed = $this->context->builder->load(
+            $this->context->builder->structGep($src, $map['constructed'])
+        );
+        $this->context->builder->store(
+            $constructed,
+            $this->context->builder->structGep($dest, $map['constructed'])
+        );
     }
 
     public function classNameForId(int $id): string
