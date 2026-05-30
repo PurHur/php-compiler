@@ -1,0 +1,22 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -1320,10 +1320,15 @@
+                 continue;
+             }
+ 
+-            $assign = new Op\Expr\Assign(
+-                $this->writeVariable($this->parseExprNode($var)),
+-                $fetch->result, $attributes
+-            );
++            $target = $this->writeVariable($this->parseExprNode($var));
++            if ($item->byRef) {
++                $assign = new Op\Expr\AssignRef(
++                    $target,
++                    $fetch->result, $attributes
++                );
++            } else {
++                $assign = new Op\Expr\Assign($target, $fetch->result, $attributes);
++            }
+             $this->block->children[] = $assign;
+         }
+     }
