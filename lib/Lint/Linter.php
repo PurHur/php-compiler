@@ -11,6 +11,7 @@ use PHPCfg\Operand;
 use PHPCfg\Script;
 use PHPTypes\State;
 use PHPCompiler\Compiler\CompileFatal;
+use PHPCompiler\AOT\AutoloadDiscovery;
 use PHPCompiler\Runtime;
 use PHPCompiler\Web\ConstStringFolder;
 use PHPCompiler\Web\IncludePathResolver;
@@ -65,6 +66,15 @@ final class Linter
                 ProjectAutoload::parsePsr4Map($projectDir, $manifest)
             )
         );
+
+        $psr4Map = ProjectAutoload::parsePsr4Map($projectDir, $manifest);
+        if ([] !== $psr4Map) {
+            $seedFiles = array_merge($extraFiles, [$entry]);
+            $autoload = AutoloadDiscovery::discover($this->runtime, $projectDir, $psr4Map, $seedFiles);
+            foreach ($autoload['errors'] as $message) {
+                $issues[] = new Issue($entry, 0, 'autoload', $message, 1803);
+            }
+        }
 
         $entryReal = realpath($entry) ?: $entry;
         foreach ($extraFiles as $file) {
