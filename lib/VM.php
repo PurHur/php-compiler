@@ -458,13 +458,31 @@ restart:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
-                    $arg1->compareOp($op->type, $arg2, $arg3);
+                    try {
+                        $arg1->compareOp($op->type, $arg2, $arg3);
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     break;
                 case OpCode::TYPE_SPACESHIP:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
-                    $arg1->spaceshipOp($arg2, $arg3);
+                    try {
+                        $arg1->spaceshipOp($arg2, $arg3);
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     break;
                 case OpCode::TYPE_PLUS:
                 case OpCode::TYPE_MINUS:
@@ -1262,6 +1280,9 @@ restart:
                             $this->context->pendingException = null;
                             $frame = $op->block1->getFrame($this->context, $frame);
                             if (null !== $op->arg3) {
+                                if (!isset($frame->scope[$op->arg3])) {
+                                    $frame->scope[$op->arg3] = new Variable();
+                                }
                                 $frame->scope[$op->arg3]->copyFrom($caught);
                             }
                             goto restart;
@@ -1378,6 +1399,21 @@ restart:
         throw new \LogicException($message.' in '.$where);
     }
 
+    /**
+     * Bridge native TypeError from VM internals into user catch handlers (#3445).
+     */
+    private function dispatchVmTypeError(\TypeError $error, Frame $frame): ?Frame
+    {
+        $thrown = VM\BuiltinExceptionSupport::materializeTypeError($this->context, $error->getMessage());
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
     private function findCatchFrameForThrow(Frame $frame, Variable $thrown): ?Frame
     {
         $this->context->pendingException = $thrown;
@@ -1441,8 +1477,17 @@ restart:
             }
             $caught = $this->context->pendingException;
             $this->context->pendingException = null;
+            if (null !== $op->arg3) {
+                if (!isset($handler->scope[$op->arg3])) {
+                    $handler->scope[$op->arg3] = new Variable();
+                }
+                $handler->scope[$op->arg3]->copyFrom($caught);
+            }
             $catchFrame = $op->block1->getFrame($this->context, $handler);
             if (null !== $op->arg3) {
+                if (!isset($catchFrame->scope[$op->arg3])) {
+                    $catchFrame->scope[$op->arg3] = new Variable();
+                }
                 $catchFrame->scope[$op->arg3]->copyFrom($caught);
             }
             $mergeFrame = null;
