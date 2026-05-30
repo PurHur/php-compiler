@@ -1,0 +1,26 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\VM\Builtin;
+
+use PHPCompiler\Frame;
+use PHPCompiler\VM\ReflectionSupport;
+
+/** ReflectionAttribute::getArguments() — VM read path (#3340). */
+final class ReflectionAttributeGetArguments extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getArguments');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = ReflectionSupport::requireReflectionAttribute($frame, $frame->calledArgs[0]);
+        $args = ReflectionSupport::argsFromReflectionObject($receiver);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->copyFrom(ReflectionSupport::argumentsArray($args));
+        }
+    }
+}

@@ -51,6 +51,8 @@ class Object_ extends Type {
     private array $propNameMap = [];
     /** @var array<int, array<string, int>> class id => method lc => visibility flags */
     private array $methodVisibility = [];
+    /** @var array<int, array<string, int>> class id => property lc => visibility flags (#3159) */
+    private array $propertyVisibility = [];
     /** @var array<int, true> class ids with a compiled __construct body */
     private array $hasConstructor = [];
     /** @var array<int, true> vendor/external classes without lowered methods (#2666) */
@@ -1158,6 +1160,16 @@ class Object_ extends Type {
         return $this->properties[$classId] ?? [];
     }
 
+    /**
+     * Compile-time property default metadata for get_class_vars() (#3159).
+     *
+     * @return array<int, array{propertyType: int, type: int, value: int|float|bool|string|null}>
+     */
+    public function propertyDefaultEntries(int $classId): array
+    {
+        return $this->propertyDefaults[$classId] ?? [];
+    }
+
     public function lookupOperand(Operand $name): int
     {
         if (!$name instanceof Literal) {
@@ -1527,6 +1539,16 @@ class Object_ extends Type {
     public function defineMethodVisibility(int $classId, string $methodLc, int $visibilityFlags): void
     {
         $this->methodVisibility[$classId][strtolower($methodLc)] = $visibilityFlags;
+    }
+
+    public function definePropertyVisibility(int $classId, string $name, int $visibilityFlags): void
+    {
+        $this->propertyVisibility[$classId][strtolower($name)] = $visibilityFlags;
+    }
+
+    public function propertyVisibility(int $classId, string $name): int
+    {
+        return $this->propertyVisibility[$classId][strtolower($name)] ?? \PHPCfg\Func::FLAG_PUBLIC;
     }
 
     public function methodVisibility(int $classId, string $methodLc): int

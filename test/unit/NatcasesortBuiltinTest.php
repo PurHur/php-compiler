@@ -31,6 +31,25 @@ final class NatcasesortBuiltinTest extends TestCase
         $this->assertSame(['img1', 'IMG2', 'img10', 'Img12'], $vals);
     }
 
+    public function testNaturalCaseSortsPackedIntegersWithSharedRefcount(): void
+    {
+        $runtime = new Runtime();
+        $fn = new natcasesort_();
+        $ht = new HashTable();
+        foreach ([3, 1, 2] as $i => $v) {
+            $val = new VMVariable();
+            $val->int($v);
+            $ht->addIndex($i, $val);
+        }
+        $ht->addRef();
+        $sorted = $this->runNatcasesort($fn, $runtime, $ht);
+        $vals = [];
+        foreach ($sorted->iterate(true) as $v) {
+            $vals[] = $v->toInt();
+        }
+        $this->assertSame([1, 2, 3], $vals);
+    }
+
     public function testNaturalCaseSortsStringKeysByValue(): void
     {
         $runtime = new Runtime();

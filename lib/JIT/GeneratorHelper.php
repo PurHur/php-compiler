@@ -39,6 +39,9 @@ final class GeneratorHelper
             $context->getTypeFromString('int1'),
             $context->getTypeFromString('__value__'),
             $context->getTypeFromString('__value__'),
+            $context->getTypeFromString('int1'),
+            $context->getTypeFromString('__hashtable__*'),
+            $context->getTypeFromString('size_t'),
         );
         $context->structFieldMap['__generator_state__'] = [
             'resume_ip' => 0,
@@ -47,6 +50,9 @@ final class GeneratorHelper
             'done' => 3,
             'current_key' => 4,
             'current_value' => 5,
+            'yield_from_active' => 6,
+            'yield_from_ht' => 7,
+            'yield_from_idx' => 8,
         ];
     }
 
@@ -77,16 +83,16 @@ final class GeneratorHelper
     }
 
     /**
-     * @return list<OpCode>
+     * @return list<array{kind: string, op: OpCode}>
      */
-    public static function linearYieldOpcodes(Block $block): array
+    public static function collectResumePoints(Block $block): array
     {
-        $yields = [];
+        $points = [];
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_YIELD === $op->type) {
-                $yields[] = $op;
+                $points[] = ['kind' => 'yield', 'op' => $op];
             } elseif (OpCode::TYPE_YIELD_FROM === $op->type) {
-                throw new \LogicException('yield from is not supported in JIT generators yet (issue #3074)');
+                $points[] = ['kind' => 'yield_from', 'op' => $op];
             } elseif (OpCode::TYPE_RETURN === $op->type || OpCode::TYPE_RETURN_VOID === $op->type) {
                 break;
             } elseif (
@@ -99,7 +105,7 @@ final class GeneratorHelper
             }
         }
 
-        return $yields;
+        return $points;
     }
 
     public static function compileResumeFunction(
@@ -131,8 +137,8 @@ final class GeneratorHelper
 
         $entry = $func->appendBasicBlock('gen_entry');
         $context->builder->positionAtEnd($entry);
-        $yields = self::linearYieldOpcodes($block);
-        $n = count($yields);
+        $points = self::collectResumePoints($block);
+        $n = count($points);
         $map = $context->structFieldMap['__generator_state__'];
         $sizeT = $context->getTypeFromString('size_t');
         $i1 = $context->getTypeFromString('int1');
@@ -143,11 +149,27 @@ final class GeneratorHelper
         $doneBb = $func->appendBasicBlock('gen_done');
         $switchInst = $context->builder->branchSwitch($resumeIp, $doneBb, $n);
 
+        $caseBlocks = [];
         for ($i = 0; $i < $n; ++$i) {
             $caseBb = $func->appendBasicBlock('gen_case_'.$i);
             $switchInst->addCase($sizeT->constInt($i, false), $caseBb);
-            $context->builder->positionAtEnd($caseBb);
-            self::emitYieldPoint($jit, $block, $yields[$i], $stateParam, $i + 1);
+            $caseBlocks[$i] = $caseBb;
+        }
+
+        for ($i = 0; $i < $n; ++$i) {
+            $context->builder->positionAtEnd($caseBlocks[$i]);
+            $point = $points[$i];
+            if ('yield' === $point['kind']) {
+                self::emitYieldPoint($jit, $block, $point['op'], $stateParam, $i + 1);
+            } else {
+                self::emitYieldFromArrayPoint(
+                    $jit,
+                    $block,
+                    $point['op'],
+                    $stateParam,
+                    $i
+                );
+            }
         }
 
         $context->builder->positionAtEnd($doneBb);
@@ -222,6 +244,105 @@ final class GeneratorHelper
         $context->builder->returnValue($i64->constInt(1, false));
     }
 
+    private static function emitYieldFromArrayPoint(
+        \PHPCompiler\JIT $jit,
+        Block $block,
+        OpCode $op,
+        Value $stateParam,
+        int $resumeIp
+    ): void {
+        $context = $jit->context;
+        $map = $context->structFieldMap['__generator_state__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $i1 = $context->getTypeFromString('int1');
+        $i64 = $context->getTypeFromString('int64');
+        $htMap = $context->structFieldMap['__hashtable__'];
+        $one = $sizeT->constInt(1, false);
+        $zero = $sizeT->constInt(0, false);
+        $invalidIdx = $context->builder->sub($zero, $one);
+        $fn = $context->builder->getInsertBlock()->getParent();
+
+        $activeField = $context->builder->structGep($stateParam, $map['yield_from_active']);
+        $htField = $context->builder->structGep($stateParam, $map['yield_from_ht']);
+        $idxField = $context->builder->structGep($stateParam, $map['yield_from_idx']);
+        $active = $context->builder->load($activeField);
+
+        $initBb = $fn->appendBasicBlock('gen_yf_init');
+        $iterBb = $fn->appendBasicBlock('gen_yf_iter');
+        $context->builder->branchIf($active, $iterBb, $initBb);
+
+        $context->builder->positionAtEnd($initBb);
+        if (null === $op->arg2) {
+            throw new \LogicException('yield from missing container operand');
+        }
+        $containerOp = $block->getOperand($op->arg2);
+        $containerVar = $context->getVariableFromOp($containerOp);
+        if ($containerVar->type & Variable::IS_NATIVE_ARRAY) {
+            $htPtr = HashTableHelper::materializeNativeArrayForCall($context, $containerVar);
+        } elseif (Variable::TYPE_HASHTABLE === $containerVar->type) {
+            $htPtr = $context->helper->loadValue(HashTableHelper::asDetachedHashtable($context, $containerVar));
+        } elseif (Variable::TYPE_VALUE === $containerVar->type) {
+            $htPtr = $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                JitValueBox::valuePtrFromVariable($context, $containerVar)
+            );
+        } else {
+            throw new \LogicException('yield from in JIT requires an array container (issue #3074)');
+        }
+        $context->builder->store($htPtr, $htField);
+        $context->builder->store($invalidIdx, $idxField);
+        $context->builder->store($i1->constInt(1, false), $activeField);
+        $context->builder->branch($iterBb);
+
+        $context->builder->positionAtEnd($iterBb);
+        $idx = $context->builder->load($idxField);
+        $nextIdx = $context->builder->addNoSignedWrap($idx, $one);
+        $context->builder->store($nextIdx, $idxField);
+        $ht = $context->builder->load($htField);
+        $nextFree = $context->builder->load($context->builder->structGep($ht, $htMap['nextFreeElement']));
+        $inPacked = $context->builder->icmp(Builder::INT_ULT, $nextIdx, $nextFree);
+
+        $packedBody = $fn->appendBasicBlock('gen_yf_packed');
+        $exhausted = $fn->appendBasicBlock('gen_yf_exhausted');
+        $yieldBb = $fn->appendBasicBlock('gen_yf_yield');
+        $advancePacked = $fn->appendBasicBlock('gen_yf_advance');
+        $context->builder->branchIf($inPacked, $packedBody, $exhausted);
+
+        $context->builder->positionAtEnd($packedBody);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $nextIdx
+        );
+        $context->builder->branchIf($isSet, $yieldBb, $advancePacked);
+
+        $context->builder->positionAtEnd($advancePacked);
+        $context->builder->branch($iterBb);
+
+        $context->builder->positionAtEnd($yieldBb);
+        $keyField = $context->builder->structGep($stateParam, $map['current_key']);
+        $valField = $context->builder->structGep($stateParam, $map['current_value']);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            JitValueBox::pointer($context, $keyField),
+            $context->builder->truncOrBitCast($nextIdx, $context->getTypeFromString('int64'))
+        );
+        $values = $context->builder->load($context->builder->structGep($ht, $htMap['values']));
+        $entry = $context->builder->inBoundsGep($values, $nextIdx);
+        JitValueBox::copyFromPointer($context, $valField, $entry);
+        $context->builder->store($i1->constInt(1, false), $context->builder->structGep($stateParam, $map['has_current']));
+        $context->builder->store($sizeT->constInt($resumeIp, false), $context->builder->structGep($stateParam, $map['resume_ip']));
+        $context->builder->returnValue($i64->constInt(1, false));
+
+        $context->builder->positionAtEnd($exhausted);
+        $context->builder->store($i1->constInt(0, false), $activeField);
+        $context->builder->store(
+            $sizeT->constInt($resumeIp + 1, false),
+            $context->builder->structGep($stateParam, $map['resume_ip'])
+        );
+        $context->builder->returnValue($i64->constInt(0, false));
+    }
+
     public static function emitCreateFromCall(
         \PHPCompiler\JIT $jit,
         string $resumeInternalName
@@ -233,11 +354,15 @@ final class GeneratorHelper
         $map = $context->structFieldMap['__generator_state__'];
         $sizeT = $context->getTypeFromString('size_t');
         $i1 = $context->getTypeFromString('int1');
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
         $zero = $sizeT->constInt(0, false);
         $context->builder->store($zero, $context->builder->structGep($statePtr, $map['resume_ip']));
         $context->builder->store($zero, $context->builder->structGep($statePtr, $map['auto_key']));
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['has_current']));
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['done']));
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['yield_from_active']));
+        $context->builder->store($htPtrTy->constNull(), $context->builder->structGep($statePtr, $map['yield_from_ht']));
+        $context->builder->store($zero, $context->builder->structGep($statePtr, $map['yield_from_idx']));
         $context->builder->call(
             $context->lookupFunction('__value__writeNull'),
             JitValueBox::pointer($context, $context->builder->structGep($statePtr, $map['current_key']))
@@ -351,11 +476,15 @@ final class GeneratorHelper
         $map = $context->structFieldMap['__generator_state__'];
         $sizeT = $context->getTypeFromString('size_t');
         $i1 = $context->getTypeFromString('int1');
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
         $zero = $sizeT->constInt(0, false);
         $context->builder->store($zero, $context->builder->structGep($state, $map['resume_ip']));
         $context->builder->store($zero, $context->builder->structGep($state, $map['auto_key']));
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($state, $map['has_current']));
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($state, $map['done']));
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($state, $map['yield_from_active']));
+        $context->builder->store($htPtrTy->constNull(), $context->builder->structGep($state, $map['yield_from_ht']));
+        $context->builder->store($zero, $context->builder->structGep($state, $map['yield_from_idx']));
     }
 
     private static function llvmInternalName(string $name): string

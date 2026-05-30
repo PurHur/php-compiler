@@ -246,6 +246,10 @@ class VM {
     /** (string) cast on objects — invoke __toString (Zend zend_operators.c, issue #3421). */
     public function castObjectToString(ObjectEntry $object): string
     {
+        $typeString = VM\ReflectionTypeSupport::tryObjectTypeString($object);
+        if (null !== $typeString) {
+            return $typeString;
+        }
         if (!$this->hasInstanceMethod($object->class, '__tostring')) {
             throw new \LogicException(
                 'Object of class '.$object->class->name.' could not be converted to string'
@@ -601,6 +605,17 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_ASSIGN_REF:
+                    if (null !== $op->arg3 && 0 !== (int) $op->arg3) {
+                        $catchFrame = $this->dispatchVmError(
+                            'Cannot assign reference to non referenceable value',
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     $lhs = $frame->scope[$op->arg1];
                     $catchFrame = $this->enforcePropertyVisibilityWrite($lhs, $frame);
                     if (null !== $catchFrame) {
@@ -617,13 +632,41 @@ restart:
                     break;
                 case OpCode::TYPE_VAR_FETCH:
                     $dest = $frame->scope[$op->arg1];
-                    $name = $frame->scope[$op->arg2]->resolveIndirect()->toString();
+                    $nameSlot = (int) $op->arg2;
+                    $nameHolder = $frame->scope[$nameSlot]->resolveIndirect();
+                    $nameOperand = $frame->block->operandForScopeSlot($nameSlot);
+                    $nameVarLabel = null !== $nameOperand ? Block::resolveVariableName($nameOperand) : null;
+                    if (
+                        null !== $nameVarLabel
+                        && (Variable::TYPE_NULL === $nameHolder->type || Variable::TYPE_UNDEFINED === $nameHolder->type)
+                    ) {
+                        $this->context->errors->undefinedVariable(
+                            $nameVarLabel,
+                            $this->context,
+                            $frame,
+                            '' !== $frame->scriptPath ? $frame->scriptPath : null
+                        );
+                    }
+                    $name = $nameHolder->toString();
+                    $forWrite = $this->varFetchDestUsedAsAssignLvalue($frame, $op);
+                    if ('' === $name) {
+                        $dest->indirect(new Variable());
+                        break;
+                    }
                     if (Superglobals::isSuperglobalName($name)) {
                         $target = $this->context->ensureSuperglobal($name);
+                    } elseif ($forWrite) {
+                        $target = $frame->block->ensureVariableByRuntimeName($name, $frame);
                     } else {
                         $target = $frame->block->findVariableByRuntimeName($name, $frame);
                         if (null === $target) {
-                            return $this->raise("Undefined variable \${$name}", $frame);
+                            $this->context->errors->undefinedVariable(
+                                $name,
+                                $this->context,
+                                $frame,
+                                '' !== $frame->scriptPath ? $frame->scriptPath : null
+                            );
+                            $target = new Variable();
                         }
                     }
                     $dest->indirect($target);
@@ -1079,14 +1122,20 @@ restart:
                         break;
                     }
                     try {
+                        $classOperand = $frame->scope[$op->arg2]->resolveIndirect();
+                        $constName = strtolower($frame->scope[$op->arg3]->toString());
+                        if (Variable::TYPE_OBJECT === $classOperand->type && 'class' === $constName) {
+                            $frame->scope[$op->arg1]->string($classOperand->toObject()->class->name);
+                            break;
+                        }
                         $lcClass = $this->resolveClassScopeName(
-                            $frame->scope[$op->arg2]->toString(),
+                            $classOperand->toString(),
                             $frame
                         );
                     } catch (\LogicException $e) {
                         return $this->raise($e->getMessage(), $frame);
                     }
-                    $className = $frame->scope[$op->arg2]->toString();
+                    $className = $frame->scope[$op->arg2]->resolveIndirect()->toString();
                     if (!isset($this->context->classes[$lcClass])) {
                         if ('self' !== strtolower($className) && 'static' !== strtolower($className)) {
                             $this->context->autoloadClass($className);
@@ -1139,12 +1188,14 @@ restart:
                     if (!isset($this->context->classes[$lcClass])) {
                         return $this->raise("Unknown class for static property fetch: {$rawClass}", $frame);
                     }
-                    $propName = strtolower($frame->scope[$op->arg3]->toString());
+                    $propNameRaw = $frame->scope[$op->arg3]->toString();
+                    $propName = strtolower($propNameRaw);
                     $classEntry = $this->context->classes[$lcClass];
                     if (!isset($classEntry->staticProperties[$propName])) {
                         $classLabel = $classEntry->name;
+
                         return $this->raise(
-                            "Undefined static property {$classLabel}::{$propName}",
+                            "Access to undeclared static property {$classLabel}::\${$propNameRaw}",
                             $frame
                         );
                     }
@@ -1161,13 +1212,14 @@ restart:
                     if (!isset($this->context->classes[$lcClass])) {
                         return $this->raise("Unknown class for static property unset: {$rawClass}", $frame);
                     }
-                    $propName = strtolower($frame->scope[$op->arg3]->toString());
+                    $propNameRaw = $frame->scope[$op->arg3]->toString();
+                    $propName = strtolower($propNameRaw);
                     $classEntry = $this->context->classes[$lcClass];
                     if (!isset($classEntry->staticProperties[$propName])) {
                         $classLabel = $classEntry->name;
 
                         return $this->raise(
-                            "Undefined static property {$classLabel}::{$propName}",
+                            "Access to undeclared static property {$classLabel}::\${$propNameRaw}",
                             $frame
                         );
                     }
@@ -1428,6 +1480,10 @@ restart:
                     $ifaceEntry = new VM\ClassEntry($name);
                     $ifaceEntry->isInterface = true;
                     $ifaceEntry->interfaces = $op->classImplements;
+                    if ($op->isSealed) {
+                        $ifaceEntry->sealed = true;
+                        $ifaceEntry->sealedPermits = $this->normalizeSealedPermits($name, $op->sealedPermits);
+                    }
                     if (null !== $op->block1) {
                         self::defineClass($ifaceEntry, $op->block1);
                     }
@@ -1443,6 +1499,7 @@ restart:
                     $traitEntry = new ClassEntry($name);
                     $traitEntry->isTrait = true;
                     $traitEntry->attributeNames = $op->attributeNames;
+                    $traitEntry->attributeEntries = $op->attributeEntries;
                     self::defineClass($traitEntry, $op->block1);
                     $this->context->classes[$lcname] = $traitEntry;
                     break;
@@ -1496,11 +1553,17 @@ restart:
                     if (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
                         $classEntry->readonly = (bool) $frame->block->constants[$op->arg3]->toInt();
                     }
+                    if ($op->isSealed) {
+                        $classEntry->sealed = true;
+                        $classEntry->sealedPermits = $this->normalizeSealedPermits($name, $op->sealedPermits);
+                    }
+                    $this->assertAllowedBySealedParents($name, $classEntry->parentLc, $classEntry->interfaces);
                     $classEntry->attributeNames = $op->attributeNames;
                     $classEntry->isAbstract = $op->classIsAbstract;
                     $classEntry->allowsDynamicProperties = AttributeNames::hasAllowDynamicProperties(
                         $op->attributeNames
                     );
+                    $classEntry->attributeEntries = $op->attributeEntries;
                     self::defineClass($classEntry, $op->block1);
                     if (null !== $classEntry->parentLc) {
                         $this->inheritFromParent($classEntry);
@@ -1947,6 +2010,9 @@ restart:
                     }
                     $catchFrame = $this->dispatchEngineThrow($frame, $thrown);
                     if (null !== $catchFrame) {
+                        VM\ExceptionTrace::captureOnThrow($frame, $thrown);
+                    }
+                    if (null !== $catchFrame) {
                         $frame = $catchFrame;
                         goto restart;
                     }
@@ -2087,6 +2153,18 @@ restart:
     {
         $where = '' !== $frame->scriptPath ? $frame->scriptPath : 'script';
         throw new \LogicException($message.' in '.$where);
+    }
+
+    /** True when the next opcode assigns through this VAR_FETCH destination slot (#3801). */
+    private function varFetchDestUsedAsAssignLvalue(Frame $frame, OpCode $op): bool
+    {
+        $nextIndex = $frame->pos;
+        if ($nextIndex >= $frame->block->nOpCodes) {
+            return false;
+        }
+        $next = $frame->block->opCodes[$nextIndex];
+
+        return OpCode::TYPE_ASSIGN === $next->type && $next->arg2 === $op->arg1;
     }
 
     /**
@@ -2887,6 +2965,27 @@ restart:
             return $frame->callArgs;
         }
 
+        if (null !== $frame->magicCallMethodName) {
+            $methodName = $frame->magicCallMethodName;
+            $frame->magicCallMethodName = null;
+            [$paramNames, $variadicIndex] = $this->calleeParamMetadata($frame->call);
+            $userArgs = [] === $frame->callArgEntries
+                ? []
+                : NamedArgs::resolve($frame->callArgEntries, $paramNames, $variadicIndex);
+            $nameVar = new Variable(Variable::TYPE_STRING);
+            $nameVar->string($methodName);
+            $argsVar = new Variable();
+            $argsVar->newArray();
+            $packed = $argsVar->toArray();
+            foreach ($userArgs as $i => $arg) {
+                $copy = new Variable();
+                $copy->copyFrom($arg);
+                $packed->addIndex($i, $copy);
+            }
+
+            return array_merge($frame->callArgs, [$nameVar, $argsVar]);
+        }
+
         [$paramNames, $variadicIndex] = $this->calleeParamMetadata($frame->call);
         $userArgs = [] === $frame->callArgEntries
             ? []
@@ -3122,7 +3221,32 @@ restart:
         }
         $frame->staticCallClass = $this->context->classes[$lcClass]->name;
         $methodLc = strtolower($methodName);
-        [$class, $methodLc] = $this->resolveStaticMethod($lcClass, $methodLc);
+        try {
+            [$class, $methodLc] = $this->resolveStaticMethod($lcClass, $methodLc);
+        } catch (\LogicException $e) {
+            $magicClass = $this->findMagicCallStaticClass($lcClass);
+            if (null === $magicClass) {
+                throw $e;
+            }
+            $frame->magicCallMethodName = $methodName;
+            $vis = $magicClass->methodVisibility['__callstatic'] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            $callerClassLc = null;
+            if (null !== $frame->block->func && null !== $frame->block->func->class) {
+                $callerClassLc = strtolower($frame->block->func->class->value);
+            }
+            MethodVisibility::assertCallable(
+                $vis,
+                $callerClassLc,
+                strtolower($magicClass->name),
+                $magicClass->name,
+                '__callStatic'
+            );
+            $frame->call = $magicClass->methods['__callstatic'];
+            $frame->callArgs = [];
+            $frame->callArgEntries = [];
+
+            return;
+        }
         $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = null;
         if (null !== $frame->block->func && null !== $frame->block->func->class) {
@@ -3298,6 +3422,12 @@ restart:
             if (isset($trait->methodDeprecated[$name])) {
                 $entry->methodDeprecated[$name] = $trait->methodDeprecated[$name];
             }
+            if (isset($trait->methodAttributeEntries[$name])) {
+                $entry->methodAttributeEntries[$name] = $trait->methodAttributeEntries[$name];
+            }
+            if (isset($trait->methodParameterMetadata[$name])) {
+                $entry->methodParameterMetadata[$name] = $trait->methodParameterMetadata[$name];
+            }
         }
         foreach ($trait->staticProperties as $name => $storage) {
             if (!isset($entry->staticProperties[$name])) {
@@ -3328,6 +3458,57 @@ restart:
                 if (!isset($entry->constants[$name])) {
                     $entry->constants[$name] = $value;
                 }
+            }
+        }
+    }
+
+    /**
+     * @param list<string> $rawPermits lowercase names from source (possibly unqualified)
+     *
+     * @return list<string>
+     */
+    protected function normalizeSealedPermits(string $sealedName, array $rawPermits): array
+    {
+        $sealedLc = strtolower(ltrim($sealedName, '\\'));
+        $ns = '';
+        if (false !== ($pos = strrpos($sealedLc, '\\'))) {
+            $ns = substr($sealedLc, 0, $pos + 1);
+        }
+        $out = [];
+        foreach ($rawPermits as $p) {
+            $p = strtolower(ltrim($p, '\\'));
+            if (str_contains($p, '\\')) {
+                $out[] = $p;
+            } else {
+                $out[] = $ns.$p;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<string> $implements lowercase interface names
+     */
+    protected function assertAllowedBySealedParents(string $childName, ?string $parentLc, array $implements): void
+    {
+        $childLc = strtolower(ltrim($childName, '\\'));
+        if (null !== $parentLc && isset($this->context->classes[$parentLc])) {
+            $parent = $this->context->classes[$parentLc];
+            if ($parent->sealed && !VM\ClassSealed::childMayInherit($childLc, $parent->sealedPermits)) {
+                $msg = [] === $parent->sealedPermits
+                    ? VM\ClassSealed::cannotExtendMessage($childName, $parent->name)
+                    : VM\ClassSealed::notInPermitsListMessage($childName, $parent->name);
+                throw new \LogicException($msg);
+            }
+        }
+        foreach ($implements as $ifaceLc) {
+            if (!isset($this->context->classes[$ifaceLc])) {
+                continue;
+            }
+            $iface = $this->context->classes[$ifaceLc];
+            if ($iface->sealed && !VM\ClassSealed::childMayInherit($childLc, $iface->sealedPermits)) {
+                throw new \LogicException(VM\ClassSealed::cannotImplementMessage($childName, $iface->name));
             }
         }
     }
@@ -3383,6 +3564,30 @@ restart:
                 $entry->properties[] = $property;
             }
         }
+    }
+
+    /**
+     * Walk the class hierarchy for __callStatic (Zend zend_std_get_static_method slow path, #3273).
+     */
+    protected function findMagicCallStaticClass(string $lcClass): ?ClassEntry
+    {
+        $visited = [];
+        while (!isset($visited[$lcClass])) {
+            $visited[$lcClass] = true;
+            if (!isset($this->context->classes[$lcClass])) {
+                break;
+            }
+            $class = $this->context->classes[$lcClass];
+            if (isset($class->methods['__callstatic'])) {
+                return $class;
+            }
+            if (null === $class->parentLc) {
+                break;
+            }
+            $lcClass = $class->parentLc;
+        }
+
+        return null;
     }
 
     /**
@@ -3492,6 +3697,12 @@ restart:
                     if (null !== $op->deprecatedMetadata) {
                         $entry->methodDeprecated[$name] = $op->deprecatedMetadata;
                     }
+                    if ([] !== $op->attributeEntries) {
+                        $entry->methodAttributeEntries[$name] = $op->attributeEntries;
+                    }
+                    if ([] !== $op->parameterMetadata) {
+                        $entry->methodParameterMetadata[$name] = $op->parameterMetadata;
+                    }
                     if (null !== $op->block1) {
                         $method = new Func\PHP($entry->name.'::'.$name, $op->block1);
                         $method->deprecated = $op->deprecatedMetadata;
@@ -3518,6 +3729,9 @@ restart:
                             'name' => $canonical,
                             'value' => clone $block->constants[$op->arg2],
                         ];
+                        if ([] !== $op->attributeEntries) {
+                            $entry->enumCaseAttributeEntries[$name] = $op->attributeEntries;
+                        }
                         if (null !== $op->deprecatedMetadata) {
                             $entry->constDeprecated[$name] = $op->deprecatedMetadata;
                         }

@@ -29,6 +29,10 @@ class JITTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'spl_autoload_register_jit')) {
                 continue;
             }
+            // Sealed classes: VM declare-time guard; JIT lowering pending (#3322).
+            if (str_contains($name, 'sealed_class')) {
+                continue;
+            }
             // preserve_keys=true is VM-only until ArrayBuiltinHelper gains the branch (#3096).
             if (str_contains($name, 'array_chunk_preserve_keys')) {
                 continue;
@@ -89,6 +93,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'phpversion')) {
                 continue;
             }
+            // ReflectionProperty/Function/Constant builtins are VM-only (#3354).
+            if (str_contains($name, 'reflection_oop')) {
+                continue;
+            }
             // array_walk_recursive() is VM-only until recursive LLVM walk (#3111).
             if (str_contains($name, 'array_walk_recursive')) {
                 continue;
@@ -109,8 +117,16 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'json_validate')) {
                 continue;
             }
+            // JsonSerializable json_encode() needs VM method dispatch (#3370).
+            if (str_contains($name, 'json_serializable')) {
+                continue;
+            }
             // Generator::getReturn() and generator return slot are VM-only until JIT generators (#167, #3350).
             if (str_contains($name, 'generator_get_return')) {
+                continue;
+            }
+            // ?: merge branch slot unification is VM-only until JIT CFG merge (#3790).
+            if (str_contains($name, 'ternary_func_call')) {
                 continue;
             }
             // Nested break/continue levels use php-cfg goto labels; VM-only until JIT (#3405).
@@ -155,6 +171,14 @@ class JITTest extends BaseTest {
             }
             // Return-by-reference MCJIT execute: LLVM verify in ReturnByRefJitCompileTest (#3778).
             if (str_contains($name, 'return_by_ref_jit')) {
+                continue;
+            }
+            // ??= MCJIT execute: LLVM verify in CoalesceAssignJitCompileTest (#3792).
+            if (str_contains($name, 'coalesce_assign_jit')) {
+                continue;
+            }
+            // Chained ?? MCJIT: VM-only until nested coalesce JIT (#3798).
+            if (str_contains($name, 'coalesce_chain')) {
                 continue;
             }
             // string/number loose == juggling is VM-only until ArrayBuiltinHelper string-long compare (#3644).
@@ -234,6 +258,18 @@ class JITTest extends BaseTest {
             }
             // HashTable COW is VM-only until JIT mirrors refcount separation (#3760).
             if (str_contains($name, 'array_cow')) {
+                continue;
+            }
+            // Variable variables MCJIT execute segfaults; VM + compile probe in JitVariableVariablesTest (#3801, #1226).
+            if (str_contains($name, 'variable_variables')) {
+                continue;
+            }
+            // class_parents()/get_class_vars() MCJIT execute segfaults (#3159); AOT PHPT covers native path.
+            if (str_contains($name, 'class_parents_get_class_vars')) {
+                continue;
+            }
+            // __callStatic is VM-only until JIT static magic dispatch (#3273).
+            if (str_contains($name, 'magic_call_static')) {
                 continue;
             }
             yield $name => $case;

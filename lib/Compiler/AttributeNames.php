@@ -56,6 +56,18 @@ final class AttributeNames
         return false;
     }
 
+    /** PHP 8.2 #[\SensitiveParameter] on parameters (issue #3351, Zend zend_attributes.c). */
+    public static function isSensitiveParameter(array $names): bool
+    {
+        foreach ($names as $name) {
+            if ('SensitiveParameter' === $name || str_ends_with($name, '\\SensitiveParameter')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Zend compile-time duplicate guard (zend_compile.c, zend_is_attribute_repeated) (#3718).
      *

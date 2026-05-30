@@ -173,8 +173,16 @@ class OpCode {
 
     /** @var list<string> */
     public array $classImplements = [];
+    /** Sealed type: permitted child class names (lowercase FQCN); empty = none (#3322). */
+    public bool $isSealed = false;
+    /** @var list<string> */
+    public array $sealedPermits = [];
     /** Declared PHP 8 attribute class names on class/method (#1936). */
     public array $attributeNames = [];
+    /** @var list<\PHPCompiler\Compiler\AttributeEntry> attribute metadata incl. ctor args (#3206, #3800). */
+    public array $attributeEntries = [];
+    /** @var list<\PHPCompiler\Compiler\ParameterMetadata> method parameter metadata (#3340). */
+    public array $parameterMetadata = [];
     /** True when TYPE_DECLARE_CLASS targets an abstract class (#3385). */
     public bool $classIsAbstract = false;
     /** #[\Deprecated] metadata on function/method/class const declarations (#3569). */

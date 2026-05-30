@@ -552,6 +552,18 @@ function syntaxRowDefinitions(): array
             'probe' => 'class E {} try { throw new E(); } catch (E $e) { echo "ok"; }',
         ],
         [
+            'id' => 'throw_expression',
+            'construct' => 'throw expressions (PHP 8.0) — `throw` in expression context',
+            'opcodes' => ['TYPE_THROW', 'TYPE_NEW', 'TYPE_JUMPIF'],
+            'issue' => 3802,
+            'notes' => [
+                'php-cfg Op\\Expr\\Throw_ overlay (#3802); php-types Expr_Throw type reconstructor patch',
+                'Compiler: skip duplicate New before Throw; fresh slot for ?: merge; ?? RHS via compileThrowExpression',
+                'VM/JIT reuse TYPE_THROW; compliance throw_expression.phpt (?:, ??, &&)',
+            ],
+            'probe' => 'try { echo (false ? 1 : throw new LogicException("x")); } catch (LogicException $e) { echo $e->getMessage(); }',
+        ],
+        [
             'id' => 'readonly_class',
             'construct' => 'readonly classes',
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_NEW', 'TYPE_ASSIGN', 'TYPE_PROPERTY_FETCH'],
@@ -761,6 +773,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'array_argument_unpack' => '/\.\.\.\s*\$/',
         'multi_catch' => '/catch\s*\([^)]*\|/',
         'try_catch_throw' => '/\btry\s*\{/',
+        'throw_expression' => '/\?\s*:\s*throw\b|\?\?\s*throw\b|&&\s*throw\b|\|\|\s*throw\b/',
         'heredoc_flexible_indent' => '/<<<\s*\w+\s*\r?\n\s+\S/',
     ];
 

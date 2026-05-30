@@ -18,15 +18,8 @@ final class ReflectionAttributeGetName extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $receiver = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $receiver->type) {
-            throw new \LogicException('ReflectionAttribute::getName() called without object');
-        }
-        $obj = $receiver->toObject();
-        if (strtolower($obj->class->name) !== ReflectionSupport::REFLECTION_ATTRIBUTE) {
-            throw new \LogicException('Expected ReflectionAttribute instance');
-        }
-        $nameVar = $obj->getProperty(ReflectionSupport::PROP_ATTR_NAME)->resolveIndirect();
+        $receiver = ReflectionSupport::requireReflectionAttribute($frame, $frame->calledArgs[0]);
+        $nameVar = $receiver->getProperty(ReflectionSupport::PROP_ATTR_NAME)->resolveIndirect();
         if (Variable::TYPE_STRING !== $nameVar->type) {
             throw new \LogicException('ReflectionAttribute missing name');
         }

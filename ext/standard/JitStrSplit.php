@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -17,7 +18,28 @@ use PHPLLVM\Value;
 
 final class JitStrSplit
 {
+    private const LENGTH_ERROR = 'str_split(): Argument #2 ($length) must be greater than 0';
+
     private static int $emitSeq = 0;
+
+    /**
+     * Runtime guard for non-constant length (issue #3749; php-src ext/standard/string.c).
+     */
+    public static function emitRuntimeLengthGuard(Context $context, Value $chunkLen): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $one = $i64->constInt(1, false);
+        $invalid = $context->builder->icmp(Builder::INT_SLT, $chunkLen, $one);
+        $okBlock = BasicBlockHelper::append($context, 'strsplit_len_ok');
+        $errBlock = BasicBlockHelper::append($context, 'strsplit_len_err');
+        $context->builder->branchIf($invalid, $errBlock, $okBlock);
+        $context->builder->positionAtEnd($errBlock);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, self::LENGTH_ERROR);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->positionAtEnd($okBlock);
+    }
 
     private static function nextEmitId(): string
     {

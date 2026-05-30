@@ -1199,7 +1199,7 @@ final class VmString
     public static function strSplit(string $string, int $length = 1): array
     {
         if ($length < 1) {
-            throw new \LogicException('str_split(): Argument #2 ($length) must be greater than 0');
+            throw new \ValueError('str_split(): Argument #2 ($length) must be greater than 0');
         }
         $len = self::byteLength($string);
         if (0 === $len) {
@@ -1219,7 +1219,10 @@ final class VmString
 
     public static function repeat(string $input, int $multiplier): string
     {
-        if ($multiplier <= 0) {
+        if ($multiplier < 0) {
+            throw new \ValueError('str_repeat(): Argument #2 ($times) must be greater than or equal to 0');
+        }
+        if (0 === $multiplier) {
             return '';
         }
         $inputLen = self::byteLength($input);

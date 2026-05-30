@@ -6,7 +6,7 @@
 |-------|--------|-----------|
 | **Compiler** | Done | `TYPE_YIELD` / `TYPE_YIELD_FROM`; `Block::$isGenerator` |
 | **VM** | Done | `GeneratorState`, `VM::GENERATOR_YIELD`, foreach over generators |
-| **JIT (`bin/jit.php`)** | MCJIT resume (#3074) | Main script MCJIT when yield only in nested functions; `GeneratorHelper` switch-on-resume-ip |
+| **JIT (`bin/jit.php`)** | MCJIT resume (#3074) | Main script MCJIT when yield only in nested functions; `GeneratorHelper` switch-on-resume-ip; linear `yield` + packed-array `yield from` |
 | **AOT (`phpc build`)** | Blocked | `Runtime::standalone()` throws before link |
 | **Bootstrap spine AOT** | Blocked | `script/bootstrap-lib.php` inventory flags `generator yield` |
 
