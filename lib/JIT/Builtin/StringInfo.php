@@ -21,6 +21,9 @@ final class StringInfo
         '__compiler_phpversion',
         '__compiler_php_sapi_name',
         '__compiler_php_uname',
+        '__compiler_version_compare',
+        '__compiler_extension_loaded',
+        '__compiler_get_loaded_extensions',
     ];
 
     public static function ensureLinked(Context $context): void
