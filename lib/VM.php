@@ -137,6 +137,40 @@ class VM {
     }
 
     /**
+     * Convert a value to string for echo/print (Zend zend_print_variable parity, #3564).
+     *
+     * php-src: Zend/zend_operators.c — cast to string via __toString when defined.
+     */
+    public function valueToPrintString(Variable $var): string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            return $var->toString();
+        }
+        $object = $var->toObject();
+        if (!$this->hasInstanceMethod($object->class, '__tostring')) {
+            throw new \Error("Object of class {$object->class->name} could not be converted to string");
+        }
+        $result = $this->invokeInstanceMethod($object, '__toString')->resolveIndirect();
+        if (Variable::TYPE_STRING !== $result->type) {
+            $returned = match ($result->type) {
+                Variable::TYPE_INTEGER => 'int',
+                Variable::TYPE_FLOAT => 'float',
+                Variable::TYPE_BOOLEAN => 'bool',
+                Variable::TYPE_NULL => 'null',
+                Variable::TYPE_ARRAY => 'array',
+                Variable::TYPE_OBJECT => 'object',
+                default => 'unknown type',
+            };
+            throw new \TypeError(
+                "Return value of {$object->class->name}::__toString() must be of type string, {$returned} returned"
+            );
+        }
+
+        return $result->toString();
+    }
+
+    /**
      * Properties for var_dump / print_r when __debugInfo is defined (Zend parity, #3259).
      *
      * @return array<string, Variable>
@@ -519,11 +553,43 @@ restart:
                     $arg1->string($arg2 . $arg3);
                     break;
                 case OpCode::TYPE_ECHO:
-                    VM\OutputBuffer::append($frame->scope[$op->arg1]->toString());
+                    try {
+                        VM\OutputBuffer::append($this->valueToPrintString($frame->scope[$op->arg1]));
+                    } catch (\Error $e) {
+                        $catchFrame = $this->dispatchVmError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     break;
                 case OpCode::TYPE_PRINT:
-                    VM\OutputBuffer::append($frame->scope[$op->arg2]->toString());
-                    $frame->scope[$op->arg1]->int(1);
+                    try {
+                        VM\OutputBuffer::append($this->valueToPrintString($frame->scope[$op->arg2]));
+                        $frame->scope[$op->arg1]->int(1);
+                    } catch (\Error $e) {
+                        $catchFrame = $this->dispatchVmError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     break;
                 case OpCode::TYPE_COALESCE:
                     $takeLeft = $frame->scope[$op->arg2]->toBool();
@@ -1405,6 +1471,21 @@ restart:
     private function dispatchVmTypeError(\TypeError $error, Frame $frame): ?Frame
     {
         $thrown = VM\BuiltinExceptionSupport::materializeTypeError($this->context, $error->getMessage());
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /**
+     * Bridge native Error from VM internals into user catch handlers (#3564).
+     */
+    private function dispatchVmError(\Error $error, Frame $frame): ?Frame
+    {
+        $thrown = VM\BuiltinExceptionSupport::materializeError($this->context, $error->getMessage());
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
             return $catchFrame;

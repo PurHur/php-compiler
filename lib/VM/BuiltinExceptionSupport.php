@@ -17,10 +17,20 @@ final class BuiltinExceptionSupport
 
     public static function materializeTypeError(Context $ctx, string $message): Variable
     {
-        if (!isset($ctx->classes[self::CLASS_TYPE_ERROR])) {
-            throw new \LogicException('TypeError builtin class is not registered');
+        return self::materializeThrowable($ctx, self::CLASS_TYPE_ERROR, $message);
+    }
+
+    public static function materializeError(Context $ctx, string $message): Variable
+    {
+        return self::materializeThrowable($ctx, self::CLASS_ERROR, $message);
+    }
+
+    private static function materializeThrowable(Context $ctx, string $classLc, string $message): Variable
+    {
+        if (!isset($ctx->classes[$classLc])) {
+            throw new \LogicException("{$classLc} builtin class is not registered");
         }
-        $entry = $ctx->classes[self::CLASS_TYPE_ERROR];
+        $entry = $ctx->classes[$classLc];
         $obj = new ObjectEntry($entry);
         $obj->getProperty(self::PROP_MESSAGE)->string($message);
         $obj->constructed = true;
