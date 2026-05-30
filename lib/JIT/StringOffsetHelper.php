@@ -3,9 +3,10 @@
 namespace PHPCompiler\JIT;
 
 use PHPLLVM;
+use PHPLLVM\Builder;
 
 /**
- * Byte-level string offset read/write for JIT (issue #198).
+ * Byte-level string offset read/write for JIT (issue #198, #3751 negative offsets).
  */
 final class StringOffsetHelper
 {
@@ -14,12 +15,48 @@ final class StringOffsetHelper
         $str = $context->builder->load($strSlot);
         $map = $context->structFieldMap['__string__'];
         $chars = $context->builder->structGep($str, $map['value']);
-        $offset = $context->builder->truncOrBitCast(
-            $context->helper->loadValue($dim),
-            $context->getTypeFromString('size_t')
+        $len = $context->builder->load(
+            $context->builder->structGep($str, $map['length'])
         );
+        $index = $context->helper->loadValue($dim);
+        $offset = self::normalizeOffset($context, $index, $len);
 
         return $context->builder->gep($chars, $offset);
+    }
+
+    /**
+     * Zend string offset index: negative values count from the end (PHP 7.1+).
+     */
+    public static function normalizeOffset(Context $context, PHPLLVM\Value $index, PHPLLVM\Value $len): PHPLLVM\Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $isNegative = $context->builder->icmp(Builder::INT_SLT, $index, $zero);
+
+        $negBlock = BasicBlockHelper::append($context, 'str_offset_neg');
+        $posBlock = BasicBlockHelper::append($context, 'str_offset_pos');
+        $doneBlock = BasicBlockHelper::append($context, 'str_offset_done');
+        $context->builder->branchIf($isNegative, $negBlock, $posBlock);
+
+        $context->builder->positionAtEnd($negBlock);
+        $lenI64 = $context->builder->zExt($len, $i64);
+        $adjusted = $context->builder->add($lenI64, $index);
+        $normalizedNeg = $context->builder->truncOrBitCast($adjusted, $sizeT);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($posBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($sizeT);
+        $phi->addIncoming($normalizedNeg, $negBlock);
+        $phi->addIncoming(
+            $context->builder->truncOrBitCast($index, $sizeT),
+            $posBlock
+        );
+
+        return $phi;
     }
 
     public static function dimAssign(Context $context, PHPLLVM\Value $charPtr, Variable $value): void

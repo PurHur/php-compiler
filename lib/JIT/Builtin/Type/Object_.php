@@ -61,8 +61,15 @@ class Object_ extends Type {
 
     private ?int $splObjectStorageClassId = null;
 
+    private ?int $weakReferenceClassId = null;
+
+    private ?int $weakMapClassId = null;
+
     /** @var array<int, true> class ids declared readonly (issue #1360) */
     private array $readonlyClassIds = [];
+
+    /** @var array<int, array<string, true>> class id => property lc => true (#3149, #3432) */
+    private array $readonlyPropertyNames = [];
 
     /** @var array<int, PHPLLVM\Value> property slot handle => owning __object__* */
     private array $slotReceivers = [];
@@ -518,6 +525,37 @@ class Object_ extends Type {
     public function readonlyClassIds(): array
     {
         return array_keys($this->readonlyClassIds);
+    }
+
+    public function markPropertyReadonly(int $classId, string $name): void
+    {
+        $this->readonlyPropertyNames[$classId][strtolower($name)] = true;
+    }
+
+    public function isPropertyReadonly(int $classId, string $name): bool
+    {
+        return isset($this->readonlyPropertyNames[$classId][strtolower($name)]);
+    }
+
+    /**
+     * @return list<int> class ids declaring $name as a readonly instance property
+     */
+    public function readonlyPropertyClassIdsForProperty(string $name): array
+    {
+        $lc = strtolower($name);
+        $ids = [];
+        foreach ($this->readonlyPropertyNames as $classId => $props) {
+            if (isset($props[$lc])) {
+                $ids[] = $classId;
+            }
+        }
+
+        return $ids;
+    }
+
+    public function hasReadonlyPropertyGuards(): bool
+    {
+        return [] !== $this->readonlyClassIds || [] !== $this->readonlyPropertyNames;
     }
 
     public function markObjectConstructed(PHPLLVM\Value $obj): void
@@ -1031,6 +1069,41 @@ class Object_ extends Type {
         return $this->classIdToName[$id];
     }
 
+    public function classIdByName(string $name): ?int
+    {
+        $lc = strtolower($name);
+        foreach ($this->classIdToName as $id => $className) {
+            if (strtolower($className) === $lc) {
+                return $id;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * WeakMap backing __hashtable__ at property slot 0 (#3667).
+     */
+    public function weakMapBackingHashtable(Variable $obj): Variable
+    {
+        if (Variable::TYPE_OBJECT !== $obj->type) {
+            throw new \LogicException('weakMapBackingHashtable requires __object__*');
+        }
+        $objPtr = $this->context->helper->loadValue($obj);
+        $loaded = $this->context->builder->load($this->propertySlotPtr($objPtr, 0));
+        $htPtr = $this->context->builder->pointerCast(
+            $loaded,
+            $this->context->getTypeFromString('__hashtable__*')
+        );
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $htPtr
+        );
+    }
+
     public function hasMethod(int $classId, string $methodLc): bool
     {
         return isset($this->methodVisibility[$classId][strtolower($methodLc)]);
@@ -1226,9 +1299,11 @@ class Object_ extends Type {
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
         }
         if ('weakreference' === $lcname) {
-            $this->defineProperty($id, '__weak_target', Variable::TYPE_NULL);
+            $this->weakReferenceClassId = $id;
+            $this->defineProperty($id, '__weak_target', Variable::TYPE_VALUE);
         }
         if ('weakmap' === $lcname) {
+            $this->weakMapClassId = $id;
             $this->defineProperty($id, '__weak_map', Variable::TYPE_HASHTABLE);
         }
         if ('phpcompiler\\vm\\variable' === $lcname) {
@@ -1525,6 +1600,19 @@ class Object_ extends Type {
     public function defineClassConst(int $classId, string $name, VMVariable $value): void
     {
         $key = strtolower($name);
+        if (VMVariable::TYPE_ARRAY === $value->type) {
+            $table = $value->toArray();
+            if (!$table instanceof \PHPCompiler\VM\HashTable) {
+                throw new \LogicException('Class constant array must be a HashTable');
+            }
+            $this->classConstants[$classId][$key] = [
+                'type' => Variable::TYPE_HASHTABLE,
+                'value' => null,
+                'vmTable' => $table,
+            ];
+
+            return;
+        }
         $this->classConstants[$classId][$key] = [
             'type' => Variable::fromVMVariable($value->type),
             'value' => $this->compileTimeValueFromVm($value),
@@ -2041,6 +2129,12 @@ class Object_ extends Type {
                     Variable::KIND_VARIABLE,
                     $slot
                 );
+            case Variable::TYPE_HASHTABLE:
+                if (!isset($entry['vmTable']) || !$entry['vmTable'] instanceof \PHPCompiler\VM\HashTable) {
+                    throw new \LogicException('Missing VM table for class constant array');
+                }
+
+                return HashTableHelper::variableFromVmHashTable($this->context, $entry['vmTable']);
             default:
                 throw new \LogicException('Unsupported class constant type for JIT');
         }

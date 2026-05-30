@@ -372,6 +372,11 @@ class Type
         }
         $decl = self::stripTrailingDocText($decl);
         $trimmedDecl = trim($decl);
+        // list<T|null> union splits may pass a trailing "null>" fragment (#2276).
+        if (str_ends_with($trimmedDecl, '>') && !str_contains($trimmedDecl, '<')) {
+            $trimmedDecl = rtrim(substr($trimmedDecl, 0, -1));
+            $decl = $trimmedDecl;
+        }
         if ('' === $trimmedDecl || '*' === $trimmedDecl || '*/' === $trimmedDecl
             || str_starts_with($trimmedDecl, '*/')) {
             return self::mixed();

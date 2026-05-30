@@ -32,6 +32,19 @@ if ($m === $t) {
 } else {
     echo 'badmtime', "\n";
 }
+$mtime = 1000000100;
+$atime = 1000000200;
+if (touch($path, $mtime, $atime)) {
+    echo 'atime_set', "\n";
+} else {
+    echo 'noatime', "\n";
+}
+$s = stat($path);
+if ($s['mtime'] === $mtime && $s['atime'] === $atime) {
+    echo 'atime_ok', "\n";
+} else {
+    echo 'badatime', "\n";
+}
 @unlink($path);
 PHP;
 
@@ -56,6 +69,19 @@ if ($m === $t) {
 } else {
     echo 'badmtime', "\n";
 }
+$mtime = 1000000100;
+$atime = 1000000200;
+if (touch($path, $mtime, $atime)) {
+    echo 'atime_set', "\n";
+} else {
+    echo 'noatime', "\n";
+}
+$s = stat($path);
+if ($s['mtime'] === $mtime && $s['atime'] === $atime) {
+    echo 'atime_ok', "\n";
+} else {
+    echo 'badatime', "\n";
+}
 if (touch('/no/such/phpc-touch-path')) {
     echo 'bad', "\n";
 } else {
@@ -64,9 +90,9 @@ if (touch('/no/such/phpc-touch-path')) {
 @unlink($path);
 PHP;
 
-    private const EXPECT = "create\nset\nmtime\n";
+    private const EXPECT = "create\nset\nmtime\natime_set\natime_ok\n";
 
-    private const EXPECT_VM = "create\nset\nmtime\ngone\n";
+    private const EXPECT_VM = "create\nset\nmtime\natime_set\natime_ok\ngone\n";
 
     protected function setUp(): void
     {

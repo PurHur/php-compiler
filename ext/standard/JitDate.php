@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringHrtime;
 use PHPCompiler\JIT\Builtin\StringMicrotime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -67,6 +68,43 @@ final class JitDate
             $context->lookupFunction('__value__writeString'),
             $slotPtr,
             $context->builder->call($context->lookupFunction('__compiler_microtime_string'))
+        );
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($mergeBb);
+
+        return $slotPtr;
+    }
+
+    public static function hrtime(Context $context, Value $asNumber): Value
+    {
+        StringHrtime::ensureLinked($context);
+
+        $slot = JitValueBox::alloc($context);
+        $slotPtr = JitValueBox::pointer($context, $slot);
+        $isNumber = $context->builder->icmp(
+            Builder::INT_NE,
+            $asNumber,
+            $context->constantFromBool(false)
+        );
+        $numberBb = BasicBlockHelper::append($context, 'hrtime_number');
+        $pairBb = BasicBlockHelper::append($context, 'hrtime_pair');
+        $mergeBb = BasicBlockHelper::append($context, 'hrtime_merge');
+        $context->builder->branchIf($isNumber, $numberBb, $pairBb);
+
+        $context->builder->positionAtEnd($numberBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $slotPtr,
+            $context->builder->call($context->lookupFunction('__compiler_hrtime_ns'))
+        );
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($pairBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $slotPtr,
+            $context->builder->call($context->lookupFunction('__compiler_hrtime_pair'))
         );
         $context->builder->branch($mergeBb);
 

@@ -10,6 +10,12 @@
                 $this->mapAttributes($node->scalarType)
             );
         }
+        $flags = 0;
+        if ($node->getAttribute(\PHPCompiler\Ast\AbstractEnumMarker::ATTR)) {
+            $flags = Stmt\Class_::MODIFIER_ABSTRACT;
+        } elseif (property_exists($node, 'flags')) {
+            $flags = (int) $node->flags;
+        }
         $stmtsBlock = new Block();
         $savedBlock = $this->block;
         $this->block = $stmtsBlock;
@@ -26,6 +32,7 @@
             $backedType,
             $this->parseExprList($node->implements),
             $stmtsBlock,
+            $flags,
             $this->mapAttributes($node)
         );
         $this->currentClass = $old;
@@ -49,4 +56,3 @@
             $this->mapAttributes($node)
         );
     }
-

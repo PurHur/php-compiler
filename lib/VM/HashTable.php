@@ -232,6 +232,31 @@ final class HashTable {
     }
 
     /**
+     * Zend zend_compare_arrays() parity for loose == (compare_function returns 0).
+     */
+    public function compareLooseEqual(self $other): bool
+    {
+        if ($this->getNumElements() !== $other->getNumElements()) {
+            return false;
+        }
+
+        $leftItems = iterator_to_array($this->iterateKeyed(true));
+        $rightItems = iterator_to_array($other->iterateKeyed(true));
+        for ($i = 0, $n = \count($leftItems); $i < $n; ++$i) {
+            [$leftKey, $leftVal] = $leftItems[$i];
+            [$rightKey, $rightVal] = $rightItems[$i];
+            if (!$leftKey->equals($rightKey)) {
+                return false;
+            }
+            if (!$leftVal->equals($rightVal)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Remove and return the last element of a packed list array (no holes).
      * Returns null when the array is empty.
      */

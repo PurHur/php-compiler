@@ -5357,6 +5357,18 @@ final class ArrayBuiltinHelper
         if (Variable::TYPE_NATIVE_BOOL === $left->type && ArrayBuiltinHelper::isNativeArray($right->type)) {
             return JitValueCompare::looseEqualArrayToBool($context, $right, $context->helper->loadValue($left));
         }
+        if (Variable::TYPE_HASHTABLE === $left->type && Variable::TYPE_NULL === $right->type) {
+            return JitValueCompare::looseEqualArrayToNull($context, $left);
+        }
+        if (Variable::TYPE_NULL === $left->type && Variable::TYPE_HASHTABLE === $right->type) {
+            return JitValueCompare::looseEqualArrayToNull($context, $right);
+        }
+        if (ArrayBuiltinHelper::isNativeArray($left->type) && Variable::TYPE_NULL === $right->type) {
+            return JitValueCompare::looseEqualArrayToNull($context, $left);
+        }
+        if (Variable::TYPE_NULL === $left->type && ArrayBuiltinHelper::isNativeArray($right->type)) {
+            return JitValueCompare::looseEqualArrayToNull($context, $right);
+        }
 
         return $context->constantFromBool(false);
     }

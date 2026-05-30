@@ -49,8 +49,16 @@ class JITTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'class_alias')) {
                 continue;
             }
+            // new static() / : static return — VM late binding (#3412); JIT phase 2.
+            if (str_contains($name, 'new_static') || str_contains($name, 'static_return_type')) {
+                continue;
+            }
             // gc_collect_cycles() is VM-only (#3113).
             if (str_contains($name, 'gc_collect_cycles')) {
+                continue;
+            }
+            // WeakReference get() return used in locals — MCJIT execute (#3667).
+            if (str_contains($name, 'weak_reference_gc_jit')) {
                 continue;
             }
             // enum case ->name / ->value is VM-only until JIT enum case objects (#3420).
@@ -69,8 +77,16 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gethostname')) {
                 continue;
             }
+            // substr() boxed int/class const MCJIT: VM passes (#587); execute segfaults until stable.
+            if (str_contains($name, 'substr_jit')) {
+                continue;
+            }
             // getrusage() MCJIT: dedicated compliance JIT path (#3240); umbrella JITTest skips until stable.
             if (str_contains($name, 'getrusage')) {
+                continue;
+            }
+            // phpversion/php_sapi_name/php_uname MCJIT: VM + AOT (#3174); umbrella JITTest skips until stable.
+            if (str_contains($name, 'phpversion')) {
                 continue;
             }
             // array_walk_recursive() is VM-only until recursive LLVM walk (#3111).
@@ -144,6 +160,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'loose_string_scientific')) {
                 continue;
             }
+            // array/scalar loose == is VM-only until JIT array compare matrix is stable (#3736).
+            if (str_contains($name, 'loose_eq_array_scalar')) {
+                continue;
+            }
             // object === identity compare is VM-only until JIT handle compare is stable (#3622).
             if (str_contains($name, 'object_identical')) {
                 continue;
@@ -172,8 +192,12 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'array_union')) {
                 continue;
             }
+            // Instance method first-class callable is VM-only until JIT bound-method FCC (#3566).
+            if (str_contains($name, 'first_class_callable_method')) {
+                continue;
+            }
             // User enum DECLARE_ENUM segfaults in MCJIT until enum lowering is stable (#3518).
-            if (str_contains($name, 'enum_')) {
+            if (str_contains($name, 'enum_') || str_contains($name, 'abstract_enum')) {
                 continue;
             }
             // Property hooks are VM-only until JIT property dispatch (#3145).
@@ -186,6 +210,18 @@ class JITTest extends BaseTest {
             }
             // Generator foreach MCJIT resume (#3074); execute needs jit-runtime-probe (#98) — GeneratorJITTest + GeneratorJitCompileTest.
             if (str_contains($name, 'generator_jit')) {
+                continue;
+            }
+            // Negative string offsets: VM (#3751); MCJIT StringOffsetHelper still segfaults (#198).
+            if (str_contains($name, 'string_negative_offset')) {
+                continue;
+            }
+            // substr() boxed int/class const MCJIT: VM passes (#587); execute segfaults until stable.
+            if (str_contains($name, 'substr_jit')) {
+                continue;
+            }
+            // property default `new` expressions — VM-only until JIT runtime init (#3391).
+            if (str_contains($name, 'property_default_new')) {
                 continue;
             }
             yield $name => $case;

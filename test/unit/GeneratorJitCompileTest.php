@@ -60,4 +60,31 @@ PHP
         );
         $this->addToAssertionCount(1);
     }
+
+    public function testKeyedYieldForeachScriptVerifies(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+function gen(): Generator {
+    yield 'a' => 1;
+    yield 'b' => 2;
+}
+foreach (gen() as $k => $v) {
+    echo $k, $v;
+}
+PHP
+            ,
+            'generator_jit_keyed.php'
+        );
+        $this->assertNotNull($block);
+        $this->assertFalse(Block::requiresVmLowering($block));
+        $runtime->jitCompileBlock($block);
+        $context = $runtime->loadJitContext();
+        $verify = new \ReflectionMethod($context, 'compileCommon');
+        $verify->setAccessible(true);
+        $verify->invoke($context);
+        $this->assertArrayHasKey('gen', $context->generatorCreators);
+        $this->addToAssertionCount(1);
+    }
 }

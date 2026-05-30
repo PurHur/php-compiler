@@ -17,7 +17,9 @@ final class Linker
         __DIR__.'/runtime/function_exists.c',
         __DIR__.'/runtime/hash_crypto.c',
         __DIR__.'/runtime/phpc_microtime.c',
+        __DIR__.'/runtime/phpc_hrtime.c',
         __DIR__.'/runtime/phpc_getdate.c',
+        __DIR__.'/runtime/phpc_info.c',
         __DIR__.'/runtime/phpc_strnatcmp.c',
         __DIR__.'/runtime/phpc_strnatcasecmp.c',
         __DIR__.'/runtime/phpc_substr_compare.c',
@@ -69,6 +71,7 @@ final class Linker
         __DIR__.'/runtime/phpc_attr_registry.c',
         __DIR__.'/runtime/phpc_reflection_attr.c',
         __DIR__.'/runtime/phpc_cli_argv.c',
+        __DIR__.'/runtime/phpc_weakref.c',
     ];
 
     private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt';

@@ -550,8 +550,10 @@ restart:
                         $this->context->propertyHookSetAborted = false;
                         break;
                     }
-                    if (null !== ($err = $this->enforceReadonlyPropertyWrite($arg2, $frame))) {
-                        return $err;
+                    $catchFrame = $this->enforceReadonlyPropertyWrite($arg2, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
                     }
                     $arg2->copyFrom($arg3);
                     $arg1->copyFrom($arg3);
@@ -570,8 +572,10 @@ restart:
                     break;
                 case OpCode::TYPE_ASSIGN_REF:
                     $lhs = $frame->scope[$op->arg1];
-                    if (null !== ($err = $this->enforceReadonlyPropertyWrite($lhs, $frame))) {
-                        return $err;
+                    $catchFrame = $this->enforceReadonlyPropertyWrite($lhs, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
                     }
                     $rhs = $frame->scope[$op->arg2]->resolveIndirect();
                     $lhs->indirect($rhs);
@@ -625,7 +629,12 @@ restart:
                     $arg3 = $frame->scope[$op->arg3];
                     if ($container->type === Variable::TYPE_STRING) {
                         $offset = new Variable(Variable::TYPE_STRING_OFFSET);
-                        $offset->stringOffset($container, $arg3->toInt());
+                        $offset->stringOffset(
+                            $container,
+                            $arg3->toInt(),
+                            $this->context->errors,
+                            '' !== $frame->scriptPath ? $frame->scriptPath : null
+                        );
                         $arg1->indirect($offset);
                     } elseif ($container->type === Variable::TYPE_ARRAY) {
                         if ($this->context->isGlobalsTable($container)) {
@@ -1404,6 +1413,7 @@ restart:
                         $classEntry->backedType = $frame->block->constants[$op->arg2]->toString();
                     }
                     $classEntry->interfaces = $op->classImplements;
+                    $classEntry->isAbstract = $op->classIsAbstract;
                     self::defineClass($classEntry, $op->block1);
                     VM\EnumSupport::ensureBuiltinCasesMethod($classEntry);
                     VM\EnumSupport::ensureBuiltinEnumInterfaces($classEntry);
@@ -1446,22 +1456,34 @@ restart:
                     break;
                 case OpCode::TYPE_NEW:
                     $result = $frame->scope[$op->arg1];
-                    $name = $frame->scope[$op->arg2]->toString();
-                    $lcname = strtolower($name);
-                    if (!isset($this->context->classes[$lcname])) {
-                        $this->context->autoloadClass($name);
+                    $rawName = $frame->scope[$op->arg2]->toString();
+                    try {
+                        $lcname = $this->resolveClassScopeName($rawName, $frame);
+                    } catch (\LogicException $e) {
+                        throw new \LogicException($e->getMessage());
                     }
                     if (!isset($this->context->classes[$lcname])) {
-                        throw new \LogicException("Attempting to instantiate non-existing class $name");
+                        $rawLc = strtolower($rawName);
+                        if (!in_array($rawLc, ['self', 'static', 'parent'], true)) {
+                            $this->context->autoloadClass($rawName);
+                        }
+                    }
+                    if (!isset($this->context->classes[$lcname])) {
+                        throw new \LogicException("Attempting to instantiate non-existing class {$rawName}");
                     }
                     $class = $this->context->classes[$lcname];
                     if ($class->isAbstract) {
-                        return $this->raise("Cannot instantiate abstract class {$class->name}", $frame);
+                        $msg = $class->isEnum
+                            ? "Cannot instantiate enum {$class->name}"
+                            : "Cannot instantiate abstract class {$class->name}";
+
+                        return $this->raise($msg, $frame);
                     }
                     if ($class->isInterface) {
                         throw new \LogicException("Cannot instantiate interface $name");
                     }
                     $object = new ObjectEntry($class);
+                    $this->initInstancePropertyDefaults($object);
                     $result->object($object);
                     $frame->call = $object->constructor;
                     $frame->callArgs = [$result];
@@ -1913,7 +1935,11 @@ restart:
         return_value_complete:
         $this->enforceReturnType($frame, $returnValue);
         if (!is_null($frame->returnVar)) {
-            $frame->returnVar->copyFrom($returnValue);
+            if ($this->functionReturnsByRef($frame)) {
+                $frame->returnVar->indirect($returnValue);
+            } else {
+                $frame->returnVar->copyFrom($returnValue);
+            }
         }
         $this->markObjectConstructedIfLeavingConstruct($frame);
         $caller = $this->context->pop();
@@ -2568,20 +2594,44 @@ restart:
         }
     }
 
-    /** Reject readonly property writes; returns a failure exit code or null. */
-    private function enforceReadonlyPropertyWrite(Variable $lvalue, Frame $frame): ?int
+    /** Reject readonly property writes; returns catch frame or throws when uncaught. */
+    private function enforceReadonlyPropertyWrite(Variable $lvalue, Frame $frame): ?Frame
     {
         $target = $lvalue->resolveIndirect();
         $owner = $target->objectPropertyOwner;
-        if (null === $owner || !$owner->class->readonly || !$owner->constructed) {
+        if (null === $owner || !$owner->constructed) {
             return null;
         }
         $prop = $target->objectPropertyName ?? 'property';
+        if (!$this->isReadonlyPropertyWrite($owner->class, $prop)) {
+            return null;
+        }
 
-        return $this->raise(
-            sprintf('Cannot modify readonly property %s::$%s', $owner->class->name, $prop),
-            $frame
+        $thrown = VM\BuiltinExceptionSupport::materializeError(
+            $this->context,
+            sprintf('Cannot modify readonly property %s::$%s', $owner->class->name, $prop)
         );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    private function isReadonlyPropertyWrite(ClassEntry $class, string $propName): bool
+    {
+        if ($class->readonly) {
+            return true;
+        }
+        foreach ($class->properties as $property) {
+            if ($property->name === $propName && $property->readonly) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function markObjectConstructedIfLeavingConstruct(Frame $frame): void
@@ -3238,9 +3288,25 @@ restart:
     protected function defineClass(ClassEntry $entry, Block $block): void {
         $frame = $block->getFrame($this->context);
         $ownMethods = $this->classBodyOwnMethodNames($block, $frame);
+        $pendingNewDefaultOps = [];
         foreach ($block->opCodes as $op) {
-            if ($this->isClassBodyDefaultInitOpcode($op->type)) {
+            if ([] !== $pendingNewDefaultOps) {
+                if (OpCode::TYPE_DECLARE_PROPERTY === $op->type || OpCode::TYPE_DECLARE_STATIC_PROPERTY === $op->type) {
+                    $this->finalizePendingNewPropertyDefault($frame, $block, $entry, $op, $pendingNewDefaultOps);
+                    $pendingNewDefaultOps = [];
+
+                    continue;
+                } else {
+                    $pendingNewDefaultOps[] = $op;
+
+                    continue;
+                }
+            } elseif ($this->isClassBodyDefaultInitOpcode($op->type)) {
                 $this->executeClassBodyDefaultInitOpcode($frame, $op);
+
+                continue;
+            } elseif (OpCode::TYPE_NEW === $op->type) {
+                $pendingNewDefaultOps[] = $op;
 
                 continue;
             }
@@ -3256,7 +3322,8 @@ restart:
                     $entry->properties[] = new VM\ClassProperty(
                         $name->toString(),
                         $default,
-                        $frame->scope[$op->arg3]
+                        $frame->scope[$op->arg3],
+                        $op->propertyReadonly
                     );
                     break;
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:
@@ -3312,11 +3379,16 @@ restart:
                         }
                         break;
                     }
-                    $entry->constants[$name] = VM\ClassConstExpr::resolveValue(
-                        $frame,
-                        $block,
-                        $op->arg2
-                    );
+                    $value = $this->resolveClassConstDefineValue($frame, $block, $op);
+                    if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
+                        $constraint = $block->constants[$op->arg3]->typeConstraint;
+                        if (null !== $constraint) {
+                            $check = new Variable();
+                            $check->copyFrom($value);
+                            TypeCheck::coerceReturn($check, true, $constraint);
+                        }
+                    }
+                    $entry->constants[$name] = $value;
                     if (null !== $op->deprecatedMetadata) {
                         $entry->constDeprecated[$name] = $op->deprecatedMetadata;
                     }
@@ -3330,9 +3402,108 @@ restart:
                     );
             }
         }
+        if ([] !== $pendingNewDefaultOps) {
+            throw new \LogicException('Unterminated property default `new` initializer in class body');
+        }
         foreach ($entry->properties as $prop) {
             $this->linkPropertyHooks($entry, $prop);
         }
+    }
+
+    private function resolveClassConstDefineValue(Frame $frame, Block $block, OpCode $op): Variable
+    {
+        if (isset($block->constants[$op->arg2])) {
+            $value = new Variable();
+            $value->copyFrom($block->constants[$op->arg2]);
+
+            return $value;
+        }
+        if (isset($frame->scope[$op->arg2])) {
+            $value = new Variable();
+            $value->copyFrom($frame->scope[$op->arg2]);
+
+            return $value;
+        }
+        throw new \LogicException('Class constant value must be a compile-time constant');
+    }
+
+    /**
+     * @param list<OpCode> $pendingNewDefaultOps
+     */
+    private function finalizePendingNewPropertyDefault(
+        Frame $frame,
+        Block $block,
+        ClassEntry $entry,
+        OpCode $declareOp,
+        array $pendingNewDefaultOps
+    ): void {
+        $resultSlot = null;
+        foreach ($pendingNewDefaultOps as $initOp) {
+            if (OpCode::TYPE_NEW === $initOp->type) {
+                $resultSlot = $initOp->arg1;
+                break;
+            }
+        }
+        if (null === $resultSlot) {
+            throw new \LogicException('Property default `new` initializer missing TYPE_NEW');
+        }
+
+        if (OpCode::TYPE_DECLARE_STATIC_PROPERTY === $declareOp->type) {
+            $value = $this->executePropertyDefaultInitBlock(
+                $block->fragmentForOpcodes($pendingNewDefaultOps),
+                $resultSlot
+            );
+            $name = strtolower($frame->scope[$declareOp->arg1]->toString());
+            $storage = clone $frame->scope[$declareOp->arg3];
+            $storage->copyFrom($value);
+            $entry->staticProperties[$name] = $storage;
+
+            return;
+        }
+
+        $property = new VM\ClassProperty(
+            $frame->scope[$declareOp->arg1]->toString(),
+            null,
+            $frame->scope[$declareOp->arg3],
+            $declareOp->propertyReadonly
+        );
+        $property->defaultInitBlock = $block->fragmentForOpcodes($pendingNewDefaultOps);
+        $property->defaultInitResultSlot = $resultSlot;
+        $entry->properties[] = $property;
+    }
+
+    public function initInstancePropertyDefaults(ObjectEntry $object): void
+    {
+        foreach ($object->class->properties as $property) {
+            if (!$property->hasRuntimeDefaultInit()) {
+                continue;
+            }
+            assert(null !== $property->defaultInitBlock);
+            assert(null !== $property->defaultInitResultSlot);
+            $value = $this->executePropertyDefaultInitBlock(
+                $property->defaultInitBlock,
+                $property->defaultInitResultSlot
+            );
+            $slot = $object->getProperty($property->name);
+            $slot->copyFrom($value);
+            $strict = false;
+            TypeCheck::coercePropertyWrite($slot, $strict);
+        }
+    }
+
+    private function executePropertyDefaultInitBlock(Block $initBlock, int $resultSlot): Variable
+    {
+        $initFrame = $initBlock->getFrame($this->context);
+        $this->context->push($initFrame);
+        $status = $this->runFrames();
+        if (self::SUCCESS !== $status) {
+            throw new \LogicException('Property default `new` initializer failed');
+        }
+        if (!isset($initFrame->scope[$resultSlot])) {
+            throw new \LogicException('Property default `new` initializer missing result slot');
+        }
+
+        return $initFrame->scope[$resultSlot]->resolveIndirect();
     }
 
     private function isClassBodyDefaultInitOpcode(int $type): bool
@@ -3405,6 +3576,14 @@ restart:
         }
     }
 
+    private function functionReturnsByRef(Frame $frame): bool
+    {
+        $func = $frame->block->func ?? null;
+
+        return null !== $func
+            && (($func->flags ?? 0) & \PHPCfg\Func::FLAG_RETURNS_REF) !== 0;
+    }
+
     private function enforceReturnType(Frame $frame, ?Variable $value): void
     {
         $block = $frame->block;
@@ -3418,6 +3597,18 @@ restart:
         }
         if ($block->returnTypeVoid) {
             TypeCheck::assertVoidReturn($value);
+
+            return;
+        }
+        if ($block->returnTypeStatic) {
+            if (null === $value) {
+                return;
+            }
+            TypeCheck::assertStaticReturn(
+                $value,
+                $this->lateStaticClassLc($frame),
+                $this->context
+            );
 
             return;
         }

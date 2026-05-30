@@ -47,6 +47,8 @@ final class Variable {
     private HashTable $array;
     private Variable $stringOffsetParent;
     private int $stringOffsetIndex;
+    private ?ErrorReporter $stringOffsetReporter = null;
+    private ?string $stringOffsetFile = null;
 
 
     public int $next = -1;
@@ -455,14 +457,22 @@ final class Variable {
         unset($this->indirect);
         unset($this->stringOffsetParent);
         unset($this->stringOffsetIndex);
+        unset($this->stringOffsetReporter);
+        unset($this->stringOffsetFile);
     }
 
-    public function stringOffset(Variable $parent, int $index): void
-    {
+    public function stringOffset(
+        Variable $parent,
+        int $index,
+        ?ErrorReporter $reporter = null,
+        ?string $file = null
+    ): void {
         $this->reset();
         $this->type = self::TYPE_STRING_OFFSET;
         $this->stringOffsetParent = $parent;
         $this->stringOffsetIndex = $index;
+        $this->stringOffsetReporter = $reporter;
+        $this->stringOffsetFile = $file;
     }
 
     public function castFrom(int $type, self $var, ?\PHPCompiler\VM $vm = null) {
@@ -636,6 +646,8 @@ restart:
                     return '' === $other->string;
                 case self::TYPE_FLOAT:
                     return 0.0 === $other->float;
+                case self::TYPE_ARRAY:
+                    return 0 === $other->toArray()->getNumElements();
                 default:
                     return false;
             }
@@ -688,9 +700,15 @@ restart:
         if ($other->type === self::TYPE_ARRAY && $self->type === self::TYPE_BOOLEAN) {
             return ($other->toArray()->getNumElements() === 0) !== $self->bool;
         }
+        if ($self->type === self::TYPE_ARRAY && $other->type === self::TYPE_ARRAY) {
+            return $self->toArray()->compareLooseEqual($other->toArray());
+        }
+        if ($self->type === self::TYPE_ARRAY || $other->type === self::TYPE_ARRAY) {
+            return false;
+        }
         try {
             return $self->toNumeric() == $other->toNumeric();
-        } catch (\LogicException) {
+        } catch (\LogicException|\TypeError) {
             return false;
         }
     }
@@ -1188,6 +1206,24 @@ restart:
         throw new \LogicException("UnaryOp $opCode not implemented for type $expr->type");
     }
 
+    /**
+     * Zend-style string byte index: negative offsets count from the end (PHP 7.1+).
+     *
+     * @return int|null byte index, or null when out of range (caller emits warning)
+     */
+    private function resolveStringOffsetByteIndex(int $rawIndex, int $len): ?int
+    {
+        $index = $rawIndex;
+        if ($index < 0) {
+            $index += $len;
+        }
+        if ($index < 0 || $index >= $len) {
+            return null;
+        }
+
+        return $index;
+    }
+
     private function readStringOffset(): string
     {
         $parent = $this->stringOffsetParent->resolveIndirect();
@@ -1195,8 +1231,19 @@ restart:
             throw new \LogicException('String offset parent is not a string');
         }
         $str = $parent->string;
-        $index = $this->stringOffsetIndex;
-        if ($index < 0 || $index >= strlen($str)) {
+        $rawIndex = $this->stringOffsetIndex;
+        $len = strlen($str);
+        $index = $this->resolveStringOffsetByteIndex($rawIndex, $len);
+        if (null === $index) {
+            if (null !== $this->stringOffsetReporter) {
+                $this->stringOffsetReporter->uninitializedStringOffset(
+                    $rawIndex,
+                    null,
+                    null,
+                    $this->stringOffsetFile
+                );
+            }
+
             return '';
         }
 
@@ -1210,12 +1257,22 @@ restart:
             throw new \LogicException('String offset parent is not a string');
         }
         $str = $parent->string;
-        $index = $this->stringOffsetIndex;
-        if ($index < 0) {
-            throw new \LogicException('Illegal string offset');
+        $rawIndex = $this->stringOffsetIndex;
+        $len = strlen($str);
+        $index = $this->resolveStringOffsetByteIndex($rawIndex, $len);
+        if (null === $index) {
+            if (null !== $this->stringOffsetReporter) {
+                $this->stringOffsetReporter->illegalStringOffset(
+                    $rawIndex,
+                    null,
+                    null,
+                    $this->stringOffsetFile
+                );
+            }
+
+            return;
         }
         $byte = self::byteFromAssignValue($value);
-        $len = strlen($str);
         if ($index >= $len) {
             $str .= str_repeat("\0", $index - $len + 1);
         }

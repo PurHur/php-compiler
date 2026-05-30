@@ -31,6 +31,7 @@ final class SelfHostBuiltinPolicy
         'is_numeric' => 'numeric',
         'time' => 'numeric',
         'microtime' => 'numeric',
+        'hrtime' => 'numeric',
         'getdate' => 'numeric',
         'uniqid' => 'numeric',
         'getmypid' => 'numeric',
@@ -55,7 +56,7 @@ final class SelfHostBuiltinPolicy
     /** @var array<string, string> */
     private const CATEGORY_OUTPUT = [
         'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_end_flush' => 'output',
-        'ob_get_level' => 'output',
+        'ob_get_level' => 'output', 'flush' => 'output',
         'getallheaders' => 'output', 'header_list' => 'output',
         'headers_sent' => 'output', 'register_shutdown_function' => 'output',
         'set_error_handler' => 'error', 'restore_error_handler' => 'error',
@@ -113,7 +114,8 @@ final class SelfHostBuiltinPolicy
         'sizeof' => 'string', 'gettype' => 'string', 'get_debug_type' => 'string', 'var_export' => 'string',
         'str_replace' => 'string', 'str_ireplace' => 'string', 'strtr' => 'string', 'str_rot13' => 'string',
         'str_increment' => 'string', 'str_decrement' => 'string', 'strval' => 'string',
-        'strip_tags' => 'string', 'sprintf' => 'string', 'chr' => 'string', 'number_format' => 'string',
+        'strip_tags' => 'string',         'sprintf' => 'string', 'chr' => 'string', 'number_format' => 'string',
+        'phpversion' => 'string', 'php_sapi_name' => 'string', 'php_uname' => 'string',
         'soundex' => 'string',
         'base64_encode' => 'string', 'base64_decode' => 'string',
         'htmlspecialchars' => 'string', 'htmlspecialchars_decode' => 'string', 'header' => 'string', 'http_response_code' => 'string',

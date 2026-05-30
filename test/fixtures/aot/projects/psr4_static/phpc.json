@@ -1,0 +1,9 @@
+{
+    "entry": "public/index.php",
+    "binary": ".phpc/bin/app",
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    }
+}

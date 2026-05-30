@@ -79,6 +79,9 @@ class Block {
     /** Declared `: never` return — any return is rejected (issue #1358). */
     public bool $returnTypeNever = false;
 
+    /** Declared `: static` return — late-bound object type (issue #3412). */
+    public bool $returnTypeStatic = false;
+
     /** Parameter index (0-based, excluding $this) that receives a packed trailing-arg array (#197). */
     public ?int $variadicParamIndex = null;
 
@@ -189,6 +192,24 @@ class Block {
         return $operands;
     }
 
+    /**
+     * Opcode sub-sequence for class property `new` defaults (issue #3391).
+     *
+     * @param list<OpCode> $opCodes
+     */
+    public function fragmentForOpcodes(array $opCodes): Block
+    {
+        $frag = new Block(null);
+        $frag->opCodes = $opCodes;
+        $frag->nOpCodes = count($opCodes);
+        $frag->constants = $this->constants;
+        foreach ($this->scope as $operand) {
+            $frag->scope[$operand] = $this->scope[$operand];
+        }
+
+        return $frag;
+    }
+
     public function getVarSlot(Operand $operand, bool $isRead): int {
         if (!$this->scope->contains($operand)) {
             $name = self::resolveVariableName($operand);
@@ -269,6 +290,7 @@ class Block {
             $this->returnTypeConstraint = $parent->returnTypeConstraint;
             $this->returnTypeVoid = $parent->returnTypeVoid;
             $this->returnTypeNever = $parent->returnTypeNever;
+            $this->returnTypeStatic = $parent->returnTypeStatic;
         }
     }
 

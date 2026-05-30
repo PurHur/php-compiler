@@ -16,11 +16,21 @@ class Enum_ extends ClassLike
     /** @var Operand[] Implemented interface name operands */
     public $implements = [];
 
-    public function __construct(Operand $name, ?Type $backedType, array $implements, Block $stmts, array $attributes = [])
-    {
+    /** php-parser Class_::flags — MODIFIER_ABSTRACT for `abstract enum` (#3737). */
+    public int $flags = 0;
+
+    public function __construct(
+        Operand $name,
+        ?Type $backedType,
+        array $implements,
+        Block $stmts,
+        int $flags = 0,
+        array $attributes = []
+    ) {
         parent::__construct($name, $stmts, $attributes);
         $this->backedType = $backedType;
         $this->implements = $implements;
+        $this->flags = $flags;
     }
 
     public function getVariableNames(): array

@@ -25,11 +25,13 @@ use PHPCfg\Script;
 use PHPTypes\Type;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\ClassReadonly;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\DeprecatedMetadata;
 use PHPCompiler\Compiler\FinalClassExtensionCheck;
+use PHPCompiler\Compiler\ReadonlyClassCompileCheck;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
 use PHPCompiler\Compiler\TraitCollisionCheck;
 use PHPCompiler\Web\ConstStringFolder;
@@ -50,6 +52,8 @@ class Compiler {
 
     /** @var array<string, true> lowercase abstract class names seen during compile (#3385). */
     private array $abstractClasses = [];
+    /** @var array<string, true> lowercase abstract enum names for instantiate diagnostics (#3737). */
+    private array $abstractEnums = [];
     /** 1-based source lines lowered from bare `throw;` (#3508). */
     private array $bareRethrowLines = [];
     /** Trailing source bytes after __halt_compiler(); (issue #3479). */
@@ -231,6 +235,7 @@ class Compiler {
     public function compile(Script $script): ?Block {
         $this->resetCompileAbortDetail();
         $this->abstractClasses = [];
+        $this->abstractEnums = [];
         $this->haltCompilerRemaining = null;
         $this->seen = new SplObjectStorage;
         $this->debugWriteLastPhase('Compiler::compile enter');
@@ -260,6 +265,7 @@ class Compiler {
         TraitCollisionCheck::validate($script);
         FinalClassExtensionCheck::validate($script);
         AbstractMethodVisibilityCheck::validate($script);
+        ReadonlyClassCompileCheck::validate($script);
 
         return $main;
     }
@@ -269,6 +275,7 @@ class Compiler {
     {
         $this->resetCompileAbortDetail();
         $this->abstractClasses = [];
+        $this->abstractEnums = [];
         // Inventory-scale sources declare user functions and/or class-like units; emit-smoke only needs {main}
         // — same as compile() without a compile() callee in the M3 emit TU (#2633, #2666).
         if ([] !== $script->functions || $this->emitSmokeScriptHasClassLike($script)) {
@@ -332,6 +339,14 @@ class Compiler {
 
             return;
         }
+        if ($returnType instanceof Op\Type\Reference) {
+            $refName = $this->staticNameFromOperand($returnType->declaration);
+            if ('static' === strtolower((string) $refName)) {
+                $block->returnTypeStatic = true;
+
+                return;
+            }
+        }
         if ($returnType instanceof Op\Type\Literal) {
             if ('void' === $returnType->name) {
                 $block->returnTypeVoid = true;
@@ -340,6 +355,11 @@ class Compiler {
             }
             if ('never' === $returnType->name) {
                 $block->returnTypeNever = true;
+
+                return;
+            }
+            if ('static' === $returnType->name) {
+                $block->returnTypeStatic = true;
 
                 return;
             }
@@ -1227,6 +1247,15 @@ class Compiler {
         );
         AttributeNames::assertNoDuplicates(AttributeNames::fromOp($enum));
         $return->classImplements = $this->interfaceNamesFromOperands($enum->implements);
+        $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($enum->flags ?? 0);
+        if ($return->classIsAbstract) {
+            $name = $this->staticNameFromOperand($enum->name);
+            if (null !== $name) {
+                $lc = strtolower(ltrim($name, '\\'));
+                $this->abstractClasses[$lc] = true;
+                $this->abstractEnums[$lc] = true;
+            }
+        }
         $return->block1 = $this->compileEnumBody($enum->stmts);
 
         return $return;
@@ -1237,13 +1266,7 @@ class Compiler {
         $result = new Block($block);
         foreach ($block->children as $child) {
             if ($child instanceof Op\Terminal\Const_) {
-                $this->compileOps($child->valueBlock->children, $result);
-                AttributeNames::assertNoDuplicates(AttributeNames::fromOp($child));
-                $result->addOpCode(new OpCode(
-                    OpCode::TYPE_DECLARE_CLASS_CONST,
-                    $this->compileOperand($child->name, $result, true),
-                    $this->compileOperand($child->value, $result, true)
-                ));
+                $this->compileClassConstDeclaration($child, $result);
                 continue;
             }
             if ($child instanceof Op\Stmt\ClassMethod) {
@@ -1486,12 +1509,16 @@ class Compiler {
                     $declareType = $child->static
                         ? OpCode::TYPE_DECLARE_STATIC_PROPERTY
                         : OpCode::TYPE_DECLARE_PROPERTY;
-                    $result->addOpCode(new OpCode(
+                    $declare = new OpCode(
                         $declareType,
                         $this->compileOperand($child->name, $result, true),
                         is_null($child->defaultVar) ? null : $this->compileOperand($child->defaultVar, $result, true),
                         $this->compileTypeConstrainedVariable($result, $declared, $propertyDeclName)
-                    ));
+                    );
+                    if (!$child->static) {
+                        $declare->propertyReadonly = $this->isReadonlyPropertyFlags($child->propertyFlags ?? 0);
+                    }
+                    $result->addOpCode($declare);
                     break;
                 case Op\Stmt\ClassMethod::class:
                     $this->compileClassMethodDeclaration($child, $result);
@@ -1504,15 +1531,7 @@ class Compiler {
                     ) {
                         $this->throwCompileLogic('Class constants are only supported on classes, interfaces, and traits for now');
                     }
-                    $this->compileOps($child->valueBlock->children, $result);
-                    AttributeNames::assertNoDuplicates(AttributeNames::fromOp($child));
-                    $constOp = new OpCode(
-                        OpCode::TYPE_DECLARE_CLASS_CONST,
-                        $this->compileOperand($child->name, $result, true),
-                        $this->compileOperand($child->value, $result, true)
-                    );
-                    $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
-                    $result->addOpCode($constOp);
+                    $this->compileClassConstDeclaration($child, $result);
                     break;
                 case Op\Stmt\TraitUse::class:
                     if (OpCode::TYPE_DECLARE_CLASS !== $type) {
@@ -1535,6 +1554,88 @@ class Compiler {
         return $result;
     }
 
+    protected function compileClassConstDeclaration(Op\Terminal\Const_ $child, Block $result): void
+    {
+        $valueSlot = $this->tryFoldClassConstValueSlot($child, $result);
+        if (null === $valueSlot) {
+            $this->compileOps($child->valueBlock->children, $result);
+            $valueSlot = $this->compileOperand($child->value, $result, true);
+        }
+        $typeSlot = null;
+        if (null !== $child->declaredType && $child->declaredType instanceof Op\Type\Literal) {
+            $declared = Type::fromDecl($child->declaredType->name);
+            if (Variable::TYPE_UNDEFINED !== Variable::mapFromType($declared)) {
+                $typeSlot = $this->compileTypeConstrainedVariable($result, $declared);
+                if (isset($result->constants[$valueSlot])) {
+                    $this->verifyClassConstCompileTimeType($child->name, $result->constants[$valueSlot], $declared);
+                }
+            }
+        }
+        $constOp = new OpCode(
+            OpCode::TYPE_DECLARE_CLASS_CONST,
+            $this->compileOperand($child->name, $result, true),
+            $valueSlot,
+            $typeSlot
+        );
+        $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
+        AttributeNames::assertNoDuplicates(AttributeNames::fromOp($child));
+        $result->addOpCode($constOp);
+    }
+
+    protected function tryFoldClassConstValueSlot(Op\Terminal\Const_ $terminal, Block $block): ?int
+    {
+        if (null !== $terminal->valueBlock && [] !== $terminal->valueBlock->children) {
+            $children = $terminal->valueBlock->children;
+            if (1 === \count($children) && $children[0] instanceof Op\Expr\Array_) {
+                $vm = $this->tryBuildCompileTimeArrayFromExpr($children[0]);
+                if (null !== $vm) {
+                    return $block->registerConstant(new Operand\Temporary(), $vm);
+                }
+            }
+        }
+        $vm = $this->vmVariableFromCfgLiteralOperand($terminal->value);
+        if (null === $vm) {
+            return null;
+        }
+
+        return $block->registerConstant(new Operand\Temporary(), $vm);
+    }
+
+    protected function verifyClassConstCompileTimeType(Operand $nameOp, Variable $value, Type $declared): void
+    {
+        $mapped = Variable::mapFromType($declared);
+        if (Variable::TYPE_UNDEFINED === $mapped) {
+            return;
+        }
+        if ($value->type === $mapped) {
+            return;
+        }
+        $constName = $nameOp instanceof Operand\Literal ? (string) $nameOp->value : 'constant';
+        $expected = self::vmTypeName($mapped);
+        $given = self::vmTypeName($value->type);
+        throw new \TypeError("Cannot assign {$given} to class constant {$constName} of type {$expected}");
+    }
+
+    private static function vmTypeName(int $type): string
+    {
+        switch ($type) {
+            case Variable::TYPE_INTEGER:
+                return 'int';
+            case Variable::TYPE_FLOAT:
+                return 'float';
+            case Variable::TYPE_BOOLEAN:
+                return 'bool';
+            case Variable::TYPE_STRING:
+                return 'string';
+            case Variable::TYPE_NULL:
+                return 'null';
+            case Variable::TYPE_ARRAY:
+                return 'array';
+            default:
+                return 'mixed';
+        }
+    }
+
     protected function isPromotedParam(Op\Expr\Param $param): bool
     {
         return property_exists($param, 'promotionFlags') && 0 !== $param->promotionFlags;
@@ -1550,12 +1651,24 @@ class Compiler {
             : Type::mixed();
         $propName = new Operand\Literal($param->name->value);
         $propName->type = Type::string();
-        $result->addOpCode(new OpCode(
+        $declare = new OpCode(
             OpCode::TYPE_DECLARE_PROPERTY,
             $this->compileOperand($propName, $result, true),
             is_null($param->defaultVar) ? null : $this->compileOperand($param->defaultVar, $result, true),
             $this->compileTypeConstrainedVariable($result, $declared)
-        ));
+        );
+        $declare->propertyReadonly = $this->isPromotedParamReadonly($param);
+        $result->addOpCode($declare);
+    }
+
+    protected function isReadonlyPropertyFlags(int $flags): bool
+    {
+        return 0 !== ($flags & ClassReadonly::MODIFIER_READONLY);
+    }
+
+    protected function isPromotedParamReadonly(Op\Expr\Param $param): bool
+    {
+        return property_exists($param, 'promotionReadonly') && $param->promotionReadonly;
     }
 
     /**
@@ -1948,6 +2061,11 @@ class Compiler {
     }
 
     protected function compileExpr(Op\Expr $expr, Block $block): array {
+        if ($expr instanceof Op\Expr\BinaryOp\Coalesce) {
+            $this->compileCoalesce($expr, $block);
+
+            return [];
+        }
         if ($expr instanceof Op\Expr\BinaryOp) {
             $opcode = new OpCode(
                 $this->getOpCodeTypeFromBinaryOp($expr),
@@ -2216,7 +2334,10 @@ class Compiler {
                 if (null !== $className) {
                     $lc = strtolower(ltrim($className, '\\'));
                     if (isset($this->abstractClasses[$lc])) {
-                        $this->throwCompileError('Cannot instantiate abstract class '.$className);
+                        $msg = isset($this->abstractEnums[$lc])
+                            ? 'Cannot instantiate enum '.$className
+                            : 'Cannot instantiate abstract class '.$className;
+                        $this->throwCompileError($msg);
                     }
                 }
                 $return = [
@@ -2391,6 +2512,11 @@ class Compiler {
 
     protected function shouldStubClosureForBootstrap(): bool
     {
+        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        if ('1' === $userScript || 'true' === strtolower((string) $userScript)) {
+            return false;
+        }
+
         return '1' === (string) getenv('PHP_COMPILER_VENDOR_PRELINK')
             || '1' === (string) getenv('PHP_COMPILER_SELFHOST_AOT');
     }

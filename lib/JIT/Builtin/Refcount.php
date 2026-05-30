@@ -172,6 +172,8 @@ class Refcount extends Builtin {
     }
 
     public function implement(): void {
+        \PHPCompiler\JIT\Builtin\WeakRefRuntime::ensureLinked($this->context);
+        \PHPCompiler\JIT\Builtin\WeakRefNative::registerDeclarations($this->context);
         $this->implementInit();
         $this->implementAddref();
         $this->implementDelref();
@@ -516,7 +518,15 @@ class Refcount extends Builtin {
                     $this->context->builder->branchIf($bool, $ifBlock, $tmp);
                 
                 $this->context->builder->positionAtEnd($ifBlock);
-                { $this->context->memory->free($refVirtual);
+                { $this->context->builder->call(
+                    $this->context->lookupFunction('phpc_weakref_clear_object_typed'),
+                    $this->context->builder->pointerCast(
+                        $refVirtual,
+                        $this->context->getTypeFromString('int8*')
+                    ),
+                    $typeinfo
+                );
+                $this->context->memory->free($refVirtual);
     }
                 if ($this->context->builder->getInsertBlock()->getTerminator() === null) {
                     $this->context->builder->branch(end($endBlock));

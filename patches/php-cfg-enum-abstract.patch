@@ -1,0 +1,12 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php
+@@ -16,6 +16,9 @@ class Enum_ extends ClassLike
+     /** @var Operand[] Implemented interface name operands */
+     public $implements = [];
+ 
++    /** php-parser Class_::flags — MODIFIER_ABSTRACT for `abstract enum` (#3737). */
++    public int $flags = 0;
++
+     public function __construct(Operand $name, ?Type $backedType, array $implements, Block $stmts, array $attributes = [])
+     {
+         parent::__construct($name, $stmts, $attributes);
