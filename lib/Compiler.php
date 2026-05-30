@@ -1787,9 +1787,6 @@ class Compiler {
 
             return;
         }
-
-            return;
-        }
         if ($declared instanceof Op\Type\Literal) {
             $declName = strtolower($declared->name);
             if ('mixed' !== $declName) {
@@ -2186,6 +2183,15 @@ class Compiler {
 
             return $return;
         }
+        $dnfArms = DnfType::armsFromCfgType(
+            $cfgType,
+            fn (Op\Type\Intersection $t) => $this->intersectionNamesFromCfgType($t)
+        );
+        if (DnfType::hasConstraints($dnfArms)) {
+            $var->dnfArms = $dnfArms;
+
+            return $return;
+        }
         if (Type::TYPE_UNION === $type->type) {
             $members = [];
             foreach ($type->subTypes as $sub) {
@@ -2198,17 +2204,7 @@ class Compiler {
                 $var->unionTypeConstraints = $members;
                 $var->declaredTypeLabel = $type->toString();
             }
-        }
-        $dnfArms = DnfType::armsFromCfgType(
-            $cfgType,
-            fn (Op\Type\Intersection $t) => $this->intersectionNamesFromCfgType($t)
-        );
-        if (DnfType::hasConstraints($dnfArms)) {
-            $var->dnfArms = $dnfArms;
 
-            return $return;
-        }
-        if (Type::TYPE_UNION === $type->type && [] !== ($var->unionTypeConstraints ?? [])) {
             return $return;
         }
         $mappedType = Variable::mapFromType($type);
