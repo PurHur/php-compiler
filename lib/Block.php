@@ -314,6 +314,26 @@ class Block {
         return null;
     }
 
+    /**
+     * @return iterable<array{0: string, 1: int}> variable name and scope slot
+     */
+    public function eachNamedScopeSlot(): iterable
+    {
+        $seen = [];
+        foreach ($this->scope as $operand) {
+            $slot = $this->scope[$operand];
+            if (isset($seen[$slot])) {
+                continue;
+            }
+            $seen[$slot] = true;
+            $name = self::resolveVariableName($operand);
+            if (null === $name) {
+                continue;
+            }
+            yield [$name, $slot];
+        }
+    }
+
     public function slotForOperand(Operand $operand): ?int
     {
         if ($this->scope->contains($operand)) {
@@ -545,7 +565,7 @@ class Block {
         return $op instanceof VarOperand ? $op : null;
     }
 
-    private static function resolveVariableName(Operand $op): ?string
+    public static function resolveVariableName(Operand $op): ?string
     {
         $root = self::cfgVarRoot($op);
         if (null === $root) {

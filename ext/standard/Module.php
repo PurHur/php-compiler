@@ -13,9 +13,26 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT;
 use PHPCompiler\ModuleAbstract;
+use PHPCompiler\Runtime;
+use PHPCompiler\VM;
 
 class Module extends ModuleAbstract
 {
+    public function init(Runtime $runtime): void
+    {
+        parent::init($runtime);
+        foreach ([
+            'LOCK_SH' => 1,
+            'LOCK_EX' => 2,
+            'LOCK_UN' => 3,
+            'LOCK_NB' => 4,
+        ] as $name => $value) {
+            $var = new VM\Variable();
+            $var->int($value);
+            $runtime->vmContext->defineConstant($name, $var);
+        }
+    }
+
     public function getFunctions(): array
     {
         return [
@@ -291,6 +308,7 @@ class Module extends ModuleAbstract
             new fpassthru(),
             new fwrite(),
             new fclose(),
+            new flock(),
             new getenv_(),
             new putenv_(),
             new shell_exec(),
@@ -305,6 +323,8 @@ class Module extends ModuleAbstract
             new ini_get_(),
             new define_(),
             new defined_(),
+            new get_defined_constants_(),
+            new get_defined_vars_(),
             new debug_backtrace(),
             new class_exists_(),
             new class_alias(),
@@ -334,6 +354,7 @@ class Module extends ModuleAbstract
             new compact_(),
             new scandir(),
             new glob_(),
+            new fnmatch(),
             new time(),
             new getmypid(),
             new microtime(),

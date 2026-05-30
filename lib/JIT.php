@@ -4345,6 +4345,7 @@ class JIT {
         $this->context->scope->blockStorage[$block] = $basicBlock;
         $builder = $this->context->builder;
         $builder->positionAtEnd($basicBlock);
+        $this->context->jitCurrentBlock = $block;
         if ([] !== $args) {
             $this->context->implicitThisArgument = null;
         }
