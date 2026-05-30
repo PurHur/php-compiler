@@ -191,6 +191,20 @@ class VM {
     }
 
     /**
+     * Zend zend_std_clone_object: shallow copy then user __clone() when defined (#3170).
+     */
+    protected function invokeCloneMagicMethod(ObjectEntry $object): void
+    {
+        $class = $object->class;
+        if (!isset($class->methods['__clone'])) {
+            return;
+        }
+        $thisVar = new Variable(Variable::TYPE_OBJECT);
+        $thisVar->object($object);
+        $this->invokePhpFunction($class->methods['__clone'], $thisVar);
+    }
+
+    /**
      * Invoke a closure from a VM builtin (isolated run stack; issue #72).
      */
     public function invokeClosure(ClosureState $closureState, Variable ...$args): Variable
@@ -1148,6 +1162,9 @@ restart:
                         throw new \LogicException("Attempting to instantiate non-existing class $name");
                     }
                     $class = $this->context->classes[$lcname];
+                    if ($class->isInterface) {
+                        throw new \LogicException("Cannot instantiate interface $name");
+                    }
                     $object = new ObjectEntry($class);
                     $result->object($object);
                     $frame->call = $object->constructor;
@@ -1227,7 +1244,9 @@ restart:
                     if (Variable::TYPE_OBJECT !== $src->type) {
                         throw new \LogicException('clone requires an object');
                     }
-                    $result->object($src->toObject()->cloneShallow());
+                    $cloned = $src->toObject()->cloneShallow();
+                    $result->object($cloned);
+                    $this->invokeCloneMagicMethod($cloned);
                     break;
                 case OpCode::TYPE_BOOLEAN_NOT:
                     $value = !($frame->scope[$op->arg2]->toBool());
@@ -1443,6 +1462,12 @@ restart:
                         if ($this->catchTypesMatch($op, $this->context->pendingException)) {
                             $caught = $this->context->pendingException;
                             $this->context->pendingException = null;
+                            if (null !== $op->arg3) {
+                                if (!isset($frame->scope[$op->arg3])) {
+                                    $frame->scope[$op->arg3] = new Variable();
+                                }
+                                $frame->scope[$op->arg3]->copyFrom($caught);
+                            }
                             $frame = $op->block1->getFrame($this->context, $frame);
                             if (null !== $op->arg3) {
                                 if (!isset($frame->scope[$op->arg3])) {
@@ -1936,16 +1961,12 @@ restart:
     private function objectIsInstanceOfClass(ClassEntry $class, string $typeName): bool
     {
         $want = strtolower(ltrim($typeName, '\\'));
-        $current = $class;
-        while (true) {
-            if (strtolower($current->name) === $want) {
-                return true;
-            }
-            if (null === $current->parentLc || !isset($this->context->classes[$current->parentLc])) {
-                return false;
-            }
-            $current = $this->context->classes[$current->parentLc];
+        $target = $this->context->classes[$want] ?? null;
+        if (null !== $target && $target->isInterface) {
+            return VM\InterfaceCheck::entryImplements($class, $want, $this->context);
         }
+
+        return VM\InterfaceCheck::entryIsInstanceOf($class, $want, $this->context);
     }
 
     private function valueInstanceOfClassName(Variable $value, string $className): bool

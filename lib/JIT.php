@@ -3962,7 +3962,7 @@ class JIT {
         if ($this->shouldUseM3InventoryEmitDriver() && !$this->shouldUseEmitHelperLinkStubs()) {
             // Never scan O(modules×funcs) on inventory argv links (#2967). parse/compileEmitSmoke from
             // Runtime.php; ctor/init* use native M3 via compileBlock / ensureM3EmitTuRuntimeInitSpineSymbols.
-            if (in_array($methodLc, ['parse', 'compileemitsmoke'], true)) {
+            if (in_array($methodLc, ['parse', 'compileemitsmoke', 'peeklastparsefailure', 'noteparsecompilenullforscript'], true)) {
                 unset(
                     $this->context->functions[$lc],
                     $this->context->functionReturnType[$lc],
@@ -4801,6 +4801,7 @@ class JIT {
                         throw new \LogicException('clone requires an object');
                     }
                     $cloned = $this->context->type->object->cloneObject($srcObj);
+                    $this->context->type->object->invokeCloneMagicIfPresent($block, $cloned);
                     $objVar = new JIT\Variable(
                         $this->context,
                         Variable::TYPE_OBJECT,

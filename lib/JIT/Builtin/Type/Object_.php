@@ -11,6 +11,7 @@ namespace PHPCompiler\JIT\Builtin\Type;
 
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
+use PHPCompiler\Block;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Refcount;
 use PHPCompiler\JIT\Builtin\Type;
@@ -874,6 +875,93 @@ class Object_ extends Type {
         $this->context->builder->positionAtEnd($exit);
 
         return $result;
+    }
+
+    /**
+     * After shallow clone, invoke user __clone() when the class defines it (Zend #3170).
+     */
+    public function invokeCloneMagicIfPresent(Block $block, PHPLLVM\Value $cloned): void
+    {
+        $cloneClassIds = [];
+        foreach ($this->methodVisibility as $classId => $methods) {
+            if (isset($methods['__clone'])) {
+                $cloneClassIds[] = $classId;
+            }
+        }
+        if ([] === $cloneClassIds) {
+            return;
+        }
+        if (1 === count($cloneClassIds)) {
+            $onlyId = $cloneClassIds[0];
+            $objMap = $this->context->structFieldMap['__object__'];
+            $classId = $this->context->builder->load(
+                $this->context->builder->structGep($cloned, $objMap['class_id'])
+            );
+            $fn = $this->context->builder->getInsertBlock()->getParent();
+            assert($fn instanceof PHPLLVM\Value\Function_);
+            $entry = $this->context->builder->getInsertBlock();
+            $callBlock = $fn->appendBasicBlock('clone_magic_single_call');
+            $done = $fn->appendBasicBlock('clone_magic_single_done');
+            $expected = $this->context->constantFromInteger($onlyId, 'int64');
+            $isId = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $classId, $expected);
+            $this->context->builder->branchIf($isId, $callBlock, $done);
+            $this->context->builder->positionAtEnd($callBlock);
+            $this->emitCloneMagicCallForClass($block, $cloned, $onlyId);
+            $this->context->builder->branch($done);
+            $this->context->builder->positionAtEnd($done);
+
+            return;
+        }
+        $objMap = $this->context->structFieldMap['__object__'];
+        $classId = $this->context->builder->load(
+            $this->context->builder->structGep($cloned, $objMap['class_id'])
+        );
+        $fn = $this->context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof PHPLLVM\Value\Function_);
+        $entry = $this->context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock('clone_magic_done');
+        $fallback = $fn->appendBasicBlock('clone_magic_unknown');
+        $caseBlocks = [];
+        foreach ($cloneClassIds as $id) {
+            $caseBlocks[] = $fn->appendBasicBlock('clone_magic_class_'.$id);
+        }
+        $checkBlock = $entry;
+        foreach ($cloneClassIds as $i => $id) {
+            $this->context->builder->positionAtEnd($checkBlock);
+            $expected = $this->context->constantFromInteger($id, 'int64');
+            $isId = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $classId, $expected);
+            $nextCheck = $i + 1 < count($cloneClassIds)
+                ? $fn->appendBasicBlock('clone_magic_try_'.($i + 1))
+                : $fallback;
+            $this->context->builder->branchIf($isId, $caseBlocks[$i], $nextCheck);
+            $this->context->builder->positionAtEnd($caseBlocks[$i]);
+            $this->emitCloneMagicCallForClass($block, $cloned, $id);
+            $this->context->builder->branch($done);
+            $checkBlock = $nextCheck;
+        }
+        $this->context->builder->positionAtEnd($fallback);
+        $this->context->builder->branch($done);
+        $this->context->builder->positionAtEnd($done);
+    }
+
+    private function emitCloneMagicCallForClass(Block $block, PHPLLVM\Value $cloned, int $classId): void
+    {
+        $className = $this->classNameForId($classId);
+        $proxyName = strtolower($className).'::'.'__clone';
+        if (!$this->context->functionIsRegistered($proxyName)) {
+            return;
+        }
+        $objVar = new Variable(
+            $this->context,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $cloned
+        );
+        $toCall = $this->context->resolveFunctionProxy($proxyName);
+        $prevStrict = $this->context->callerStrictTypes;
+        $this->context->callerStrictTypes = $block->strictTypes;
+        $toCall->call($this->context, $objVar);
+        $this->context->callerStrictTypes = $prevStrict;
     }
 
     private function copyPropertySlots(
