@@ -116,48 +116,45 @@ if [[ -f vendor/bin/phpunit ]] && ci_docker_run -v "$(pwd):/compiler" -w /compil
   exit $?
 fi
 
+_tar_fallback_inner="
+  set -euo pipefail
+  tar -xf -
+  chmod +x bin/*.php script/*.sh 2>/dev/null || true
+  ${_llvm_exports}
+  source script/php-env.sh
+  ${quoted}
+"
+
 echo "docker-exec: bind-mount incomplete; copying repo via tar..." >&2
 # shellcheck disable=SC2086
 if [[ "${#SYNC_BACK_PATHS[@]}" -gt 0 ]]; then
-  sync_quoted=$(printf '%q ' "${SYNC_BACK_PATHS[@]}")
   # Stream the repo into a throwaway container, run the command, then sync selected paths back.
   # NOTE: `docker start -ai` multiplexes stdout+stderr, so streaming a tarball back can be corrupted
   # by any stderr output. Use `docker cp` for sync-back instead so bootstrap tools can print freely.
   # Use docker create/start + trap cleanup so tar-fallback never leaks long-lived containers (#2708).
-  container_id="$(ci_docker_create -i -w /compiler "$IMAGE" bash -c "
-    set -euo pipefail
-    tar -xf -
-    chmod +x bin/*.php script/*.sh 2>/dev/null || true
-    ${_llvm_exports}
-    source script/php-env.sh
-    ${quoted}
-  ")"
-  trap 'docker rm -f "${container_id}" >/dev/null 2>&1 || true' EXIT INT TERM
+  container_id=""
+  _tar_fallback_cleanup() {
+    if [[ -n "${container_id:-}" ]]; then
+      docker rm -f "${container_id}" >/dev/null 2>&1 || true
+    fi
+  }
+  container_id="$(ci_docker_create \
+    --label php-compiler.tar-fallback=1 \
+    -i -w /compiler "$IMAGE" bash -c "${_tar_fallback_inner}")"
+  trap _tar_fallback_cleanup EXIT INT TERM
   set +e
   tar -cf - --exclude='.git' --exclude='.llvm' . | docker start -ai "${container_id}"
-  status="$(docker wait "${container_id}" 2>/dev/null)"
+  status="$(docker wait "${container_id}" 2>/dev/null || echo 1)"
   docker logs "${container_id}" 1>&2
   set -e
   for p in "${SYNC_BACK_PATHS[@]}"; do
     mkdir -p "$(dirname "${p}")"
     docker cp "${container_id}:/compiler/${p}" "${p}" >/dev/null 2>&1 || true
   done
-  docker rm -f "${container_id}" >/dev/null 2>&1 || true
+  _tar_fallback_cleanup
+  trap - EXIT INT TERM
   exit "$status"
 else
-  container_id="$(ci_docker_create -i -w /compiler "$IMAGE" bash -c "
-    set -euo pipefail
-    tar -xf -
-    chmod +x bin/*.php script/*.sh 2>/dev/null || true
-    ${_llvm_exports}
-    source script/php-env.sh
-    ${quoted}
-  ")"
-  trap 'docker rm -f "${container_id}" >/dev/null 2>&1 || true' EXIT INT TERM
-  set +e
-  tar -cf - --exclude='.git' --exclude='.llvm' . | docker start -ai "${container_id}"
-  status=$?
-  set -e
-  docker rm -f "${container_id}" >/dev/null 2>&1 || true
-  exit "$status"
+  # No sync-back: use ci_docker_run (--rm) so Docker removes the container on exit (#2708).
+  tar -cf - --exclude='.git' --exclude='.llvm' . | ci_docker_run -i -w /compiler "$IMAGE" bash -c "${_tar_fallback_inner}"
 fi
