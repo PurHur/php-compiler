@@ -7365,6 +7365,15 @@ class JIT {
 
             return;
         }
+        if (null !== $result->valueBoxAliasPtr) {
+            JIT\JitValueBox::assignToPointer(
+                $this->context,
+                $result->valueBoxAliasPtr,
+                $value
+            );
+
+            return;
+        }
         if ($result->kind !== Variable::KIND_VARIABLE) {
             throw new \LogicException("Cannot assign to a value");
         }
@@ -8230,17 +8239,22 @@ class JIT {
         }
 
         if (Variable::TYPE_VALUE === $read->type && Variable::KIND_VARIABLE === $read->kind) {
-            $slot = $read->value;
+            $readPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $read);
             $cur = $this->context->builder->call(
                 $this->context->lookupFunction('__value__readLong'),
-                JIT\JitValueBox::pointer($this->context, $slot)
+                $readPtr
             );
             $one = $cur->typeOf()->constInt(1, false);
             $newLong = $increment
                 ? $this->context->builder->add($cur, $one)
                 : $this->context->builder->sub($cur, $one);
             $write = $this->context->getVariableFromOpInScopes($writeOp);
-            JIT\JitValueBox::writeLong($this->context, $write->value, $newLong);
+            $writePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $write);
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeLong'),
+                $writePtr,
+                $newLong
+            );
             if ($prefix) {
                 $newVar = new Variable(
                     $this->context,
