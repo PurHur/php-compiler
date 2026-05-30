@@ -206,6 +206,10 @@ patch_already_applied() {
     php-cfg-typed-class-const.patch)
       grep -q 'public ?Type \\$declaredType' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php" 2>/dev/null
       ;;
+    php-cfg-yield-from.overlay)
+      grep -q 'function parseExpr_YieldFrom' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        && [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/YieldFrom.php" ]]
+      ;;
     php-cfg-asymmetric-visibility.patch)
       grep -q 'setVisibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null \
         && grep -q 'promotionSetVisibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null
@@ -395,12 +399,12 @@ apply_php_cfg_yield_from_overlay() {
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/YieldFrom.php"
   local overlay="$PATCH_DIR/overlays/php-cfg"
-  if grep -q 'function parseExpr_YieldFrom' "$parser" 2>/dev/null && [[ -f "$op" ]]; then
-    echo "Skip php-cfg-yield-from.patch (already applied)"
+  if patch_already_applied "$PATCH_DIR/php-cfg-yield-from.overlay"; then
+    echo "Skip php-cfg yield-from overlay (already applied)"
     return 0
   fi
   if [[ ! -f "$overlay/Op/Expr/YieldFrom.php" || ! -f "$overlay/yield-from-parser-method.php" ]]; then
-    echo "Skip php-cfg-yield-from.patch (overlay files missing)" >&2
+    echo "Skip php-cfg yield-from overlay (overlay files missing)" >&2
     return 1
   fi
   mkdir -p "$(dirname "$op")"
@@ -426,7 +430,7 @@ if anchor not in text:
 insert = method_path.read_text().rstrip("\n") + "\n\n"
 parser_path.write_text(text.replace(anchor, insert + anchor, 1))
 PY
-  echo "Applied php-cfg-yield-from.patch (overlay)"
+  echo "Applied php-cfg yield-from overlay"
 }
 
 apply_php_cfg_incdec_expr_overlay() {
@@ -1964,10 +1968,6 @@ apply_patch() {
   if [[ ! -f "$patch" ]]; then
     return 0
   fi
-  if [[ "$(basename "$patch")" == "php-cfg-yield-from.patch" ]]; then
-    apply_php_cfg_yield_from_overlay
-    return $?
-  fi
   if [[ "$(basename "$patch")" == "php-cfg-incdec-expr.patch" ]]; then
     apply_php_cfg_incdec_expr_overlay
     return $?
@@ -2176,7 +2176,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-typed-class-const.patch"
   apply_patch "$PATCH_DIR/php-cfg-asymmetric-visibility.patch"
   apply_patch "$PATCH_DIR/php-cfg-assertion-expr-property.patch"
-  apply_patch "$PATCH_DIR/php-cfg-yield-from.patch"
+  apply_php_cfg_yield_from_overlay
   apply_patch "$PATCH_DIR/php-cfg-incdec-expr.patch"
   apply_patch "$PATCH_DIR/php-cfg-yield-keyed.patch"
   apply_patch "$PATCH_DIR/php-cfg-match.patch"
