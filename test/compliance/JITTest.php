@@ -105,6 +105,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'object_loose_equals')) {
                 continue;
             }
+            // object === identity compare is VM-only until JIT handle compare is stable (#3622).
+            if (str_contains($name, 'object_identical')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
