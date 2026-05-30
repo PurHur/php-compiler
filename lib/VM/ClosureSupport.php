@@ -96,12 +96,15 @@ final class ClosureSupport
         Context $ctx,
         ClosureState $state,
         Variable $newThis,
-        ?Variable $newScope
+        ?Variable $newScope,
+        string $context = 'Closure::bindTo()'
     ): ?ObjectEntry {
         $newThis = $newThis->resolveIndirect();
         if (Variable::TYPE_NULL !== $newThis->type && Variable::TYPE_OBJECT !== $newThis->type) {
-            throw new \LogicException(
-                'Closure::bindTo(): Argument #1 ($newThis) must be of type ?object'
+            $thisArg = 'Closure::bind()' === $context ? '#2 ($newThis)' : '#1 ($newThis)';
+            throw new \TypeError(
+                "{$context}: Argument {$thisArg} must be of type ?object, "
+                .self::valueTypeName($newThis).' given'
             );
         }
         if (null !== $state->wrappedFunc || null !== $state->methodName) {
@@ -113,7 +116,7 @@ final class ClosureSupport
         } else {
             $bound->boundThis = $newThis;
         }
-        $scopeClass = self::resolveScopeClass($newScope, $newThis);
+        $scopeClass = self::resolveScopeClass($newScope, $newThis, $context);
         $bound->boundScopeClass = $scopeClass;
 
         return self::wrapState($ctx, $bound);
@@ -217,8 +220,12 @@ final class ClosureSupport
         return $state;
     }
 
-    private static function resolveScopeClass(?Variable $newScope, Variable $newThis): ?string
-    {
+    private static function resolveScopeClass(
+        ?Variable $newScope,
+        Variable $newThis,
+        string $context = 'Closure::bindTo()'
+    ): ?string {
+        $scopeArg = 'Closure::bind()' === $context ? '#3 ($newScope)' : '#2 ($newScope)';
         if (null === $newScope) {
             if (Variable::TYPE_OBJECT === $newThis->type) {
                 return $newThis->toObject()->class->name;
@@ -250,9 +257,24 @@ final class ClosureSupport
             return $scope;
         }
 
-        throw new \LogicException(
-            'Closure::bindTo(): Argument #2 ($newScope) must be of type object|string|null'
+        throw new \TypeError(
+            "{$context}: Argument {$scopeArg} must be of type object|string|null, "
+            .self::valueTypeName($newScope).' given'
         );
+    }
+
+    private static function valueTypeName(Variable $value): string
+    {
+        return match ($value->type) {
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            default => 'mixed',
+        };
     }
 
     private static function resolveClassScopeName(string $className, Frame $frame, Context $ctx): string
