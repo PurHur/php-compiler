@@ -1219,7 +1219,10 @@ final class VmString
 
     public static function repeat(string $input, int $multiplier): string
     {
-        if ($multiplier <= 0) {
+        if ($multiplier < 0) {
+            throw new \ValueError('str_repeat(): Argument #2 ($times) must be greater than or equal to 0');
+        }
+        if (0 === $multiplier) {
             return '';
         }
         $inputLen = self::byteLength($input);
