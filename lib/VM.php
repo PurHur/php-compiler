@@ -690,6 +690,13 @@ restart:
                     $arg3 = $frame->scope[$op->arg3];
                     try {
                         $arg1->numericOp($op->type, $arg2, $arg3);
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
                     } catch (\DivisionByZeroError $e) {
                         $catchFrame = $this->dispatchVmDivisionByZeroError($e, $frame);
                         if (null !== $catchFrame) {
