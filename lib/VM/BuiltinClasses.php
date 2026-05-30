@@ -25,10 +25,17 @@ use PHPCompiler\VM\Builtin\ReflectionConstantGetName;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetValue;
 use PHPCompiler\VM\Builtin\ReflectionFunctionConstruct;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetName;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetParameters;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetReturnType;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
+use PHPCompiler\VM\Builtin\ReflectionNamedTypeGetName;
+use PHPCompiler\VM\Builtin\ReflectionNamedTypeIsBuiltin;
+use PHPCompiler\VM\Builtin\ReflectionParameterGetType;
 use PHPCompiler\VM\Builtin\ReflectionPropertyConstruct;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetName;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetValue;
+use PHPCompiler\VM\Builtin\ReflectionTypeAllowsNull;
+use PHPCompiler\VM\Builtin\ReflectionTypeToString;
 use PHPCompiler\VM\Builtin\WeakMapConstruct;
 use PHPCompiler\VM\Builtin\WeakMapCount;
 use PHPCompiler\VM\Builtin\WeakMapOffsetExists;
@@ -131,6 +138,9 @@ final class BuiltinClasses
     private static function registerReflection(Context $ctx): void
     {
         $strProto = new Variable(Variable::TYPE_STRING);
+        $intProto = new Variable(Variable::TYPE_INTEGER);
+        $boolProto = new Variable(Variable::TYPE_BOOLEAN);
+        $arrayProto = new Variable(Variable::TYPE_ARRAY);
         $pub = CfgFunc::FLAG_PUBLIC;
 
         $attr = new ClassEntry('ReflectionAttribute');
@@ -171,12 +181,20 @@ final class BuiltinClasses
         $ctx->classes[ReflectionSupport::REFLECTION_PROPERTY] = $rp;
 
         $rf = new ClassEntry('ReflectionFunction');
-        $rf->properties[] = new ClassProperty(ReflectionSupport::PROP_FUNCTION_NAME, null, $strProto);
+        $rf->properties[] = new ClassProperty(ReflectionSupport::PROP_FUNC_NAME, null, $strProto);
         $rf->constructor = new ReflectionFunctionConstruct();
         $rf->methods['__construct'] = $rf->constructor;
         $rf->methodVisibility['__construct'] = $pub;
-        $rf->methods['getname'] = new ReflectionFunctionGetName();
-        $rf->methodVisibility['getname'] = $pub;
+        foreach (
+            [
+                'getname' => new ReflectionFunctionGetName(),
+                'getparameters' => new ReflectionFunctionGetParameters(),
+                'getreturntype' => new ReflectionFunctionGetReturnType(),
+            ] as $name => $method
+        ) {
+            $rf->methods[$name] = $method;
+            $rf->methodVisibility[$name] = $pub;
+        }
         $ctx->classes[ReflectionSupport::REFLECTION_FUNCTION] = $rf;
 
         $rconst = new ClassEntry('ReflectionConstant');
@@ -192,6 +210,78 @@ final class BuiltinClasses
         $ctx->classes[ReflectionSupport::REFLECTION_CONSTANT] = $rconst;
 
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS] = $rc;
+
+        $rp = new ClassEntry('ReflectionParameter');
+        $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_FUNC_NAME, null, $strProto);
+        $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_PARAM_INDEX, null, $intProto);
+        $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_PARAM_NAME, null, $strProto);
+        $rp->methods['gettype'] = new ReflectionParameterGetType();
+        $rp->methodVisibility['gettype'] = $pub;
+        $ctx->classes[ReflectionSupport::REFLECTION_PARAMETER] = $rp;
+
+        self::registerReflectionTypeClass(
+            $ctx,
+            'ReflectionNamedType',
+            ReflectionSupport::REFLECTION_NAMED_TYPE,
+            $strProto,
+            $boolProto,
+            $arrayProto,
+            $pub,
+            [
+                'getname' => new ReflectionNamedTypeGetName(),
+                'isbuiltin' => new ReflectionNamedTypeIsBuiltin(),
+            ]
+        );
+        self::registerReflectionTypeClass(
+            $ctx,
+            'ReflectionUnionType',
+            ReflectionSupport::REFLECTION_UNION_TYPE,
+            $strProto,
+            $boolProto,
+            $arrayProto,
+            $pub,
+            []
+        );
+        self::registerReflectionTypeClass(
+            $ctx,
+            'ReflectionIntersectionType',
+            ReflectionSupport::REFLECTION_INTERSECTION_TYPE,
+            $strProto,
+            $boolProto,
+            $arrayProto,
+            $pub,
+            []
+        );
+    }
+
+    /**
+     * @param array<string, VmClassMethod> $extraMethods
+     */
+    private static function registerReflectionTypeClass(
+        Context $ctx,
+        string $name,
+        string $lcKey,
+        Variable $strProto,
+        Variable $boolProto,
+        Variable $arrayProto,
+        int $pub,
+        array $extraMethods
+    ): void {
+        $entry = new ClassEntry($name);
+        $entry->properties[] = new ClassProperty(ReflectionSupport::PROP_TYPE_STRING, null, $strProto);
+        $entry->properties[] = new ClassProperty(ReflectionSupport::PROP_TYPE_ALLOWS_NULL, null, $boolProto);
+        $entry->properties[] = new ClassProperty(ReflectionSupport::PROP_TYPE_NAME, null, $strProto);
+        $entry->properties[] = new ClassProperty(ReflectionSupport::PROP_TYPE_BUILTIN, null, $boolProto);
+        $entry->properties[] = new ClassProperty(ReflectionSupport::PROP_TYPE_MEMBERS, null, $arrayProto);
+        $shared = [
+            'allowsnull' => new ReflectionTypeAllowsNull(),
+            '__tostring' => new ReflectionTypeToString(),
+        ];
+        foreach (array_merge($shared, $extraMethods) as $methodName => $method) {
+            $entry->methods[$methodName] = $method;
+            $entry->methodVisibility[$methodName] = $pub;
+        }
+        $ctx->classes[$lcKey] = $entry;
     }
 
     private static function registerDateTime(Context $ctx): void

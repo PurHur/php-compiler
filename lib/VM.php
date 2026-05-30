@@ -246,6 +246,10 @@ class VM {
     /** (string) cast on objects — invoke __toString (Zend zend_operators.c, issue #3421). */
     public function castObjectToString(ObjectEntry $object): string
     {
+        $typeString = VM\ReflectionTypeSupport::tryObjectTypeString($object);
+        if (null !== $typeString) {
+            return $typeString;
+        }
         if (!$this->hasInstanceMethod($object->class, '__tostring')) {
             throw new \LogicException(
                 'Object of class '.$object->class->name.' could not be converted to string'
@@ -1090,14 +1094,20 @@ restart:
                         break;
                     }
                     try {
+                        $classOperand = $frame->scope[$op->arg2]->resolveIndirect();
+                        $constName = strtolower($frame->scope[$op->arg3]->toString());
+                        if (Variable::TYPE_OBJECT === $classOperand->type && 'class' === $constName) {
+                            $frame->scope[$op->arg1]->string($classOperand->toObject()->class->name);
+                            break;
+                        }
                         $lcClass = $this->resolveClassScopeName(
-                            $frame->scope[$op->arg2]->toString(),
+                            $classOperand->toString(),
                             $frame
                         );
                     } catch (\LogicException $e) {
                         return $this->raise($e->getMessage(), $frame);
                     }
-                    $className = $frame->scope[$op->arg2]->toString();
+                    $className = $frame->scope[$op->arg2]->resolveIndirect()->toString();
                     if (!isset($this->context->classes[$lcClass])) {
                         if ('self' !== strtolower($className) && 'static' !== strtolower($className)) {
                             $this->context->autoloadClass($className);

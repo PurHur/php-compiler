@@ -24,6 +24,14 @@ final class ReflectionSupport
 
     public const REFLECTION_ATTRIBUTE = 'reflectionattribute';
 
+    public const REFLECTION_PARAMETER = 'reflectionparameter';
+
+    public const REFLECTION_NAMED_TYPE = 'reflectionnamedtype';
+
+    public const REFLECTION_UNION_TYPE = 'reflectionuniontype';
+
+    public const REFLECTION_INTERSECTION_TYPE = 'reflectionintersectiontype';
+
     public const PROP_CLASS_NAME = 'name';
 
     public const PROP_METHOD_NAME = 'method';
@@ -35,6 +43,22 @@ final class ReflectionSupport
     public const PROP_CONSTANT_NAME = 'constant';
 
     public const PROP_ATTR_NAME = 'name';
+
+    public const PROP_FUNC_NAME = 'funcName';
+
+    public const PROP_PARAM_INDEX = 'paramIndex';
+
+    public const PROP_PARAM_NAME = 'paramName';
+
+    public const PROP_TYPE_NAME = 'typeName';
+
+    public const PROP_TYPE_BUILTIN = 'typeBuiltin';
+
+    public const PROP_TYPE_STRING = 'typeString';
+
+    public const PROP_TYPE_ALLOWS_NULL = 'allowsNullFlag';
+
+    public const PROP_TYPE_MEMBERS = 'typeMembers';
 
     /**
      * @param list<string> $names
@@ -166,7 +190,10 @@ final class ReflectionSupport
 
     public static function functionNameFromReflection(ObjectEntry $reflection): string
     {
-        $nameVar = $reflection->getProperty(self::PROP_FUNCTION_NAME)->resolveIndirect();
+        $nameVar = $reflection->getProperty(self::PROP_FUNC_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $nameVar->type) {
+            $nameVar = $reflection->getProperty(self::PROP_FUNCTION_NAME)->resolveIndirect();
+        }
         if (Variable::TYPE_STRING !== $nameVar->type) {
             throw new \LogicException('ReflectionFunction missing function name');
         }
@@ -204,5 +231,74 @@ final class ReflectionSupport
         }
 
         return $out;
+    }
+
+    public static function requireReflectionParameter(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('ReflectionParameter method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (strtolower($obj->class->name) !== self::REFLECTION_PARAMETER) {
+            throw new \LogicException('Expected ReflectionParameter instance');
+        }
+
+        return $obj;
+    }
+
+    public static function requireReflectionType(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('ReflectionType method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (!ReflectionTypeSupport::isReflectionTypeClass(strtolower($obj->class->name))) {
+            throw new \LogicException('Expected ReflectionType instance');
+        }
+
+        return $obj;
+    }
+
+    public static function paramIndexFromReflection(ObjectEntry $reflection): int
+    {
+        $idxVar = $reflection->getProperty(self::PROP_PARAM_INDEX)->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $idxVar->type) {
+            throw new \LogicException('ReflectionParameter missing parameter index');
+        }
+
+        return $idxVar->toInt();
+    }
+
+    /**
+     * @return \PHPCompiler\Func\PHP
+     */
+    public static function resolveUserFunction(Context $ctx, string $functionName): \PHPCompiler\Func\PHP
+    {
+        $lc = strtolower($functionName);
+        $func = $ctx->functions[$lc] ?? null;
+        if (!$func instanceof \PHPCompiler\Func\PHP) {
+            throw new \LogicException("Function {$functionName}() does not exist");
+        }
+
+        return $func;
+    }
+
+    public static function typeStringFromReflection(ObjectEntry $reflection): string
+    {
+        $stored = $reflection->getProperty(self::PROP_TYPE_STRING)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $stored->type) {
+            throw new \LogicException('ReflectionType missing type string');
+        }
+
+        return $stored->toString();
+    }
+
+    public static function allowsNullFromReflection(ObjectEntry $reflection): bool
+    {
+        $flag = $reflection->getProperty(self::PROP_TYPE_ALLOWS_NULL)->resolveIndirect();
+
+        return $flag->toBool();
     }
 }

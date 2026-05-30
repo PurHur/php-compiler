@@ -329,6 +329,7 @@ class Compiler {
         if (null === $returnType) {
             return;
         }
+        $block->returnDeclaredType = $returnType;
         if ($returnType instanceof Op\Type\Void_) {
             $block->returnTypeVoid = true;
 
@@ -1448,6 +1449,9 @@ class Compiler {
         }
         if ($declared instanceof Op\Type\Literal && 'never' === strtolower($declared->name)) {
             $this->throwCompileError('never cannot be used as a parameter type');
+        }
+        if (null !== $declared) {
+            $block->paramDeclaredTypes[$slot] = $declared;
         }
         if ($declared instanceof Op\Type\Intersection) {
             $block->paramTypeConstraints[$slot] = Variable::TYPE_OBJECT;
