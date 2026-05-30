@@ -1037,6 +1037,16 @@ class Object_ extends Type {
         $this->classIdToName[$id] = $lcname;
         $this->ensureExternalClassConstants($id, $lcname);
         $this->seedExternalClassProperties($id, $lcname);
+        if ('reflectionattribute' === $lcname) {
+            $this->defineProperty($id, 'name', Variable::TYPE_VALUE);
+        }
+        if ('reflectionclass' === $lcname) {
+            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
+        }
+        if ('reflectionmethod' === $lcname) {
+            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
+            $this->defineProperty($id, 'method', Variable::TYPE_STRING);
+        }
         if ('phpcompiler\vm\context' === $lcname) {
             $this->defineProperty($id, 'runtime', Variable::TYPE_OBJECT);
             $this->defineProperty($id, 'errors', Variable::TYPE_OBJECT);
@@ -1843,6 +1853,32 @@ class Object_ extends Type {
             default:
                 throw new \LogicException('Class constant value must be a scalar compile-time constant');
         }
+    }
+
+    public function propertySlotFor(PHPLLVM\Value $obj, string $class, string $name): PHPLLVM\Value
+    {
+        $classId = $this->lookup('' !== $class ? $class : 'stdclass');
+        $nameId = $this->propNameMap[$name] ?? null;
+        $hasProp = false;
+        if (null !== $nameId) {
+            foreach ($this->properties[$classId] as $propset) {
+                if ($propset[0] === $nameId) {
+                    $hasProp = true;
+                    break;
+                }
+            }
+        }
+        if (!$hasProp) {
+            $this->defineProperty($classId, $name, $this->externalPropertyJitType($class, $name));
+            $nameId = $this->propNameMap[$name];
+        }
+        foreach ($this->properties[$classId] as $propset) {
+            if ($propset[0] === $nameId) {
+                return $this->propertySlotPtr($obj, $propset[3]);
+            }
+        }
+
+        throw new \LogicException('Property slot not found: '.$class.'::$'.$name);
     }
 
     public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name): Variable
