@@ -188,6 +188,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'pre_post_inc')) {
                 continue;
             }
+            // Property hooks: LLVM dispatch lands in #3723; MCJIT still crashes on hook classes (#3145).
+            if (str_contains($name, 'property_hook')) {
+                continue;
+            }
             // array union (+/+=) is VM-only until JIT TYPE_PLUS array branch (#3690).
             if (str_contains($name, 'array_union')) {
                 continue;
@@ -198,10 +202,6 @@ class JITTest extends BaseTest {
             }
             // User enum DECLARE_ENUM segfaults in MCJIT until enum lowering is stable (#3518).
             if (str_contains($name, 'enum_') || str_contains($name, 'abstract_enum')) {
-                continue;
-            }
-            // Property hooks are VM-only until JIT property dispatch (#3145).
-            if (str_contains($name, 'property_hook')) {
                 continue;
             }
             // ++/-- string increment_string is VM-only until JIT reads OpCode::isIncDec (#3469).
