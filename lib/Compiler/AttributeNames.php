@@ -43,4 +43,16 @@ final class AttributeNames
 
         return $names;
     }
+
+    /** True when `#[\AllowDynamicProperties]` is present (#3467). */
+    public static function hasAllowDynamicProperties(array $attributeNames): bool
+    {
+        foreach ($attributeNames as $name) {
+            if ('AllowDynamicProperties' === ltrim($name, '\\')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

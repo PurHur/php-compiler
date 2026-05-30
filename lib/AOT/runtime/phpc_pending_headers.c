@@ -62,6 +62,8 @@ static __phpc_header_node *phpc_pending_head = NULL;
 static __phpc_header_node *phpc_pending_tail = NULL;
 static int phpc_response_headers_flushed = 0;
 
+extern int __phpc_sapi_output_started;
+
 static int phpc_header_name_from_line(__string__ *line, char *buf, size_t bufsz)
 {
     const char *s;
@@ -145,6 +147,12 @@ void __phpc_pending_header_reset(void)
 {
     phpc_pending_free_nodes();
     phpc_response_headers_flushed = 0;
+    __phpc_sapi_output_started = 0;
+}
+
+int __phpc_headers_sent(void)
+{
+    return __phpc_sapi_output_started || phpc_response_headers_flushed;
 }
 
 void __phpc_response_headers_flush(void)

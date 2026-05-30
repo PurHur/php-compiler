@@ -31,6 +31,9 @@ patch_already_applied() {
     php-types-cast-object.patch)
       grep -q 'exprType instanceof Type' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
+    php-types-cast-unset.patch)
+      grep -q 'resolveOp_Expr_Cast_Unset' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
+      ;;
     php-types-nullsafe.patch)
       grep -q "case 'Expr_NullsafePropertyFetch':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
@@ -148,6 +151,12 @@ patch_already_applied() {
     php-cfg-nullsafe-parser.patch)
       grep -q 'function parseExpr_NullsafePropertyFetch' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
+    php-cfg-error-suppress-read.patch)
+      grep -q 'ZEND_COMPILE_SILENCE' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
+    php-cfg-error-suppress-simplifier.patch)
+      grep -q 'instanceof ErrorSuppressBlock' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php" 2>/dev/null
+      ;;
     php-cfg-strict-types.patch)
       grep -q 'public \$strictTypes' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php" 2>/dev/null
       ;;
@@ -222,6 +231,9 @@ patch_already_applied() {
     php-cfg-intersection-type.patch)
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Intersection.php" ]]
       ;;
+    php-cfg-instanceof-union.patch)
+      grep -q 'parseInstanceofClassUnion' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-cfg-union-type.patch)
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Union_.php" ]]
       ;;
@@ -234,6 +246,9 @@ patch_already_applied() {
     php-cfg-trait-use.patch)
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TraitUse.php" ]]
       ;;
+    php-cfg-throw-expr.patch)
+      [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Throw_.php" ]]
+      ;;
     php-types-never-type.patch)
       grep -q 'Op\\Type\\Never_' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
@@ -243,6 +258,9 @@ patch_already_applied() {
     php-types-union-type.patch)
       grep -q 'instanceof CfgType\\Union_' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
         && grep -q 'instanceof Op\\Type\\Union_' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
+      ;;
+    php-types-throw-expr.patch)
+      grep -q "case 'Expr_Throw':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
     php-types-magic-script-const.patch)
       grep -q 'KIND_LINE === \$op->kind' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
@@ -563,6 +581,72 @@ if 'Op\\\\Type\\\\Intersection' not in printer:
     printer_path.write_text(printer)
 PY
   echo "Applied php-cfg-intersection-type.patch (overlay)"
+}
+
+apply_php_cfg_instanceof_union_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local instanceof_op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/InstanceOf_.php"
+  local methods="$PATCH_DIR/overlays/php-cfg/instanceof-union-parser-methods.php"
+  if grep -q 'parseInstanceofClassUnion' "$parser" 2>/dev/null \
+    && grep -q 'classUnion' "$instanceof_op" 2>/dev/null; then
+    echo "Skip php-cfg-instanceof-union.patch (already applied)"
+    return 0
+  fi
+  python3 - "$parser" "$instanceof_op" "$methods" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+instanceof_path = Path(sys.argv[2])
+methods_path = Path(sys.argv[3])
+methods = methods_path.read_text()
+
+parser = parser_path.read_text()
+if 'parseInstanceofClassUnion' not in parser:
+    anchor = "    protected function parseExpr_Instanceof(Expr\\Instanceof_ $expr)"
+    if anchor not in parser:
+        sys.stderr.write("php-cfg-instanceof-union: parseExpr_Instanceof anchor not found\\n")
+        raise SystemExit(1)
+    parser = parser.replace(anchor, methods + anchor, 1)
+    old_body = """        $var = $this->readVariable($this->parseExprNode($expr->expr));
+        $class = $this->readVariable($this->parseExprNode($expr->class));"""
+    new_body = """        $var = $this->readVariable($this->parseExprNode($expr->expr));
+        $union = $this->parseInstanceofClassUnion($expr->class);
+        if (null !== $union) {
+            $class = $this->readVariable(new Literal(''));
+            $op = new Op\\Expr\\InstanceOf_($var, $class, $this->mapAttributes($expr));
+            $op->classUnion = $union;
+
+            return $op;
+        }
+        $class = $this->readVariable($this->parseExprNode($expr->class));"""
+    if old_body not in parser:
+        sys.stderr.write("php-cfg-instanceof-union: instanceof body anchor not found\\n")
+        raise SystemExit(1)
+    parser = parser.replace(old_body, new_body, 1)
+    parser_path.write_text(parser)
+
+instanceof_src = instanceof_path.read_text()
+if 'classUnion' not in instanceof_src:
+    anchor = "use PhpCfg\\Operand;"
+    insert = "use PhpCfg\\Operand;\nuse PHPCfg\\Op\\Type;"
+    if anchor not in instanceof_src:
+        sys.stderr.write("php-cfg-instanceof-union: Operand import anchor not found\\n")
+        raise SystemExit(1)
+    instanceof_src = instanceof_src.replace(anchor, insert, 1)
+    prop_anchor = "    public $class;\n"
+    prop_insert = """    public $class;
+
+    /** @var null|Type\\Union_ union RHS for $obj instanceof (A|B) (#3461) */
+    public $classUnion = null;
+"""
+    if prop_anchor not in instanceof_src:
+        sys.stderr.write("php-cfg-instanceof-union: class property anchor not found\\n")
+        raise SystemExit(1)
+    instanceof_src = instanceof_src.replace(prop_anchor, prop_insert, 1)
+    instanceof_path.write_text(instanceof_src)
+PY
+  echo "Applied php-cfg-instanceof-union.patch (overlay)"
 }
 
 apply_php_cfg_union_type_overlay() {
@@ -1142,13 +1226,14 @@ PY
 apply_php_cfg_magic_constants_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php"
   local overlay="$PATCH_DIR/overlays/php-cfg/MagicStringResolver.php"
-  if patch_already_applied "$PATCH_DIR/php-cfg-magic-constants.patch"; then
-    echo "Skip php-cfg-magic-constants.patch (already applied)"
-    return 0
-  fi
   if [[ ! -f "$overlay" ]]; then
     echo "Skip php-cfg-magic-constants.patch (overlay missing)" >&2
     return 1
+  fi
+  if patch_already_applied "$PATCH_DIR/php-cfg-magic-constants.patch" \
+    && grep -q 'traitStack' "$target" 2>/dev/null; then
+    echo "Skip php-cfg-magic-constants.patch (already applied)"
+    return 0
   fi
   cp "$overlay" "$target"
   echo "Applied php-cfg-magic-constants.patch (overlay)"
@@ -1406,6 +1491,10 @@ apply_patch() {
     apply_php_cfg_intersection_type_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-instanceof-union.patch" ]]; then
+    apply_php_cfg_instanceof_union_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-attribute-groups.patch" ]]; then
     apply_php_cfg_attribute_groups_overlay
     return $?
@@ -1528,6 +1617,8 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-cfg-nullsafe.patch"
   apply_patch "$PATCH_DIR/php-cfg-nullsafe-parser.patch"
+  apply_patch "$PATCH_DIR/php-cfg-error-suppress-read.patch"
+  apply_patch "$PATCH_DIR/php-cfg-error-suppress-simplifier.patch"
   apply_patch "$PATCH_DIR/php-cfg-strict-types.patch"
   apply_patch "$PATCH_DIR/php-cfg-trycatch.patch"
   apply_patch "$PATCH_DIR/php-cfg-phi-resolver-null.patch"
@@ -1553,16 +1644,20 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-spread.patch"
   apply_patch "$PATCH_DIR/php-cfg-never-type.patch"
   apply_patch "$PATCH_DIR/php-cfg-intersection-type.patch"
+  apply_patch "$PATCH_DIR/php-cfg-instanceof-union.patch"
   apply_patch "$PATCH_DIR/php-cfg-union-type.patch"
   apply_patch "$PATCH_DIR/php-cfg-ctor-promotion.patch"
   apply_patch "$PATCH_DIR/php-cfg-attribute-groups.patch"
   apply_patch "$PATCH_DIR/php-cfg-trait-use.patch"
+  apply_patch "$PATCH_DIR/php-cfg-throw-expr.patch"
+  apply_patch "$PATCH_DIR/php-cfg-is-resource-no-assertion.patch"
 fi
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-binaryop-pow.patch"
   apply_patch "$PATCH_DIR/php-types-binaryop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-types-cast-object.patch"
+  apply_patch "$PATCH_DIR/php-types-cast-unset.patch"
   apply_patch "$PATCH_DIR/php-types-binaryop-spaceship.patch"
   apply_patch "$PATCH_DIR/php-types-str-bool-fns.patch"
   apply_patch "$PATCH_DIR/php-types-str-incdec.patch"
@@ -1596,6 +1691,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-never-type.patch"
   apply_patch "$PATCH_DIR/php-types-intersection-type.patch"
   apply_patch "$PATCH_DIR/php-types-union-type.patch"
+  apply_patch "$PATCH_DIR/php-types-throw-expr.patch"
 fi
 
 if [[ -d "$ROOT/vendor/pre/plugin" ]]; then
