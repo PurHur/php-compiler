@@ -12,7 +12,7 @@ use PHPCompiler\Web\FastCgi\RequestHandler;
 /**
  * FastCGI VM adapter over TCP (issue #173 slice 2).
  *
- * @group serve
+ * @group fastcgi
  */
 final class FastCgiTest extends TestCase
 {
@@ -30,79 +30,25 @@ final class FastCgiTest extends TestCase
 
     public function testVmFastCgiHealthReturnsOk(): void
     {
-        $public = $this->repoRoot.'/examples/009-FastCGIWeb/public';
-        if (!is_dir($public)) {
-            $public = $this->repoRoot.'/examples/009-FastCGIWeb';
-        }
-        $script = is_file($public.'/example.php') ? $public.'/example.php' : $this->repoRoot.'/examples/009-FastCGIWeb/example.php';
-        $this->assertFileExists($script);
-        $docRoot = dirname($script);
-
-        $server = @stream_socket_server('tcp://127.0.0.1:0', $errno, $errstr);
-        $this->assertNotFalse($server, $errstr);
-        $bound = stream_socket_get_name($server, false);
-        $this->assertIsString($bound);
-        fclose($server);
-
-        $listener = proc_open(
-            [
-                PHP_BINARY,
-                $this->repoRoot.'/bin/fcgi.php',
-                '--listen',
-                $bound,
-                $this->repoRoot.'/examples/009-FastCGIWeb',
-            ],
-            [
-                0 => ['pipe', 'r'],
-                1 => ['pipe', 'w'],
-                2 => ['pipe', 'w'],
-            ],
-            $pipes,
-            $this->repoRoot
-        );
-        $this->assertIsResource($listener);
-        fclose($pipes[0]);
-        fclose($pipes[1]);
-        stream_set_blocking($pipes[2], false);
-
-        usleep(200000);
-
-        $client = @stream_socket_client('tcp://'.$bound, $errno, $errstr, 5);
-        $this->assertNotFalse($client, $errstr);
-
-        $params = [
-            'REQUEST_METHOD' => 'GET',
-            'SCRIPT_FILENAME' => $script,
-            'SCRIPT_NAME' => '/'.basename($script),
-            'REQUEST_URI' => '/'.basename($script),
-            'DOCUMENT_ROOT' => $docRoot,
-            'QUERY_STRING' => '',
-            'CONTENT_LENGTH' => '0',
-        ];
-        fwrite($client, Request::encode(1, $params, ''));
-
-        $stdoutBody = '';
-        $endSeen = false;
-        while (!$endSeen) {
-            $record = Record::readFromStream($client);
-            if (null === $record) {
-                break;
-            }
-            if (Record::STDOUT === $record['type']) {
-                $stdoutBody .= $record['content'];
-            }
-            if (Record::END_REQUEST === $record['type']) {
-                $endSeen = true;
-            }
-        }
-        fclose($client);
-        proc_terminate($listener);
-        proc_close($listener);
-
-        $this->assertTrue($endSeen);
+        $stdoutBody = $this->runVmFastCgiTcpRequest($this->healthParams());
         $this->assertStringContainsString('ok', $stdoutBody);
     }
 
+    public function testVmFastCgiPathInfoDiagnostics(): void
+    {
+        $params = $this->healthParams();
+        $params['PATH_INFO'] = '/ping';
+        $params['REQUEST_URI'] = '/example.php/ping';
+        $stdoutBody = $this->runVmFastCgiTcpRequest($params);
+        $this->assertStringContainsString('PATH_INFO=', $stdoutBody);
+        $this->assertStringContainsString('REQUEST_URI=', $stdoutBody);
+        $this->assertStringContainsString('SCRIPT_NAME=', $stdoutBody);
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
     public function testKeepConnMultiplexesTwoRequestsOnOneStream(): void
     {
         $public = $this->repoRoot.'/examples/009-FastCGIWeb/public';
@@ -256,6 +202,68 @@ final class FastCgiTest extends TestCase
             'QUERY_STRING' => '',
             'CONTENT_LENGTH' => '0',
         ];
+    }
+
+    /**
+     * @param array<string, string> $params
+     */
+    private function runVmFastCgiTcpRequest(array $params): string
+    {
+        $server = @stream_socket_server('tcp://127.0.0.1:0', $errno, $errstr);
+        $this->assertNotFalse($server, $errstr);
+        $bound = stream_socket_get_name($server, false);
+        $this->assertIsString($bound);
+        fclose($server);
+
+        $listener = proc_open(
+            [
+                PHP_BINARY,
+                $this->repoRoot.'/bin/fcgi.php',
+                '--listen',
+                $bound,
+                $this->repoRoot.'/examples/009-FastCGIWeb',
+            ],
+            [
+                0 => ['pipe', 'r'],
+                1 => ['pipe', 'w'],
+                2 => ['pipe', 'w'],
+            ],
+            $pipes,
+            $this->repoRoot
+        );
+        $this->assertIsResource($listener);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        stream_set_blocking($pipes[2], false);
+
+        usleep(200000);
+
+        $client = @stream_socket_client('tcp://'.$bound, $errno, $errstr, 5);
+        $this->assertNotFalse($client, $errstr);
+
+        fwrite($client, Request::encode(1, $params, ''));
+
+        $stdoutBody = '';
+        $endSeen = false;
+        while (!$endSeen) {
+            $record = Record::readFromStream($client);
+            if (null === $record) {
+                break;
+            }
+            if (Record::STDOUT === $record['type']) {
+                $stdoutBody .= $record['content'];
+            }
+            if (Record::END_REQUEST === $record['type']) {
+                $endSeen = true;
+            }
+        }
+        fclose($client);
+        proc_terminate($listener);
+        proc_close($listener);
+
+        $this->assertTrue($endSeen);
+
+        return $stdoutBody;
     }
 
     /**

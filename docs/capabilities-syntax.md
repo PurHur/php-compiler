@@ -103,7 +103,7 @@ ROADMAP Phase 3/4: [#78](https://github.com/PurHur/php-compiler/issues/78), runt
 | Runtime template `include` from deploy tree | yes | no | partial | [#623](https://github.com/PurHur/php-compiler/issues/623) | #623 VM/AOT lint; execute ✅ (#764 closed); gates #1760 |
 | CGI/1.1 driver (`bin/cgi.php`) | yes | n/a | n/a | [#50](https://github.com/PurHur/php-compiler/issues/50) | #50 VM closed; #656 CgiDriverTest; #666 MiniWebApp PATH_INFO |
 | AOT CGI (`cgi-wrapper` + `phpc cgi`) | n/a | n/a | partial | [#665](https://github.com/PurHur/php-compiler/issues/665) | #665 closed; 001 green; 003 execute ✅ (#764 closed); #682; gates #1760 |
-| FastCGI loop | no | no | no | [#173](https://github.com/PurHur/php-compiler/issues/173) |  |
+| FastCGI loop | partial | n/a | partial | [#173](https://github.com/PurHur/php-compiler/issues/173) | bin/fcgi.php + phpc fcgi; FASTCGI_SMOKE_GATE=1 (#173, #1899) |
 
 _Web rows are curated from ROADMAP issue state; native link [#568](https://github.com/PurHur/php-compiler/issues/568) closed; AOT execute [#764](https://github.com/PurHur/php-compiler/issues/764) closed; default-off CI gates [#1760](https://github.com/PurHur/php-compiler/issues/1760)._
 ## OOP reference (`examples/003-MiniWebApp`)

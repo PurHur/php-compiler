@@ -358,6 +358,21 @@ final class CiScriptsTest extends TestCase
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString('FASTCGI_WEB_AOT_SMOKE_GATE="${FASTCGI_WEB_AOT_SMOKE_GATE:-0}"', $defaults);
+        $this->assertStringContainsString('FASTCGI_SMOKE_GATE="${FASTCGI_SMOKE_GATE:-0}"', $defaults);
+    }
+
+    public function testCiLocalExcludesFastcgiSmokeUnlessGateOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_fastcgi_smoke', $body);
+        $this->assertStringContainsString('FASTCGI_SMOKE_GATE:-0', $body);
+        $this->assertStringContainsString("--filter 'FastCgiRecordTest|FastCgiTest'", $body);
+    }
+
+    public function testCiLocalRunsFastcgiSmokeGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_fastcgi_smoke', $local);
     }
 
     public function testCiLocalExcludesFastcgiWebAotExecuteUnlessGateOn(): void

@@ -62,6 +62,7 @@ if [[ -z "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
   ci_run_sessions_web_smoke
   ci_run_file_upload_web_smoke
   ci_run_throws_web_smoke
+  ci_run_fastcgi_smoke "$@"
 fi
 
 if ci_llvm_ready; then

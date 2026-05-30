@@ -212,6 +212,7 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('#2135', $result['stdout']);
         $this->assertStringContainsString('009-FastCGIWeb CI gates', $result['stdout']);
         $this->assertStringContainsString('009-FastCGIWeb', $result['stdout']);
+        $this->assertStringContainsString('FASTCGI_SMOKE_GATE', $result['stdout']);
         $this->assertStringContainsString('FASTCGI_WEB_SMOKE_GATE', $result['stdout']);
         $this->assertStringContainsString('FASTCGI_WEB_AOT_SMOKE_GATE', $result['stdout']);
         $this->assertStringContainsString('FASTCGI_WEB_DEPLOY_SMOKE_GATE', $result['stdout']);
