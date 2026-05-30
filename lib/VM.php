@@ -153,7 +153,7 @@ class VM {
     }
 
     /** Invoke a user instance method from VM internals (e.g. __debugInfo, #3259). */
-    public function invokeInstanceMethod(ObjectEntry $object, string $methodName): Variable
+    public function invokeInstanceMethod(ObjectEntry $object, string $methodName, Variable ...$extraArgs): Variable
     {
         $methodLc = strtolower($methodName);
         [$declaring] = $this->resolveInstanceMethod($object->class, $methodLc);
@@ -163,7 +163,50 @@ class VM {
         }
         $thisVar = new Variable();
         $thisVar->object($object);
-        return $this->invokePhpFunction($func, $thisVar);
+        return $this->invokePhpFunction($func, $thisVar, ...$extraArgs);
+    }
+
+    /**
+     * isset($obj->prop) — Zend zend_std_has_property / __isset parity (#3298).
+     */
+    public function objectPropertyIsSet(ObjectEntry $object, string $propName): bool
+    {
+        $props = $object->getRawProperties();
+        if (isset($props[$propName])) {
+            $value = $props[$propName]->resolveIndirect();
+            if (!$value->isUndefined() && Variable::TYPE_NULL !== $value->type) {
+                return true;
+            }
+
+            return false;
+        }
+        if ($this->hasInstanceMethod($object->class, '__isset')) {
+            $key = new Variable();
+            $key->string($propName);
+            $result = $this->invokeInstanceMethod($object, '__isset', $key)->resolveIndirect();
+
+            return $result->toBool();
+        }
+
+        return false;
+    }
+
+    /**
+     * unset($obj->prop) — Zend zend_std_unset_property / __unset parity (#3298).
+     */
+    public function unsetObjectProperty(ObjectEntry $object, string $propName): void
+    {
+        $props = $object->getRawProperties();
+        if (isset($props[$propName])) {
+            $object->unsetProperty($propName);
+
+            return;
+        }
+        if ($this->hasInstanceMethod($object->class, '__unset')) {
+            $key = new Variable();
+            $key->string($propName);
+            $this->invokeInstanceMethod($object, '__unset', $key);
+        }
     }
 
     /** (string) cast on objects — invoke __toString (Zend zend_operators.c, issue #3421). */
@@ -1027,7 +1070,7 @@ restart:
                     $container = $frame->scope[$op->arg2]->resolveIndirect();
                     $key = $frame->scope[$op->arg3];
                     if (Variable::TYPE_OBJECT === $container->type) {
-                        $container->toObject()->unsetProperty($key->toString());
+                        $this->unsetObjectProperty($container->toObject(), $key->toString());
                         break;
                     }
                     if (Variable::TYPE_ARRAY === $container->type) {
@@ -1446,18 +1489,18 @@ restart:
                     $dst = $frame->scope[$op->arg1];
                     if (null !== $op->arg3) {
                         $container = $frame->scope[$op->arg2]->resolveIndirect();
+                        if (Variable::TYPE_ARRAY === $container->type) {
+                            $dst->bool($container->toArray()->offsetIsSet($frame->scope[$op->arg3]));
+                            break;
+                        }
                         if (Variable::TYPE_OBJECT === $container->type) {
-                            $name = $frame->scope[$op->arg3]->toString();
+                            $propName = $frame->scope[$op->arg3]->toString();
                             $propertyObject = $container->toObject();
                             VM\LazyObjectSupport::ensureInitialized($this, $propertyObject);
-                            $dst->bool($propertyObject->issetProperty($name));
+                            $dst->bool($this->objectPropertyIsSet($propertyObject, $propName));
                             break;
                         }
-                        if (Variable::TYPE_ARRAY !== $container->type) {
-                            $dst->bool(false);
-                            break;
-                        }
-                        $dst->bool($container->toArray()->offsetIsSet($frame->scope[$op->arg3]));
+                        $dst->bool(false);
                         break;
                     }
                     $value = $frame->scope[$op->arg2]->resolveIndirect();
