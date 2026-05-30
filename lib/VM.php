@@ -1263,6 +1263,7 @@ restart:
                     $classEntry->interfaces = $op->classImplements;
                     self::defineClass($classEntry, $op->block1);
                     VM\EnumSupport::ensureBuiltinCasesMethod($classEntry);
+                    VM\EnumSupport::ensureBuiltinEnumInterfaces($classEntry);
                     $this->context->classes[$lcname] = $classEntry;
                     $this->context->enums[$lcname] = true;
                     break;
@@ -2181,6 +2182,12 @@ restart:
     {
         $resolved = $value->resolveIndirect();
         $className = strtolower(ltrim($className, '\\'));
+        if (Variable::TYPE_ENUM_CASE === $resolved->type) {
+            $enumClass = $resolved->toEnumCase()->enumClass;
+
+            return VM\InterfaceCheck::entryIsInstanceOf($enumClass, $className, $this->context)
+                || VM\InterfaceCheck::entryImplements($enumClass, $className, $this->context);
+        }
         if (Variable::TYPE_OBJECT !== $resolved->type) {
             return false;
         }
