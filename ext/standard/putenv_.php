@@ -25,13 +25,13 @@ final class putenv_ extends Internal
             throw new \LogicException('putenv() requires exactly one argument');
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_STRING !== $v->type) {
             throw new \LogicException('putenv() requires a string assignment in this compiler build');
         }
-        $frame->returnVar->bool(\putenv($v->toString()));
+        $ok = VmEnv::putenv($v->toString());
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value
