@@ -39,10 +39,10 @@ final class array_count extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_ARRAY !== $v->type) {
-            throw new \LogicException('count() only supports arrays in this compiler build');
+        if (null === $frame->vmContext) {
+            throw new \LogicException('count() requires VM context in this compiler build');
         }
-        $frame->returnVar->int($v->toArray()->getNumElements());
+        $frame->returnVar->int(VmArray::countValue($frame->vmContext, $v));
     }
 
     public Context $context;
