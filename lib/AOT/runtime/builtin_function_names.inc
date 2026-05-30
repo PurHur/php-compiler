@@ -77,6 +77,7 @@ static const char *phpc_builtin_functions[] = {
     "decoct",
     "define",
     "defined",
+    "constant",
     "deg2rad",
     "dirname",
     "doubleval",
