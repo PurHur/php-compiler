@@ -37,6 +37,7 @@ class Runtime {
     public Parser $parser;
     public Traverser $preprocessor;
     public Traverser $postprocessor;
+    private Ast\AbstractEnumMarker $abstractEnumMarker;
     public CfgLivenessDetector $detector;
     public Optimizer $assignOpResolver;
     public VMContext $vmContext;
@@ -69,6 +70,8 @@ class Runtime {
             new NodeVisitor\NameResolver
         );
         $astTraverser->addVisitor(new GroupUseStripper());
+        $this->abstractEnumMarker = new Ast\AbstractEnumMarker();
+        $astTraverser->addVisitor($this->abstractEnumMarker);
         $this->parser = new Parser(
             (new ParserFactory)->create(ParserFactory::ONLY_PHP7),
             $astTraverser
@@ -198,9 +201,15 @@ class Runtime {
         [$code] = (new SourcePreprocessor\PropertyHooks())->process($code);
         $code = SwitchCommaCaseRewriter::rewrite($code);
         $code = GenericArrayTypeSourceRewriter::rewrite($code);
+        [$code, $abstractEnumLines] = AbstractEnumSourceRewriter::rewrite($code);
+        $this->abstractEnumMarker->setAbstractLines($abstractEnumLines);
         [$code, $bareRethrowLines] = SourceBareThrowRewriter::rewrite($code);
         $this->compiler->setBareRethrowLines($bareRethrowLines);
-        $script = $this->parser->parse($code, $filename);
+        try {
+            $script = $this->parser->parse($code, $filename);
+        } finally {
+            $this->abstractEnumMarker->clear();
+        }
         $this->preprocessor->traverse($script);
         if (!$this->isBootstrapVendorPrelinkMode()) {
             $state = new State($script);

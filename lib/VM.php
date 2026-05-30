@@ -1413,6 +1413,7 @@ restart:
                         $classEntry->backedType = $frame->block->constants[$op->arg2]->toString();
                     }
                     $classEntry->interfaces = $op->classImplements;
+                    $classEntry->isAbstract = $op->classIsAbstract;
                     self::defineClass($classEntry, $op->block1);
                     VM\EnumSupport::ensureBuiltinCasesMethod($classEntry);
                     VM\EnumSupport::ensureBuiltinEnumInterfaces($classEntry);
@@ -1472,7 +1473,11 @@ restart:
                     }
                     $class = $this->context->classes[$lcname];
                     if ($class->isAbstract) {
-                        return $this->raise("Cannot instantiate abstract class {$class->name}", $frame);
+                        $msg = $class->isEnum
+                            ? "Cannot instantiate enum {$class->name}"
+                            : "Cannot instantiate abstract class {$class->name}";
+
+                        return $this->raise($msg, $frame);
                     }
                     if ($class->isInterface) {
                         throw new \LogicException("Cannot instantiate interface $name");

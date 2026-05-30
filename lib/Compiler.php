@@ -51,6 +51,8 @@ class Compiler {
 
     /** @var array<string, true> lowercase abstract class names seen during compile (#3385). */
     private array $abstractClasses = [];
+    /** @var array<string, true> lowercase abstract enum names for instantiate diagnostics (#3737). */
+    private array $abstractEnums = [];
     /** 1-based source lines lowered from bare `throw;` (#3508). */
     private array $bareRethrowLines = [];
     /** Trailing source bytes after __halt_compiler(); (issue #3479). */
@@ -232,6 +234,7 @@ class Compiler {
     public function compile(Script $script): ?Block {
         $this->resetCompileAbortDetail();
         $this->abstractClasses = [];
+        $this->abstractEnums = [];
         $this->haltCompilerRemaining = null;
         $this->seen = new SplObjectStorage;
         $this->debugWriteLastPhase('Compiler::compile enter');
@@ -270,6 +273,7 @@ class Compiler {
     {
         $this->resetCompileAbortDetail();
         $this->abstractClasses = [];
+        $this->abstractEnums = [];
         // Inventory-scale sources declare user functions and/or class-like units; emit-smoke only needs {main}
         // — same as compile() without a compile() callee in the M3 emit TU (#2633, #2666).
         if ([] !== $script->functions || $this->emitSmokeScriptHasClassLike($script)) {
@@ -1241,6 +1245,15 @@ class Compiler {
         );
         AttributeNames::assertNoDuplicates(AttributeNames::fromOp($enum));
         $return->classImplements = $this->interfaceNamesFromOperands($enum->implements);
+        $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($enum->flags ?? 0);
+        if ($return->classIsAbstract) {
+            $name = $this->staticNameFromOperand($enum->name);
+            if (null !== $name) {
+                $lc = strtolower(ltrim($name, '\\'));
+                $this->abstractClasses[$lc] = true;
+                $this->abstractEnums[$lc] = true;
+            }
+        }
         $return->block1 = $this->compileEnumBody($enum->stmts);
 
         return $return;
@@ -2314,7 +2327,10 @@ class Compiler {
                 if (null !== $className) {
                     $lc = strtolower(ltrim($className, '\\'));
                     if (isset($this->abstractClasses[$lc])) {
-                        $this->throwCompileError('Cannot instantiate abstract class '.$className);
+                        $msg = isset($this->abstractEnums[$lc])
+                            ? 'Cannot instantiate enum '.$className
+                            : 'Cannot instantiate abstract class '.$className;
+                        $this->throwCompileError($msg);
                     }
                 }
                 $return = [
