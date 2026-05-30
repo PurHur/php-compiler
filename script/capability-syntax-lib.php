@@ -504,10 +504,11 @@ function syntaxRowDefinitions(): array
             'construct' => 'Simple `use Trait;` in class body',
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_USE_TRAIT', 'TYPE_DECLARE_METHOD'],
             'issue' => 2314,
-            'jit' => false,
-            'aot' => false,
+            'jit' => true,
+            'aot' => true,
             'notes' => [
                 'php-cfg-trait-use.patch; VM merges trait methods into class',
+                'JIT/AOT alias trait-merged methods onto using class (#3789)',
                 'TraitUseAdaptation (alias/insteadof) is #144',
                 'Horizontal trait method collision fatals at compile time (#3416)',
             ],
