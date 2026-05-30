@@ -15,6 +15,7 @@ use SplObjectStorage;
 use PHPCfg\Func as CfgFunc;
 use PHPCfg\Op;
 use PHPCfg\Block as CfgBlock;
+use PHPCfg\ErrorSuppressBlock;
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCfg\Operand\Temporary;
@@ -25,8 +26,10 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
 use PHPCompiler\Compiler\AttributeNames;
+use PHPCompiler\Compiler\DeprecatedMetadata;
 use PHPCompiler\Compiler\FinalClassExtensionCheck;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
+use PHPCompiler\Compiler\TraitCollisionCheck;
 use PHPCompiler\Web\ConstStringFolder;
 use PHPCompiler\Web\IncludePathResolver;
 use PHPCompiler\Web\Superglobals;
@@ -43,6 +46,8 @@ class Compiler {
     /** Set from the first compile-time abort (#2642, self-host diagnostics). */
     private ?string $compileAbortDetail = null;
 
+    /** @var array<string, true> lowercase abstract class names seen during compile (#3385). */
+    private array $abstractClasses = [];
     /** 1-based source lines lowered from bare `throw;` (#3508). */
     private array $bareRethrowLines = [];
 
@@ -215,8 +220,16 @@ class Compiler {
 
     public function compile(Script $script): ?Block {
         $this->resetCompileAbortDetail();
+        $this->abstractClasses = [];
         $this->seen = new SplObjectStorage;
         $this->debugWriteLastPhase('Compiler::compile enter');
+
+        Compiler\InheritanceVariance::validateScript(
+            $script,
+            function (string $detail): void {
+                $this->throwCompileError($detail);
+            }
+        );
 
         /** @var mixed $main */
         $main = $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
@@ -233,6 +246,7 @@ class Compiler {
         $this->seen = null;
 
         InterfaceImplementationCheck::validate($script);
+        TraitCollisionCheck::validate($script);
         FinalClassExtensionCheck::validate($script);
         AbstractMethodVisibilityCheck::validate($script);
 
@@ -243,6 +257,7 @@ class Compiler {
     public function compileEmitSmoke(Script $script): ?Block
     {
         $this->resetCompileAbortDetail();
+        $this->abstractClasses = [];
         // Inventory-scale sources declare user functions and/or class-like units; emit-smoke only needs {main}
         // — same as compile() without a compile() callee in the M3 emit TU (#2633, #2666).
         if ([] !== $script->functions || $this->emitSmokeScriptHasClassLike($script)) {
@@ -383,6 +398,12 @@ class Compiler {
             $this->seen[$block] = $new = new Block($block);
             $new->inheritScopeFrom($parent);
             $this->inheritFuncFromParent($new, $parent);
+            if ($block instanceof ErrorSuppressBlock) {
+                $new->inheritUndefinedLocals = true;
+                $new->addOpCode(new OpCode(OpCode::TYPE_BEGIN_SILENCE));
+            } elseif ($this->isErrorSuppressEndBlock($block)) {
+                $new->inheritUndefinedLocals = true;
+            }
             $this->compileBlock($new);
         } else {
             $child = $this->seen[$block];
@@ -517,6 +538,15 @@ class Compiler {
                         && $i + 1 < $opCount
                         && $this->isPropertyFetchOnlyUnsetVar($child, $ops[$i + 1])
                     ) {
+                        break;
+                    } elseif ($this->isLoweredByFollowingCoalesce($child, $ops, $i)) {
+                        break;
+                    } elseif (
+                        $child instanceof Op\Expr\PropertyFetch
+                        && $i + 1 < $opCount
+                        && $this->isPropertyFetchOnlyIssetVar($child, $ops[$i + 1])
+                    ) {
+                        // Lowered by compileIsset via isset(object, prop) — no eager fetch (#3603).
                         break;
                     } else {
                         if ($this->needsCfgSplitBeforeStringDimFetch($child, $block, $ops, $i)) {
@@ -961,6 +991,35 @@ class Compiler {
         return false;
     }
 
+    /**
+     * php-cfg emits PropertyFetch as its own stmt before Isset_; skip duplicate lowering.
+     */
+    private function isPropertyFetchOnlyIssetVar(
+        Op\Expr\PropertyFetch $fetch,
+        Op $next
+    ): bool {
+        if (!$next instanceof Op\Expr\Isset_) {
+            return false;
+        }
+        foreach ($next->vars as $var) {
+            $target = $var;
+            while ($target instanceof Temporary) {
+                if ($target === $fetch->result) {
+                    return true;
+                }
+                if (null === $target->original) {
+                    break;
+                }
+                $target = $target->original;
+            }
+            if ($target === $fetch->result) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function isPropertyFetchOnlyUnsetVar(
         Op\Expr\PropertyFetch $fetch,
         Op $next
@@ -1036,6 +1095,7 @@ class Compiler {
             $this->compileOperand($iface->name, $block, true)
         );
         $return->classImplements = $this->interfaceNamesFromOperands($iface->extends);
+        $return->block1 = $this->compileClassBody($iface->stmts, OpCode::TYPE_DECLARE_INTERFACE);
 
         return $return;
     }
@@ -1124,6 +1184,7 @@ class Compiler {
             $declare->block1 = $methodBlock;
         }
         $declare->attributeNames = AttributeNames::fromOp($child);
+        $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $result->addOpCode($declare);
     }
 
@@ -1157,6 +1218,13 @@ class Compiler {
             VM\StringableSupport::assertConcreteClassImplements($class, $className);
         }
         $return->attributeNames = AttributeNames::fromOp($class);
+        $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($class->flags);
+        if ($return->classIsAbstract) {
+            $name = $this->staticNameFromOperand($class->name);
+            if (null !== $name) {
+                $this->abstractClasses[strtolower(ltrim($name, '\\'))] = true;
+            }
+        }
         $return->block1 = $this->compileClassBody($class->stmts, $type);
         return $return;
     }
@@ -1299,15 +1367,21 @@ class Compiler {
                     $this->compileClassMethodDeclaration($child, $result);
                     break;
                 case Op\Terminal\Const_::class:
-                    if (OpCode::TYPE_DECLARE_CLASS !== $type && OpCode::TYPE_DECLARE_TRAIT !== $type) {
-                        $this->throwCompileLogic('Class constants are only supported on classes and traits for now');
+                    if (
+                        OpCode::TYPE_DECLARE_CLASS !== $type
+                        && OpCode::TYPE_DECLARE_INTERFACE !== $type
+                        && OpCode::TYPE_DECLARE_TRAIT !== $type
+                    ) {
+                        $this->throwCompileLogic('Class constants are only supported on classes, interfaces, and traits for now');
                     }
                     $this->compileOps($child->valueBlock->children, $result);
-                    $result->addOpCode(new OpCode(
+                    $constOp = new OpCode(
                         OpCode::TYPE_DECLARE_CLASS_CONST,
                         $this->compileOperand($child->name, $result, true),
                         $this->compileOperand($child->value, $result, true)
-                    ));
+                    );
+                    $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
+                    $result->addOpCode($constOp);
                     break;
                 case Op\Stmt\TraitUse::class:
                     if (OpCode::TYPE_DECLARE_CLASS !== $type) {
@@ -1444,6 +1518,7 @@ class Compiler {
             $this->compileOperand($operand, $block, true)
         );
         $return->block1 = $funcBlock;
+        $return->deprecatedMetadata = DeprecatedMetadata::fromOp($function);
         return $return;
     }
 
@@ -1503,6 +1578,9 @@ class Compiler {
 
     protected function compileStmt(Op\Stmt $stmt, Block $block) {
         if ($stmt instanceof Op\Stmt\Jump) {
+            if (null !== $block->orig && $this->isErrorSuppressEndBlock($block->orig)) {
+                $block->addOpCode(new OpCode(OpCode::TYPE_END_SILENCE));
+            }
             $target = $this->compileCfgBranch($stmt->target, $block);
             if (!$this->isRedundantTryEntryJump($block, $target)) {
                 $op = new OpCode(OpCode::TYPE_JUMP);
@@ -1510,6 +1588,9 @@ class Compiler {
                 $block->addOpCode($op);
             }
         } elseif ($stmt instanceof Op\Stmt\JumpIf) {
+            if (null !== $block->orig && $this->isErrorSuppressEndBlock($block->orig)) {
+                $block->addOpCode(new OpCode(OpCode::TYPE_END_SILENCE));
+            }
             $op = new OpCode(OpCode::TYPE_JUMPIF, $this->compileOperand($stmt->cond, $block, true));
             $op->block1 = $this->compileCfgBranch($stmt->if, $block);
             $op->block2 = $this->compileCfgBranch($stmt->else, $block);
@@ -1517,6 +1598,7 @@ class Compiler {
         } elseif ($stmt instanceof Op\Stmt\TryCatch) {
             $merge = $this->compileCfgBranch($stmt->end, $block);
             $try = $this->compileCfgBranch($stmt->try, $block);
+            $try->inheritUndefinedLocals = true;
             $tryOp = new OpCode(OpCode::TYPE_TRY);
             $tryOp->block1 = $try;
             $tryOp->block2 = $merge;
@@ -1547,6 +1629,17 @@ class Compiler {
         } else {
             $this->throwCompileLogic("Unknown Stmt Type: " . $stmt->getType());
         }
+    }
+
+    /** php-cfg: {@see ErrorSuppressBlock} jump target where silenced reads are lowered (#3546). */
+    private function isErrorSuppressEndBlock(CfgBlock $block): bool
+    {
+        if (1 !== \count($block->parents)) {
+            return false;
+        }
+        $parent = $block->parents[0];
+
+        return $parent instanceof ErrorSuppressBlock;
     }
 
     /**
@@ -1812,10 +1905,14 @@ class Compiler {
                 $exitExpr = null !== $expr->expr
                     ? $this->compileOperand($expr->expr, $block, true)
                     : null;
+                $resultSlot = null;
+                if ([] !== $expr->result->usages || $block->callResultFeedsReturn($expr->result)) {
+                    $resultSlot = $this->compileOperand($expr->result, $block, false);
+                }
 
                 return [new OpCode(
                     OpCode::TYPE_EXIT,
-                    $this->compileOperand($expr->result, $block, false),
+                    $resultSlot,
                     $exitExpr
                 )];
             case Op\Expr\PostInc::class:
@@ -1937,6 +2034,13 @@ class Compiler {
                 }
                 return $return;
             case Op\Expr\New_::class:
+                $className = $this->literalScopeClassName($expr->class);
+                if (null !== $className) {
+                    $lc = strtolower(ltrim($className, '\\'));
+                    if (isset($this->abstractClasses[$lc])) {
+                        $this->throwCompileError('Cannot instantiate abstract class '.$className);
+                    }
+                }
                 $return = [
                     new OpCode(
                         OpCode::TYPE_NEW,
@@ -1983,6 +2087,13 @@ class Compiler {
                 return [$this->compileIncludeOp($expr, $block)];
             case Op\Expr\Isset_::class:
                 return $this->compileIsset($expr, $block);
+            case Op\Expr\Throw_::class:
+                $this->compileOrigExprForOperand($expr->expr, $block);
+
+                return [new OpCode(
+                    OpCode::TYPE_THROW,
+                    $this->compileOperand($expr->expr, $block, true)
+                )];
             case Op\Iterator\Valid::class:
                 return [new OpCode(
                     OpCode::TYPE_ITER_VALID,
@@ -2126,10 +2237,13 @@ class Compiler {
     {
         assert(1 === count($expr->vars));
         $resultSlot = $this->compileOperand($expr->result, $block, false);
-        $dimFetch = $this->findCoalesceArrayDimFetch($expr->vars[0], $block);
-        [$containerSlot, $dimSlot] = null !== $dimFetch
-            ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
-            : $this->resolveIssetTarget($expr->vars[0], $block);
+        $propFetch = $this->findCoalescePropertyFetch($expr->vars[0], $block);
+        $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($expr->vars[0], $block);
+        [$containerSlot, $dimSlot] = null !== $propFetch
+            ? $this->resolveIssetTargetFromPropertyFetch($propFetch, $block)
+            : (null !== $dimFetch
+                ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
+                : $this->resolveIssetTarget($expr->vars[0], $block));
 
         return [new OpCode(
             OpCode::TYPE_ISSET,
@@ -2195,6 +2309,90 @@ class Compiler {
         );
     }
 
+    /**
+     * ?? right branch: evaluate RHS expr ops only when the left is null (#3462).
+     */
+    private function compileCoalesceRhsValue(Operand $rhs, Block $targetBlock, Block $entryBlock): ?int
+    {
+        $exprOp = $this->findOrigExprOpForOperand($rhs, $entryBlock);
+        if (null !== $exprOp) {
+            foreach ($this->compileExpr($exprOp, $targetBlock) as $op) {
+                $targetBlock->addOpCode($op);
+            }
+            if ($exprOp instanceof Op\Expr\Throw_) {
+                return null;
+            }
+        }
+
+        return $this->compileOperand($rhs, $targetBlock, true);
+    }
+
+    /**
+     * php-cfg emits RHS expr ops (New_, Throw_, …) before Coalesce; lower them on the ?? branch (#3462).
+     *
+     * @param Op[] $ops
+     */
+    private function isLoweredByFollowingCoalesce(Op $op, array $ops, int $index): bool
+    {
+        if (!$op instanceof Op\Expr) {
+            return false;
+        }
+        $count = count($ops);
+        for ($j = $index + 1; $j < $count; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Expr\BinaryOp\Coalesce) {
+                return $this->exprOpFeedsCoalesceRhs($op, $next);
+            }
+            if (!$next instanceof Op\Expr\Throw_) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    private function exprOpFeedsCoalesceRhs(Op\Expr $op, Op\Expr\BinaryOp\Coalesce $coalesce): bool
+    {
+        if ($this->operandsChainEqual($op->result, $coalesce->right)) {
+            return true;
+        }
+        $rhsRoot = $this->unwrapOperandChain($coalesce->right);
+        if ($rhsRoot instanceof Op\Expr\Throw_ && $this->operandsChainEqual($op->result, $rhsRoot->expr)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function compileOrigExprForOperand(Operand $operand, Block $block): void
+    {
+        $exprOp = $this->findOrigExprOpForOperand($operand, $block);
+        if (null === $exprOp) {
+            return;
+        }
+        foreach ($this->compileExpr($exprOp, $block) as $op) {
+            $block->addOpCode($op);
+        }
+    }
+
+    private function findOrigExprOpForOperand(Operand $operand, Block $block): ?Op\Expr
+    {
+        $root = $this->unwrapOperandChain($operand);
+        if ($root instanceof Op\Expr) {
+            return $root;
+        }
+        if (null === $block->orig) {
+            return null;
+        }
+        foreach ($block->orig->children as $child) {
+            if ($child instanceof Op\Expr && $this->operandsChainEqual($child->result, $operand)) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
     protected function compileCoalesce(
         Op\Expr\BinaryOp\Coalesce $expr,
         Block $block,
@@ -2244,7 +2442,7 @@ class Compiler {
         $rightBlock->syntheticCfgBranch = true;
         $rightBlock->inheritUndefinedLocals = true;
         $rightBlock->inheritScopeFrom($block);
-        $rightSlot = $this->compileOperand($expr->right, $rightBlock, true);
+        $rightSlot = $this->compileCoalesceRhsValue($expr->right, $rightBlock, $block);
         $coalesceAssignTarget = $resultOverride ?? $expr->result;
         if (
             null !== $dimFetch
@@ -2252,12 +2450,14 @@ class Compiler {
         ) {
             $this->compileArrayDimFetchWrite($dimFetch, $rightBlock);
         }
-        $rightBlock->addOpCode(new OpCode(
-            OpCode::TYPE_ASSIGN,
-            $resultSlot,
-            $resultSlot,
-            $rightSlot
-        ));
+        if (null !== $rightSlot) {
+            $rightBlock->addOpCode(new OpCode(
+                OpCode::TYPE_ASSIGN,
+                $resultSlot,
+                $resultSlot,
+                $rightSlot
+            ));
+        }
 
         $leftBlock = new Block($block->orig);
         $leftBlock->syntheticCfgBranch = true;
@@ -2727,6 +2927,23 @@ class Compiler {
         return $operand instanceof Operand\Literal ? $operand : null;
     }
 
+    /**
+     * Scope slot for the local alias created by `global $name` (#3413).
+     *
+     * php-cfg may pass writeVariable(Literal('x')) rather than a Variable operand.
+     */
+    protected function compileGlobalImportSlot(Operand $var, string $globalName, Block $block): int
+    {
+        if ($var instanceof Operand\Variable) {
+            return $block->getVarSlot($var, false);
+        }
+        $nameLiteral = new Operand\Literal($globalName);
+        $nameLiteral->type = Type::string();
+        $local = new Operand\Variable($nameLiteral);
+
+        return $block->getVarSlot($local, false);
+    }
+
     protected function resolveSimpleVariableName(Operand $var): string
     {
         while ($var instanceof Temporary) {
@@ -2790,6 +3007,35 @@ class Compiler {
     }
 
     /**
+     * @return ?Op\Expr\PropertyFetch
+     */
+    protected function findCoalescePropertyFetch(Operand $operand, Block $block): ?Op\Expr\PropertyFetch
+    {
+        $direct = $this->unwrapPropertyFetch($operand);
+        if (null !== $direct) {
+            return $direct;
+        }
+        foreach ($block->orig->children as $child) {
+            if ($child instanceof Op\Expr\PropertyFetch && $child->result === $operand) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{0: int, 1: ?int}
+     */
+    protected function resolveIssetTargetFromPropertyFetch(Op\Expr\PropertyFetch $fetch, Block $block): array
+    {
+        return [
+            $this->compileOperand($fetch->var, $block, true),
+            $this->compileOperand($fetch->name, $block, true),
+        ];
+    }
+
+    /**
      * @return array{0: int, 1: ?int}
      */
     protected function resolveIssetTargetFromArrayDimFetch(Op\Expr\ArrayDimFetch $fetch, Block $block): array
@@ -2847,10 +3093,13 @@ class Compiler {
         $vars = $expr->vars;
         $last = count($vars) - 1;
         foreach ($vars as $i => $var) {
-            $dimFetch = $this->findCoalesceArrayDimFetch($var, $block);
-            [$containerSlot, $dimSlot] = null !== $dimFetch
-                ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
-                : $this->resolveIssetTarget($var, $block);
+            $propFetch = $this->findCoalescePropertyFetch($var, $block);
+            $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($var, $block);
+            [$containerSlot, $dimSlot] = null !== $propFetch
+                ? $this->resolveIssetTargetFromPropertyFetch($propFetch, $block)
+                : (null !== $dimFetch
+                    ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
+                    : $this->resolveIssetTarget($var, $block));
             $checkSlot = $resultSlot;
             if ($i < $last) {
                 $checkSlot = $this->compileBoolTemporary($current);
@@ -3306,7 +3555,7 @@ class Compiler {
                 $nameSlot = $block->registerConstant($nameOperand, $nameVar);
                 return [new OpCode(
                     OpCode::TYPE_DECLARE_GLOBAL,
-                    $this->compileOperand($terminal->var, $block, false),
+                    $this->compileGlobalImportSlot($terminal->var, $globalName, $block),
                     $nameSlot
                 )];
             case 'Terminal_StaticVar':
@@ -3333,12 +3582,50 @@ class Compiler {
      */
     protected function compileInstanceOf(Op\Expr\InstanceOf_ $expr, Block $block): array
     {
+        $union = $expr->classUnion ?? null;
+        if ($union instanceof Op\Type\Union_) {
+            $names = $this->instanceofUnionNamesFromCfgType($union);
+            $op = new OpCode(
+                OpCode::TYPE_INSTANCEOF,
+                $this->compileOperand($expr->result, $block, false),
+                $this->compileOperand($expr->expr, $block, true),
+                null
+            );
+            $op->instanceofUnionTypes = $this->encodeCatchTypeList($names);
+
+            return [$op];
+        }
+
         return [new OpCode(
             OpCode::TYPE_INSTANCEOF,
             $this->compileOperand($expr->result, $block, false),
             $this->compileOperand($expr->expr, $block, true),
             $this->compileOperand($expr->class, $block, true)
         )];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function instanceofUnionNamesFromCfgType(Op\Type\Union_ $union): array
+    {
+        $invalid = ['int', 'string', 'float', 'bool', 'array', 'callable', 'iterable', 'object', 'mixed', 'never', 'void', 'null'];
+        $names = [];
+        foreach ($union->types as $type) {
+            if (!$type instanceof Op\Type\Literal) {
+                $this->throwCompileLogic('instanceof union type members must be class or interface names');
+            }
+            $name = $type->name;
+            if (in_array(strtolower($name), $invalid, true)) {
+                $this->throwCompileLogic('Type '.$name.' cannot be used in instanceof');
+            }
+            $names[] = $name;
+        }
+        if (count($names) < 2) {
+            $this->throwCompileLogic('instanceof union requires at least two class or interface names');
+        }
+
+        return $names;
     }
 
     /**

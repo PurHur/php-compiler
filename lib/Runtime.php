@@ -22,10 +22,12 @@ use PhpParser\ParserFactory;
 use PHPTypes\State;
 use PHPCompiler\VM\Optimizer;
 use PHPCompiler\VM\Context as VMContext;
+use PHPCompiler\VM\ObjectRegistry;
 use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\Ast\GroupUseStripper;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Lint\LintCompiler;
+use PHPCompiler\VM\ShutdownQueue;
 
 class Runtime {
     const MODE_NORMAL   = 0b0001;
@@ -51,6 +53,7 @@ class Runtime {
     private static ?string $lastParseFailure = null;
 
     public function __construct(int $mode = self::MODE_NORMAL) {
+        ObjectRegistry::reset();
         self::clearLastParseFailure();
         $this->mode = $mode;
         $this->initParsePipeline();
@@ -109,6 +112,12 @@ class Runtime {
         if (null === $this->vm) {
             $this->vm = new VM($this->vmContext);
         }
+    }
+
+    public function vm(): VM {
+        $this->ensureVm();
+
+        return $this->vm;
     }
 
     public function __destruct() {
@@ -186,6 +195,7 @@ class Runtime {
     }
 
     public function parse(string $code, string $filename): Script {
+        $code = SwitchCommaCaseRewriter::rewrite($code);
         [$code, $bareRethrowLines] = SourceBareThrowRewriter::rewrite($code);
         $this->compiler->setBareRethrowLines($bareRethrowLines);
         $script = $this->parser->parse($code, $filename);
@@ -513,6 +523,7 @@ class Runtime {
         try {
             return $this->vm->run($block);
         } finally {
+            ShutdownQueue::run($this->vmContext);
             Superglobals::setActiveContext(null);
         }
     }

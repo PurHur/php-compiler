@@ -23,6 +23,7 @@ final class VmConstants
         'filter_validate_email',
         'input_get',
         'input_post',
+        ...StdlibConstants::CORE_FETCH_NAMES,
     ];
 
     public static function getDefinedConstants(Context $ctx, bool $categorize = false): HashTable
@@ -92,6 +93,9 @@ final class VmConstants
             }
             $entries[$outName] = $value;
         }
+        foreach (VmPhpCoreConstants::definedCoreEntries() as $coreName => $value) {
+            $entries[$coreName] = $value;
+        }
 
         return $entries;
     }
@@ -101,7 +105,7 @@ final class VmConstants
         return match ($fetchName) {
             'true' => 'TRUE',
             'false' => 'FALSE',
-            default => $fetchName,
+            default => strtoupper($fetchName),
         };
     }
 

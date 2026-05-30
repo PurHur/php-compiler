@@ -145,17 +145,20 @@ class OpCode {
      * block1 = compiled anonymous function body (VM-only today; JIT still lowers to null).
      */
     const TYPE_CLOSURE = 109;
-    /** Post-increment: arg1=result, arg2=read, arg3=write (#3552). */
-    const TYPE_POST_INC = 111;
-    /** Pre-increment: arg1=result, arg2=read, arg3=write (#3552). */
-    const TYPE_PRE_INC = 112;
-    /** Post-decrement: arg1=result, arg2=read, arg3=write (#3552). */
-    const TYPE_POST_DEC = 113;
-    /** Pre-decrement: arg1=result, arg2=read, arg3=write (#3552). */
-    const TYPE_PRE_DEC = 114;
-
     /** Bare `throw;` in catch — rethrow active caught exception (#3508). */
-    const TYPE_RETHROW = 115;
+    const TYPE_RETHROW = 111;
+    /** Begin `@` error-control: mask E_WARNING/E_NOTICE for wrapped expression (issue #3546). */
+    const TYPE_BEGIN_SILENCE = 112;
+    /** End `@` error-control: restore prior error_reporting (issue #3546). */
+    const TYPE_END_SILENCE = 113;
+    /** Post-increment: arg1=result, arg2=read, arg3=write (#3552). */
+    const TYPE_POST_INC = 114;
+    /** Pre-increment: arg1=result, arg2=read, arg3=write (#3552). */
+    const TYPE_PRE_INC = 115;
+    /** Post-decrement: arg1=result, arg2=read, arg3=write (#3552). */
+    const TYPE_POST_DEC = 116;
+    /** Pre-decrement: arg1=result, arg2=read, arg3=write (#3552). */
+    const TYPE_PRE_DEC = 117;
 
     public int $type;
     public ?int $arg1;
@@ -172,8 +175,14 @@ class OpCode {
     public array $classImplements = [];
     /** Declared PHP 8 attribute class names on class/method (#1936). */
     public array $attributeNames = [];
+    /** True when TYPE_DECLARE_CLASS targets an abstract class (#3385). */
+    public bool $classIsAbstract = false;
+    /** #[\Deprecated] metadata on function/method/class const declarations (#3569). */
+    public ?\PHPCompiler\Compiler\DeprecatedMetadata $deprecatedMetadata = null;
     /** Pipe-separated lowercase catch class names for TYPE_CATCH (#1362). */
     public ?string $catchTypes = null;
+    /** Pipe-separated lowercase class/interface names for union `instanceof` RHS (#3461). */
+    public ?string $instanceofUnionTypes = null;
 
     /**
      * Closure `use ($var)` metadata for TYPE_CLOSURE (issue #72).
