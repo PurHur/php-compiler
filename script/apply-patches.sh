@@ -1226,13 +1226,14 @@ PY
 apply_php_cfg_magic_constants_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php"
   local overlay="$PATCH_DIR/overlays/php-cfg/MagicStringResolver.php"
-  if patch_already_applied "$PATCH_DIR/php-cfg-magic-constants.patch"; then
-    echo "Skip php-cfg-magic-constants.patch (already applied)"
-    return 0
-  fi
   if [[ ! -f "$overlay" ]]; then
     echo "Skip php-cfg-magic-constants.patch (overlay missing)" >&2
     return 1
+  fi
+  if patch_already_applied "$PATCH_DIR/php-cfg-magic-constants.patch" \
+    && grep -q 'traitStack' "$target" 2>/dev/null; then
+    echo "Skip php-cfg-magic-constants.patch (already applied)"
+    return 0
   fi
   cp "$overlay" "$target"
   echo "Applied php-cfg-magic-constants.patch (overlay)"

@@ -113,6 +113,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gettype_object_resource')) {
                 continue;
             }
+            // __TRAIT__ in trait bodies requires trait JIT lowering (#3609); parse-time fold is VM-only for now.
+            if (str_contains($name, 'magic_const_trait')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
