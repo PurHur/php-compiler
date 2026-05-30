@@ -3518,6 +3518,9 @@ restart:
                             'name' => $canonical,
                             'value' => clone $block->constants[$op->arg2],
                         ];
+                        if ([] !== $op->attributeMetadata) {
+                            $entry->enumCaseAttributes[$name] = $op->attributeMetadata;
+                        }
                         if (null !== $op->deprecatedMetadata) {
                             $entry->constDeprecated[$name] = $op->deprecatedMetadata;
                         }

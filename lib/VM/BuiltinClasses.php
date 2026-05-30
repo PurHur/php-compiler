@@ -16,10 +16,15 @@ use PHPCompiler\VM\Builtin\ExceptionGetFile;
 use PHPCompiler\VM\Builtin\ExceptionGetLine;
 use PHPCompiler\VM\Builtin\ExceptionGetMessage;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetName;
+use PHPCompiler\VM\Builtin\ReflectionAttributeNewInstance;
 use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethod;
 use PHPCompiler\VM\Builtin\ReflectionClassNewLazyProxy;
+use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseConstruct;
+use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetAttributes;
+use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetName;
+use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetValue;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
 use PHPCompiler\VM\Builtin\WeakMapConstruct;
 use PHPCompiler\VM\Builtin\WeakMapCount;
@@ -126,8 +131,12 @@ final class BuiltinClasses
 
         $attr = new ClassEntry('ReflectionAttribute');
         $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_NAME, null, $strProto);
+        $arrayProto = new Variable(Variable::TYPE_ARRAY);
+        $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_ARGS, null, $arrayProto);
         $attr->methods['getname'] = new ReflectionAttributeGetName();
         $attr->methodVisibility['getname'] = $pub;
+        $attr->methods['newinstance'] = new ReflectionAttributeNewInstance();
+        $attr->methodVisibility['newinstance'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_ATTRIBUTE] = $attr;
 
         $rm = new ClassEntry('ReflectionMethod');
@@ -149,6 +158,20 @@ final class BuiltinClasses
         $rc->methods['newlazyproxy'] = new ReflectionClassNewLazyProxy();
         $rc->methodVisibility['newlazyproxy'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS] = $rc;
+
+        $reuc = new ClassEntry('ReflectionEnumUnitCase');
+        $reuc->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
+        $reuc->properties[] = new ClassProperty(ReflectionSupport::PROP_ENUM_CASE_NAME, null, $strProto);
+        $reuc->constructor = new ReflectionEnumUnitCaseConstruct();
+        $reuc->methods['__construct'] = $reuc->constructor;
+        $reuc->methodVisibility['__construct'] = $pub;
+        $reuc->methods['getattributes'] = new ReflectionEnumUnitCaseGetAttributes();
+        $reuc->methodVisibility['getattributes'] = $pub;
+        $reuc->methods['getname'] = new ReflectionEnumUnitCaseGetName();
+        $reuc->methodVisibility['getname'] = $pub;
+        $reuc->methods['getvalue'] = new ReflectionEnumUnitCaseGetValue();
+        $reuc->methodVisibility['getvalue'] = $pub;
+        $ctx->classes[ReflectionSupport::REFLECTION_ENUM_UNIT_CASE] = $reuc;
     }
 
     private static function registerDateTime(Context $ctx): void

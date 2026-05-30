@@ -56,6 +56,8 @@ class ClassEntry {
     public bool $allowsDynamicProperties = false;
     /** @var list<string> PHP 8 attribute names on this class (#1936). */
     public array $attributeNames = [];
+    /** @var array<string, list<\PHPCompiler\Compiler\AttributeMetadata>> enum case (lowercase) => attributes (#3800) */
+    public array $enumCaseAttributes = [];
     /** @var array<string, list<string>> method (lowercase) => attribute names (#1936). */
     public array $methodAttributeNames = [];
     /** @var array<string, string> method (lowercase) => trait FQCN when imported via use Trait (#3416). */
