@@ -558,6 +558,17 @@ function syntaxRowDefinitions(): array
             'probe' => 'readonly class R { public int $x = 0; } $o = new R(); $o->x = 1;',
         ],
         [
+            'id' => 'property_hooks',
+            'construct' => 'Property hooks (`get` / `set` on properties)',
+            'opcodes' => ['TYPE_ASSIGN', 'TYPE_PROPERTY_FETCH', 'TYPE_DECLARE_METHOD'],
+            'issue' => 3145,
+            'notes' => [
+                'SourcePreprocessor lowers hooks to __phpc_property_* methods (#3145)',
+                'VM dispatches set/get on property access; JIT PropertyHookDispatch (#3723)',
+            ],
+            'probe' => 'class U { public string $e { set (string $v) { $this->e = $v; } } } $o = new U(); $o->e = "a@b"; echo $o->e;',
+        ],
+        [
             'id' => 'php8_attribute_reflection',
             'construct' => 'PHP 8 attributes — `ReflectionClass` / `ReflectionMethod` metadata',
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_DECLARE_METHOD'],

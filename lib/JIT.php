@@ -5862,6 +5862,17 @@ class JIT {
                     $receiver = $this->loadPropertyFetchReceiver($obj);
                     $forceBranchMerge = $this->context->coalesceAssignTargets->contains($result);
                     if ($name instanceof Operand\Literal) {
+                        $hookFetched = JIT\PropertyHookDispatch::tryEmitPropertyGet(
+                            $this->context,
+                            $receiver,
+                            $declaringClass,
+                            $name->value,
+                            $block
+                        );
+                        if (null !== $hookFetched) {
+                            $this->assignOperandValue($result, $hookFetched);
+                            break;
+                        }
                         $fetched = $this->context->type->object->propertyFetch(
                             $receiver,
                             $declaringClass,
@@ -6768,6 +6779,14 @@ class JIT {
                 $result,
                 $this->context->jitEnclosingBlock
             );
+            if (JIT\PropertyHookDispatch::emitSetHookIfNeeded(
+                $this->context,
+                $result,
+                $value,
+                $this->context->jitEnclosingBlock
+            )) {
+                return;
+            }
             $this->context->type->object->propertyStore(
                 $result->objectPropertySlot,
                 $value,
