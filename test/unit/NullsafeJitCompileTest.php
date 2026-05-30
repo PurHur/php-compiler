@@ -12,6 +12,8 @@ require_once __DIR__ . '/../LlvmToolchain.php';
  * JIT lowering for ?-> nullsafe property/method fetch (issues #308, #3219).
  *
  * @group llvm
+ * @runInSeparateProcess
+ * @preserveGlobalState disabled
  */
 final class NullsafeJitCompileTest extends TestCase
 {
@@ -32,10 +34,21 @@ final class NullsafeJitCompileTest extends TestCase
         $methodCode = file_get_contents($methodPath);
         $this->assertNotFalse($methodCode);
 
-        $this->assertJitModuleVerifies(
-            [$this->fixtureCode('nullsafe.phpt'), $methodCode],
-            ['nullsafe.phpt', 'nullsafe_method_call.php']
-        );
+        $runtime = new Runtime();
+        foreach (
+            [
+                [$this->fixtureCode('nullsafe.phpt'), 'nullsafe.phpt'],
+                [$methodCode, 'nullsafe_method_call.php'],
+            ] as [$code, $filename]
+        ) {
+            $block = $runtime->parseAndCompile($code, $filename);
+            $runtime->jitCompileBlock($block);
+        }
+
+        $context = $runtime->loadJitContext();
+        $verify = new \ReflectionMethod($context, 'compileCommon');
+        $verify->setAccessible(true);
+        $verify->invoke($context);
     }
 
     public function testBinJitRunNullsafeOneLiner(): void
@@ -69,21 +82,6 @@ final class NullsafeJitCompileTest extends TestCase
         $combined = trim(($stdout !== false ? $stdout : '') . ($stderr !== false ? $stderr : ''));
         $this->assertSame(0, $exit, $combined);
         $this->assertStringContainsString('ok', $combined);
-    }
-
-    /** @param list<string> $codes @param list<string> $filenames */
-    private function assertJitModuleVerifies(array $codes, array $filenames): void
-    {
-        $runtime = new Runtime();
-        foreach ($codes as $i => $code) {
-            $block = $runtime->parseAndCompile($code, $filenames[$i]);
-            $runtime->jitCompileBlock($block);
-        }
-
-        $context = $runtime->loadJitContext();
-        $verify = new \ReflectionMethod($context, 'compileCommon');
-        $verify->setAccessible(true);
-        $verify->invoke($context);
     }
 
     private function fixtureCode(string $file): string

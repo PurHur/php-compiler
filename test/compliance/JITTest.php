@@ -18,6 +18,10 @@ class JITTest extends BaseTest {
     public static function providePHPTests(): \Generator
     {
         foreach (parent::providePHPTests() as $name => $case) {
+            // ?-> LLVM lowering verified in NullsafeJitCompileTest (#3219); MCJIT execute needs jit-runtime-probe (#98).
+            if (str_contains(strtolower($case[0]), 'nullsafe')) {
+                continue;
+            }
             // SplObjectStorage JIT-only (#1998); see SplObjectStorageJITTest.
             if (str_contains(strtolower($case[0]), 'splobjectstorage')) {
                 continue;
