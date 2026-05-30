@@ -11,6 +11,7 @@ namespace PHPCompiler\JIT\Builtin\Type;
 
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
+use PHPCompiler\Block;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\Builtin\Refcount;
@@ -550,6 +551,84 @@ class Object_ extends Type {
         return $this->classParentLc[strtolower(ltrim($declaringClassLc, '\\'))] ?? null;
     }
 
+    /** Parent class display name for JIT get_parent_class() when known at compile time (#3483). */
+    public function parentClassDisplayName(string $className): ?string
+    {
+        $parentLc = $this->parentClassLc($className);
+        if (null === $parentLc || !isset($this->classes[$parentLc])) {
+            return null;
+        }
+
+        return $this->classNameForId($this->classes[$parentLc]);
+    }
+
+    /**
+     * Compile-time extends-chain check for is_a() string form (#3478).
+     */
+    public function classIsInstanceOf(string $childName, string $parentName): bool
+    {
+        return $this->classEntryIsInstanceOfLc(
+            strtolower(ltrim($childName, '\\')),
+            strtolower(ltrim($parentName, '\\'))
+        );
+    }
+
+    /**
+     * Compile-time strict-subclass check for is_subclass_of() string form (#3478).
+     */
+    public function classIsSubclassOf(string $childName, string $parentName): bool
+    {
+        $childLc = strtolower(ltrim($childName, '\\'));
+        $parentLc = strtolower(ltrim($parentName, '\\'));
+        if ($childLc === $parentLc) {
+            return false;
+        }
+
+        return $this->classEntryIsInstanceOfLc($childLc, $parentLc);
+    }
+
+    /**
+     * @return list<int> class ids whose instances satisfy instanceof $className
+     */
+    public function classIdsInstanceOf(string $className): array
+    {
+        $wantLc = strtolower(ltrim($className, '\\'));
+        $ids = [];
+        foreach ($this->classIdToName as $id => $name) {
+            if ($this->classEntryIsInstanceOfLc(strtolower(ltrim($name, '\\')), $wantLc)) {
+                $ids[] = $id;
+            }
+        }
+        if (isset($this->classes[$wantLc])) {
+            $expectedId = $this->classes[$wantLc];
+            if (!in_array($expectedId, $ids, true)) {
+                $ids[] = $expectedId;
+            }
+        }
+
+        return $ids;
+    }
+
+    private function classEntryIsInstanceOfLc(string $classLc, string $wantLc): bool
+    {
+        $visited = [];
+        $current = $classLc;
+        while (true) {
+            if (isset($visited[$current])) {
+                return false;
+            }
+            $visited[$current] = true;
+            if ($current === $wantLc) {
+                return true;
+            }
+            $parent = $this->classParentLc[$current] ?? null;
+            if (null === $parent) {
+                return false;
+            }
+            $current = $parent;
+        }
+    }
+
     /**
      * @param list<string> $interfaceLcs lowercase interface names
      */
@@ -685,6 +764,28 @@ class Object_ extends Type {
     }
 
     /**
+     * Canonical enum class names from DECLARE_ENUM (issue #3538).
+     *
+     * @return list<string>
+     */
+    public function allDeclaredEnumNames(): array
+    {
+        $names = [];
+        foreach (array_keys($this->enums) as $enumLc) {
+            $resolved = null;
+            foreach ($this->classIdToName as $name) {
+                if (strtolower(ltrim($name, '\\')) === $enumLc) {
+                    $resolved = $name;
+                    break;
+                }
+            }
+            $names[] = $resolved ?? $enumLc;
+        }
+
+        return $names;
+    }
+
+    /**
      * Lowercase registry keys for JIT enum_exists() runtime compare (#1373).
      *
      * @return list<string>
@@ -777,6 +878,93 @@ class Object_ extends Type {
         return $result;
     }
 
+    /**
+     * After shallow clone, invoke user __clone() when the class defines it (Zend #3170).
+     */
+    public function invokeCloneMagicIfPresent(Block $block, PHPLLVM\Value $cloned): void
+    {
+        $cloneClassIds = [];
+        foreach ($this->methodVisibility as $classId => $methods) {
+            if (isset($methods['__clone'])) {
+                $cloneClassIds[] = $classId;
+            }
+        }
+        if ([] === $cloneClassIds) {
+            return;
+        }
+        if (1 === count($cloneClassIds)) {
+            $onlyId = $cloneClassIds[0];
+            $objMap = $this->context->structFieldMap['__object__'];
+            $classId = $this->context->builder->load(
+                $this->context->builder->structGep($cloned, $objMap['class_id'])
+            );
+            $fn = $this->context->builder->getInsertBlock()->getParent();
+            assert($fn instanceof PHPLLVM\Value\Function_);
+            $entry = $this->context->builder->getInsertBlock();
+            $callBlock = $fn->appendBasicBlock('clone_magic_single_call');
+            $done = $fn->appendBasicBlock('clone_magic_single_done');
+            $expected = $this->context->constantFromInteger($onlyId, 'int64');
+            $isId = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $classId, $expected);
+            $this->context->builder->branchIf($isId, $callBlock, $done);
+            $this->context->builder->positionAtEnd($callBlock);
+            $this->emitCloneMagicCallForClass($block, $cloned, $onlyId);
+            $this->context->builder->branch($done);
+            $this->context->builder->positionAtEnd($done);
+
+            return;
+        }
+        $objMap = $this->context->structFieldMap['__object__'];
+        $classId = $this->context->builder->load(
+            $this->context->builder->structGep($cloned, $objMap['class_id'])
+        );
+        $fn = $this->context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof PHPLLVM\Value\Function_);
+        $entry = $this->context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock('clone_magic_done');
+        $fallback = $fn->appendBasicBlock('clone_magic_unknown');
+        $caseBlocks = [];
+        foreach ($cloneClassIds as $id) {
+            $caseBlocks[] = $fn->appendBasicBlock('clone_magic_class_'.$id);
+        }
+        $checkBlock = $entry;
+        foreach ($cloneClassIds as $i => $id) {
+            $this->context->builder->positionAtEnd($checkBlock);
+            $expected = $this->context->constantFromInteger($id, 'int64');
+            $isId = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $classId, $expected);
+            $nextCheck = $i + 1 < count($cloneClassIds)
+                ? $fn->appendBasicBlock('clone_magic_try_'.($i + 1))
+                : $fallback;
+            $this->context->builder->branchIf($isId, $caseBlocks[$i], $nextCheck);
+            $this->context->builder->positionAtEnd($caseBlocks[$i]);
+            $this->emitCloneMagicCallForClass($block, $cloned, $id);
+            $this->context->builder->branch($done);
+            $checkBlock = $nextCheck;
+        }
+        $this->context->builder->positionAtEnd($fallback);
+        $this->context->builder->branch($done);
+        $this->context->builder->positionAtEnd($done);
+    }
+
+    private function emitCloneMagicCallForClass(Block $block, PHPLLVM\Value $cloned, int $classId): void
+    {
+        $className = $this->classNameForId($classId);
+        $proxyName = strtolower($className).'::'.'__clone';
+        if (!$this->context->functionIsRegistered($proxyName)) {
+            return;
+        }
+        $objVar = new Variable(
+            $this->context,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $cloned
+        );
+        $toCall = $this->context->resolveFunctionProxy($proxyName);
+        $prevStrict = $this->context->callerStrictTypes;
+        $this->context->callerStrictTypes = $block->strictTypes;
+        $toCall->call($this->context, $objVar);
+        $this->context->callerStrictTypes = $prevStrict;
+    }
+
     private function copyPropertySlots(
         PHPLLVM\Value $dest,
         PHPLLVM\Value $src,
@@ -784,6 +972,7 @@ class Object_ extends Type {
         PHPLLVM\LLVMAbstract\BasicBlock $continue
     ): void {
         if (!isset($this->properties[$classId]) || [] === $this->properties[$classId]) {
+            $this->copyConstructedFlag($dest, $src);
             $this->context->builder->branch($continue);
 
             return;
@@ -796,7 +985,21 @@ class Object_ extends Type {
             $value = $this->propertyFetch($src, $className, $propName);
             $this->propertyStore($this->propertySlotPtr($dest, $slotIndex), $value, $propType);
         }
+        $this->copyConstructedFlag($dest, $src);
         $this->context->builder->branch($continue);
+    }
+
+    /** Preserve post-construct state on clone (Zend zend_clones.c; issue #3430). */
+    private function copyConstructedFlag(PHPLLVM\Value $dest, PHPLLVM\Value $src): void
+    {
+        $map = $this->context->structFieldMap['__object__'];
+        $constructed = $this->context->builder->load(
+            $this->context->builder->structGep($src, $map['constructed'])
+        );
+        $this->context->builder->store(
+            $constructed,
+            $this->context->builder->structGep($dest, $map['constructed'])
+        );
     }
 
     public function classNameForId(int $id): string
@@ -949,6 +1152,16 @@ class Object_ extends Type {
         $this->classIdToName[$id] = $lcname;
         $this->ensureExternalClassConstants($id, $lcname);
         $this->seedExternalClassProperties($id, $lcname);
+        if ('reflectionattribute' === $lcname) {
+            $this->defineProperty($id, 'name', Variable::TYPE_VALUE);
+        }
+        if ('reflectionclass' === $lcname) {
+            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
+        }
+        if ('reflectionmethod' === $lcname) {
+            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
+            $this->defineProperty($id, 'method', Variable::TYPE_STRING);
+        }
         if ('phpcompiler\vm\context' === $lcname) {
             $this->defineProperty($id, 'runtime', Variable::TYPE_OBJECT);
             $this->defineProperty($id, 'errors', Variable::TYPE_OBJECT);
@@ -1220,6 +1433,35 @@ class Object_ extends Type {
         return $this->methodVisibility[$classId][strtolower($methodLc)] ?? \PHPCfg\Func::FLAG_PUBLIC;
     }
 
+    /**
+     * @return list<string> lowercase method names declared on this class id
+     */
+    public function declaredMethodNames(int $classId): array
+    {
+        return array_keys($this->methodVisibility[$classId] ?? []);
+    }
+
+    /**
+     * Walk parent chain and copy parent method visibility slots missing on $childId (#101).
+     */
+    public function inheritMethodVisibilityFromParent(int $childId, string $childLc): void
+    {
+        $parentLc = $this->parentClassLc($childLc);
+        if (null === $parentLc || !isset($this->classes[$parentLc])) {
+            return;
+        }
+        $parentId = $this->classes[$parentLc];
+        foreach ($this->declaredMethodNames($parentId) as $methodLc) {
+            if (!isset($this->methodVisibility[$childId][$methodLc])) {
+                $this->methodVisibility[$childId][$methodLc] = $this->methodVisibility[$parentId][$methodLc];
+            }
+        }
+        $grandparent = $this->parentClassLc($parentLc);
+        if (null !== $grandparent) {
+            $this->inheritMethodVisibilityFromParent($childId, $parentLc);
+        }
+    }
+
     public function markHasConstructor(int $classId): void
     {
         $this->hasConstructor[$classId] = true;
@@ -1267,6 +1509,25 @@ class Object_ extends Type {
             'type' => Variable::fromVMVariable($value->type),
             'value' => $this->compileTimeValueFromVm($value),
         ];
+    }
+
+    public function inheritInterfaceConstants(int $classId, string $className): void
+    {
+        $classLc = strtolower(ltrim($className, '\\'));
+        foreach ($this->allInterfacesForClassLc($classLc) as $ifaceLc) {
+            if ($ifaceLc === $classLc) {
+                continue;
+            }
+            $ifaceId = $this->lookup($ifaceLc);
+            if (!isset($this->classConstants[$ifaceId])) {
+                continue;
+            }
+            foreach ($this->classConstants[$ifaceId] as $name => $entry) {
+                if (!isset($this->classConstants[$classId][$name])) {
+                    $this->classConstants[$classId][$name] = $entry;
+                }
+            }
+        }
     }
 
     public function resolveClassId(Operand $classOp): int
@@ -1614,21 +1875,15 @@ class Object_ extends Type {
 
     public function emitInstanceOf(Variable $expr, string $className): Variable
     {
-        $expectedId = $this->lookup($className);
         $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
         $objMap = $this->context->structFieldMap['__object__'];
-        $expectedClassId = $this->context->constantFromInteger($expectedId, 'int64');
 
         if (Variable::TYPE_OBJECT === $expr->type) {
             $obj = $this->context->helper->loadValue($expr);
             $classId = $this->context->builder->load(
                 $this->context->builder->structGep($obj, $objMap['class_id'])
             );
-            $match = $this->context->builder->icmp(
-                PHPLLVM\Builder::INT_EQ,
-                $classId,
-                $expectedClassId
-            );
+            $match = $this->emitClassIdInstanceOf($classId, $className);
 
             return new Variable(
                 $this->context,
@@ -1653,11 +1908,7 @@ class Object_ extends Type {
             $classId = $this->context->builder->load(
                 $this->context->builder->structGep($obj, $objMap['class_id'])
             );
-            $matches = $this->context->builder->icmp(
-                PHPLLVM\Builder::INT_EQ,
-                $classId,
-                $expectedClassId
-            );
+            $matches = $this->emitClassIdInstanceOf($classId, $className);
             $match = $this->context->builder->and($isObject, $matches);
 
             return new Variable(
@@ -1673,6 +1924,64 @@ class Object_ extends Type {
             Variable::TYPE_NATIVE_BOOL,
             Variable::KIND_VALUE,
             $falseVal
+        );
+    }
+
+    private function emitClassIdInstanceOf(PHPLLVM\Value $classId, string $className): PHPLLVM\Value
+    {
+        $matchingIds = $this->classIdsInstanceOf($className);
+        if ([] === $matchingIds) {
+            $expectedId = $this->lookup($className);
+
+            return $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $classId,
+                $this->context->constantFromInteger($expectedId, 'int64')
+            );
+        }
+        if (1 === \count($matchingIds)) {
+            return $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $classId,
+                $this->context->constantFromInteger($matchingIds[0], 'int64')
+            );
+        }
+        $match = null;
+        foreach ($matchingIds as $id) {
+            $cmp = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $classId,
+                $this->context->constantFromInteger($id, 'int64')
+            );
+            $match = null === $match ? $cmp : $this->context->builder->or($match, $cmp);
+        }
+
+        return $match;
+    }
+
+    /**
+     * @param list<string> $classNames
+     */
+    public function emitInstanceOfUnion(Variable $expr, array $classNames): Variable
+    {
+        $i1 = $this->context->getTypeFromString('int1');
+        $acc = $i1->constInt(0, false);
+        foreach ($classNames as $name) {
+            if ('' === $name) {
+                continue;
+            }
+            $check = $this->emitInstanceOf($expr, $name);
+            $bool = Variable::TYPE_NATIVE_BOOL === $check->type
+                ? $check->value
+                : $this->context->helper->loadValue($check);
+            $acc = $this->context->builder->or($acc, $bool);
+        }
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_BOOL,
+            Variable::KIND_VALUE,
+            $acc
         );
     }
 
@@ -1736,6 +2045,32 @@ class Object_ extends Type {
             default:
                 throw new \LogicException('Class constant value must be a scalar compile-time constant');
         }
+    }
+
+    public function propertySlotFor(PHPLLVM\Value $obj, string $class, string $name): PHPLLVM\Value
+    {
+        $classId = $this->lookup('' !== $class ? $class : 'stdclass');
+        $nameId = $this->propNameMap[$name] ?? null;
+        $hasProp = false;
+        if (null !== $nameId) {
+            foreach ($this->properties[$classId] as $propset) {
+                if ($propset[0] === $nameId) {
+                    $hasProp = true;
+                    break;
+                }
+            }
+        }
+        if (!$hasProp) {
+            $this->defineProperty($classId, $name, $this->externalPropertyJitType($class, $name));
+            $nameId = $this->propNameMap[$name];
+        }
+        foreach ($this->properties[$classId] as $propset) {
+            if ($propset[0] === $nameId) {
+                return $this->propertySlotPtr($obj, $propset[3]);
+            }
+        }
+
+        throw new \LogicException('Property slot not found: '.$class.'::$'.$name);
     }
 
     public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name): Variable
@@ -1830,6 +2165,32 @@ class Object_ extends Type {
             }
         }
         throw new \LogicException("Could not find property $name for class $classId");
+    }
+
+    /**
+     * isset($obj->prop) for a literal property name (issue #3603).
+     */
+    public function propertyIsSet(PHPLLVM\Value $obj, string $class, string $name): PHPLLVM\Value
+    {
+        $classId = $this->lookup('' !== $class ? $class : 'stdclass');
+        $i1 = $this->context->getTypeFromString('int1');
+        if (!$this->hasProperty($classId, $name)) {
+            return $i1->constInt(0, false);
+        }
+        $prop = $this->propertyFetch($obj, $class, $name);
+        if (Variable::TYPE_VALUE === $prop->type) {
+            $valueMap = $this->context->structFieldMap['__value__'];
+            $typeByte = $this->context->builder->load(
+                $this->context->builder->structGep($prop->value, $valueMap['type'])
+            );
+            $nullType = $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false);
+
+            return $this->context->builder->icmp(PHPLLVM\Builder::INT_NE, $typeByte, $nullType);
+        }
+        $loaded = $this->context->helper->loadValue($prop);
+        $nullPtr = $this->context->getTypeFromString('void*')->constNull();
+
+        return $this->context->builder->icmp(PHPLLVM\Builder::INT_NE, $loaded, $nullPtr);
     }
 
     public function storeInstanceProperty(

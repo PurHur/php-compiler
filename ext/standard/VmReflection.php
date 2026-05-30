@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -50,6 +51,26 @@ final class VmReflection
     public static function enumExists(Context $ctx, string $enumName): bool
     {
         return isset($ctx->enums[strtolower($enumName)]);
+    }
+
+    /**
+     * get_declared_enums() — user enum class names (issue #3538).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_enums)
+     */
+    public static function declaredEnumsTable(Context $ctx): \PHPCompiler\VM\HashTable
+    {
+        $result = new \PHPCompiler\VM\HashTable();
+        foreach ($ctx->classes as $lc => $entry) {
+            if (!$entry->isEnum || isset($ctx->classAliases[$lc])) {
+                continue;
+            }
+            $value = new Variable();
+            $value->string($entry->name);
+            $result->append($value);
+        }
+
+        return $result;
     }
 
     public static function interfaceExists(Context $ctx, string $interfaceName): bool
@@ -221,6 +242,20 @@ final class VmReflection
         return $result;
     }
 
+    /**
+     * Parent class FQCN for get_parent_class() / class_parents() (issue #3483).
+     *
+     * php-src: ext/standard/class.c — PHP_FUNCTION(get_parent_class)
+     */
+    public static function parentClassName(ClassEntry $entry, Context $ctx): ?string
+    {
+        if (null === $entry->parentLc || !isset($ctx->classes[$entry->parentLc])) {
+            return null;
+        }
+
+        return $ctx->classes[$entry->parentLc]->name;
+    }
+
     public static function resolveClassFromArg(Context $ctx, Variable $arg): ClassEntry
     {
         $arg = $arg->resolveIndirect();
@@ -281,6 +316,43 @@ final class VmReflection
         }
 
         return strtolower($value->toObject()->class->name) === strtolower($className);
+    }
+
+    /**
+     * is_a() / is_subclass_of() object operand — walk extends chain (#3478).
+     *
+     * php-src: ext/standard/class.c — instanceof_function / instanceof_function_ex
+     */
+    public static function isInstanceOf(Context $ctx, ClassEntry $entry, string $className): bool
+    {
+        return InterfaceCheck::entryIsInstanceOf($entry, strtolower(ltrim($className, '\\')), $ctx);
+    }
+
+    public static function isInstanceOfObject(Context $ctx, Variable $object, string $className): bool
+    {
+        $object = $object->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $object->type) {
+            return false;
+        }
+
+        return self::isInstanceOf($ctx, $object->toObject()->class, $className);
+    }
+
+    /**
+     * is_subclass_of() class-string operand — strict subclass (excludes same class).
+     */
+    public static function isSubclassOf(Context $ctx, string $childName, string $parentName): bool
+    {
+        $child = self::resolveClassEntry($ctx, $childName);
+        if (null === $child) {
+            return false;
+        }
+        $parentLc = strtolower(ltrim($parentName, '\\'));
+        if (strtolower($child->name) === $parentLc) {
+            return false;
+        }
+
+        return InterfaceCheck::entryIsInstanceOf($child, $parentLc, $ctx);
     }
 
     /**

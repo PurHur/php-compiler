@@ -343,11 +343,19 @@ final class JitValueCompare
             $context->builder->icmp(Builder::INT_EQ, $rightType, $longTag)
         );
 
+        $objectTag = $i8->constInt(Variable::TYPE_OBJECT, false);
+        $bothObject = $context->builder->and(
+            $context->builder->icmp(Builder::INT_EQ, $leftType, $objectTag),
+            $context->builder->icmp(Builder::INT_EQ, $rightType, $objectTag)
+        );
+
         $entry = $context->builder->getInsertBlock();
         $i1 = $context->getTypeFromString('int1');
         $stringBlock = BasicBlockHelper::append($context, 'identical_value_string');
         $longCheckBlock = BasicBlockHelper::append($context, 'identical_value_long_check');
         $longBlock = BasicBlockHelper::append($context, 'identical_value_long');
+        $objectCheckBlock = BasicBlockHelper::append($context, 'identical_value_object_check');
+        $objectBlock = BasicBlockHelper::append($context, 'identical_value_object');
         $typedFalseBlock = BasicBlockHelper::append($context, 'identical_value_typed_false');
         $doneBlock = BasicBlockHelper::append($context, 'identical_value_typed_done');
 
@@ -372,12 +380,37 @@ final class JitValueCompare
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($longCheckBlock);
-        $context->builder->branchIf($bothLong, $longBlock, $typedFalseBlock);
+        $context->builder->branchIf($bothLong, $longBlock, $objectCheckBlock);
 
         $context->builder->positionAtEnd($longBlock);
         $leftLong = $context->builder->call($context->lookupFunction('__value__readLong'), $leftPtr);
         $rightLong = $context->builder->call($context->lookupFunction('__value__readLong'), $rightPtr);
         $longMatch = $context->builder->icmp(Builder::INT_EQ, $leftLong, $rightLong);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($objectCheckBlock);
+        $context->builder->branchIf($bothObject, $objectBlock, $typedFalseBlock);
+
+        $context->builder->positionAtEnd($objectBlock);
+        $leftObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $leftPtr
+        );
+        $rightObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $rightPtr
+        );
+        $voidp = $context->getTypeFromString('void')->pointerType(0);
+        $sizeT = $context->getTypeFromString('size_t');
+        $leftHandle = $context->builder->ptrToInt(
+            $context->builder->pointerCast($leftObj, $voidp),
+            $sizeT
+        );
+        $rightHandle = $context->builder->ptrToInt(
+            $context->builder->pointerCast($rightObj, $voidp),
+            $sizeT
+        );
+        $objectMatch = $context->builder->icmp(Builder::INT_EQ, $leftHandle, $rightHandle);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($typedFalseBlock);
@@ -387,6 +420,7 @@ final class JitValueCompare
         $phi = $context->builder->phi($i1);
         $phi->addIncoming($stringsMatch, $stringBlock);
         $phi->addIncoming($longMatch, $longBlock);
+        $phi->addIncoming($objectMatch, $objectBlock);
         $phi->addIncoming($falseVal, $typedFalseBlock);
         $context->builder->branch($exitBlock);
 

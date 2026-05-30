@@ -39,7 +39,7 @@ PHP
         $this->assertFalse(Block::requiresVmLowering($block));
     }
 
-    public function testRequiresVmLoweringForTryCatchWithoutYield(): void
+    public function testRequiresVmLoweringForSimpleTryCatch(): void
     {
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(<<<'PHP'
@@ -55,6 +55,26 @@ PHP
         );
         $this->assertNotNull($block);
         $this->assertFalse(Block::containsGeneratorOpcodes($block));
+        $this->assertFalse(Block::containsFinallyOpcodes($block));
+        $this->assertTrue(Block::requiresVmLowering($block));
+    }
+
+    public function testRequiresVmLoweringForTryFinally(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+try {
+    echo 1;
+} finally {
+    echo 0;
+}
+PHP
+            ,
+            'try_finally_probe.php'
+        );
+        $this->assertNotNull($block);
+        $this->assertTrue(Block::containsFinallyOpcodes($block));
         $this->assertTrue(Block::requiresVmLowering($block));
     }
 }
