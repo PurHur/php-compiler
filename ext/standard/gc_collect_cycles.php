@@ -28,14 +28,14 @@ final class gc_collect_cycles extends Internal
         if (\count($frame->calledArgs) > 0) {
             throw new \LogicException('gc_collect_cycles() takes no arguments');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         $ctx = $frame->vmContext;
         if (null === $ctx) {
             throw new \LogicException('gc_collect_cycles() requires VM context');
         }
-        $frame->returnVar->int(CycleCollector::collect($ctx));
+        $collected = CycleCollector::collect($ctx);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int($collected);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value

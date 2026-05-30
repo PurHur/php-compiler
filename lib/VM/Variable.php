@@ -24,11 +24,14 @@ final class Variable {
     const TYPE_INDIRECT = 7;
     /** Writable single-byte view of a parent string (Zend-style $str[$i]). */
     const TYPE_STRING_OFFSET = 8;
-    /** Zend enum case object for E::Case->name / ->value (#3420). */
+    /** Zend enum case object for E::Case fetches (#3420, #3554). */
     const TYPE_ENUM_CASE = 9;
 
 
     const NUMERIC = self::TYPE_INTEGER | self::TYPE_FLOAT;
+
+    /** castFrom() target: promote to int or float (distinct from TYPE_BOOLEAN, which shares value 3). */
+    private const CAST_NUMERIC = 64;
 
     public int $type = self::TYPE_NULL;
 
@@ -53,6 +56,9 @@ final class Variable {
     public ?ObjectEntry $objectPropertyOwner = null;
 
     public ?string $objectPropertyName = null;
+
+    /** Stream handle from fopen()/similar; distinguishes handle ints from plain integers (#3519). */
+    public bool $streamResource = false;
 
     public function __construct(int $type = self::TYPE_NULL) {
         $this->type = $type;
@@ -93,6 +99,11 @@ final class Variable {
         return $var;
     }
 
+    public function isIndirect(): bool
+    {
+        return self::TYPE_INDIRECT === $this->type;
+    }
+
     public function newArray(): HashTable {
         $this->array(new HashTable);
         return $this->array;
@@ -120,6 +131,18 @@ final class Variable {
         $this->reset();
         $this->type = self::TYPE_INTEGER;
         $this->integer = $value;
+        $this->streamResource = false;
+    }
+
+    public function streamHandle(int $value): void
+    {
+        $this->int($value);
+        $this->streamResource = true;
+    }
+
+    public function isStreamResource(): bool
+    {
+        return $this->streamResource && self::TYPE_INTEGER === $this->type;
     }
 
     public function is(int $type): bool {
@@ -132,7 +155,7 @@ final class Variable {
         return false;
     }
 
-    public function toInt(): int {
+    public function toInt(?\PHPCompiler\VM $vm = null): int {
         switch ($this->type) {
             case self::TYPE_NULL:
                 return 0;
@@ -144,8 +167,10 @@ final class Variable {
                 return $this->bool ? 1 : 0;
             case self::TYPE_STRING:
                 return (int) $this->string;
+            case self::TYPE_OBJECT:
+                return $this->objectToScalarString($vm, 'int')->toInt();
             case self::TYPE_INDIRECT:
-                return $this->indirect->toInt();
+                return $this->indirect->toInt($vm);
         }
     }
 
@@ -155,7 +180,7 @@ final class Variable {
         $this->float = $value;
     }
 
-    public function toFloat(): float {
+    public function toFloat(?\PHPCompiler\VM $vm = null): float {
         switch ($this->type) {
             case self::TYPE_NULL:
                 return 0;
@@ -167,12 +192,14 @@ final class Variable {
                 return $this->bool ? 1.0 : 0.0;
             case self::TYPE_STRING:
                 return (float) $this->string;
+            case self::TYPE_OBJECT:
+                return $this->objectToScalarString($vm, 'float')->toFloat();
             case self::TYPE_INDIRECT:
-                return $this->indirect->toFloat();
+                return $this->indirect->toFloat($vm);
         }
     }
 
-    public function toNumeric() {
+    public function toNumeric(?\PHPCompiler\VM $vm = null) {
         switch ($this->type) {
             case self::TYPE_NULL:
                 return 0;
@@ -190,8 +217,10 @@ final class Variable {
                     return (int) $this->string;
                 }
                 return (float) $this->string;
+            case self::TYPE_OBJECT:
+                return $this->objectToScalarString($vm, 'int')->toNumeric();
             case self::TYPE_INDIRECT:
-                return $this->indirect->toNumeric();
+                return $this->indirect->toNumeric($vm);
         }
         throw new \LogicException("Not implemented numeric conversion: $this->type");
     }
@@ -208,7 +237,7 @@ final class Variable {
         $this->bool = $value;
     }
 
-    public function toBool(): bool {
+    public function toBool(?\PHPCompiler\VM $vm = null): bool {
         switch ($this->type) {
             case self::TYPE_NULL:
                 return false;
@@ -219,9 +248,19 @@ final class Variable {
             case self::TYPE_BOOLEAN:
                 return $this->bool;
             case self::TYPE_STRING:
-                return '' === $this->string || '0' === $this->string;
+                return '' !== $this->string && '0' !== $this->string;
+            case self::TYPE_OBJECT:
+                if (null === $vm) {
+                    return true;
+                }
+                $object = $this->resolveIndirect();
+                if (!$vm->hasInstanceMethod($object->object->class, '__tostring')) {
+                    return true;
+                }
+
+                return $this->objectToScalarString($vm, 'bool')->toBool();
             case self::TYPE_INDIRECT:
-                return $this->indirect->toBool();
+                return $this->indirect->toBool($vm);
         }
     }
 
@@ -304,6 +343,7 @@ final class Variable {
 
     public function reset(): void {
         $this->type = self::TYPE_NULL;
+        $this->streamResource = false;
         unset($this->string);
         unset($this->integer);
         unset($this->float);
@@ -323,10 +363,10 @@ final class Variable {
         $this->stringOffsetIndex = $index;
     }
 
-    public function castFrom(int $type, self $var) {
+    public function castFrom(int $type, self $var, ?\PHPCompiler\VM $vm = null) {
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();
-            $result->castFrom($type, $var);
+            $result->castFrom($type, $var, $vm);
             $this->indirect->copyFrom($result);
 
             return;
@@ -334,21 +374,22 @@ final class Variable {
         $this->reset();
         $this->type = $type;
         switch ($type) {
-            case Variable::NUMERIC:
-                $number = $var->toNumeric();
+            case Variable::TYPE_BOOLEAN:
+                $this->bool = $var->toBool($vm);
+                break;
+            case self::CAST_NUMERIC:
+                $number = $var->toNumeric($vm);
                 if (is_int($number)) {
-                    $this->castFrom(Variable::TYPE_INTEGER, $var);
+                    $this->castFrom(Variable::TYPE_INTEGER, $var, $vm);
                 } else {
-                    $this->castFrom(Variable::TYPE_FLOAT, $var);
+                    $this->castFrom(Variable::TYPE_FLOAT, $var, $vm);
                 }
+                break;
             case Variable::TYPE_INTEGER:
-                $this->integer = $var->toInt();
+                $this->integer = $var->toInt($vm);
                 break;
             case Variable::TYPE_FLOAT:
-                $this->float = $var->toFloat();
-                break;
-            case Variable::TYPE_BOOLEAN:
-                $this->bool = $var->toBool();
+                $this->float = $var->toFloat($vm);
                 break;
             case Variable::TYPE_STRING:
                 $this->string = $var->toString();
@@ -382,6 +423,7 @@ final class Variable {
                 break;
             case self::TYPE_INTEGER:
                 $this->int($var->integer);
+                $this->streamResource = $var->streamResource;
                 break;
             case self::TYPE_FLOAT:
                 $this->float($var->float);
@@ -416,6 +458,10 @@ final class Variable {
         if ($self->type !== $other->type) {
             return false;
         }
+        if (self::TYPE_OBJECT === $self->type) {
+            return $self->object === $other->object;
+        }
+
         return $self->equals($other);
     }
 
@@ -431,7 +477,7 @@ restart:
             case TYPE_PAIR_STRING_STRING:
                 return $self->string === $other->string;
             case TYPE_PAIR_OBJECT_OBJECT:
-                return $self->object === $other->object;
+                return $self->object->looseEquals($other->object);
             case TYPE_PAIR_BOOLEAN_BOOLEAN:
                 return $self->bool === $other->bool;
             case TYPE_PAIR_NULL_NULL:
@@ -498,6 +544,47 @@ restart:
         }
     }
 
+    /**
+     * Zend cast_object: explicit scalar casts invoke __toString when defined (zend_operators.c).
+     *
+     * @param 'bool'|'int'|'float' $castKind
+     */
+    private function objectToScalarString(?\PHPCompiler\VM $vm, string $castKind): self
+    {
+        $var = $this->resolveIndirect();
+        if (self::TYPE_OBJECT !== $var->type) {
+            throw new \LogicException('Expected object operand for scalar cast');
+        }
+        $className = $var->object->class->name;
+        if (null === $vm) {
+            throw new \LogicException('VM required for explicit object scalar cast');
+        }
+        if (!$vm->hasInstanceMethod($var->object->class, '__tostring')) {
+            if ('int' === $castKind) {
+                throw new \TypeError("Object of class {$className} could not be converted to int");
+            }
+            if ('float' === $castKind) {
+                throw new \TypeError("Object of class {$className} could not be converted to float");
+            }
+            throw new \TypeError("Object of class {$className} could not be converted to bool");
+        }
+        $str = $vm->invokeInstanceMethod($var->object, '__toString')->toString();
+        $tmp = new self(self::TYPE_STRING);
+        $tmp->string($str);
+
+        return $tmp;
+    }
+
+    private static function throwObjectNumericCompareError(Variable $object): never
+    {
+        $var = $object->resolveIndirect();
+        if (self::TYPE_OBJECT !== $var->type) {
+            throw new \LogicException('Expected object operand for numeric compare error');
+        }
+        $className = $var->object->class->name;
+        throw new \TypeError("Object of class {$className} could not be converted to number");
+    }
+
     public function compareOp(int $opCode, Variable $left, Variable $right): void {
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();
@@ -530,6 +617,8 @@ restart:
             case TYPE_PAIR_NULL_NULL:
                 $this->bool($this->_compareOp($opCode, null, null));
                 break;
+            case TYPE_PAIR_OBJECT_OBJECT:
+                self::throwObjectNumericCompareError($left);
             default:
                 if ($left->type === self::TYPE_INDIRECT) {
                     $left = $left->indirect;
@@ -593,6 +682,8 @@ restart:
             case TYPE_PAIR_NULL_NULL:
                 $this->int(0);
                 break;
+            case TYPE_PAIR_OBJECT_OBJECT:
+                self::throwObjectNumericCompareError($left);
             default:
                 if ($left->type === self::TYPE_INDIRECT) {
                     $left = $left->indirect;
@@ -763,7 +854,7 @@ restart:
 restart:
         switch ($opCode) {
             case OpCode::TYPE_UNARY_PLUS:
-                $this->castFrom(self::NUMERIC, $expr);
+                $this->castFrom(self::CAST_NUMERIC, $expr);
                 return;
             case OpCode::TYPE_UNARY_MINUS:
                 if ($expr->type === Variable::TYPE_INTEGER) {
@@ -775,7 +866,7 @@ restart:
                     $this->float *= -1.0;
                     return;
                 } else {
-                    $this->castFrom(self::NUMERIC, $expr);
+                    $this->castFrom(self::CAST_NUMERIC, $expr);
                     goto restart;
                 }
                 break;
@@ -840,9 +931,9 @@ restart:
 
 /** Precomputed (left * 256 + right) for JIT self-host bundle (no shift/mul in global init). */
 const TYPE_PAIR_INTEGER_INTEGER = 257;
-const TYPE_PAIR_FLOAT_INTEGER = 514;
-const TYPE_PAIR_INTEGER_FLOAT = 260;
-const TYPE_PAIR_FLOAT_FLOAT = 516;
+const TYPE_PAIR_INTEGER_FLOAT = 258;
+const TYPE_PAIR_FLOAT_INTEGER = 513;
+const TYPE_PAIR_FLOAT_FLOAT = 514;
 const TYPE_PAIR_STRING_STRING = 1028;
 const TYPE_PAIR_OBJECT_OBJECT = 1285;
 const TYPE_PAIR_BOOLEAN_BOOLEAN = 771;

@@ -175,6 +175,22 @@ final class IssetHelper
 
             return self::compileHashTableOffsetIsSet($context, $htVar, $dim, $dimOp, $containerOp);
         }
+        if (Variable::TYPE_OBJECT === $container->type && null === $container->objectPropertySlot) {
+            $propName = self::literalStringKey($dimOp);
+            if (
+                null !== $propName
+                && null !== $containerOp
+                && null !== $containerOp->type
+                && Type::TYPE_OBJECT === $containerOp->type->type
+            ) {
+                $class = $containerOp->type->userType ?? '';
+                $objPtr = Variable::KIND_VALUE === $container->kind
+                    ? $container->value
+                    : $context->builder->load($container->value);
+
+                return $context->type->object->propertyIsSet($objPtr, $class, $propName);
+            }
+        }
         if (Variable::TYPE_OBJECT === $container->type) {
             $htVar = self::hashtableFromObjectContainer($context, $container, $containerOp);
             $containerUserType = '';

@@ -18,12 +18,12 @@ final class ReflectionClassGetName implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
-        $objPtr = $context->builder->pointerCast($obj, $context->getTypeFromString('__object__*'));
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
         $i64 = $context->getTypeFromString('int64');
+        $objArg = $context->builder->pointerCast($obj, $i8p);
         $outLen = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $namePtr = $context->builder->call($context->lookupFunction('phpc_reflect_get_class_name'), $objPtr, $outLen);
+        $namePtr = $context->builder->call($context->lookupFunction('phpc_reflect_get_class_name'), $objArg, $outLen);
         $isNull = $context->builder->icmp(Builder::INT_EQ, $namePtr, $namePtr->typeOf()->constNull());
         $empty = $context->builder->pointerCast($context->constantFromString(''), $i8p);
         $cstr = $context->builder->select($isNull, $empty, $namePtr);

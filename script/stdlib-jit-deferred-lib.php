@@ -13,7 +13,10 @@ declare(strict_types=1);
  */
 function stdlib_jit_deferred_tracked(): array
 {
-    return [];
+    return [
+        'headers_sent' => ['issue' => 3120, 'category' => 'output'],
+        'register_shutdown_function' => ['issue' => 3120, 'category' => 'output'],
+    ];
 }
 
 /**

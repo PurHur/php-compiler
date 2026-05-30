@@ -3,7 +3,7 @@
 namespace PHPCompiler\VM;
 
 /**
- * Zend-style enum case object for E::Case->name / ->value (#3420).
+ * Zend-style enum case object for E::Case fetches (#3420, #3554).
  */
 final class EnumCaseEntry
 {
