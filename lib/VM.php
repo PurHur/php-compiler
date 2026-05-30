@@ -711,6 +711,23 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_CLASS_CONST_FETCH:
+                    $constName = strtolower($frame->scope[$op->arg3]->toString());
+                    $classOperand = $frame->scope[$op->arg2]->resolveIndirect();
+                    if (Variable::TYPE_OBJECT === $classOperand->type) {
+                        $classEntry = $classOperand->toObject()->class;
+                        if ('class' === $constName) {
+                            $frame->scope[$op->arg1]->string($classEntry->name);
+                            break;
+                        }
+                        if (!isset($classEntry->constants[$constName])) {
+                            return $this->raise(
+                                "Undefined class constant {$classEntry->name}::{$constName}",
+                                $frame
+                            );
+                        }
+                        $frame->scope[$op->arg1]->copyFrom($classEntry->constants[$constName]);
+                        break;
+                    }
                     try {
                         $lcClass = $this->resolveClassScopeName(
                             $frame->scope[$op->arg2]->toString(),
@@ -728,7 +745,6 @@ restart:
                     if (!isset($this->context->classes[$lcClass])) {
                         return $this->raise("Unknown class for constant fetch: {$className}", $frame);
                     }
-                    $constName = strtolower($frame->scope[$op->arg3]->toString());
                     $classEntry = $this->context->classes[$lcClass];
                     if ('class' === $constName) {
                         $frame->scope[$op->arg1]->string($classEntry->name);
