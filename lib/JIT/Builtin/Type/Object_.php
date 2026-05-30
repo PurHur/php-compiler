@@ -61,6 +61,10 @@ class Object_ extends Type {
     private array $externalOnlyClassIds = [];
     /** @var array<int, array<string, array{type: int, value: int|float|bool|string|null}>> */
     private array $classConstants = [];
+
+    /** @var array<string, PHPLLVM\Value> singleton __object__* globals for object class constants (#3196) */
+    private array $classConstObjectGlobals = [];
+
     /** @var array<int, array<int, array{propertyType: int, type: int, value: int|float|bool|string|null}>> */
     private array $propertyDefaults = [];
     /**
@@ -1685,6 +1689,29 @@ class Object_ extends Type {
 
             return;
         }
+        if (VMVariable::TYPE_OBJECT === $value->type) {
+            $objClass = strtolower($value->toObject()->class->name);
+            $jitClassId = $this->lookup($objClass);
+            $globalName = 'php_compiler_class_const_obj_'.$classId.'_'.$key;
+            $objPtrType = $this->context->getTypeFromString('__object__*');
+            $global = $this->context->module->addGlobal($objPtrType, $globalName);
+            $global->setInitializer($objPtrType->constNull());
+            $this->classConstObjectGlobals[$globalName] = $global;
+            $restore = $this->context->builder->getInsertBlock();
+            $this->context->builder->positionAtEnd($this->context->initBlock);
+            $alloc = $this->allocate($jitClassId);
+            if (!$this->hasConstructor($jitClassId)) {
+                $this->markObjectConstructed($alloc);
+            }
+            $this->context->builder->store($alloc, $global);
+            $this->context->builder->positionAtEnd($restore);
+            $this->classConstants[$classId][$key] = [
+                'type' => Variable::TYPE_OBJECT,
+                'global' => $globalName,
+            ];
+
+            return;
+        }
         $this->classConstants[$classId][$key] = [
             'type' => Variable::fromVMVariable($value->type),
             'value' => $this->compileTimeValueFromVm($value),
@@ -2264,9 +2291,36 @@ class Object_ extends Type {
                 }
 
                 return HashTableHelper::variableFromVmHashTable($this->context, $entry['vmTable']);
+            case Variable::TYPE_OBJECT:
+                return $this->jitClassConstObjectFromGlobal($entry);
             default:
                 throw new \LogicException('Unsupported class constant type for JIT');
         }
+    }
+
+    /**
+     * @param array{type: int, global: string} $entry
+     */
+    private function jitClassConstObjectFromGlobal(array $entry): Variable
+    {
+        $globalName = $entry['global'];
+        if (!isset($this->classConstObjectGlobals[$globalName])) {
+            throw new \LogicException("Missing class constant object global: {$globalName}");
+        }
+        $global = $this->classConstObjectGlobals[$globalName];
+        $slot = JitValueBox::alloc($this->context);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($this->context, $slot),
+            $this->context->builder->load($global)
+        );
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
     }
 
     /**

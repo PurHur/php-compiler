@@ -3941,8 +3941,8 @@ restart:
 
                     continue;
                 }
-            } elseif ($this->isClassBodyDefaultInitOpcode($op->type)) {
-                $this->executeClassBodyDefaultInitOpcode($frame, $op);
+            } elseif ($this->isClassBodyConstInitOpcode($op->type)) {
+                $this->executeClassBodyConstInitOpcode($frame, $op);
 
                 continue;
             } elseif (OpCode::TYPE_NEW === $op->type) {
@@ -4075,10 +4075,7 @@ restart:
             return $value;
         }
         if (isset($frame->scope[$op->arg2])) {
-            $value = new Variable();
-            $value->copyFrom($frame->scope[$op->arg2]);
-
-            return $value;
+            return VM\ClassConstMaterializer::detachConstantValue($frame->scope[$op->arg2]);
         }
         throw new \LogicException('Class constant value must be a compile-time constant');
     }
@@ -4162,6 +4159,14 @@ restart:
         return $initFrame->scope[$resultSlot]->resolveIndirect();
     }
 
+    public function isClassBodyConstInitOpcode(int $type): bool
+    {
+        return $this->isClassBodyDefaultInitOpcode($type)
+            || OpCode::TYPE_NEW === $type
+            || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $type
+            || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $type;
+    }
+
     private function isClassBodyDefaultInitOpcode(int $type): bool
     {
         return OpCode::TYPE_INIT_ARRAY === $type
@@ -4186,6 +4191,71 @@ restart:
         }
 
         return $methods;
+    }
+
+    public function executeClassBodyConstInitOpcode(Frame $frame, OpCode $op): void
+    {
+        if ($this->isClassBodyDefaultInitOpcode($op->type)) {
+            $this->executeClassBodyDefaultInitOpcode($frame, $op);
+
+            return;
+        }
+        switch ($op->type) {
+            case OpCode::TYPE_NEW:
+                $result = $frame->scope[$op->arg1];
+                $name = $frame->scope[$op->arg2]->toString();
+                $lcname = strtolower($name);
+                if (!isset($this->context->classes[$lcname])) {
+                    $this->context->autoloadClass($name);
+                }
+                if (!isset($this->context->classes[$lcname])) {
+                    throw new \LogicException("Attempting to instantiate non-existing class $name");
+                }
+                $class = $this->context->classes[$lcname];
+                $object = new VM\ObjectEntry($class);
+                $result->object($object);
+                $frame->call = $object->constructor;
+                $frame->callArgs = [$result];
+                $frame->callArgEntries = [];
+                if (null === $frame->call) {
+                    $object->constructed = true;
+                }
+                break;
+            case OpCode::TYPE_FUNCCALL_EXEC_RETURN:
+            case OpCode::TYPE_FUNCCALL_EXEC_NORETURN:
+                if (is_null($frame->call)) {
+                    $this->markPendingNewObjectConstructed($frame);
+                    break;
+                }
+                if ($frame->call instanceof Func\PHP && $frame->call->block->isGenerator) {
+                    throw new \LogicException('Generator constructors are not allowed in class constants');
+                }
+                $new = $frame->call->getFrame($this->context, $frame);
+                $new->calledClass = $this->inferCalledClass($frame);
+                $new->returnVar = null;
+                try {
+                    $new->calledArgs = $this->resolveOutgoingCallArgs($frame);
+                } catch (\LogicException $e) {
+                    throw new \LogicException($e->getMessage(), 0, $e);
+                }
+                $frame->call = null;
+                $frame->callArgs = [];
+                $frame->callArgEntries = [];
+                $new->parent = $frame;
+                $new->vmContext = $this->context;
+                $new->ephemeral = true;
+                $this->context->push($frame);
+                $this->context->push($new);
+                $result = $this->runFrames();
+                if (self::SUCCESS !== $result) {
+                    throw new \LogicException('Class constant constructor failed');
+                }
+                break;
+            default:
+                throw new \LogicException(
+                    'Unexpected class constant init opcode: '.opcode_type_name($op->type)
+                );
+        }
     }
 
     private function executeClassBodyDefaultInitOpcode(Frame $frame, OpCode $op): void

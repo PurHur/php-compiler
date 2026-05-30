@@ -6782,6 +6782,7 @@ class JIT {
                 case OpCode::TYPE_FUNCCALL_EXEC_NORETURN:
                 case OpCode::TYPE_FUNCCALL_EXEC_RETURN:
                     // Default property values are initialized in __object__ allocation.
+                    // Object class constants are materialized at TYPE_DECLARE_CLASS_CONST (#3196).
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
                     $name = $block->getOperand($op->arg1);
@@ -6856,7 +6857,14 @@ class JIT {
                         if ($this->shouldSkipExternalClassBodyLowering($classId)) {
                             break;
                         }
-                        throw new \LogicException('Class constant value must be a compile-time constant');
+                        $vm = new VM($this->context->runtime->vmContext);
+                        $vmVar = VM\ClassConstMaterializer::materializeSlot($vm, $block, $op->arg2);
+                        $this->context->type->object->defineClassConst(
+                            $classId,
+                            $name->value,
+                            $vmVar
+                        );
+                        break;
                     }
                     $this->context->type->object->defineClassConst(
                         $classId,
