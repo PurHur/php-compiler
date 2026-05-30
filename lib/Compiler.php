@@ -64,6 +64,12 @@ class Compiler {
     /** Trailing source bytes after __halt_compiler(); (issue #3479). */
     private ?string $haltCompilerRemaining = null;
 
+    /** Lowercase class name while compiling a class body (#3803). */
+    private ?string $compilingClassLc = null;
+
+    /** @var array<string, array<string, Variable>> compile-time class constants by lc name */
+    private array $compileTimeClassConsts = [];
+
     public function setBareRethrowLines(array $lines): void
     {
         $this->bareRethrowLines = $lines;
@@ -1359,7 +1365,11 @@ class Compiler {
         );
         AttributeNames::assertNoDuplicates(AttributeNames::fromOp($iface));
         $return->classImplements = $this->interfaceNamesFromOperands($iface->extends);
-        $return->block1 = $this->compileClassBody($iface->stmts, OpCode::TYPE_DECLARE_INTERFACE);
+        $return->block1 = $this->compileClassBody(
+            $iface->stmts,
+            OpCode::TYPE_DECLARE_INTERFACE,
+            $this->staticNameFromOperand($iface->name)
+        );
 
         return $return;
     }
@@ -1371,7 +1381,11 @@ class Compiler {
             $this->compileOperand($trait->name, $block, true)
         );
         $this->assignAttributeMetadata($return, $trait);
-        $return->block1 = $this->compileClassBody($trait->stmts, OpCode::TYPE_DECLARE_TRAIT);
+        $return->block1 = $this->compileClassBody(
+            $trait->stmts,
+            OpCode::TYPE_DECLARE_TRAIT,
+            $this->staticNameFromOperand($trait->name)
+        );
 
         return $return;
     }
@@ -1522,7 +1536,11 @@ class Compiler {
                 $this->abstractClasses[strtolower(ltrim($name, '\\'))] = true;
             }
         }
-        $return->block1 = $this->compileClassBody($class->stmts, $type);
+        $return->block1 = $this->compileClassBody(
+            $class->stmts,
+            $type,
+            $this->staticNameFromOperand($class->name)
+        );
         return $return;
     }
 
@@ -1665,8 +1683,15 @@ class Compiler {
         return null !== $name ? GenericArrayTypeSpec::tryParseDeclName($name) : null;
     }
 
-    protected function compileClassBody(CfgBlock $block, int $type): Block {
+    protected function compileClassBody(CfgBlock $block, int $type, ?string $className = null): Block {
         $result = new Block($block);
+        $prevClassLc = $this->compilingClassLc;
+        if (null !== $className) {
+            $this->compilingClassLc = strtolower(ltrim($className, '\\'));
+            if (!isset($this->compileTimeClassConsts[$this->compilingClassLc])) {
+                $this->compileTimeClassConsts[$this->compilingClassLc] = [];
+            }
+        }
         foreach ($block->children as $child) {
             switch (get_class($child)) {
                 case Op\Stmt\Property::class:
@@ -1684,10 +1709,25 @@ class Compiler {
                     $declareType = $child->static
                         ? OpCode::TYPE_DECLARE_STATIC_PROPERTY
                         : OpCode::TYPE_DECLARE_PROPERTY;
+                    $defaultSlot = null;
+                    if (null !== $child->defaultVar) {
+                        $defaultSlot = $this->tryFoldPropertyDefaultSlot($child, $result);
+                        if (null === $defaultSlot) {
+                            if (null !== $child->defaultBlock) {
+                                $this->compileOps($child->defaultBlock->children, $result);
+                            }
+                            $defaultSlot = $this->compileOperand($child->defaultVar, $result, true);
+                            if (!isset($result->constants[$defaultSlot])) {
+                                $this->throwCompileLogic(
+                                    'Property default must be a compile-time constant (#3803)'
+                                );
+                            }
+                        }
+                    }
                     $declare = new OpCode(
                         $declareType,
                         $this->compileOperand($child->name, $result, true),
-                        is_null($child->defaultVar) ? null : $this->compileOperand($child->defaultVar, $result, true),
+                        $defaultSlot,
                         $this->compileTypeConstrainedVariable($result, $declared, $propertyDeclName)
                     );
                     if (!$child->static) {
@@ -1727,6 +1767,8 @@ class Compiler {
                     $this->throwCompileLogic('Unsupported class body element: ' . get_class($child));
             }
         }
+        $this->compilingClassLc = $prevClassLc;
+
         return $result;
     }
 
@@ -1756,6 +1798,14 @@ class Compiler {
         $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         AttributeNames::assertNoDuplicates(AttributeNames::fromOp($child));
         $result->addOpCode($constOp);
+        if (null !== $this->compilingClassLc && isset($result->constants[$valueSlot])) {
+            $constName = $this->staticNameFromOperand($child->name);
+            if (null !== $constName) {
+                $stored = new Variable();
+                $stored->copyFrom($result->constants[$valueSlot]);
+                $this->compileTimeClassConsts[$this->compilingClassLc][strtolower($constName)] = $stored;
+            }
+        }
     }
 
     protected function tryFoldClassConstValueSlot(Op\Terminal\Const_ $terminal, Block $block): ?int
@@ -1819,9 +1869,7 @@ class Compiler {
 
     protected function compilePromotedPropertyDeclaration(Op\Expr\Param $param, Block $result): void
     {
-        if (!is_null($param->defaultBlock)) {
-            $this->compileOps($param->defaultBlock->children, $result);
-        }
+        $defaultSlot = $this->resolvePropertyOrParamDefaultSlot($param, $result);
         $declared = $param->declaredType instanceof Op\Type\Literal
             ? Type::fromDecl($param->declaredType->name)
             : Type::mixed();
@@ -1830,7 +1878,7 @@ class Compiler {
         $declare = new OpCode(
             OpCode::TYPE_DECLARE_PROPERTY,
             $this->compileOperand($propName, $result, true),
-            is_null($param->defaultVar) ? null : $this->compileOperand($param->defaultVar, $result, true),
+            $defaultSlot,
             $this->compileTypeConstrainedVariable($result, $declared)
         );
         $declare->propertyReadonly = $this->isPromotedParamReadonly($param);
@@ -1909,6 +1957,160 @@ class Compiler {
     }
 
 
+    /**
+     * Fold parameter/property defaults to block constant slots (Zend zend_compile_default_value, #3803).
+     */
+    protected function resolvePropertyOrParamDefaultSlot(Op\Expr\Param $param, Block $block): ?int
+    {
+        if (null === $param->defaultVar) {
+            return null;
+        }
+        $folded = $this->tryFoldParamDefaultSlot($param, $block);
+        if (null !== $folded) {
+            return $folded;
+        }
+        if (null !== $param->defaultBlock) {
+            $this->compileOps($param->defaultBlock->children, $block);
+        }
+        $slot = $this->compileOperand($param->defaultVar, $block, true);
+        if (!isset($block->constants[$slot])) {
+            $this->throwCompileLogic('Parameter default must be a compile-time constant (#3803)');
+        }
+
+        return $slot;
+    }
+
+    protected function tryFoldPropertyDefaultSlot(Op\Stmt\Property $prop, Block $block): ?int
+    {
+        if (null === $prop->defaultVar) {
+            return null;
+        }
+        $pseudo = new Op\Expr\Param(
+            new Operand\Literal(''),
+            null,
+            false,
+            false,
+            $prop->defaultVar,
+            $prop->defaultBlock
+        );
+
+        return $this->tryFoldParamDefaultSlot($pseudo, $block);
+    }
+
+    protected function tryFoldParamDefaultSlot(Op\Expr\Param $param, Block $block): ?int
+    {
+        if (null === $param->defaultVar) {
+            return null;
+        }
+        if ($param->defaultVar instanceof Operand\NullOperand) {
+            return $this->registerNullConstantSlot($block, $param->defaultVar);
+        }
+        $vm = $this->vmVariableFromCfgLiteralOperand($param->defaultVar);
+        if (null !== $vm) {
+            return $block->registerConstant($param->defaultVar, $vm);
+        }
+        if (null === $param->defaultBlock || [] === $param->defaultBlock->children) {
+            return null;
+        }
+        $children = $param->defaultBlock->children;
+        if (1 !== \count($children)) {
+            return null;
+        }
+        $expr = $children[0];
+        if ($expr instanceof Op\Expr\ConstFetch) {
+            $vm = $this->tryFoldGlobalConstFetch($expr);
+            if (null !== $vm) {
+                return $block->registerConstant($param->defaultVar, $vm);
+            }
+        }
+        if ($expr instanceof Op\Expr\ClassConstFetch) {
+            $vm = $this->tryFoldClassConstFetchDefault($expr, $block);
+            if (null !== $vm) {
+                return $block->registerConstant($param->defaultVar, $vm);
+            }
+        }
+
+        return null;
+    }
+
+    protected function registerNullConstantSlot(Block $block, Operand $operand): int
+    {
+        return $block->registerConstant($operand, new Variable(Variable::TYPE_NULL));
+    }
+
+    protected function tryFoldGlobalConstFetch(Op\Expr\ConstFetch $expr): ?Variable
+    {
+        $name = $this->staticNameFromOperand($expr->name);
+        if (null === $name) {
+            return null;
+        }
+        $vm = \PHPCompiler\ext\standard\VmPhpCoreConstants::fetch($name);
+        if (null !== $vm) {
+            return $vm;
+        }
+        $lc = strtolower($name);
+        if ('null' === $lc) {
+            return new Variable(Variable::TYPE_NULL);
+        }
+        if ('true' === $lc) {
+            $v = new Variable(Variable::TYPE_BOOLEAN);
+            $v->bool(true);
+
+            return $v;
+        }
+        if ('false' === $lc) {
+            $v = new Variable(Variable::TYPE_BOOLEAN);
+            $v->bool(false);
+
+            return $v;
+        }
+
+        return null;
+    }
+
+    protected function tryFoldClassConstFetchDefault(Op\Expr\ClassConstFetch $expr, Block $block): ?Variable
+    {
+        $constName = $this->staticNameFromOperand($expr->name);
+        $className = $this->staticNameFromOperand($expr->class);
+        if (null === $constName || null === $className) {
+            return null;
+        }
+        $lcClass = $this->resolveDefaultClassConstScope($className, $block);
+        if (null === $lcClass) {
+            return null;
+        }
+        $lcConst = strtolower($constName);
+        if (!isset($this->compileTimeClassConsts[$lcClass][$lcConst])) {
+            return null;
+        }
+        $value = new Variable();
+        $value->copyFrom($this->compileTimeClassConsts[$lcClass][$lcConst]);
+
+        return $value;
+    }
+
+    protected function resolveDefaultClassConstScope(string $className, Block $block): ?string
+    {
+        $lc = strtolower($className);
+        if ('self' === $lc || 'static' === $lc) {
+            if (null !== $this->compilingClassLc) {
+                return $this->compilingClassLc;
+            }
+            if (null !== $block->func && null !== $block->func->class) {
+                $name = $this->staticNameFromOperand($block->func->class);
+
+                return null !== $name ? strtolower(ltrim($name, '\\')) : null;
+            }
+
+            return null;
+        }
+        if ('parent' === $lc) {
+            return null;
+        }
+
+        return strtolower(ltrim($className, '\\'));
+    }
+
     protected function compileParam(Op\Expr\Param $param, Block $block, int $paramIdx): OpCode {
         if ($param->byRef) {
             $block->paramByRef[$paramIdx] = true;
@@ -1920,10 +2122,7 @@ class Compiler {
             }
             $block->variadicParamIndex = $paramIdx;
         }
-        $defaultConst = null;
-        if (null !== $param->defaultVar) {
-            $defaultConst = $this->compileOperand($param->defaultVar, $block, true);
-        }
+        $defaultConst = $this->resolvePropertyOrParamDefaultSlot($param, $block);
         $slot = $this->compileOperand($param->result, $block, false);
         if ($param->name instanceof Operand\Literal && is_string($param->name->value)) {
             $block->paramNames[$paramIdx] = $param->name->value;
