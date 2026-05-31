@@ -208,6 +208,34 @@ class Context {
         return null;
     }
 
+    /** @var list<string> */
+    private const ERROR_REPORTING_CONSTANT_NAMES = [
+        'e_error',
+        'e_warning',
+        'e_parse',
+        'e_notice',
+        'e_core_error',
+        'e_core_warning',
+        'e_compile_error',
+        'e_compile_warning',
+        'e_user_error',
+        'e_user_warning',
+        'e_user_notice',
+        'e_strict',
+        'e_recoverable_error',
+        'e_deprecated',
+        'e_user_deprecated',
+        'e_all',
+    ];
+
+    /**
+     * @return list<string> lowercase names registered for constantFetch()
+     */
+    public static function errorReportingConstantFetchNames(): array
+    {
+        return self::ERROR_REPORTING_CONSTANT_NAMES;
+    }
+
     public static function errorReportingConstant(string $name): ?int
     {
         return match (strtolower($name)) {
@@ -224,7 +252,7 @@ class Context {
             'e_user_notice' => ErrorReporter::E_USER_NOTICE,
             'e_strict' => 2048,
             'e_recoverable_error' => 4096,
-            'e_deprecated' => 8192,
+            'e_deprecated' => ErrorReporter::E_DEPRECATED,
             'e_user_deprecated' => ErrorReporter::E_USER_DEPRECATED,
             'e_all' => E_ALL,
             default => null,

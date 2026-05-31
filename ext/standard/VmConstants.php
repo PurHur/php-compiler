@@ -23,6 +23,7 @@ final class VmConstants
         'filter_validate_email',
         'input_get',
         'input_post',
+        ...Context::errorReportingConstantFetchNames(),
         ...StdlibConstants::CORE_FETCH_NAMES,
     ];
 
