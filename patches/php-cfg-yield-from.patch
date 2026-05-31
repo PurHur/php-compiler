@@ -1,5 +1,0 @@
-This file is intentionally kept as a placeholder.
-
-`script/apply-patches.sh` applies `yield from` support for `vendor/ircmaxell/php-cfg`
-via an overlay-based fallback (see `patches/overlays/php-cfg/`), because the
-historical unified diff for this change became brittle across vendor revisions.
