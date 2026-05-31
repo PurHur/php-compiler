@@ -1654,6 +1654,9 @@ restart:
 
                             return self::FIBER_SUSPEND;
                         }
+                        $frame->call = null;
+                        $frame->callArgs = [];
+                        $frame->callArgEntries = [];
                         break;
                     }
                     $this->context->push($frame);
@@ -2893,7 +2896,7 @@ restart:
             } catch (\LogicException) {
                 $message = 'Exception';
             }
-            throw new \Exception($message);
+            throw VM\ExceptionSupport::nativeUncaughtThrowable($entry, $message);
         }
         throw new \Exception($thrown->toString());
     }
@@ -3784,8 +3787,16 @@ restart:
         if (!isset($this->context->classes[$lcClass])) {
             throw new \LogicException("Call to undefined static method {$callableName}()");
         }
-        $frame->staticCallClass = $this->context->classes[$lcClass]->name;
+        $class = $this->context->classes[$lcClass];
+        $frame->staticCallClass = $class->name;
         $methodLc = strtolower($methodName);
+        if ($class->isEnum && null !== $class->backedType && ('from' === $methodLc || 'tryfrom' === $methodLc)) {
+            $frame->call = new VM\EnumFromHandler($class, 'tryfrom' === $methodLc);
+            $frame->callArgs = [];
+            $frame->callArgEntries = [];
+
+            return;
+        }
         try {
             [$class, $methodLc] = $this->resolveStaticMethod($lcClass, $methodLc);
         } catch (\LogicException $e) {

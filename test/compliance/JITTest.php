@@ -292,6 +292,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'asymmetric_visibility')) {
                 continue;
             }
+            // BackedEnum::from/tryFrom VM-only until JIT lowering (#3114, #3076).
+            if (str_contains($name, 'enum_from') || str_contains($name, 'enum_try_from')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
