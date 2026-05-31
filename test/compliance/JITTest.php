@@ -33,10 +33,7 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'sealed_class')) {
                 continue;
             }
-            // preserve_keys=true is VM-only until ArrayBuiltinHelper gains the branch (#3096).
-            if (str_contains($name, 'array_chunk_preserve_keys')) {
-                continue;
-            }
+            // preserve_keys=true: VM + JIT/AOT via ArrayBuiltinHelper (#3524).
             // VM-only until ArrayBuiltinHelper gains recursive replace (#3127).
             if (str_contains(strtolower($case[0]), 'array_replace_recursive')) {
                 continue;
