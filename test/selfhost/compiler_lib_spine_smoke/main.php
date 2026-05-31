@@ -61,6 +61,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringDeployPath.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFileGetContents.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFilePutContents.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFunctionExists.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/GetDefinedFunctionsRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGetenv.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHtmlspecialchars.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHttpBuildQuery.php';
@@ -832,6 +833,9 @@ require_once __DIR__.'/../../../ext/standard/get_class_vars_.php';
 require_once __DIR__.'/../../../ext/standard/get_debug_type.php';
 require_once __DIR__.'/../../../ext/standard/get_declared_enums_.php';
 require_once __DIR__.'/../../../ext/standard/get_declared_interfaces_.php';
+require_once __DIR__.'/../../../ext/standard/get_declared_classes_.php';
+require_once __DIR__.'/../../../ext/standard/get_declared_traits_.php';
+require_once __DIR__.'/../../../ext/standard/get_defined_functions_.php';
 require_once __DIR__.'/../../../ext/standard/get_defined_constants_.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/macro_functions_spine_shim.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).

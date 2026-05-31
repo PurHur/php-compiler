@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
+use PHPCompiler\Func\Internal as FuncInternal;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
@@ -98,6 +99,107 @@ final class VmReflection
             $value->string($entry->name);
             $result->append($value);
         }
+
+        return $result;
+    }
+
+    /**
+     * get_declared_classes() — numerically indexed class name list (issue #3128).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_classes)
+     */
+    public static function declaredClassesTable(Context $ctx): \PHPCompiler\VM\HashTable
+    {
+        $result = new \PHPCompiler\VM\HashTable();
+        foreach ($ctx->classes as $lc => $entry) {
+            if ($entry->isInterface || $entry->isTrait || $entry->isEnum || isset($ctx->classAliases[$lc])) {
+                continue;
+            }
+            $value = new Variable();
+            $value->string($entry->name);
+            $result->append($value);
+        }
+
+        return $result;
+    }
+
+    /**
+     * get_declared_traits() — numerically indexed trait name list (issue #3128).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_traits)
+     */
+    public static function declaredTraitsTable(Context $ctx): \PHPCompiler\VM\HashTable
+    {
+        $result = new \PHPCompiler\VM\HashTable();
+        foreach ($ctx->classes as $lc => $entry) {
+            if (!$entry->isTrait || isset($ctx->classAliases[$lc])) {
+                continue;
+            }
+            $value = new Variable();
+            $value->string($entry->name);
+            $result->append($value);
+        }
+
+        return $result;
+    }
+
+    /** @var list<string>|null */
+    private static ?array $internalFunctionNames = null;
+
+    /**
+     * Registered ext Module internal function names (php-src internal bucket).
+     *
+     * @return list<string>
+     */
+    public static function internalFunctionNameList(): array
+    {
+        if (null !== self::$internalFunctionNames) {
+            return self::$internalFunctionNames;
+        }
+        $names = [];
+        foreach ([new Module(), new \PHPCompiler\ext\types\Module()] as $module) {
+            foreach ($module->getFunctions() as $func) {
+                $names[] = $func->getName();
+            }
+        }
+        $names = array_values(array_unique($names));
+        sort($names);
+        self::$internalFunctionNames = $names;
+
+        return self::$internalFunctionNames;
+    }
+
+    /**
+     * get_defined_functions() — internal/user name lists (issue #3128).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_defined_functions)
+     */
+    public static function definedFunctionsTable(Context $ctx): \PHPCompiler\VM\HashTable
+    {
+        $result = new \PHPCompiler\VM\HashTable();
+
+        $internalVar = new Variable();
+        $internalVar->newArray();
+        $internalHt = $internalVar->toArray();
+        foreach (self::internalFunctionNameList() as $name) {
+            $value = new Variable();
+            $value->string($name);
+            $internalHt->append($value);
+        }
+        $result->add('internal', $internalVar);
+
+        $userVar = new Variable();
+        $userVar->newArray();
+        $userHt = $userVar->toArray();
+        foreach ($ctx->functions as $func) {
+            if ($func instanceof FuncInternal) {
+                continue;
+            }
+            $value = new Variable();
+            $value->string($func->getName());
+            $userHt->append($value);
+        }
+        $result->add('user', $userVar);
 
         return $result;
     }
