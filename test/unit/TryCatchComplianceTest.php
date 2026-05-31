@@ -60,7 +60,7 @@ try {
         );
     }
 
-    public function testFinallyRunsBeforeCatchOnThrow(): void
+    public function testCatchRunsBeforeFinallyOnMatchedThrow(): void
     {
         $this->assertVmOutput(
             '<?php
@@ -74,7 +74,7 @@ try {
 }
 echo "after\n";
 ',
-            "finally\ncatch\nafter\n"
+            "catch\nfinally\nafter\n"
         );
     }
 
