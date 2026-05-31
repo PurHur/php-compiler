@@ -241,6 +241,7 @@ class Module extends ModuleAbstract
             new crc32(),
             new password_hash(),
             new password_verify(),
+            new crypt(),
             new random_bytes(),
             new random_int(),
             new uniqid(),

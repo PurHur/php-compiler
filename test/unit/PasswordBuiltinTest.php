@@ -46,4 +46,32 @@ final class PasswordBuiltinTest extends TestCase
         $verifyFn->execute($badFrame);
         $this->assertFalse($badFrame->returnVar->resolveIndirect()->toBool());
     }
+
+    public function testCryptBcryptAndInvalidSalt(): void
+    {
+        $runtime = new Runtime();
+        $cryptFn = new \PHPCompiler\ext\standard\crypt();
+        $pass = new VMVariable();
+        $pass->string('secret');
+        $salt = new VMVariable();
+        $salt->string('$2y$10$'.str_repeat('a', 22));
+
+        $frame = $cryptFn->getFrame($runtime->vmContext);
+        $frame->calledArgs = [$pass, $salt];
+        $frame->returnVar = new VMVariable();
+        $cryptFn->execute($frame);
+
+        $hash = $frame->returnVar->resolveIndirect();
+        $this->assertSame(VMVariable::TYPE_STRING, $hash->type);
+        $this->assertSame(60, strlen($hash->toString()));
+        $this->assertSame(0, strncmp($hash->toString(), '$2y$10$', 7));
+
+        $badSalt = new VMVariable();
+        $badSalt->string('$2y$10$');
+        $badFrame = $cryptFn->getFrame($runtime->vmContext);
+        $badFrame->calledArgs = [$pass, $badSalt];
+        $badFrame->returnVar = new VMVariable();
+        $cryptFn->execute($badFrame);
+        $this->assertSame('*0', $badFrame->returnVar->resolveIndirect()->toString());
+    }
 }

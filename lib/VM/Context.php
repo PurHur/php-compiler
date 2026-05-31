@@ -154,6 +154,22 @@ class Context {
                 $var = new Variable(Variable::TYPE_INTEGER);
                 $var->int(\PHPCompiler\ext\standard\VmPassword::PASSWORD_DEFAULT);
                 return $var;
+            case 'crypt_std_des':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_STD_DES);
+                return $var;
+            case 'crypt_ext_des':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_EXT_DES);
+                return $var;
+            case 'crypt_md5':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_MD5);
+                return $var;
+            case 'crypt_blowfish':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_BLOWFISH);
+                return $var;
             case 'filter_validate_int':
                 $var = new Variable(Variable::TYPE_INTEGER);
                 $var->int(\PHPCompiler\ext\standard\VmFilter::FILTER_VALIDATE_INT);

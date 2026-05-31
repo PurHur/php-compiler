@@ -73,6 +73,7 @@ static const char *phpc_builtin_functions[] = {
     "convert_uuencode",
     "crc32",
     "crc32c",
+    "crypt",
     "date",
     "debug_backtrace",
     "decbin",
@@ -380,4 +381,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 373;
+static const size_t phpc_builtin_functions_count = 374;

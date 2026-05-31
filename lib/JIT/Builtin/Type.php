@@ -449,6 +449,9 @@ class Type extends Builtin {
         $fntypePasswordVerify = $this->context->context->functionType($i32, false, $strPtr, $strPtr);
         $fnPasswordVerify = $this->context->module->addFunction('__compiler_password_verify', $fntypePasswordVerify);
         $this->context->registerFunction('__compiler_password_verify', $fnPasswordVerify);
+        $fntypeCrypt = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr);
+        $fnCrypt = $this->context->module->addFunction('__compiler_crypt', $fntypeCrypt);
+        $this->context->registerFunction('__compiler_crypt', $fnCrypt);
         $fntypeCrc32 = $this->context->context->functionType($i64, false, $strPtr, $i64);
         $fnCrc32 = $this->context->module->addFunction('__compiler_crc32', $fntypeCrc32);
         $this->context->registerFunction('__compiler_crc32', $fnCrc32);

@@ -88,7 +88,7 @@ final class SelfHostBuiltinPolicy
 
     /** @var array<string, string> */
     private const CATEGORY_PASSWORD = [
-        'password_hash' => 'password', 'password_verify' => 'password',
+        'password_hash' => 'password', 'password_verify' => 'password', 'crypt' => 'password',
     ];
 
     /** @var array<string, string> */
