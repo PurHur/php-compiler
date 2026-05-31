@@ -628,13 +628,13 @@ final class JitValueCompare
         $zeroLen = $context->builder->icmp(Builder::INT_EQ, $len, $len->typeOf()->constInt(0, false));
         $__native = $context->builder->intCast($nativeLong, $i64);
 
-        $isNumeric = self::stringIsNumeric($context, $strPtr);
         $isIntegerNumeric = self::stringIsIntegerNumeric($context, $strPtr);
         $zeroLong = $context->builder->icmp(Builder::INT_EQ, $__native, $i64->constInt(0, false));
-        $nonNumericMatch = $context->builder->and(
-            $context->builder->not($isNumeric),
-            $zeroLong
-        );
+        // Zend #3644: non-numeric strings compare as 0. Do not use strtod/is_numeric here —
+        // length-tracked __string__ buffers can make strtod fail while strtol still consumes a
+        // numeric prefix ('0e123'), which must not match via the non-numeric path (#3658).
+        $noLeadingIntegerPrefix = self::stringStrtolConsumedNothing($context, $strPtr);
+        $nonNumericMatch = $context->builder->and($noLeadingIntegerPrefix, $zeroLong);
 
         $charPtr = $context->builder->structGep($strPtr, $map['value']);
         $i8p = $context->getTypeFromString('int8*');
@@ -708,6 +708,37 @@ final class JitValueCompare
         );
 
         return $context->builder->select($isEmpty, $context->constantFromBool(false), $numeric);
+    }
+
+    /**
+     * True when strtol(base 10) consumes no bytes — string has no leading integer prefix (#3644).
+     */
+    private static function stringStrtolConsumedNothing(Context $context, Value $strPtr): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $endPtrSlot = $context->builder->alloca($i8p, 1, 'loose_str_strtol_prefix_end');
+        $nullEnd = $i8p->constNull();
+        $context->builder->store($nullEnd, $endPtrSlot);
+        $context->builder->call(
+            $context->lookupFunction('strtol'),
+            $charPtr,
+            $endPtrSlot,
+            $context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $endPtr = $context->builder->load($endPtrSlot);
+        $endOffset = $context->builder->sub(
+            $context->builder->ptrToInt($endPtr, $i64),
+            $context->builder->ptrToInt($charPtr, $i64)
+        );
+
+        return $context->builder->icmp(
+            Builder::INT_EQ,
+            $endOffset,
+            $i64->constInt(0, false)
+        );
     }
 
     /**
