@@ -162,6 +162,10 @@ class Context {
                 $var = new Variable(Variable::TYPE_INTEGER);
                 $var->int(\PHPCompiler\ext\standard\VmFilter::FILTER_VALIDATE_EMAIL);
                 return $var;
+            case 'filter_null_on_failure':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmFilter::FILTER_NULL_ON_FAILURE);
+                return $var;
             case 'input_get':
                 $var = new Variable(Variable::TYPE_INTEGER);
                 $var->int(\PHPCompiler\ext\standard\VmFilter::INPUT_GET);
