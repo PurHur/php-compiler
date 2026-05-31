@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -13,8 +14,44 @@ use PHPCompiler\VM\Variable;
 final class VmParseStr
 {
     /**
+     * One-arg parse_str(): bind parsed keys into the caller symbol table (issue #3708).
+     *
      * @param array<int|string, mixed> $params
      */
+    public static function importIntoCaller(Frame $caller, array $params): void
+    {
+        foreach ($params as $key => $value) {
+            if (!\is_string($key) && !\is_int($key)) {
+                continue;
+            }
+            $name = (string) $key;
+            $target = $caller->block->ensureVariableByRuntimeName($name, $caller);
+            if (\is_array($value)) {
+                $parsed = new HashTable();
+                self::mergeInto($parsed, $value);
+                $replacement = new Variable(Variable::TYPE_ARRAY);
+                $replacement->array($parsed);
+                $target->copyFrom($replacement);
+
+                continue;
+            }
+            if (!\is_scalar($value)) {
+                continue;
+            }
+            $replacement = new Variable();
+            if (\is_int($value)) {
+                $replacement->int($value);
+            } elseif (\is_float($value)) {
+                $replacement->float($value);
+            } elseif (\is_bool($value)) {
+                $replacement->bool($value);
+            } else {
+                $replacement->string((string) $value);
+            }
+            $target->copyFrom($replacement);
+        }
+    }
+
     public static function mergeInto(HashTable $ht, array $params): void
     {
         foreach ($params as $key => $value) {
