@@ -68,6 +68,9 @@ final class Variable {
     /** list&lt;T&gt; / array&lt;K,V&gt; shape when declaration used generic array syntax (#3705). */
     public ?GenericArrayTypeSpec $genericArrayTypeSpec = null;
 
+    /** @var list<array{kind: string, interfaces?: list<string>, name?: string}>|null */
+    public ?array $dnfArms = null;
+
     /** Set for instance properties so readonly-class writes can be enforced (issue #1360). */
     public ?ObjectEntry $objectPropertyOwner = null;
 

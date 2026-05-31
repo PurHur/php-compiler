@@ -305,6 +305,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'enum_from') || str_contains($name, 'enum_try_from')) {
                 continue;
             }
+            // DNF types VM-only until JIT param/property checks (#3094).
+            if (str_contains($name, 'dnf_')) {
+                continue;
+            }
             yield $name => $case;
         }
     }

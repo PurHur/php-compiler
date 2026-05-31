@@ -76,6 +76,12 @@ class Block {
     /** Declared return type AST for reflection (#3355), or null when untyped. */
     public ?Op\Type $returnDeclaredType = null;
 
+    /** @var array<int, list<array{kind: string, interfaces?: list<string>, name?: string}>> */
+    public array $paramDnfConstraints = [];
+
+    /** DNF return type arms (#3094), or null when untyped / non-DNF. */
+    public ?array $returnDnfConstraints = null;
+
     /** Declared scalar return type for this function (issue #205), or null when untyped. */
     public ?int $returnTypeConstraint = null;
 
@@ -416,6 +422,7 @@ class Block {
             $this->func = $parent->func;
             $this->strictTypes = $parent->strictTypes;
             $this->returnTypeConstraint = $parent->returnTypeConstraint;
+            $this->returnDnfConstraints = $parent->returnDnfConstraints;
             $this->returnTypeVoid = $parent->returnTypeVoid;
             $this->returnTypeNever = $parent->returnTypeNever;
             $this->returnTypeStatic = $parent->returnTypeStatic;
@@ -423,6 +430,7 @@ class Block {
             $this->paramDeclaredTypes = $parent->paramDeclaredTypes;
             $this->paramTypeConstraints = $parent->paramTypeConstraints;
             $this->paramIntersectionConstraints = $parent->paramIntersectionConstraints;
+            $this->paramDnfConstraints = $parent->paramDnfConstraints;
             $this->paramNames = $parent->paramNames;
         }
     }

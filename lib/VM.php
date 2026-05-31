@@ -17,6 +17,7 @@ use PHPCompiler\ext\standard\VmEval;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\CastSupport;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\DnfCheck;
 use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
@@ -789,6 +790,15 @@ restart:
                         : $frame->block->strictTypes;
                     try {
                         TypeCheck::coercePropertyWrite($arg2, $strict);
+                        if (null !== $writeTarget->dnfArms) {
+                            DnfCheck::assertMatches(
+                                $arg3,
+                                $writeTarget->dnfArms,
+                                $this->context,
+                                'Property',
+                                $writeTarget
+                            );
+                        }
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
@@ -1709,19 +1719,26 @@ restart:
                     $arraySpec = $frame->block->paramGenericArrayTypeSpecs[$op->arg1] ?? null;
                     try {
                         TypeCheck::coerceParameter($arg1, $strict, $arraySpec);
+                        if (isset($frame->block->paramIntersectionConstraints[$op->arg1])) {
+                            TypeCheck::assertParamIntersection(
+                                $arg1,
+                                $frame->block->paramIntersectionConstraints[$op->arg1],
+                                $this->context
+                            );
+                        }
+                        if (isset($frame->block->paramDnfConstraints[$op->arg1])) {
+                            DnfCheck::assertMatches(
+                                $arg1,
+                                $frame->block->paramDnfConstraints[$op->arg1],
+                                $this->context
+                            );
+                        }
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
                         }
-                    }
-                    if (isset($frame->block->paramIntersectionConstraints[$op->arg1])) {
-                        TypeCheck::assertParamIntersection(
-                            $arg1,
-                            $frame->block->paramIntersectionConstraints[$op->arg1],
-                            $this->context
-                        );
                     }
                     break;
                 case OpCode::TYPE_DECLARE_INTERFACE:
@@ -2391,7 +2408,16 @@ restart:
         return self::SUCCESS;
 
         return_void_complete:
-        $this->enforceReturnType($frame, null);
+        try {
+            $this->enforceReturnType($frame, null);
+        } catch (\TypeError $e) {
+            $catchFrame = $this->dispatchVmTypeError($e, $frame);
+            if (null !== $catchFrame) {
+                $frame = $catchFrame;
+                goto restart;
+            }
+            return self::FAIL;
+        }
         // Do not null returnVar: it may alias the caller result slot (#1885).
         $this->markObjectConstructedIfLeavingConstruct($frame);
         $gen = $this->findGeneratorState($frame);
@@ -2410,7 +2436,16 @@ restart:
         goto nextframe;
 
         return_value_complete:
-        $this->enforceReturnType($frame, $returnValue);
+        try {
+            $this->enforceReturnType($frame, $returnValue);
+        } catch (\TypeError $e) {
+            $catchFrame = $this->dispatchVmTypeError($e, $frame);
+            if (null !== $catchFrame) {
+                $frame = $catchFrame;
+                goto restart;
+            }
+            return self::FAIL;
+        }
         $gen = $this->findGeneratorState($frame);
         if (null !== $gen) {
             $gen->markReturned($returnValue);
@@ -4832,6 +4867,16 @@ restart:
                 $value,
                 $this->lateStaticClassLc($frame),
                 $this->context
+            );
+
+            return;
+        }
+        if (null !== $block->returnDnfConstraints && null !== $value) {
+            DnfCheck::assertMatches(
+                $value,
+                $block->returnDnfConstraints,
+                $this->context,
+                'Return value'
             );
 
             return;

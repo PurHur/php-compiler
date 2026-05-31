@@ -33,6 +33,9 @@ final class TypeCheck
     public static function coercePropertyWrite(Variable $dest, bool $strict): void
     {
         $target = $dest->resolveIndirect();
+        if (null !== $target->dnfArms) {
+            return;
+        }
         if (null !== $target->unionTypeConstraints) {
             self::coerceUnionPropertyWrite($target, $strict);
 
