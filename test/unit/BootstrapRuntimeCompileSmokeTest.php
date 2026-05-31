@@ -163,6 +163,10 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('compile_smoke_m3_emit', $jit);
         $smoke = (string) file_get_contents(self::$root.'/test/bootstrap-aot/compile_smoke_m3_emit.php');
         $this->assertStringContainsString('getLastParseFailure', $smoke);
+        $hello = (string) file_get_contents(self::$root.'/test/bootstrap-aot/helloworld_compile_smoke.php');
+        $this->assertStringContainsString('getLastParseFailure', $hello);
+        $this->assertStringContainsString('parseAndCompile failure: target=', $hello);
+        $this->assertStringContainsString('formatParseAndCompileNullDetail($script)', $hello);
         $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
         $this->assertStringContainsString('peeklastparsefailure', $emit);
         $this->assertStringContainsString('echoLastParseFailureSuffix', $emit);
