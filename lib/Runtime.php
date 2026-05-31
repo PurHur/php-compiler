@@ -31,6 +31,7 @@ use PHPCompiler\Ast\SealedClassPreprocessor;
 use PHPCompiler\Ast\PipeOperatorDesugar;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Lint\LintCompiler;
+use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\ShutdownQueue;
 
 class Runtime {
@@ -633,6 +634,7 @@ class Runtime {
             return $this->vm->run($block);
         } finally {
             ShutdownQueue::run($this->vmContext);
+            OutputBuffer::endAllAtShutdown();
             Superglobals::setActiveContext(null);
         }
     }

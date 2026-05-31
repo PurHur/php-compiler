@@ -59,11 +59,19 @@ final class OutputBuffer
         self::append(array_pop(self::$stack));
     }
 
-    /** flush() — fflush stdout; ob buffers unchanged until ob_end_flush (issue #3388, php-src php_flush). */
+    /** flush() — sapi_flush / fflush(stdout) (issue #3388, php-src basic_functions.c PHP_FUNCTION(flush)). */
     public static function flush(): void
     {
         if (\defined('STDOUT') && \is_resource(\STDOUT)) {
             @\fflush(\STDOUT);
+        }
+    }
+
+    /** php_output_end_all parity — flush remaining ob levels at request shutdown (issue #3675). */
+    public static function endAllAtShutdown(): void
+    {
+        while ([] !== self::$stack) {
+            self::endFlush();
         }
     }
 }
