@@ -30,6 +30,7 @@ class Context {
     public PHPLLVM\Module $module;
     public PHPLLVM\BasicBlock $initBlock;
     public PHPLLVM\BasicBlock $shutdownBlock;
+    public PHPLLVM\BasicBlock $headerPreFlushBlock;
     public PHPLLVM\Builder $builder;
     public PHPLLVM\Intrinsic $intrinsic;
     public PHPLLVM\TargetData $targetData;
@@ -37,6 +38,7 @@ class Context {
     public ?PHPLLVM\Value\Function_ $main = null;
     public ?PHPLLVM\Value\Function_ $initFunc = null;
     public ?PHPLLVM\Value\Function_ $shutdownFunc = null;
+    public ?PHPLLVM\Value\Function_ $headerPreFlushFunc = null;
 
     public array $constants = [];
     public array $functions = [];
@@ -477,6 +479,9 @@ class Context {
         $this->shutdownFunc = $this->module->addFunction('__shutdown__', $signature);
         $this->shutdownBlock = $this->shutdownFunc->appendBasicBlock('main');
 
+        $this->headerPreFlushFunc = $this->module->addFunction('__header_pre_flush__', $signature);
+        $this->headerPreFlushBlock = $this->headerPreFlushFunc->appendBasicBlock('main');
+
         foreach ($this->builtins as $builtin) {
             $builtin->initialize();
         }
@@ -720,6 +725,8 @@ class Context {
         $this->builder->positionAtEnd($this->initBlock);
         $this->builder->returnVoid();
         $this->builder->positionAtEnd($this->shutdownBlock);
+        $this->builder->returnVoid();
+        $this->builder->positionAtEnd($this->headerPreFlushBlock);
         $this->builder->returnVoid();
 
         if (!is_null($this->debugFile)) {
@@ -1059,6 +1066,23 @@ class Context {
         $oldBuilder = $this->builder;
         $this->builder = $this->context->builderCreate();
         $this->builder->positionAtEnd($this->shutdownBlock);
+        try {
+            $emit($this);
+        } finally {
+            $this->builder = $oldBuilder;
+        }
+    }
+
+    /**
+     * Temporarily position the builder at __header_pre_flush__ (header_register_callback, #3759).
+     *
+     * @param callable(self): void $emit
+     */
+    public function emitInHeaderPreFlush(callable $emit): void
+    {
+        $oldBuilder = $this->builder;
+        $this->builder = $this->context->builderCreate();
+        $this->builder->positionAtEnd($this->headerPreFlushBlock);
         try {
             $emit($this);
         } finally {

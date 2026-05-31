@@ -1215,6 +1215,9 @@ restart:
                     break;
                 case OpCode::TYPE_ECHO:
                     try {
+                        if (!VM\SapiOutput::headersSent()) {
+                            VM\HeaderCallbackQueue::runBeforeOutput($this->context);
+                        }
                         VM\OutputBuffer::append($this->valueToPrintString($frame->scope[$op->arg1]));
                     } catch (\Error $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
@@ -1234,6 +1237,9 @@ restart:
                     break;
                 case OpCode::TYPE_PRINT:
                     try {
+                        if (!VM\SapiOutput::headersSent()) {
+                            VM\HeaderCallbackQueue::runBeforeOutput($this->context);
+                        }
                         VM\OutputBuffer::append($this->valueToPrintString($frame->scope[$op->arg2]));
                         $frame->scope[$op->arg1]->int(1);
                     } catch (\Error $e) {
