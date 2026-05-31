@@ -8,8 +8,8 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for link() via libc linkat(2) (issue #3589; avoids LLVM symbol name "link"). */
-final class JitLink
+/** LLVM lowering for symlink() via libc symlinkat(2) (issue #3227; avoids LLVM symbol name "symlink"). */
+final class JitSymlink
 {
     /** Linux AT_FDCWD — same as {@see fcntl.h}. */
     private const AT_FDCWD = -100;
@@ -22,17 +22,15 @@ final class JitLink
         $linkPtr = $context->builder->structGep($linkStr, $map['value']);
         $i32 = $context->getTypeFromString('int32');
         $atFdcwd = $i32->constInt(self::AT_FDCWD, true);
-        $flags = $i32->constInt(0, false);
         $ret = $context->builder->call(
-            $context->lookupFunction('linkat'),
-            $atFdcwd,
+            $context->lookupFunction('symlinkat'),
             $targetPtr,
             $atFdcwd,
-            $linkPtr,
-            $flags
+            $linkPtr
         );
         $zero = $i32->constInt(0, false);
         $ok = $context->builder->icmp(Builder::INT_EQ, $ret, $zero);
+        // InternalArgInfo lists int return; box as 0/1 long for assign lowering.
         $i64 = $context->getTypeFromString('int64');
 
         return $context->builder->zext($ok, $i64);

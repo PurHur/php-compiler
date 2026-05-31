@@ -322,6 +322,7 @@ class Module extends ModuleAbstract
             new is_link(),
             new readlink(),
             new link_(),
+            new symlink_(),
             new unlink(),
             new mkdir_(),
             new rmdir_(),
@@ -693,6 +694,15 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i32, $i8p, $i32, $i8p, $i32);
             $fn = $context->module->addFunction('linkat', $ft);
             $context->registerFunction('linkat', $fn);
+        }
+        try {
+            $context->lookupFunction('symlinkat');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i8p, $i32, $i8p);
+            $fn = $context->module->addFunction('symlinkat', $ft);
+            $context->registerFunction('symlinkat', $fn);
         }
         try {
             $context->lookupFunction('chdir');
