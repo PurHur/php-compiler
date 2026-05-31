@@ -781,19 +781,55 @@ final class HashTable {
     }
 
     /**
-     * Remove a portion of a packed list array, optionally replace it, and return the removed slice.
-     *
-     * @param list<Variable> $replacement
+     * Whether this array is a packed list (0..n-1 int keys, no string keys).
      */
-    public function spliceInPlace(int $offset, ?int $length = null, array $replacement = []): HashTable
+    public function isPackedList(): bool
+    {
+        if (0 === $this->numElements) {
+            return true;
+        }
+        if (!$this->isWithoutHoles()) {
+            return false;
+        }
+        $pos = 0;
+        for ($i = 0; $i < $this->numUsed; ++$i) {
+            $bucket = $this->buckets->read($i);
+            if ($bucket->value->isUndefined()) {
+                continue;
+            }
+            if (null !== $bucket->key) {
+                return false;
+            }
+            if ($bucket->hash !== $pos) {
+                return false;
+            }
+            ++$pos;
+        }
+
+        return $pos === $this->numElements;
+    }
+
+    /**
+     * Remove a portion of an array, optionally replace it, and return the removed slice.
+     *
+     * Packed lists renumber; associative arrays preserve keys (ext/standard/array.c).
+     */
+    public function spliceInPlace(int $offset, ?int $length = null, ?HashTable $replacement = null): HashTable
     {
         $this->assertConsistent();
-        if (!$this->isWithoutHoles()) {
-            throw new \LogicException('spliceInPlace() only supports packed list arrays without holes');
-        }
         $this->refcount->assertSeparated();
+        if ($this->isPackedList()) {
+            return $this->splicePackedInPlace($offset, $length, $replacement);
+        }
 
-        $num = $this->numElements;
+        return $this->spliceKeyedInPlace($offset, $length, $replacement);
+    }
+
+    /**
+     * @return array{0: int, 1: int}
+     */
+    private function normalizeSpliceRange(int $offset, ?int $length, int $num): array
+    {
         if ($offset < 0) {
             $offset = $num + $offset;
             if ($offset < 0) {
@@ -816,6 +852,12 @@ final class HashTable {
             $removeLen = $num - $offset;
         }
 
+        return [$offset, $removeLen];
+    }
+
+    private function splicePackedInPlace(int $offset, ?int $length, ?HashTable $replacement): HashTable
+    {
+        [$offset, $removeLen] = $this->normalizeSpliceRange($offset, $length, $this->numElements);
         $removed = $this->sliceCopy($offset, $removeLen);
 
         $values = [];
@@ -823,16 +865,19 @@ final class HashTable {
             $values[] = $value;
         }
 
+        $num = $this->numElements;
         $newValues = [];
         for ($i = 0; $i < $offset; ++$i) {
             $copy = new Variable();
             $copy->copyFrom($values[$i]);
             $newValues[] = $copy;
         }
-        foreach ($replacement as $value) {
-            $copy = new Variable();
-            $copy->copyFrom($value);
-            $newValues[] = $copy;
+        if (null !== $replacement) {
+            foreach ($replacement->iterate(true) as $value) {
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $newValues[] = $copy;
+            }
         }
         for ($i = $offset + $removeLen; $i < $num; ++$i) {
             $copy = new Variable();
@@ -843,6 +888,110 @@ final class HashTable {
         $this->assignPackedList($newValues);
 
         return $removed;
+    }
+
+    private function spliceKeyedInPlace(int $offset, ?int $length, ?HashTable $replacement): HashTable
+    {
+        $pairs = iterator_to_array($this->iterateKeyed(true), false);
+        $num = \count($pairs);
+        [$offset, $removeLen] = $this->normalizeSpliceRange($offset, $length, $num);
+
+        $removed = new self();
+        for ($i = $offset; $i < $offset + $removeLen; ++$i) {
+            [$key, $value] = $this->duplicateKeyedPair($pairs[$i]);
+            $this->copyKeyedEntry($removed, $key, $value);
+        }
+
+        $newPairs = [];
+        for ($i = 0; $i < $offset; ++$i) {
+            $newPairs[] = $this->duplicateKeyedPair($pairs[$i]);
+        }
+        $this->appendSpliceReplacement($newPairs, $replacement, $offset, false);
+        for ($i = $offset + $removeLen; $i < $num; ++$i) {
+            $newPairs[] = $this->duplicateKeyedPair($pairs[$i]);
+        }
+
+        $this->assignFromKeyedPairs($newPairs);
+
+        return $removed;
+    }
+
+    /**
+     * Insert replacement values with Zend array_splice key rules (ext/standard/array.c).
+     *
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    private function appendSpliceReplacement(array &$pairs, ?HashTable $replacement, int $offset, bool $destIsPacked): void
+    {
+        if (null === $replacement) {
+            return;
+        }
+        $i = 0;
+        foreach ($replacement->iterate(true) as $value) {
+            $key = new Variable();
+            $key->int($destIsPacked ? $offset + $i : $i);
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $pairs[] = [$key, $copy];
+            ++$i;
+        }
+    }
+
+    /**
+     * @param array{0: Variable, 1: Variable} $pair
+     *
+     * @return array{0: Variable, 1: Variable}
+     */
+    private function duplicateKeyedPair(array $pair): array
+    {
+        [$key, $value] = $pair;
+        $keyCopy = new Variable();
+        if (Variable::TYPE_INTEGER === $key->type) {
+            $keyCopy->int($key->toInt());
+        } else {
+            $keyCopy->string($key->toString());
+        }
+        $valCopy = new Variable();
+        $valCopy->copyFrom($value->resolveIndirect());
+
+        return [$keyCopy, $valCopy];
+    }
+
+    private function copyKeyedEntry(self $dest, Variable $key, Variable $value): void
+    {
+        $copy = new Variable();
+        $copy->copyFrom($value);
+        if (Variable::TYPE_INTEGER === $key->type) {
+            $dest->addIndex($key->toInt(), $copy);
+        } else {
+            $dest->add($key->toString(), $copy);
+        }
+    }
+
+    /**
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    private function assignFromKeyedPairs(array $pairs): void
+    {
+        $this->assertConsistent();
+        $this->refcount->assertSeparated();
+        if ($this->flags & self::FLAG_UNINITIALIZED) {
+            $this->initMixed();
+        }
+        for ($i = 0; $i < $this->numUsed; ++$i) {
+            $bucket = $this->buckets->read($i);
+            if (!$bucket->value->isUndefined()) {
+                $bucket->value->reset();
+                $bucket->value->type = Variable::TYPE_UNDEFINED;
+            }
+        }
+        $this->numUsed = 0;
+        $this->numElements = 0;
+        $this->nextFreeElement = 0;
+        $this->rehash();
+        foreach ($pairs as [$key, $value]) {
+            $this->copyKeyedEntry($this, $key, $value);
+        }
     }
 
     /**

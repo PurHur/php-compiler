@@ -15,7 +15,10 @@ final class HashTableSpliceTest extends TestCase
         $nine->int(9);
         $ten = new Variable();
         $ten->int(10);
-        $removed = $ht->spliceInPlace(1, 2, [$nine, $ten]);
+        $repl = new HashTable();
+        $repl->append($nine);
+        $repl->append($ten);
+        $removed = $ht->spliceInPlace(1, 2, $repl);
 
         $this->assertSame(2, $removed->getNumElements());
         $this->assertSame(1, $removed->findIndex(0)->toInt());
@@ -31,7 +34,7 @@ final class HashTableSpliceTest extends TestCase
     public function testSpliceNegativeOffsetRemovesTail(): void
     {
         $ht = $this->packedList([0, 1, 2, 3, 4]);
-        $removed = $ht->spliceInPlace(-2, null, []);
+        $removed = $ht->spliceInPlace(-2, null);
 
         $this->assertSame(2, $removed->getNumElements());
         $this->assertSame(3, $removed->findIndex(0)->toInt());
@@ -49,7 +52,10 @@ final class HashTableSpliceTest extends TestCase
         $five->int(5);
         $six = new Variable();
         $six->int(6);
-        $removed = $ht->spliceInPlace(1, 0, [$five, $six]);
+        $repl = new HashTable();
+        $repl->append($five);
+        $repl->append($six);
+        $removed = $ht->spliceInPlace(1, 0, $repl);
 
         $this->assertSame(0, $removed->getNumElements());
         $this->assertSame(5, $ht->getNumElements());
@@ -58,6 +64,39 @@ final class HashTableSpliceTest extends TestCase
         $this->assertSame(6, $ht->findIndex(2)->toInt());
         $this->assertSame(1, $ht->findIndex(3)->toInt());
         $this->assertSame(2, $ht->findIndex(4)->toInt());
+    }
+
+    public function testSpliceAssociativePreservesKeys(): void
+    {
+        $ht = new HashTable();
+        foreach (['a' => 1, 'b' => 2, 'c' => 3] as $key => $value) {
+            $var = new Variable();
+            $var->int($value);
+            $ht->add($key, $var);
+        }
+        $removed = $ht->spliceInPlace(1, 1);
+
+        $this->assertSame(2, $ht->getNumElements());
+        $this->assertSame(1, $removed->getNumElements());
+        $this->assertSame(1, $ht->find('a')?->resolveIndirect()->toInt());
+        $this->assertSame(3, $ht->find('c')?->resolveIndirect()->toInt());
+        $this->assertSame(2, $removed->find('b')?->resolveIndirect()->toInt());
+    }
+
+    public function testSpliceAssociativeNegativeOffset(): void
+    {
+        $ht = new HashTable();
+        foreach (['x' => 10, 'y' => 20, 'z' => 30] as $key => $value) {
+            $var = new Variable();
+            $var->int($value);
+            $ht->add($key, $var);
+        }
+        $removed = $ht->spliceInPlace(-1, null);
+
+        $this->assertSame(2, $ht->getNumElements());
+        $this->assertSame(1, $removed->getNumElements());
+        $this->assertSame(30, $removed->find('z')?->resolveIndirect()->toInt());
+        $this->assertNull($ht->find('z'));
     }
 
     /** @param list<int> $values */
