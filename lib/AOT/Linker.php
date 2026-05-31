@@ -16,6 +16,7 @@ final class Linker
         __DIR__.'/runtime/phpc_pending_headers.c',
         __DIR__.'/runtime/superglobal_name.c',
         __DIR__.'/runtime/function_exists.c',
+        __DIR__.'/runtime/phpc_get_defined_functions.c',
         __DIR__.'/runtime/hash_crypto.c',
         __DIR__.'/runtime/phpc_microtime.c',
         __DIR__.'/runtime/phpc_hrtime.c',
@@ -285,7 +286,7 @@ final class Linker
         } else {
             $flags = self::runtimeCIncludeFlags();
         }
-        if ('function_exists.c' === $basename) {
+        if ('function_exists.c' === $basename || 'phpc_get_defined_functions.c' === $basename) {
             $flags .= ' -I'.escapeshellarg(__DIR__.'/runtime');
         }
 

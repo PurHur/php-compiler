@@ -837,6 +837,53 @@ class Object_ extends Type {
         return $names;
     }
 
+    /**
+     * User and builtin classes from DECLARE_CLASS (issue #3128).
+     *
+     * @return list<string>
+     */
+    public function allDeclaredClassNames(): array
+    {
+        $names = [];
+        foreach (array_keys($this->classes) as $classLc) {
+            if (isset($this->interfaceClassLcs[$classLc])
+                || isset($this->traitClassLcs[$classLc])
+                || isset($this->enums[$classLc])) {
+                continue;
+            }
+            $resolved = null;
+            foreach ($this->classIdToName as $name) {
+                if (strtolower(ltrim($name, '\\')) === $classLc) {
+                    $resolved = $name;
+                    break;
+                }
+            }
+            $names[] = $resolved ?? $classLc;
+        }
+
+        return $names;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function allDeclaredTraitNames(): array
+    {
+        $names = [];
+        foreach (array_keys($this->traitClassLcs) as $traitLc) {
+            $resolved = null;
+            foreach ($this->classIdToName as $name) {
+                if (strtolower(ltrim($name, '\\')) === $traitLc) {
+                    $resolved = $name;
+                    break;
+                }
+            }
+            $names[] = $resolved ?? $traitLc;
+        }
+
+        return $names;
+    }
+
     public function hasUserDeclaredEnum(string $name): bool
     {
         return isset($this->enums[strtolower($name)]);

@@ -129,9 +129,12 @@ static const char *phpc_builtin_functions[] = {
     "get_class_methods",
     "get_class_vars",
     "get_debug_type",
+    "get_declared_classes",
     "get_declared_enums",
     "get_declared_interfaces",
+    "get_declared_traits",
     "get_defined_constants",
+    "get_defined_functions",
     "get_defined_vars",
     "get_object_vars",
     "get_parent_class",
@@ -368,4 +371,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 359;
+static const size_t phpc_builtin_functions_count = 370;

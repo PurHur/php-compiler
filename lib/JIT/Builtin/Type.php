@@ -650,6 +650,12 @@ class Type extends Builtin {
             $this->context->context->functionType($void, false, $i64, $valuePtr)
         );
         $this->context->registerFunction('__compiler_getrusage', $fnGetrusage);
+        $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $fnGetDefinedFunctions = $this->context->module->addFunction(
+            '__compiler_get_defined_functions_merge',
+            $this->context->context->functionType($htPtr, false, $htPtr)
+        );
+        $this->context->registerFunction('__compiler_get_defined_functions_merge', $fnGetDefinedFunctions);
         $fnPendingFlush = $this->context->module->addFunction(
             '__phpc_response_headers_flush',
             $this->context->context->functionType($void, false)
