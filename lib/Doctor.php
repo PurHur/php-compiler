@@ -464,13 +464,14 @@ final class Doctor
             ? 'ready at '.$llvmInfo['dir'].' ('.$llvmInfo['source'].')'
             : 'missing — M0/M2 link steps need LLVM 9';
 
-        $m3StrictGate = getenv('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE');
-        $m3StrictOn = false !== $m3StrictGate && '1' === $m3StrictGate;
+        $defaults = self::readCiDefaultsEnv($repoRoot);
+        $m3HelloStrictDefault = $defaults['BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE'] ?? '1';
+        $m3StrictOn = self::gateEnabled('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE', $m3HelloStrictDefault);
         $m3StrictEnv = getenv('BOOTSTRAP_M3_HELLOWORLD_STRICT');
         $m3StrictProbe = false !== $m3StrictEnv && '1' === $m3StrictEnv;
         $m3Detail = $m3StrictOn || $m3StrictProbe
             ? 'strict probe enabled (GATE or BOOTSTRAP_M3_HELLOWORLD_STRICT=1)'
-            : 'default off — export BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=1 for ci-local LLVM tail (#1493)';
+            : 'ci-local LLVM tail strict gate off — default '.$m3HelloStrictDefault.' (#1866); opt-out BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=0';
 
         $ns2Script = $repoRoot.'/script/north-star2-verify.sh';
         $ns2Make = is_executable($ns2Script);
