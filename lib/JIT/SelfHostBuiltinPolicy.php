@@ -71,7 +71,7 @@ final class SelfHostBuiltinPolicy
     private const CATEGORY_OUTPUT = [
         'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_end_flush' => 'output',
         'ob_get_level' => 'output', 'flush' => 'output',
-        'getallheaders' => 'output', 'header_list' => 'output',
+        'getallheaders' => 'output', 'header_list' => 'output', 'headers_list' => 'output',
         'headers_sent' => 'output', 'register_shutdown_function' => 'output',
         'set_error_handler' => 'error', 'restore_error_handler' => 'error',
     ];

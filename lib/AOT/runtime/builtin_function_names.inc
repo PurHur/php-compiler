@@ -157,6 +157,7 @@ static const char *phpc_builtin_functions[] = {
     "hash_hmac",
     "header",
     "header_list",
+    "headers_list",
     "header_remove",
     "headers_sent",
     "hex2bin",

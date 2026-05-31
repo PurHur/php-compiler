@@ -14,17 +14,17 @@ use PHPLLVM\Value;
 /**
  * header_list() — list pending response headers (issue #311).
  */
-final class header_list extends Internal
+class header_list extends Internal
 {
-    public function __construct()
+    public function __construct(?string $name = null)
     {
-        parent::__construct('header_list');
+        parent::__construct($name ?? 'header_list');
     }
 
     public function execute(Frame $frame): void
     {
         if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException('header_list() takes no arguments');
+            throw new \LogicException($this->getName().'() takes no arguments');
         }
         if (null === $frame->returnVar) {
             return;
@@ -35,7 +35,7 @@ final class header_list extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) > 0) {
-            throw new \LogicException('header_list() takes no arguments');
+            throw new \LogicException($this->getName().'() takes no arguments');
         }
 
         return JitPendingHeaders::list($context);

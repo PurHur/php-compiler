@@ -461,6 +461,7 @@ require_once __DIR__.'/../../../ext/standard/hash_.php';
 require_once __DIR__.'/../../../ext/standard/hash_hmac.php';
 require_once __DIR__.'/../../../ext/standard/header_.php';
 require_once __DIR__.'/../../../ext/standard/header_list.php';
+require_once __DIR__.'/../../../ext/standard/headers_list.php';
 require_once __DIR__.'/../../../ext/standard/header_remove.php';
 require_once __DIR__.'/../../../ext/standard/hex2bin.php';
 require_once __DIR__.'/../../../ext/standard/hexdec.php';
