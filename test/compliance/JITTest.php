@@ -134,6 +134,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'array_walk_recursive')) {
                 continue;
             }
+            // uasort()/uksort() closure comparators are VM-only (#3582, #3143).
+            if (str_contains($name, 'uasort_closure') || str_contains($name, 'uksort_closure')) {
+                continue;
+            }
             // #[\AllowDynamicProperties] is VM-only until JIT class flag (#3467).
             if (str_contains($name, 'allow_dynamic_properties')) {
                 continue;
