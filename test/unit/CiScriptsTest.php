@@ -1996,6 +1996,15 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('./script/docker-exec.sh', $body);
         $this->assertStringContainsString('bootstrap-selfhost-gate.sh', $body);
         $this->assertStringContainsString('do not nest', $body);
+        $this->assertStringContainsString('selfhost_preflight_warn_nested_docker', $body);
+        $this->assertStringContainsString('#2757', $body);
+        $this->assertStringContainsString('issues/1492', $body);
+    }
+
+    public function testDockerExecWarnsOnNestedDockerInInnerCommand(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/docker-exec.sh');
+        $this->assertStringContainsString('selfhost_preflight_warn_nested_docker', $body);
     }
 
     public function testBootstrapScriptsSourceSelfhostPreflight(): void

@@ -47,9 +47,25 @@ _selfhost_preflight_print_docker_path() {
 }
 
 _selfhost_preflight_print_install_docker() {
-  echo "selfhost-preflight: install Docker Engine, ensure 'docker info' succeeds, then:" >&2
+  echo "selfhost-preflight: install Docker Engine, ensure 'docker info' succeeds on the host, then:" >&2
   echo "  make docker-build-22   # once: image php-compiler:22.04-dev" >&2
-  echo "  ./script/docker-exec.sh -- bash -lc 'make bootstrap-selfhost-link'" >&2
+  echo "  docker info >/dev/null && ./script/docker-exec.sh -- bash -lc 'make bootstrap-selfhost-link'" >&2
+  echo "selfhost-preflight: bootstrap probe recipe: https://github.com/PurHur/php-compiler/issues/1492 (#2674)" >&2
+}
+
+# Warn when docker-exec inner commands nest `docker` (container has no docker CLI — #2757).
+selfhost_preflight_warn_nested_docker() {
+  local cmd="$*"
+  if [[ -z "${cmd}" ]]; then
+    return 0
+  fi
+  # Match `docker` as a shell token (not path segments like docker-exec.sh).
+  if [[ " ${cmd} " =~ (^|[[:space:]|;&()\"'])docker([[:space:]|;&)\"']|$) ]]; then
+    echo "docker-exec: warning: 'docker' inside the inner command will fail — the dev image has PHP/LLVM only (#2757)." >&2
+    echo "docker-exec: run 'docker info' on the **host** before docker-exec, not inside it:" >&2
+    echo "  docker info >/dev/null && ./script/docker-exec.sh -- bash -lc 'make bootstrap-selfhost-link'" >&2
+    echo "docker-exec: see https://github.com/PurHur/php-compiler/issues/1492 (#2674)" >&2
+  fi
 }
 
 # selfhost_preflight <label> <mode>
