@@ -30,6 +30,8 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'gettype_object_resource.phpt',
         'is_countable.phpt',
         'crc32c.phpt',
+        'anonymous_class.phpt',
+        'anonymous_class_ctor.phpt',
     ];
 
     /**
