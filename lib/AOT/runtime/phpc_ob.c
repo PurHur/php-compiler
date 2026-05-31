@@ -152,3 +152,18 @@ void __phpc_flush(void)
 {
     fflush(stdout);
 }
+
+void __phpc_ob_end_all(void)
+{
+    while (__phpc_ob_level > 0) {
+        __phpc_ob_level--;
+        int idx = __phpc_ob_level;
+        unsigned long len = __phpc_ob_len[idx];
+        if (len > 0) {
+            ob_append_bytes(__phpc_ob_storage[idx], (size_t) len);
+        }
+        __phpc_ob_len[idx] = 0;
+        __phpc_ob_storage[idx][0] = '\0';
+    }
+    fflush(stdout);
+}

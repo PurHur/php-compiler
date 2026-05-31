@@ -539,6 +539,7 @@ class Context {
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
                 Builtin\ReadonlyRaise::emitAbortIfPendingForStandaloneMain($this);
                 Builtin\PendingHeaders::emitFlushForStandalone($this);
+                Builtin\ObOutput::emitEndAllForStandalone($this);
             }
             $this->builder->call($this->shutdownFunc);
             $this->builder->returnValue($i32->constInt(0, false));

@@ -107,6 +107,7 @@ final class ScriptExit
     {
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
             PendingHeaders::emitFlushForStandalone($context);
+            ObOutput::emitEndAllForStandalone($context);
         }
         $i32 = $context->getTypeFromString('int32');
         $trunc = $context->builder->trunc($status, $i32);

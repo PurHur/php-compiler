@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /** Register LLVM declarations for JIT/AOT ob_*() runtime (issue #118, #1056). */
@@ -26,6 +27,7 @@ final class ObOutput
             '__phpc_ob_get_clean' => [$i32, false, [$valuePtr]],
             '__phpc_ob_end_flush' => [$i32, false, [$valuePtr]],
             '__phpc_flush' => [$void, false, []],
+            '__phpc_ob_end_all' => [$void, false, []],
             '__phpc_pow_int' => [$void, false, [$valuePtr, $i64, $i64]],
             '__phpc_ob_echo_cstr' => [$void, false, [$i8p]],
             '__phpc_ob_echo_char' => [$void, false, [$i8]],
@@ -41,5 +43,14 @@ final class ObOutput
             $fn = $context->module->addFunction($name, $ft);
             $context->registerFunction($name, $fn);
         }
+    }
+
+    /** Emit php_output_end_all at standalone main return (issue #3675). */
+    public static function emitEndAllForStandalone(Context $context): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return;
+        }
+        $context->builder->call($context->lookupFunction('__phpc_ob_end_all'));
     }
 }
