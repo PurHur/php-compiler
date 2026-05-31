@@ -8,6 +8,7 @@ namespace PHPCompiler\ext\standard;
  * Zend predefined constants for ext/standard (php-src basic_functions.c PHP_MINIT).
  *
  * @see ext/standard/basic_functions.c — STR_PAD_*, ENT_*, PHP_ROUND_*, M_*
+ * @see ext/standard/php_array.h — SORT_*, EXTR_*
  * @see ext/standard/php_math.h — M_PI, M_E, …
  */
 final class StdlibConstants
@@ -57,6 +58,26 @@ final class StdlibConstants
     public const CASE_LOWER = 0;
     public const CASE_UPPER = 1;
 
+    /** sort() / array_multisort() flags (ext/standard/php_array.h). */
+    public const SORT_REGULAR = 0;
+    public const SORT_NUMERIC = 1;
+    public const SORT_STRING = 2;
+    public const SORT_DESC = 3;
+    public const SORT_ASC = 4;
+    public const SORT_LOCALE_STRING = 5;
+    public const SORT_NATURAL = 6;
+    public const SORT_FLAG_CASE = 8;
+
+    /** extract() flags (ext/standard/php_array.h). */
+    public const EXTR_OVERWRITE = 0;
+    public const EXTR_SKIP = 1;
+    public const EXTR_PREFIX_SAME = 2;
+    public const EXTR_PREFIX_ALL = 3;
+    public const EXTR_PREFIX_INVALID = 4;
+    public const EXTR_PREFIX_IF_EXISTS = 5;
+    public const EXTR_IF_EXISTS = 6;
+    public const EXTR_REFS = 0x100;
+
     /** pathinfo() component flags (ext/standard/basic_functions.c). */
     public const PATHINFO_DIRNAME = 1;
     public const PATHINFO_BASENAME = 2;
@@ -96,6 +117,22 @@ final class StdlibConstants
         'fnm_casefold' => VmFnmatch::FNM_CASEFOLD,
         'count_normal' => VmArray::COUNT_NORMAL,
         'count_recursive' => VmArray::COUNT_RECURSIVE,
+        'sort_regular' => self::SORT_REGULAR,
+        'sort_numeric' => self::SORT_NUMERIC,
+        'sort_string' => self::SORT_STRING,
+        'sort_desc' => self::SORT_DESC,
+        'sort_asc' => self::SORT_ASC,
+        'sort_locale_string' => self::SORT_LOCALE_STRING,
+        'sort_natural' => self::SORT_NATURAL,
+        'sort_flag_case' => self::SORT_FLAG_CASE,
+        'extr_overwrite' => self::EXTR_OVERWRITE,
+        'extr_skip' => self::EXTR_SKIP,
+        'extr_prefix_same' => self::EXTR_PREFIX_SAME,
+        'extr_prefix_all' => self::EXTR_PREFIX_ALL,
+        'extr_prefix_invalid' => self::EXTR_PREFIX_INVALID,
+        'extr_prefix_if_exists' => self::EXTR_PREFIX_IF_EXISTS,
+        'extr_if_exists' => self::EXTR_IF_EXISTS,
+        'extr_refs' => self::EXTR_REFS,
     ];
 
     /** Lowercase name => float value for VM\Context::constantFetch(). */
@@ -151,6 +188,22 @@ final class StdlibConstants
         'fnm_casefold',
         'count_normal',
         'count_recursive',
+        'sort_regular',
+        'sort_numeric',
+        'sort_string',
+        'sort_desc',
+        'sort_asc',
+        'sort_locale_string',
+        'sort_natural',
+        'sort_flag_case',
+        'extr_overwrite',
+        'extr_skip',
+        'extr_prefix_same',
+        'extr_prefix_all',
+        'extr_prefix_invalid',
+        'extr_prefix_if_exists',
+        'extr_if_exists',
+        'extr_refs',
         'm_e',
         'm_log2e',
         'm_log10e',
