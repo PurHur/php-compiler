@@ -13,13 +13,14 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringTrimMask;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * ltrim() for strings (default whitespace mask; subset of PHP).
+ * ltrim() for strings (default whitespace or optional $characters mask; php-src string.c).
  */
 final class string_ltrim extends Internal
 {
@@ -30,8 +31,9 @@ final class string_ltrim extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('ltrim() requires exactly one argument');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('ltrim() requires one or two arguments');
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
@@ -40,7 +42,15 @@ final class string_ltrim extends Internal
         if (Variable::TYPE_STRING !== $v->type) {
             throw new \LogicException('ltrim() only supports strings in this compiler build');
         }
-        $frame->returnVar->string(VmString::ltrim($v->toString()));
+        $mask = VmString::TRIM_DEFAULT;
+        if (2 === $argc) {
+            $maskArg = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_STRING !== $maskArg->type) {
+                throw new \LogicException('ltrim() character mask must be a string in this compiler build');
+            }
+            $mask = $maskArg->toString();
+        }
+        $frame->returnVar->string(VmString::ltrim($v->toString(), $mask));
     }
 
     public Context $context;
@@ -48,10 +58,29 @@ final class string_ltrim extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('ltrim() requires exactly one argument');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('ltrim() requires one or two arguments');
+        }
+        $literal = $args[0]->compileTimeString ?? null;
+        $maskLiteral = (2 === $argc) ? ($args[1]->compileTimeString ?? null) : null;
+        if (null !== $literal && (1 === $argc || null !== $maskLiteral)) {
+            $mask = null !== $maskLiteral ? $maskLiteral : VmString::TRIM_DEFAULT;
+
+            return $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $context->builder->load(
+                    $context->constantStringFromString(VmString::ltrim($literal, $mask))
+                )
+            );
+        }
+        if (2 === $argc) {
+            StringTrimMask::ensureLinked($context);
         }
         $str = $this->jitString($context, $args[0], 'string_ltrim() argument #1');
+        $maskStr = (2 === $argc)
+            ? $this->jitString($context, $args[1], 'string_ltrim() argument #2')
+            : null;
         $structName = $str->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
         $len = $context->builder->load(
@@ -63,7 +92,7 @@ final class string_ltrim extends Internal
 
         $startSlot = $context->builder->alloca($i64, 1, 'ltrim_start');
         $context->builder->store($zero, $startSlot);
-        string_trim::advanceWhileTrimByte($context, $charPtr, $len, $startSlot, true, 'ltrim');
+        string_trim::advanceWhileTrimByte($context, $charPtr, $len, $startSlot, true, 'ltrim', $maskStr);
 
         $start = $context->builder->load($startSlot);
         $sliceLen = $context->builder->sub($len, $start);

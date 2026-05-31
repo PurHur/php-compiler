@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringTrimMask;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -21,7 +22,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * trim() for strings (default whitespace mask; subset of PHP).
+ * trim() for strings (default whitespace or optional $characters mask; php-src string.c).
  */
 final class string_trim extends Internal
 {
@@ -36,8 +37,9 @@ final class string_trim extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('trim() requires exactly one argument');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('trim() requires one or two arguments');
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
@@ -46,7 +48,15 @@ final class string_trim extends Internal
         if (Variable::TYPE_STRING !== $v->type) {
             throw new \LogicException('trim() only supports strings in this compiler build');
         }
-        $frame->returnVar->string(VmString::trim($v->toString()));
+        $mask = VmString::TRIM_DEFAULT;
+        if (2 === $argc) {
+            $maskArg = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_STRING !== $maskArg->type) {
+                throw new \LogicException('trim() character mask must be a string in this compiler build');
+            }
+            $mask = $maskArg->toString();
+        }
+        $frame->returnVar->string(VmString::trim($v->toString(), $mask));
     }
 
     public Context $context;
@@ -54,20 +64,30 @@ final class string_trim extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('trim() requires exactly one argument');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('trim() requires one or two arguments');
         }
         $literal = $args[0]->compileTimeString ?? null;
-        if (null !== $literal) {
+        $maskLiteral = (2 === $argc) ? ($args[1]->compileTimeString ?? null) : null;
+        if (null !== $literal && (1 === $argc || null !== $maskLiteral)) {
+            $mask = null !== $maskLiteral ? $maskLiteral : VmString::TRIM_DEFAULT;
+
             return $context->builder->call(
                 $context->lookupFunction('__string__separate'),
                 $context->builder->load(
-                    $context->constantStringFromString(VmString::trim($literal))
+                    $context->constantStringFromString(VmString::trim($literal, $mask))
                 )
             );
         }
+        if (2 === $argc) {
+            StringTrimMask::ensureLinked($context);
+        }
         $str = $this->jitString($context, $args[0], 'string_trim() argument #1');
         $str = $context->builder->call($context->lookupFunction('__string__separate'), $str);
+        $maskStr = (2 === $argc)
+            ? $this->jitString($context, $args[1], 'string_trim() argument #2')
+            : null;
         $structName = $str->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
         $len = $context->builder->load(
@@ -75,7 +95,6 @@ final class string_trim extends Internal
         );
         $i64 = JitStringIndex::i64($context);
         $zero = JitStringIndex::zero($context);
-        $one = $i64->constInt(1, false);
         $charPtr = $context->builder->structGep($str, $map['value']);
 
         $startSlot = $context->builder->alloca($i64, 1, 'trim_start');
@@ -83,8 +102,8 @@ final class string_trim extends Internal
         $context->builder->store($zero, $startSlot);
         $context->builder->store($len, $endSlot);
 
-        self::advanceWhileTrimByte($context, $charPtr, $len, $startSlot, true, 'trim');
-        self::advanceWhileTrimByte($context, $charPtr, $len, $endSlot, false, 'trim');
+        self::advanceWhileTrimByte($context, $charPtr, $len, $startSlot, true, 'trim', $maskStr);
+        self::advanceWhileTrimByte($context, $charPtr, $len, $endSlot, false, 'trim', $maskStr);
 
         $start = $context->builder->load($startSlot);
         $end = $context->builder->load($endSlot);
@@ -142,7 +161,8 @@ final class string_trim extends Internal
         Value $len,
         Value $indexSlot,
         bool $fromStart,
-        string $blockId = ''
+        string $blockId = '',
+        ?Value $maskStr = null
     ): void {
         $suffix = ('' === $blockId ? '' : '_'.$blockId).'_'.(string) (++self::$trimBlockSerial);
         $i64 = JitStringIndex::i64($context);
@@ -169,7 +189,7 @@ final class string_trim extends Internal
             : $context->builder->gep($charPtr, $context->builder->sub($idx, $one));
         $ch = $context->builder->load($at);
         $chI32 = $context->builder->zExt($ch, $context->getTypeFromString('int32'));
-        $isTrim = self::jitIsTrimByte($context, $chI32);
+        $isTrim = self::jitIsMaskByte($context, $chI32, $maskStr);
         $continueLoop = $fromStart
             ? $context->builder->addNoSignedWrap($idx, $one)
             : $context->builder->sub($idx, $one);
@@ -182,22 +202,34 @@ final class string_trim extends Internal
         $context->builder->positionAtEnd($done);
     }
 
-    private static function jitIsTrimByte(Context $context, Value $ch): Value
+    private static function jitIsMaskByte(Context $context, Value $ch, ?Value $maskStr): Value
     {
-        $i32 = $context->getTypeFromString('int32');
-        $checks = [];
-        foreach ([0x20, 0x09, 0x0A, 0x0D, 0x00, 0x0B] as $byte) {
-            $checks[] = $context->builder->icmp(
-                Builder::INT_EQ,
-                $ch,
-                $i32->constInt($byte, false)
-            );
-        }
-        $result = $checks[0];
-        for ($i = 1; $i < count($checks); ++$i) {
-            $result = $context->builder->or($result, $checks[$i]);
+        if (null === $maskStr) {
+            $i32 = $context->getTypeFromString('int32');
+            $checks = [];
+            foreach ([0x20, 0x09, 0x0A, 0x0D, 0x00, 0x0B] as $byte) {
+                $checks[] = $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $ch,
+                    $i32->constInt($byte, false)
+                );
+            }
+            $result = $checks[0];
+            for ($i = 1; $i < count($checks); ++$i) {
+                $result = $context->builder->or($result, $checks[$i]);
+            }
+
+            return $result;
         }
 
-        return $result;
+        $maskStr = $context->builder->call($context->lookupFunction('__string__separate'), $maskStr);
+        $i32 = $context->getTypeFromString('int32');
+        $inMask = $context->builder->call(
+            $context->lookupFunction('__phpc_char_in_mask'),
+            $ch,
+            $maskStr
+        );
+
+        return $context->builder->icmp(Builder::INT_NE, $inMask, $i32->constInt(0, false));
     }
 }

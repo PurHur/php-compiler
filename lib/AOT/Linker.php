@@ -39,6 +39,7 @@ final class Linker
         __DIR__.'/runtime/crc32.c',
         __DIR__.'/runtime/crc32c.c',
         __DIR__.'/runtime/strtr.c',
+        __DIR__.'/runtime/phpc_trim_mask.c',
         __DIR__.'/runtime/filter_validate.c',
         __DIR__.'/runtime/phpc_fs_dir.c',
         __DIR__.'/runtime/phpc_count_chars.c',
