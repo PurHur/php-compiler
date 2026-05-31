@@ -149,6 +149,27 @@ On harness hosts where `docker-exec` prints `bind-mount incomplete; copying repo
 
 Self-host native link requires `PHP_COMPILER_SELFHOST_AOT=1` (set by `./script/bootstrap-selfhost-link.sh` and `make bootstrap-selfhost-probe`). `PHP_COMPILER_JIT_PROGRESS_FILE` is optional progress logging for segfault triage only — it does not enable JIT stubs.
 
+### Parse/compile failure diagnostics ([#2988](https://github.com/PurHur/php-compiler/issues/2988))
+
+When native bootstrap compile returns `parseAndCompile returned null`, enable actionable stderr breadcrumbs:
+
+```bash
+export PHP_COMPILER_PARSE_DIAG=1
+export PHP_COMPILER_JIT_PROGRESS_FILE=/tmp/jit.progress   # optional segfault breadcrumbs
+./script/docker-exec.sh -- bash -lc 'make north-star5-verify 2>&1 | tail -50'
+```
+
+`PHP_COMPILER_PARSE_DIAG=1` also applies outside self-host when iterating on `bin/compile.php` / inventory argv drivers. `Runtime::getLastParseFailure()` carries the same detail for M3 emit TU bridges ([#3037](https://github.com/PurHur/php-compiler/issues/3037)).
+
+Lib spine segfault triage (optional, requires `gdb` in the container):
+
+```bash
+export BOOTSTRAP_SPINE_CRASH_DIAG=1
+./script/docker-exec.sh -- bash -lc 'BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke'
+```
+
+On exit 139 the link script prints a gdb batch backtrace when a core file exists or re-runs the failing binary under gdb.
+
 ## Self-host `JIT\Result` / FFI policy
 
 Native self-host bundles include `lib/JIT/Result.php` for type closure only. When `PHP_COMPILER_SELFHOST_AOT=1`, `lib/JIT.php` stubs every `\JIT\Result::` method body (LLVM must not lower `FFI::new` / `FFI::memcpy` in `getCallable`), and `Result::getFunc` / `getHandler` / `getCallable` return no-op `Func\JIT` handlers at runtime instead of casting native addresses. Normal JIT/AOT (without the env flag) keeps the real FFI path unchanged.

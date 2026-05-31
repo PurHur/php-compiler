@@ -60,6 +60,27 @@ class Runtime {
     /** Last parse/compile failure for native M3 emit bridge (#3037). */
     private static ?string $lastParseFailure = null;
 
+    /**
+     * Whether parse/compile null diagnostics should be emitted (#2988).
+     */
+    public static function isParseDiagEnabled(): bool
+    {
+        if (JIT\EmitTuMode::isMinimalRuntime()) {
+            return true;
+        }
+        if (!\function_exists('getenv')) {
+            return false;
+        }
+        foreach (['PHP_COMPILER_PARSE_DIAG', 'PHP_COMPILER_SELFHOST_AOT', 'PHP_COMPILER_M3_COMPILE_MODE'] as $name) {
+            $value = getenv($name);
+            if (false !== $value && ('1' === $value || 'true' === strtolower((string) $value))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function __construct(int $mode = self::MODE_NORMAL) {
         ObjectRegistry::reset();
         self::clearLastParseFailure();
@@ -251,7 +272,7 @@ class Runtime {
     {
         $detail = $this->compiler->getCompileAbortDetail();
         $primary = null !== $detail && '' !== $detail ? $detail : $e->getMessage();
-        $this->recordLastParseFailure($primary);
+        $this->recordLastParseFailure(sprintf('%s: %s', $sourcePath, $primary));
         $line = sprintf("parseAndCompile failure: target=%s: %s\n", $sourcePath, $primary);
         $context = null;
         if (null !== $sourceCode && $e instanceof \PhpParser\Error) {
@@ -316,7 +337,8 @@ class Runtime {
         if (!$block instanceof Block) {
             // Self-host AOT can surface unexpected stub returns as null; preserve a stable abort detail.
             $this->compiler->setCompileAbortDetailIfEmpty('Runtime::compile: Compiler::compile returned non-Block');
-            $this->recordLastParseFailure($this->formatParseAndCompileNullDetail($script));
+            $sourceFile = $this->compiler->getDebugLastPhaseInputFile() ?? $script->main->getFile();
+            $this->emitParseAndCompileNullDiagnostic($script, $sourceFile);
 
             return null;
         }
@@ -331,7 +353,8 @@ class Runtime {
         $block = $this->compiler->compileEmitSmoke($script);
         if (!$block instanceof Block) {
             $this->compiler->setCompileAbortDetailIfEmpty('Runtime::compileEmitSmoke: Compiler::compileEmitSmoke returned non-Block');
-            $this->recordLastParseFailure($this->formatParseAndCompileNullDetail($script));
+            $sourceFile = $this->compiler->getDebugLastPhaseInputFile() ?? $script->main->getFile();
+            $this->emitParseAndCompileNullDiagnostic($script, $sourceFile);
 
             return null;
         }
@@ -376,13 +399,12 @@ class Runtime {
     {
         self::clearLastParseFailure();
         $this->compiler->resetCompileAbortDetail();
+        $this->compiler->setDebugLastPhaseInputFile($filename);
         try {
             $script = $this->parse($code, $filename);
             $block = $this->compileEmitSmoke($script);
             if (null !== $block) {
                 $block->setScriptPath($filename);
-            } else {
-                $this->emitParseAndCompileNullDiagnostic($script);
             }
 
             return $block;
@@ -475,8 +497,6 @@ class Runtime {
             $block = $this->compile($script);
             if (null !== $block) {
                 $block->setScriptPath($filename);
-            } else {
-                $this->emitParseAndCompileNullDiagnostic($script);
             }
 
             return $block;
@@ -507,8 +527,6 @@ class Runtime {
             \PHPCompiler\JIT\Progress::noteFunction('runtime_parseandcompilefile_compile_done');
             if (null !== $block) {
                 $block->setScriptPath($filename);
-            } else {
-                $this->emitParseAndCompileNullDiagnostic($script);
             }
 
             return $block;
@@ -553,21 +571,30 @@ class Runtime {
      * `parseAndCompile()` returning null is a common self-host bootstrap failure mode (#2642).
      * Best-effort: re-run compile under the lint compiler and print the first unsupported kind.
      */
-    private function emitParseAndCompileNullDiagnostic(Script $script): void
+    private function emitParseAndCompileNullDiagnostic(Script $script, ?string $sourceFile = null): void
     {
-        if (
-            false === getenv('PHP_COMPILER_SELFHOST_AOT')
-            && false === getenv('PHP_COMPILER_M3_COMPILE_MODE')
-            && !JIT\EmitTuMode::isMinimalRuntime()
-        ) {
+        $detail = $this->formatParseAndCompileNullDetail($script);
+        $this->recordLastParseFailure($detail);
+        if (!self::isParseDiagEnabled()) {
             return;
         }
 
-        $detail = $this->formatParseAndCompileNullDetail($script);
-        $this->recordLastParseFailure($detail);
-        if (null !== $detail && '' !== $detail) {
-            echo "parseAndCompile: {$detail}\n";
+        if (null === $detail || '' === $detail) {
+            $detail = 'unknown compile failure (no lint issue recorded)';
         }
+        if (null === $sourceFile || '' === $sourceFile) {
+            $sourceFile = $script->main->getFile();
+        }
+        if ('' === $sourceFile) {
+            $sourceFile = 'unknown';
+        }
+        $line = sprintf("parseAndCompile: %s: %s\n", $sourceFile, $detail);
+        if (\defined('STDERR') && \is_resource(STDERR)) {
+            fwrite(STDERR, $line);
+
+            return;
+        }
+        echo $line;
     }
 
     /**

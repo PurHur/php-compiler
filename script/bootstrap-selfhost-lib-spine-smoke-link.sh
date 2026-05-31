@@ -10,6 +10,34 @@ source "$(dirname "$0")/php-env.sh"
 source "$(dirname "$0")/bootstrap-resolve-compile-invoke.sh"
 ci_apply_llvm_memory_env
 
+bootstrap_spine_emit_crash_diag() {
+  local binary="$1"
+  shift
+  [[ "${BOOTSTRAP_SPINE_CRASH_DIAG:-0}" == "1" ]] || return 0
+  if ! command -v gdb >/dev/null 2>&1; then
+    echo "bootstrap-selfhost-lib-spine-smoke-link: BOOTSTRAP_SPINE_CRASH_DIAG=1 but gdb not found (apt-get install -y gdb inside docker-exec shell)" >&2
+    return 0
+  fi
+  local corefile=""
+  if compgen -G "${ROOT}/core*" >/dev/null 2>&1; then
+    corefile="$(ls -t "${ROOT}"/core* 2>/dev/null | head -1 || true)"
+  fi
+  echo "bootstrap-selfhost-lib-spine-smoke-link: segfault (exit 139) on ${binary}; gdb backtrace:" >&2
+  if [[ -n "${corefile}" && -f "${corefile}" ]]; then
+    gdb -batch -q "${binary}" "${corefile}" -ex 'thread apply all bt' -ex quit 2>&1 | head -80 >&2 || true
+    return 0
+  fi
+  if [[ "$#" -gt 0 ]]; then
+    gdb -batch -q "${binary}" -ex run -ex 'thread apply all bt' -ex quit --args "$@" 2>&1 | head -80 >&2 || true
+    return 0
+  fi
+  gdb -batch -q "${binary}" -ex 'thread apply all bt' -ex quit 2>&1 | head -40 >&2 || true
+}
+
+if [[ "${BOOTSTRAP_SPINE_CRASH_DIAG:-0}" == "1" ]]; then
+  ulimit -c unlimited 2>/dev/null || true
+fi
+
 if [[ ! -f "${ENTRY}" ]]; then
   echo "bootstrap-selfhost-lib-spine-smoke-link: missing ${ENTRY}" >&2
   exit 1
@@ -103,6 +131,9 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
     "${SPINE_COMPILE_DRIVER}" -o "${OUT}" "${ENTRY}" 2>&1
   driver_code=$?
   set -e
+  if [[ "${driver_code}" -eq 139 ]]; then
+    bootstrap_spine_emit_crash_diag "${SPINE_COMPILE_DRIVER}" -o "${OUT}" "${ENTRY}"
+  fi
   if [[ "${driver_code}" -ne 0 || ! -x "${OUT}" ]]; then
     if [[ -f "${PHP_COMPILER_JIT_PROGRESS_FILE}" ]]; then
       echo "bootstrap-selfhost-lib-spine-smoke-link: last JIT func: $(cat "${PHP_COMPILER_JIT_PROGRESS_FILE}" 2>/dev/null || true)" >&2
@@ -173,7 +204,14 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" == "1" ]]; then
   fi
 fi
 test -x "${OUT}"
-out="$({ PHP_COMPILER_CLI_SPINE_BUNDLE=1 "${OUT}"; })"
+set +e
+run_out="$({ PHP_COMPILER_CLI_SPINE_BUNDLE=1 "${OUT}"; })"
+run_code=$?
+set -e
+if [[ "${run_code}" -eq 139 ]]; then
+  bootstrap_spine_emit_crash_diag "${OUT}" PHP_COMPILER_CLI_SPINE_BUNDLE=1 "${OUT}"
+fi
+out="${run_out}"
 if ! grep -q 'compiler_lib_spine_smoke bundle OK' <<< "${out}"; then
   echo "bootstrap-selfhost-lib-spine-smoke-link: unexpected stdout (want compiler_lib_spine_smoke bundle OK)" >&2
   printf '%s\n' "${out}" >&2
