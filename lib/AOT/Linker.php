@@ -30,6 +30,7 @@ final class Linker
         __DIR__.'/runtime/phpc_similar_text.c',
         __DIR__.'/runtime/phpc_soundex.c',
         __DIR__.'/runtime/phpc_str_incdec.c',
+        __DIR__.'/runtime/phpc_str_word_count.c',
         __DIR__.'/runtime/phpc_base_convert.c',
         __DIR__.'/runtime/phpc_metaphone.c',
         __DIR__.'/runtime/phpc_str_getcsv.c',
