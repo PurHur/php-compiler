@@ -112,6 +112,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | Variable | Default | Script | Notes |
 |----------|---------|--------|-------|
 | `MINIWEBAPP_VM_CLI_GATE` | `1` | `ci-fast.sh` | PHPUnit `MiniWebApp*VmCli` matrix ([#597](https://github.com/PurHur/php-compiler/issues/597)) |
+| `MINIWEBAPP_VM_OOP_GATE` | `0` | `ci-fast.sh` (`ci_run_miniwebapp_vm_oop`) | `script/check-miniwebapp-vm-oop.sh` — lint zero + VM `phpc serve` PATH_INFO curls ([#2189](https://github.com/PurHur/php-compiler/issues/2189), [#2059](https://github.com/PurHur/php-compiler/issues/2059)); set `1` to opt in; default-on follow-up ([#2293](https://github.com/PurHur/php-compiler/issues/2293)) |
 | `NESTED_RETURN_COMPLIANCE_GATE` | `1` | `ci-fast.sh` | PHPUnit `NestedReturn*` — nested `return <call>()` / late static binding VM ([#1888](https://github.com/PurHur/php-compiler/issues/1888), [#1885](https://github.com/PurHur/php-compiler/issues/1885)); set `0` to skip |
 | `ATTRIBUTES_COMPLIANCE_GATE` | `1` | `ci-fast.sh` | PHPUnit `Attribute*` — PHP 8 attributes VM v1 ([#1904](https://github.com/PurHur/php-compiler/issues/1904), [#1354](https://github.com/PurHur/php-compiler/issues/1354)); set `0` to skip |
 | `REHASH_COMPLIANCE_GATE` | `1` | `ci-fast.sh` | `VMTest` paths `array/array_rehash_string_keys`, `array/hashtable_string_keys`, `hashtable_rehash_unset` ([#1956](https://github.com/PurHur/php-compiler/issues/1956), [#66](https://github.com/PurHur/php-compiler/issues/66)); set `0` to skip |

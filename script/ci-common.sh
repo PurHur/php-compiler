@@ -391,6 +391,24 @@ ci_run_miniwebapp_lint_zero_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-miniwebapp-lint-zero.php
 }
 
+# 003-MiniWebApp VM OOP lint + phpc serve curls (issues #2059, #2189); opt-in MINIWEBAPP_VM_OOP_GATE=1.
+ci_run_miniwebapp_vm_oop() {
+  if [[ "${MINIWEBAPP_VM_OOP_GATE:-0}" != "1" ]]; then
+    echo "MiniWebApp VM OOP: skipped (MINIWEBAPP_VM_OOP_GATE=0 default; set 1 to opt in, issue #2189)"
+    return 0
+  fi
+  if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+    echo "MiniWebApp VM OOP: MINIWEBAPP_VM_OOP_GATE=1 requires serve tests; unset PHP_COMPILER_SKIP_SERVE_TESTS (#2189)" >&2
+    exit 1
+  fi
+  if ! ci_can_bind_loopback; then
+    echo "MiniWebApp VM OOP: skipped (cannot bind loopback TCP)"
+    return 0
+  fi
+  echo "MiniWebApp VM OOP (MINIWEBAPP_VM_OOP_GATE=1, issue #2189)..."
+  "$_CI_SCRIPT_DIR/check-miniwebapp-vm-oop.sh"
+}
+
 ci_run_init_sessionsweb_parity_check() {
   if [[ "${INIT_SESSIONSWEB_PARITY_GATE:-1}" != "1" ]]; then
     return 0

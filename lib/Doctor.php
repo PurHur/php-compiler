@@ -436,6 +436,12 @@ final class Doctor
             ? 'default on when gate=1 — ci-local MiniWebAppJitProjectTest (#587, #2183)'
             : 'opt-in default 0 — MINIWEBAPP_JIT_PROJECT_GATE=1 for project JIT (#587)';
         fwrite(STDOUT, '  003 project JIT  MINIWEBAPP_JIT_PROJECT_GATE='.($jitProjectOn ? '1' : '0')." (default {$jitProjectDefault}) — {$jitProjectDetail}\n");
+        $vmOopDefault = $defaultsWeb['MINIWEBAPP_VM_OOP_GATE'] ?? '0';
+        $vmOopOn = self::gateEnabled('MINIWEBAPP_VM_OOP_GATE', $vmOopDefault);
+        $vmOopDetail = $vmOopOn
+            ? 'opt-in when gate=1 — ci-fast check-miniwebapp-vm-oop.sh (#2189, #2059)'
+            : 'opt-in default 0 — MINIWEBAPP_VM_OOP_GATE=1 for VM serve OOP curls (#2189)';
+        fwrite(STDOUT, '  003 VM OOP e2e  MINIWEBAPP_VM_OOP_GATE='.($vmOopOn ? '1' : '0')." (default {$vmOopDefault}) — {$vmOopDetail}\n");
         fwrite(STDOUT, "  Full AOT tail    ./script/ci-local.sh --filter MiniWebAppAotExecuteTest   LLVM required\n");
         fwrite(STDOUT, "  Presenter bundle make north-star1-verify            --require-llvm / --skip-llvm-tail\n");
         fwrite(STDOUT, "  Script           ./script/north-star1-verify.sh    same as make target\n");
