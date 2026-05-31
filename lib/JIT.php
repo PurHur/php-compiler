@@ -5354,11 +5354,13 @@ class JIT {
                     break;
                 case OpCode::TYPE_POW:
                     $pow = new \PHPCompiler\ext\standard\pow();
+                    $this->context->powReturnValueBox = true;
                     $powResult = $pow->call(
                         $this->context,
                         $this->context->getVariableFromOp($block->getOperand($op->arg2)),
                         $this->context->getVariableFromOp($block->getOperand($op->arg3))
                     );
+                    $this->context->powReturnValueBox = false;
                     $this->assignOperandValue($block->getOperand($op->arg1), $powResult);
                     break;
                 case OpCode::TYPE_POST_INC:

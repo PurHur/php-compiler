@@ -67,6 +67,9 @@ class Context {
     /** Call-site file strict_types while lowering FUNCCALL (issues #156, #1229). */
     public bool $callerStrictTypes = false;
 
+    /** When true, pow() lowering returns a boxed {@see __value__*} (power operator **). */
+    public bool $powReturnValueBox = false;
+
     /** Link-time source bytes for runtime_trivial_echo.php (M3 emit-helper #2559). */
     public ?string $m3EmitTuTrivialEchoSource = null;
 
