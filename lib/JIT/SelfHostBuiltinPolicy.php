@@ -42,6 +42,8 @@ final class SelfHostBuiltinPolicy
         'getdate' => 'numeric',
         'uniqid' => 'numeric',
         'getmypid' => 'numeric',
+        'getmygrgid' => 'numeric',
+        'getmyinode' => 'numeric',
         'getrusage' => 'numeric',
         'pi' => 'numeric',
     ];

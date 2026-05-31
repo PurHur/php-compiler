@@ -394,6 +394,8 @@ class Module extends ModuleAbstract
             new fnmatch(),
             new time(),
             new getmypid(),
+            new getmygrgid(),
+            new getmyinode(),
             new getrusage(),
             new microtime(),
             new gettimeofday(),
