@@ -13,8 +13,28 @@ use PHPCompiler\Frame;
  */
 final class CycleCollector
 {
+    private static bool $enabled = true;
+
+    public static function isEnabled(): bool
+    {
+        return self::$enabled;
+    }
+
+    public static function enable(): void
+    {
+        self::$enabled = true;
+    }
+
+    public static function disable(): void
+    {
+        self::$enabled = false;
+    }
+
     public static function collect(Context $ctx): int
     {
+        if (!self::$enabled) {
+            return 0;
+        }
         /** @var array<int, true> $marked */
         $marked = [];
         $visitVar = static function (Variable $var) use (&$marked, &$visitVar): void {
