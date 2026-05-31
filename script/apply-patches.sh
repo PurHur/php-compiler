@@ -595,6 +595,7 @@ apply_php_cfg_enum_overlay() {
     && php_cfg_enum_implements_parser_applied "$parser" \
     && grep -A25 'function parseStmt_Enum' "$parser" | grep -q 'Stmt\\ClassMethod'; then
     echo "Skip php-cfg-enum.patch (already applied)"
+    php_cfg_sync_enum_flags_parser "$parser" "$op" || true
     return 0
   fi
   if ! grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null; then
@@ -618,6 +619,7 @@ PY
   fi
   apply_php_cfg_enum_implements_parser_fix "$parser"
   apply_php_cfg_enum_class_method_parser_fix "$parser"
+  php_cfg_sync_enum_flags_parser "$parser" "$op" || true
 }
 
 apply_php_cfg_enum_implements_overlay() {
@@ -636,6 +638,7 @@ apply_php_cfg_enum_implements_overlay() {
   fi
   apply_php_cfg_enum_implements_parser_fix "$parser"
   echo "Applied php-cfg-enum-implements.patch (overlay)"
+  php_cfg_sync_enum_flags_parser "$parser" "$op" || true
 }
 
 php_cfg_enum_flags_parser_applied() {
@@ -644,26 +647,19 @@ php_cfg_enum_flags_parser_applied() {
   grep -A12 'new Op\\Stmt\\Enum_' "$parser" 2>/dev/null | grep -q '\$flags,'
 }
 
-# Run enum overlays before patches that may fail and abort the php-cfg block (#3114).
-apply_php_cfg_enum_early_chain() {
-  [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]] || return 0
-  apply_php_cfg_enum_overlay || true
-  apply_php_cfg_enum_implements_overlay || true
-  apply_php_cfg_enum_class_method_parser_fix || true
-  apply_php_cfg_enum_abstract_overlay || true
+php_cfg_enum_op_expects_flags() {
+  local op="${1:-$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php}"
+  [[ -f "$op" ]] || return 1
+  grep -q 'int \$flags' "$op" 2>/dev/null
 }
 
-apply_php_cfg_enum_abstract_overlay() {
-  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
-  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php"
+php_cfg_apply_enum_flags_parser_fix() {
+  local parser="${1:-$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php}"
   local overlay="$PATCH_DIR/overlays/php-cfg"
   if ! grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null; then
-    echo "Skip php-cfg-enum-abstract.patch (parseStmt_Enum missing)" >&2
     return 1
   fi
-  cp "$overlay/Op/Stmt/Enum_.php" "$op"
   if php_cfg_enum_flags_parser_applied "$parser"; then
-    echo "Skip php-cfg-enum-abstract.patch (already applied)"
     return 0
   fi
   python3 - "$parser" "$overlay/enum-abstract-parser-method.php" <<'PY'
@@ -682,6 +678,46 @@ if not match:
     raise SystemExit(1)
 parser_path.write_text(text[: match.start()] + replacement + text[match.end() :])
 PY
+}
+
+# Keep Enum_.php flags ctor and parseStmt_Enum in sync (#3114).
+php_cfg_sync_enum_flags_parser() {
+  local parser="${1:-$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php}"
+  local op="${2:-$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php}"
+  if ! php_cfg_enum_op_expects_flags "$op"; then
+    return 0
+  fi
+  if php_cfg_enum_flags_parser_applied "$parser"; then
+    return 0
+  fi
+  php_cfg_apply_enum_flags_parser_fix "$parser"
+  echo "Repair php-cfg-enum-abstract.patch (Enum_ flags ctor vs Parser.php)"
+}
+
+# Run enum overlays before patches that may fail and abort the php-cfg block (#3114).
+apply_php_cfg_enum_early_chain() {
+  [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]] || return 0
+  apply_php_cfg_enum_overlay || true
+  apply_php_cfg_enum_implements_overlay || true
+  apply_php_cfg_enum_class_method_parser_fix || true
+  apply_php_cfg_enum_abstract_overlay || true
+  php_cfg_sync_enum_flags_parser || true
+}
+
+apply_php_cfg_enum_abstract_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg"
+  if ! grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-enum-abstract.patch (parseStmt_Enum missing)" >&2
+    return 1
+  fi
+  cp "$overlay/Op/Stmt/Enum_.php" "$op"
+  if php_cfg_enum_flags_parser_applied "$parser"; then
+    echo "Skip php-cfg-enum-abstract.patch (already applied)"
+    return 0
+  fi
+  php_cfg_apply_enum_flags_parser_fix "$parser"
   echo "Applied php-cfg-enum-abstract.patch (overlay)"
 }
 
