@@ -2896,7 +2896,7 @@ restart:
             } catch (\LogicException) {
                 $message = 'Exception';
             }
-            throw new \Exception($message);
+            throw VM\ExceptionSupport::nativeUncaughtThrowable($entry, $message);
         }
         throw new \Exception($thrown->toString());
     }

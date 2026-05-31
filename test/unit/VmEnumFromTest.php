@@ -34,7 +34,7 @@ Color::from('missing');
 PHP;
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile($code, 'enum_from_invalid.php');
-        $this->expectException(\Exception::class);
+        $this->expectException(\ValueError::class);
         $this->expectExceptionMessage('"missing" is not a valid backing value for enum Color');
         $runtime->run($block);
     }
@@ -86,7 +86,7 @@ Level::from('1abc');
 PHP;
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile($code, 'enum_from_int_bad_string.php');
-        $this->expectException(\Exception::class);
+        $this->expectException(\TypeError::class);
         $this->expectExceptionMessage('Level::from(): Argument #1 ($value) must be of type int, string given');
         $runtime->run($block);
     }
