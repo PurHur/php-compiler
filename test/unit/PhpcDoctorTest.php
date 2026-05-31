@@ -61,6 +61,7 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE', $result['stdout']);
         $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE', $result['stdout']);
         $this->assertStringContainsString('NORTH_STAR3_VERIFY_GATE', $result['stdout']);
+        $this->assertStringContainsString('NORTH_STAR4_VERIFY_GATE', $result['stdout']);
         $this->assertStringContainsString('SELFHOST_SPINE_COUNT_SYNC_GATE', $result['stdout']);
         $this->assertStringContainsString('SELFHOST_SPINE_DEFERRED_SYNC_GATE', $result['stdout']);
         $this->assertStringContainsString('SELFHOST_SPINE_COVERAGE_SYNC_GATE', $result['stdout']);
@@ -154,6 +155,8 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('check-init-miniwebapp-parity.sh', $result['stdout']);
         $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE', $result['stdout']);
         $this->assertStringContainsString('NORTH_STAR3_VERIFY_GATE', $result['stdout']);
+        $this->assertStringContainsString('NORTH_STAR4_VERIFY_GATE', $result['stdout']);
+        $this->assertStringContainsString('M4 presenter', $result['stdout']);
         $this->assertStringContainsString('NORTH_STAR2_THROWSWEB_GATE', $result['stdout']);
         $this->assertStringContainsString('examples-throws-smoke', $result['stdout']);
         $this->assertStringContainsString('Bootstrap subset', $result['stdout']);
