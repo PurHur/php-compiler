@@ -587,23 +587,15 @@ function buildFromProject(
         \PHPCompiler\Cli\PhpcBuild::emitVerboseProjectGraph($projectDir);
     }
 
-    $graph = \PHPCompiler\AOT\ProjectGraph::resolve($projectDir);
-    if ([] !== $graph['errors']) {
-        foreach ($graph['errors'] as $message) {
+    $resolved = \PHPCompiler\Cli\PhpcBuild::resolveGraphIncludePaths($projectDir, $entry);
+    if ([] !== $resolved['errors']) {
+        foreach ($resolved['errors'] as $message) {
             fwrite(STDERR, $message."\n");
         }
 
         return 1;
     }
-
-    $entryKey = realpath($entry) ?: $entry;
-    $includes = [];
-    foreach ($graph['files'] as $path) {
-        $key = realpath($path) ?: $path;
-        if ($key !== $entryKey) {
-            $includes[] = $path;
-        }
-    }
+    $includes = $resolved['includes'];
 
     $compileArgv = ['-o', $output];
     foreach ($includes as $includePath) {
