@@ -77,6 +77,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'enum_case_name_value')) {
                 continue;
             }
+            // get_debug_type() on enum cases: VM enum class names; MCJIT deferred (#3454).
+            if (str_contains($name, 'get_debug_type_enum')) {
+                continue;
+            }
             // count() on Countable objects is VM-only until JIT object dispatch (#3364).
             if (str_contains($name, 'countable')) {
                 continue;
