@@ -18,6 +18,8 @@ final class BuiltinByRefParams
                 return [1];
             case 'frexp':
                 return [1];
+            case 'similar_text':
+                return [2];
         }
 
         return [];
