@@ -142,6 +142,44 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_pre_dec.php'));
     }
 
+    public function testReadonlyPropertyRejectsCompoundAssignAfterConstruct(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public readonly int $x;
+    public function __construct() {
+        $this->x = 1;
+    }
+}
+$c = new C();
+$c->x += 1;
+PHP;
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Cannot modify readonly property C::$x');
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_compound.php'));
+    }
+
+    public function testReadonlyPropertyRejectsConcatAssignAfterConstruct(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public readonly string $x;
+    public function __construct() {
+        $this->x = 'a';
+    }
+}
+$c = new C();
+$c->x .= 'b';
+PHP;
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Cannot modify readonly property C::$x');
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_concat.php'));
+    }
+
     public function testReadonlyPropertyAllowsUnsetOnNonReadonlyProperty(): void
     {
         $runtime = new Runtime();

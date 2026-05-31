@@ -1131,6 +1131,11 @@ restart:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
+                    $catchFrame = $this->enforceReadonlyForCompoundAssign($frame, $op, $arg2);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     try {
                         if (
                             $op->isIncDec
@@ -1164,6 +1169,11 @@ restart:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
+                    $catchFrame = $this->enforceReadonlyForCompoundAssign($frame, $op, $arg2);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $arg1->bitwiseOp($op->type, $arg2, $arg3);
                     break;
 
@@ -1175,6 +1185,11 @@ restart:
                     break;
                 case OpCode::TYPE_CONCAT:
                     $arg1 = $frame->scope[$op->arg1];
+                    $catchFrame = $this->enforceReadonlyForCompoundAssign($frame, $op, $arg1);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $arg2 = $this->coerceVariableToString($frame->scope[$op->arg2]);
                     $arg3 = $this->coerceVariableToString($frame->scope[$op->arg3]);
                     $arg1->string($arg2 . $arg3);
@@ -2647,10 +2662,16 @@ restart:
         $ops = $handler->block->opCodes;
         $n = $handler->block->nOpCodes;
         for ($i = 0; $i < $n; ++$i) {
+            if (!isset($ops[$i])) {
+                continue;
+            }
             if (OpCode::TYPE_TRY !== $ops[$i]->type) {
                 continue;
             }
             for ($j = $i + 1; $j < $n; ++$j) {
+                if (!isset($ops[$j])) {
+                    continue;
+                }
                 if (OpCode::TYPE_CATCH === $ops[$j]->type) {
                     $handler->pos = $j;
 
@@ -3111,6 +3132,19 @@ restart:
         $this->raiseUncaughtException($thrown);
 
         return null;
+    }
+
+    /**
+     * Compound assignment ($obj->prop += 1) reuses one operand slot (arg1 === arg2).
+     * Reject when the lvalue is a readonly instance property after construction (#3149).
+     */
+    private function enforceReadonlyForCompoundAssign(Frame $frame, OpCode $op, Variable $lvalue): ?Frame
+    {
+        if ($op->arg1 !== $op->arg2) {
+            return null;
+        }
+
+        return $this->enforceReadonlyPropertyWrite($lvalue, $frame);
     }
 
     /** Reject readonly property writes; returns catch frame or throws when uncaught. */

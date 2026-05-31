@@ -19,7 +19,7 @@ final class ReadonlyPropertyAotTest extends AotTest
 {
     public static function providePHPTests(): \Generator
     {
-        foreach (['readonly_property_write.phpt', 'readonly_property_unset.phpt', 'readonly_property_inc.phpt'] as $basename) {
+        foreach (['readonly_property_write.phpt', 'readonly_property_unset.phpt', 'readonly_property_inc.phpt', 'readonly_property_compound_assign.phpt'] as $basename) {
             $path = dirname(__DIR__).'/fixtures/aot/cases/'.$basename;
             if (!is_file($path)) {
                 throw new \RuntimeException('readonly property AOT: missing fixture '.$path);
