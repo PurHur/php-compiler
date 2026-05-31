@@ -10,10 +10,15 @@ namespace PHPCompiler\VM;
 final class DnfCheck
 {
     /**
-     * @param list<array{kind: string, interfaces?: list<string>, name?: string}> $arms
+     * @param list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}> $arms
      */
-    public static function assertMatches(Variable $value, array $arms, Context $context, string $kind = 'Argument'): void
-    {
+    public static function assertMatches(
+        Variable $value,
+        array $arms,
+        Context $context,
+        string $kind = 'Argument',
+        ?Variable $propertyMeta = null
+    ): void {
         if ([] === $arms) {
             return;
         }
@@ -24,6 +29,9 @@ final class DnfCheck
             }
         }
         $expected = \PHPCompiler\DnfType::formatUnionType($arms);
+        if ('Property' === $kind && null !== $propertyMeta && null !== $propertyMeta->declaredTypeLabel) {
+            throw self::propertyTypeError($propertyMeta, $propertyMeta->declaredTypeLabel, $resolved);
+        }
         $given = self::givenTypeLabel($resolved);
         throw new \TypeError("{$kind} must be of type {$expected}, {$given} given");
     }
@@ -61,6 +69,10 @@ final class DnfCheck
 
     private static function matchesLiteralArm(Variable $value, string $name): bool
     {
+        if ('null' === $name) {
+            return Variable::TYPE_NULL === $value->type;
+        }
+
         return match ($name) {
             'int' => Variable::TYPE_INTEGER === $value->type,
             'float' => Variable::TYPE_FLOAT === $value->type,
@@ -68,7 +80,6 @@ final class DnfCheck
             'string' => Variable::TYPE_STRING === $value->type,
             'array' => Variable::TYPE_ARRAY === $value->type,
             'object' => Variable::TYPE_OBJECT === $value->type,
-            'null' => Variable::TYPE_NULL === $value->type,
             default => false,
         };
     }
@@ -94,5 +105,29 @@ final class DnfCheck
         }
 
         return strtolower(ltrim($value->toObject()->class->name, '\\'));
+    }
+
+    private static function propertyTypeError(
+        Variable $target,
+        string $expectedType,
+        Variable $value
+    ): \TypeError {
+        $owner = $target->objectPropertyOwner;
+        $propName = $target->objectPropertyName ?? 'property';
+        if (null !== $owner) {
+            return new \TypeError(sprintf(
+                'Cannot assign %s to property %s::$%s of type %s',
+                self::givenTypeLabel($value),
+                $owner->class->name,
+                $propName,
+                $expectedType
+            ));
+        }
+
+        return new \TypeError(sprintf(
+            'Property must be of type %s, %s given',
+            $expectedType,
+            self::givenTypeLabel($value)
+        ));
     }
 }

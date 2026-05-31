@@ -16,21 +16,21 @@ final class DnfType
     /**
      * @return list<DnfArm>
      */
-    public static function armsFromCfgType(?CfgType $type, callable $intersectionNames): array
+    public static function armsFromCfgType(?CfgType $type, callable $intersectionNames, ?callable $intersectionDisplay = null): array
     {
         if (null === $type) {
             return [];
         }
         if ($type instanceof CfgType\Nullable) {
             return array_merge(
-                self::armsFromCfgType($type->subtype, $intersectionNames),
+                self::armsFromCfgType($type->subtype, $intersectionNames, $intersectionDisplay),
                 [['kind' => 'null']]
             );
         }
         if ($type instanceof CfgType\Union_) {
             $arms = [];
             foreach ($type->types as $member) {
-                $arms = array_merge($arms, self::armsFromCfgType($member, $intersectionNames));
+                $arms = array_merge($arms, self::armsFromCfgType($member, $intersectionNames, $intersectionDisplay));
             }
 
             return $arms;
@@ -40,14 +40,27 @@ final class DnfType
             if ([] === $ifaces) {
                 return [];
             }
+            $display = null !== $intersectionDisplay
+                ? $intersectionDisplay($type)
+                : implode('&', $ifaces);
 
-            return [['kind' => 'intersection', 'interfaces' => $ifaces]];
+            return [['kind' => 'intersection', 'interfaces' => $ifaces, 'display' => $display]];
         }
         if ($type instanceof CfgType\Literal) {
             return [['kind' => 'literal', 'name' => strtolower($type->name)]];
         }
 
         return [];
+    }
+
+    public static function labelFromCfgType(
+        ?CfgType $type,
+        callable $intersectionNames,
+        ?callable $intersectionDisplay = null
+    ): string {
+        return self::formatUnionType(
+            self::armsFromCfgType($type, $intersectionNames, $intersectionDisplay)
+        );
     }
 
     /**
@@ -65,11 +78,15 @@ final class DnfType
     {
         $parts = [];
         foreach ($arms as $arm) {
-            $parts[] = match ($arm['kind']) {
+            $part = match ($arm['kind']) {
                 'null' => 'null',
-                'intersection' => implode('&', $arm['interfaces']),
+                'intersection' => $arm['display'] ?? implode('&', $arm['interfaces']),
                 'literal' => $arm['name'],
             };
+            if (\count($arms) > 1 && 'intersection' === $arm['kind']) {
+                $part = '(' . $part . ')';
+            }
+            $parts[] = $part;
         }
 
         return implode('|', $parts);

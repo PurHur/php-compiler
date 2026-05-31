@@ -1738,6 +1738,52 @@ class Compiler {
         return $names;
     }
 
+    /**
+     * True when declared type uses union/intersection/nullable DNF shape (#3094).
+     * Plain scalars like `int` stay on paramTypeConstraints / typeConstraint paths.
+     */
+    protected function cfgTypeUsesDnfShape(?Op\Type $declared): bool
+    {
+        if (null === $declared) {
+            return false;
+        }
+        if ($declared instanceof Op\Type\Union_ || $declared instanceof Op\Type\Intersection) {
+            return true;
+        }
+        if ($declared instanceof Op\Type\Nullable) {
+            return true;
+        }
+
+        return false;
+    }
+
+    protected function dnfTypeLabelFromCfgType(?Op\Type $declared): string
+    {
+        if (null === $declared) {
+            return 'mixed';
+        }
+
+        return DnfType::labelFromCfgType(
+            $declared,
+            fn (Op\Type\Intersection $t) => $this->intersectionNamesFromCfgType($t),
+            fn (Op\Type\Intersection $t) => $this->intersectionDisplayFromCfgType($t)
+        );
+    }
+
+    protected function intersectionDisplayFromCfgType(Op\Type\Intersection $type): string
+    {
+        $names = [];
+        foreach ($type->types as $member) {
+            $name = $this->staticNameFromCfgType($member);
+            if (null === $name) {
+                $this->throwCompileError('Intersection type members must be interface names');
+            }
+            $names[] = ltrim($name, '\\');
+        }
+
+        return implode('&', $names);
+    }
+
     protected function staticNameFromCfgType(?Op\Type $type): ?string
     {
         if (null === $type) {
@@ -1778,14 +1824,17 @@ class Compiler {
 
             return;
         }
-        $dnfArms = DnfType::armsFromCfgType(
-            $declared,
-            fn (Op\Type\Intersection $t) => $this->intersectionNamesFromCfgType($t)
-        );
-        if (DnfType::hasConstraints($dnfArms)) {
-            $block->paramDnfConstraints[$slot] = $dnfArms;
+        if ($this->cfgTypeUsesDnfShape($declared)) {
+            $dnfArms = DnfType::armsFromCfgType(
+                $declared,
+                fn (Op\Type\Intersection $t) => $this->intersectionNamesFromCfgType($t),
+                fn (Op\Type\Intersection $t) => $this->intersectionDisplayFromCfgType($t)
+            );
+            if (DnfType::hasConstraints($dnfArms)) {
+                $block->paramDnfConstraints[$slot] = $dnfArms;
 
-            return;
+                return;
+            }
         }
         if ($declared instanceof Op\Type\Literal) {
             $declName = strtolower($declared->name);
@@ -2183,14 +2232,18 @@ class Compiler {
 
             return $return;
         }
-        $dnfArms = DnfType::armsFromCfgType(
-            $cfgType,
-            fn (Op\Type\Intersection $t) => $this->intersectionNamesFromCfgType($t)
-        );
-        if (DnfType::hasConstraints($dnfArms)) {
-            $var->dnfArms = $dnfArms;
+        if ($this->cfgTypeUsesDnfShape($cfgType)) {
+            $dnfArms = DnfType::armsFromCfgType(
+                $cfgType,
+                fn (Op\Type\Intersection $t) => $this->intersectionNamesFromCfgType($t),
+                fn (Op\Type\Intersection $t) => $this->intersectionDisplayFromCfgType($t)
+            );
+            if (DnfType::hasConstraints($dnfArms)) {
+                $var->dnfArms = $dnfArms;
+                $var->declaredTypeLabel = $this->dnfTypeLabelFromCfgType($cfgType);
 
-            return $return;
+                return $return;
+            }
         }
         if (Type::TYPE_UNION === $type->type) {
             $members = [];

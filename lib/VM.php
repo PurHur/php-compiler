@@ -790,8 +790,14 @@ restart:
                         : $frame->block->strictTypes;
                     try {
                         TypeCheck::coercePropertyWrite($arg2, $strict);
-                        if (null !== $arg2->dnfArms) {
-                            DnfCheck::assertMatches($arg3, $arg2->dnfArms, $this->context, 'Property');
+                        if (null !== $writeTarget->dnfArms) {
+                            DnfCheck::assertMatches(
+                                $arg3,
+                                $writeTarget->dnfArms,
+                                $this->context,
+                                'Property',
+                                $writeTarget
+                            );
                         }
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
@@ -1713,26 +1719,26 @@ restart:
                     $arraySpec = $frame->block->paramGenericArrayTypeSpecs[$op->arg1] ?? null;
                     try {
                         TypeCheck::coerceParameter($arg1, $strict, $arraySpec);
+                        if (isset($frame->block->paramIntersectionConstraints[$op->arg1])) {
+                            TypeCheck::assertParamIntersection(
+                                $arg1,
+                                $frame->block->paramIntersectionConstraints[$op->arg1],
+                                $this->context
+                            );
+                        }
+                        if (isset($frame->block->paramDnfConstraints[$op->arg1])) {
+                            DnfCheck::assertMatches(
+                                $arg1,
+                                $frame->block->paramDnfConstraints[$op->arg1],
+                                $this->context
+                            );
+                        }
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
                         }
-                    }
-                    if (isset($frame->block->paramIntersectionConstraints[$op->arg1])) {
-                        TypeCheck::assertParamIntersection(
-                            $arg1,
-                            $frame->block->paramIntersectionConstraints[$op->arg1],
-                            $this->context
-                        );
-                    }
-                    if (isset($frame->block->paramDnfConstraints[$op->arg1])) {
-                        DnfCheck::assertMatches(
-                            $arg1,
-                            $frame->block->paramDnfConstraints[$op->arg1],
-                            $this->context
-                        );
                     }
                     break;
                 case OpCode::TYPE_DECLARE_INTERFACE:
