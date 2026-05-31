@@ -25,9 +25,13 @@ static int phpc_stream_chunk_size[PHPC_MAX_STREAM_HANDLES];
 static int phpc_stream_write_buffer[PHPC_MAX_STREAM_HANDLES];
 static int phpc_stream_read_buffer[PHPC_MAX_STREAM_HANDLES];
 static char phpc_stream_write_buffer_storage[PHPC_MAX_STREAM_HANDLES][8192];
+static char *phpc_stream_paths[PHPC_MAX_STREAM_HANDLES];
 
 #define PHPC_STREAM_DEFAULT_CHUNK_SIZE 8192
 #define PHPC_STREAM_DEFAULT_BUFFER_SIZE 8192
+
+typedef struct __hashtable__ __hashtable__;
+extern __hashtable__ *__phpc_stat(__string__ *path, int use_lstat);
 
 static size_t phpc_string_len(__string__ *s)
 {
@@ -107,6 +111,13 @@ int64_t __compiler_fopen(__string__ *path, __string__ *mode)
             phpc_stream_chunk_size[id] = PHPC_STREAM_DEFAULT_CHUNK_SIZE;
             phpc_stream_write_buffer[id] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
             phpc_stream_read_buffer[id] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
+            phpc_stream_paths[id] = strdup(phpc_string_data(path));
+            if (NULL == phpc_stream_paths[id]) {
+                fclose(fp);
+                phpc_stream_handles[id] = NULL;
+
+                return -1;
+            }
 
             return id;
         }
@@ -131,6 +142,7 @@ int64_t __compiler_tmpfile(void)
             phpc_stream_chunk_size[id] = PHPC_STREAM_DEFAULT_CHUNK_SIZE;
             phpc_stream_write_buffer[id] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
             phpc_stream_read_buffer[id] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
+            phpc_stream_paths[id] = NULL;
 
             return id;
         }
@@ -195,6 +207,10 @@ int __compiler_fclose(int64_t handle)
         return 0;
     }
     phpc_stream_handles[handle] = NULL;
+    if (NULL != phpc_stream_paths[handle]) {
+        free(phpc_stream_paths[handle]);
+        phpc_stream_paths[handle] = NULL;
+    }
 
     return fclose(fp) == 0 ? 1 : 0;
 }
@@ -521,6 +537,48 @@ int64_t __compiler_fseek(int64_t handle, int64_t offset, int64_t whence)
     }
 
     return fseek(fp, (long) offset, (int) whence) == 0 ? 0 : -1;
+}
+
+/** fstat() metadata via stored fopen path + __phpc_stat (issue #3482). */
+__hashtable__ *__phpc_fstat(int64_t handle)
+{
+    const char *path;
+    size_t len;
+
+    if (handle <= 0 || handle >= PHPC_MAX_STREAM_HANDLES) {
+        return NULL;
+    }
+    if (NULL == phpc_stream_handles[handle]) {
+        return NULL;
+    }
+    path = phpc_stream_paths[handle];
+    if (NULL == path) {
+        return NULL;
+    }
+    len = strlen(path);
+
+    return __phpc_stat(__string__init((long long) len, path), 0);
+}
+
+/** Open stream path for fstat() JIT lowering via stat() (issue #3482). */
+__string__ *__phpc_stream_path(int64_t handle)
+{
+    const char *path;
+    size_t len;
+
+    if (handle <= 0 || handle >= PHPC_MAX_STREAM_HANDLES) {
+        return NULL;
+    }
+    if (NULL == phpc_stream_handles[handle]) {
+        return NULL;
+    }
+    path = phpc_stream_paths[handle];
+    if (NULL == path) {
+        return NULL;
+    }
+    len = strlen(path);
+
+    return __string__init((long long) len, path);
 }
 
 typedef struct __hashtable__ __hashtable__;
