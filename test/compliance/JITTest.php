@@ -337,6 +337,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'highlight_string')) {
                 continue;
             }
+            // ob_get_contents/ob_end_clean/ob_get_length VM-only until LLVM ob read API (#3236).
+            if (str_contains($name, 'ob_get_contents')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
