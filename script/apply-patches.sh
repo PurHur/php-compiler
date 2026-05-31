@@ -252,8 +252,7 @@ patch_already_applied() {
       grep -q 'elseif ($stmt instanceof Stmt\\ClassMethod)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-enum-abstract.patch)
-      grep -q 'public \$flags' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php" 2>/dev/null \
-        && grep -q 'AbstractEnumMarker::ATTR' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      php_cfg_enum_flags_parser_applied
       ;;
     php-cfg-named-args.patch)
       grep -q 'callArgName' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
@@ -639,6 +638,21 @@ apply_php_cfg_enum_implements_overlay() {
   echo "Applied php-cfg-enum-implements.patch (overlay)"
 }
 
+php_cfg_enum_flags_parser_applied() {
+  local parser="${1:-$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php}"
+  [[ -f "$parser" ]] || return 1
+  grep -A12 'new Op\\Stmt\\Enum_' "$parser" 2>/dev/null | grep -q '\$flags,'
+}
+
+# Run enum overlays before patches that may fail and abort the php-cfg block (#3114).
+apply_php_cfg_enum_early_chain() {
+  [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]] || return 0
+  apply_php_cfg_enum_overlay || true
+  apply_php_cfg_enum_implements_overlay || true
+  apply_php_cfg_enum_class_method_parser_fix || true
+  apply_php_cfg_enum_abstract_overlay || true
+}
+
 apply_php_cfg_enum_abstract_overlay() {
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php"
@@ -648,8 +662,7 @@ apply_php_cfg_enum_abstract_overlay() {
     return 1
   fi
   cp "$overlay/Op/Stmt/Enum_.php" "$op"
-  if grep -q 'AbstractEnumMarker::ATTR' "$parser" 2>/dev/null \
-    && grep -q 'public \$flags' "$op" 2>/dev/null; then
+  if php_cfg_enum_flags_parser_applied "$parser"; then
     echo "Skip php-cfg-enum-abstract.patch (already applied)"
     return 0
   fi
@@ -2173,6 +2186,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-no-arrow-function.patch"
   apply_patch "$PATCH_DIR/php-cfg-no-closure-preg-replace-callback.patch"
   apply_patch "$PATCH_DIR/php-cfg-property-type.patch"
+  apply_php_cfg_enum_early_chain
   apply_patch "$PATCH_DIR/php-cfg-typed-class-const.patch"
   apply_patch "$PATCH_DIR/php-cfg-asymmetric-visibility.patch"
   apply_patch "$PATCH_DIR/php-cfg-assertion-expr-property.patch"
