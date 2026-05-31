@@ -33,6 +33,26 @@ final class VmMath
         throw new \LogicException('Math builtins only support integers and floats in this compiler build');
     }
 
+    /**
+     * pow() return typing — int when both operands are int with integral result (php-src math.c, issue #3678).
+     */
+    public static function applyPow(Variable $returnVar, Variable $base, Variable $exp): void
+    {
+        $returnVar->reset();
+        if (Variable::TYPE_INTEGER === $base->type && Variable::TYPE_INTEGER === $exp->type) {
+            $result = $base->toInt() ** $exp->toInt();
+            if (\is_int($result)) {
+                $returnVar->int($result);
+
+                return;
+            }
+            $returnVar->float($result);
+
+            return;
+        }
+        $returnVar->float(\pow(self::toFloat($base), self::toFloat($exp)));
+    }
+
     /** @return float fractional part; writes integer part to $intPart (php-src modf). */
     public static function modf(float $num, float &$intPart): float
     {

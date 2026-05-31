@@ -65,6 +65,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gc_collect_cycles')) {
                 continue;
             }
+            // set_exception_handler() / restore_exception_handler() VM-only (#3146).
+            if (str_contains($name, 'exception_handler')) {
+                continue;
+            }
             // WeakReference get() return used in locals — MCJIT execute (#3667).
             if (str_contains($name, 'weak_reference_gc_jit')) {
                 continue;
@@ -185,8 +189,9 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'coalesce_chain')) {
                 continue;
             }
-            // string/number loose == juggling is VM-only until ArrayBuiltinHelper string-long compare (#3644).
-            if (str_contains($name, 'loose_numeric_string')) {
+            // var_dump() not JIT-implemented; int↔string loose == IR guarded by LooseScientificStringJitCompileTest (#3658).
+            // MCJIT execute for loose == still segfaults (jit-runtime-probe #98); compile-only JIT gates cover #3644/#3658.
+            if (str_contains($name, 'loose_numeric_string') || str_contains($name, 'loose_scientific_string')) {
                 continue;
             }
             if (str_contains($name, 'loose_int_empty_string')) {
@@ -244,8 +249,8 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'string_increment')) {
                 continue;
             }
-            // Generator foreach MCJIT resume (#3074); execute needs jit-runtime-probe (#98) — GeneratorJITTest + GeneratorJitCompileTest.
-            if (str_contains($name, 'generator_jit')) {
+            // Generator foreach MCJIT resume (#3074); VM in GeneratorVMTest, compile in GeneratorJITTest/GeneratorJitCompileTest.
+            if (str_contains($name, 'generator_')) {
                 continue;
             }
             // Negative string offsets: VM (#3751); MCJIT StringOffsetHelper still segfaults (#198).
@@ -290,6 +295,10 @@ class JITTest extends BaseTest {
             }
             // PHP 8.4 asymmetric visibility is VM-only until JIT property guards (#3165).
             if (str_contains($name, 'asymmetric_visibility')) {
+                continue;
+            }
+            // BackedEnum::from/tryFrom VM-only until JIT lowering (#3114, #3076).
+            if (str_contains($name, 'enum_from') || str_contains($name, 'enum_try_from')) {
                 continue;
             }
             yield $name => $case;

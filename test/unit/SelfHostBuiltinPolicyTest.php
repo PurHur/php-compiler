@@ -50,6 +50,11 @@ final class SelfHostBuiltinPolicyTest extends TestCase
         $this->assertTrue(SelfHostBuiltinPolicy::isRequiredForBundle('shell_exec'));
         $this->assertSame('process', SelfHostBuiltinPolicy::categoryFor('shell_exec'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('shell_exec'));
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        $this->assertTrue(SelfHostBuiltinPolicy::isRequiredForBundle('trait_exists'));
+        $this->assertTrue(SelfHostBuiltinPolicy::isRequiredForBundle('interface_exists'));
+        $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('trait_exists'));
+        $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('interface_exists'));
     }
 
     public function testWave12ArrayOpsUseRealLoweringUnderSelfHostAot(): void

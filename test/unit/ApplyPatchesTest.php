@@ -63,5 +63,10 @@ final class ApplyPatchesTest extends TestCase
             $body,
             'parseStmt_Enum must pass implements[] to Op\\Stmt\\Enum_ ctor (#3083, #3419)'
         );
+        self::assertMatchesRegularExpression(
+            '/new Op\\\\Stmt\\\\Enum_\([\s\S]*?\$flags,\s*\n\s*\$this->mapAttributes/',
+            $body,
+            'parseStmt_Enum must pass int $flags before attributes (#3114, Enum_ ctor)'
+        );
     }
 }
