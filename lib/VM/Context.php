@@ -77,6 +77,8 @@ class Context {
 
     public ErrorReporter $errors;
 
+    public ExceptionHandlerStack $exceptionHandlers;
+
     public ScriptStack $scriptStack;
 
     /** @var array<int, Variable> foreach iterator container cache (issue #167, #1885). */
@@ -108,6 +110,7 @@ class Context {
     public function __construct(Runtime $runtime) {
         $this->runtime = $runtime;
         $this->errors = new ErrorReporter();
+        $this->exceptionHandlers = new ExceptionHandlerStack();
         $this->scriptStack = new ScriptStack();
         BuiltinClasses::register($this);
     }

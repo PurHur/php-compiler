@@ -26,6 +26,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ObjectPropertyIterator;
+use PHPCompiler\VM\ScriptExit;
 use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\TypedPropertyReadSignal;
 use PHPCompiler\VM\Variable;
@@ -2889,6 +2890,9 @@ restart:
     private function raiseUncaughtException(Variable $thrown): void
     {
         $this->clearTryCatchUnwindState();
+        if ($this->context->exceptionHandlers->dispatch($this->context, $thrown)) {
+            throw new ScriptExit(0);
+        }
         if (Variable::TYPE_OBJECT === $thrown->type) {
             $entry = $thrown->toObject();
             try {
