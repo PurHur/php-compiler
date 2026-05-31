@@ -1994,6 +1994,7 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('docker-only', $body);
         $this->assertStringContainsString('environment prerequisites missing', $body);
         $this->assertStringContainsString('./script/docker-exec.sh', $body);
+        $this->assertStringContainsString('bootstrap-selfhost-gate.sh', $body);
         $this->assertStringContainsString('do not nest', $body);
     }
 
@@ -2043,6 +2044,17 @@ final class CiScriptsTest extends TestCase
         $cap = (string) file_get_contents($root.'/script/docker-capability-matrix.sh');
         $this->assertStringContainsString('ci-docker-run.sh', $cap);
         $this->assertStringContainsString('ci_docker_create', $cap);
+    }
+
+    public function testDockerExecRejectsNestedDockerInInnerCommand(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/docker-exec.sh');
+        $this->assertStringContainsString('_docker_exec_reject_nested_docker', $body);
+        $this->assertStringContainsString('docker info', $body);
+        $this->assertStringContainsString('#2674', $body);
+        $this->assertStringContainsString('#2757', $body);
+        $this->assertStringContainsString('bootstrap-selfhost-gate', $body);
+        $this->assertStringContainsString('environment misuse', $body);
     }
 
     /** Tar-fallback must not leak docker create containers (#2708). */

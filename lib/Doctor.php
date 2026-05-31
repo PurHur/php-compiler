@@ -484,6 +484,7 @@ final class Doctor
         fwrite(STDOUT, "  Inventory        php script/bootstrap-inventory.php --check\n");
         fwrite(STDOUT, "  Wave gate        make bootstrap-wave-check\n");
         fwrite(STDOUT, "  M0 link          ./script/bootstrap-selfhost-link.sh\n");
+        fwrite(STDOUT, "  M0 link (no make) ./script/bootstrap-selfhost-gate.sh link (#2905)\n");
         fwrite(STDOUT, "  M2 spine link    BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke\n");
         fwrite(STDOUT, "  M2 VM smoke      BOOTSTRAP_LIB_SPINE_VM_SMOKE=1 make bootstrap-selfhost-lib-spine-vm-smoke\n");
         $defaultsPresenter = self::readCiDefaultsEnv($repoRoot);
