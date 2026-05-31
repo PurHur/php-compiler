@@ -277,6 +277,19 @@ class Type extends Builtin {
         $fntypeGettype = $this->context->context->functionType($strPtr, false, $valuePtr);
         $fnGettype = $this->context->module->addFunction('__compiler_gettype', $fntypeGettype);
         $this->context->registerFunction('__compiler_gettype', $fnGettype);
+        $objPtr = $this->context->getTypeFromString('__object__*');
+        $fntypeObjectIdFromObject = $this->context->context->functionType($i64, false, $objPtr);
+        $fnObjectIdFromObject = $this->context->module->addFunction(
+            'phpc_get_object_id_from_object',
+            $fntypeObjectIdFromObject
+        );
+        $this->context->registerFunction('phpc_get_object_id_from_object', $fnObjectIdFromObject);
+        $fntypeObjectIdFromValue = $this->context->context->functionType($i64, false, $valuePtr);
+        $fnObjectIdFromValue = $this->context->module->addFunction(
+            'phpc_get_object_id_from_value',
+            $fntypeObjectIdFromValue
+        );
+        $this->context->registerFunction('phpc_get_object_id_from_value', $fnObjectIdFromValue);
         $fntypeFlock = $this->context->context->functionType($i32, false, $i64, $i64);
         $fnFlock = $this->context->module->addFunction('__compiler_flock', $fntypeFlock);
         $this->context->registerFunction('__compiler_flock', $fnFlock);
