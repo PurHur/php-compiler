@@ -128,6 +128,22 @@ try {
         );
     }
 
+    public function testCatchVariableWithFinallyBlock(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+try {
+    throw new Exception("x");
+} catch (Exception $e) {
+    echo $e->getMessage(), "\n";
+} finally {
+    echo "f\n";
+}
+',
+            "f\nx\n"
+        );
+    }
+
     /** Guards bin/vm.php stdin path (compliance PHPTs); Runtime-only tests miss merge resume (#195). */
     public function testThrowExceptionCaughtViaVmCli(): void
     {

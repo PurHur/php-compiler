@@ -2727,11 +2727,13 @@ class Compiler {
             }
             if (null !== $stmt->finally) {
                 $compiledFinally = $this->compileCfgBranch($stmt->finally, $block);
+                // Finally runs before catch on throw; catch locals must not be inherited yet (#195).
+                $compiledFinally->inheritUndefinedLocals = true;
                 $finallyOp = new OpCode(OpCode::TYPE_FINALLY);
                 $finallyOp->block1 = $compiledFinally;
                 $finallyOp->block2 = $merge;
                 $block->addOpCode($finallyOp);
-                $this->rewriteTryMergeJumpsToFinally($try, $merge, $compiledFinally);
+                $this->rewriteMergeJumpsToFinally($try, $merge, $compiledFinally);
             }
         } elseif ($stmt instanceof Op\Stmt\Switch_) {
             $this->compileSwitchAsJumpIfChain($stmt, $block);
@@ -4526,12 +4528,12 @@ class Compiler {
     }
 
     /**
-     * Normal try completion must run finally before merge; php-cfg jumps try straight to end (#2114).
+     * Normal try/catch completion must run finally before merge; php-cfg jumps straight to end (#2114, #195).
      */
-    private function rewriteTryMergeJumpsToFinally(Block $try, Block $merge, Block $finally): void
+    private function rewriteMergeJumpsToFinally(Block $source, Block $merge, Block $finally): void
     {
-        for ($i = 0; $i < $try->nOpCodes; ++$i) {
-            $op = $try->opCodes[$i];
+        for ($i = 0; $i < $source->nOpCodes; ++$i) {
+            $op = $source->opCodes[$i];
             if (OpCode::TYPE_JUMP === $op->type && $op->block1 === $merge) {
                 $op->block1 = $finally;
             }
