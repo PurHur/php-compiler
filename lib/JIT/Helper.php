@@ -1096,24 +1096,64 @@ restart:
             }
         }
         if (Variable::TYPE_STRING === $leftType && Variable::TYPE_NATIVE_LONG === $rightType) {
-            $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
-            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
-                $result = $falseVal;
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                $result = $this->context->getTypeFromString('int1')->constInt(0, false);
                 goto return_bool;
             }
-            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
                 $result = $this->context->getTypeFromString('int1')->constInt(1, false);
+                goto return_bool;
+            }
+            if (OpCode::TYPE_EQUAL === $opcode->type) {
+                $result = JitValueCompare::looseEqualStringToNativeLong(
+                    $this->context,
+                    $leftValue,
+                    $rightValue
+                );
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $same = JitValueCompare::looseEqualStringToNativeLong(
+                    $this->context,
+                    $leftValue,
+                    $rightValue
+                );
+                $result = $this->context->builder->icmp(
+                    Builder::INT_EQ,
+                    $same,
+                    $this->context->getTypeFromString('int1')->constInt(0, false)
+                );
                 goto return_bool;
             }
         }
         if (Variable::TYPE_NATIVE_LONG === $leftType && Variable::TYPE_STRING === $rightType) {
-            $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
-            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
-                $result = $falseVal;
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                $result = $this->context->getTypeFromString('int1')->constInt(0, false);
                 goto return_bool;
             }
-            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
                 $result = $this->context->getTypeFromString('int1')->constInt(1, false);
+                goto return_bool;
+            }
+            if (OpCode::TYPE_EQUAL === $opcode->type) {
+                $result = JitValueCompare::looseEqualStringToNativeLong(
+                    $this->context,
+                    $rightValue,
+                    $leftValue
+                );
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $same = JitValueCompare::looseEqualStringToNativeLong(
+                    $this->context,
+                    $rightValue,
+                    $leftValue
+                );
+                $result = $this->context->builder->icmp(
+                    Builder::INT_EQ,
+                    $same,
+                    $this->context->getTypeFromString('int1')->constInt(0, false)
+                );
                 goto return_bool;
             }
         }
