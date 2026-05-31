@@ -134,6 +134,11 @@ final class VmFs
         return @rename($from, $to);
     }
 
+    public static function hardLink(string $target, string $link): bool
+    {
+        return @link($target, $link);
+    }
+
     /** Prefix for multipart upload temps (lib/Web/Superglobals.php, AOT sg_set_file_entry). */
     public const UPLOAD_TEMP_PREFIX = 'phpc_upload_';
 
