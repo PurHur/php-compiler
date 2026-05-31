@@ -69,6 +69,65 @@ final class JitFilter
         return $ptr;
     }
 
+    public static function loadNullOnFailureFlag(Context $context, ?JITVariable $options): Value
+    {
+        if (null === $options || JITVariable::TYPE_NULL === $options->type) {
+            return $context->constantFromBool(false);
+        }
+
+        $optionsVal = self::loadFilterId($context, $options);
+        $i64 = $context->getTypeFromString('int64');
+        $flag = $i64->constInt(VmFilter::FILTER_NULL_ON_FAILURE, false);
+        $masked = $context->builder->and($optionsVal, $flag);
+
+        return $context->builder->icmp(
+            Builder::INT_NE,
+            $masked,
+            $i64->constInt(0, false)
+        );
+    }
+
+    /** When flag is set, rewrite boxed false validation results to null. */
+    public static function applyNullOnFailure(Context $context, Value $resultPtr, Value $nullOnFailure): Value
+    {
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($resultPtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $boolTag = $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false);
+        $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolTag);
+        $stored = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $resultPtr
+        );
+        $zero = $context->getTypeFromString('int64')->constInt(0, false);
+        $isFalse = $context->builder->icmp(Builder::INT_EQ, $stored, $zero);
+        $isBoolFalse = $context->builder->and($isBool, $isFalse);
+        $shouldRewrite = $context->builder->and($nullOnFailure, $isBoolFalse);
+
+        $id = (string) (++self::$blockSerial);
+        $rewriteBlock = BasicBlockHelper::append($context, 'fv_null_on_fail_'.$id);
+        $keepBlock = BasicBlockHelper::append($context, 'fv_keep_result_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'fv_null_on_fail_done_'.$id);
+        $context->builder->branchIf($shouldRewrite, $rewriteBlock, $keepBlock);
+
+        $context->builder->positionAtEnd($rewriteBlock);
+        $nullResult = self::boxedNull($context);
+        $rewriteTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($keepBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($resultPtr->typeOf());
+        $phi->addIncoming($nullResult, $rewriteTail);
+        $phi->addIncoming($resultPtr, $keepBlock);
+
+        return $phi;
+    }
+
     public static function validateInt(Context $context, JITVariable $value): Value
     {
         if (JITVariable::TYPE_VALUE === $value->type) {
