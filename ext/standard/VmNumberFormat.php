@@ -8,8 +8,34 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\Variable;
+
 final class VmNumberFormat
 {
+    /**
+     * Coerce number_format() argument #1 to float (php-src ext/standard/number_format.c).
+     *
+     * @throws \TypeError when the value is not int, float, or a numeric string
+     */
+    public static function coerceFloat(Variable $value): float
+    {
+        switch ($value->type) {
+            case Variable::TYPE_INTEGER:
+                return (float) $value->toInt();
+            case Variable::TYPE_FLOAT:
+                return $value->toFloat();
+            case Variable::TYPE_STRING:
+                $s = $value->toString();
+                if (!\is_numeric($s)) {
+                    throw new \TypeError('number_format(): Argument #1 ($num) must be of type float, string given');
+                }
+
+                return (float) $s;
+            default:
+                throw new \TypeError('number_format(): Argument #1 ($num) must be of type float');
+        }
+    }
+
     public static function format(
         float $number,
         int $decimals = 0,
