@@ -530,6 +530,9 @@ class Type extends Builtin {
         );
         $fnUudecode = $this->context->module->addFunction('__compiler_convert_uudecode', $fntypeUudecode);
         $this->context->registerFunction('__compiler_convert_uudecode', $fnUudecode);
+        $fntypeWordwrap = $this->context->context->functionType($strPtr, false, $strPtr, $i64, $strPtr, $i8);
+        $fnWordwrap = $this->context->module->addFunction('__compiler_wordwrap', $fntypeWordwrap);
+        $this->context->registerFunction('__compiler_wordwrap', $fnWordwrap);
         $fntypePregMatch = $this->context->context->functionType(
             $i64,
             false,

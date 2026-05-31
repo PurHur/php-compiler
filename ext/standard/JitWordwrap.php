@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Value;
 
-/** JIT lowering for wordwrap() → __string__wordwrap. */
+/** JIT lowering for wordwrap() → __compiler_wordwrap (lib/AOT/runtime/compiler_wordwrap.c). */
 final class JitWordwrap
 {
     public static function wrap(
@@ -18,7 +18,7 @@ final class JitWordwrap
         Value $cutI8
     ): Value {
         return $context->builder->call(
-            $context->lookupFunction('__string__wordwrap'),
+            $context->lookupFunction('__compiler_wordwrap'),
             $strPtr,
             $width,
             $break,

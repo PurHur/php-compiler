@@ -160,18 +160,18 @@ final class VmString
             throw new \ValueError('wordwrap(): Argument #4 ($cut) cannot be true when argument #2 ($width) is 0');
         }
 
-        if (1 === $breakLen && !$cut) {
-            return self::wordwrapFastSingleByteBreak($text, $len, $width, $break[0]);
+        if ($cut) {
+            return self::wordwrapCutFixedWidth($text, $len, $width, $break);
         }
-        if (1 === $breakLen && $cut) {
-            return self::wordwrapCutFixedWidth($text, $len, $width, $break[0]);
+        if (1 === $breakLen) {
+            return self::wordwrapFastSingleByteBreak($text, $len, $width, $break[0]);
         }
 
         return self::wordwrapGeneral($text, $len, $width, $break, $breakLen);
     }
 
-    /** cut=true, single-byte break — fixed-width chunks (AOT self-host safe). */
-    private static function wordwrapCutFixedWidth(string $text, int $len, int $width, string $breakByte): string
+    /** cut=true — fixed-width chunks with full $break between segments (php-src php_wordwrap). */
+    private static function wordwrapCutFixedWidth(string $text, int $len, int $width, string $break): string
     {
         if ($width < 1) {
             return $text;
@@ -179,7 +179,7 @@ final class VmString
         $out = '';
         for ($i = 0; $i < $len; $i += $width) {
             if ($i > 0) {
-                $out .= $breakByte;
+                $out .= $break;
             }
             $out .= self::byteSlice($text, $i, $width);
         }

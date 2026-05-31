@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * wordwrap() VM/AOT smoke (issue #975).
+ * wordwrap() VM/AOT smoke (issues #975, #3774).
  */
 final class WordwrapBuiltinTest extends TestCase
 {
@@ -17,9 +17,10 @@ echo wordwrap($s, 20, "\n"), "\n";
 echo wordwrap('supercalifragilistic', 5, '|', true), "\n";
 echo wordwrap('hello world', 5, '-'), "\n";
 echo wordwrap('', 10), "\n";
+echo wordwrap('abcdef', 3, '--', true), "\n";
 PHP;
 
-    private const EXPECT = "The quick brown fox\njumped over the lazy\ndog.\nsuper|calif|ragil|istic\nhello-world\n\n";
+    private const EXPECT = "The quick brown fox\njumped over the lazy\ndog.\nsuper|calif|ragil|istic\nhello-world\n\nabc--def\n";
 
     public function testVmMatchesPhpSubset(): void
     {
