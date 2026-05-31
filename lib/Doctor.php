@@ -179,6 +179,7 @@ final class Doctor
         $m4LoopProbeDefault = $defaults['BOOTSTRAP_M4_LOOP_PROBE'] ?? '0';
         $m4Gen2SyncDefault = $defaults['SELFHOST_M4_GEN2_SYNC_GATE'] ?? '1';
         $compilerDriverSmokeDefault = $defaults['COMPILER_DRIVER_SMOKE_GATE'] ?? '1';
+        $vmDriverExecuteDefault = $defaults['BOOTSTRAP_VM_DRIVER_EXECUTE_GATE'] ?? '1';
         $compilerUnitProbeDefault = $defaults['BOOTSTRAP_COMPILER_UNIT_PROBE_GATE'] ?? '1';
         $jitUnitProbeDefault = $defaults['BOOTSTRAP_JIT_UNIT_PROBE_GATE'] ?? '0';
         $vmUnitProbeDefault = $defaults['BOOTSTRAP_VM_UNIT_PROBE_GATE'] ?? '0';
@@ -207,6 +208,8 @@ final class Doctor
         fwrite(STDOUT, "   SELFHOST_SPINE_DEFERRED_SYNC_GATE=".(self::gateEnabled('SELFHOST_SPINE_DEFERRED_SYNC_GATE', $spineDeferredDefault) ? '1' : '0')." (default {$spineDeferredDefault})\n");
         fwrite(STDOUT, "   BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke\n");
         fwrite(STDOUT, "   BOOTSTRAP_LIB_SPINE_VM_SMOKE=1 make bootstrap-selfhost-lib-spine-vm-smoke\n");
+        fwrite(STDOUT, "   make bootstrap-selfhost-vm-driver-execute-probe\n");
+        fwrite(STDOUT, '   BOOTSTRAP_VM_DRIVER_EXECUTE_GATE='.(self::gateEnabled('BOOTSTRAP_VM_DRIVER_EXECUTE_GATE', $vmDriverExecuteDefault) ? '1' : '0')." (default {$vmDriverExecuteDefault}) — ci-local LLVM tail M2 VM driver execute ([#2201](https://github.com/PurHur/php-compiler/issues/2201), [#2227](https://github.com/PurHur/php-compiler/issues/2227))\n");
         fwrite(STDOUT, "   BOOTSTRAP_COMPILER_DRIVER_SMOKE=1 make bootstrap-selfhost-compiler-driver-smoke\n");
         fwrite(STDOUT, '   COMPILER_DRIVER_SMOKE_GATE='.(self::gateEnabled('COMPILER_DRIVER_SMOKE_GATE', $compilerDriverSmokeDefault) ? '1' : '0')." (default {$compilerDriverSmokeDefault}) — ci-local LLVM tail ([#2137](https://github.com/PurHur/php-compiler/issues/2137), [#2168](https://github.com/PurHur/php-compiler/issues/2168))\n");
         fwrite(STDOUT, "   make bootstrap-selfhost-compiler-unit-probe\n");
@@ -495,6 +498,13 @@ final class Doctor
         fwrite(STDOUT, "  M2 spine link    BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke\n");
         fwrite(STDOUT, "  M2 VM smoke      BOOTSTRAP_LIB_SPINE_VM_SMOKE=1 make bootstrap-selfhost-lib-spine-vm-smoke\n");
         $defaultsPresenter = self::readCiDefaultsEnv($repoRoot);
+        $vmDriverExecuteDefaultPresenter = $defaultsPresenter['BOOTSTRAP_VM_DRIVER_EXECUTE_GATE'] ?? '1';
+        $vmDriverExecuteOn = self::gateEnabled('BOOTSTRAP_VM_DRIVER_EXECUTE_GATE', $vmDriverExecuteDefaultPresenter);
+        $vmDriverExecuteDetail = $vmDriverExecuteOn
+            ? 'BOOTSTRAP_VM_DRIVER_EXECUTE_GATE=1 (default) — ci-local LLVM tail M2 VM driver execute (#2201, #2227)'
+            : 'skipped (BOOTSTRAP_VM_DRIVER_EXECUTE_GATE=0 opt-out)';
+        fwrite(STDOUT, "  M2 VM driver     make bootstrap-selfhost-vm-driver-execute-probe\n");
+        fwrite(STDOUT, "                   {$vmDriverExecuteDetail}\n");
         $compilerDriverSmokeDefaultPresenter = $defaultsPresenter['COMPILER_DRIVER_SMOKE_GATE'] ?? '1';
         $compilerDriverSmokeOn = self::gateEnabled('COMPILER_DRIVER_SMOKE_GATE', $compilerDriverSmokeDefaultPresenter);
         $compilerDriverSmokeDetail = $compilerDriverSmokeOn

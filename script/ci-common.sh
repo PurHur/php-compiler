@@ -629,9 +629,9 @@ ci_run_bootstrap_lib_spine_vm_smoke() {
   "$_CI_SCRIPT_DIR/bootstrap-selfhost-lib-spine-vm-smoke.sh"
 }
 
-# M2 VM driver execute: spine-linked bin/vm.php run() dispatch (#2201); opt-in (#2227).
+# M2 VM driver execute: spine-linked bin/vm.php run() dispatch (#2201); default-on (#2227).
 ci_run_bootstrap_vm_driver_execute_probe() {
-  if [[ "${BOOTSTRAP_VM_DRIVER_EXECUTE_GATE:-0}" != "1" ]]; then
+  if [[ "${BOOTSTRAP_VM_DRIVER_EXECUTE_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if ! ci_llvm_ready; then
