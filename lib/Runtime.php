@@ -193,7 +193,53 @@ class Runtime {
             return true;
         }
 
-        return JIT\EmitTuMode::isMinimalRuntime();
+        if (JIT\EmitTuMode::isMinimalRuntime()) {
+            return true;
+        }
+
+        $loadType = $this->mode === self::MODE_NORMAL
+            ? JIT\Builtin::LOAD_TYPE_EMBED
+            : JIT\Builtin::LOAD_TYPE_STANDALONE;
+
+        return JIT\LazyBuiltins::isEnabled($loadType);
+    }
+
+    /**
+     * Lower a registered ext/* function on first reference (issue #94).
+     */
+    public function ensureJitBuiltinCompiled(string $proxyName): bool
+    {
+        foreach ($this->jitBuiltinLookupCandidates($proxyName) as $candidate) {
+            foreach ($this->modules as $module) {
+                foreach ($module->getFunctions() as $func) {
+                    if (strtolower($func->getName()) !== $candidate) {
+                        continue;
+                    }
+                    $this->loadJit()->compileFunc($func);
+
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function jitBuiltinLookupCandidates(string $proxyName): array
+    {
+        $lc = strtolower($proxyName);
+        $candidates = [$lc];
+        if (preg_match('/^(.+)\\\\([^\\\\]+)::(.+)$/', $lc, $matches)) {
+            $candidates[] = $matches[2].'::'.$matches[3];
+        }
+        if (str_contains($lc, '\\') && !str_contains($lc, '::')) {
+            $candidates[] = substr($lc, strrpos($lc, '\\') + 1);
+        }
+
+        return array_values(array_unique($candidates));
     }
 
     /** Avoid inlining loadJitContext into loadJit (LLVM 9 crash when both are real-lowered #1402). */
