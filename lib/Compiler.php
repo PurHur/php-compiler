@@ -5528,7 +5528,7 @@ class Compiler {
         if (!$nameOp instanceof Operand\Literal || 'define' !== $nameOp->value) {
             return null;
         }
-        if (count($args) < 2) {
+        if (count($args) < 2 || count($args) > 3) {
             return null;
         }
         $constNameArg = $args[0];
@@ -5539,6 +5539,20 @@ class Compiler {
         if (Variable::TYPE_STRING !== Variable::mapFromType($constNameArg->type)) {
             return null;
         }
+        $caseInsensitiveSlot = null;
+        if (3 === count($args)) {
+            $caseInsensitiveArg = $args[2];
+            if (!$caseInsensitiveArg instanceof Operand\Literal) {
+                return null;
+            }
+            if (Variable::TYPE_BOOLEAN !== Variable::mapFromType($caseInsensitiveArg->type)) {
+                return null;
+            }
+            $caseInsensitiveSlot = $this->compileOperand($caseInsensitiveArg, $block, true);
+            if (!isset($block->constants[$caseInsensitiveSlot])) {
+                return null;
+            }
+        }
         $constNameSlot = $this->compileOperand($constNameArg, $block, true);
         $valueSlot = $this->compileOperand($valueArg, $block, true);
         if (!isset($block->constants[$constNameSlot], $block->constants[$valueSlot])) {
@@ -5547,7 +5561,8 @@ class Compiler {
         $ops = [new OpCode(
             OpCode::TYPE_DECLARE_GLOBAL_CONST,
             $constNameSlot,
-            $valueSlot
+            $valueSlot,
+            $caseInsensitiveSlot
         )];
         if (!empty($result->usages)) {
             $trueVar = new Variable(Variable::TYPE_BOOLEAN);

@@ -35,6 +35,13 @@ class Context {
     private ?RunStackEntry $runStack = null;
     public array $constants = [];
 
+    /**
+     * Case-insensitive user constants: lowercase name => canonical key in $constants (#3711).
+     *
+     * @var array<string, string>
+     */
+    private array $caseInsensitiveConstantNames = [];
+
     /** @var array<string, Variable> */
     private array $superglobalVars = [];
 
@@ -189,6 +196,11 @@ class Context {
         if (isset($this->constants[$name])) {
             return $this->constants[$name];
         }
+        $lc = strtolower($name);
+        if (isset($this->caseInsensitiveConstantNames[$lc])) {
+            return $this->constants[$this->caseInsensitiveConstantNames[$lc]];
+        }
+
         return null;
     }
 
@@ -217,18 +229,42 @@ class Context {
 
     public function isUserConstantDefined(string $name): bool
     {
-        return isset($this->constants[$name]);
+        if (isset($this->constants[$name])) {
+            return true;
+        }
+
+        return isset($this->caseInsensitiveConstantNames[strtolower($name)]);
     }
 
     /**
      * Register a user constant (const / define). Returns false if already defined.
      */
-    public function defineConstant(string $name, Variable $value): bool
+    public function defineConstant(string $name, Variable $value, bool $caseInsensitive = false): bool
     {
         if (isset($this->constants[$name])) {
             return false;
         }
+        $lc = strtolower($name);
+        if (isset($this->caseInsensitiveConstantNames[$lc])) {
+            return false;
+        }
+        if (!$caseInsensitive) {
+            foreach ($this->constants as $existingName => $_) {
+                if (0 === strcasecmp($existingName, $name)) {
+                    return false;
+                }
+            }
+            $this->constants[$name] = clone $value;
+
+            return true;
+        }
+        foreach ($this->constants as $existingName => $_) {
+            if (0 === strcasecmp($existingName, $name)) {
+                return false;
+            }
+        }
         $this->constants[$name] = clone $value;
+        $this->caseInsensitiveConstantNames[$lc] = $name;
 
         return true;
     }

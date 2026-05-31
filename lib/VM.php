@@ -1788,7 +1788,11 @@ restart:
                     if (!isset($frame->block->constants[$op->arg2])) {
                         throw new \LogicException('Global constant value must be a compile-time constant');
                     }
-                    if (!$this->context->defineConstant($name, $frame->block->constants[$op->arg2])) {
+                    $caseInsensitive = false;
+                    if (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
+                        $caseInsensitive = $frame->block->constants[$op->arg3]->toBool();
+                    }
+                    if (!$this->context->defineConstant($name, $frame->block->constants[$op->arg2], $caseInsensitive)) {
                         throw new \LogicException("Cannot redefine constant {$name}");
                     }
                     break;
