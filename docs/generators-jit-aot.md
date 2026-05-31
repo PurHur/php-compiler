@@ -41,4 +41,4 @@ Deferred: try/catch inside generator bodies under MCJIT; script-scope top-level 
 - [capabilities-syntax.md](capabilities-syntax.md) — matrix row for generators
 - [unsupported-syntax.md](unsupported-syntax.md) — `Expr_YieldFrom` no longer lint-tracked (#167 closed)
 - `lib/VM/GeneratorState.php`, `lib/VM.php` (`TYPE_YIELD*` cases)
-- Wave 4 epic: [#2483](https://github.com/PurHur/php-compiler/issues/2483)
+- Wave 4 epic ([#2483](https://github.com/PurHur/php-compiler/issues/2483)): child issues #72, #142, #101, #144, #167 closed; VM/JIT/AOT nested generators + trait adaptations green; script-scope yield and MCJIT closure `use (&$x)` execute remain honestly deferred in `docs/capabilities-syntax.md`
