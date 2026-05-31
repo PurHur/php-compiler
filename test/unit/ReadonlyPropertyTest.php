@@ -363,6 +363,37 @@ PHP
         );
     }
 
+    /**
+     * @group llvm
+     * @group jit
+     */
+    public function testReadonlyPropertyJitLowersDotAssignAfterConstructCheck(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $stderr = $this->runJitCompileProbe(<<<'PHP'
+<?php
+class C {
+    public readonly string $x;
+    public function __construct() {
+        $this->x = 'a';
+    }
+}
+$c = new C();
+$c->x .= 'b';
+PHP
+        );
+        self::assertStringNotContainsString(
+            'Unknown how to assign to a value',
+            $stderr,
+            'readonly property .= should lower for JIT (#3149)'
+        );
+        self::assertStringNotContainsString(
+            'Unknown JIT opcode',
+            $stderr,
+            'readonly property .= should lower for JIT (#3149)'
+        );
+    }
+
     public function testReadonlyPropertyCoalesceAssignNoOpWhenSet(): void
     {
         $runtime = new Runtime();

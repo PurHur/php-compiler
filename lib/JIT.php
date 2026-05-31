@@ -5024,7 +5024,11 @@ class JIT {
                     $result = $this->context->getVariableFromOp($block->getOperand($op->arg1));
                     $left = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $right = $this->context->getVariableFromOp($block->getOperand($op->arg3));
-                    $this->context->type->string->concat($result, $left, $right);
+                    if (null !== $result->objectPropertySlot) {
+                        $this->compileObjectPropertyConcatOp($result, $left, $right);
+                    } else {
+                        $this->context->type->string->concat($result, $left, $right);
+                    }
                     $this->maybeRefreshIncludeBindingsBeforeUse();
                     break;
                 case OpCode::TYPE_CONST_FETCH:
@@ -8127,6 +8131,63 @@ class JIT {
         if ($prefix) {
             $this->assignOperand($resultOp, $newVal, true);
         }
+    }
+
+    /** .= on object properties: concat into new string, guard readonly, store via slot (#3149). */
+    private function compileObjectPropertyConcatOp(Variable $dest, Variable $left, Variable $right): void
+    {
+        if (null === $dest->objectPropertySlot || null === $dest->objectPropertyType) {
+            throw new \LogicException('objectPropertySlot requires objectPropertyType');
+        }
+        $newVal = $this->compileConcatIntoNewString($left, $right);
+        JIT\ReadonlyClassGuard::emitBeforePropertyStore(
+            $this->context,
+            $dest,
+            $this->context->jitEnclosingBlock
+        );
+        $this->context->type->object->propertyStore(
+            $dest->objectPropertySlot,
+            $newVal,
+            $dest->objectPropertyType
+        );
+    }
+
+    /** Allocate a fresh native string holding left . right (php-src string concat semantics). */
+    private function compileConcatIntoNewString(Variable $left, Variable $right): Variable
+    {
+        $this->context->intrinsic->builder = $this->context->builder;
+        $left = JIT\JitNativeString::coerce($this->context, $left);
+        $right = JIT\JitNativeString::coerce($this->context, $right);
+        $leftVar = $this->context->helper->loadValue($left);
+        $rightVar = $this->context->helper->loadValue($right);
+        $map = $this->context->structFieldMap['__string__'];
+        $leftSize = $this->context->builder->load(
+            $this->context->builder->structGep($leftVar, $map['length'])
+        );
+        $rightSize = $this->context->builder->load(
+            $this->context->builder->structGep($rightVar, $map['length'])
+        );
+        $size = $this->context->builder->addNoUnsignedWrap(
+            $leftSize,
+            $this->context->builder->intCast($rightSize, $leftSize->typeOf())
+        );
+        $result = $this->context->builder->call(
+            $this->context->lookupFunction('__string__alloc'),
+            $size
+        );
+        $char = $this->context->builder->structGep($result, $map['value']);
+        $leftChar = $this->context->builder->structGep($leftVar, $map['value']);
+        $this->context->intrinsic->memcpy($char, $leftChar, $leftSize, false);
+        $char = $this->context->builder->gep($char, $leftSize);
+        $rightChar = $this->context->builder->structGep($rightVar, $map['value']);
+        $this->context->intrinsic->memcpy($char, $rightChar, $rightSize, false);
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $result
+        );
     }
 
     /** ++/-- on object properties: guard readonly and store via property slot (#3149). */
