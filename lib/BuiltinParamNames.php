@@ -42,6 +42,10 @@ final class BuiltinParamNames
                 return ['name', 'local_only'];
             case 'define':
                 return ['constant_name', 'value', 'case_insensitive'];
+            case 'vsprintf':
+                return ['format', 'args'];
+            case 'sscanf':
+                return ['string', 'format'];
         }
 
         return null;

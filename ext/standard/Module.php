@@ -180,6 +180,8 @@ class Module extends ModuleAbstract
             new printf_(),
             new vprintf_(),
             new vfprintf_(),
+            new vsprintf(),
+            new sscanf(),
             new array_values(),
             new array_keys(),
             new array_merge(),

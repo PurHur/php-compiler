@@ -16,6 +16,7 @@ extern char **environ;
 #define phpc_environ environ
 #endif
 
+typedef struct __value__ __value__;
 typedef struct __hashtable__ __hashtable__;
 typedef struct __string__ __string__;
 
@@ -1887,6 +1888,203 @@ long long __compiler_printf(__string__ *fmt, long long argc, __value__ *argv)
     }
 
     return (long long) len;
+}
+
+static int ss_is_space(char c)
+{
+    return ' ' == c || '\t' == c || '\n' == c || '\r' == c || '\f' == c || '\v' == c;
+}
+
+static int ss_scan_int(const char *s, size_t len, size_t *pos, long long *out)
+{
+    size_t i = *pos;
+    int neg = 0;
+    int any = 0;
+    long long val = 0;
+
+    while (i < len && ss_is_space(s[i])) {
+        i++;
+    }
+    if (i >= len) {
+        return 0;
+    }
+    if ('-' == s[i]) {
+        neg = 1;
+        i++;
+    } else if ('+' == s[i]) {
+        i++;
+    }
+    while (i < len && s[i] >= '0' && s[i] <= '9') {
+        any = 1;
+        val = val * 10 + (long long) (s[i] - '0');
+        i++;
+    }
+    if (!any) {
+        return 0;
+    }
+    if (neg) {
+        val = -val;
+    }
+    *out = val;
+    *pos = i;
+
+    return 1;
+}
+
+static int ss_scan_string(const char *s, size_t len, size_t *pos, char *buf, size_t buf_cap)
+{
+    size_t i = *pos;
+    size_t out = 0;
+
+    while (i < len && ss_is_space(s[i])) {
+        i++;
+    }
+    if (i >= len) {
+        return 0;
+    }
+    while (i < len && !ss_is_space(s[i]) && out + 1 < buf_cap) {
+        buf[out++] = s[i++];
+    }
+    if (0 == out) {
+        return 0;
+    }
+    buf[out] = '\0';
+    *pos = i;
+
+    return 1;
+}
+
+static int ss_scan_float(const char *s, size_t len, size_t *pos, double *out)
+{
+    size_t i = *pos;
+    size_t start;
+    int any = 0;
+    char tmp[64];
+
+    while (i < len && ss_is_space(s[i])) {
+        i++;
+    }
+    if (i >= len) {
+        return 0;
+    }
+    start = i;
+    if ('-' == s[i] || '+' == s[i]) {
+        i++;
+    }
+    while (i < len && s[i] >= '0' && s[i] <= '9') {
+        any = 1;
+        i++;
+    }
+    if (i < len && '.' == s[i]) {
+        i++;
+        while (i < len && s[i] >= '0' && s[i] <= '9') {
+            any = 1;
+            i++;
+        }
+    }
+    if (!any || i - start >= sizeof(tmp)) {
+        return 0;
+    }
+    memcpy(tmp, s + start, i - start);
+    tmp[i - start] = '\0';
+    *out = strtod(tmp, NULL);
+    *pos = i;
+
+    return 1;
+}
+
+extern void __value__writeLong(__value__ *out, long long v);
+extern void __value__writeDouble(__value__ *out, double v);
+
+/**
+ * LLVM/AOT runtime: sscanf() subset (%d, %s, %f, %%) (issue #3190).
+ */
+long long __compiler_sscanf(
+    __string__ *str,
+    __string__ *fmt,
+    long long out_count,
+    __value__ **out_ptrs
+) {
+    const char *input;
+    size_t in_len;
+    const char *format;
+    size_t fmt_len;
+    size_t in_pos = 0;
+    long long assigned = 0;
+    long long out_idx = 0;
+    size_t fpos;
+
+    if (NULL == str || NULL == fmt) {
+        return 0;
+    }
+    input = nf_strdata(str);
+    in_len = nf_strlen(str);
+    format = nf_strdata(fmt);
+    fmt_len = nf_strlen(fmt);
+    for (fpos = 0; fpos < fmt_len; fpos++) {
+        char ch = format[fpos];
+
+        if ('%' != ch) {
+            if (in_pos >= in_len || input[in_pos] != ch) {
+                return assigned;
+            }
+            in_pos++;
+            continue;
+        }
+        if (fpos + 1 >= fmt_len) {
+            return assigned;
+        }
+        ch = format[++fpos];
+        if ('%' == ch) {
+            if (in_pos >= in_len || input[in_pos] != '%') {
+                return assigned;
+            }
+            in_pos++;
+            continue;
+        }
+        if (out_idx >= out_count || NULL == out_ptrs || NULL == out_ptrs[out_idx]) {
+            return assigned;
+        }
+        switch (ch) {
+            case 'd': {
+                long long val;
+
+                if (!ss_scan_int(input, in_len, &in_pos, &val)) {
+                    return assigned;
+                }
+                __value__writeLong(out_ptrs[out_idx], val);
+                out_idx++;
+                assigned++;
+                break;
+            }
+            case 's': {
+                char buf[4096];
+
+                if (!ss_scan_string(input, in_len, &in_pos, buf, sizeof(buf))) {
+                    return assigned;
+                }
+                __value__writeString(out_ptrs[out_idx], __string__init((long long) strlen(buf), buf));
+                out_idx++;
+                assigned++;
+                break;
+            }
+            case 'f': {
+                double val;
+
+                if (!ss_scan_float(input, in_len, &in_pos, &val)) {
+                    return assigned;
+                }
+                __value__writeDouble(out_ptrs[out_idx], val);
+                out_idx++;
+                assigned++;
+                break;
+            }
+            default:
+                return assigned;
+        }
+    }
+
+    return assigned;
 }
 
 /**
