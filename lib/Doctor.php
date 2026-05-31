@@ -166,7 +166,7 @@ final class Doctor
         $ns2ThrowswebDefault = $defaults['NORTH_STAR2_THROWSWEB_GATE'] ?? '1';
         $ns3Default = $defaults['NORTH_STAR3_VERIFY_GATE'] ?? '0';
         $m3HelloStrictDefault = $defaults['BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE'] ?? '0';
-        $m3SmokeStrictDefault = $defaults['BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE'] ?? '0';
+        $m3SmokeStrictDefault = $defaults['BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE'] ?? '1';
         $m3SmokeProbeDefault = $defaults['BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE'] ?? '1';
         $runtimeSmokeProbeDefault = $defaults['BOOTSTRAP_RUNTIME_COMPILE_SMOKE_PROBE_GATE'] ?? '1';
         $runtimeSmokeStrictDefault = $defaults['BOOTSTRAP_RUNTIME_COMPILE_SMOKE_STRICT_GATE'] ?? '0';
