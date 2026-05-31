@@ -3,6 +3,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define PHPC_OB_MAX_DEPTH 8
@@ -115,7 +116,19 @@ int __phpc_ob_get_clean(struct __value__ *out)
     __phpc_ob_level--;
     int idx = __phpc_ob_level;
     unsigned long len = __phpc_ob_len[idx];
-    __value__writeString(out, __string__init((long long) len, __phpc_ob_storage[idx]));
+    if (len > 0) {
+        char *copy = (char *) malloc((size_t) len + 1);
+        if (copy) {
+            memcpy(copy, __phpc_ob_storage[idx], (size_t) len);
+            copy[len] = '\0';
+            __value__writeString(out, __string__init((long long) len, copy));
+            free(copy);
+        } else {
+            __value__writeString(out, __string__init(0, ""));
+        }
+    } else {
+        __value__writeString(out, __string__init(0, ""));
+    }
     __phpc_ob_len[idx] = 0;
     __phpc_ob_storage[idx][0] = '\0';
     return 1;
@@ -138,6 +151,36 @@ int __phpc_ob_end_flush(struct __value__ *out)
     __phpc_ob_len[idx] = 0;
     __phpc_ob_storage[idx][0] = '\0';
     __value__writeBool(out, 1);
+    return 1;
+}
+
+int __phpc_ob_get_flush(struct __value__ *out)
+{
+    if (!out || __phpc_ob_level <= 0) {
+        if (out) {
+            __value__writeBool(out, 0);
+        }
+        return 0;
+    }
+    __phpc_ob_level--;
+    int idx = __phpc_ob_level;
+    unsigned long len = __phpc_ob_len[idx];
+    if (len > 0) {
+        char *copy = (char *) malloc((size_t) len + 1);
+        if (copy) {
+            memcpy(copy, __phpc_ob_storage[idx], (size_t) len);
+            copy[len] = '\0';
+            __value__writeString(out, __string__init((long long) len, copy));
+            free(copy);
+            ob_append_bytes(__phpc_ob_storage[idx], (size_t) len);
+        } else {
+            __value__writeString(out, __string__init(0, ""));
+        }
+    } else {
+        __value__writeString(out, __string__init(0, ""));
+    }
+    __phpc_ob_len[idx] = 0;
+    __phpc_ob_storage[idx][0] = '\0';
     return 1;
 }
 

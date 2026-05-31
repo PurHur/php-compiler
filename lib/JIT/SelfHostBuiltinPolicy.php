@@ -62,11 +62,21 @@ final class SelfHostBuiltinPolicy
 
     /** @var array<string, string> */
     private const CATEGORY_OUTPUT = [
-        'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_end_flush' => 'output',
-        'ob_get_level' => 'output', 'flush' => 'output',
+        'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_get_flush' => 'output',
+        'ob_end_flush' => 'output', 'ob_get_level' => 'output', 'flush' => 'output',
         'getallheaders' => 'output', 'header_list' => 'output',
         'headers_sent' => 'output', 'register_shutdown_function' => 'output',
         'set_error_handler' => 'error', 'restore_error_handler' => 'error',
+    ];
+
+    /** User-script AOT (bin/compile.php): real ob_* / flush lowering (#3753, mirrors #3725 closures). */
+    private const AOT_USER_SCRIPT_REAL_OUTPUT = [
+        'ob_start' => true,
+        'ob_get_clean' => true,
+        'ob_get_flush' => true,
+        'ob_end_flush' => true,
+        'ob_get_level' => true,
+        'flush' => true,
     ];
 
     /** @var array<string, string> */
@@ -273,7 +283,21 @@ final class SelfHostBuiltinPolicy
             return false;
         }
 
+        if (self::isAotUserScriptRealOutput($name)) {
+            return false;
+        }
+
         return self::isAutoStubBatchMember($name) || self::looksLikeStdlibBuiltin($name);
+    }
+
+    private static function isAotUserScriptRealOutput(string $name): bool
+    {
+        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        if ('1' !== $userScript && 'true' !== strtolower((string) $userScript)) {
+            return false;
+        }
+
+        return isset(self::AOT_USER_SCRIPT_REAL_OUTPUT[self::normalizeName($name)]);
     }
 
     /** @var array<string, true>|null */

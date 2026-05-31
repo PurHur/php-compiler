@@ -254,6 +254,7 @@ class Module extends ModuleAbstract
             new getallheaders_(),
             new ob_start(),
             new ob_get_clean(),
+            new ob_get_flush(),
             new ob_end_flush(),
             new flush_(),
             new ob_get_level(),

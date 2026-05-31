@@ -22,6 +22,7 @@ final class EmbedObOutput
         self::implementNoop($context, '__phpc_ob_start');
         self::implementReturnZero($context, '__phpc_ob_get_level');
         self::implementReturnZero($context, '__phpc_ob_get_clean');
+        self::implementReturnZero($context, '__phpc_ob_get_flush');
         self::implementReturnZero($context, '__phpc_ob_end_flush');
         self::implementNoop($context, '__phpc_flush');
         self::implementEchoCstr($context);

@@ -224,6 +224,7 @@ static const char *phpc_builtin_functions[] = {
     "number_format",
     "ob_end_flush",
     "ob_get_clean",
+    "ob_get_flush",
     "ob_get_level",
     "ob_start",
     "octdec",

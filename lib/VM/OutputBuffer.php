@@ -59,6 +59,26 @@ final class OutputBuffer
         self::append(array_pop(self::$stack));
     }
 
+    /**
+     * ob_get_flush() — pop active buffer, flush to parent/SAPI, return contents (issue #3753).
+     *
+     * php-src: ext/standard/output.c — like ob_end_flush but returns string|false.
+     *
+     * @return string|false
+     */
+    public static function getFlush(): string|bool
+    {
+        if ([] === self::$stack) {
+            return false;
+        }
+        $content = array_pop(self::$stack);
+        if ('' !== $content) {
+            self::append($content);
+        }
+
+        return $content;
+    }
+
     /** flush() — fflush stdout; ob buffers unchanged until ob_end_flush (issue #3388, php-src php_flush). */
     public static function flush(): void
     {
