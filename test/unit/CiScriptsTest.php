@@ -1739,6 +1739,40 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE=1', $docSelfhost);
     }
 
+    public function testCiDefaultsEnvDefinesBootstrapVmDriverExecuteGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'BOOTSTRAP_VM_DRIVER_EXECUTE_GATE="${BOOTSTRAP_VM_DRIVER_EXECUTE_GATE:-1}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#2227', $defaults);
+        $this->assertStringContainsString('#2201', $defaults);
+    }
+
+    public function testCiLocalHonorsBootstrapVmDriverExecuteGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_vm_driver_execute_probe', $local);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('BOOTSTRAP_VM_DRIVER_EXECUTE_GATE', $common);
+        $this->assertStringContainsString('BOOTSTRAP_VM_DRIVER_EXECUTE_GATE:-1', $common);
+        $this->assertStringContainsString('bootstrap-selfhost-vm-driver-execute-probe.sh', $common);
+    }
+
+    public function testLocalCiMatrixDocumentsBootstrapVmDriverExecuteGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('BOOTSTRAP_VM_DRIVER_EXECUTE_GATE', $doc);
+        $this->assertStringContainsString('bootstrap-selfhost-vm-driver-execute-probe.sh', $doc);
+        $this->assertStringContainsString('#2227', $doc);
+
+        $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
+        $this->assertStringContainsString('BOOTSTRAP_VM_DRIVER_EXECUTE_GATE=1', $docSelfhost);
+        $this->assertStringContainsString('BOOTSTRAP_VM_DRIVER_EXECUTE_GATE=0', $docSelfhost);
+    }
+
     public function testCiDefaultsEnvDefinesCompilerDriverSmokeGateDefaultOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
