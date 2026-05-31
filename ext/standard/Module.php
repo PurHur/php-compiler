@@ -165,6 +165,8 @@ class Module extends ModuleAbstract
             new uksort_(),
             new sprintf_(),
             new printf_(),
+            new vprintf_(),
+            new vfprintf_(),
             new array_values(),
             new array_keys(),
             new array_merge(),
