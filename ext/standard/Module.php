@@ -237,6 +237,7 @@ class Module extends ModuleAbstract
             new htmlspecialchars_decode(),
             new htmlentities(),
             new html_entity_decode(),
+            new get_html_translation_table(),
             new strip_tags(),
             new header_(),
             new headers_sent(),
