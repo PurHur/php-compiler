@@ -69,6 +69,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gc_collect_cycles')) {
                 continue;
             }
+            // gc_enable/gc_disable/gc_enabled() are VM-only (#3209).
+            if (str_contains($name, 'gc_enabled')) {
+                continue;
+            }
             // set_exception_handler() / restore_exception_handler() VM-only (#3146).
             if (str_contains($name, 'exception_handler')) {
                 continue;
