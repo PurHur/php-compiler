@@ -235,11 +235,8 @@ final class ScopeBuiltinHelper
         if (null === $flagsArg) {
             return $i64->constInt(VmScope::EXTR_SKIP, false);
         }
-        if (Variable::TYPE_NATIVE_LONG !== $flagsArg->type) {
-            throw new \LogicException('extract() flags must be an integer in this compiler build');
-        }
 
-        return $context->helper->loadValue($flagsArg);
+        return JitLongArg::lower($context, $flagsArg, 'extract() flags');
     }
 
     private static function storeVariableAtStringKey(
