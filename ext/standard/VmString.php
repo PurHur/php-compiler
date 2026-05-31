@@ -1284,7 +1284,7 @@ final class VmString
             throw new \LogicException('htmlspecialchars() only supports UTF-8 in this compiler build');
         }
         unset($doubleEncode);
-        $quoteBoth = 0 !== ($flags & ENT_QUOTES);
+        $quoteBoth = ENT_QUOTES === ($flags & ENT_QUOTES);
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
         $out = '';
         $len = self::byteLength($string);
@@ -1312,6 +1312,56 @@ final class VmString
         }
 
         return $out;
+    }
+
+    /**
+     * get_html_translation_table() — character => entity map (ext/standard/html.c, #3637).
+     *
+     * @return \PHPCompiler\VM\HashTable
+     */
+    public static function getHtmlTranslationTable(
+        int $table = HTML_SPECIALCHARS,
+        int $flags = ENT_COMPAT,
+        string $encoding = 'UTF-8'
+    ): \PHPCompiler\VM\HashTable {
+        if ('UTF-8' !== $encoding) {
+            throw new \LogicException(
+                'get_html_translation_table() only supports UTF-8 in this compiler build'
+            );
+        }
+        $quoteBoth = ENT_QUOTES === ($flags & ENT_QUOTES);
+        $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
+
+        if (HTML_SPECIALCHARS === $table) {
+            $entries = [
+                '&' => '&amp;',
+                '<' => '&lt;',
+                '>' => '&gt;',
+            ];
+            if ($quoteBoth || $quoteDouble) {
+                $entries['"'] = '&quot;';
+            }
+            if ($quoteBoth) {
+                $entries["'"] = '&#039;';
+            }
+        } else {
+            $entries = HtmlEntityTable::entitiesEntQuotes();
+            if (!$quoteBoth && !$quoteDouble) {
+                unset($entries['"']);
+            }
+            if (!$quoteBoth) {
+                unset($entries["'"]);
+            }
+        }
+
+        $ht = new \PHPCompiler\VM\HashTable();
+        foreach ($entries as $key => $value) {
+            $var = new \PHPCompiler\VM\Variable();
+            $var->string($value);
+            $ht->add($key, $var);
+        }
+
+        return $ht;
     }
 
     /** htmlentities() — same subset as htmlspecialchars(); PHP default flags ENT_COMPAT (#2472). */

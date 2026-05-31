@@ -36,6 +36,10 @@ final class StdlibConstants
     public const STR_PAD_RIGHT = 1;
     public const STR_PAD_BOTH = 2;
 
+    /** get_html_translation_table() table selector (ext/standard/html.c). */
+    public const HTML_SPECIALCHARS = 0;
+    public const HTML_ENTITIES = 1;
+
     /** htmlspecialchars() / htmlentities() flags (ext/standard/html.c). */
     public const ENT_COMPAT = 2;
     public const ENT_QUOTES = 3;
@@ -90,6 +94,8 @@ final class StdlibConstants
         'str_pad_left' => self::STR_PAD_LEFT,
         'str_pad_right' => self::STR_PAD_RIGHT,
         'str_pad_both' => self::STR_PAD_BOTH,
+        'html_specialchars' => self::HTML_SPECIALCHARS,
+        'html_entities' => self::HTML_ENTITIES,
         'ent_compat' => self::ENT_COMPAT,
         'ent_quotes' => self::ENT_QUOTES,
         'ent_noquotes' => self::ENT_NOQUOTES,
@@ -161,6 +167,8 @@ final class StdlibConstants
         'str_pad_left',
         'str_pad_right',
         'str_pad_both',
+        'html_specialchars',
+        'html_entities',
         'ent_compat',
         'ent_quotes',
         'ent_noquotes',
