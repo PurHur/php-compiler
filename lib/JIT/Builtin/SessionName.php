@@ -52,8 +52,10 @@ final class SessionName
         self::$bufGlobal = $context->module->addGlobal($bufType, self::GLOBAL_BUF);
         self::$lenGlobal = $context->module->addGlobal($i64, self::GLOBAL_LEN);
         self::$activeGlobal = $context->module->addGlobal($i8, self::GLOBAL_ACTIVE);
-        self::$lenGlobal->setInitializer($i64->constInt(\strlen(self::DEFAULT_NAME), false));
-        self::$activeGlobal->setInitializer($i8->constInt(0, false));
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            self::$lenGlobal->setInitializer($i64->constInt(\strlen(self::DEFAULT_NAME), false));
+            self::$activeGlobal->setInitializer($i8->constInt(0, false));
+        }
 
         $sig = $context->context->functionType(
             $void,
