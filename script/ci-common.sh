@@ -845,9 +845,9 @@ ci_run_bootstrap_runtime_compile_smoke_strict() {
     "$_CI_SCRIPT_DIR/bootstrap-selfhost-runtime-compile-smoke.sh"
 }
 
-# M3 compile-smoke strict native emit (issue #1937); default off until emit_path=native stable.
+# M3 compile-smoke strict native emit (issue #1937); default on in ci-local (#2165); skipped when LLVM missing.
 ci_run_bootstrap_m3_compile_smoke_strict() {
-  if [[ "${BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE:-0}" != "1" ]]; then
+  if [[ "${BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if ! ci_llvm_ready; then

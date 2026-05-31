@@ -1371,7 +1371,19 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE', $doc);
         $this->assertStringContainsString('BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE', $doc);
         $this->assertMatchesRegularExpression('/\| `BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE` \| `1` \|/', $doc);
-        $this->assertMatchesRegularExpression('/\| `BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE` \| `0` \|/', $doc);
+        $this->assertMatchesRegularExpression('/\| `BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE` \| `1` \|/', $doc);
+    }
+
+    public function testCiDefaultsEnvDefinesBootstrapM3CompileSmokeStrictGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE="${BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE:-1}"', $defaults);
+    }
+
+    public function testCiDockerRunPassesBootstrapM3CompileSmokeStrictGateDefaultOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE=${BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE:-1}', $body);
     }
 
     public function testCiDefaultsEnvDefinesBootstrapVendorInventorySyncGateOn(): void
