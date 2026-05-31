@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
@@ -82,6 +83,7 @@ final class VmScope
         foreach (self::collectCompactNamesFromArgs($frame->calledArgs) as $name) {
             $slot = self::slotForName($caller, $name);
             if (null === $slot) {
+                self::compactUndefinedVariableWarning($frame, $name);
                 continue;
             }
             $value = $caller->scope[$slot];
@@ -125,6 +127,21 @@ final class VmScope
 
         throw new \LogicException(
             'compact() arguments must be string variable names or arrays of names in this compiler build'
+        );
+    }
+
+    private static function compactUndefinedVariableWarning(Frame $frame, string $name): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $file = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+        $frame->vmContext->errors->triggerError(
+            "compact(): Undefined variable \${$name}",
+            ErrorReporter::E_WARNING,
+            $file,
+            $frame->vmContext,
+            $frame
         );
     }
 
