@@ -35,7 +35,11 @@ function syntaxRowDefinitions(): array
             'construct' => 'Anonymous class `new class { }`',
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_NEW', 'TYPE_METHODCALL_INIT'],
             'issue' => 1233,
-            'notes' => ['php-cfg inline Stmt\\Class_ in parseExpr_New; synthetic AnonymousClass@line name'],
+            'aot' => true,
+            'notes' => [
+                'php-cfg inline Stmt\\Class_ in parseExpr_New; synthetic AnonymousClass@line name',
+                'AOT: user AnonymousClass@* methods lowered when PHP_COMPILER_SELFHOST_AOT=1 (#3098)',
+            ],
             'probe' => '$o = new class { public function f(): int { return 42; } }; echo $o->f();',
         ],
         [
@@ -645,7 +649,7 @@ function syntaxRowDefinitions(): array
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_NEW', 'TYPE_ASSIGN', 'TYPE_PROPERTY_FETCH'],
             'issue' => 1360,
             'notes' => ['php-cfg Class_::flags MODIFIER_READONLY; VM rejects instance property writes after __construct'],
-            'probe' => 'readonly class R { public int $x = 0; } $o = new R(); $o->x = 1;',
+            'probe' => 'readonly class R { public function __construct(public int $x) {} } $o = new R(0); $o->x = 1;',
         ],
         [
             'id' => 'readonly_property',

@@ -360,33 +360,49 @@ class JIT {
 
     private function shouldSkipExternalClassBodyLowering(int $classId): bool
     {
-        if ($this->shouldUseEmitHelperLinkStubs()
-            || $this->shouldUseM3EmitTuNativeBridge()
-            || $this->shouldUseVendorPrelinkJitStubs()
-            || $this->isBundledSuperglobalsClass($classId)
-        ) {
+        if ($this->isBundledSuperglobalsClass($classId)) {
             return true;
         }
         $className = strtolower($this->context->type->object->classNameForId($classId));
         if ('' === $className) {
-            return false;
+            return $this->shouldUseSelfHostJitStubs()
+                || $this->shouldUseEmitHelperLinkStubs()
+                || $this->shouldUseM3EmitTuNativeBridge()
+                || $this->shouldUseVendorPrelinkJitStubs();
         }
-
-        if (str_starts_with($className, 'phpcfg\\')
-            || str_starts_with($className, 'phptypes\\')
-            || str_starts_with($className, 'phpllvm\\')
-            || str_starts_with($className, 'nikic\\')
+        if ($this->isBundledJitExternalClassPrefix($className)) {
+            return true;
+        }
+        if ($this->shouldUseEmitHelperLinkStubs()
+            || $this->shouldUseM3EmitTuNativeBridge()
+            || $this->shouldUseVendorPrelinkJitStubs()
         ) {
             return true;
         }
-
-        // Self-host AOT skips compiler/runtime spine classes only — user script classes
-        // (e.g. property-hook fixtures) still need method lowering (#3723).
+        // bin/compile.php sets PHP_COMPILER_SELFHOST_AOT=1 for LLVM stability (#2600), but user
+        // script classes (including synthetic AnonymousClass@line) still need method lowering (#3098).
         if ($this->shouldUseSelfHostJitStubs()) {
-            return str_starts_with($className, 'phpcompiler\\');
+            return $this->isSelfHostBundledClassPrefix($className);
         }
 
         return false;
+    }
+
+    private function isBundledJitExternalClassPrefix(string $classLc): bool
+    {
+        return str_starts_with($classLc, 'phpcfg\\')
+            || str_starts_with($classLc, 'phptypes\\')
+            || str_starts_with($classLc, 'phpllvm\\')
+            || str_starts_with($classLc, 'nikic\\');
+    }
+
+    private function isSelfHostBundledClassPrefix(string $classLc): bool
+    {
+        return $this->isBundledJitExternalClassPrefix($classLc)
+            || str_starts_with($classLc, 'phpcompiler\\')
+            || 'compiler' === $classLc
+            || 'runtime' === $classLc
+            || str_starts_with($classLc, 'ircmaxell\\');
     }
 
     /** Opt-in when linking test/selfhost compile_driver.php bundles (#1056, #1768). */
@@ -5642,8 +5658,10 @@ class JIT {
 
                         return $returnBlock;
                     }
+                    $returnOperand = $block->getOperand($op->arg1);
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
-                        $this->context->freeDeadVariables($func, $returnBlock, $block);
+                        // php-cfg may mark inline `new class` temps dead before return (#3098).
+                        $this->context->freeDeadVariables($func, $returnBlock, $block, $returnOperand);
                     }
                     if ($this->isVoidLlvmFunction($func)) {
                         $this->context->builder->returnVoid();
@@ -6161,12 +6179,25 @@ class JIT {
 
     private function coerceReturnValue(Variable $return, PHPLLVM\Value $retval, ?string $expected): PHPLLVM\Value
     {
+        if ('__object__*' === $expected && Variable::TYPE_OBJECT === $return->type) {
+            return $retval;
+        }
         if ('__value__*' === $expected) {
             if (Variable::TYPE_VALUE === $return->type) {
                 return JIT\JitValueBox::valuePtrFromVariable($this->context, $return);
             }
             if (Variable::TYPE_NULL === $return->type) {
                 return $this->context->getTypeFromString('__value__*')->constNull();
+            }
+            if (Variable::TYPE_OBJECT === $return->type) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeObject'),
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $retval
+                );
+
+                return JIT\JitValueBox::pointer($this->context, $slot);
             }
             if (Variable::TYPE_STRING === $return->type) {
                 $slot = JIT\JitValueBox::alloc($this->context);
@@ -8480,6 +8511,25 @@ class JIT {
         }
 
         $proxyName = $this->resolveJitInstanceMethodProxyName($declaringClassLc, $methodLc);
+        $receiverVar = $this->context->getVariableFromOp($receiverOp);
+        $receiverUserType = $receiverOp->type?->userType;
+        $staticProxy = $this->context->resolveFunctionProxy($proxyName);
+        $needsRuntimeDispatch = null === $receiverUserType
+            || 'object' === strtolower(ltrim((string) $receiverUserType, '\\'))
+            || $staticProxy instanceof JIT\Call\ExternalMethod;
+        if ($needsRuntimeDispatch) {
+            $runtimeCandidates = $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLc);
+            if ([] !== $runtimeCandidates) {
+                $this->context->scope->toCall = new JIT\Call\RuntimeIndirectInstanceMethodCall(
+                    $receiverVar,
+                    $methodLc,
+                    $runtimeCandidates
+                );
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
         $resolvedClassLc = strstr($proxyName, '::', true) ?: $declaringClassLc;
         $declaringClassId = $this->context->type->object->lookup($resolvedClassLc);
         $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
@@ -8496,8 +8546,27 @@ class JIT {
             $className,
             $methodName
         );
-        $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
-        $this->context->scope->args = [$this->context->getVariableFromOp($receiverOp)];
+        $this->context->scope->toCall = $staticProxy;
+        $this->context->scope->args = [$receiverVar];
+    }
+
+    /**
+     * @return array<int, JIT\Call> class id => invoke proxy
+     */
+    private function buildRuntimeInstanceMethodCandidatesByClassId(string $methodLc): array
+    {
+        $methodLc = strtolower($methodLc);
+        $candidates = [];
+        foreach ($this->context->type->object->allClassNamesById() as $classId => $className) {
+            $classLc = strtolower(ltrim($className, '\\'));
+            $proxyName = $this->resolveJitInstanceMethodProxyName($classLc, $methodLc);
+            if (!$this->context->functionIsRegistered($proxyName)) {
+                continue;
+            }
+            $candidates[$classId] = $this->context->resolveFunctionProxy($proxyName);
+        }
+
+        return $candidates;
     }
 
     /**

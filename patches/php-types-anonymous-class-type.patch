@@ -1,0 +1,12 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+@@ -433,6 +433,9 @@
+         if (preg_match('/^(list|array)\s*</i', trim($decl))) {
+             return new self(self::TYPE_ARRAY);
+         }
++        if (preg_match('/^AnonymousClass@\d+$/', trim($decl))) {
++            return new self(self::TYPE_OBJECT, [], $decl);
++        }
+         $regex = '(^([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\\\\)*[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*$)';
+         if (! preg_match($regex, $decl)) {
+             throw new \RuntimeException("Unknown type declaration found: {$decl}");
