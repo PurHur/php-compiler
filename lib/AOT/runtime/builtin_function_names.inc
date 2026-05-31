@@ -178,6 +178,7 @@ static const char *phpc_builtin_functions[] = {
     "is_array",
     "is_bool",
     "is_countable",
+    "is_iterable",
     "is_dir",
     "is_double",
     "is_executable",
@@ -200,6 +201,8 @@ static const char *phpc_builtin_functions[] = {
     "is_subclass_of",
     "is_uploaded_file",
     "is_writable",
+    "iterator_apply",
+    "iterator_count",
     "iterator_to_array",
     "join",
     "json_decode",
@@ -373,4 +376,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 370;
+static const size_t phpc_builtin_functions_count = 373;
