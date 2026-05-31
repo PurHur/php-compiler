@@ -384,6 +384,7 @@ class Module extends ModuleAbstract
             new property_exists_(),
             new get_object_vars_(),
             new get_class_(),
+            new get_called_class_(),
             new get_class_vars_(),
             new get_class_methods_(),
             new get_parent_class_(),
