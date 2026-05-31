@@ -4379,7 +4379,8 @@ class JIT {
         Block $block,
         \PHPLLVM\BasicBlock $entryBlock,
         OpCode $yieldFromOp,
-        ?string $innerResumeName = null
+        ?string $innerResumeName = null,
+        int $prefixStart = 0
     ): JIT\Variable {
         $yfIdx = null;
         foreach ($block->opCodes as $i => $op) {
@@ -4392,11 +4393,11 @@ class JIT {
             throw new \LogicException('yield from opcode not found in generator block');
         }
         if (
-            $this->generatorYieldFromPrefixNeedsCompile($block, $yfIdx, $innerResumeName)
+            $this->generatorYieldFromPrefixNeedsCompile($block, $yfIdx, $innerResumeName, $prefixStart)
         ) {
             $savedStorage = $this->context->scope->blockStorage;
             $this->context->scope->blockStorage = new \SplObjectStorage();
-            $exit = $this->compileBlockInternal($func, $block, $yfIdx, $entryBlock);
+            $exit = $this->compileGeneratorResumePrefix($func, $block, $prefixStart, $yfIdx, $entryBlock);
             $this->context->builder->positionAtEnd($exit);
             $this->context->scope->blockStorage = $savedStorage;
         }
@@ -4408,25 +4409,23 @@ class JIT {
     }
 
     /**
-     * Compile prefix opcodes before yield from when the container is produced by call/assign (#3074).
-     * Inline array literals keep the prior path (container read without prefix compileBlockInternal).
+     * Compile prefix opcodes before yield from when the container is not yet materialized (#3074).
+     * Includes inline array literals (INIT_ARRAY) and dynamic containers (call/assign).
      */
-    private function generatorYieldFromPrefixNeedsCompile(Block $block, int $yfIdx, ?string $innerResumeName): bool
-    {
+    private function generatorYieldFromPrefixNeedsCompile(
+        Block $block,
+        int $yfIdx,
+        ?string $innerResumeName,
+        int $prefixStart = 0
+    ): bool {
         if (null !== $innerResumeName) {
             return true;
         }
-        if ($yfIdx <= 0 || !JIT\GeneratorHelper::prefixOpcodesSafeForYieldFromInit($block, $yfIdx)) {
+        if ($yfIdx <= $prefixStart || !JIT\GeneratorHelper::prefixOpcodesSafeForYieldFromInit($block, $yfIdx)) {
             return false;
         }
-        for ($i = 0; $i < $yfIdx; ++$i) {
-            $type = $block->opCodes[$i]->type;
-            if (OpCode::TYPE_FUNCCALL_INIT === $type || OpCode::TYPE_ASSIGN === $type) {
-                return true;
-            }
-        }
 
-        return false;
+        return true;
     }
 
     /**

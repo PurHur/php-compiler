@@ -49,6 +49,21 @@ PHP
             '12');
     }
 
+    public function testYieldFromArrayForeachExecutesViaMcjit(): void
+    {
+        $this->assertMcjitOutput(<<<'PHP'
+<?php
+function gen() {
+    yield from [1, 2, 3];
+}
+foreach (gen() as $v) {
+    echo $v;
+}
+PHP
+            ,
+            '123');
+    }
+
     public function testRequiresVmLoweringSkipsNestedGeneratorBodies(): void
     {
         $runtime = new Runtime();

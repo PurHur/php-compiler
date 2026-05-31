@@ -378,13 +378,21 @@ final class GeneratorHelper
 
         $initBb = $fn->appendBasicBlock('gen_yf_init');
         $dispatchBb = $fn->appendBasicBlock('gen_yf_dispatch');
-        $arrayInitBb = $fn->appendBasicBlock('gen_yf_init_array');
         $arrayIterBb = $fn->appendBasicBlock('gen_yf_iter_array');
         $genIterBb = $fn->appendBasicBlock('gen_yf_iter_gen');
         $context->builder->branchIf($active, $dispatchBb, $initBb);
 
         $context->builder->positionAtEnd($initBb);
-        $containerVar = $jit->compileGeneratorYieldFromSetup($fn, $block, $initBb, $op, $innerResumeName);
+        $points = self::collectResumePoints($block);
+        $prefixStart = self::resumePrefixStart($block, $points, $resumeIp);
+        $containerVar = $jit->compileGeneratorYieldFromSetup(
+            $fn,
+            $block,
+            $initBb,
+            $op,
+            $innerResumeName,
+            $prefixStart
+        );
         $effectiveResumeName = $innerResumeName ?? $containerVar->generatorResumeName;
         if (
             null !== $effectiveResumeName
@@ -405,8 +413,6 @@ final class GeneratorHelper
             || Variable::TYPE_HASHTABLE === $containerVar->type
             || Variable::TYPE_VALUE === $containerVar->type
         ) {
-            $context->builder->branch($arrayInitBb);
-            $context->builder->positionAtEnd($arrayInitBb);
             if ($containerVar->type & Variable::IS_NATIVE_ARRAY) {
                 $htPtr = HashTableHelper::materializeNativeArrayForCall($context, $containerVar);
             } elseif (Variable::TYPE_HASHTABLE === $containerVar->type) {
@@ -696,30 +702,36 @@ final class GeneratorHelper
         $state = $gen->generatorStatePtr;
         $map = $context->structFieldMap['__generator_state__'];
         $i1 = $context->getTypeFromString('int1');
-        $done = $context->builder->load($context->builder->structGep($state, $map['done']));
+        $i64 = $context->getTypeFromString('int64');
+        $doneField = $context->builder->structGep($state, $map['done']);
         $fn = $context->builder->getInsertBlock()->getParent();
-        $early = $fn->appendBasicBlock('gen_iter_done');
-        $body = $fn->appendBasicBlock('gen_iter_resume');
-        $merge = $fn->appendBasicBlock('gen_iter_merge');
-        $context->builder->branchIf($done, $early, $body);
-        $context->builder->positionAtEnd($early);
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($body);
+        $doneBb = $fn->appendBasicBlock('gen_iter_done');
+        $resumeBb = $fn->appendBasicBlock('gen_iter_resume');
+        $mergeBb = $fn->appendBasicBlock('gen_iter_merge');
         $resumeFn = $context->functions[strtolower($gen->generatorResumeName)] ?? null;
         if (!$resumeFn instanceof \PHPLLVM\Value\Function_) {
             throw new \LogicException('Generator resume function missing from JIT context');
         }
+
+        $context->builder->branchIf($context->builder->load($doneField), $doneBb, $resumeBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($resumeBb);
+        $loopHead = $resumeBb;
         $yielded = $context->builder->call($resumeFn, $state);
-        $has = $context->builder->icmp(
-            Builder::INT_NE,
-            $yielded,
-            $context->getTypeFromString('int64')->constInt(0, false)
-        );
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($merge);
+        $hasYield = $context->builder->icmp(Builder::INT_NE, $yielded, $i64->constInt(0, false));
+        $afterResume = $fn->appendBasicBlock('gen_iter_after_resume');
+        $context->builder->branchIf($hasYield, $mergeBb, $afterResume);
+
+        $context->builder->positionAtEnd($afterResume);
+        $context->builder->branchIf($context->builder->load($doneField), $doneBb, $loopHead);
+
+        $context->builder->positionAtEnd($mergeBb);
         $phi = $context->builder->phi($i1);
-        $phi->addIncoming($i1->constInt(0, false), $early);
-        $phi->addIncoming($has, $body);
+        $phi->addIncoming($i1->constInt(0, false), $doneBb);
+        $phi->addIncoming($i1->constInt(1, false), $resumeBb);
 
         return $phi;
     }
