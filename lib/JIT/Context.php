@@ -181,6 +181,17 @@ class Context {
     public function bindVariableByName(string $name, Variable $var): void
     {
         $resolved = $this->resolveRefAliasName($name);
+        if (isset($this->namedVariableBindings[$resolved])) {
+            $existing = $this->namedVariableBindings[$resolved];
+            // Closure use() snapshot reads must not rebind enclosing locals to MCJIT rvalues (#72).
+            if (
+                Variable::KIND_VARIABLE === $existing->kind
+                && Variable::KIND_VALUE === $var->kind
+                && null === $var->valueBoxAliasPtr
+            ) {
+                return;
+            }
+        }
         $this->namedVariableBindings[$resolved] = $var;
         foreach ($this->scope->variables as $scopeOp) {
             if (!$scopeOp instanceof Operand) {
@@ -1000,6 +1011,46 @@ class Context {
 
     public function setVariableOp(Operand $op, Variable $var) {
         $this->scope->variables[$op] = $var;
+    }
+
+    /**
+     * php-cfg may use distinct {@see Operand\Temporary} objects for one scope slot (#72).
+     */
+    public function aliasVariableOpFromSlot(Block $block, Operand $op): bool
+    {
+        if ($this->scope->variables->contains($op)) {
+            return true;
+        }
+        $name = OperandName::resolve($op);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->resolveRefAliasName($name);
+            if (isset($this->namedVariableBindings[$resolved])) {
+                $this->scope->variables[$op] = $this->namedVariableBindings[$resolved];
+
+                return true;
+            }
+            foreach ($this->scope->variables as $scopeOp) {
+                if ($name === OperandName::resolve($scopeOp)) {
+                    $this->scope->variables[$op] = $this->scope->variables[$scopeOp];
+
+                    return true;
+                }
+            }
+        }
+        $slot = $block->slotForOperand($op);
+        if (null === $slot) {
+            return false;
+        }
+        foreach ($block->scopedOperands() as $scopeOp) {
+            if ($block->slotForOperand($scopeOp) !== $slot || !$this->scope->variables->contains($scopeOp)) {
+                continue;
+            }
+            $this->scope->variables[$op] = $this->scope->variables[$scopeOp];
+
+            return true;
+        }
+
+        return false;
     }
 
     public function hasVariableOp(Operand $op): bool {

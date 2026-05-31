@@ -4395,7 +4395,8 @@ class JIT {
         Block $block,
         \PHPLLVM\BasicBlock $entryBlock,
         OpCode $yieldFromOp,
-        ?string $innerResumeName = null
+        ?string $innerResumeName = null,
+        int $prefixStart = 0
     ): JIT\Variable {
         $yfIdx = null;
         foreach ($block->opCodes as $i => $op) {
@@ -4408,11 +4409,11 @@ class JIT {
             throw new \LogicException('yield from opcode not found in generator block');
         }
         if (
-            $this->generatorYieldFromPrefixNeedsCompile($block, $yfIdx, $innerResumeName)
+            $this->generatorYieldFromPrefixNeedsCompile($block, $yfIdx, $innerResumeName, $prefixStart)
         ) {
             $savedStorage = $this->context->scope->blockStorage;
             $this->context->scope->blockStorage = new \SplObjectStorage();
-            $exit = $this->compileBlockInternal($func, $block, $yfIdx, $entryBlock);
+            $exit = $this->compileGeneratorResumePrefix($func, $block, $prefixStart, $yfIdx, $entryBlock);
             $this->context->builder->positionAtEnd($exit);
             $this->context->scope->blockStorage = $savedStorage;
         }
@@ -4424,25 +4425,26 @@ class JIT {
     }
 
     /**
-     * Compile prefix opcodes before yield from when the container is produced by call/assign (#3074).
-     * Inline array literals keep the prior path (container read without prefix compileBlockInternal).
+     * Compile prefix opcodes before yield from when the container is not yet materialized (#3074).
+     * Includes inline array literals (INIT_ARRAY) and dynamic containers (call/assign).
      */
-    private function generatorYieldFromPrefixNeedsCompile(Block $block, int $yfIdx, ?string $innerResumeName): bool
-    {
+    private function generatorYieldFromPrefixNeedsCompile(
+        Block $block,
+        int $yfIdx,
+        ?string $innerResumeName,
+        int $prefixStart = 0
+    ): bool {
         if (null !== $innerResumeName) {
             return true;
         }
-        if ($yfIdx <= 0 || !JIT\GeneratorHelper::prefixOpcodesSafeForYieldFromInit($block, $yfIdx)) {
+        if (
+            $yfIdx <= $prefixStart
+            || !JIT\GeneratorHelper::prefixSegmentSafeForYieldFromInit($block, $prefixStart, $yfIdx)
+        ) {
             return false;
         }
-        for ($i = 0; $i < $yfIdx; ++$i) {
-            $type = $block->opCodes[$i]->type;
-            if (OpCode::TYPE_FUNCCALL_INIT === $type || OpCode::TYPE_ASSIGN === $type) {
-                return true;
-            }
-        }
 
-        return false;
+        return true;
     }
 
     /**
@@ -4563,19 +4565,13 @@ class JIT {
                             $this->context->makeVariableFromOp($func, $basicBlock, $block, $captureOperand);
                         }
                         $captureArg = $args[$captureBase + $captureIdx];
-                        if (isset($block->closureCaptureByRef[$captureSlot])) {
-                            JIT\ClosureHelper::bindCaptureSlotByReference(
-                                $this->context,
-                                $this->context->getVariableFromOp($captureOperand),
-                                $captureArg
-                            );
-                        } else {
-                            $this->assignOperand(
-                                $captureOperand,
-                                $captureArg,
-                                true
-                            );
-                        }
+                        $captureVar = $this->context->getVariableFromOp($captureOperand);
+                        // By-ref binds live storage; by-value binds snapshot __value__* formal (#72, #2483).
+                        JIT\ClosureHelper::bindCaptureSlotByReference(
+                            $this->context,
+                            $captureVar,
+                            $captureArg
+                        );
                     }
                 }
             }
@@ -5975,6 +5971,14 @@ class JIT {
                     $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
                     $this->context->scope->className = strtolower($nameOp->value);
                     $this->context->type->object->markTraitClass($this->context->scope->className);
+                    if (null !== $this->context->runtime->vmContext) {
+                        $lcname = strtolower($nameOp->value);
+                        if (!isset($this->context->runtime->vmContext->classes[$lcname])) {
+                            $traitEntry = new \PHPCompiler\VM\ClassEntry($nameOp->value);
+                            $traitEntry->isTrait = true;
+                            $this->context->runtime->vmContext->classes[$lcname] = $traitEntry;
+                        }
+                    }
                     $this->compileClass($op->block1, $this->context->scope->classId);
                     $this->context->popScope();
                     break;
@@ -6824,7 +6828,36 @@ class JIT {
         }
         $ownMethods = [];
         $traitMethodSources = [];
+        /** @var list<string> */
+        $pendingTraitNames = [];
         foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_TRAIT_USE_ADAPTATION === $op->type) {
+                if ($this->shouldSkipExternalClassBodyLowering($classId)) {
+                    $pendingTraitNames = [];
+
+                    continue;
+                }
+                $this->applyJitTraitUsesWithAdaptations(
+                    $block,
+                    $pendingTraitNames,
+                    $op->traitAdaptations,
+                    $classId,
+                    $ownMethods,
+                    $traitMethodSources
+                );
+                $pendingTraitNames = [];
+
+                continue;
+            }
+            if (OpCode::TYPE_USE_TRAIT !== $op->type) {
+                $this->flushPendingJitTraitUses(
+                    $block,
+                    $pendingTraitNames,
+                    $classId,
+                    $ownMethods,
+                    $traitMethodSources
+                );
+            }
             switch ($op->type) {
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:
                     $name = $block->getOperand($op->arg1);
@@ -6993,7 +7026,9 @@ class JIT {
                     if ($this->shouldSkipExternalClassBodyLowering($classId)) {
                         break;
                     }
-                    $this->applyJitTraitUse($block, $op, $classId, $ownMethods, $traitMethodSources);
+                    $traitOp = $block->getOperand($op->arg1);
+                    assert($traitOp instanceof Operand\Literal);
+                    $pendingTraitNames[] = (string) $traitOp->value;
                     break;
                 default:
                     if ($this->shouldSkipExternalClassBodyLowering($classId)) {
@@ -7001,39 +7036,68 @@ class JIT {
                     }
                     throw new \LogicException('Other class body types are not jittable for now');
             }
-            
         }
+        $this->flushPendingJitTraitUses(
+            $block,
+            $pendingTraitNames,
+            $classId,
+            $ownMethods,
+            $traitMethodSources
+        );
     }
 
     /**
-     * Merge trait methods/constants onto a using class (Zend zend_compile_traits; #3789).
-     *
+     * @param list<string> $pendingTraitNames
      * @param array<string, true> $ownMethods
-     * @param array<string, string> $traitMethodSources method lc => trait FQCN
+     * @param array<string, string> $traitMethodSources
      */
-    private function applyJitTraitUse(
+    private function flushPendingJitTraitUses(
         Block $block,
-        OpCode $op,
+        array &$pendingTraitNames,
         int $classId,
         array $ownMethods,
         array &$traitMethodSources
     ): void {
-        $traitOp = $block->getOperand($op->arg1);
-        assert($traitOp instanceof Operand\Literal);
-        $traitName = $traitOp->value;
-        $traitLc = strtolower(ltrim($traitName, '\\'));
+        if ([] === $pendingTraitNames || $this->shouldSkipExternalClassBodyLowering($classId)) {
+            $pendingTraitNames = [];
+
+            return;
+        }
+        $this->applyJitTraitUsesWithAdaptations(
+            $block,
+            $pendingTraitNames,
+            [],
+            $classId,
+            $ownMethods,
+            $traitMethodSources
+        );
+        $pendingTraitNames = [];
+    }
+
+    /**
+     * Merge trait methods/constants onto a using class (Zend zend_compile_traits; #3238).
+     *
+     * @param list<string> $traitNames
+     * @param list<array<string, mixed>> $adaptations
+     * @param array<string, true> $ownMethods
+     * @param array<string, string> $traitMethodSources method lc => trait FQCN
+     */
+    private function applyJitTraitUsesWithAdaptations(
+        Block $block,
+        array $traitNames,
+        array $adaptations,
+        int $classId,
+        array $ownMethods,
+        array &$traitMethodSources
+    ): void {
+        if ([] === $traitNames) {
+            return;
+        }
         $classLc = '' !== ($this->context->scope->className ?? '')
             ? strtolower(ltrim($this->context->scope->className, '\\'))
             : strtolower(ltrim($this->context->type->object->classNameForId($classId), '\\'));
         $className = $this->context->type->object->classNameForId($classId);
         $object = $this->context->type->object;
-        if (!$object->hasDeclaredClass($traitName)) {
-            throw new \LogicException("Trait {$traitName} not found");
-        }
-        if (!$object->isTraitClass($traitLc)) {
-            throw new \LogicException("{$traitName} is not a trait");
-        }
-        $traitId = $object->lookup($traitName);
         $excluded = $ownMethods;
         $visited = [];
         $current = $object->parentClassLc($classLc);
@@ -7048,7 +7112,104 @@ class JIT {
             }
             $current = $object->parentClassLc($current);
         }
-        foreach ($object->declaredMethodNames($traitId) as $methodLc) {
+
+        /** @var array<string, array<string, array{traitId: int, traitName: string, traitLc: string, methodLc: string}>> */
+        $perTraitMethods = [];
+        foreach ($traitNames as $traitName) {
+            $traitLc = strtolower(ltrim($traitName, '\\'));
+            if (!$object->hasDeclaredClass($traitName)) {
+                throw new \LogicException("Trait {$traitName} not found");
+            }
+            if (!$object->isTraitClass($traitLc)) {
+                throw new \LogicException("{$traitName} is not a trait");
+            }
+            $traitId = $object->lookup($traitName);
+            $object->inheritTraitConstants($classId, $traitId, $traitName);
+            $object->inheritTraitStaticProperties($classId, $traitId);
+            if (!isset($perTraitMethods[$traitLc])) {
+                $perTraitMethods[$traitLc] = [];
+            }
+            foreach ($object->declaredMethodNames($traitId) as $methodLc) {
+                $perTraitMethods[$traitLc][$methodLc] = [
+                    'traitId' => $traitId,
+                    'traitName' => $traitName,
+                    'traitLc' => $traitLc,
+                    'methodLc' => $methodLc,
+                    'sourceMethodLc' => $methodLc,
+                ];
+            }
+        }
+
+        /** @var array<string, true> */
+        $excludedByPrecedence = [];
+        foreach ($adaptations as $adaptation) {
+            if ('precedence' !== ($adaptation['kind'] ?? '')) {
+                continue;
+            }
+            $methodLc = strtolower((string) $adaptation['method']);
+            foreach ($adaptation['insteadof'] as $loserTrait) {
+                $loserLc = strtolower(ltrim((string) $loserTrait, '\\'));
+                $excludedByPrecedence["{$loserLc}\0{$methodLc}"] = true;
+            }
+        }
+
+        /** @var array<string, array{traitId: int, traitName: string, traitLc: string, methodLc: string}> */
+        $merged = [];
+        foreach ($perTraitMethods as $traitLc => $methods) {
+            foreach ($methods as $methodLc => $data) {
+                if (isset($excludedByPrecedence["{$traitLc}\0{$methodLc}"])) {
+                    continue;
+                }
+                if (isset($merged[$methodLc])) {
+                    $prev = $merged[$methodLc]['traitName'];
+                    throw new \CompileError(
+                        "Trait method {$data['traitName']}::{$methodLc} has not been applied as {$className}::{$methodLc}, "
+                        ."because of collision with {$prev}::{$methodLc}"
+                    );
+                }
+                $merged[$methodLc] = $data;
+            }
+        }
+
+        foreach ($adaptations as $adaptation) {
+            if ('alias' !== ($adaptation['kind'] ?? '')) {
+                continue;
+            }
+            $methodLc = strtolower((string) $adaptation['method']);
+            $traitLcFilter = null !== ($adaptation['trait'] ?? null)
+                ? strtolower(ltrim((string) $adaptation['trait'], '\\'))
+                : null;
+            if (!isset($merged[$methodLc])) {
+                throw new \LogicException('Could not find trait method ' . $adaptation['method']);
+            }
+            if (null !== $traitLcFilter && $merged[$methodLc]['traitLc'] !== $traitLcFilter) {
+                throw new \LogicException(
+                    'Could not find trait method ' . $adaptation['method'] . ' in trait ' . $adaptation['trait']
+                );
+            }
+            $newName = $adaptation['newName'] ?? null;
+            $newModifier = $adaptation['newModifier'] ?? null;
+            if (null === $newName && null === $newModifier) {
+                continue;
+            }
+            $data = $merged[$methodLc];
+            if (null !== $newModifier) {
+                $data['vis'] = (int) $newModifier;
+            }
+            if (null === $newName) {
+                $merged[$methodLc] = $data;
+                continue;
+            }
+            $newNameLc = strtolower((string) $newName);
+            unset($merged[$methodLc]);
+            if (isset($merged[$newNameLc])) {
+                throw new \LogicException('Cannot redefine method ' . $newName);
+            }
+            $data['methodLc'] = $newNameLc;
+            $merged[$newNameLc] = $data;
+        }
+
+        foreach ($merged as $methodLc => $data) {
             if (isset($excluded[$methodLc])) {
                 continue;
             }
@@ -7058,27 +7219,28 @@ class JIT {
             if (isset($traitMethodSources[$methodLc])) {
                 $prevTrait = $traitMethodSources[$methodLc];
                 throw new \CompileError(
-                    "Trait method {$traitName}::{$methodLc} has not been applied as {$className}::{$methodLc}, "
+                    "Trait method {$data['traitName']}::{$methodLc} has not been applied as {$className}::{$methodLc}, "
                     ."because of collision with {$prevTrait}::{$methodLc}"
                 );
             }
-            $traitMethodSources[$methodLc] = $traitName;
+            $traitMethodSources[$methodLc] = $data['traitName'];
+            $traitId = $data['traitId'];
+            $vis = $data['vis'] ?? $object->methodVisibility($traitId, $methodLc);
             $object->defineMethodVisibility(
                 $classId,
                 $methodLc,
-                $object->methodVisibility($traitId, $methodLc)
+                $vis
             );
             if ('__construct' === $methodLc) {
                 $object->markHasConstructor($classId);
             }
-            $object->recordTraitMethodSource($classId, $methodLc, $traitLc);
-            $methodBlock = $object->traitMethodBlock($traitId, $methodLc);
+            $object->recordTraitMethodSource($classId, $methodLc, $data['traitLc']);
+            $sourceMethodLc = $data['sourceMethodLc'] ?? $data['methodLc'];
+            $methodBlock = $object->traitMethodBlock($traitId, $sourceMethodLc);
             if (null !== $methodBlock) {
                 $this->compileBlock($methodBlock, $classLc.'::'.$methodLc);
             }
         }
-        $object->inheritTraitConstants($classId, $traitId, $traitName);
-        $object->inheritTraitStaticProperties($classId, $traitId);
     }
 
     public function assignIncludeResult(Operand $result): void
@@ -7118,9 +7280,17 @@ class JIT {
             return;
         }
         if (!$this->context->hasVariableOp($resultOp)) {
-            // it's a kind!
-            $this->context->makeVariableFromValueOp($this->context->helper->loadValue($value), $resultOp);
-            return;
+            if (
+                null !== $this->context->jitCurrentBlock
+                && $this->context->aliasVariableOpFromSlot($this->context->jitCurrentBlock, $resultOp)
+            ) {
+                // fall through to normal assign on the aliased lvalue
+            } else {
+                // it's a kind!
+                $this->context->makeVariableFromValueOp($this->context->helper->loadValue($value), $resultOp);
+
+                return;
+            }
         }
         $result = $this->context->getVariableFromOp($resultOp);
         if ($result === $value) {
@@ -7233,6 +7403,15 @@ class JIT {
         }
         if ($result->kind === Variable::KIND_VALUE && $result->type === Variable::TYPE_STRING) {
             JIT\StringOffsetHelper::dimAssign($this->context, $result->value, $value);
+
+            return;
+        }
+        if (null !== $result->valueBoxAliasPtr) {
+            JIT\JitValueBox::assignToPointer(
+                $this->context,
+                $result->valueBoxAliasPtr,
+                $value
+            );
 
             return;
         }
@@ -8106,17 +8285,22 @@ class JIT {
         }
 
         if (Variable::TYPE_VALUE === $read->type && Variable::KIND_VARIABLE === $read->kind) {
-            $slot = $read->value;
+            $readPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $read);
             $cur = $this->context->builder->call(
                 $this->context->lookupFunction('__value__readLong'),
-                JIT\JitValueBox::pointer($this->context, $slot)
+                $readPtr
             );
             $one = $cur->typeOf()->constInt(1, false);
             $newLong = $increment
                 ? $this->context->builder->add($cur, $one)
                 : $this->context->builder->sub($cur, $one);
             $write = $this->context->getVariableFromOpInScopes($writeOp);
-            JIT\JitValueBox::writeLong($this->context, $write->value, $newLong);
+            $writePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $write);
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeLong'),
+                $writePtr,
+                $newLong
+            );
             if ($prefix) {
                 $newVar = new Variable(
                     $this->context,

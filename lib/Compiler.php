@@ -2019,15 +2019,16 @@ class Compiler {
         $out = [];
         foreach ($adaptations as $adaptation) {
             if ($adaptation instanceof \PhpParser\Node\Stmt\TraitUseAdaptation\Alias) {
-                if (null !== $adaptation->newModifier) {
-                    $this->throwCompileLogic('TraitUseAdaptation visibility changes are not supported yet');
-                }
-                $out[] = [
+                $entry = [
                     'kind' => 'alias',
                     'trait' => null !== $adaptation->trait ? $adaptation->trait->toString() : null,
                     'method' => $adaptation->method->name,
                     'newName' => null !== $adaptation->newName ? $adaptation->newName->name : null,
                 ];
+                if (null !== $adaptation->newModifier) {
+                    $entry['newModifier'] = MethodVisibility::mask((int) $adaptation->newModifier);
+                }
+                $out[] = $entry;
             } elseif ($adaptation instanceof \PhpParser\Node\Stmt\TraitUseAdaptation\Precedence) {
                 $insteadof = [];
                 foreach ($adaptation->insteadof as $name) {
