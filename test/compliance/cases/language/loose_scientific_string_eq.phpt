@@ -7,10 +7,12 @@ this compiler follows the stricter int↔string branch (see issue #3658).
 --FILE--
 <?php
 var_dump(0 == '0e123');
+var_dump('0e123' == 0);
 var_dump(0 == '0');
 var_dump(1 == '1abc');
 ?>
 --EXPECT--
+bool(false)
 bool(false)
 bool(true)
 bool(false)
