@@ -534,7 +534,24 @@ function buildFromProject(
         \PHPCompiler\Cli\PhpcBuild::emitVerboseProjectGraph($projectDir);
     }
 
-    $includes = \PHPCompiler\Web\ProjectManifest::resolveIncludePaths($projectDir);
+    $graph = \PHPCompiler\AOT\ProjectGraph::resolve($projectDir);
+    if ([] !== $graph['errors']) {
+        foreach ($graph['errors'] as $message) {
+            fwrite(STDERR, $message."\n");
+        }
+
+        return 1;
+    }
+
+    $entryKey = realpath($entry) ?: $entry;
+    $includes = [];
+    foreach ($graph['files'] as $path) {
+        $key = realpath($path) ?: $path;
+        if ($key !== $entryKey) {
+            $includes[] = $path;
+        }
+    }
+
     $compileArgv = ['-o', $output];
     foreach ($includes as $includePath) {
         $compileArgv[] = '--include';
