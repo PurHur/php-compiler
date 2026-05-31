@@ -14,15 +14,6 @@ use PHPUnit\Framework\TestCase;
  */
 final class UnsupportedRegistryTest extends TestCase
 {
-    /**
-     * @return array<string, array{string, int}>
-     */
-    public static function kindToIssueProvider(): array
-    {
-        return [
-            'yield from' => ['Expr_YieldFrom', 167],
-        ];
-    }
 
     public function testMatchNoLongerTrackedAsUnsupported(): void
     {
@@ -53,12 +44,14 @@ final class UnsupportedRegistryTest extends TestCase
         $this->assertNull(UnsupportedRegistry::trackingIssueForKind('Expr_ArrowFunction'));
     }
 
-    /**
-     * @dataProvider kindToIssueProvider
-     */
-    public function testTrackingIssueForKind(string $kind, int $issue): void
+    public function testYieldFromNoLongerTrackedAsUnsupported(): void
     {
-        $this->assertSame($issue, UnsupportedRegistry::trackingIssueForKind($kind));
+        $this->assertNull(UnsupportedRegistry::trackingIssueForKind('Expr_YieldFrom'));
+    }
+
+    public function testTryCatchStillTrackedAsUnsupported(): void
+    {
+        $this->assertSame(57, UnsupportedRegistry::trackingIssueForKind('Stmt_TryCatch'));
     }
 
     public function testUnknownKindReturnsNull(): void

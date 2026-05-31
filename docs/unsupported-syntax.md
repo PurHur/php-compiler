@@ -30,7 +30,6 @@ Some constructs (for example `break`/`continue`, `goto`/`label`, `list()` / shor
 | CFG kind | Tracking |
 |----------|----------|
 | `Stmt_Try`, `Stmt_TryCatch`, `Stmt_Catch`, `Stmt_Finally` | [#57](https://github.com/PurHur/php-compiler/issues/57) (AOT lint lowering; VM unwind follow-up) |
-| `Expr_YieldFrom` | [#167](https://github.com/PurHur/php-compiler/issues/167) (VM supported; JIT falls back to VM; native AOT resume deferred) |
 
 The mapping lives in `lib/Lint/UnsupportedRegistry.php`. Compiler gaps are also listed in `docs/bootstrap-inventory.md` (self-host bootstrap).
 
