@@ -36,6 +36,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'readonly_property_dec.phpt',
         'readonly_property_compound_assign.phpt',
         'readonly_property_promoted.phpt',
+        'readonly_property_coalesce_assign.phpt',
     ];
 
     /**
