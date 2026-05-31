@@ -573,7 +573,7 @@ PY
 }
 
 apply_php_cfg_enum_class_method_parser_fix() {
-  local parser="$1"
+  local parser="${1:-$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php}"
   if grep -q 'elseif ($stmt instanceof Stmt\\ClassMethod)' "$parser" 2>/dev/null \
     && grep -A20 'function parseStmt_Enum' "$parser" | grep -q 'Stmt\\ClassMethod'; then
     return 0
