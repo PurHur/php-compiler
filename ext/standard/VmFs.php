@@ -305,6 +305,18 @@ final class VmFs
         return $data;
     }
 
+    /**
+     * @return list<string>|false
+     */
+    public static function file(string $path, int $flags = 0) {
+        $lines = @\file($path, $flags);
+        if (false === $lines) {
+            return false;
+        }
+
+        return $lines;
+    }
+
     public static function readfile(string $path) {
         $fp = @fopen($path, 'rb');
         if (false === $fp) {

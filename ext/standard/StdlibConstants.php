@@ -62,6 +62,12 @@ final class StdlibConstants
     public const CASE_LOWER = 0;
     public const CASE_UPPER = 1;
 
+    /** file() flags (ext/standard/file.c; PHP bitmask constants). */
+    public const FILE_USE_INCLUDE_PATH = 1;
+    public const FILE_IGNORE_NEW_LINES = 2;
+    public const FILE_SKIP_EMPTY_LINES = 4;
+    public const FILE_APPEND = 8;
+
     /** sort() / array_multisort() flags (ext/standard/php_array.h). */
     public const SORT_REGULAR = 0;
     public const SORT_NUMERIC = 1;
@@ -141,6 +147,10 @@ final class StdlibConstants
         'php_round_half_odd' => self::PHP_ROUND_HALF_ODD,
         'case_lower' => self::CASE_LOWER,
         'case_upper' => self::CASE_UPPER,
+        'file_ignore_new_lines' => self::FILE_IGNORE_NEW_LINES,
+        'file_skip_empty_lines' => self::FILE_SKIP_EMPTY_LINES,
+        'file_use_include_path' => self::FILE_USE_INCLUDE_PATH,
+        'file_append' => self::FILE_APPEND,
         'pathinfo_dirname' => self::PATHINFO_DIRNAME,
         'pathinfo_basename' => self::PATHINFO_BASENAME,
         'pathinfo_extension' => self::PATHINFO_EXTENSION,
@@ -232,6 +242,10 @@ final class StdlibConstants
         'php_round_half_odd',
         'case_lower',
         'case_upper',
+        'file_ignore_new_lines',
+        'file_skip_empty_lines',
+        'file_use_include_path',
+        'file_append',
         'pathinfo_dirname',
         'pathinfo_basename',
         'pathinfo_extension',
