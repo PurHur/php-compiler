@@ -52,6 +52,7 @@ final class Linker
         __DIR__.'/runtime/phpc_session_storage.c',
         __DIR__.'/runtime/phpc_ob_storage.c',
         __DIR__.'/runtime/phpc_ob.c',
+        __DIR__.'/runtime/phpc_pow.c',
         __DIR__.'/runtime/phpc_parse_url.c',
         __DIR__.'/runtime/phpc_parse_str.c',
         __DIR__.'/runtime/phpc_json_decode.c',

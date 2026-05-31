@@ -76,6 +76,12 @@ class Block {
     /** Declared return type AST for reflection (#3355), or null when untyped. */
     public ?Op\Type $returnDeclaredType = null;
 
+    /** @var array<int, list<array{kind: string, interfaces?: list<string>, name?: string}>> */
+    public array $paramDnfConstraints = [];
+
+    /** DNF return type arms (#3094), or null when untyped / non-DNF. */
+    public ?array $returnDnfConstraints = null;
+
     /** Declared scalar return type for this function (issue #205), or null when untyped. */
     public ?int $returnTypeConstraint = null;
 
@@ -416,6 +422,7 @@ class Block {
             $this->func = $parent->func;
             $this->strictTypes = $parent->strictTypes;
             $this->returnTypeConstraint = $parent->returnTypeConstraint;
+            $this->returnDnfConstraints = $parent->returnDnfConstraints;
             $this->returnTypeVoid = $parent->returnTypeVoid;
             $this->returnTypeNever = $parent->returnTypeNever;
             $this->returnTypeStatic = $parent->returnTypeStatic;
@@ -423,6 +430,7 @@ class Block {
             $this->paramDeclaredTypes = $parent->paramDeclaredTypes;
             $this->paramTypeConstraints = $parent->paramTypeConstraints;
             $this->paramIntersectionConstraints = $parent->paramIntersectionConstraints;
+            $this->paramDnfConstraints = $parent->paramDnfConstraints;
             $this->paramNames = $parent->paramNames;
         }
     }
@@ -1063,6 +1071,73 @@ class Block {
     }
 
     /**
+     * Closures with {@code use ($var)} / {@code use (&$var)} — MCJIT IR verify / execute unstable (#72, #2483).
+     */
+    public static function containsClosureUseCaptureOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_CLOSURE === $op->type && [] !== $op->closureCaptures) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Closures with {@code use (&$var)} — MCJIT execute segfaults after IR verify (#72, #2483).
+     * {@see JIT::compileIncDecOp} uses {@see Variable::$valueBoxAliasPtr}; execute ABI still unstable.
+     */
+    public static function containsClosureByRefCaptureOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_CLOSURE === $op->type) {
+                    foreach ($op->closureCaptures as $capture) {
+                        if (!empty($capture['byRef'])) {
+                            return true;
+                        }
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * User functions/methods with non-void declared return types — MCJIT execute segfaults (#55, #2055).
      * LLVM IR verify passes ({@see FunctionReturnTypeJitCompileTest}); AOT execute is OK.
      */
@@ -1116,6 +1191,38 @@ class Block {
     }
 
     /**
+     * Per-property or readonly-class property declarations — MCJIT uncaught violation exits
+     * with segfault instead of surfacing pending LogicException (#3149, #1360).
+     */
+    public static function containsReadonlyPropertyOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_PROPERTY === $op->type && $op->propertyReadonly) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * CFG regions that MCJIT must not execute yet; `bin/jit.php` runs the VM instead (#2114, #167).
      * Simple try/catch without `finally` may pass MCJIT when {@see TryCatchJitExecuteTest} is green.
      */
@@ -1126,6 +1233,8 @@ class Block {
             || self::containsExceptionHandlingOpcodesInScriptScope($root)
             || self::containsArrayAccessObjectOpcodes($root)
             || self::containsDynamicStaticPropertyOpcodes($root)
-            || self::containsTypedNonVoidReturnOpcodes($root);
+            || self::containsTypedNonVoidReturnOpcodes($root)
+            || self::containsClosureByRefCaptureOpcodes($root)
+            || self::containsReadonlyPropertyOpcodes($root);
     }
 }

@@ -17,6 +17,7 @@ use PHPCompiler\ext\standard\VmEval;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\CastSupport;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\DnfCheck;
 use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
@@ -25,7 +26,9 @@ use PHPCompiler\VM\GeneratorState;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ObjectLifetime;
 use PHPCompiler\VM\ObjectPropertyIterator;
+use PHPCompiler\VM\ScriptExit;
 use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\TypedPropertyReadSignal;
 use PHPCompiler\VM\Variable;
@@ -56,23 +59,30 @@ class VM {
     }
 
     public function run(Block $block): int {
-        if (!is_null($block->handler)) {
+        ObjectLifetime::setVm($this);
+        try {
+            if (!is_null($block->handler)) {
+                $frame = $block->getFrame($this->context);
+                $this->seedScriptPath($frame);
+                $block->handler->execute($frame);
+
+                return self::SUCCESS;
+            }
+
             $frame = $block->getFrame($this->context);
             $this->seedScriptPath($frame);
-            $block->handler->execute($frame);
-            return self::SUCCESS;
+            $this->context->push($frame);
+
+            $result = $this->runFrames();
+            if ('' !== $frame->scriptPath) {
+                $this->context->scriptStack->pop();
+            }
+
+            return $result;
+        } finally {
+            ObjectLifetime::runShutdownDestructors();
+            ObjectLifetime::clearVm();
         }
-
-        $frame = $block->getFrame($this->context);
-        $this->seedScriptPath($frame);
-        $this->context->push($frame);
-
-        $result = $this->runFrames();
-        if ('' !== $frame->scriptPath) {
-            $this->context->scriptStack->pop();
-        }
-
-        return $result;
     }
 
     /**
@@ -780,6 +790,15 @@ restart:
                         : $frame->block->strictTypes;
                     try {
                         TypeCheck::coercePropertyWrite($arg2, $strict);
+                        if (null !== $writeTarget->dnfArms) {
+                            DnfCheck::assertMatches(
+                                $arg3,
+                                $writeTarget->dnfArms,
+                                $this->context,
+                                'Property',
+                                $writeTarget
+                            );
+                        }
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
@@ -1095,16 +1114,32 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_POST_INC:
-                    $this->executeIncDec($frame, $op, true, false);
+                    $catchFrame = $this->executeIncDec($frame, $op, true, false);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     break;
                 case OpCode::TYPE_PRE_INC:
-                    $this->executeIncDec($frame, $op, true, true);
+                    $catchFrame = $this->executeIncDec($frame, $op, true, true);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     break;
                 case OpCode::TYPE_POST_DEC:
-                    $this->executeIncDec($frame, $op, false, false);
+                    $catchFrame = $this->executeIncDec($frame, $op, false, false);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     break;
                 case OpCode::TYPE_PRE_DEC:
-                    $this->executeIncDec($frame, $op, false, true);
+                    $catchFrame = $this->executeIncDec($frame, $op, false, true);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     break;
                 case OpCode::TYPE_PLUS:
                 case OpCode::TYPE_MINUS:
@@ -1115,6 +1150,11 @@ restart:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
+                    $catchFrame = $this->enforceReadonlyForCompoundAssign($frame, $op, $arg2);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     try {
                         if (
                             $op->isIncDec
@@ -1148,6 +1188,11 @@ restart:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
+                    $catchFrame = $this->enforceReadonlyForCompoundAssign($frame, $op, $arg2);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $arg1->bitwiseOp($op->type, $arg2, $arg3);
                     break;
 
@@ -1159,6 +1204,11 @@ restart:
                     break;
                 case OpCode::TYPE_CONCAT:
                     $arg1 = $frame->scope[$op->arg1];
+                    $catchFrame = $this->enforceReadonlyForCompoundAssign($frame, $op, $arg1);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $arg2 = $this->coerceVariableToString($frame->scope[$op->arg2]);
                     $arg3 = $this->coerceVariableToString($frame->scope[$op->arg3]);
                     $arg1->string($arg2 . $arg3);
@@ -1260,6 +1310,16 @@ restart:
                     $resumeFrame = $this->resumeCatchAfterFinally($frame);
                     if (null !== $resumeFrame) {
                         $frame = $resumeFrame;
+                        goto restart;
+                    }
+                    $mergeFrame = $this->resumeMergeAfterFinally($frame);
+                    if (null !== $mergeFrame) {
+                        $frame = $mergeFrame;
+                        goto restart;
+                    }
+                    $finallyFrame = $this->beginCatchExitFinallyUnwind($frame, $op->block1);
+                    if (null !== $finallyFrame) {
+                        $frame = $finallyFrame;
                         goto restart;
                     }
                     $frame = $this->frameForBranch($frame, $op->block1);
@@ -1448,7 +1508,13 @@ restart:
                             $this->invokeArrayAccessOffsetUnset($object, $key);
                             break;
                         }
-                        $this->unsetObjectProperty($object, $key->toString());
+                        $propName = $key->toString();
+                        $catchFrame = $this->enforceReadonlyPropertyUnset($object, $propName, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        $this->unsetObjectProperty($object, $propName);
                         break;
                     }
                     if (Variable::TYPE_ARRAY === $container->type) {
@@ -1617,6 +1683,9 @@ restart:
 
                             return self::FIBER_SUSPEND;
                         }
+                        $frame->call = null;
+                        $frame->callArgs = [];
+                        $frame->callArgEntries = [];
                         break;
                     }
                     $this->context->push($frame);
@@ -1660,19 +1729,26 @@ restart:
                     $arraySpec = $frame->block->paramGenericArrayTypeSpecs[$op->arg1] ?? null;
                     try {
                         TypeCheck::coerceParameter($arg1, $strict, $arraySpec);
+                        if (isset($frame->block->paramIntersectionConstraints[$op->arg1])) {
+                            TypeCheck::assertParamIntersection(
+                                $arg1,
+                                $frame->block->paramIntersectionConstraints[$op->arg1],
+                                $this->context
+                            );
+                        }
+                        if (isset($frame->block->paramDnfConstraints[$op->arg1])) {
+                            DnfCheck::assertMatches(
+                                $arg1,
+                                $frame->block->paramDnfConstraints[$op->arg1],
+                                $this->context
+                            );
+                        }
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
                         }
-                    }
-                    if (isset($frame->block->paramIntersectionConstraints[$op->arg1])) {
-                        TypeCheck::assertParamIntersection(
-                            $arg1,
-                            $frame->block->paramIntersectionConstraints[$op->arg1],
-                            $this->context
-                        );
                     }
                     break;
                 case OpCode::TYPE_DECLARE_INTERFACE:
@@ -1813,6 +1889,12 @@ restart:
                     }
                     $object = new ObjectEntry($class);
                     $this->initInstancePropertyDefaults($object);
+                    if (null !== $op->arg3 && VM\ExceptionSupport::classEntryImplementsThrowable($class, $this->context)) {
+                        $newLine = (int) $op->arg3;
+                        if ($newLine > 0) {
+                            $object->getProperty(VM\ExceptionSupport::PROP_LINE)->int($newLine);
+                        }
+                    }
                     $result->object($object);
                     $frame->call = $object->constructor;
                     $frame->callArgs = [$result];
@@ -2280,6 +2362,9 @@ restart:
                     break;
                 case OpCode::TYPE_THROW:
                     $thrown = $frame->scope[$op->arg1]->resolveIndirect();
+                    if (null !== $op->arg2) {
+                        VM\ExceptionSupport::stampThrowLine($thrown, (int) $op->arg2);
+                    }
                     if ($this->frameIsPropertySetHook($frame)) {
                         $this->context->propertyHookSetAborted = true;
                     }
@@ -2330,31 +2415,56 @@ restart:
             $this->context->scriptStack->pop();
             if (null !== $frame->parent) {
                 $this->markObjectConstructedIfLeavingConstruct($frame);
+                $child = $frame;
                 $frame = $frame->parent;
+                $this->releaseFrameObjectRefs($child);
                 goto restart;
             }
+            $this->releaseFrameObjectRefs($frame);
             goto nextframe;
         }
 
         return self::SUCCESS;
 
         return_void_complete:
-        $this->enforceReturnType($frame, null);
+        try {
+            $this->enforceReturnType($frame, null);
+        } catch (\TypeError $e) {
+            $catchFrame = $this->dispatchVmTypeError($e, $frame);
+            if (null !== $catchFrame) {
+                $frame = $catchFrame;
+                goto restart;
+            }
+            return self::FAIL;
+        }
         // Do not null returnVar: it may alias the caller result slot (#1885).
         $this->markObjectConstructedIfLeavingConstruct($frame);
         $gen = $this->findGeneratorState($frame);
         if (null !== $gen) {
             $gen->markReturned(null);
+            $this->releaseFrameObjectRefs($frame);
             goto nextframe;
         }
         if ($frame->ephemeral && null !== $frame->parent) {
+            $child = $frame;
             $frame = $frame->parent;
+            $this->releaseFrameObjectRefs($child);
             goto restart;
         }
+        $this->releaseFrameObjectRefs($frame);
         goto nextframe;
 
         return_value_complete:
-        $this->enforceReturnType($frame, $returnValue);
+        try {
+            $this->enforceReturnType($frame, $returnValue);
+        } catch (\TypeError $e) {
+            $catchFrame = $this->dispatchVmTypeError($e, $frame);
+            if (null !== $catchFrame) {
+                $frame = $catchFrame;
+                goto restart;
+            }
+            return self::FAIL;
+        }
         $gen = $this->findGeneratorState($frame);
         if (null !== $gen) {
             $gen->markReturned($returnValue);
@@ -2369,7 +2479,9 @@ restart:
             }
         }
         $this->markObjectConstructedIfLeavingConstruct($frame);
+        $callee = $frame;
         $caller = $this->context->pop();
+        $this->releaseFrameObjectRefs($callee);
         if (null !== $caller) {
             $caller->callArgs = [];
             $caller->callArgEntries = [];
@@ -2378,11 +2490,15 @@ restart:
         }
         // Nested return <call>(): callee may finish with an empty run stack (#1885).
         if (null !== $frame->parent && null !== $frame->returnVar) {
+            $child = $frame;
             $frame = $frame->parent;
+            $this->releaseFrameObjectRefs($child);
             goto restart;
         }
         if ($frame->ephemeral && null !== $frame->parent) {
+            $child = $frame;
             $frame = $frame->parent;
+            $this->releaseFrameObjectRefs($child);
             goto restart;
         }
 
@@ -2410,12 +2526,17 @@ restart:
 
     /**
      * Pre/post increment/decrement with Zend bool preservation (#3552).
+     * Rejects ++/-- on readonly properties after construction (#3149).
      */
-    private function executeIncDec(Frame $frame, OpCode $op, bool $increment, bool $prefix): void
+    private function executeIncDec(Frame $frame, OpCode $op, bool $increment, bool $prefix): ?Frame
     {
         $read = $frame->scope[$op->arg2];
         $write = $frame->scope[$op->arg3];
         $result = $frame->scope[$op->arg1];
+        $catchFrame = $this->enforceReadonlyPropertyWrite($write, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
         $working = new Variable();
         $working->copyFrom($read->resolveIndirect());
         if ($prefix) {
@@ -2427,7 +2548,7 @@ restart:
             $write->copyFrom($working);
             $result->copyFrom($working);
 
-            return;
+            return null;
         }
         $old = new Variable();
         $old->copyFrom($working);
@@ -2438,6 +2559,8 @@ restart:
         }
         $write->copyFrom($working);
         $result->copyFrom($old);
+
+        return null;
     }
 
     protected function raise(string $message, Frame $frame): int
@@ -2578,12 +2701,16 @@ restart:
     private function dispatchCatchForHandlerFrame(Frame $handler): ?Frame
     {
         $this->rewindHandlerToCatchChain($handler);
-        $finallyFrame = $this->enterFinallyHandlerForUnwind($handler);
+        $catchFrame = $this->enterMatchingCatchHandler($handler);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $finallyFrame = $this->enterFinallyHandlerForUnwind($handler, true);
         if (null !== $finallyFrame) {
             return $finallyFrame;
         }
 
-        return $this->enterMatchingCatchHandler($handler);
+        return null;
     }
 
     private function popTryHandlerIfAtMergeBlock(Frame $frame): void
@@ -2618,10 +2745,16 @@ restart:
         $ops = $handler->block->opCodes;
         $n = $handler->block->nOpCodes;
         for ($i = 0; $i < $n; ++$i) {
+            if (!isset($ops[$i])) {
+                continue;
+            }
             if (OpCode::TYPE_TRY !== $ops[$i]->type) {
                 continue;
             }
             for ($j = $i + 1; $j < $n; ++$j) {
+                if (!isset($ops[$j])) {
+                    continue;
+                }
                 if (OpCode::TYPE_CATCH === $ops[$j]->type) {
                     $handler->pos = $j;
 
@@ -2680,7 +2813,8 @@ restart:
                 $handler->pos = $handler->block->nOpCodes;
                 $catchFrame->parent = $mergeFrame;
             }
-            $this->clearTryCatchUnwindState();
+            $this->context->activeCatchHandlerFrame = $handler;
+            $this->clearThrowDispatchState();
 
             return $catchFrame;
         }
@@ -2688,7 +2822,7 @@ restart:
         return null;
     }
 
-    private function enterFinallyHandlerForUnwind(Frame $handler): ?Frame
+    private function enterFinallyHandlerForUnwind(Frame $handler, bool $resumeCatchAfter = true): ?Frame
     {
         $handlerId = spl_object_id($handler);
         if (isset($this->context->completedFinallyHandlers[$handlerId])) {
@@ -2699,9 +2833,41 @@ restart:
             return null;
         }
         $this->context->completedFinallyHandlers[$handlerId] = true;
-        $this->context->pendingCatchResumeHandler = $handler;
+        $this->context->pendingCatchResumeHandler = $resumeCatchAfter ? $handler : null;
 
         return $finallyOp->block1->getFrame($this->context, $handler);
+    }
+
+    /** Run finally after a matching catch body before the try/catch merge block (Zend order). */
+    private function beginCatchExitFinallyUnwind(Frame $frame, Block $target): ?Frame
+    {
+        if (null === $this->resolveActiveCatchException($frame) && null === $frame->activeCatchException) {
+            return null;
+        }
+        if (!isset($this->context->tryMergeBlockIds[spl_object_id($target)])) {
+            return null;
+        }
+        $handler = $this->context->activeCatchHandlerFrame;
+        if (null === $handler || !$this->hasPendingFinally($handler)) {
+            return null;
+        }
+        $this->context->pendingMergeAfterFinally = $target;
+        $this->context->activeCatchHandlerFrame = null;
+
+        return $this->enterFinallyHandlerForUnwind($handler, false);
+    }
+
+    private function resumeMergeAfterFinally(Frame $frame): ?Frame
+    {
+        $merge = $this->context->pendingMergeAfterFinally;
+        if (null === $merge) {
+            return null;
+        }
+        $this->context->pendingMergeAfterFinally = null;
+        $this->context->activeCatchHandlerFrame = null;
+        $frame->activeCatchException = null;
+
+        return $merge->getFrame($this->context, $frame);
     }
 
     private function findFinallyOpForHandler(Frame $handler): ?OpCode
@@ -2738,11 +2904,18 @@ restart:
         $this->raiseUncaughtException($thrown);
     }
 
-    private function clearTryCatchUnwindState(): void
+    private function clearThrowDispatchState(): void
     {
         $this->context->pendingException = null;
         $this->context->pendingCatchResumeHandler = null;
         $this->context->completedFinallyHandlers = [];
+    }
+
+    private function clearTryCatchUnwindState(): void
+    {
+        $this->clearThrowDispatchState();
+        $this->context->activeCatchHandlerFrame = null;
+        $this->context->pendingMergeAfterFinally = null;
         $this->clearPendingReturnState();
     }
 
@@ -2803,7 +2976,7 @@ restart:
         $this->context->pendingReturnValue = $value;
         $this->context->pendingReturnResumeFrame = $frame;
 
-        return $this->enterFinallyHandlerForUnwind($handler);
+        return $this->enterFinallyHandlerForUnwind($handler, true);
     }
 
     private function continueReturnFinallyChain(): ?Frame
@@ -2816,7 +2989,7 @@ restart:
             return null;
         }
 
-        return $this->enterFinallyHandlerForUnwind($handler);
+        return $this->enterFinallyHandlerForUnwind($handler, true);
     }
 
     private function schedulePendingReturnDispatch(): bool
@@ -2836,6 +3009,9 @@ restart:
     private function raiseUncaughtException(Variable $thrown): void
     {
         $this->clearTryCatchUnwindState();
+        if ($this->context->exceptionHandlers->dispatch($this->context, $thrown)) {
+            throw new ScriptExit(0);
+        }
         if (Variable::TYPE_OBJECT === $thrown->type) {
             $entry = $thrown->toObject();
             try {
@@ -2843,7 +3019,7 @@ restart:
             } catch (\LogicException) {
                 $message = 'Exception';
             }
-            throw new \Exception($message);
+            throw VM\ExceptionSupport::nativeUncaughtThrowable($entry, $message);
         }
         throw new \Exception($thrown->toString());
     }
@@ -3063,6 +3239,40 @@ restart:
         }
     }
 
+    /** Reject unset() on readonly properties; returns catch frame or throws when uncaught. */
+    private function enforceReadonlyPropertyUnset(ObjectEntry $object, string $propName, Frame $frame): ?Frame
+    {
+        $declaringClass = $this->readonlyPropertyDeclaringClass($object, $propName);
+        if (null === $declaringClass) {
+            return null;
+        }
+
+        $thrown = VM\BuiltinExceptionSupport::materializeError(
+            $this->context,
+            sprintf('Cannot unset readonly property %s::$%s', $declaringClass, $propName)
+        );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /**
+     * Compound assignment ($obj->prop += 1) reuses one operand slot (arg1 === arg2).
+     * Reject when the lvalue is a readonly instance property after construction (#3149).
+     */
+    private function enforceReadonlyForCompoundAssign(Frame $frame, OpCode $op, Variable $lvalue): ?Frame
+    {
+        if ($op->arg1 !== $op->arg2) {
+            return null;
+        }
+
+        return $this->enforceReadonlyPropertyWrite($lvalue, $frame);
+    }
+
     /** Reject readonly property writes; returns catch frame or throws when uncaught. */
     private function enforceReadonlyPropertyWrite(Variable $lvalue, Frame $frame): ?Frame
     {
@@ -3072,13 +3282,14 @@ restart:
             return null;
         }
         $prop = $target->objectPropertyName ?? 'property';
-        if (!$this->isReadonlyPropertyWrite($owner->class, $prop)) {
+        $declaringClass = $this->readonlyPropertyDeclaringClass($owner, $prop);
+        if (null === $declaringClass) {
             return null;
         }
 
         $thrown = VM\BuiltinExceptionSupport::materializeError(
             $this->context,
-            sprintf('Cannot modify readonly property %s::$%s', $owner->class->name, $prop)
+            sprintf('Cannot modify readonly property %s::$%s', $declaringClass, $prop)
         );
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
@@ -3142,18 +3353,20 @@ restart:
         return null;
     }
 
-    private function isReadonlyPropertyWrite(ClassEntry $class, string $propName): bool
+    private function readonlyPropertyDeclaringClass(ObjectEntry $object, string $propName): ?string
     {
-        if ($class->readonly) {
-            return true;
+        if ($object->class->readonly) {
+            return $object->class->name;
         }
-        foreach ($class->properties as $property) {
-            if ($property->name === $propName && $property->readonly) {
-                return true;
-            }
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null === $meta || !$meta->readonly) {
+            return null;
+        }
+        if ('' !== $meta->declaringClassLc && isset($this->context->classes[$meta->declaringClassLc])) {
+            return $this->context->classes[$meta->declaringClassLc]->name;
         }
 
-        return false;
+        return $meta->declaringClassLc !== '' ? $meta->declaringClassLc : $object->class->name;
     }
 
     /** Reject asymmetric set visibility violations (#3165); returns message or null. */
@@ -3697,8 +3910,16 @@ restart:
         if (!isset($this->context->classes[$lcClass])) {
             throw new \LogicException("Call to undefined static method {$callableName}()");
         }
-        $frame->staticCallClass = $this->context->classes[$lcClass]->name;
+        $class = $this->context->classes[$lcClass];
+        $frame->staticCallClass = $class->name;
         $methodLc = strtolower($methodName);
+        if ($class->isEnum && null !== $class->backedType && ('from' === $methodLc || 'tryfrom' === $methodLc)) {
+            $frame->call = new VM\EnumFromHandler($class, 'tryfrom' === $methodLc);
+            $frame->callArgs = [];
+            $frame->callArgEntries = [];
+
+            return;
+        }
         try {
             [$class, $methodLc] = $this->resolveStaticMethod($lcClass, $methodLc);
         } catch (\LogicException $e) {
@@ -4018,11 +4239,19 @@ restart:
                 );
             }
             $newName = $adaptation['newName'] ?? null;
+            $newModifier = $adaptation['newModifier'] ?? null;
+            if (null === $newName && null === $newModifier) {
+                continue;
+            }
+            $data = $merged[$methodLc];
+            if (null !== $newModifier) {
+                $data['vis'] = (int) $newModifier;
+            }
             if (null === $newName) {
+                $merged[$methodLc] = $data;
                 continue;
             }
             $newNameLc = strtolower((string) $newName);
-            $data = $merged[$methodLc];
             unset($merged[$methodLc]);
             if (isset($merged[$newNameLc])) {
                 throw new \LogicException('Cannot redefine method ' . $newName);
@@ -4177,6 +4406,9 @@ restart:
         }
         if (null === $entry->constructor && null !== $parent->constructor) {
             $entry->constructor = $parent->constructor;
+        }
+        if (null === $entry->destructor && null !== $parent->destructor) {
+            $entry->destructor = $parent->destructor;
         }
         if ($parent->readonly) {
             $entry->readonly = true;
@@ -4364,6 +4596,9 @@ restart:
                         unset($entry->abstractMethods[$name]);
                         if ('__construct' === $name) {
                             $entry->constructor = $method;
+                        }
+                        if ('__destruct' === $name) {
+                            $entry->destructor = $method;
                         }
                     } else {
                         $entry->abstractMethods[$name] = true;
@@ -4699,6 +4934,16 @@ restart:
 
             return;
         }
+        if (null !== $block->returnDnfConstraints && null !== $value) {
+            DnfCheck::assertMatches(
+                $value,
+                $block->returnDnfConstraints,
+                $this->context,
+                'Return value'
+            );
+
+            return;
+        }
         if (null === $block->returnTypeConstraint || null === $value) {
             return;
         }
@@ -4773,6 +5018,54 @@ restart:
         }
 
         return false;
+    }
+
+    /**
+     * Invoke user __destruct() once (Zend zend_objects_destroy_object; #3144).
+     */
+    public function invokeUserDestructor(ObjectEntry $object): void
+    {
+        if ($object->destructorInvoked) {
+            return;
+        }
+        $destructor = $object->class->destructor;
+        if (null === $destructor) {
+            $object->destructorInvoked = true;
+
+            return;
+        }
+        $object->destructorInvoked = true;
+        $thisVar = new Variable();
+        $thisVar->object($object);
+        ObjectLifetime::addRef($object);
+
+        $savedStack = $this->context->swapRunStack(null);
+        try {
+            $child = $destructor->getFrame($this->context, null);
+            $thisIdx = $destructor->block->slotIndexForVariableName('this');
+            if (null !== $thisIdx) {
+                $child->scope[$thisIdx] = $thisVar;
+            }
+            $child->calledArgs = [$thisVar];
+            $this->context->push($child);
+            $result = $this->runFrames();
+            if (self::SUCCESS !== $result) {
+                throw new \LogicException('__destruct() failed in this compiler build');
+            }
+        } finally {
+            $this->context->swapRunStack($savedStack);
+            ObjectLifetime::releaseRef($object);
+        }
+    }
+
+    private function releaseFrameObjectRefs(Frame $frame): void
+    {
+        foreach ($frame->scope as $slot) {
+            ObjectLifetime::releaseDirectObject($slot);
+        }
+        foreach ($frame->iterators as $iter) {
+            ObjectLifetime::releaseDirectObject($iter);
+        }
     }
 
 }

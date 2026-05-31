@@ -25,6 +25,12 @@ class ObjectEntry {
     /** True after `__construct` returns (or immediately when none is defined). */
     public bool $constructed = false;
 
+    /** Live Variable references holding this object (#3144). */
+    public int $refCount = 0;
+
+    /** True after user `__destruct()` has run (or when class has none). */
+    public bool $destructorInvoked = false;
+
     /** User generator instance state (issue #167). */
     public ?GeneratorState $generatorState = null;
 
@@ -78,6 +84,7 @@ class ObjectEntry {
     public function destroyForGc(): void
     {
         foreach ($this->properties as $prop) {
+            ObjectLifetime::releaseDirectObject($prop);
             if (Variable::TYPE_INDIRECT === $prop->type) {
                 $prop->resolveIndirect()->null();
             } else {

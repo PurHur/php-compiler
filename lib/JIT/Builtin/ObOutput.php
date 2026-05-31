@@ -26,6 +26,7 @@ final class ObOutput
             '__phpc_ob_get_clean' => [$i32, false, [$valuePtr]],
             '__phpc_ob_end_flush' => [$i32, false, [$valuePtr]],
             '__phpc_flush' => [$void, false, []],
+            '__phpc_pow_int' => [$void, false, [$valuePtr, $i64, $i64]],
             '__phpc_ob_echo_cstr' => [$void, false, [$i8p]],
             '__phpc_ob_echo_char' => [$void, false, [$i8]],
             '__phpc_ob_echo_ll' => [$void, false, [$i64]],

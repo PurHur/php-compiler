@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 726 |
-| Phase A inventory files (M2 ratio SSOT) | 726 |
+| PHP files on vm.php path | 989 |
+| Phase A inventory files (M2 ratio SSOT) | 989 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 1880 |
+| Source constructs flagged (warnings) | 2727 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -30,6 +30,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitArrayIsList.php` | 0 | 1 |
 | `ext/standard/JitArrayKey.php` | 0 | 1 |
 | `ext/standard/JitArrayRand.php` | 0 | 1 |
+| `ext/standard/JitAssert.php` | 0 | 2 |
 | `ext/standard/JitBase64Decode.php` | 0 | 1 |
 | `ext/standard/JitBase64Encode.php` | 0 | 1 |
 | `ext/standard/JitBin2hex.php` | 0 | 1 |
@@ -37,16 +38,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitChmod.php` | 0 | 1 |
 | `ext/standard/JitChunkSplit.php` | 0 | 1 |
 | `ext/standard/JitClassExists.php` | 0 | 1 |
+| `ext/standard/JitClassImplements.php` | 0 | 3 |
+| `ext/standard/JitClassParents.php` | 0 | 3 |
 | `ext/standard/JitClearstatcache.php` | 0 | 1 |
+| `ext/standard/JitConstant.php` | 0 | 1 |
 | `ext/standard/JitCopy.php` | 0 | 1 |
+| `ext/standard/JitCountChars.php` | 0 | 1 |
 | `ext/standard/JitCrc32.php` | 0 | 1 |
+| `ext/standard/JitCrc32c.php` | 0 | 1 |
 | `ext/standard/JitDate.php` | 0 | 1 |
 | `ext/standard/JitDebugBacktrace.php` | 0 | 1 |
 | `ext/standard/JitDeployPath.php` | 0 | 1 |
 | `ext/standard/JitEnumExists.php` | 0 | 1 |
 | `ext/standard/JitEnv.php` | 0 | 1 |
+| `ext/standard/JitErrorGetLast.php` | 0 | 1 |
 | `ext/standard/JitErrorHandler.php` | 0 | 1 |
 | `ext/standard/JitEscapeshellarg.php` | 0 | 1 |
+| `ext/standard/JitEscapeshellcmd.php` | 0 | 1 |
 | `ext/standard/JitExplode.php` | 0 | 1 |
 | `ext/standard/JitFclose.php` | 0 | 1 |
 | `ext/standard/JitFeof.php` | 0 | 1 |
@@ -61,6 +69,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitFilesize.php` | 0 | 1 |
 | `ext/standard/JitFiletype.php` | 0 | 1 |
 | `ext/standard/JitFilter.php` | 0 | 3 |
+| `ext/standard/JitFlock.php` | 0 | 1 |
+| `ext/standard/JitFlush.php` | 0 | 1 |
+| `ext/standard/JitFnmatch.php` | 0 | 1 |
 | `ext/standard/JitFopen.php` | 0 | 1 |
 | `ext/standard/JitFpassthru.php` | 0 | 1 |
 | `ext/standard/JitFputcsv.php` | 0 | 1 |
@@ -71,11 +82,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitFuncArgs.php` | 0 | 2 |
 | `ext/standard/JitFunctionExists.php` | 0 | 1 |
 | `ext/standard/JitFwrite.php` | 0 | 1 |
+| `ext/standard/JitGetClassMethods.php` | 0 | 3 |
+| `ext/standard/JitGetClassVars.php` | 0 | 9 |
+| `ext/standard/JitGetDeclaredEnums.php` | 0 | 2 |
+| `ext/standard/JitGetDeclaredInterfaces.php` | 0 | 2 |
+| `ext/standard/JitGetDefinedConstants.php` | 0 | 4 |
 | `ext/standard/JitGetObjectVars.php` | 0 | 1 |
+| `ext/standard/JitGetParentClass.php` | 0 | 2 |
 | `ext/standard/JitGetallheaders.php` | 0 | 1 |
 | `ext/standard/JitGetcwd.php` | 0 | 1 |
+| `ext/standard/JitGetdate.php` | 0 | 1 |
+| `ext/standard/JitGethostname.php` | 0 | 1 |
+| `ext/standard/JitGetrusage.php` | 0 | 1 |
+| `ext/standard/JitGettimeofday.php` | 0 | 1 |
+| `ext/standard/JitGettype.php` | 0 | 1 |
 | `ext/standard/JitHash.php` | 0 | 1 |
 | `ext/standard/JitHeader.php` | 0 | 1 |
+| `ext/standard/JitHeadersSent.php` | 0 | 1 |
 | `ext/standard/JitHex2bin.php` | 0 | 1 |
 | `ext/standard/JitHtmlEntityDecode.php` | 0 | 1 |
 | `ext/standard/JitHtmlentities.php` | 0 | 1 |
@@ -84,12 +107,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitHttpBuildQuery.php` | 0 | 1 |
 | `ext/standard/JitHttpResponseCode.php` | 0 | 1 |
 | `ext/standard/JitImplode.php` | 0 | 1 |
+| `ext/standard/JitInfo.php` | 0 | 1 |
 | `ext/standard/JitIni.php` | 0 | 1 |
 | `ext/standard/JitInterfaceExists.php` | 0 | 1 |
+| `ext/standard/JitIsResource.php` | 0 | 1 |
 | `ext/standard/JitIsUploadedFile.php` | 0 | 1 |
 | `ext/standard/JitJsonDecode.php` | 0 | 1 |
 | `ext/standard/JitJsonEncode.php` | 0 | 1 |
 | `ext/standard/JitJsonLastError.php` | 0 | 1 |
+| `ext/standard/JitJsonLastErrorMsg.php` | 0 | 1 |
+| `ext/standard/JitJsonValidate.php` | 0 | 1 |
 | `ext/standard/JitMd5.php` | 0 | 1 |
 | `ext/standard/JitMkdir.php` | 0 | 1 |
 | `ext/standard/JitMoveUploadedFile.php` | 0 | 1 |
@@ -109,6 +136,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitPhpcRunCommand.php` | 0 | 1 |
 | `ext/standard/JitPregGrep.php` | 0 | 1 |
 | `ext/standard/JitPregLastError.php` | 0 | 1 |
+| `ext/standard/JitPregLastErrorMsg.php` | 0 | 1 |
 | `ext/standard/JitPregMatch.php` | 0 | 1 |
 | `ext/standard/JitPregMatchAll.php` | 0 | 1 |
 | `ext/standard/JitPregQuote.php` | 0 | 1 |
@@ -122,8 +150,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitReadfile.php` | 0 | 1 |
 | `ext/standard/JitReadlink.php` | 0 | 1 |
 | `ext/standard/JitRealpath.php` | 0 | 1 |
+| `ext/standard/JitRegisterShutdown.php` | 0 | 1 |
 | `ext/standard/JitRename.php` | 0 | 1 |
 | `ext/standard/JitRequestBody.php` | 0 | 1 |
+| `ext/standard/JitRewind.php` | 0 | 1 |
 | `ext/standard/JitRmdir.php` | 0 | 1 |
 | `ext/standard/JitSerialize.php` | 0 | 1 |
 | `ext/standard/JitSessionDestroy.php` | 0 | 1 |
@@ -159,6 +189,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStrrchr.php` | 0 | 1 |
 | `ext/standard/JitStrrpos.php` | 0 | 1 |
 | `ext/standard/JitStrstr.php` | 0 | 1 |
+| `ext/standard/JitStrtok.php` | 0 | 1 |
 | `ext/standard/JitStrtr.php` | 0 | 1 |
 | `ext/standard/JitSubstrCount.php` | 0 | 1 |
 | `ext/standard/JitSuperglobalName.php` | 0 | 1 |
@@ -166,41 +197,57 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitTempnam.php` | 0 | 1 |
 | `ext/standard/JitTouch.php` | 0 | 1 |
 | `ext/standard/JitTraitExists.php` | 0 | 1 |
+| `ext/standard/JitUmask.php` | 0 | 1 |
 | `ext/standard/JitUniqid.php` | 0 | 1 |
 | `ext/standard/JitUnlink.php` | 0 | 1 |
+| `ext/standard/JitUnpack.php` | 0 | 1 |
 | `ext/standard/JitUnserialize.php` | 0 | 1 |
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
 | `ext/standard/JitWebParams.php` | 0 | 15 |
 | `ext/standard/JitWordwrap.php` | 0 | 1 |
-| `ext/standard/Module.php` | 0 | 304 |
+| `ext/standard/Module.php` | 0 | 367 |
 | `ext/standard/SetcookieLine.php` | 0 | 1 |
 | `ext/standard/VmArray.php` | 0 | 36 |
+| `ext/standard/VmAssert.php` | 0 | 1 |
+| `ext/standard/VmClosureCall.php` | 0 | 2 |
+| `ext/standard/VmConstants.php` | 0 | 10 |
 | `ext/standard/VmCrc32.php` | 0 | 1 |
+| `ext/standard/VmCrc32c.php` | 0 | 1 |
 | `ext/standard/VmCsv.php` | 0 | 1 |
-| `ext/standard/VmDate.php` | 0 | 1 |
+| `ext/standard/VmDate.php` | 0 | 5 |
 | `ext/standard/VmDebugBacktrace.php` | 0 | 6 |
+| `ext/standard/VmEnv.php` | 0 | 1 |
 | `ext/standard/VmErrorHandler.php` | 0 | 6 |
+| `ext/standard/VmEval.php` | 0 | 1 |
 | `ext/standard/VmExit.php` | 0 | 2 |
 | `ext/standard/VmFilter.php` | 0 | 3 |
+| `ext/standard/VmFnmatch.php` | 0 | 1 |
 | `ext/standard/VmFs.php` | 0 | 6 |
 | `ext/standard/VmHash.php` | 0 | 1 |
+| `ext/standard/VmHost.php` | 0 | 1 |
 | `ext/standard/VmHttpBuildQuery.php` | 0 | 1 |
+| `ext/standard/VmInfo.php` | 0 | 3 |
 | `ext/standard/VmIni.php` | 0 | 1 |
 | `ext/standard/VmInternalCall.php` | 0 | 3 |
 | `ext/standard/VmInternalCompare.php` | 0 | 3 |
-| `ext/standard/VmJson.php` | 0 | 2 |
+| `ext/standard/VmJson.php` | 0 | 4 |
+| `ext/standard/VmJsonValidate.php` | 0 | 1 |
+| `ext/standard/VmMath.php` | 0 | 1 |
 | `ext/standard/VmMetaphone.php` | 0 | 1 |
 | `ext/standard/VmNumberFormat.php` | 0 | 1 |
 | `ext/standard/VmPack.php` | 0 | 1 |
 | `ext/standard/VmParseStr.php` | 0 | 4 |
 | `ext/standard/VmPassword.php` | 0 | 1 |
+| `ext/standard/VmPhpCoreConstants.php` | 0 | 5 |
 | `ext/standard/VmPreg.php` | 0 | 1 |
 | `ext/standard/VmPregReplaceCallback.php` | 0 | 1 |
+| `ext/standard/VmProcess.php` | 0 | 3 |
 | `ext/standard/VmRandom.php` | 0 | 2 |
-| `ext/standard/VmReflection.php` | 0 | 5 |
-| `ext/standard/VmScope.php` | 0 | 3 |
-| `ext/standard/VmSerialize.php` | 0 | 4 |
+| `ext/standard/VmReflection.php` | 0 | 17 |
+| `ext/standard/VmScope.php` | 0 | 5 |
+| `ext/standard/VmSerialize.php` | 0 | 11 |
 | `ext/standard/VmSession.php` | 0 | 7 |
+| `ext/standard/VmSettype.php` | 0 | 5 |
 | `ext/standard/VmSleep.php` | 0 | 1 |
 | `ext/standard/VmSplAutoload.php` | 0 | 10 |
 | `ext/standard/VmSprintf.php` | 0 | 1 |
@@ -236,6 +283,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/array_rand.php` | 0 | 1 |
 | `ext/standard/array_reduce.php` | 0 | 3 |
 | `ext/standard/array_replace.php` | 0 | 1 |
+| `ext/standard/array_replace_recursive.php` | 0 | 1 |
 | `ext/standard/array_reverse.php` | 0 | 1 |
 | `ext/standard/array_search.php` | 0 | 1 |
 | `ext/standard/array_shift.php` | 0 | 1 |
@@ -245,12 +293,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/array_unique.php` | 0 | 4 |
 | `ext/standard/array_unshift.php` | 0 | 2 |
 | `ext/standard/array_values.php` | 0 | 1 |
-| `ext/standard/array_walk.php` | 0 | 2 |
+| `ext/standard/array_walk.php` | 0 | 5 |
+| `ext/standard/array_walk_recursive.php` | 0 | 3 |
 | `ext/standard/arsort_.php` | 0 | 2 |
 | `ext/standard/asort_.php` | 0 | 2 |
+| `ext/standard/assert_.php` | 0 | 1 |
 | `ext/standard/atan2.php` | 0 | 1 |
 | `ext/standard/base64_decode.php` | 0 | 1 |
 | `ext/standard/base64_encode.php` | 0 | 1 |
+| `ext/standard/base_convert_.php` | 0 | 1 |
 | `ext/standard/basename.php` | 0 | 1 |
 | `ext/standard/bin2hex.php` | 0 | 1 |
 | `ext/standard/bindec.php` | 0 | 1 |
@@ -260,13 +311,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/chmod_.php` | 0 | 1 |
 | `ext/standard/chr.php` | 0 | 1 |
 | `ext/standard/chunk_split.php` | 0 | 1 |
+| `ext/standard/class_alias.php` | 0 | 1 |
 | `ext/standard/class_exists_.php` | 0 | 1 |
+| `ext/standard/class_implements_.php` | 0 | 1 |
+| `ext/standard/class_parents_.php` | 0 | 1 |
+| `ext/standard/class_uses_.php` | 0 | 1 |
 | `ext/standard/clearstatcache_.php` | 0 | 1 |
 | `ext/standard/compact_.php` | 0 | 1 |
 | `ext/standard/compiler_is_superglobal_name.php` | 0 | 1 |
+| `ext/standard/constant_.php` | 0 | 2 |
 | `ext/standard/copy_.php` | 0 | 1 |
 | `ext/standard/cos.php` | 0 | 1 |
+| `ext/standard/count_chars.php` | 0 | 3 |
 | `ext/standard/crc32.php` | 0 | 1 |
+| `ext/standard/crc32c.php` | 0 | 1 |
 | `ext/standard/date.php` | 0 | 1 |
 | `ext/standard/debug_backtrace.php` | 0 | 1 |
 | `ext/standard/decbin.php` | 0 | 1 |
@@ -278,11 +336,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/dirname.php` | 0 | 1 |
 | `ext/standard/doubleval.php` | 0 | 2 |
 | `ext/standard/enum_exists_.php` | 0 | 1 |
+| `ext/standard/error_clear_last.php` | 0 | 1 |
+| `ext/standard/error_get_last.php` | 0 | 1 |
 | `ext/standard/escapeshellarg.php` | 0 | 1 |
+| `ext/standard/escapeshellcmd.php` | 0 | 1 |
+| `ext/standard/eval_.php` | 0 | 1 |
 | `ext/standard/exp.php` | 0 | 1 |
 | `ext/standard/explode.php` | 0 | 3 |
+| `ext/standard/expm1.php` | 0 | 1 |
+| `ext/standard/extension_loaded.php` | 0 | 1 |
 | `ext/standard/extract_.php` | 0 | 1 |
 | `ext/standard/fclose.php` | 0 | 1 |
+| `ext/standard/fdiv.php` | 0 | 1 |
 | `ext/standard/feof_.php` | 0 | 1 |
 | `ext/standard/fflush_.php` | 0 | 1 |
 | `ext/standard/fgetc.php` | 0 | 1 |
@@ -298,36 +363,56 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/filter_input.php` | 0 | 4 |
 | `ext/standard/filter_var.php` | 0 | 1 |
 | `ext/standard/floatval.php` | 0 | 1 |
+| `ext/standard/flock.php` | 0 | 1 |
 | `ext/standard/floor.php` | 0 | 1 |
+| `ext/standard/flush_.php` | 0 | 1 |
 | `ext/standard/fmod.php` | 0 | 1 |
+| `ext/standard/fnmatch.php` | 0 | 1 |
 | `ext/standard/fopen.php` | 0 | 1 |
 | `ext/standard/fpassthru.php` | 0 | 1 |
 | `ext/standard/fputcsv.php` | 0 | 1 |
 | `ext/standard/fread.php` | 0 | 1 |
+| `ext/standard/frexp.php` | 0 | 1 |
 | `ext/standard/fseek.php` | 0 | 1 |
 | `ext/standard/ftell_.php` | 0 | 1 |
 | `ext/standard/func_get_args.php` | 0 | 1 |
 | `ext/standard/func_num_args.php` | 0 | 1 |
 | `ext/standard/function_exists.php` | 0 | 1 |
 | `ext/standard/fwrite.php` | 0 | 1 |
+| `ext/standard/gc_collect_cycles.php` | 0 | 1 |
 | `ext/standard/get_class_.php` | 0 | 1 |
+| `ext/standard/get_class_methods_.php` | 0 | 1 |
+| `ext/standard/get_class_vars_.php` | 0 | 1 |
+| `ext/standard/get_debug_type.php` | 0 | 1 |
+| `ext/standard/get_declared_enums_.php` | 0 | 1 |
+| `ext/standard/get_declared_interfaces_.php` | 0 | 1 |
+| `ext/standard/get_defined_constants_.php` | 0 | 1 |
+| `ext/standard/get_defined_vars_.php` | 0 | 1 |
+| `ext/standard/get_loaded_extensions.php` | 0 | 1 |
 | `ext/standard/get_object_vars_.php` | 0 | 1 |
 | `ext/standard/get_parent_class_.php` | 0 | 1 |
 | `ext/standard/getallheaders_.php` | 0 | 3 |
 | `ext/standard/getcwd_.php` | 0 | 1 |
+| `ext/standard/getdate.php` | 0 | 1 |
 | `ext/standard/getenv_.php` | 0 | 1 |
+| `ext/standard/gethostname.php` | 0 | 1 |
 | `ext/standard/getmypid.php` | 0 | 1 |
+| `ext/standard/getrusage.php` | 0 | 1 |
+| `ext/standard/gettimeofday.php` | 0 | 1 |
 | `ext/standard/gettype.php` | 0 | 1 |
 | `ext/standard/glob_.php` | 0 | 1 |
 | `ext/standard/gmdate.php` | 0 | 1 |
+| `ext/standard/halt_compiler_.php` | 0 | 3 |
 | `ext/standard/hash_.php` | 0 | 1 |
 | `ext/standard/hash_equals.php` | 0 | 1 |
 | `ext/standard/hash_hmac.php` | 0 | 1 |
 | `ext/standard/header_.php` | 0 | 1 |
 | `ext/standard/header_list.php` | 0 | 1 |
 | `ext/standard/header_remove.php` | 0 | 1 |
+| `ext/standard/headers_sent.php` | 0 | 1 |
 | `ext/standard/hex2bin.php` | 0 | 1 |
 | `ext/standard/hexdec.php` | 0 | 1 |
+| `ext/standard/hrtime.php` | 0 | 4 |
 | `ext/standard/html_entity_decode.php` | 0 | 1 |
 | `ext/standard/htmlentities.php` | 0 | 1 |
 | `ext/standard/htmlspecialchars.php` | 0 | 1 |
@@ -345,6 +430,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/interface_exists_.php` | 0 | 1 |
 | `ext/standard/intval.php` | 0 | 1 |
 | `ext/standard/is_a_.php` | 0 | 1 |
+| `ext/standard/is_countable.php` | 0 | 3 |
 | `ext/standard/is_dir.php` | 0 | 1 |
 | `ext/standard/is_executable.php` | 0 | 1 |
 | `ext/standard/is_file.php` | 0 | 1 |
@@ -354,24 +440,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/is_nan.php` | 0 | 1 |
 | `ext/standard/is_numeric.php` | 0 | 1 |
 | `ext/standard/is_readable.php` | 0 | 1 |
+| `ext/standard/is_resource_.php` | 0 | 1 |
 | `ext/standard/is_scalar.php` | 0 | 1 |
 | `ext/standard/is_subclass_of_.php` | 0 | 1 |
 | `ext/standard/is_uploaded_file.php` | 0 | 1 |
 | `ext/standard/is_writable.php` | 0 | 1 |
+| `ext/standard/iterator_to_array.php` | 0 | 1 |
 | `ext/standard/json_decode.php` | 0 | 1 |
 | `ext/standard/json_encode.php` | 0 | 1 |
 | `ext/standard/json_last_error_.php` | 0 | 1 |
+| `ext/standard/json_last_error_msg_.php` | 0 | 1 |
+| `ext/standard/json_validate.php` | 0 | 1 |
 | `ext/standard/krsort_.php` | 0 | 1 |
 | `ext/standard/ksort_.php` | 0 | 1 |
 | `ext/standard/lcfirst.php` | 0 | 1 |
+| `ext/standard/ldexp.php` | 0 | 1 |
 | `ext/standard/levenshtein.php` | 0 | 1 |
 | `ext/standard/log.php` | 0 | 1 |
+| `ext/standard/log10.php` | 0 | 1 |
+| `ext/standard/log1p.php` | 0 | 1 |
 | `ext/standard/lstat_.php` | 0 | 1 |
 | `ext/standard/md5.php` | 0 | 1 |
 | `ext/standard/metaphone.php` | 0 | 1 |
 | `ext/standard/method_exists_.php` | 0 | 1 |
 | `ext/standard/microtime.php` | 0 | 1 |
 | `ext/standard/mkdir_.php` | 0 | 1 |
+| `ext/standard/modf.php` | 0 | 1 |
 | `ext/standard/move_uploaded_file.php` | 0 | 1 |
 | `ext/standard/natcasesort_.php` | 0 | 2 |
 | `ext/standard/natsort_.php` | 0 | 2 |
@@ -389,12 +483,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/password_hash.php` | 0 | 1 |
 | `ext/standard/password_verify.php` | 0 | 1 |
 | `ext/standard/pathinfo.php` | 0 | 3 |
+| `ext/standard/php_sapi_name.php` | 0 | 1 |
+| `ext/standard/php_uname.php` | 0 | 1 |
 | `ext/standard/phpc_deploy_path.php` | 0 | 1 |
 | `ext/standard/phpc_run_command.php` | 0 | 5 |
+| `ext/standard/phpversion.php` | 0 | 1 |
 | `ext/standard/pi.php` | 0 | 1 |
 | `ext/standard/pow.php` | 0 | 1 |
 | `ext/standard/preg_grep.php` | 0 | 2 |
 | `ext/standard/preg_last_error_.php` | 0 | 1 |
+| `ext/standard/preg_last_error_msg_.php` | 0 | 1 |
 | `ext/standard/preg_match.php` | 0 | 1 |
 | `ext/standard/preg_match_all.php` | 0 | 1 |
 | `ext/standard/preg_quote.php` | 0 | 1 |
@@ -413,8 +511,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/readfile.php` | 0 | 1 |
 | `ext/standard/readlink.php` | 0 | 1 |
 | `ext/standard/realpath.php` | 0 | 1 |
+| `ext/standard/register_shutdown_function.php` | 0 | 2 |
 | `ext/standard/rename_.php` | 0 | 1 |
 | `ext/standard/restore_error_handler_.php` | 0 | 1 |
+| `ext/standard/rewind_.php` | 0 | 1 |
 | `ext/standard/rmdir_.php` | 0 | 1 |
 | `ext/standard/round.php` | 0 | 1 |
 | `ext/standard/rsort_.php` | 0 | 2 |
@@ -429,6 +529,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/set_error_handler_.php` | 0 | 1 |
 | `ext/standard/setcookie.php` | 0 | 1 |
 | `ext/standard/setrawcookie.php` | 0 | 1 |
+| `ext/standard/settype.php` | 0 | 1 |
 | `ext/standard/sha1.php` | 0 | 1 |
 | `ext/standard/shell_exec.php` | 0 | 1 |
 | `ext/standard/shuffle_.php` | 0 | 1 |
@@ -442,8 +543,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/sqrt.php` | 0 | 1 |
 | `ext/standard/stat_.php` | 0 | 1 |
 | `ext/standard/str_contains.php` | 0 | 1 |
+| `ext/standard/str_decrement.php` | 0 | 1 |
 | `ext/standard/str_ends_with.php` | 0 | 1 |
 | `ext/standard/str_getcsv.php` | 0 | 1 |
+| `ext/standard/str_increment.php` | 0 | 1 |
 | `ext/standard/str_ireplace.php` | 0 | 1 |
 | `ext/standard/str_pad.php` | 0 | 1 |
 | `ext/standard/str_repeat.php` | 0 | 1 |
@@ -476,6 +579,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/strrpos.php` | 0 | 1 |
 | `ext/standard/strspn.php` | 0 | 1 |
 | `ext/standard/strstr.php` | 0 | 1 |
+| `ext/standard/strtok.php` | 0 | 1 |
 | `ext/standard/strtolower.php` | 0 | 1 |
 | `ext/standard/strtoupper.php` | 0 | 1 |
 | `ext/standard/strtr.php` | 0 | 1 |
@@ -493,14 +597,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/uasort_.php` | 0 | 4 |
 | `ext/standard/ucfirst.php` | 0 | 1 |
 | `ext/standard/ucwords.php` | 0 | 1 |
+| `ext/standard/uksort_.php` | 0 | 4 |
+| `ext/standard/umask_.php` | 0 | 1 |
 | `ext/standard/uniqid.php` | 0 | 1 |
 | `ext/standard/unlink.php` | 0 | 1 |
+| `ext/standard/unpack.php` | 0 | 3 |
 | `ext/standard/unserialize.php` | 0 | 2 |
 | `ext/standard/urldecode.php` | 0 | 1 |
 | `ext/standard/urlencode.php` | 0 | 1 |
 | `ext/standard/usleep.php` | 0 | 1 |
 | `ext/standard/usort_.php` | 0 | 2 |
+| `ext/standard/var_dump_.php` | 0 | 1 |
 | `ext/standard/var_export.php` | 0 | 1 |
+| `ext/standard/version_compare.php` | 0 | 1 |
 | `ext/standard/web_bool.php` | 0 | 1 |
 | `ext/standard/web_int.php` | 0 | 1 |
 | `ext/standard/web_string.php` | 0 | 1 |
@@ -510,28 +619,51 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/types/is_type.php` | 0 | 1 |
 | `ext/types/mb_strlen.php` | 0 | 1 |
 | `ext/types/strlen.php` | 0 | 1 |
+| `lib/AOT/AutoloadDiscovery.php` | 0 | 1 |
 | `lib/AOT/Linker.php` | 0 | 1 |
 | `lib/AOT/LinkerProcessPolyfill.php` | 0 | 1 |
 | `lib/AOT/ProjectGraph.php` | 0 | 3 |
+| `lib/AbstractEnumSourceRewriter.php` | 0 | 1 |
+| `lib/Ast/AbstractEnumMarker.php` | 0 | 1 |
+| `lib/Ast/AsymmetricVisibilityRewriter.php` | 0 | 2 |
 | `lib/Ast/GroupUseStripper.php` | 0 | 1 |
-| `lib/Block.php` | 0 | 5 |
+| `lib/Ast/PipeOperatorDesugar.php` | 0 | 1 |
+| `lib/Ast/SealedClassAnnotator.php` | 0 | 1 |
+| `lib/Ast/SealedClassPreprocessor.php` | 0 | 1 |
+| `lib/Block.php` | 0 | 10 |
+| `lib/BuiltinByRefParams.php` | 0 | 1 |
 | `lib/BuiltinParamNames.php` | 0 | 1 |
 | `lib/Cli/InvokeCwd.php` | 0 | 1 |
 | `lib/Cli/PhpcBuild.php` | 0 | 3 |
+| `lib/Cli/PhpcFcgi.php` | 0 | 1 |
 | `lib/Cli/PhpcInit.php` | 0 | 1 |
 | `lib/Cli/PhpcRun.php` | 0 | 1 |
-| `lib/Compiler.php` | 0 | 191 |
-| `lib/Compiler/AttributeNames.php` | 0 | 1 |
+| `lib/Compiler.php` | 0 | 239 |
+| `lib/Compiler/AbstractMethodVisibilityCheck.php` | 0 | 3 |
+| `lib/Compiler/AttributeConstantEvaluator.php` | 0 | 1 |
+| `lib/Compiler/AttributeEntry.php` | 0 | 1 |
+| `lib/Compiler/AttributeMetadata.php` | 0 | 2 |
+| `lib/Compiler/AttributeNames.php` | 0 | 2 |
+| `lib/Compiler/ClassCompileRegistry.php` | 0 | 1 |
+| `lib/Compiler/DeprecatedMetadata.php` | 0 | 2 |
+| `lib/Compiler/FinalClassExtensionCheck.php` | 0 | 3 |
+| `lib/Compiler/InheritanceVariance.php` | 0 | 4 |
+| `lib/Compiler/InterfaceImplementationCheck.php` | 0 | 4 |
+| `lib/Compiler/OverrideValidator.php` | 0 | 2 |
+| `lib/Compiler/ReadonlyClassCompileCheck.php` | 0 | 5 |
+| `lib/Compiler/TraitCollisionCheck.php` | 0 | 3 |
 | `lib/Doctor.php` | 0 | 1 |
 | `lib/Frame.php` | 0 | 1 |
 | `lib/Func.php` | 0 | 1 |
 | `lib/Func/Internal.php` | 0 | 2 |
 | `lib/Func/JIT.php` | 0 | 2 |
 | `lib/Func/PHP.php` | 0 | 1 |
+| `lib/GenericArrayTypeSourceRewriter.php` | 0 | 1 |
+| `lib/GenericArrayTypeSpec.php` | 0 | 4 |
 | `lib/Handler.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 56 |
+| `lib/JIT.php` | 0 | 67 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
-| `lib/JIT/ArrayBuiltinHelper.php` | 0 | 47 |
+| `lib/JIT/ArrayBuiltinHelper.php` | 0 | 53 |
 | `lib/JIT/ArrayMapCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayReduceCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/BasicBlockHelper.php` | 0 | 1 |
@@ -539,6 +671,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin.php` | 0 | 1 |
 | `lib/JIT/Builtin/AttributeRegistry.php` | 0 | 1 |
 | `lib/JIT/Builtin/CallArgv.php` | 0 | 1 |
+| `lib/JIT/Builtin/EmbedObOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/ErrorHandler.php` | 0 | 1 |
 | `lib/JIT/Builtin/ErrorHandlerOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/HttpResponseCode.php` | 0 | 1 |
@@ -548,15 +681,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Internal.php` | 0 | 1 |
 | `lib/JIT/Builtin/IsNullFn.php` | 0 | 2 |
 | `lib/JIT/Builtin/JitThrow.php` | 0 | 2 |
-| `lib/JIT/Builtin/MemoryManager.php` | 0 | 3 |
+| `lib/JIT/Builtin/MathBaseConvert.php` | 0 | 1 |
+| `lib/JIT/Builtin/MemoryManager.php` | 0 | 4 |
+| `lib/JIT/Builtin/MemoryManager/EmbedMcjit.php` | 0 | 1 |
 | `lib/JIT/Builtin/MemoryManager/Native.php` | 0 | 1 |
 | `lib/JIT/Builtin/MemoryManager/PHP.php` | 0 | 1 |
+| `lib/JIT/Builtin/MethodRegistry.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/Output.php` | 0 | 1 |
 | `lib/JIT/Builtin/PendingHeaders.php` | 0 | 1 |
 | `lib/JIT/Builtin/ReadonlyRaise.php` | 0 | 1 |
 | `lib/JIT/Builtin/Refcount.php` | 0 | 1 |
 | `lib/JIT/Builtin/ReflectionNative.php` | 0 | 1 |
+| `lib/JIT/Builtin/ReflectionRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ReflectionSetup.php` | 0 | 1 |
 | `lib/JIT/Builtin/ScriptExit.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionDestroy.php` | 0 | 1 |
@@ -568,18 +705,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SplAutoloadOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamContextOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringAddslashes.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringCountChars.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDateTime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDebugBacktrace.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDeployPath.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringEnvLocal.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFileGetContents.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilePutContents.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFsDir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFunctionExists.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringGetdate.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetenv.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringGethostname.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringGetrusage.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringGettimeofday.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHashCrypto.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringHrtime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHtmlspecialchars.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHtmlspecialcharsDecode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHttpBuildQuery.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringInfo.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringJsonEncode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringLevenshtein.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringMetaphone.php` | 0 | 1 |
@@ -595,10 +740,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringSerialize.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSimilarText.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSoundex.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringStrIncdec.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStreamCsv.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStripslashes.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrnatcasecmp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrnatcmp.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringStrtok.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSubstrCompare.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSuperglobalName.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUcwords.php` | 0 | 1 |
@@ -610,11 +757,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Type/HashTable.php` | 0 | 1 |
 | `lib/JIT/Builtin/Type/MaskedArray.php` | 0 | 1 |
 | `lib/JIT/Builtin/Type/NativeArray.php` | 0 | 1 |
-| `lib/JIT/Builtin/Type/Object_.php` | 0 | 15 |
+| `lib/JIT/Builtin/Type/Object_.php` | 0 | 20 |
 | `lib/JIT/Builtin/Type/String_.php` | 0 | 1 |
 | `lib/JIT/Builtin/Type/Value.php` | 0 | 4 |
+| `lib/JIT/Builtin/TypeErrorRaise.php` | 0 | 1 |
 | `lib/JIT/Builtin/VarArg.php` | 0 | 1 |
+| `lib/JIT/Builtin/WeakRefNative.php` | 0 | 1 |
+| `lib/JIT/Builtin/WeakRefRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/WeakRefSetup.php` | 0 | 1 |
 | `lib/JIT/Call.php` | 0 | 1 |
+| `lib/JIT/Call/ClosureWithCaptures.php` | 0 | 1 |
 | `lib/JIT/Call/ExternalMethod.php` | 0 | 1 |
 | `lib/JIT/Call/Native.php` | 0 | 4 |
 | `lib/JIT/Call/ReflectionAttributeGetName.php` | 0 | 1 |
@@ -623,19 +775,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/ReflectionClassGetMethod.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionClassGetName.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionMethodGetAttributes.php` | 0 | 2 |
+| `lib/JIT/Call/RuntimeIndirectClosureCall.php` | 0 | 1 |
 | `lib/JIT/Call/RuntimeVariableFunction.php` | 0 | 1 |
 | `lib/JIT/Call/SplObjectStorageMethod.php` | 0 | 1 |
 | `lib/JIT/Call/Vararg.php` | 0 | 1 |
+| `lib/JIT/Call/WeakMapMethod.php` | 0 | 2 |
+| `lib/JIT/Call/WeakReferenceCreate.php` | 0 | 1 |
+| `lib/JIT/Call/WeakReferenceGet.php` | 0 | 1 |
 | `lib/JIT/CliArgvGlobalInit.php` | 0 | 2 |
+| `lib/JIT/ClosureHelper.php` | 0 | 7 |
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
+| `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 39 |
+| `lib/JIT/Context.php` | 0 | 46 |
 | `lib/JIT/EmitTuMode.php` | 0 | 1 |
 | `lib/JIT/ErrorHandlerCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/FunctionStaticHelper.php` | 0 | 1 |
-| `lib/JIT/HashTableHelper.php` | 0 | 26 |
+| `lib/JIT/GeneratorHelper.php` | 0 | 7 |
+| `lib/JIT/HashTableHelper.php` | 0 | 28 |
 | `lib/JIT/Helper.php` | 0 | 7 |
 | `lib/JIT/IncludeHelper.php` | 0 | 8 |
+| `lib/JIT/IntersectionParamCheck.php` | 0 | 2 |
 | `lib/JIT/IssetHelper.php` | 0 | 4 |
 | `lib/JIT/IteratorHelper.php` | 0 | 13 |
 | `lib/JIT/JitBoolArg.php` | 0 | 1 |
@@ -646,11 +806,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/JitValueBox.php` | 0 | 1 |
 | `lib/JIT/JitValueCompare.php` | 0 | 1 |
 | `lib/JIT/M3EmitTuTrivialEchoAot.php` | 0 | 2 |
+| `lib/JIT/McjitEmbedRuntime.php` | 0 | 1 |
+| `lib/JIT/NamedArgs.php` | 0 | 1 |
 | `lib/JIT/NullsafeHelper.php` | 0 | 1 |
 | `lib/JIT/OperandName.php` | 0 | 1 |
 | `lib/JIT/OperandNameNative.php` | 0 | 2 |
 | `lib/JIT/PregReplaceCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/Progress.php` | 0 | 1 |
+| `lib/JIT/PropertyHookDispatch.php` | 0 | 3 |
 | `lib/JIT/ReadonlyClassGuard.php` | 0 | 1 |
 | `lib/JIT/ReflectionBuiltinHelper.php` | 0 | 1 |
 | `lib/JIT/Result.php` | 0 | 5 |
@@ -679,7 +842,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/VmUnitProbeExecuteNative.php` | 0 | 2 |
 | `lib/Lint/Issue.php` | 0 | 2 |
 | `lib/Lint/LintCompiler.php` | 0 | 11 |
-| `lib/Lint/Linter.php` | 0 | 7 |
+| `lib/Lint/Linter.php` | 0 | 10 |
 | `lib/Lint/SwitchDetector.php` | 0 | 5 |
 | `lib/Lint/UnsupportedRegistry.php` | 0 | 1 |
 | `lib/MethodVisibility.php` | 0 | 1 |
@@ -687,13 +850,71 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ModuleAbstract.php` | 0 | 1 |
 | `lib/NullSafeLivenessDetector.php` | 0 | 1 |
 | `lib/Printer.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 23 |
-| `lib/VM.php` | 0 | 20 |
+| `lib/PropertyVisibility.php` | 0 | 1 |
+| `lib/Runtime.php` | 0 | 27 |
+| `lib/SourceBareThrowRewriter.php` | 0 | 1 |
+| `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 1 |
+| `lib/SwitchCommaCaseRewriter.php` | 0 | 1 |
+| `lib/VM.php` | 0 | 80 |
+| `lib/VM/ArrayAccessDimension.php` | 0 | 1 |
+| `lib/VM/Builtin/ClosureBind.php` | 0 | 2 |
+| `lib/VM/Builtin/ClosureBindTo.php` | 0 | 2 |
+| `lib/VM/Builtin/ClosureFromCallable.php` | 0 | 2 |
+| `lib/VM/Builtin/DateTimeConstruct.php` | 0 | 1 |
+| `lib/VM/Builtin/DateTimeFormat.php` | 0 | 1 |
+| `lib/VM/Builtin/DateTimeGetTimestamp.php` | 0 | 1 |
+| `lib/VM/Builtin/DateTimeSetTimezone.php` | 0 | 1 |
+| `lib/VM/Builtin/DateTimeZoneConstruct.php` | 0 | 1 |
+| `lib/VM/Builtin/EnumCases.php` | 0 | 5 |
+| `lib/VM/Builtin/ExceptionConstruct.php` | 0 | 1 |
+| `lib/VM/Builtin/ExceptionGetCode.php` | 0 | 1 |
+| `lib/VM/Builtin/ExceptionGetFile.php` | 0 | 1 |
+| `lib/VM/Builtin/ExceptionGetLine.php` | 0 | 1 |
+| `lib/VM/Builtin/ExceptionGetMessage.php` | 0 | 1 |
+| `lib/VM/Builtin/FiberConstruct.php` | 0 | 1 |
+| `lib/VM/Builtin/FiberGetCurrent.php` | 0 | 2 |
+| `lib/VM/Builtin/FiberResume.php` | 0 | 2 |
+| `lib/VM/Builtin/FiberStart.php` | 0 | 2 |
+| `lib/VM/Builtin/FiberSuspend.php` | 0 | 1 |
+| `lib/VM/Builtin/GeneratorCurrent.php` | 0 | 1 |
+| `lib/VM/Builtin/GeneratorGetReturn.php` | 0 | 2 |
+| `lib/VM/Builtin/GeneratorKey.php` | 0 | 1 |
+| `lib/VM/Builtin/GeneratorNext.php` | 0 | 2 |
+| `lib/VM/Builtin/GeneratorRewind.php` | 0 | 2 |
+| `lib/VM/Builtin/GeneratorSend.php` | 0 | 3 |
+| `lib/VM/Builtin/GeneratorThrow.php` | 0 | 1 |
+| `lib/VM/Builtin/GeneratorValid.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionAttributeGetArguments.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionAttributeGetName.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionAttributeNewInstance.php` | 0 | 3 |
 | `lib/VM/Builtin/ReflectionClassConstruct.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionClassGetAttributes.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionClassGetMethod.php` | 0 | 3 |
+| `lib/VM/Builtin/ReflectionClassNewLazyProxy.php` | 0 | 2 |
+| `lib/VM/Builtin/ReflectionConstantConstruct.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionConstantGetName.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionConstantGetValue.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionEnumUnitCaseConstruct.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionEnumUnitCaseGetAttributes.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionEnumUnitCaseGetName.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionEnumUnitCaseGetValue.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionFunctionConstruct.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionFunctionGetName.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionFunctionGetParameters.php` | 0 | 4 |
+| `lib/VM/Builtin/ReflectionFunctionGetReturnType.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionMethodConstruct.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionMethodGetAttributes.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionMethodGetParameters.php` | 0 | 4 |
+| `lib/VM/Builtin/ReflectionNamedTypeGetName.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionNamedTypeIsBuiltin.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionParameterGetAttributes.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionParameterGetType.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionPropertyConstruct.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionPropertyGetName.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionPropertyGetValue.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionTypeAllowsNull.php` | 0 | 1 |
+| `lib/VM/Builtin/ReflectionTypeToString.php` | 0 | 1 |
+| `lib/VM/Builtin/ThrowableGetMessage.php` | 0 | 1 |
 | `lib/VM/Builtin/VmClassMethod.php` | 0 | 1 |
 | `lib/VM/Builtin/WeakMapConstruct.php` | 0 | 1 |
 | `lib/VM/Builtin/WeakMapCount.php` | 0 | 1 |
@@ -704,31 +925,67 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Builtin/WeakReferenceConstruct.php` | 0 | 1 |
 | `lib/VM/Builtin/WeakReferenceCreate.php` | 0 | 3 |
 | `lib/VM/Builtin/WeakReferenceGet.php` | 0 | 1 |
-| `lib/VM/BuiltinClasses.php` | 0 | 29 |
+| `lib/VM/BuiltinClasses.php` | 0 | 117 |
+| `lib/VM/BuiltinExceptionSupport.php` | 0 | 5 |
+| `lib/VM/CastSupport.php` | 0 | 4 |
+| `lib/VM/ClassAbstract.php` | 0 | 1 |
+| `lib/VM/ClassConstExpr.php` | 0 | 5 |
+| `lib/VM/ClassConstMaterializer.php` | 0 | 2 |
 | `lib/VM/ClassEntry.php` | 0 | 1 |
+| `lib/VM/ClassFlags.php` | 0 | 1 |
 | `lib/VM/ClassProperty.php` | 0 | 1 |
 | `lib/VM/ClassReadonly.php` | 0 | 1 |
-| `lib/VM/Context.php` | 0 | 18 |
-| `lib/VM/ErrorReporter.php` | 0 | 1 |
-| `lib/VM/GeneratorState.php` | 0 | 6 |
-| `lib/VM/HashTable.php` | 0 | 46 |
+| `lib/VM/ClassSealed.php` | 0 | 1 |
+| `lib/VM/ClassValidator.php` | 0 | 1 |
+| `lib/VM/ClosureState.php` | 0 | 13 |
+| `lib/VM/ClosureSupport.php` | 0 | 4 |
+| `lib/VM/Context.php` | 0 | 27 |
+| `lib/VM/CycleCollector.php` | 0 | 2 |
+| `lib/VM/DateTimeSupport.php` | 0 | 7 |
+| `lib/VM/EnumCaseEntry.php` | 0 | 3 |
+| `lib/VM/EnumCaseSupport.php` | 0 | 6 |
+| `lib/VM/EnumSupport.php` | 0 | 2 |
+| `lib/VM/ErrorReporter.php` | 0 | 7 |
+| `lib/VM/ExceptionSupport.php` | 0 | 1 |
+| `lib/VM/ExceptionTrace.php` | 0 | 1 |
+| `lib/VM/FiberState.php` | 0 | 2 |
+| `lib/VM/FiberSupport.php` | 0 | 2 |
+| `lib/VM/ForeachIterator.php` | 0 | 1 |
+| `lib/VM/GeneratorState.php` | 0 | 17 |
+| `lib/VM/HashTable.php` | 0 | 60 |
 | `lib/VM/InterfaceCheck.php` | 0 | 1 |
+| `lib/VM/LazyObjectSupport.php` | 0 | 2 |
 | `lib/VM/NamedArgs.php` | 0 | 1 |
-| `lib/VM/ObjectEntry.php` | 0 | 2 |
+| `lib/VM/ObjectEntry.php` | 0 | 7 |
+| `lib/VM/ObjectPropertyIterator.php` | 0 | 3 |
+| `lib/VM/ObjectRegistry.php` | 0 | 1 |
 | `lib/VM/Optimizer.php` | 0 | 1 |
 | `lib/VM/Optimizer/AssignOp.php` | 0 | 1 |
 | `lib/VM/OutputBuffer.php` | 0 | 1 |
 | `lib/VM/Refcount.php` | 0 | 1 |
-| `lib/VM/ReflectionSupport.php` | 0 | 4 |
+| `lib/VM/ReflectionSupport.php` | 0 | 10 |
+| `lib/VM/ReflectionTypeSupport.php` | 0 | 8 |
+| `lib/VM/SapiOutput.php` | 0 | 1 |
 | `lib/VM/ScriptStack.php` | 0 | 1 |
+| `lib/VM/SensitiveParamSupport.php` | 0 | 9 |
+| `lib/VM/ShutdownQueue.php` | 0 | 1 |
+| `lib/VM/StringableSupport.php` | 0 | 3 |
 | `lib/VM/TypeCheck.php` | 0 | 1 |
-| `lib/VM/Variable.php` | 0 | 10 |
-| `lib/VM/WeakRefSupport.php` | 0 | 1 |
+| `lib/VM/TypedPropertyCheck.php` | 0 | 3 |
+| `lib/VM/Variable.php` | 0 | 19 |
+| `lib/VM/WeakRefRegistry.php` | 0 | 3 |
+| `lib/VM/WeakRefSupport.php` | 0 | 3 |
 | `lib/Web/CgiAotDriver.php` | 0 | 1 |
 | `lib/Web/CgiDriver.php` | 0 | 2 |
 | `lib/Web/ConstStringFolder.php` | 0 | 1 |
 | `lib/Web/DeployRoot.php` | 0 | 1 |
 | `lib/Web/DevServer.php` | 0 | 1 |
+| `lib/Web/FastCgi/Environment.php` | 0 | 1 |
+| `lib/Web/FastCgi/Listener.php` | 0 | 2 |
+| `lib/Web/FastCgi/ParamsCodec.php` | 0 | 1 |
+| `lib/Web/FastCgi/Record.php` | 0 | 1 |
+| `lib/Web/FastCgi/Request.php` | 0 | 2 |
+| `lib/Web/FastCgi/RequestHandler.php` | 0 | 1 |
 | `lib/Web/IncludePathResolver.php` | 0 | 1 |
 | `lib/Web/LiteralIncludeDiscovery.php` | 0 | 1 |
 | `lib/Web/ManifestValidator.php` | 0 | 1 |
@@ -768,6 +1025,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/JitAssert.php`
+
+**Warnings** (review for bootstrap subset):
+- new boolval (line 24)
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/JitBase64Decode.php`
 
 **Warnings** (review for bootstrap subset):
@@ -796,24 +1059,53 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitChunkSplit.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitClassExists.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/JitClassImplements.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 46)
+- new JITVariable (line 186)
+- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitClassParents.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 49)
+- new JITVariable (line 179)
+- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/JitClearstatcache.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitConstant.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitCopy.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/JitCountChars.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/JitCrc32.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitCrc32c.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -821,7 +1113,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDate.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitDebugBacktrace.php`
 
@@ -841,6 +1133,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitEnv.php`
 
 **Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitErrorGetLast.php`
+
+**Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitErrorHandler.php`
@@ -853,10 +1150,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
-### `ext/standard/JitExplode.php`
+### `ext/standard/JitEscapeshellcmd.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitExplode.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitFclose.php`
 
@@ -925,6 +1227,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 220)
 - 10 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/JitFlock.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitFlush.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitFnmatch.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/JitFopen.php`
 
 **Warnings** (review for bootstrap subset):
@@ -976,10 +1293,56 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/JitGetClassMethods.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 48)
+- new JITVariable (line 181)
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitGetClassVars.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 105)
+- new JITVariable (line 115)
+- new JITVariable (line 125)
+- new JITVariable (line 135)
+- new JITVariable (line 158)
+- new JITVariable (line 168)
+- new JITVariable (line 178)
+- new JITVariable (line 188)
+- 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitGetDeclaredEnums.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 43)
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitGetDeclaredInterfaces.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 43)
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitGetDefinedConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 154)
+- new JITVariable (line 164)
+- new JITVariable (line 176)
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/JitGetObjectVars.php`
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitGetParentClass.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 48)
+- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitGetallheaders.php`
 
@@ -991,6 +1354,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/JitGetdate.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitGethostname.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitGetrusage.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitGettimeofday.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitGettype.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/JitHash.php`
 
 **Warnings** (review for bootstrap subset):
@@ -1001,10 +1389,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/JitHeadersSent.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/JitHex2bin.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitHtmlEntityDecode.php`
 
@@ -1041,12 +1434,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/JitInfo.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/JitIni.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitInterfaceExists.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitIsResource.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -1070,6 +1473,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitJsonLastErrorMsg.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitJsonValidate.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitMd5.php`
 
@@ -1139,7 +1552,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitPath.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 10 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitPathinfo.php`
 
@@ -1162,6 +1575,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitPregLastError.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitPregLastErrorMsg.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -1231,12 +1649,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/JitRegisterShutdown.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/JitRename.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitRequestBody.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitRewind.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -1340,7 +1768,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStrRepeat.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitStrReplace.php`
 
@@ -1360,7 +1788,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStrSplit.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitStrWordCount.php`
 
@@ -1417,6 +1845,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/JitStrtok.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/JitStrtr.php`
 
 **Warnings** (review for bootstrap subset):
@@ -1452,6 +1885,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/JitUmask.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/JitUniqid.php`
 
 **Warnings** (review for bootstrap subset):
@@ -1461,6 +1899,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitUnpack.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitUnserialize.php`
 
@@ -1499,310 +1942,373 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new str_repeat (line 22)
-- new decbin (line 23)
-- new abs (line 24)
-- new ceil (line 25)
-- new floor (line 26)
-- new round (line 27)
-- new number_format (line 28)
-- new sqrt (line 29)
-- new pi (line 30)
-- new deg2rad (line 31)
-- new rad2deg (line 32)
-- new log (line 33)
-- new exp (line 34)
-- new sin (line 35)
-- new cos (line 36)
-- new tan (line 37)
-- new is_nan (line 38)
-- new is_finite (line 39)
-- new is_infinite (line 40)
-- new pow (line 41)
-- new hypot (line 42)
-- new atan2 (line 43)
-- new fmod (line 44)
-- new intval (line 45)
-- new floatval (line 46)
-- new doubleval (line 47)
-- new boolval (line 48)
-- new var_export (line 49)
-- new gettype (line 50)
-- new strval (line 51)
-- new int_min (line 52)
-- new int_max (line 53)
-- new intdiv (line 54)
-- new ord (line 55)
-- new pack (line 56)
-- new chr (line 57)
-- new strcmp (line 58)
-- new levenshtein (line 59)
-- new similar_text (line 60)
-- new soundex (line 61)
-- new metaphone (line 62)
-- new strnatcmp (line 63)
-- new strnatcasecmp (line 64)
-- new strcasecmp (line 65)
-- new strncasecmp (line 66)
-- new strspn (line 67)
-- new strcspn (line 68)
-- new strpbrk (line 69)
-- new dechex (line 70)
-- new hexdec (line 71)
-- new decoct (line 72)
-- new octdec (line 73)
-- new bindec (line 74)
-- new is_numeric (line 75)
-- new is_scalar (line 76)
-- new lcfirst (line 77)
-- new ucfirst (line 78)
-- new ucwords (line 79)
-- new strtolower (line 80)
-- new strtoupper (line 81)
-- new string_trim (line 82)
-- new string_ltrim (line 83)
-- new string_rtrim (line 84)
-- new substr (line 85)
-- new strrev (line 86)
-- new str_rot13 (line 87)
-- new str_shuffle (line 88)
-- new strpos (line 89)
-- new strstr (line 90)
-- new strchr (line 91)
-- new stristr (line 92)
-- new strrchr (line 93)
-- new stripos (line 94)
-- new strrpos (line 95)
-- new substr_count (line 96)
-- new str_word_count (line 97)
-- new str_contains (line 98)
-- new str_starts_with (line 99)
-- new str_ends_with (line 100)
-- new strncmp (line 101)
-- new substr_compare (line 102)
-- new array_count (line 103)
-- new array_count (line 104)
-- new array_key_exists (line 105)
-- new array_key_first (line 106)
-- new array_key_last (line 107)
-- new array_is_list (line 108)
-- new in_array (line 109)
-- new array_push (line 110)
-- new array_pop (line 111)
-- new array_shift (line 112)
-- new array_unshift (line 113)
-- new sort_ (line 114)
-- new rsort_ (line 115)
-- new shuffle_ (line 116)
-- new array_rand (line 117)
-- new ksort_ (line 118)
-- new krsort_ (line 119)
-- new asort_ (line 120)
-- new natsort_ (line 121)
-- new natcasesort_ (line 122)
-- new arsort_ (line 123)
-- new array_multisort (line 124)
-- new usort_ (line 125)
-- new uasort_ (line 126)
-- new sprintf_ (line 127)
-- new array_values (line 128)
-- new array_keys (line 129)
-- new array_merge (line 130)
-- new array_slice (line 131)
-- new array_splice (line 132)
-- new array_chunk (line 133)
-- new array_column (line 134)
-- new explode (line 135)
-- new implode (line 136)
-- new implode (line 137)
-- new str_replace (line 138)
-- new str_ireplace (line 139)
-- new strtr (line 140)
-- new preg_quote (line 141)
-- new quotemeta (line 142)
-- new addslashes (line 143)
-- new stripslashes (line 144)
-- new preg_match (line 145)
-- new preg_match_all (line 146)
-- new preg_grep (line 147)
-- new preg_replace (line 148)
-- new preg_replace_callback (line 149)
-- new preg_split (line 150)
-- new preg_last_error_ (line 151)
-- new nl2br (line 152)
-- new array_reverse (line 153)
-- new array_search (line 154)
-- new array_sum (line 155)
-- new array_product (line 156)
-- new array_flip (line 157)
-- new array_change_key_case (line 158)
-- new array_count_values (line 159)
-- new array_unique (line 160)
-- new array_diff (line 161)
-- new array_intersect (line 162)
-- new array_replace (line 163)
-- new array_fill (line 164)
-- new array_fill_keys (line 165)
-- new array_pad (line 166)
-- new array_combine (line 167)
-- new array_map (line 168)
-- new array_filter (line 169)
-- new array_walk (line 170)
-- new array_reduce (line 171)
-- new range (line 172)
-- new bin2hex (line 173)
-- new crc32 (line 174)
-- new hex2bin (line 175)
-- new base64_encode (line 176)
-- new base64_decode (line 177)
-- new hash_ (line 178)
-- new hash_hmac (line 179)
-- new hash_equals (line 180)
-- new md5 (line 181)
-- new sha1 (line 182)
-- new crc32 (line 183)
-- new password_hash (line 184)
-- new password_verify (line 185)
-- new random_bytes (line 186)
-- new random_int (line 187)
-- new uniqid (line 188)
-- new str_pad (line 189)
-- new str_split (line 190)
-- new chunk_split (line 191)
-- new wordwrap (line 192)
-- new htmlspecialchars (line 193)
-- new htmlspecialchars_decode (line 194)
-- new htmlentities (line 195)
-- new html_entity_decode (line 196)
-- new strip_tags (line 197)
-- new header_ (line 198)
-- new setcookie (line 199)
-- new setrawcookie (line 200)
-- new session_start (line 201)
-- new session_id_ (line 202)
-- new session_name (line 203)
-- new session_destroy (line 204)
-- new session_write_close (line 205)
-- new session_regenerate_id (line 206)
-- new header_remove (line 207)
-- new header_list (line 208)
-- new getallheaders_ (line 209)
-- new ob_start (line 210)
-- new ob_get_clean (line 211)
-- new ob_end_flush (line 212)
-- new ob_get_level (line 213)
-- new http_response_code (line 214)
-- new json_encode (line 215)
-- new json_decode (line 216)
-- new serialize (line 217)
-- new unserialize (line 218)
-- new json_last_error_ (line 219)
-- new web_int (line 220)
-- new web_string (line 221)
-- new web_bool (line 222)
-- new filter_var (line 223)
-- new filter_input (line 224)
-- new urlencode (line 225)
-- new rawurlencode (line 226)
-- new http_build_query (line 227)
-- new parse_str (line 228)
-- new urldecode (line 229)
-- new rawurldecode (line 230)
-- new parse_url (line 231)
-- new dirname (line 232)
-- new basename (line 233)
-- new realpath (line 234)
-- new pathinfo (line 235)
-- new file_get_contents (line 236)
-- new readfile (line 237)
-- new file_put_contents (line 238)
-- new file_exists (line 239)
-- new filesize (line 240)
-- new filemtime (line 241)
-- new clearstatcache_ (line 242)
-- new stat_ (line 243)
-- new lstat_ (line 244)
-- new fileperms (line 245)
-- new is_file (line 246)
-- new is_dir (line 247)
-- new is_readable (line 248)
-- new is_writable (line 249)
-- new is_executable (line 250)
-- new is_link (line 251)
-- new readlink (line 252)
-- new unlink (line 253)
-- new mkdir_ (line 254)
-- new rmdir_ (line 255)
-- new chmod_ (line 256)
-- new rename_ (line 257)
-- new move_uploaded_file (line 258)
-- new is_uploaded_file (line 259)
-- new copy_ (line 260)
-- new move_uploaded_file (line 261)
-- new touch_ (line 262)
-- new filetype (line 263)
-- new stream_context_create (line 264)
-- new fopen (line 265)
-- new fread (line 266)
-- new fgetc (line 267)
-- new fgets (line 268)
-- new fgetcsv (line 269)
-- new fputcsv (line 270)
-- new str_getcsv (line 271)
-- new ftell_ (line 272)
-- new fseek (line 273)
-- new feof_ (line 274)
-- new fflush_ (line 275)
-- new fpassthru (line 276)
-- new fwrite (line 277)
-- new fclose (line 278)
-- new getenv_ (line 279)
-- new putenv_ (line 280)
-- new shell_exec (line 281)
-- new escapeshellarg (line 282)
-- new phpc_run_command (line 283)
-- new sys_get_temp_dir (line 284)
-- new tempnam (line 285)
-- new getcwd_ (line 286)
-- new chdir_ (line 287)
-- new putenv_ (line 288)
-- new ini_set_ (line 289)
-- new ini_get_ (line 290)
-- new define_ (line 291)
-- new defined_ (line 292)
-- new debug_backtrace (line 293)
-- new class_exists_ (line 294)
-- new enum_exists_ (line 295)
-- new interface_exists_ (line 296)
-- new trait_exists_ (line 297)
-- new function_exists (line 298)
-- new func_get_args (line 299)
-- new func_num_args (line 300)
-- new method_exists_ (line 301)
-- new property_exists_ (line 302)
-- new get_object_vars_ (line 303)
-- new get_class_ (line 304)
-- new get_parent_class_ (line 305)
-- new is_a_ (line 306)
-- new is_subclass_of_ (line 307)
-- new trigger_error_ (line 308)
-- new set_error_handler_ (line 309)
-- new restore_error_handler_ (line 310)
-- new phpc_deploy_path (line 311)
-- new compiler_is_superglobal_name (line 312)
-- new extract_ (line 313)
-- new compact_ (line 314)
-- new scandir (line 315)
-- new glob_ (line 316)
-- new time (line 317)
-- new getmypid (line 318)
-- new microtime (line 319)
-- new date (line 320)
-- new gmdate (line 321)
-- new sleep (line 322)
-- new spl_autoload_register (line 323)
-- new usleep (line 324)
-- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new VM\Variable (line 30)
+- new str_repeat (line 39)
+- new decbin (line 40)
+- new abs (line 41)
+- new ceil (line 42)
+- new floor (line 43)
+- new round (line 44)
+- new number_format (line 45)
+- new sqrt (line 46)
+- new pi (line 47)
+- new deg2rad (line 48)
+- new rad2deg (line 49)
+- new log (line 50)
+- new log10 (line 51)
+- new exp (line 52)
+- new expm1 (line 53)
+- new log1p (line 54)
+- new sin (line 55)
+- new cos (line 56)
+- new tan (line 57)
+- new is_nan (line 58)
+- new is_finite (line 59)
+- new is_infinite (line 60)
+- new pow (line 61)
+- new hypot (line 62)
+- new atan2 (line 63)
+- new fmod (line 64)
+- new modf (line 65)
+- new ldexp (line 66)
+- new frexp (line 67)
+- new fdiv (line 68)
+- new intval (line 69)
+- new floatval (line 70)
+- new doubleval (line 71)
+- new boolval (line 72)
+- new settype (line 73)
+- new var_export (line 74)
+- new var_dump_ (line 75)
+- new gettype (line 76)
+- new get_debug_type (line 77)
+- new gc_collect_cycles (line 78)
+- new halt_compiler_ (line 79)
+- new strval (line 80)
+- new int_min (line 81)
+- new int_max (line 82)
+- new intdiv (line 83)
+- new ord (line 84)
+- new pack (line 85)
+- new unpack (line 86)
+- new chr (line 87)
+- new strcmp (line 88)
+- new levenshtein (line 89)
+- new similar_text (line 90)
+- new soundex (line 91)
+- new metaphone (line 92)
+- new strnatcmp (line 93)
+- new strnatcasecmp (line 94)
+- new strcasecmp (line 95)
+- new strncasecmp (line 96)
+- new strspn (line 97)
+- new strcspn (line 98)
+- new strpbrk (line 99)
+- new dechex (line 100)
+- new hexdec (line 101)
+- new decoct (line 102)
+- new octdec (line 103)
+- new bindec (line 104)
+- new base_convert_ (line 105)
+- new is_numeric (line 106)
+- new is_scalar (line 107)
+- new is_countable (line 108)
+- new is_resource_ (line 109)
+- new lcfirst (line 110)
+- new ucfirst (line 111)
+- new ucwords (line 112)
+- new strtolower (line 113)
+- new strtoupper (line 114)
+- new string_trim (line 115)
+- new string_ltrim (line 116)
+- new string_rtrim (line 117)
+- new substr (line 118)
+- new strrev (line 119)
+- new str_rot13 (line 120)
+- new str_increment (line 121)
+- new str_decrement (line 122)
+- new str_shuffle (line 123)
+- new strpos (line 124)
+- new strstr (line 125)
+- new strtok (line 126)
+- new strchr (line 127)
+- new stristr (line 128)
+- new strrchr (line 129)
+- new stripos (line 130)
+- new strrpos (line 131)
+- new substr_count (line 132)
+- new count_chars (line 133)
+- new str_word_count (line 134)
+- new str_contains (line 135)
+- new str_starts_with (line 136)
+- new str_ends_with (line 137)
+- new strncmp (line 138)
+- new substr_compare (line 139)
+- new array_count (line 140)
+- new array_count (line 141)
+- new array_key_exists (line 142)
+- new array_key_first (line 143)
+- new array_key_last (line 144)
+- new array_is_list (line 145)
+- new in_array (line 146)
+- new array_push (line 147)
+- new array_pop (line 148)
+- new array_shift (line 149)
+- new array_unshift (line 150)
+- new sort_ (line 151)
+- new rsort_ (line 152)
+- new shuffle_ (line 153)
+- new array_rand (line 154)
+- new ksort_ (line 155)
+- new krsort_ (line 156)
+- new asort_ (line 157)
+- new natsort_ (line 158)
+- new natcasesort_ (line 159)
+- new arsort_ (line 160)
+- new array_multisort (line 161)
+- new usort_ (line 162)
+- new uasort_ (line 163)
+- new uksort_ (line 164)
+- new sprintf_ (line 165)
+- new array_values (line 166)
+- new array_keys (line 167)
+- new array_merge (line 168)
+- new array_slice (line 169)
+- new array_splice (line 170)
+- new array_chunk (line 171)
+- new array_column (line 172)
+- new explode (line 173)
+- new implode (line 174)
+- new implode (line 175)
+- new str_replace (line 176)
+- new str_ireplace (line 177)
+- new strtr (line 178)
+- new preg_quote (line 179)
+- new quotemeta (line 180)
+- new addslashes (line 181)
+- new stripslashes (line 182)
+- new preg_match (line 183)
+- new preg_match_all (line 184)
+- new preg_grep (line 185)
+- new preg_replace (line 186)
+- new preg_replace_callback (line 187)
+- new preg_split (line 188)
+- new preg_last_error_ (line 189)
+- new preg_last_error_msg_ (line 190)
+- new nl2br (line 191)
+- new array_reverse (line 192)
+- new array_search (line 193)
+- new array_sum (line 194)
+- new array_product (line 195)
+- new array_flip (line 196)
+- new array_change_key_case (line 197)
+- new array_count_values (line 198)
+- new array_unique (line 199)
+- new array_diff (line 200)
+- new array_intersect (line 201)
+- new iterator_to_array (line 202)
+- new array_replace (line 203)
+- new array_replace_recursive (line 204)
+- new array_fill (line 205)
+- new array_fill_keys (line 206)
+- new array_pad (line 207)
+- new array_combine (line 208)
+- new array_map (line 209)
+- new array_filter (line 210)
+- new array_walk (line 211)
+- new array_walk_recursive (line 212)
+- new array_reduce (line 213)
+- new range (line 214)
+- new bin2hex (line 215)
+- new crc32 (line 216)
+- new crc32c (line 217)
+- new hex2bin (line 218)
+- new base64_encode (line 219)
+- new base64_decode (line 220)
+- new hash_ (line 221)
+- new hash_hmac (line 222)
+- new hash_equals (line 223)
+- new md5 (line 224)
+- new sha1 (line 225)
+- new crc32 (line 226)
+- new password_hash (line 227)
+- new password_verify (line 228)
+- new random_bytes (line 229)
+- new random_int (line 230)
+- new uniqid (line 231)
+- new str_pad (line 232)
+- new str_split (line 233)
+- new chunk_split (line 234)
+- new wordwrap (line 235)
+- new htmlspecialchars (line 236)
+- new htmlspecialchars_decode (line 237)
+- new htmlentities (line 238)
+- new html_entity_decode (line 239)
+- new strip_tags (line 240)
+- new header_ (line 241)
+- new headers_sent (line 242)
+- new register_shutdown_function (line 243)
+- new setcookie (line 244)
+- new setrawcookie (line 245)
+- new session_start (line 246)
+- new session_id_ (line 247)
+- new session_name (line 248)
+- new session_destroy (line 249)
+- new session_write_close (line 250)
+- new session_regenerate_id (line 251)
+- new header_remove (line 252)
+- new header_list (line 253)
+- new getallheaders_ (line 254)
+- new ob_start (line 255)
+- new ob_get_clean (line 256)
+- new ob_end_flush (line 257)
+- new flush_ (line 258)
+- new ob_get_level (line 259)
+- new http_response_code (line 260)
+- new json_encode (line 261)
+- new json_decode (line 262)
+- new json_validate (line 263)
+- new serialize (line 264)
+- new unserialize (line 265)
+- new json_last_error_ (line 266)
+- new json_last_error_msg_ (line 267)
+- new web_int (line 268)
+- new web_string (line 269)
+- new web_bool (line 270)
+- new filter_var (line 271)
+- new filter_input (line 272)
+- new urlencode (line 273)
+- new rawurlencode (line 274)
+- new http_build_query (line 275)
+- new parse_str (line 276)
+- new urldecode (line 277)
+- new rawurldecode (line 278)
+- new parse_url (line 279)
+- new dirname (line 280)
+- new basename (line 281)
+- new realpath (line 282)
+- new pathinfo (line 283)
+- new file_get_contents (line 284)
+- new readfile (line 285)
+- new file_put_contents (line 286)
+- new file_exists (line 287)
+- new filesize (line 288)
+- new filemtime (line 289)
+- new clearstatcache_ (line 290)
+- new stat_ (line 291)
+- new lstat_ (line 292)
+- new fileperms (line 293)
+- new is_file (line 294)
+- new is_dir (line 295)
+- new is_readable (line 296)
+- new is_writable (line 297)
+- new is_executable (line 298)
+- new is_link (line 299)
+- new readlink (line 300)
+- new unlink (line 301)
+- new mkdir_ (line 302)
+- new rmdir_ (line 303)
+- new chmod_ (line 304)
+- new umask_ (line 305)
+- new rename_ (line 306)
+- new move_uploaded_file (line 307)
+- new is_uploaded_file (line 308)
+- new copy_ (line 309)
+- new move_uploaded_file (line 310)
+- new touch_ (line 311)
+- new filetype (line 312)
+- new stream_context_create (line 313)
+- new fopen (line 314)
+- new fread (line 315)
+- new fgetc (line 316)
+- new fgets (line 317)
+- new fgetcsv (line 318)
+- new fputcsv (line 319)
+- new str_getcsv (line 320)
+- new ftell_ (line 321)
+- new fseek (line 322)
+- new rewind_ (line 323)
+- new feof_ (line 324)
+- new fflush_ (line 325)
+- new fpassthru (line 326)
+- new fwrite (line 327)
+- new fclose (line 328)
+- new flock (line 329)
+- new getenv_ (line 330)
+- new putenv_ (line 331)
+- new shell_exec (line 332)
+- new escapeshellarg (line 333)
+- new escapeshellcmd (line 334)
+- new phpc_run_command (line 335)
+- new sys_get_temp_dir (line 336)
+- new tempnam (line 337)
+- new getcwd_ (line 338)
+- new gethostname (line 339)
+- new chdir_ (line 340)
+- new putenv_ (line 341)
+- new ini_set_ (line 342)
+- new ini_get_ (line 343)
+- new define_ (line 344)
+- new defined_ (line 345)
+- new constant_ (line 346)
+- new get_defined_constants_ (line 347)
+- new get_defined_vars_ (line 348)
+- new get_declared_interfaces_ (line 349)
+- new debug_backtrace (line 350)
+- new class_exists_ (line 351)
+- new class_alias (line 352)
+- new enum_exists_ (line 353)
+- new get_declared_enums_ (line 354)
+- new interface_exists_ (line 355)
+- new trait_exists_ (line 356)
+- new class_uses_ (line 357)
+- new class_implements_ (line 358)
+- new class_parents_ (line 359)
+- new function_exists (line 360)
+- new func_get_args (line 361)
+- new func_num_args (line 362)
+- new method_exists_ (line 363)
+- new property_exists_ (line 364)
+- new get_object_vars_ (line 365)
+- new get_class_ (line 366)
+- new get_class_vars_ (line 367)
+- new get_class_methods_ (line 368)
+- new get_parent_class_ (line 369)
+- new is_a_ (line 370)
+- new is_subclass_of_ (line 371)
+- new assert_ (line 372)
+- new trigger_error_ (line 373)
+- new set_error_handler_ (line 374)
+- new restore_error_handler_ (line 375)
+- new error_get_last (line 376)
+- new error_clear_last (line 377)
+- new eval_ (line 378)
+- new phpc_deploy_path (line 379)
+- new compiler_is_superglobal_name (line 380)
+- new extract_ (line 381)
+- new compact_ (line 382)
+- new scandir (line 383)
+- new glob_ (line 384)
+- new fnmatch (line 385)
+- new time (line 386)
+- new getmypid (line 387)
+- new getrusage (line 388)
+- new microtime (line 389)
+- new gettimeofday (line 390)
+- new hrtime (line 391)
+- new phpversion (line 392)
+- new php_sapi_name (line 393)
+- new php_uname (line 394)
+- new version_compare (line 395)
+- new extension_loaded (line 396)
+- new get_loaded_extensions (line 397)
+- new date (line 398)
+- new gmdate (line 399)
+- new getdate (line 400)
+- new sleep (line 401)
+- new spl_autoload_register (line 402)
+- new usleep (line 403)
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/SetcookieLine.php`
 
@@ -1812,44 +2318,74 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmArray.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 89)
-- new Variable (line 91)
-- new Variable (line 115)
-- new Variable (line 117)
-- new HashTable (line 122)
-- new Variable (line 125)
-- new Variable (line 149)
-- new Variable (line 151)
-- new HashTable (line 156)
-- new Variable (line 159)
-- new Variable (line 183)
-- new Variable (line 185)
-- new HashTable (line 202)
-- new Variable (line 205)
-- new Variable (line 229)
-- new Variable (line 231)
-- new HashTable (line 248)
-- new Variable (line 251)
-- new Variable (line 275)
-- new Variable (line 277)
-- new HashTable (line 294)
-- new Variable (line 297)
-- new Variable (line 321)
-- new Variable (line 323)
-- new HashTable (line 340)
-- new Variable (line 343)
-- new Variable (line 375)
-- new Variable (line 438)
-- new HashTable (line 444)
-- new Variable (line 446)
-- new HashTable (line 460)
-- new Variable (line 467)
-- new Variable (line 480)
-- new HashTable (line 500)
-- new Variable (line 503)
-- 16 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new HashTable (line 96)
+- new Variable (line 98)
+- new Variable (line 122)
+- new Variable (line 124)
+- new HashTable (line 129)
+- new Variable (line 132)
+- new Variable (line 156)
+- new Variable (line 158)
+- new HashTable (line 163)
+- new Variable (line 166)
+- new Variable (line 190)
+- new Variable (line 192)
+- new HashTable (line 209)
+- new Variable (line 212)
+- new Variable (line 236)
+- new Variable (line 238)
+- new HashTable (line 255)
+- new Variable (line 258)
+- new Variable (line 282)
+- new Variable (line 284)
+- new HashTable (line 301)
+- new Variable (line 304)
+- new Variable (line 328)
+- new Variable (line 330)
+- new HashTable (line 347)
+- new Variable (line 350)
+- new Variable (line 382)
+- new Variable (line 445)
+- new HashTable (line 451)
+- new Variable (line 453)
+- new HashTable (line 484)
+- new Variable (line 491)
+- new Variable (line 504)
+- new HashTable (line 524)
+- new Variable (line 527)
+- 19 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/VmAssert.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/VmClosureCall.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 48)
+- 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/VmConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 40)
+- new Variable (line 42)
+- new Variable (line 47)
+- new HashTable (line 57)
+- new HashTable (line 58)
+- new Variable (line 60)
+- new HashTable (line 67)
+- new Variable (line 69)
+- new Variable (line 114)
+- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmCrc32.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/VmCrc32c.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -1862,17 +2398,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDate.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new HashTable (line 53)
+- new Variable (line 55)
+- new HashTable (line 80)
+- new Variable (line 82)
+- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmDebugBacktrace.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 17)
-- new Variable (line 40)
-- new Variable (line 44)
-- new Variable (line 48)
-- new Variable (line 52)
+- new Variable (line 18)
+- new Variable (line 45)
+- new Variable (line 49)
+- new Variable (line 53)
+- new Variable (line 57)
 - 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/VmEnv.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmErrorHandler.php`
 
@@ -1884,10 +2429,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 98)
 - 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/VmEval.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/VmExit.php`
 
 **Warnings** (review for bootstrap subset):
-- new ScriptExit (line 15)
+- new ScriptExit (line 21)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmFilter.php`
@@ -1897,6 +2447,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 78)
 - 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/VmFnmatch.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/VmFs.php`
 
 **Warnings** (review for bootstrap subset):
@@ -1905,17 +2460,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 89)
 - new Variable (line 92)
 - new Variable (line 95)
-- 40 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 43 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmHash.php`
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/VmHost.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/VmHttpBuildQuery.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/VmInfo.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 55)
+- new Variable (line 60)
+- 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmIni.php`
 
@@ -1934,13 +2501,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Frame (line 40)
 - new Variable (line 42)
-- 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 12 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmJson.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 16)
-- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 58)
+- new VmJsonExportException (line 146)
+- new Error (line 149)
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/VmJsonValidate.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/VmMath.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmMetaphone.php`
 
@@ -1955,7 +2534,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPack.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmParseStr.php`
 
@@ -1970,14 +2549,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/VmPhpCoreConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 123)
+- new Variable (line 129)
+- new Variable (line 135)
+- new Variable (line 141)
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/VmPreg.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmPregReplaceCallback.php`
 
 **Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/VmProcess.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 26)
+- new Variable (line 28)
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmRandom.php`
@@ -1989,26 +2584,47 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmReflection.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 151)
-- new Variable (line 155)
-- new Variable (line 182)
-- new Variable (line 190)
-- 16 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 70)
+- new Variable (line 97)
+- new Variable (line 307)
+- new Variable (line 311)
+- new Variable (line 321)
+- new Variable (line 325)
+- new Variable (line 372)
+- new Variable (line 376)
+- new Variable (line 391)
+- new Variable (line 402)
+- new Variable (line 454)
+- new Variable (line 458)
+- new Variable (line 522)
+- new Variable (line 530)
+- new Variable (line 584)
+- new Variable (line 588)
+- 39 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmScope.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 80)
-- new Variable (line 92)
-- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new HashTable (line 81)
+- new Variable (line 93)
+- new HashTable (line 115)
+- new Variable (line 127)
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmSerialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 116)
-- new Variable (line 117)
-- new Variable (line 133)
-- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new ObjectEntry (line 223)
+- new Variable (line 224)
+- new ObjectEntry (line 237)
+- new Variable (line 245)
+- new ObjectEntry (line 263)
+- new Variable (line 264)
+- new Variable (line 266)
+- new Variable (line 332)
+- new Variable (line 351)
+- new Variable (line 377)
+- 20 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmSession.php`
 
@@ -2020,6 +2636,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 187)
 - new HashTable (line 214)
 - 18 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/VmSettype.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 19)
+- new HashTable (line 149)
+- new HashTable (line 151)
+- new Variable (line 152)
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmSleep.php`
 
@@ -2057,7 +2682,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Exception (line 1011)
 - new Exception (line 1019)
-- 110 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 121 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmUserCall.php`
 
@@ -2179,8 +2804,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 47)
-- new Variable (line 91)
-- new Variable (line 99)
+- new Variable (line 108)
+- new Variable (line 116)
 - 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/array_merge.php`
@@ -2229,6 +2854,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/array_replace.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/array_replace_recursive.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -2285,8 +2915,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_walk.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 51)
-- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new HashTable (line 61)
+- new Variable (line 110)
+- new Variable (line 113)
+- new Variable (line 132)
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/array_walk_recursive.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 122)
+- new Variable (line 138)
+- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/arsort_.php`
 
@@ -2300,6 +2940,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 48)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/assert_.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/atan2.php`
 
 **Warnings** (review for bootstrap subset):
@@ -2311,6 +2956,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/base64_encode.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/base_convert_.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -2360,7 +3010,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/class_alias.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/class_exists_.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/class_implements_.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/class_parents_.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/class_uses_.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -2380,6 +3050,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/constant_.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 47)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/copy_.php`
 
 **Warnings** (review for bootstrap subset):
@@ -2390,7 +3066,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/count_chars.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 55)
+- new Variable (line 64)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/crc32.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/crc32c.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -2457,7 +3145,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/error_clear_last.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/error_get_last.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/escapeshellarg.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/escapeshellcmd.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/eval_.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -2470,8 +3178,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/explode.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 38)
-- new Variable (line 40)
+- new HashTable (line 48)
+- new Variable (line 50)
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/expm1.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/extension_loaded.php`
+
+**Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/extract_.php`
@@ -2483,6 +3201,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/fdiv.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/feof_.php`
 
@@ -2562,7 +3285,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/flock.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/floor.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/flush_.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -2571,6 +3304,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/fnmatch.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/fopen.php`
 
@@ -2588,6 +3326,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/fread.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/frexp.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -2622,7 +3365,52 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/gc_collect_cycles.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/get_class_.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/get_class_methods_.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/get_class_vars_.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/get_debug_type.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/get_declared_enums_.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/get_declared_interfaces_.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/get_defined_constants_.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/get_defined_vars_.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/get_loaded_extensions.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -2649,12 +3437,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/getdate.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/getenv_.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/gethostname.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/getmypid.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/getrusage.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/gettimeofday.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -2672,6 +3480,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/gmdate.php`
 
 **Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/halt_compiler_.php`
+
+**Warnings** (review for bootstrap subset):
+- new CompileError (line 31)
+- new CompileError (line 40)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/hash_.php`
@@ -2704,6 +3519,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/headers_sent.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/hex2bin.php`
 
 **Warnings** (review for bootstrap subset):
@@ -2712,6 +3532,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/hexdec.php`
 
 **Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/hrtime.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 47)
+- new Variable (line 48)
+- new Variable (line 51)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/html_entity_decode.php`
@@ -2782,7 +3610,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/intdiv.php`
 
 **Warnings** (review for bootstrap subset):
-- new DivisionByZeroError (line 39)
+- new DivisionByZeroError (line 36)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/interface_exists_.php`
@@ -2799,6 +3627,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/is_countable.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 121)
+- new JITVariable (line 174)
+- 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/is_dir.php`
 
@@ -2845,6 +3680,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/is_resource_.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/is_scalar.php`
 
 **Warnings** (review for bootstrap subset):
@@ -2865,6 +3705,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/iterator_to_array.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/json_decode.php`
 
 **Warnings** (review for bootstrap subset):
@@ -2876,6 +3721,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/json_last_error_.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/json_last_error_msg_.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/json_validate.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -2895,6 +3750,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/ldexp.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/levenshtein.php`
 
 **Warnings** (review for bootstrap subset):
@@ -2904,6 +3764,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/log10.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/log1p.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/lstat_.php`
 
@@ -2931,6 +3801,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/mkdir_.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/modf.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -3027,6 +3902,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 44)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/php_sapi_name.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/php_uname.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/phpc_deploy_path.php`
 
 **Warnings** (review for bootstrap subset):
@@ -3039,6 +3924,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 70)
 - new Variable (line 73)
 - new Variable (line 76)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/phpversion.php`
+
+**Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/pi.php`
@@ -3058,6 +3948,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/preg_last_error_.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/preg_last_error_msg_.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -3157,12 +4052,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/register_shutdown_function.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 34)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/rename_.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/restore_error_handler_.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/rewind_.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -3238,6 +4144,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/settype.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/sha1.php`
 
 **Warnings** (review for bootstrap subset):
@@ -3304,12 +4215,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/str_decrement.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/str_ends_with.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/str_getcsv.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/str_increment.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -3480,6 +4401,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/strtok.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/strtolower.php`
 
 **Warnings** (review for bootstrap subset):
@@ -3568,6 +4494,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/uksort_.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 50)
+- new Variable (line 52)
+- new HashTable (line 76)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/umask_.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/uniqid.php`
 
 **Warnings** (review for bootstrap subset):
@@ -3578,11 +4517,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/unpack.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 77)
+- new Variable (line 79)
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/unserialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 84)
-- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new JITVariable (line 93)
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/urldecode.php`
 
@@ -3602,13 +4548,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/usort_.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 57)
+- new Variable (line 49)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/var_dump_.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/var_export.php`
 
 **Warnings** (review for bootstrap subset):
 - 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/version_compare.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/web_bool.php`
 
@@ -3667,6 +4623,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/AOT/AutoloadDiscovery.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/AOT/Linker.php`
 
 **Warnings** (review for bootstrap subset):
@@ -3680,23 +4641,64 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/AOT/ProjectGraph.php`
 
 **Warnings** (review for bootstrap subset):
-- new Runtime (line 41)
-- new Runtime (line 147)
+- new Runtime (line 42)
+- new Runtime (line 169)
 - 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/AbstractEnumSourceRewriter.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Ast/AbstractEnumMarker.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Ast/AsymmetricVisibilityRewriter.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 1 closure(s)
 
 ### `lib/Ast/GroupUseStripper.php`
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/Ast/PipeOperatorDesugar.php`
+
+**Warnings** (review for bootstrap subset):
+- 18 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Ast/SealedClassAnnotator.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Ast/SealedClassPreprocessor.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/Block.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 418)
-- new Variable (line 424)
-- new Frame (line 457)
-- new Variable (line 482)
-- 22 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Block (line 215)
+- new Variable (line 551)
+- new Variable (line 557)
+- new Variable (line 664)
+- new Variable (line 670)
+- new Variable (line 699)
+- new Frame (line 713)
+- new Variable (line 744)
+- new Variable (line 775)
+- 53 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/BuiltinByRefParams.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/BuiltinParamNames.php`
 
@@ -3715,6 +4717,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Linter (line 216)
 - 17 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/Cli/PhpcFcgi.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/Cli/PhpcInit.php`
 
 **Warnings** (review for bootstrap subset):
@@ -3728,207 +4735,335 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileError (line 202)
-- new Func\PHP (line 271)
-- new Block (line 334)
-- new Block (line 356)
-- new Block (line 368)
-- new Block (line 568)
-- new OpCode (line 571)
-- new OpCode (line 637)
-- new OpCode (line 665)
-- new OpCode (line 1016)
-- new OpCode (line 1027)
-- new OpCode (line 1039)
-- new Block (line 1051)
-- new OpCode (line 1055)
-- new Operand\Literal (line 1082)
-- new Variable (line 1084)
-- new Operand\Temporary (line 1086)
-- new OpCode (line 1089)
-- new Variable (line 1114)
-- new Operand\Temporary (line 1118)
-- new OpCode (line 1121)
-- new Block (line 1246)
-- new OpCode (line 1262)
-- new OpCode (line 1277)
-- new OpCode (line 1291)
-- new Operand\Literal (line 1317)
-- new OpCode (line 1319)
-- new Operand\Variable (line 1332)
-- new Operand\Literal (line 1332)
-- new Operand\Literal (line 1342)
-- new Temporary (line 1345)
-- new OpCode (line 1348)
-- new OpCode (line 1354)
-- new Variable (line 1364)
-- new Operand\Temporary (line 1365)
-- new OpCode (line 1401)
-- new Operand\Literal (line 1411)
-- new OpCode (line 1413)
-- new Operand\Literal (line 1426)
-- new OpCode (line 1429)
-- new OpCode (line 1437)
-- new OpCode (line 1445)
-- new OpCode (line 1453)
-- new OpCode (line 1479)
-- new OpCode (line 1484)
-- new OpCode (line 1491)
-- new OpCode (line 1497)
-- new OpCode (line 1509)
-- new OpCode (line 1535)
-- new OpCode (line 1552)
-- new Block (line 1564)
-- new OpCode (line 1571)
-- new OpCode (line 1674)
-- new OpCode (line 1681)
-- new Operand\Literal (line 1697)
-- new OpCode (line 1699)
-- new Operand\Literal (line 1714)
-- new OpCode (line 1716)
-- new OpCode (line 1729)
-- new OpCode (line 1740)
-- new OpCode (line 1746)
-- new OpCode (line 1754)
-- new OpCode (line 1769)
-- new OpCode (line 1775)
-- new OpCode (line 1783)
-- new OpCode (line 1794)
-- new OpCode (line 1805)
-- new OpCode (line 1817)
-- new OpCode (line 1823)
-- new OpCode (line 1836)
-- new OpCode (line 1847)
-- new OpCode (line 1861)
-- new Operand\Literal (line 1873)
-- new Operand\Literal (line 1890)
-- new OpCode (line 1905)
-- new OpCode (line 1915)
-- new OpCode (line 1920)
-- new OpCode (line 1927)
-- new OpCode (line 1936)
-- new OpCode (line 1949)
-- new OpCode (line 1962)
-- new OpCode (line 1973)
-- new OpCode (line 1979)
-- new OpCode (line 1985)
-- new OpCode (line 1994)
-- new OpCode (line 2000)
-- new OpCode (line 2015)
-- new OpCode (line 2027)
-- new OpCode (line 2035)
-- new OpCode (line 2068)
-- new Operand\Literal (line 2095)
-- new OpCode (line 2098)
-- new Operand\Literal (line 2111)
-- new OpCode (line 2116)
-- new OpCode (line 2125)
-- new OpCode (line 2151)
-- new OpCode (line 2159)
-- new OpCode (line 2165)
-- new Block (line 2173)
-- new Block (line 2177)
-- new OpCode (line 2189)
-- new Block (line 2196)
-- new OpCode (line 2204)
-- new OpCode (line 2212)
-- new OpCode (line 2221)
-- new OpCode (line 2224)
-- new OpCode (line 2232)
-- new OpCode (line 2250)
-- new OpCode (line 2263)
-- new Block (line 2276)
-- new Block (line 2280)
-- new Operand\Literal (line 2283)
-- new OpCode (line 2286)
-- new OpCode (line 2292)
-- new Block (line 2296)
-- new OpCode (line 2299)
-- new OpCode (line 2305)
-- new OpCode (line 2311)
-- new Block (line 2329)
-- new Block (line 2333)
-- new Operand\Literal (line 2336)
-- new OpCode (line 2339)
-- new OpCode (line 2345)
-- new Block (line 2349)
-- new OpCode (line 2352)
-- new OpCode (line 2361)
-- new OpCode (line 2366)
-- new OpCode (line 2370)
-- new OpCode (line 2376)
-- new Variable (line 2424)
-- new Operand\Literal (line 2426)
-- new OpCode (line 2451)
-- new Operand\Temporary (line 2491)
-- new HashTable (line 2499)
-- new Variable (line 2530)
-- new Variable (line 2556)
-- new Block (line 2687)
-- new Block (line 2690)
-- new OpCode (line 2693)
-- new OpCode (line 2699)
-- new OpCode (line 2716)
-- new Block (line 2723)
-- new OpCode (line 2726)
-- new OpCode (line 2736)
-- new Temporary (line 2746)
-- new Variable (line 2756)
-- new Operand\Temporary (line 2758)
-- new Variable (line 2952)
-- new OpCode (line 2976)
-- new OpCode (line 3033)
-- new OpCode (line 3048)
-- new OpCode (line 3058)
-- new OpCode (line 3065)
-- new OpCode (line 3068)
-- new OpCode (line 3073)
-- new OpCode (line 3078)
-- new OpCode (line 3086)
-- new OpCode (line 3095)
-- new Variable (line 3106)
-- new Operand\Literal (line 3108)
-- new OpCode (line 3111)
-- new OpCode (line 3130)
-- new OpCode (line 3150)
-- new OpCode (line 3172)
-- new OpCode (line 3178)
+- new CompileError (line 254)
+- new ClassCompileRegistry (line 264)
+- new ClassCompileRegistry (line 305)
+- new ClassCompileRegistry (line 342)
+- new Func\PHP (line 347)
+- new Block (line 427)
+- new Block (line 449)
+- new Block (line 461)
+- new OpCode (line 468)
+- new Block (line 859)
+- new OpCode (line 862)
+- new OpCode (line 949)
+- new OpCode (line 977)
+- new OpCode (line 1443)
+- new OpCode (line 1468)
+- new Variable (line 1486)
+- new Operand\Temporary (line 1488)
+- new OpCode (line 1492)
+- new Block (line 1515)
+- new Operand\Literal (line 1541)
+- new Variable (line 1543)
+- new Operand\Temporary (line 1545)
+- new OpCode (line 1548)
+- new ParameterMetadata (line 1576)
+- new Variable (line 1622)
+- new Operand\Temporary (line 1624)
+- new OpCode (line 1627)
+- new Block (line 1813)
+- new OpCode (line 1863)
+- new OpCode (line 1896)
+- new OpCode (line 1901)
+- new OpCode (line 1937)
+- new Variable (line 1951)
+- new Operand\Temporary (line 1965)
+- new Operand\Temporary (line 1974)
+- new Operand\Literal (line 2062)
+- new OpCode (line 2064)
+- new Operand\Variable (line 2103)
+- new Operand\Literal (line 2103)
+- new Operand\Literal (line 2113)
+- new Temporary (line 2116)
+- new OpCode (line 2121)
+- new OpCode (line 2127)
+- new Variable (line 2137)
+- new Operand\Temporary (line 2138)
+- new Op\Type\Literal (line 2212)
+- new Op\Expr\Param (line 2213)
+- new Operand\Literal (line 2214)
+- new Op\Type\Mixed_ (line 2215)
+- new Variable (line 2303)
+- new Variable (line 2347)
+- new Variable (line 2354)
+- new Variable (line 2366)
+- new Variable (line 2381)
+- new Variable (line 2384)
+- new Variable (line 2390)
+- new Variable (line 2397)
+- new Variable (line 2419)
+- new Variable (line 2447)
+- new OpCode (line 2496)
+- new Operand\Literal (line 2510)
+- new OpCode (line 2512)
+- new Operand\Literal (line 2526)
+- new OpCode (line 2529)
+- new OpCode (line 2537)
+- new OpCode (line 2545)
+- new OpCode (line 2553)
+- new OpCode (line 2578)
+- new OpCode (line 2582)
+- new OpCode (line 2588)
+- new OpCode (line 2590)
+- new OpCode (line 2598)
+- new OpCode (line 2605)
+- new OpCode (line 2617)
+- new OpCode (line 2629)
+- new OpCode (line 2660)
+- new OpCode (line 2677)
+- new Block (line 2689)
+- new OpCode (line 2696)
+- new OpCode (line 2778)
+- new OpCode (line 2816)
+- new OpCode (line 2828)
+- new OpCode (line 2846)
+- new OpCode (line 2857)
+- new OpCode (line 2863)
+- new OpCode (line 2871)
+- new OpCode (line 2886)
+- new OpCode (line 2892)
+- new OpCode (line 2900)
+- new OpCode (line 2917)
+- new OpCode (line 2932)
+- new OpCode (line 2961)
+- new OpCode (line 2967)
+- new OpCode (line 2975)
+- new OpCode (line 2981)
+- new OpCode (line 2987)
+- new OpCode (line 3000)
+- new OpCode (line 3011)
+- new OpCode (line 3020)
+- new Operand\Literal (line 3032)
+- new Operand\Literal (line 3049)
+- new OpCode (line 3064)
+- new OpCode (line 3074)
+- new OpCode (line 3079)
+- new OpCode (line 3097)
+- new OpCode (line 3106)
+- new OpCode (line 3119)
+- new OpCode (line 3132)
+- new OpCode (line 3145)
+- new OpCode (line 3151)
+- new OpCode (line 3157)
+- new OpCode (line 3177)
+- new OpCode (line 3184)
 - new OpCode (line 3195)
-- new Variable (line 3223)
-- new Temporary (line 3225)
-- new Variable (line 3233)
-- new Temporary (line 3235)
-- new OpCode (line 3245)
-- new Operand\Literal (line 3334)
-- new Variable (line 3336)
-- new OpCode (line 3341)
-- new OpCode (line 3370)
+- new OpCode (line 3211)
+- new Operand\Literal (line 3229)
+- new OpCode (line 3231)
+- new OpCode (line 3240)
+- new OpCode (line 3331)
+- new Operand\Literal (line 3358)
+- new OpCode (line 3361)
+- new Operand\Literal (line 3374)
 - new OpCode (line 3379)
-- new OpCode (line 3382)
-- new OpCode (line 3393)
-- new OpCode (line 3396)
-- new OpCode (line 3411)
-- new OpCode (line 3421)
-- new OpCode (line 3426)
-- new OpCode (line 3443)
-- new OpCode (line 3448)
-- new OpCode (line 3450)
-- new Literal (line 3469)
-- new OpCode (line 3549)
-- new Variable (line 3555)
-- new Temporary (line 3557)
-- new OpCode (line 3560)
-- 128 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new OpCode (line 3388)
+- new OpCode (line 3543)
+- new OpCode (line 3588)
+- new OpCode (line 3597)
+- new OpCode (line 3660)
+- new OpCode (line 3668)
+- new OpCode (line 3674)
+- new Block (line 3682)
+- new Block (line 3686)
+- new OpCode (line 3699)
+- new Block (line 3707)
+- new OpCode (line 3715)
+- new OpCode (line 3723)
+- new OpCode (line 3732)
+- new OpCode (line 3735)
+- new OpCode (line 3743)
+- new OpCode (line 3761)
+- new OpCode (line 3774)
+- new Block (line 3810)
+- new Block (line 3814)
+- new Operand\Literal (line 3817)
+- new OpCode (line 3820)
+- new OpCode (line 3826)
+- new Block (line 3830)
+- new OpCode (line 3833)
+- new OpCode (line 3839)
+- new OpCode (line 3845)
+- new Block (line 3863)
+- new Block (line 3867)
+- new Operand\Literal (line 3870)
+- new OpCode (line 3873)
+- new OpCode (line 3879)
+- new Block (line 3883)
+- new OpCode (line 3886)
+- new OpCode (line 3892)
+- new OpCode (line 3898)
+- new Block (line 3916)
+- new Block (line 3920)
+- new Operand\Literal (line 3923)
+- new OpCode (line 3926)
+- new OpCode (line 3932)
+- new Block (line 3936)
+- new OpCode (line 3939)
+- new OpCode (line 3948)
+- new OpCode (line 3953)
+- new OpCode (line 3957)
+- new OpCode (line 3963)
+- new Variable (line 4011)
+- new Operand\Literal (line 4013)
+- new OpCode (line 4038)
+- new Operand\Temporary (line 4078)
+- new HashTable (line 4086)
+- new Variable (line 4117)
+- new Variable (line 4143)
+- new Operand\Literal (line 4185)
+- new Operand\Variable (line 4187)
+- new Block (line 4327)
+- new Block (line 4330)
+- new OpCode (line 4333)
+- new OpCode (line 4339)
+- new OpCode (line 4359)
+- new Block (line 4366)
+- new OpCode (line 4369)
+- new OpCode (line 4379)
+- new Temporary (line 4389)
+- new Variable (line 4399)
+- new Operand\Temporary (line 4401)
+- new CfgVariable (line 4731)
+- new Literal (line 4731)
+- new Variable (line 4762)
+- new OpCode (line 4786)
+- new OpCode (line 4850)
+- new OpCode (line 4865)
+- new OpCode (line 4875)
+- new OpCode (line 4882)
+- new OpCode (line 4885)
+- new OpCode (line 4890)
+- new OpCode (line 4896)
+- new OpCode (line 4899)
+- new OpCode (line 4907)
+- new OpCode (line 4916)
+- new Variable (line 4927)
+- new Operand\Literal (line 4929)
+- new OpCode (line 4932)
+- new OpCode (line 4964)
+- new OpCode (line 4975)
+- new OpCode (line 5012)
+- new OpCode (line 5034)
+- new OpCode (line 5040)
+- new OpCode (line 5057)
+- new Variable (line 5085)
+- new Temporary (line 5087)
+- new Variable (line 5095)
+- new Temporary (line 5097)
+- new OpCode (line 5107)
+- new Operand\Literal (line 5206)
+- new Variable (line 5208)
+- new OpCode (line 5213)
+- new OpCode (line 5242)
+- new OpCode (line 5251)
+- new OpCode (line 5254)
+- new OpCode (line 5265)
+- new OpCode (line 5268)
+- new OpCode (line 5283)
+- new OpCode (line 5293)
+- new OpCode (line 5298)
+- new OpCode (line 5315)
+- new OpCode (line 5320)
+- new OpCode (line 5322)
+- new Literal (line 5341)
+- new OpCode (line 5421)
+- new Variable (line 5427)
+- new Temporary (line 5429)
+- new OpCode (line 5432)
+- 203 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 1 closure(s)
 
-### `lib/Compiler/AttributeNames.php`
+### `lib/Compiler/AbstractMethodVisibilityCheck.php`
+
+**Warnings** (review for bootstrap subset):
+- new self (line 21)
+- new CompileFatal (line 42)
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Compiler/AttributeConstantEvaluator.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/Compiler/AttributeEntry.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Compiler/AttributeMetadata.php`
+
+**Warnings** (review for bootstrap subset):
+- new AttributeEntry (line 44)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Compiler/AttributeNames.php`
+
+**Warnings** (review for bootstrap subset):
+- new CompileError (line 82)
+- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Compiler/ClassCompileRegistry.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Compiler/DeprecatedMetadata.php`
+
+**Warnings** (review for bootstrap subset):
+- new self (line 112)
+- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Compiler/FinalClassExtensionCheck.php`
+
+**Warnings** (review for bootstrap subset):
+- new self (line 25)
+- new CompileError (line 66)
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Compiler/InheritanceVariance.php`
+
+**Warnings** (review for bootstrap subset):
+- new self (line 53)
+- new self (line 402)
+- new self (line 462)
+- 28 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Compiler/InterfaceImplementationCheck.php`
+
+**Warnings** (review for bootstrap subset):
+- new self (line 29)
+- new CompileError (line 172)
+- 13 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 1 closure(s)
+
+### `lib/Compiler/OverrideValidator.php`
+
+**Warnings** (review for bootstrap subset):
+- new CompileError (line 47)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Compiler/ReadonlyClassCompileCheck.php`
+
+**Warnings** (review for bootstrap subset):
+- new self (line 25)
+- new CompileError (line 71)
+- new CompileError (line 86)
+- new CompileError (line 91)
+- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Compiler/TraitCollisionCheck.php`
+
+**Warnings** (review for bootstrap subset):
+- new self (line 26)
+- new CompileError (line 159)
+- 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/Doctor.php`
 
 **Warnings** (review for bootstrap subset):
-- 34 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 37 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Frame.php`
 
@@ -3957,6 +5092,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/GenericArrayTypeSourceRewriter.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/GenericArrayTypeSpec.php`
+
+**Warnings** (review for bootstrap subset):
+- new self (line 43)
+- new self (line 49)
+- new self (line 52)
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/Handler.php`
 
 **Warnings** (review for bootstrap subset):
@@ -3965,62 +5113,73 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT\Call\ExternalMethod (line 152)
-- new JIT\Scope (line 178)
-- new Operand\Literal (line 231)
-- new Operand\Literal (line 247)
-- new Variable (line 1018)
-- new JIT\Call\Vararg (line 1028)
-- new JIT\Call\Native (line 1038)
-- new JIT\Call\Native (line 1182)
-- new JIT\Variable (line 1381)
-- new JIT\Call\Native (line 1398)
-- new JIT\Call\Native (line 1458)
-- new JIT\Call\Native (line 1500)
-- new JIT\Call\Native (line 1545)
-- new JIT\Call\Native (line 2563)
-- new JIT\Call\Native (line 2594)
-- new JIT\Call\Native (line 2641)
-- new JIT\Call\Native (line 2688)
-- new JIT\Call\Native (line 2750)
-- new JIT\Call\Native (line 3540)
-- new JIT\Call\Native (line 3578)
-- new JIT\Call\Native (line 3612)
-- new JIT\Call\Native (line 3714)
-- new JIT\Call\Native (line 4166)
-- new JIT\Call\Native (line 4232)
-- new ext\standard\boolval (line 4597)
-- new Operand\Literal (line 4677)
-- new JIT\Variable (line 4711)
-- new Operand\Literal (line 4786)
-- new ext\standard\intval (line 4890)
-- new Variable (line 4919)
-- new Variable (line 5030)
-- new OpCode (line 5113)
-- new Variable (line 5362)
-- new JIT\Call\RuntimeVariableFunction (line 5401)
-- new Variable (line 5458)
-- new Variable (line 5587)
-- new Variable (line 5606)
-- new Variable (line 6387)
-- new Variable (line 6427)
-- new Variable (line 6446)
-- new Variable (line 6979)
-- new Variable (line 6999)
-- new Variable (line 7069)
-- new Variable (line 7275)
-- new Variable (line 7314)
-- new Operand\Literal (line 7323)
-- new Variable (line 7338)
-- new Operand\Literal (line 7677)
-- new Operand\Literal (line 7681)
-- new Operand\Literal (line 7685)
-- new Variable (line 7689)
-- new Variable (line 7713)
-- new Variable (line 7725)
-- new Variable (line 7938)
-- new Variable (line 7954)
-- 199 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new JIT\Call\ExternalMethod (line 158)
+- new JIT\Scope (line 184)
+- new Operand\Literal (line 251)
+- new Operand\Literal (line 267)
+- new Variable (line 1081)
+- new JIT\Call\Vararg (line 1091)
+- new JIT\Call\Native (line 1101)
+- new JIT\Call\Native (line 1252)
+- new JIT\Variable (line 1452)
+- new JIT\Call\Native (line 1469)
+- new JIT\Call\Native (line 1529)
+- new JIT\Call\Native (line 1571)
+- new JIT\Call\Native (line 1616)
+- new JIT\Call\Native (line 2649)
+- new JIT\Call\Native (line 2680)
+- new JIT\Call\Native (line 2727)
+- new JIT\Call\Native (line 2776)
+- new JIT\Call\Native (line 2838)
+- new JIT\Call\Native (line 3635)
+- new JIT\Call\Native (line 3673)
+- new JIT\Call\Native (line 3707)
+- new JIT\Call\Native (line 3809)
+- new JIT\Call\Native (line 4261)
+- new JIT\Call\Native (line 4327)
+- new ext\standard\boolval (line 4847)
+- new Operand\Literal (line 4949)
+- new JIT\Variable (line 4984)
+- new Operand\Literal (line 5060)
+- new ext\standard\intval (line 5176)
+- new Variable (line 5205)
+- new Variable (line 5316)
+- new OpCode (line 5412)
+- new Variable (line 5667)
+- new JIT\Call\RuntimeVariableFunction (line 5743)
+- new Variable (line 5830)
+- new Variable (line 6038)
+- new Variable (line 6057)
+- new Type (line 6065)
+- new Variable (line 6696)
+- new VM (line 6975)
+- new CompileError (line 7130)
+- new CompileError (line 7186)
+- new Variable (line 7223)
+- new Variable (line 7292)
+- new Variable (line 7311)
+- new Variable (line 7869)
+- new Variable (line 7889)
+- new Variable (line 7959)
+- new Variable (line 8263)
+- new Variable (line 8281)
+- new OpCode (line 8295)
+- new Variable (line 8296)
+- new Variable (line 8348)
+- new Variable (line 8387)
+- new Operand\Literal (line 8396)
+- new Variable (line 8411)
+- new Variable (line 9069)
+- new Operand\Literal (line 9105)
+- new Operand\Literal (line 9109)
+- new Operand\Literal (line 9113)
+- new Variable (line 9117)
+- new Variable (line 9141)
+- new Variable (line 9153)
+- new Variable (line 9378)
+- new Variable (line 9398)
+- 228 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 2 closure(s)
 
 ### `lib/JIT/Analyzer.php`
 
@@ -4030,58 +5189,64 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ArrayBuiltinHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 791)
-- new Variable (line 1046)
-- new Variable (line 1104)
-- new Variable (line 1106)
-- new Variable (line 1118)
-- new Variable (line 1235)
-- new Variable (line 1237)
-- new Variable (line 1755)
-- new Variable (line 1757)
-- new Variable (line 2271)
-- new Variable (line 2600)
-- new Variable (line 2665)
-- new Variable (line 2667)
-- new Variable (line 2865)
-- new Variable (line 2867)
-- new Variable (line 2934)
-- new Variable (line 2936)
-- new Variable (line 3204)
-- new Variable (line 3251)
-- new Variable (line 3253)
-- new boolval (line 3263)
-- new Variable (line 4184)
-- new Variable (line 4232)
-- new Variable (line 4235)
-- new Variable (line 5037)
-- new Variable (line 5073)
-- new Variable (line 5081)
-- new Variable (line 5091)
-- new Variable (line 5102)
-- new Variable (line 5147)
-- new Variable (line 5168)
-- new Variable (line 5189)
-- new Variable (line 5213)
-- new Variable (line 5264)
-- new Variable (line 5272)
-- new Variable (line 6437)
-- new Variable (line 6462)
-- new Variable (line 6478)
-- new Variable (line 6537)
-- new Variable (line 6553)
-- new Variable (line 6729)
-- new Variable (line 6745)
-- new Variable (line 6793)
-- new Variable (line 7079)
-- new Variable (line 7095)
-- new Variable (line 7145)
-- 143 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 813)
+- new Variable (line 909)
+- new Variable (line 920)
+- new Variable (line 941)
+- new Variable (line 1059)
+- new Variable (line 1061)
+- new Variable (line 1280)
+- new Variable (line 1338)
+- new Variable (line 1340)
+- new Variable (line 1352)
+- new Variable (line 1469)
+- new Variable (line 1471)
+- new Variable (line 1989)
+- new Variable (line 1991)
+- new Variable (line 2505)
+- new Variable (line 2834)
+- new Variable (line 2899)
+- new Variable (line 2901)
+- new Variable (line 3099)
+- new Variable (line 3101)
+- new Variable (line 3168)
+- new Variable (line 3170)
+- new Variable (line 3438)
+- new Variable (line 3485)
+- new Variable (line 3487)
+- new boolval (line 3497)
+- new Variable (line 4418)
+- new Variable (line 4466)
+- new Variable (line 4469)
+- new Variable (line 5271)
+- new Variable (line 5307)
+- new Variable (line 5315)
+- new Variable (line 5325)
+- new Variable (line 5336)
+- new Variable (line 5383)
+- new Variable (line 5404)
+- new Variable (line 5425)
+- new Variable (line 5449)
+- new Variable (line 5470)
+- new Variable (line 5521)
+- new Variable (line 5529)
+- new Variable (line 6726)
+- new Variable (line 6751)
+- new Variable (line 6767)
+- new Variable (line 6826)
+- new Variable (line 6842)
+- new Variable (line 7018)
+- new Variable (line 7034)
+- new Variable (line 7082)
+- new Variable (line 7368)
+- new Variable (line 7384)
+- new Variable (line 7434)
+- 149 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/ArrayMapCallbackPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/ArrayReduceCallbackPolicy.php`
 
@@ -4096,9 +5261,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/BootstrapCompileSmokeM3Emit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 476)
-- new Call\Native (line 531)
-- 19 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Call\Native (line 543)
+- new Call\Native (line 598)
+- 22 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Builtin.php`
 
@@ -4114,6 +5279,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Builtin/EmbedObOutput.php`
+
+**Warnings** (review for bootstrap subset):
+- 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Builtin/ErrorHandler.php`
 
@@ -4162,12 +5332,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Exception (line 190)
 - 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/JIT/Builtin/MathBaseConvert.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/JIT/Builtin/MemoryManager.php`
 
 **Warnings** (review for bootstrap subset):
 - new MemoryManager\Native (line 24)
-- new MemoryManager\PHP (line 26)
+- new MemoryManager\EmbedMcjit (line 27)
+- new MemoryManager\PHP (line 29)
 - 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Builtin/MemoryManager/EmbedMcjit.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Builtin/MemoryManager/Native.php`
 
@@ -4178,6 +5359,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Builtin/MethodRegistry.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Builtin/ObOutput.php`
 
@@ -4209,10 +5395,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/JIT/Builtin/ReflectionRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/JIT/Builtin/ReflectionSetup.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Builtin/ScriptExit.php`
 
@@ -4264,6 +5455,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/JIT/Builtin/StringCountChars.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/JIT/Builtin/StringDateTime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -4278,6 +5474,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Builtin/StringEnvLocal.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Builtin/StringFileGetContents.php`
 
@@ -4299,12 +5500,37 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/JIT/Builtin/StringGetdate.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/JIT/Builtin/StringGetenv.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/JIT/Builtin/StringGethostname.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Builtin/StringGetrusage.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Builtin/StringGettimeofday.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/JIT/Builtin/StringHashCrypto.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Builtin/StringHrtime.php`
 
 **Warnings** (review for bootstrap subset):
 - 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -4323,6 +5549,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Builtin/StringInfo.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Builtin/StringJsonEncode.php`
 
@@ -4399,6 +5630,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/JIT/Builtin/StringStrIncdec.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/JIT/Builtin/StringStreamCsv.php`
 
 **Warnings** (review for bootstrap subset):
@@ -4419,6 +5655,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/JIT/Builtin/StringStrtok.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/JIT/Builtin/StringSubstrCompare.php`
 
 **Warnings** (review for bootstrap subset):
@@ -4432,7 +5673,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringUcwords.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Builtin/StringUnserialize.php`
 
@@ -4481,21 +5722,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Type/Object_.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 343)
-- new Variable (line 1379)
-- new Variable (line 1390)
-- new Variable (line 1522)
-- new Variable (line 1552)
-- new Variable (line 1560)
-- new Literal (line 1577)
-- new Literal (line 1582)
-- new Literal (line 1587)
-- new Variable (line 1598)
-- new Variable (line 1665)
-- new Variable (line 1685)
-- new Variable (line 1705)
-- new Variable (line 1773)
-- 73 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 376)
+- new Variable (line 1027)
+- new Variable (line 1113)
+- new Variable (line 2025)
+- new Variable (line 2036)
+- new Variable (line 2162)
+- new Variable (line 2188)
+- new Variable (line 2196)
+- new Variable (line 2254)
+- new Literal (line 2271)
+- new Literal (line 2276)
+- new Literal (line 2281)
+- new Variable (line 2292)
+- new Variable (line 2328)
+- new Variable (line 2418)
+- new Variable (line 2438)
+- new Variable (line 2458)
+- new Variable (line 2578)
+- 118 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/Type/String_.php`
 
@@ -4510,15 +5756,40 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new StdClass (line 1931)
 - 12 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/JIT/Builtin/TypeErrorRaise.php`
+
+**Warnings** (review for bootstrap subset):
+- 12 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/JIT/Builtin/VarArg.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/JIT/Builtin/WeakRefNative.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Builtin/WeakRefRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Builtin/WeakRefSetup.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/JIT/Call.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Call/ClosureWithCaptures.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Call/ExternalMethod.php`
 
@@ -4528,9 +5799,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/Native.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 399)
-- new Variable (line 407)
-- new Variable (line 416)
+- new Variable (line 434)
+- new Variable (line 442)
+- new Variable (line 451)
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Call/ReflectionAttributeGetName.php`
@@ -4546,7 +5817,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/ReflectionClassGetAttributes.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 74)
+- new Variable (line 81)
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Call/ReflectionClassGetMethod.php`
@@ -4562,8 +5833,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/ReflectionMethodGetAttributes.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 84)
+- new Variable (line 91)
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Call/RuntimeIndirectClosureCall.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Call/RuntimeVariableFunction.php`
 
@@ -4580,16 +5856,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/JIT/Call/WeakMapMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 141)
+- 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Call/WeakReferenceCreate.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Call/WeakReferenceGet.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/JIT/CliArgvGlobalInit.php`
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 52)
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/JIT/ClosureHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 44)
+- new Variable (line 110)
+- new Variable (line 182)
+- new ClosureWithCaptures (line 255)
+- new RuntimeIndirectClosureCall (line 275)
+- new Variable (line 280)
+- 16 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/JIT/CoalesceHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/CompileCache.php`
+
+**Warnings** (review for bootstrap subset):
+- 18 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/CompilerOperandChainNative.php`
 
@@ -4601,45 +5909,52 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new Scope (line 177)
-- new Analyzer (line 197)
-- new Helper (line 198)
-- new Builtin\Refcount (line 200)
-- new Builtin\Output (line 202)
-- new Builtin\Type (line 203)
-- new Builtin\Internal (line 204)
-- new Builtin\VarArg (line 205)
-- new Builtin\ErrorHandler (line 206)
-- new Scope (line 224)
-- new Call\ExternalMethod (line 275)
-- new Builtin\IsNullFn (line 380)
-- new Builtin\IsNullFn (line 381)
-- new Call\SplObjectStorageMethod (line 382)
-- new Call\SplObjectStorageMethod (line 383)
-- new Call\SplObjectStorageMethod (line 384)
-- new Call\SplObjectStorageMethod (line 385)
-- new Call\SplObjectStorageMethod (line 386)
-- new Call\SplObjectStorageMethod (line 387)
-- new Call\ReflectionClassConstruct (line 389)
-- new Call\ReflectionClassGetName (line 390)
-- new Call\ReflectionClassGetAttributes (line 391)
-- new Call\ReflectionClassGetMethod (line 392)
-- new Call\ReflectionMethodGetAttributes (line 393)
-- new Call\ReflectionAttributeGetName (line 394)
-- new Result (line 536)
-- new Variable (line 630)
-- new Variable (line 957)
-- new VMVariable (line 1060)
-- new VMVariable (line 1066)
-- new VMVariable (line 1072)
-- new VMVariable (line 1078)
-- new VMVariable (line 1085)
-- new VMVariable (line 1091)
-- new VMVariable (line 1097)
-- new VMVariable (line 1103)
-- new Variable (line 1128)
-- new Variable (line 1163)
-- 51 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Scope (line 208)
+- new Analyzer (line 228)
+- new Helper (line 229)
+- new Builtin\Refcount (line 231)
+- new Builtin\Output (line 233)
+- new Builtin\Type (line 234)
+- new Builtin\Internal (line 235)
+- new Builtin\VarArg (line 236)
+- new Builtin\ErrorHandler (line 237)
+- new Scope (line 256)
+- new Call\ExternalMethod (line 307)
+- new Builtin\IsNullFn (line 433)
+- new Builtin\IsNullFn (line 434)
+- new Call\SplObjectStorageMethod (line 435)
+- new Call\SplObjectStorageMethod (line 436)
+- new Call\SplObjectStorageMethod (line 437)
+- new Call\SplObjectStorageMethod (line 438)
+- new Call\SplObjectStorageMethod (line 439)
+- new Call\SplObjectStorageMethod (line 440)
+- new Call\WeakReferenceCreate (line 442)
+- new Call\WeakReferenceGet (line 443)
+- new Call\WeakMapMethod (line 444)
+- new Call\WeakMapMethod (line 445)
+- new Call\WeakMapMethod (line 446)
+- new Call\WeakMapMethod (line 447)
+- new Call\ReflectionClassConstruct (line 449)
+- new Call\ReflectionClassGetName (line 450)
+- new Call\ReflectionClassGetAttributes (line 451)
+- new Call\ReflectionClassGetMethod (line 452)
+- new Call\ReflectionMethodGetAttributes (line 453)
+- new Call\ReflectionAttributeGetName (line 454)
+- new Result (line 597)
+- new Result (line 619)
+- new Variable (line 727)
+- new Variable (line 1111)
+- new VMVariable (line 1215)
+- new VMVariable (line 1221)
+- new VMVariable (line 1227)
+- new VMVariable (line 1233)
+- new VMVariable (line 1240)
+- new VMVariable (line 1246)
+- new VMVariable (line 1252)
+- new VMVariable (line 1258)
+- new Variable (line 1283)
+- new Variable (line 1318)
+- 56 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/EmitTuMode.php`
 
@@ -4654,7 +5969,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/FunctionStaticHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/GeneratorHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new Native (line 251)
+- new Variable (line 677)
+- new Variable (line 680)
+- new Variable (line 690)
+- new Variable (line 759)
+- new Variable (line 774)
+- 27 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/HashTableHelper.php`
 
@@ -4663,28 +5989,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 148)
 - new Variable (line 258)
 - new Variable (line 274)
-- new Variable (line 298)
-- new Variable (line 738)
-- new Variable (line 880)
-- new Variable (line 897)
-- new Variable (line 915)
-- new Variable (line 933)
-- new Variable (line 976)
-- new Variable (line 1046)
+- new Variable (line 317)
+- new Variable (line 352)
+- new Variable (line 376)
+- new Variable (line 816)
+- new Variable (line 980)
+- new Variable (line 997)
+- new Variable (line 1015)
+- new Variable (line 1033)
+- new Variable (line 1076)
 - new Variable (line 1146)
-- new Variable (line 1247)
-- new Variable (line 1280)
-- new Variable (line 1756)
-- new Variable (line 1791)
-- new Variable (line 1834)
-- new Variable (line 1836)
-- new Variable (line 1865)
+- new Variable (line 1268)
+- new Variable (line 1369)
+- new Variable (line 1402)
 - new Variable (line 1878)
-- new Variable (line 1888)
-- new Variable (line 1930)
-- new Variable (line 2018)
-- new Variable (line 2025)
-- 48 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 1913)
+- new Variable (line 1956)
+- new Variable (line 1958)
+- new Variable (line 1987)
+- new Variable (line 2000)
+- new Variable (line 2010)
+- new Variable (line 2052)
+- new Variable (line 2140)
+- new Variable (line 2147)
+- 49 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Helper.php`
 
@@ -4692,9 +6020,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 127)
 - new Variable (line 129)
 - new Variable (line 131)
-- new Variable (line 1096)
-- new Variable (line 1098)
-- new Variable (line 1100)
+- new Variable (line 1206)
+- new Variable (line 1208)
+- new Variable (line 1210)
 - 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/IncludeHelper.php`
@@ -4703,18 +6031,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Temporary (line 111)
 - new Variable (line 115)
 - new Variable (line 155)
-- new Variable (line 309)
-- new Variable (line 336)
-- new Literal (line 497)
-- new Variable (line 747)
+- new Variable (line 313)
+- new Variable (line 340)
+- new Literal (line 501)
+- new Variable (line 751)
 - 21 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/IntersectionParamCheck.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 102)
+- 10 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/IssetHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 216)
-- new Variable (line 246)
-- new Variable (line 260)
+- new Variable (line 232)
+- new Variable (line 262)
+- new Variable (line 276)
 - 12 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/IteratorHelper.php`
@@ -4766,23 +6100,33 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitValueBox.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 14 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/JitValueCompare.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 23 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/M3EmitTuTrivialEchoAot.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 132)
+- new Call\Native (line 137)
 - 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/McjitEmbedRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/NamedArgs.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/NullsafeHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/OperandName.php`
 
@@ -4805,6 +6149,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/JIT/PropertyHookDispatch.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 44)
+- new Variable (line 78)
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/JIT/ReadonlyClassGuard.php`
 
 **Warnings** (review for bootstrap subset):
@@ -4813,7 +6164,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ReflectionBuiltinHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 14 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Result.php`
 
@@ -4854,7 +6205,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ScopeBuiltinHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 15 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/ScriptMagic.php`
 
@@ -4874,13 +6225,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/StringOffsetHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/SuperglobalInit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 184)
-- new VMVariable (line 236)
+- new Variable (line 199)
+- new VMVariable (line 251)
 - 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/TryCatchHelper.php`
@@ -4889,7 +6240,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new TryCatchHandler (line 76)
 - new Variable (line 237)
 - new Variable (line 257)
-- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/TryCatchState.php`
 
@@ -4921,34 +6272,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/VarFetchHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Variable.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 281)
-- new Variable (line 303)
-- new Variable (line 331)
-- new Variable (line 361)
-- new Variable (line 401)
-- new Variable (line 415)
-- new Variable (line 429)
-- new self (line 444)
-- new self (line 455)
-- new self (line 464)
-- new self (line 477)
-- new self (line 484)
-- new self (line 491)
-- new self (line 504)
-- new self (line 514)
-- new Variable (line 636)
-- new Variable (line 645)
-- new Variable (line 672)
-- new Variable (line 731)
-- new Variable (line 745)
-- new Variable (line 789)
-- new Variable (line 807)
-- new Variable (line 829)
+- new Variable (line 298)
+- new Variable (line 320)
+- new Variable (line 348)
+- new Variable (line 378)
+- new Variable (line 418)
+- new Variable (line 432)
+- new Variable (line 446)
+- new self (line 461)
+- new self (line 472)
+- new self (line 481)
+- new self (line 494)
+- new self (line 501)
+- new self (line 508)
+- new self (line 521)
+- new self (line 531)
+- new Variable (line 653)
+- new Variable (line 662)
+- new Variable (line 689)
+- new Variable (line 748)
+- new Variable (line 762)
+- new Variable (line 806)
+- new Variable (line 824)
+- new Variable (line 846)
 - 17 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/VariableFunctionCallHelper.php`
@@ -5004,12 +6355,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Lint/Linter.php`
 
 **Warnings** (review for bootstrap subset):
-- new Runtime (line 32)
-- new State (line 208)
-- new Issue (line 232)
-- new LintCompiler (line 247)
-- new RecursiveIteratorIterator (line 337)
-- new RecursiveDirectoryIterator (line 338)
+- new Runtime (line 34)
+- new Issue (line 75)
+- new State (line 219)
+- new Issue (line 243)
+- new LintCompiler (line 258)
+- new Issue (line 263)
+- new Issue (line 270)
+- new RecursiveIteratorIterator (line 362)
+- new RecursiveDirectoryIterator (line 363)
 - 14 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Lint/SwitchDetector.php`
@@ -5029,7 +6383,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/MethodVisibility.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Module.php`
 
@@ -5051,60 +6405,311 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/PropertyVisibility.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/Runtime.php`
 
 **Warnings** (review for bootstrap subset):
-- new NodeTraverser (line 60)
-- new NodeVisitor\NameResolver (line 62)
-- new GroupUseStripper (line 64)
-- new Parser (line 65)
-- new ParserFactory (line 66)
-- new Traverser (line 70)
-- new Visitor\Simplifier (line 71)
-- new Visitor\DeadBlockEliminator (line 72)
-- new Traverser (line 73)
-- new Visitor\PhiResolver (line 74)
-- new NullSafeLivenessDetector (line 75)
-- new Optimizer\AssignOp (line 76)
-- new TypeReconstructor (line 78)
-- new Compiler (line 96)
-- new VMContext (line 101)
-- new VM (line 106)
-- new ext\types\Module (line 121)
-- new ext\standard\Module (line 122)
-- new JIT (line 148)
-- new JITContext (line 162)
-- new State (line 188)
-- new LintCompiler (line 436)
-- 33 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new NodeTraverser (line 75)
+- new NodeVisitor\NameResolver (line 77)
+- new GroupUseStripper (line 79)
+- new Ast\AbstractEnumMarker (line 80)
+- new SealedClassAnnotator (line 82)
+- new Parser (line 84)
+- new ParserFactory (line 85)
+- new Traverser (line 89)
+- new Visitor\Simplifier (line 90)
+- new Visitor\DeadBlockEliminator (line 91)
+- new Traverser (line 92)
+- new Visitor\PhiResolver (line 93)
+- new NullSafeLivenessDetector (line 94)
+- new Optimizer\AssignOp (line 95)
+- new TypeReconstructor (line 97)
+- new Compiler (line 115)
+- new VMContext (line 120)
+- new VM (line 125)
+- new ext\types\Module (line 146)
+- new ext\standard\Module (line 147)
+- new JIT (line 177)
+- new JITContext (line 191)
+- new SealedClassPreprocessor (line 215)
+- new SourcePreprocessor\PropertyHooks (line 218)
+- new State (line 239)
+- new LintCompiler (line 536)
+- 39 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/SourceBareThrowRewriter.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/SourcePreprocessor/PropertyHooks.php`
+
+**Warnings** (review for bootstrap subset):
+- 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/SwitchCommaCaseRewriter.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 76)
-- new Variable (line 207)
-- new Variable (line 212)
-- new Variable (line 536)
-- new Func\PHP (line 565)
-- new GeneratorState (line 636)
-- new Variable (line 684)
-- new VM\ClassEntry (line 717)
-- new ClassEntry (line 728)
-- new ClassEntry (line 749)
-- new ClassEntry (line 762)
-- new ObjectEntry (line 796)
-- new Exception (line 1105)
-- new Exception (line 1107)
-- new Variable (line 1434)
-- new Variable (line 1747)
-- new Variable (line 1749)
-- new VM\ClassProperty (line 1774)
-- new Func\PHP (line 1799)
-- 42 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 97)
+- new Variable (line 177)
+- new Variable (line 222)
+- new Variable (line 244)
+- new Error (line 288)
+- new Variable (line 343)
+- new Variable (line 363)
+- new Variable (line 376)
+- new Variable (line 390)
+- new Variable (line 392)
+- new Variable (line 406)
+- new Frame (line 433)
+- new Variable (line 442)
+- new Variable (line 467)
+- new Variable (line 503)
+- new Variable (line 534)
+- new Variable (line 562)
+- new Variable (line 570)
+- new HashTable (line 612)
+- new Variable (line 619)
+- new Variable (line 635)
+- new Variable (line 651)
+- new ObjectEntry (line 688)
+- new Variable (line 691)
+- new Variable (line 846)
+- new Variable (line 862)
+- new Error (line 896)
+- new Variable (line 910)
+- new Variable (line 915)
+- new Variable (line 953)
+- new VM\ArrayAccessDimension (line 954)
+- new VM\ObjectEntry (line 1014)
+- new Func\PHP (line 1467)
+- new ClosureState (line 1469)
+- new Variable (line 1485)
+- new Func\PHP (line 1499)
+- new GeneratorState (line 1578)
+- new Variable (line 1642)
+- new VM\ClassEntry (line 1684)
+- new ClassEntry (line 1703)
+- new ClassEntry (line 1725)
+- new ClassEntry (line 1744)
+- new ObjectEntry (line 1814)
+- new ObjectPropertyIterator (line 2133)
+- new Variable (line 2251)
+- new Variable (line 2258)
+- new Variable (line 2419)
+- new Variable (line 2432)
+- new Variable (line 2661)
+- new Variable (line 2668)
+- new Exception (line 2846)
+- new Exception (line 2848)
+- new Variable (line 3003)
+- new Variable (line 3029)
+- new Variable (line 3052)
+- new ClassEntry (line 3200)
+- new Variable (line 3201)
+- new VM\ClassProperty (line 3202)
+- new ObjectEntry (line 3205)
+- new Variable (line 3208)
+- new Exception (line 3331)
+- new Exception (line 3334)
+- new Variable (line 3359)
+- new VM\GeneratorUncaughtThrow (line 3371)
+- new Variable (line 3441)
+- new Variable (line 3443)
+- new Variable (line 3447)
+- new Variable (line 3485)
+- new Variable (line 3501)
+- new CompileError (line 4050)
+- new Variable (line 4257)
+- new Variable (line 4259)
+- new VM\ClassProperty (line 4324)
+- new Func\PHP (line 4369)
+- new Variable (line 4411)
+- new Variable (line 4441)
+- new VM\ClassProperty (line 4486)
+- new VM\ObjectEntry (line 4584)
+- 143 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 3 closure(s)
+
+### `lib/VM/ArrayAccessDimension.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ClosureBind.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 57)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ClosureBindTo.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 50)
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ClosureFromCallable.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 33)
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/DateTimeConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/DateTimeFormat.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/DateTimeGetTimestamp.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/DateTimeSetTimezone.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/DateTimeZoneConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/EnumCases.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 25)
+- new Variable (line 29)
+- new Variable (line 31)
+- new EnumCaseEntry (line 32)
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ExceptionConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ExceptionGetCode.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ExceptionGetFile.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ExceptionGetLine.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ExceptionGetMessage.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/FiberConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/FiberGetCurrent.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 33)
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/FiberResume.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 32)
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/FiberStart.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 32)
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/FiberSuspend.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/GeneratorCurrent.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/GeneratorGetReturn.php`
+
+**Warnings** (review for bootstrap subset):
+- new Exception (line 33)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/GeneratorKey.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/GeneratorNext.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 24)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/GeneratorRewind.php`
+
+**Warnings** (review for bootstrap subset):
+- new Exception (line 23)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/GeneratorSend.php`
+
+**Warnings** (review for bootstrap subset):
+- new Exception (line 23)
+- new Variable (line 25)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/GeneratorThrow.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/GeneratorValid.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionAttributeGetArguments.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/Builtin/ReflectionAttributeGetName.php`
 
 **Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionAttributeNewInstance.php`
+
+**Warnings** (review for bootstrap subset):
+- new ObjectEntry (line 39)
+- new Variable (line 40)
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/Builtin/ReflectionClassConstruct.php`
@@ -5124,7 +6729,134 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 47)
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/VM/Builtin/ReflectionClassNewLazyProxy.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 46)
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionConstantConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionConstantGetName.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionConstantGetValue.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionEnumUnitCaseConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionEnumUnitCaseGetAttributes.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionEnumUnitCaseGetName.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionEnumUnitCaseGetValue.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionFunctionConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionFunctionGetName.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionFunctionGetParameters.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 34)
+- new ObjectEntry (line 40)
+- new Variable (line 45)
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionFunctionGetReturnType.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionMethodConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/VM/Builtin/ReflectionMethodGetAttributes.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionMethodGetParameters.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 37)
+- new ObjectEntry (line 41)
+- new Variable (line 47)
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionNamedTypeGetName.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionNamedTypeIsBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionParameterGetAttributes.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionParameterGetType.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionPropertyConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionPropertyGetName.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionPropertyGetValue.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionTypeAllowsNull.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ReflectionTypeToString.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/Builtin/ThrowableGetMessage.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -5147,13 +6879,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/WeakMapOffsetExists.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 30)
+- new Variable (line 44)
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/Builtin/WeakMapOffsetGet.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 30)
+- new Variable (line 44)
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/Builtin/WeakMapOffsetSet.php`
@@ -5164,7 +6896,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/WeakMapOffsetUnset.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 27)
+- new Variable (line 32)
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/Builtin/WeakReferenceConstruct.php`
@@ -5175,8 +6907,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/WeakReferenceCreate.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 34)
-- new Variable (line 35)
+- new ObjectEntry (line 35)
+- new Variable (line 36)
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/Builtin/WeakReferenceGet.php`
@@ -5187,142 +6919,420 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 38)
-- new Variable (line 39)
-- new ClassProperty (line 40)
-- new WeakReferenceCreate (line 46)
-- new WeakReferenceGet (line 48)
-- new WeakReferenceConstruct (line 50)
-- new ClassEntry (line 58)
-- new Variable (line 59)
-- new ClassProperty (line 60)
-- new WeakMapConstruct (line 66)
-- new WeakMapOffsetSet (line 71)
-- new WeakMapOffsetGet (line 72)
-- new WeakMapOffsetExists (line 73)
-- new WeakMapOffsetUnset (line 74)
-- new WeakMapCount (line 75)
-- new Variable (line 86)
-- new ClassEntry (line 89)
-- new ClassProperty (line 90)
-- new ReflectionAttributeGetName (line 91)
-- new ClassEntry (line 95)
-- new ClassProperty (line 96)
-- new ClassProperty (line 97)
-- new ReflectionMethodGetAttributes (line 98)
-- new ClassEntry (line 102)
-- new ClassProperty (line 103)
-- new ReflectionClassConstruct (line 104)
-- new ReflectionClassGetAttributes (line 107)
-- new ReflectionClassGetMethod (line 109)
-- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new ClassEntry (line 90)
+- new ClassEntry (line 97)
+- new ClassEntry (line 104)
+- new Variable (line 105)
+- new ClassProperty (line 106)
+- new WeakReferenceCreate (line 112)
+- new WeakReferenceGet (line 114)
+- new WeakReferenceConstruct (line 116)
+- new ClassEntry (line 124)
+- new Variable (line 125)
+- new ClassProperty (line 126)
+- new ClassProperty (line 131)
+- new WeakMapConstruct (line 137)
+- new WeakMapOffsetSet (line 142)
+- new WeakMapOffsetGet (line 143)
+- new WeakMapOffsetExists (line 144)
+- new WeakMapOffsetUnset (line 145)
+- new WeakMapCount (line 146)
+- new Variable (line 157)
+- new Variable (line 158)
+- new Variable (line 159)
+- new Variable (line 160)
+- new ClassEntry (line 163)
+- new ClassProperty (line 164)
+- new ClassProperty (line 165)
+- new ReflectionAttributeGetName (line 166)
+- new ReflectionAttributeGetArguments (line 168)
+- new ReflectionAttributeNewInstance (line 170)
+- new ClassEntry (line 174)
+- new ClassProperty (line 175)
+- new ClassProperty (line 176)
+- new ClassProperty (line 177)
+- new ClassProperty (line 178)
+- new ClassProperty (line 179)
+- new ClassProperty (line 180)
+- new ReflectionParameterGetAttributes (line 181)
+- new ReflectionParameterGetType (line 183)
+- new ClassEntry (line 187)
+- new ClassProperty (line 188)
+- new ClassProperty (line 189)
+- new ReflectionMethodConstruct (line 190)
+- new ReflectionMethodGetAttributes (line 193)
+- new ReflectionMethodGetParameters (line 195)
+- new ClassEntry (line 199)
+- new ClassProperty (line 200)
+- new ReflectionClassConstruct (line 201)
+- new ReflectionClassGetAttributes (line 204)
+- new ReflectionClassGetMethod (line 206)
+- new ReflectionClassNewLazyProxy (line 208)
+- new ClassEntry (line 211)
+- new ClassProperty (line 212)
+- new ClassProperty (line 213)
+- new ReflectionPropertyConstruct (line 214)
+- new ReflectionPropertyGetName (line 217)
+- new ReflectionPropertyGetValue (line 219)
+- new ClassEntry (line 223)
+- new ClassProperty (line 224)
+- new ReflectionFunctionConstruct (line 225)
+- new ReflectionFunctionGetName (line 230)
+- new ReflectionFunctionGetParameters (line 231)
+- new ReflectionFunctionGetReturnType (line 232)
+- new ClassEntry (line 240)
+- new ClassProperty (line 241)
+- new ClassProperty (line 242)
+- new ReflectionConstantConstruct (line 243)
+- new ReflectionConstantGetName (line 246)
+- new ReflectionConstantGetValue (line 248)
+- new ClassEntry (line 254)
+- new ClassProperty (line 255)
+- new ClassProperty (line 256)
+- new ReflectionEnumUnitCaseConstruct (line 257)
+- new ReflectionEnumUnitCaseGetAttributes (line 260)
+- new ReflectionEnumUnitCaseGetName (line 262)
+- new ReflectionEnumUnitCaseGetValue (line 264)
+- new ReflectionNamedTypeGetName (line 277)
+- new ReflectionNamedTypeIsBuiltin (line 278)
+- new ClassEntry (line 316)
+- new ClassProperty (line 317)
+- new ClassProperty (line 318)
+- new ClassProperty (line 319)
+- new ClassProperty (line 320)
+- new ClassProperty (line 321)
+- new ReflectionTypeAllowsNull (line 323)
+- new ReflectionTypeToString (line 324)
+- new Variable (line 335)
+- new Variable (line 336)
+- new ClassEntry (line 339)
+- new ClassProperty (line 340)
+- new DateTimeZoneConstruct (line 341)
+- new ClassEntry (line 346)
+- new ClassProperty (line 347)
+- new ClassProperty (line 348)
+- new DateTimeConstruct (line 349)
+- new DateTimeFormat (line 354)
+- new DateTimeGetTimestamp (line 355)
+- new DateTimeSetTimezone (line 356)
+- new ClassEntry (line 367)
+- new Variable (line 420)
+- new Variable (line 421)
+- new ClassEntry (line 424)
+- new ClassProperty (line 430)
+- new ClassProperty (line 431)
+- new ClassProperty (line 432)
+- new ClassProperty (line 433)
+- new ExceptionConstruct (line 434)
+- new ExceptionGetMessage (line 439)
+- new ExceptionGetCode (line 440)
+- new ExceptionGetFile (line 441)
+- new ExceptionGetLine (line 442)
+- new ClassEntry (line 454)
+- new ClassEntry (line 461)
+- new FiberConstruct (line 463)
+- new FiberStart (line 468)
+- new FiberResume (line 469)
+- new FiberSuspend (line 470)
+- new FiberGetCurrent (line 471)
+- 12 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/BuiltinExceptionSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- new ObjectEntry (line 42)
+- new Variable (line 45)
+- new ObjectEntry (line 57)
+- new Variable (line 60)
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/CastSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 15)
+- new Variable (line 31)
+- new Variable (line 52)
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/ClassAbstract.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/ClassConstExpr.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 97)
+- new Variable (line 105)
+- new Variable (line 163)
+- new EnumCaseEntry (line 166)
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/ClassConstMaterializer.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 40)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/ClassEntry.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/VM/ClassFlags.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/VM/ClassProperty.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/ClassReadonly.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/VM/ClassSealed.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/ClassValidator.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/ClosureState.php`
+
+**Warnings** (review for bootstrap subset):
+- new Func\PHP (line 50)
+- new self (line 51)
+- new Func\PHP (line 59)
+- new self (line 60)
+- new Variable (line 72)
+- new self (line 84)
+- new ClassEntry (line 98)
+- new Builtin\ClosureFromCallable (line 100)
+- new Builtin\ClosureBind (line 102)
+- new Builtin\ClosureBindTo (line 104)
+- new ObjectEntry (line 111)
+- new Variable (line 120)
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/ClosureSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 166)
+- new Variable (line 168)
+- new Variable (line 215)
+- 15 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/VM/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new ErrorReporter (line 57)
-- new ScriptStack (line 58)
-- new Variable (line 65)
-- new Variable (line 67)
-- new Variable (line 71)
-- new Variable (line 75)
-- new Variable (line 79)
-- new Variable (line 84)
-- new Variable (line 88)
-- new Variable (line 92)
-- new Variable (line 96)
-- new Variable (line 100)
-- new Variable (line 169)
-- new HashTable (line 170)
-- new Variable (line 185)
-- new Variable (line 193)
-- new RunStackEntry (line 223)
-- 18 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new ErrorReporter (line 110)
+- new ScriptStack (line 111)
+- new Variable (line 118)
+- new Variable (line 120)
+- new Variable (line 124)
+- new Variable (line 128)
+- new Variable (line 132)
+- new Variable (line 137)
+- new Variable (line 141)
+- new Variable (line 145)
+- new Variable (line 149)
+- new Variable (line 153)
+- new Variable (line 159)
+- new Variable (line 165)
+- new Variable (line 175)
+- new Variable (line 308)
+- new HashTable (line 309)
+- new Variable (line 324)
+- new Variable (line 334)
+- new HashTable (line 335)
+- new Variable (line 366)
+- new Variable (line 373)
+- new Variable (line 391)
+- new Variable (line 398)
+- new Variable (line 407)
+- new RunStackEntry (line 437)
+- 25 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/CycleCollector.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 1 closure(s)
+
+### `lib/VM/DateTimeSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- new DateTimeZone (line 57)
+- new DateTime (line 71)
+- new DateTimeZone (line 71)
+- new DateTimeZone (line 92)
+- new DateTime (line 100)
+- new DateTimeZone (line 101)
+- 12 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/EnumCaseEntry.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 25)
+- new Variable (line 36)
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/EnumCaseSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- new ObjectEntry (line 22)
+- new Variable (line 28)
+- new Variable (line 39)
+- new Error (line 64)
+- new Error (line 76)
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/EnumSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- new EnumCases (line 18)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/ErrorReporter.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 115)
+- new HashTable (line 121)
+- new Variable (line 122)
+- new Variable (line 125)
+- new Variable (line 128)
+- new Variable (line 131)
+- 23 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/ExceptionSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/ExceptionTrace.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/FiberState.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 39)
+- new Variable (line 40)
+
+### `lib/VM/FiberSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- new FiberState (line 45)
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/ForeachIterator.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/GeneratorState.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 37)
-- new Variable (line 38)
-- new Variable (line 39)
-- new ClassEntry (line 44)
-- new ObjectEntry (line 49)
-- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 62)
+- new Variable (line 63)
+- new Variable (line 64)
+- new Variable (line 65)
+- new Variable (line 66)
+- new Variable (line 68)
+- new ClassEntry (line 74)
+- new GeneratorGetReturn (line 76)
+- new GeneratorSend (line 78)
+- new GeneratorThrow (line 80)
+- new GeneratorRewind (line 82)
+- new GeneratorCurrent (line 84)
+- new GeneratorKey (line 86)
+- new GeneratorValid (line 88)
+- new GeneratorNext (line 90)
+- new ObjectEntry (line 110)
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/HashTable.php`
 
 **Warnings** (review for bootstrap subset):
 - new Refcount (line 46)
-- new ArrayIterator (line 66)
-- new Variable (line 80)
-- new ArrayIterator (line 93)
-- new Variable (line 115)
-- new Variable (line 131)
-- new Variable (line 161)
-- new Variable (line 218)
-- new Variable (line 243)
-- new Variable (line 277)
-- new self (line 340)
-- new Variable (line 342)
-- new self (line 355)
-- new Variable (line 361)
-- new Variable (line 386)
-- new self (line 402)
-- new Variable (line 404)
-- new Variable (line 414)
-- new Variable (line 458)
-- new self (line 476)
-- new Variable (line 478)
-- new self (line 497)
-- new Variable (line 499)
-- new Variable (line 507)
-- new self (line 510)
-- new Variable (line 512)
-- new Variable (line 517)
-- new Variable (line 526)
-- new self (line 530)
-- new Variable (line 533)
-- new self (line 555)
-- new Variable (line 566)
-- new Variable (line 621)
-- new Variable (line 626)
+- new self (line 69)
+- new Variable (line 74)
+- new ArrayIterator (line 100)
+- new Variable (line 114)
+- new ArrayIterator (line 127)
+- new Variable (line 149)
+- new Variable (line 165)
+- new Variable (line 195)
+- new Variable (line 309)
+- new Variable (line 334)
+- new Variable (line 368)
+- new self (line 431)
+- new Variable (line 433)
+- new self (line 446)
+- new Variable (line 452)
+- new Variable (line 477)
+- new self (line 493)
+- new Variable (line 495)
+- new Variable (line 505)
+- new self (line 538)
+- new Variable (line 540)
+- new Variable (line 558)
+- new self (line 604)
+- new Variable (line 606)
 - new Variable (line 631)
-- new self (line 691)
-- new self (line 696)
-- new Variable (line 698)
-- new Variable (line 703)
-- new Variable (line 711)
-- new Variable (line 800)
-- new HashTableBucket (line 958)
-- new Variable (line 958)
-- new HashTableBucket (line 969)
-- new Variable (line 969)
-- 51 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 639)
+- new Variable (line 665)
+- new self (line 683)
+- new Variable (line 685)
+- new self (line 704)
+- new Variable (line 706)
+- new Variable (line 714)
+- new self (line 717)
+- new Variable (line 719)
+- new Variable (line 724)
+- new Variable (line 733)
+- new self (line 737)
+- new Variable (line 740)
+- new self (line 762)
+- new Variable (line 773)
+- new Variable (line 828)
+- new Variable (line 833)
+- new Variable (line 838)
+- new self (line 898)
+- new self (line 903)
+- new Variable (line 905)
+- new Variable (line 910)
+- new Variable (line 918)
+- new self (line 928)
+- new self (line 936)
+- new Variable (line 938)
+- new Variable (line 947)
+- new Variable (line 955)
+- new Variable (line 1044)
+- new HashTableBucket (line 1217)
+- new Variable (line 1217)
+- new HashTableBucket (line 1228)
+- new Variable (line 1228)
+- 63 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/InterfaceCheck.php`
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/LazyObjectSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- new ObjectEntry (line 16)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/NamedArgs.php`
 
@@ -5332,8 +7342,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ObjectEntry.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 64)
+- new Variable (line 101)
+- new Variable (line 172)
+- new Variable (line 175)
+- new Variable (line 207)
+- new Variable (line 210)
+- new self (line 222)
+- 13 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/ObjectPropertyIterator.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 35)
+- new Variable (line 47)
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/ObjectRegistry.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/Optimizer.php`
 
@@ -5348,54 +7375,127 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/OutputBuffer.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/Refcount.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/ReflectionSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 40)
-- new ObjectEntry (line 44)
-- new Variable (line 47)
-- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new AttributeEntry (line 80)
+- new Variable (line 99)
+- new ObjectEntry (line 106)
+- new Variable (line 110)
+- new Variable (line 123)
+- new Variable (line 127)
+- new Variable (line 130)
+- new Variable (line 151)
+- new Variable (line 168)
+- 29 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/ReflectionTypeSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 26)
+- new CfgType\Literal (line 37)
+- new ObjectEntry (line 150)
+- new ObjectEntry (line 166)
+- new CfgType\Intersection (line 169)
+- new ObjectEntry (line 181)
+- new Variable (line 204)
+- 14 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/SapiOutput.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/ScriptStack.php`
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/VM/SensitiveParamSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 21)
+- new Variable (line 27)
+- new ObjectEntry (line 28)
+- new Variable (line 58)
+- new Variable (line 72)
+- new Variable (line 109)
+- new Variable (line 113)
+- new ClassEntry (line 138)
+- 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/ShutdownQueue.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/StringableSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 21)
+- new CompileError (line 43)
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/VM/TypeCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 20 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/TypedPropertyCheck.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 53)
+- new TypedPropertyReadSignal (line 55)
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/Variable.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 94)
-- new HashTable (line 107)
-- new HashTable (line 111)
-- new self (line 300)
-- new self (line 466)
-- new self (line 528)
-- new self (line 585)
-- new self (line 637)
-- new self (line 719)
-- 40 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new HashTable (line 129)
+- new HashTable (line 164)
+- new HashTable (line 168)
+- new self (line 561)
+- new Variable (line 642)
+- new EnumCaseEntry (line 644)
+- new self (line 857)
+- new self (line 875)
+- new self (line 945)
+- new self (line 953)
+- new self (line 1016)
+- new self (line 1068)
+- new self (line 1136)
+- new self (line 1232)
+- new self (line 1255)
+- new self (line 1267)
+- new self (line 1287)
+- new self (line 1295)
+- 68 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/WeakRefRegistry.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 100)
+- 10 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 3 closure(s)
 
 ### `lib/VM/WeakRefSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 45)
+- new Variable (line 113)
+- 13 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Web/CgiAotDriver.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Web/CgiDriver.php`
 
@@ -5418,6 +7518,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 24 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/Web/FastCgi/Environment.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Web/FastCgi/Listener.php`
+
+**Warnings** (review for bootstrap subset):
+- new RequestHandler (line 24)
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Web/FastCgi/ParamsCodec.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Web/FastCgi/Record.php`
+
+**Warnings** (review for bootstrap subset):
+- 13 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Web/FastCgi/Request.php`
+
+**Warnings** (review for bootstrap subset):
+- new self (line 34)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Web/FastCgi/RequestHandler.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/Web/IncludePathResolver.php`
 
 **Warnings** (review for bootstrap subset):
@@ -5426,7 +7558,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Web/LiteralIncludeDiscovery.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Web/ManifestValidator.php`
 
@@ -5477,9 +7609,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Web/Superglobals.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 647)
-- new Variable (line 875)
-- new Variable (line 882)
-- new Variable (line 884)
-- 42 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 653)
+- new Variable (line 881)
+- new Variable (line 888)
+- new Variable (line 890)
+- 43 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 

@@ -67,6 +67,9 @@ class Context {
     /** Call-site file strict_types while lowering FUNCCALL (issues #156, #1229). */
     public bool $callerStrictTypes = false;
 
+    /** When true, pow() lowering returns a boxed {@see __value__*} (power operator **). */
+    public bool $powReturnValueBox = false;
+
     /** Link-time source bytes for runtime_trivial_echo.php (M3 emit-helper #2559). */
     public ?string $m3EmitTuTrivialEchoSource = null;
 
@@ -181,6 +184,17 @@ class Context {
     public function bindVariableByName(string $name, Variable $var): void
     {
         $resolved = $this->resolveRefAliasName($name);
+        if (isset($this->namedVariableBindings[$resolved])) {
+            $existing = $this->namedVariableBindings[$resolved];
+            // Closure use() snapshot reads must not rebind enclosing locals to MCJIT rvalues (#72).
+            if (
+                Variable::KIND_VARIABLE === $existing->kind
+                && Variable::KIND_VALUE === $var->kind
+                && null === $var->valueBoxAliasPtr
+            ) {
+                return;
+            }
+        }
         $this->namedVariableBindings[$resolved] = $var;
         foreach ($this->scope->variables as $scopeOp) {
             if (!$scopeOp instanceof Operand) {
@@ -504,6 +518,7 @@ class Context {
                 $this->builder->call($this->lookupFunction('__superglobals__refresh'));
                 Builtin\JitThrow::registerDeclarations($this);
                 $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending'));
+                Builtin\ReadonlyRaise::emitClearForStandaloneMain($this);
             }
             $this->builder->call(
                 $this->lookupFunction('__phpc_progress_note'),
@@ -521,6 +536,7 @@ class Context {
                 )
             );
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+                Builtin\ReadonlyRaise::emitAbortIfPendingForStandaloneMain($this);
                 Builtin\PendingHeaders::emitFlushForStandalone($this);
             }
             $this->builder->call($this->shutdownFunc);
@@ -1000,6 +1016,46 @@ class Context {
         $this->scope->variables[$op] = $var;
     }
 
+    /**
+     * php-cfg may use distinct {@see Operand\Temporary} objects for one scope slot (#72).
+     */
+    public function aliasVariableOpFromSlot(Block $block, Operand $op): bool
+    {
+        if ($this->scope->variables->contains($op)) {
+            return true;
+        }
+        $name = OperandName::resolve($op);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->resolveRefAliasName($name);
+            if (isset($this->namedVariableBindings[$resolved])) {
+                $this->scope->variables[$op] = $this->namedVariableBindings[$resolved];
+
+                return true;
+            }
+            foreach ($this->scope->variables as $scopeOp) {
+                if ($name === OperandName::resolve($scopeOp)) {
+                    $this->scope->variables[$op] = $this->scope->variables[$scopeOp];
+
+                    return true;
+                }
+            }
+        }
+        $slot = $block->slotForOperand($op);
+        if (null === $slot) {
+            return false;
+        }
+        foreach ($block->scopedOperands() as $scopeOp) {
+            if ($block->slotForOperand($scopeOp) !== $slot || !$this->scope->variables->contains($scopeOp)) {
+                continue;
+            }
+            $this->scope->variables[$op] = $this->scope->variables[$scopeOp];
+
+            return true;
+        }
+
+        return false;
+    }
+
     public function hasVariableOp(Operand $op): bool {
         if ($this->scope->variables->contains($op)) {
             return true;
@@ -1126,7 +1182,8 @@ class Context {
     public function freeDeadVariables(
         PHPLLVM\Value\Function_ $func,
         PHPLLVM\BasicBlock $basicBlock,
-        Block $block
+        Block $block,
+        ?Operand $skipOperand = null
     ): void {
         $coalesceResults = new \SplObjectStorage();
         foreach ($block->opCodes as $blockOp) {
@@ -1134,7 +1191,28 @@ class Context {
                 $coalesceResults[$block->getOperand($blockOp->arg1)] = true;
             }
         }
+        $returnVarNames = [];
+        foreach ($block->opCodes as $blockOp) {
+            if (OpCode::TYPE_RETURN !== $blockOp->type || null === $blockOp->arg1) {
+                continue;
+            }
+            $returnOp = $block->getOperand($blockOp->arg1);
+            $name = OperandName::resolve($returnOp);
+            if (null !== $name) {
+                $returnVarNames[$name] = true;
+            }
+        }
+        if (null !== $skipOperand) {
+            $name = OperandName::resolve($skipOperand);
+            if (null !== $name) {
+                $returnVarNames[$name] = true;
+            }
+        }
         foreach ($block->orig->deadOperands as $op) {
+            $name = OperandName::resolve($op);
+            if (null !== $name && isset($returnVarNames[$name])) {
+                continue;
+            }
             if ($coalesceResults->contains($op)) {
                 continue;
             }

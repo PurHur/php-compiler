@@ -5609,27 +5609,10 @@ final class ArrayBuiltinHelper
 
     private static function looseEqualStringLong(Context $context, Variable $str, Variable $long): Value
     {
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $numBuf = $context->builder->alloca($context->getTypeFromString('int8'), $i64->constInt(32, false), 'loose_strlong_buf');
-        $num = $context->helper->loadValue($long);
-        $bufC = $context->builder->pointerCast($numBuf, $i8p);
-        $fmt = $context->builder->pointerCast($context->constantFromString('%lld'), $i8p);
-        $context->builder->call($context->lookupFunction('sprintf'), $bufC, $fmt, $num);
-        $len = $context->builder->call($context->lookupFunction('strlen'), $bufC);
-        $lenI64 = $len->typeOf() === $i64
-            ? $len
-            : $context->builder->zExt($len, $i64);
-        $numStr = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $lenI64,
-            $bufC
-        );
-
-        return JitStringCompare::identical(
+        return JitValueCompare::looseEqualStringToNativeLong(
             $context,
             $context->helper->loadValue($str),
-            $numStr
+            $context->helper->loadValue($long)
         );
     }
 
