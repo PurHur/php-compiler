@@ -21,7 +21,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * min() with exactly two integer or float arguments (subset of PHP standard library).
+ * min() — array, variadic scalars, and two-arg numeric subset (php-src array.c).
  */
 final class int_min extends Internal
 {
@@ -32,29 +32,29 @@ final class int_min extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== count($frame->calledArgs)) {
-            throw new \LogicException('This min() implementation requires exactly two arguments');
-        }
-        $a = $frame->calledArgs[0]->resolveIndirect();
-        $b = $frame->calledArgs[1]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
-        if (Variable::TYPE_INTEGER === $a->type && Variable::TYPE_INTEGER === $b->type) {
-            $ai = $a->toInt();
-            $bi = $b->toInt();
-            $frame->returnVar->int($ai < $bi ? $ai : $bi);
+        if (2 === \count($frame->calledArgs)) {
+            $a = $frame->calledArgs[0]->resolveIndirect();
+            $b = $frame->calledArgs[1]->resolveIndirect();
+            if (null === $frame->returnVar) {
+                return;
+            }
+            if (Variable::TYPE_INTEGER === $a->type && Variable::TYPE_INTEGER === $b->type) {
+                $ai = $a->toInt();
+                $bi = $b->toInt();
+                $frame->returnVar->int($ai < $bi ? $ai : $bi);
 
-            return;
-        }
-        if (self::isNumeric($a) && self::isNumeric($b)) {
-            $af = self::toFloat($a);
-            $bf = self::toFloat($b);
-            $frame->returnVar->float($af < $bf ? $af : $bf);
+                return;
+            }
+            if (self::isNumeric($a) && self::isNumeric($b)) {
+                $af = self::toFloat($a);
+                $bf = self::toFloat($b);
+                $frame->returnVar->float($af < $bf ? $af : $bf);
 
-            return;
+                return;
+            }
         }
-        throw new \LogicException('min() only supports two integers or floats in this compiler build');
+
+        VmMinMax::min($frame);
     }
 
     public Context $context;
@@ -62,8 +62,8 @@ final class int_min extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (2 !== count($args)) {
-            throw new \LogicException('This min() implementation requires exactly two arguments');
+        if (2 !== \count($args)) {
+            throw new \LogicException('This min() JIT path requires exactly two arguments');
         }
         if (JITVariable::TYPE_NATIVE_LONG === $args[0]->type && JITVariable::TYPE_NATIVE_LONG === $args[1]->type) {
             $l = JitLongArg::lower($context, $args[0], 'min() argument #1');
