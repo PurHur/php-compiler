@@ -65,6 +65,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gc_collect_cycles')) {
                 continue;
             }
+            // set_exception_handler() / restore_exception_handler() VM-only (#3146).
+            if (str_contains($name, 'exception_handler')) {
+                continue;
+            }
             // WeakReference get() return used in locals — MCJIT execute (#3667).
             if (str_contains($name, 'weak_reference_gc_jit')) {
                 continue;
