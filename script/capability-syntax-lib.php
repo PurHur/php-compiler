@@ -47,10 +47,11 @@ function syntaxRowDefinitions(): array
             'construct' => 'Enum declarations `enum Foo: string { case Bar = \'x\'; }`',
             'opcodes' => ['TYPE_DECLARE_ENUM', 'TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH'],
             'issue' => 1356,
+            'aot' => true,
             'notes' => [
                 'Backed enum case objects with `->name` / `->value`; string context coerces to backed scalar (#3518)',
                 '`Foo::Bar` singleton fetch; `enum_exists` registry; `implements` interface list + instance methods + `instanceof` (#3373)',
-                'static methods (#2299); `Enum::cases()` VM (#3308)',
+                'static methods (#2299); `Enum::cases()` VM (#3308); AOT fixture enum_backed.phpt (#3076)',
                 '`BackedEnum::from()` / `tryFrom()` VM lookup with Zend-parity ValueError (#3114); JIT deferred',
             ],
             'probe' => 'interface L { public function n(): string; } enum S: string implements L { case A = "a"; public function n(): string { return $this->name; } } echo S::A->n();',
@@ -909,6 +910,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'arrow_functions' => '/\bfn\s*\(/',
         'generator_yield' => '/\byield\b/',
         'class_name_const' => '/::class\b/',
+        'enum_declarations' => '/\benum\s+\w+/',
         'class_member_const' => '/\b(?:public|private|protected)\s+const\b/',
         'magic_const_class_method' => '/__CLASS__|__FUNCTION__|__METHOD__/',
         'magic_const_namespace' => '/__NAMESPACE__/',
@@ -937,6 +939,12 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
     foreach (glob($root . '/test/bootstrap-aot/*.php') ?: [] as $php) {
         $scan[] = $php;
     }
+    $aotFixtures = $root . '/test/fixtures/aot/cases';
+    if (is_dir($aotFixtures)) {
+        foreach (glob($aotFixtures . '/*.phpt') ?: [] as $phpt) {
+            $scan[] = $phpt;
+        }
+    }
 
     foreach ($scan as $path) {
         $content = (string) file_get_contents($path);
@@ -944,7 +952,8 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         $body = $isPhpt && preg_match('/--FILE--\s*\n<\?php(.*?)(?:--EXPECT|$)/s', $content, $m)
             ? $m[1]
             : $content;
-        $tag = $isPhpt ? 'compliance PHPT' : 'bootstrap AOT';
+        $aotPhpt = $isPhpt && str_contains(str_replace('\\', '/', $path), '/test/fixtures/aot/');
+        $tag = $aotPhpt ? 'AOT PHPT' : ($isPhpt ? 'compliance PHPT' : 'bootstrap AOT');
         foreach ($patterns as $id => $pattern) {
             if (preg_match($pattern, $body)) {
                 $coverage[$id][] = $tag;
