@@ -17,6 +17,11 @@ typedef struct __string__ __string__;
 
 extern __string__ *__string__init(long long size, const char *value);
 
+static int pc_is_valid_salt_char(char c)
+{
+    return (c >= '.' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+}
+
 static const char BCRYPT_ITOA64[] =
     "./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
@@ -131,6 +136,41 @@ __string__ *__compiler_password_hash(__string__ *password, int64_t algo)
     result = crypt(phrase, setting);
     if (NULL == result || result[0] == '*') {
         return NULL;
+    }
+
+    return pc_string_from_cstr(result);
+}
+
+__string__ *__compiler_crypt(__string__ *password, __string__ *salt)
+{
+    const char *phrase = pc_strdata(password);
+    const char *setting = pc_strdata(salt);
+    size_t salt_len = pc_strlen(salt);
+    char *result;
+
+    if (salt_len >= 2 && setting[0] == '*' && (setting[1] == '0' || setting[1] == '1')) {
+        return pc_string_from_cstr("*0");
+    }
+
+    if (salt_len > 0 && setting[0] == '$') {
+        if (salt_len >= 4 && setting[1] == '2' && setting[3] == '$') {
+            /* blowfish — libcrypt */
+        } else if (salt_len >= 3 && setting[1] == '1' && setting[2] == '$') {
+            /* md5-crypt — libcrypt */
+        } else {
+            return pc_string_from_cstr("*0");
+        }
+    } else if (salt_len >= 2) {
+        if (!pc_is_valid_salt_char(setting[0]) || !pc_is_valid_salt_char(setting[1])) {
+            return pc_string_from_cstr("*0");
+        }
+    } else {
+        return pc_string_from_cstr("*0");
+    }
+
+    result = crypt(phrase, setting);
+    if (NULL == result || result[0] == '*' || 0 == strcmp(result, "*")) {
+        return pc_string_from_cstr("*0");
     }
 
     return pc_string_from_cstr(result);

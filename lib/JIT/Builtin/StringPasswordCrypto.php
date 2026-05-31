@@ -76,7 +76,7 @@ final class StringPasswordCrypto
 
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach (['__compiler_password_hash', '__compiler_password_verify'] as $name) {
+        foreach (['__compiler_password_hash', '__compiler_password_verify', '__compiler_crypt'] as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
                 throw new \LogicException($name.' missing after password bitcode link');
