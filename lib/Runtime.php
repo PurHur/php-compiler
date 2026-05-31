@@ -163,6 +163,13 @@ class Runtime {
         $this->debugFile = $debugFile;
     }
 
+    public function setAotDebugSymbols(bool $enabled = true): void
+    {
+        if ($enabled) {
+            JIT\AotDebugSymbols::enable();
+        }
+    }
+
     private function loadCoreModules(): void {
         $this->load(new ext\types\Module);
         $this->load(new ext\standard\Module);
@@ -475,6 +482,9 @@ class Runtime {
     public function standalone(?Block $block, string $outfile, ?string $sourceCode = null, ?string $sourceFilename = null) {
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_begin');
         $context = $this->loadJitContext();
+        if (null !== $sourceFilename && '' !== $sourceFilename) {
+            $context->setAotSourceFilename($sourceFilename);
+        }
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_loadjitcontext_done');
         // Generator bodies use GeneratorHelper resume lowering; script-scope yield still blocked (#3115).
         if (null !== $block && Block::containsGeneratorOpcodesInScriptScope($block)) {

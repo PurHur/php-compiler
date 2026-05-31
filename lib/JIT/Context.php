@@ -112,6 +112,7 @@ class Context {
     public int $loadType;
     private static int $stringConstantCounter = 0;
     private ?string $debugFile = null;
+    private ?string $aotSourceFilename = null;
 
     public Helper $helper;
 
@@ -664,6 +665,7 @@ class Context {
         if (!is_null($this->debugFile)) {
             $this->module->printToFile($this->debugFile . '.bc');
         }
+        $this->registerAotDebugSourceGlobal();
         Progress::noteFunction('jit_context_compile_common_phase_seal_functions');
         $function = $this->module->getFirstFunction();
         while (null !== $function) {
@@ -681,9 +683,29 @@ class Context {
         Progress::noteFunction('jit_context_verify_done');
     }
 
+    private function registerAotDebugSourceGlobal(): void
+    {
+        if (!AotDebugSymbols::isEnabled()) {
+            return;
+        }
+        $path = $this->aotSourceFilename;
+        if (!is_string($path) || '' === $path || '-' === $path) {
+            return;
+        }
+        $normalized = str_replace('\\', '/', $path);
+        $const = $this->context->constString($normalized, true);
+        $global = $this->module->addGlobal($const->typeOf(), '__phpc_aot_source_file');
+        $global->setInitializer($const);
+    }
+
     public function setDebugFile(string $file): void {
         $this->debugFile = $file;
         $this->setDebug(true);
+    }
+
+    public function setAotSourceFilename(?string $filename): void
+    {
+        $this->aotSourceFilename = $filename;
     }
 
     public function setDebug(bool $value): void {
