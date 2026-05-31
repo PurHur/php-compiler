@@ -354,6 +354,7 @@ static const char *phpc_builtin_functions[] = {
     "sys_get_temp_dir",
     "tan",
     "tempnam",
+    "tmpfile",
     "time",
     "touch",
     "trait_exists",

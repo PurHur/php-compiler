@@ -116,6 +116,30 @@ int64_t __compiler_fopen(__string__ *path, __string__ *mode)
     return -1;
 }
 
+int64_t __compiler_tmpfile(void)
+{
+    FILE *fp;
+    int64_t id;
+
+    fp = tmpfile();
+    if (NULL == fp) {
+        return -1;
+    }
+    for (id = 3; id < PHPC_MAX_STREAM_HANDLES; id++) {
+        if (NULL == phpc_stream_handles[id]) {
+            phpc_stream_handles[id] = fp;
+            phpc_stream_chunk_size[id] = PHPC_STREAM_DEFAULT_CHUNK_SIZE;
+            phpc_stream_write_buffer[id] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
+            phpc_stream_read_buffer[id] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
+
+            return id;
+        }
+    }
+    fclose(fp);
+
+    return -1;
+}
+
 __string__ *__compiler_fread(int64_t handle, int64_t length)
 {
     FILE *fp;

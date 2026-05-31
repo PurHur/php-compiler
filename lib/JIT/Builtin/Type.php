@@ -257,6 +257,9 @@ class Type extends Builtin {
         );
         $fnFopen = $this->context->module->addFunction('__compiler_fopen', $fntypeFopen);
         $this->context->registerFunction('__compiler_fopen', $fnFopen);
+        $fntypeTmpfile = $this->context->context->functionType($i64, false);
+        $fnTmpfile = $this->context->module->addFunction('__compiler_tmpfile', $fntypeTmpfile);
+        $this->context->registerFunction('__compiler_tmpfile', $fnTmpfile);
         $fntypeFread = $this->context->context->functionType(
             $strPtr,
             false,

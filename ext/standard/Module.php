@@ -368,6 +368,7 @@ class Module extends ModuleAbstract
             new phpc_run_command(),
             new sys_get_temp_dir(),
             new tempnam(),
+            new tmpfile(),
             new getcwd_(),
             new gethostname(),
             new chdir_(),

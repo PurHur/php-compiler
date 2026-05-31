@@ -299,6 +299,19 @@ final class VmFs
         return $id;
     }
 
+    /** @return int|false */
+    public static function tmpfile()
+    {
+        $fp = @\tmpfile();
+        if (false === $fp) {
+            return false;
+        }
+        $id = ++self::$nextHandleId;
+        self::$handles[$id] = $fp;
+
+        return $id;
+    }
+
     public static function fread(int $handle, int $length) {
         $fp = self::lookup($handle);
         if (null === $fp) {
