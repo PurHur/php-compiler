@@ -262,6 +262,7 @@ class Module extends ModuleAbstract
             new session_regenerate_id(),
             new header_remove(),
             new header_list(),
+            new headers_list(),
             new getallheaders_(),
             new ob_start(),
             new ob_get_clean(),
