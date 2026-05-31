@@ -288,6 +288,24 @@ class Context {
 
     public function resolveFunctionProxy(string $proxyName): Call
     {
+        $proxy = $this->lookupFunctionProxy($proxyName);
+        if (null !== $proxy) {
+            return $proxy;
+        }
+        if (LazyBuiltins::isEnabled($this->loadType) && $this->runtime->ensureJitBuiltinCompiled($proxyName)) {
+            $proxy = $this->lookupFunctionProxy($proxyName);
+            if (null !== $proxy) {
+                return $proxy;
+            }
+        }
+        $lc = strtolower($proxyName);
+        $this->functionProxies[$lc] = new Call\ExternalMethod($proxyName);
+
+        return $this->functionProxies[$lc];
+    }
+
+    private function lookupFunctionProxy(string $proxyName): ?Call
+    {
         $lc = strtolower($proxyName);
         if (isset($this->functionProxies[$lc])) {
             return $this->functionProxies[$lc];
@@ -307,11 +325,8 @@ class Context {
                 return $this->functionProxies[$globalFn];
             }
         }
-        if (!isset($this->functionProxies[$lc])) {
-            $this->functionProxies[$lc] = new Call\ExternalMethod($proxyName);
-        }
 
-        return $this->functionProxies[$lc];
+        return null;
     }
 
     public function recordExternalMethodStub(string $proxyName): void

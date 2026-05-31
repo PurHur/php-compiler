@@ -18,6 +18,7 @@ final class BenchCompileScriptTest extends TestCase
         $body = (string) file_get_contents($script);
         $this->assertStringContainsString('#94', $body);
         $this->assertStringContainsString('#153', $body);
+        $this->assertStringContainsString('lazy ext/* JIT', $body);
         $this->assertStringContainsString('bench-compile-probe.php', $body);
         $this->assertFileIsReadable(dirname(__DIR__, 2).'/script/bench-compile-probe.php');
     }
