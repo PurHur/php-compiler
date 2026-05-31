@@ -269,6 +269,35 @@ int __compiler_fflush(int64_t handle)
     return fflush(fp) == 0 ? 1 : 0;
 }
 
+int __compiler_ftruncate(int64_t handle, int64_t size)
+{
+    FILE *fp = phpc_resolve_stream(handle);
+    int fd;
+    int rc;
+
+    if (NULL == fp) {
+        return 0;
+    }
+    if (fflush(fp) != 0) {
+        return 0;
+    }
+    fd = fileno(fp);
+    if (fd < 0) {
+        return 0;
+    }
+#if defined(_WIN32)
+    rc = _chsize(fd, (long) size);
+#else
+    rc = ftruncate(fd, (off_t) size);
+#endif
+    if (rc != 0) {
+        return 0;
+    }
+    clearerr(fp);
+
+    return 1;
+}
+
 int64_t __compiler_ftell(int64_t handle)
 {
     FILE *fp = phpc_resolve_stream(handle);

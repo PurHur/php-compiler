@@ -383,6 +383,16 @@ final class VmFs
         return @\fflush($fp);
     }
 
+    public static function ftruncate(int $handle, int $size): bool
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+
+        return @\ftruncate($fp, $size);
+    }
+
     public static function ftell(int $handle) {
         $fp = self::lookup($handle);
         if (null === $fp) {

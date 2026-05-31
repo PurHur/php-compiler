@@ -323,6 +323,7 @@ class Module extends ModuleAbstract
             new rewind_(),
             new feof_(),
             new fflush_(),
+            new ftruncate_(),
             new fpassthru(),
             new fwrite(),
             new fclose(),

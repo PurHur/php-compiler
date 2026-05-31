@@ -95,6 +95,7 @@ static const char *phpc_builtin_functions[] = {
     "fdiv",
     "feof",
     "fflush",
+    "ftruncate",
     "fgetc",
     "fgetcsv",
     "fgets",
@@ -366,4 +367,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 358;
+static const size_t phpc_builtin_functions_count = 359;
