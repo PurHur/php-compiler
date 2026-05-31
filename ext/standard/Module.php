@@ -294,6 +294,10 @@ class Module extends ModuleAbstract
             new file_exists(),
             new filesize(),
             new filemtime(),
+            new disk_free_space(),
+            new disk_total_space(),
+            new diskfreespace(),
+            new disktotalspace(),
             new clearstatcache_(),
             new stat_(),
             new lstat_(),
@@ -599,6 +603,15 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p, $i8p);
             $fn = $context->module->addFunction('lstat', $ft);
             $context->registerFunction('lstat', $fn);
+        }
+        try {
+            $context->lookupFunction('statvfs');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i8p, $i8p);
+            $fn = $context->module->addFunction('statvfs', $ft);
+            $context->registerFunction('statvfs', $fn);
         }
         try {
             $context->lookupFunction('readlink');

@@ -676,6 +676,58 @@ restart:
                     goto return_bool;
                 }
                 break;
+            case TYPE_PAIR_NATIVE_DOUBLE_NATIVE_BOOL:
+                if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                    $result = $this->context->getTypeFromString('int1')->constInt(0, false);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = $this->context->getTypeFromString('int1')->constInt(1, false);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_EQUAL === $opcode->type) {
+                    $doubleTy = $this->context->getTypeFromString('double');
+                    $zero = $doubleTy->constReal(0.0);
+                    $result = $this->context->builder->fcmp(\PHPLLVM\Builder::REAL_OEQ, $leftValue, $zero);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                    $doubleTy = $this->context->getTypeFromString('double');
+                    $zero = $doubleTy->constReal(0.0);
+                    $eq = $this->context->builder->fcmp(\PHPLLVM\Builder::REAL_OEQ, $leftValue, $zero);
+                    $result = $this->context->builder->xor(
+                        $eq,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                    goto return_bool;
+                }
+                break;
+            case TYPE_PAIR_NATIVE_BOOL_NATIVE_DOUBLE:
+                if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                    $result = $this->context->getTypeFromString('int1')->constInt(0, false);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = $this->context->getTypeFromString('int1')->constInt(1, false);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_EQUAL === $opcode->type) {
+                    $doubleTy = $this->context->getTypeFromString('double');
+                    $zero = $doubleTy->constReal(0.0);
+                    $result = $this->context->builder->fcmp(\PHPLLVM\Builder::REAL_OEQ, $rightValue, $zero);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                    $doubleTy = $this->context->getTypeFromString('double');
+                    $zero = $doubleTy->constReal(0.0);
+                    $eq = $this->context->builder->fcmp(\PHPLLVM\Builder::REAL_OEQ, $rightValue, $zero);
+                    $result = $this->context->builder->xor(
+                        $eq,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                    goto return_bool;
+                }
+                break;
             case TYPE_PAIR_NATIVE_BOOL_NATIVE_BOOL:
                 switch ($opcode->type) {
                     case OpCode::TYPE_IDENTICAL:
