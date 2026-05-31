@@ -277,6 +277,32 @@ PHP;
      * @group llvm
      * @group jit
      */
+    public function testReadonlyPropertyJitLowersIncDecAfterConstructCheck(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $stderr = $this->runJitCompileProbe(<<<'PHP'
+<?php
+class C {
+    public readonly int $x;
+    public function __construct() {
+        $this->x = 1;
+    }
+}
+$c = new C();
+$c->x++;
+PHP
+        );
+        self::assertStringNotContainsString(
+            'Unknown JIT opcode',
+            $stderr,
+            'readonly property ++ should lower for JIT (#3149)'
+        );
+    }
+
+    /**
+     * @group llvm
+     * @group jit
+     */
     public function testReadonlyPropertyJitCompileProbe(): void
     {
         $this->skipUnlessLlvmReady();

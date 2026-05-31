@@ -7114,8 +7114,10 @@ class JIT {
             && Variable::KIND_VALUE === $result->kind
             && Variable::TYPE_STRING !== $result->type
             && !$value->isJitGenerator
+            && null === $result->objectPropertySlot
         ) {
             // ?? left branch fetch binds a superglobal lvalue; force-assign needs a stack slot (#866).
+            // Property lvalues keep objectPropertySlot so ReadonlyClassGuard runs on inc/dec (#3149).
             $slot = JIT\JitValueBox::alloc($this->context);
             $this->context->setVariableOp(
                 $resultOp,
@@ -8051,6 +8053,11 @@ class JIT {
         $writeOp = $this->operandAt($block, $op->arg3, 'inc/dec write');
         $resultOp = $this->operandAt($block, $op->arg1, 'inc/dec result');
         $read = $this->context->getVariableFromOpInScopes($readOp);
+        if (null !== $read->objectPropertySlot) {
+            $this->compileObjectPropertyIncDecOp($read, $resultOp, $increment, $prefix);
+
+            return;
+        }
 
         if (Variable::TYPE_NATIVE_BOOL === $read->type) {
             $this->assignOperand($writeOp, $read, true);
@@ -8117,6 +8124,42 @@ class JIT {
         );
         $newVal = $this->context->helper->binaryOp($arithOp, $read, $oneVar);
         $this->assignOperand($writeOp, $newVal, true);
+        if ($prefix) {
+            $this->assignOperand($resultOp, $newVal, true);
+        }
+    }
+
+    /** ++/-- on object properties: guard readonly and store via property slot (#3149). */
+    private function compileObjectPropertyIncDecOp(
+        Variable $read,
+        \PHPCfg\Operand $resultOp,
+        bool $increment,
+        bool $prefix
+    ): void {
+        if (null === $read->objectPropertySlot || null === $read->objectPropertyType) {
+            throw new \LogicException('objectPropertySlot requires objectPropertyType');
+        }
+        if (!$prefix) {
+            $this->assignOperand($resultOp, $read, true);
+        }
+        $arithOp = new OpCode($increment ? OpCode::TYPE_PLUS : OpCode::TYPE_MINUS);
+        $oneVar = new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $this->context->constantFromInteger(1)
+        );
+        $newVal = $this->context->helper->binaryOp($arithOp, $read, $oneVar);
+        JIT\ReadonlyClassGuard::emitBeforePropertyStore(
+            $this->context,
+            $read,
+            $this->context->jitEnclosingBlock
+        );
+        $this->context->type->object->propertyStore(
+            $read->objectPropertySlot,
+            $newVal,
+            $read->objectPropertyType
+        );
         if ($prefix) {
             $this->assignOperand($resultOp, $newVal, true);
         }
