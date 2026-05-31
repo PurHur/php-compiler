@@ -14,6 +14,7 @@ namespace PHPCompiler\JIT;
 
 require_once __DIR__.'/../OpCodeNames.php';
 
+use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\OpCode;
 use function PHPCompiler\opcode_type_name;
 use PHPLLVM;
@@ -132,6 +133,17 @@ return_bool:
     }
 
     public function binaryOp(OpCode $opcode, Variable $left, Variable $right): Variable {
+        if (OpCode::TYPE_BITWISE_AND === $opcode->type
+            || OpCode::TYPE_BITWISE_OR === $opcode->type
+            || OpCode::TYPE_BITWISE_XOR === $opcode->type
+        ) {
+            $folded = $this->tryFoldCoreIntBitwise($opcode->type, $left, $right);
+            if (null !== $folded) {
+                $result = $this->context->getTypeFromString('int64')->constInt($folded, false);
+
+                goto return_long;
+            }
+        }
         $leftValue = $this->loadValue($left);
         $rightValue = $this->loadValue($right);
         $leftType = $this->operandJitType($left);
@@ -366,37 +378,22 @@ restart:
     
                         goto return_long;
                     case OpCode::TYPE_BITWISE_AND:
-                        $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
-                            
-                            
-                        
-
-                        $result = $this->context->builder->bitwiseAnd($leftValue, $__right);
-    
-                        goto return_long;
                     case OpCode::TYPE_BITWISE_OR:
-                        $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
-                            
-                            
-                        
-
-                        
-
-                        $result = $this->context->builder->bitwiseOr($leftValue, $__right);
-    
-                        goto return_long;
                     case OpCode::TYPE_BITWISE_XOR:
+                        $folded = $this->tryFoldCoreIntBitwise($opcode->type, $left, $right);
+                        if (null !== $folded) {
+                            $result = $this->context->getTypeFromString('int64')->constInt($folded, false);
+                            goto return_long;
+                        }
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
-                            
-                            
-                        
+                        if (OpCode::TYPE_BITWISE_AND === $opcode->type) {
+                            $result = $this->context->builder->bitwiseAnd($leftValue, $__right);
+                        } elseif (OpCode::TYPE_BITWISE_OR === $opcode->type) {
+                            $result = $this->context->builder->bitwiseOr($leftValue, $__right);
+                        } else {
+                            $result = $this->context->builder->bitwiseXor($leftValue, $__right);
+                        }
 
-                        
-
-                        
-
-                        $result = $this->context->builder->bitwiseXor($leftValue, $__right);
-    
                         goto return_long;
                     case OpCode::TYPE_SHIFT_LEFT:
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
@@ -789,6 +786,11 @@ restart:
                 case OpCode::TYPE_BITWISE_XOR:
                 case OpCode::TYPE_SHIFT_LEFT:
                 case OpCode::TYPE_SHIFT_RIGHT:
+                    $folded = $this->tryFoldCoreIntBitwise($opcode->type, $left, $right);
+                    if (null !== $folded) {
+                        $result = $this->context->getTypeFromString('int64')->constInt($folded, false);
+                        goto return_long;
+                    }
                     $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
                     $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
                     if (OpCode::TYPE_BITWISE_AND === $opcode->type) {
@@ -1413,6 +1415,52 @@ return_bool:
         }
 
         return $var->type;
+    }
+
+    public function tryFoldCoreIntBitwise(int $opType, Variable $left, Variable $right): ?int
+    {
+        $leftInt = $this->tryResolveCoreIntConstant($left);
+        $rightInt = $this->tryResolveCoreIntConstant($right);
+        if (null === $leftInt || null === $rightInt) {
+            return null;
+        }
+
+        return match ($opType) {
+            OpCode::TYPE_BITWISE_AND => $leftInt & $rightInt,
+            OpCode::TYPE_BITWISE_OR => $leftInt | $rightInt,
+            OpCode::TYPE_BITWISE_XOR => $leftInt ^ $rightInt,
+            default => null,
+        };
+    }
+
+    private function tryResolveCoreIntConstant(Variable $var): ?int
+    {
+        if (Variable::TYPE_NATIVE_LONG === $var->type
+            && Variable::KIND_VALUE === $var->kind
+        ) {
+            $lib = $this->context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
+                return (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
+            }
+        }
+
+        $name = $var->compileTimeConstantName ?? null;
+        if (null === $name) {
+            return null;
+        }
+        $lookup = strtolower($name);
+        if (isset(StdlibConstants::CORE_INT_BY_NAME[$lookup])) {
+            return StdlibConstants::CORE_INT_BY_NAME[$lookup];
+        }
+        if (null === $this->context->runtime->vmContext) {
+            return null;
+        }
+        $phpVar = $this->context->runtime->vmContext->constantFetch($name);
+        if (null !== $phpVar && \PHPCompiler\VM\Variable::TYPE_INTEGER === $phpVar->type) {
+            return $phpVar->toInt();
+        }
+
+        return null;
     }
 
 }
