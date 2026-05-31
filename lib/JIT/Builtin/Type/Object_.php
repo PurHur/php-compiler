@@ -680,6 +680,9 @@ class Object_ extends Type {
             if ($current === $wantLc) {
                 return true;
             }
+            if (in_array($wantLc, $this->allInterfacesForClassLc($current), true)) {
+                return true;
+            }
             $parent = $this->classParentLc[$current] ?? null;
             if (null === $parent) {
                 return false;
