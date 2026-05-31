@@ -1095,16 +1095,32 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_POST_INC:
-                    $this->executeIncDec($frame, $op, true, false);
+                    $catchFrame = $this->executeIncDec($frame, $op, true, false);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     break;
                 case OpCode::TYPE_PRE_INC:
-                    $this->executeIncDec($frame, $op, true, true);
+                    $catchFrame = $this->executeIncDec($frame, $op, true, true);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     break;
                 case OpCode::TYPE_POST_DEC:
-                    $this->executeIncDec($frame, $op, false, false);
+                    $catchFrame = $this->executeIncDec($frame, $op, false, false);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     break;
                 case OpCode::TYPE_PRE_DEC:
-                    $this->executeIncDec($frame, $op, false, true);
+                    $catchFrame = $this->executeIncDec($frame, $op, false, true);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     break;
                 case OpCode::TYPE_PLUS:
                 case OpCode::TYPE_MINUS:
@@ -2416,12 +2432,17 @@ restart:
 
     /**
      * Pre/post increment/decrement with Zend bool preservation (#3552).
+     * Rejects ++/-- on readonly properties after construction (#3149).
      */
-    private function executeIncDec(Frame $frame, OpCode $op, bool $increment, bool $prefix): void
+    private function executeIncDec(Frame $frame, OpCode $op, bool $increment, bool $prefix): ?Frame
     {
         $read = $frame->scope[$op->arg2];
         $write = $frame->scope[$op->arg3];
         $result = $frame->scope[$op->arg1];
+        $catchFrame = $this->enforceReadonlyPropertyWrite($write, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
         $working = new Variable();
         $working->copyFrom($read->resolveIndirect());
         if ($prefix) {
@@ -2433,7 +2454,7 @@ restart:
             $write->copyFrom($working);
             $result->copyFrom($working);
 
-            return;
+            return null;
         }
         $old = new Variable();
         $old->copyFrom($working);
@@ -2444,6 +2465,8 @@ restart:
         }
         $write->copyFrom($working);
         $result->copyFrom($old);
+
+        return null;
     }
 
     protected function raise(string $message, Frame $frame): int

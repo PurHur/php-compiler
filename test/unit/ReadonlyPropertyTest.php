@@ -104,6 +104,44 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_unset.php'));
     }
 
+    public function testReadonlyPropertyRejectsPostIncrementAfterConstruct(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public readonly int $x;
+    public function __construct() {
+        $this->x = 1;
+    }
+}
+$c = new C();
+$c->x++;
+PHP;
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Cannot modify readonly property C::$x');
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_post_inc.php'));
+    }
+
+    public function testReadonlyPropertyRejectsPreDecrementAfterConstruct(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public readonly int $x;
+    public function __construct() {
+        $this->x = 1;
+    }
+}
+$c = new C();
+--$c->x;
+PHP;
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Cannot modify readonly property C::$x');
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_pre_dec.php'));
+    }
+
     public function testReadonlyPropertyAllowsUnsetOnNonReadonlyProperty(): void
     {
         $runtime = new Runtime();
