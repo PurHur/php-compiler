@@ -259,6 +259,7 @@ class Module extends ModuleAbstract
             new strip_tags(),
             new header_(),
             new headers_sent(),
+            new header_register_callback(),
             new register_shutdown_function(),
             new setcookie(),
             new setrawcookie(),

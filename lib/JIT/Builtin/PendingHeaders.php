@@ -29,6 +29,9 @@ final class PendingHeaders
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
+        if (null !== $context->headerPreFlushFunc) {
+            $context->builder->call($context->headerPreFlushFunc);
+        }
         $context->builder->call($context->lookupFunction('__phpc_response_headers_flush'));
     }
 }

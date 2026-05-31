@@ -72,7 +72,8 @@ final class SelfHostBuiltinPolicy
         'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_end_flush' => 'output',
         'ob_get_level' => 'output', 'flush' => 'output',
         'getallheaders' => 'output', 'header_list' => 'output', 'headers_list' => 'output',
-        'headers_sent' => 'output', 'register_shutdown_function' => 'output',
+        'headers_sent' => 'output', 'header_register_callback' => 'output',
+        'register_shutdown_function' => 'output',
         'set_error_handler' => 'error', 'restore_error_handler' => 'error',
     ];
 
@@ -150,7 +151,8 @@ final class SelfHostBuiltinPolicy
         'htmlentities' => 'string', 'html_entity_decode' => 'string',
         'get_html_translation_table' => 'string',
         'header' => 'string', 'http_response_code' => 'string',
-        'headers_sent' => 'string', 'register_shutdown_function' => 'string',
+        'headers_sent' => 'string', 'header_register_callback' => 'string',
+        'register_shutdown_function' => 'string',
         'substr' => 'string', 'trim' => 'string', 'ltrim' => 'string', 'rtrim' => 'string',
         'urlencode' => 'string', 'rawurlencode' => 'string', 'http_build_query' => 'string',
         'parse_str' => 'string',

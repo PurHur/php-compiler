@@ -18,6 +18,7 @@ final class OutputBuffer
     {
         self::$stack = [];
         SapiOutput::reset();
+        HeaderCallbackQueue::reset();
     }
 
     public static function getLevel(): int
