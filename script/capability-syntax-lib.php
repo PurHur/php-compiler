@@ -228,7 +228,7 @@ function syntaxRowDefinitions(): array
                 'MCJIT/AOT resume lowering for nested generator funcs (#3074, #3115); script-scope yield blocked',
                 'JIT linear `yield` + packed-array `yield from`; `yield from` generator + try/catch in generator JIT deferred',
                 'see docs/generators-jit-aot.md',
-                'AOT fixture generator_yield.phpt',
+                'AOT fixture generator_yield.phpt + generator_yield_keys.phpt',
             ],
             'probe' => 'function g() { yield 1; yield 2; } foreach (g() as $v) echo $v;',
         ],

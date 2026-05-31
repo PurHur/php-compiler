@@ -37,7 +37,7 @@ final class GeneratorJitExecuteTest extends TestCase
     {
         $this->assertMcjitOutput(<<<'PHP'
 <?php
-function gen(): Generator {
+function gen() {
     yield 1;
     yield 2;
 }
@@ -54,7 +54,7 @@ PHP
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
-function gen(): Generator {
+function gen() {
     yield 1;
 }
 foreach (gen() as $v) {
