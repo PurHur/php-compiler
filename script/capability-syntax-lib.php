@@ -366,6 +366,19 @@ function syntaxRowDefinitions(): array
             'probe' => null,
         ],
         [
+            'id' => 'array_access_interface',
+            'construct' => 'ArrayAccess interface — `$obj[$key]` read/write/isset/unset',
+            'opcodes' => ['TYPE_ARRAY_DIM_FETCH', 'TYPE_ARRAY_DIM_FETCH_WRITE', 'TYPE_ISSET', 'TYPE_UNSET'],
+            'issue' => 3331,
+            'jit' => false,
+            'aot' => false,
+            'notes' => [
+                'VM dispatches offsetGet/Set/Exists/Unset (Zend zend_object_handlers.c read_dimension)',
+                'Non-ArrayAccess objects keep Illegal offset; JIT VM fallback via requiresVmLowering',
+            ],
+            'probe' => null,
+        ],
+        [
             'id' => 'ref_param',
             'construct' => 'By-reference parameters (`function f(&$x)`)',
             'opcodes' => ['TYPE_ARG_RECV', 'TYPE_ARG_SEND'],
@@ -908,6 +921,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'try_catch_throw' => '/\btry\s*\{/',
         'throw_expression' => '/\?\s*:\s*throw\b|\?\?\s*throw\b|&&\s*throw\b|\|\|\s*throw\b/',
         'heredoc_flexible_indent' => '/<<<\s*\w+\s*\r?\n\s+\S/',
+        'array_access_interface' => '/implements\s+ArrayAccess|function\s+offsetGet\s*\(/',
     ];
 
     $scan = [];
