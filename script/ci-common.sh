@@ -773,6 +773,25 @@ ci_run_north_star3_verify() {
   make -C "$_CI_REPO_ROOT" north-star3-verify
 }
 
+# M4 strict-loop presenter in ci-local LLVM tail (issue #2429, #2379); default off — opt-in with NORTH_STAR4_VERIFY_GATE=1.
+ci_run_north_star4_verify() {
+  if [[ "${NORTH_STAR4_VERIFY_GATE:-0}" != "1" ]]; then
+    echo "north-star4-verify: skipped (NORTH_STAR4_VERIFY_GATE=0 default; set 1 to opt in, issue #2429)"
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "north-star4-verify: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  local ns4_script="$_CI_SCRIPT_DIR/north-star4-verify.sh"
+  if [[ ! -x "$ns4_script" ]]; then
+    echo "north-star4-verify: skipped (script missing — run from repo root)"
+    return 0
+  fi
+  echo "north-star4-verify (NORTH_STAR4_VERIFY_GATE=1, issue #2429)..."
+  make -C "$_CI_REPO_ROOT" north-star4-verify
+}
+
 # M4 bootstrap-loop dry-run probe (issue #1777, #1498); default off until M3 strict is stable.
 ci_run_bootstrap_loop_probe() {
   if [[ "${BOOTSTRAP_LOOP_PROBE_GATE:-0}" != "1" ]]; then

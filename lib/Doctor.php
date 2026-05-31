@@ -165,6 +165,7 @@ final class Doctor
         $ns2Default = $defaults['NORTH_STAR2_VERIFY_GATE'] ?? '1';
         $ns2ThrowswebDefault = $defaults['NORTH_STAR2_THROWSWEB_GATE'] ?? '1';
         $ns3Default = $defaults['NORTH_STAR3_VERIFY_GATE'] ?? '0';
+        $ns4Default = $defaults['NORTH_STAR4_VERIFY_GATE'] ?? '0';
         $m3HelloStrictDefault = $defaults['BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE'] ?? '0';
         $m3SmokeStrictDefault = $defaults['BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE'] ?? '1';
         $m3SmokeProbeDefault = $defaults['BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE'] ?? '1';
@@ -232,6 +233,7 @@ final class Doctor
         fwrite(STDOUT, "4. Presenter / fast CI\n");
         fwrite(STDOUT, "   NORTH_STAR2_VERIFY_GATE=".(self::gateEnabled('NORTH_STAR2_VERIFY_GATE', $ns2Default) ? '1' : '0')." (default {$ns2Default}) — ci-fast\n");
         fwrite(STDOUT, "   NORTH_STAR3_VERIFY_GATE=".(self::gateEnabled('NORTH_STAR3_VERIFY_GATE', $ns3Default) ? '1' : '0')." (default {$ns3Default}) — ci-fast opt-in ([#2396](https://github.com/PurHur/php-compiler/issues/2396))\n");
+        fwrite(STDOUT, "   NORTH_STAR4_VERIFY_GATE=".(self::gateEnabled('NORTH_STAR4_VERIFY_GATE', $ns4Default) ? '1' : '0')." (default {$ns4Default}) — ci-local LLVM tail opt-in ([#2429](https://github.com/PurHur/php-compiler/issues/2429))\n");
         fwrite(STDOUT, "   BOOTSTRAP_TEST_SUBSET_GATE=".(self::gateEnabled('BOOTSTRAP_TEST_SUBSET_GATE', $testSubsetDefault) ? '1' : '0')." (default {$testSubsetDefault}) — ci-fast after inventory; phpc test --bootstrap ([#2069](https://github.com/PurHur/php-compiler/issues/2069))\n");
         fwrite(STDOUT, "   BOOTSTRAP_TEST_SUBSET_STRICT=".(self::gateEnabled('BOOTSTRAP_TEST_SUBSET_STRICT', $testSubsetStrictDefault) ? '1' : '0')." (default {$testSubsetStrictDefault}) — strict M3 tail when subset gate on\n");
         if (is_executable($repoRoot.'/script/north-star2-verify.sh')) {
@@ -543,6 +545,11 @@ final class Doctor
         $ns3CiDetail = $ns3CiOn
             ? 'NORTH_STAR3_VERIFY_GATE=1 — ci-fast runs make north-star3-verify (#2396)'
             : 'opt-in NORTH_STAR3_VERIFY_GATE=1 for M3 unit probes in ci-fast (#2396)';
+        $ns4CiGate = getenv('NORTH_STAR4_VERIFY_GATE');
+        $ns4CiOn = false !== $ns4CiGate && '1' === $ns4CiGate;
+        $ns4CiDetail = $ns4CiOn
+            ? 'NORTH_STAR4_VERIFY_GATE=1 — ci-local LLVM tail runs make north-star4-verify (#2429)'
+            : 'opt-in NORTH_STAR4_VERIFY_GATE=1 for M4 presenter in ci-local (#2429)';
         $defaults = self::readCiDefaultsEnv($repoRoot);
         $ns2ThrowswebDefault = $defaults['NORTH_STAR2_THROWSWEB_GATE'] ?? '1';
         $ns2ThrowswebOn = self::gateEnabled('NORTH_STAR2_THROWSWEB_GATE', $ns2ThrowswebDefault);
@@ -578,6 +585,7 @@ final class Doctor
         }
         fwrite(STDOUT, "  Fast CI hook     {$ns2CiDetail}\n");
         fwrite(STDOUT, "  M3 ci-fast       {$ns3CiDetail}\n");
+        fwrite(STDOUT, "  M4 presenter     {$ns4CiDetail}\n");
         fwrite(STDOUT, "  Bootstrap subset {$subsetDetail}\n");
         fwrite(STDOUT, "  Docs             docs/bootstrap-selfhost.md · docs/self-host-target.md (#1492)\n");
     }
