@@ -526,6 +526,11 @@ class Object_ extends Type {
         if (isset($this->readonlyClassIds[$parentId])) {
             $this->readonlyClassIds[$childId] = true;
         }
+        if (isset($this->readonlyPropertyNames[$parentId])) {
+            foreach ($this->readonlyPropertyNames[$parentId] as $propLc => $_) {
+                $this->readonlyPropertyNames[$childId][$propLc] = true;
+            }
+        }
     }
 
     public function hasReadonlyClasses(): bool

@@ -515,6 +515,7 @@ class Context {
                 $this->builder->call($this->lookupFunction('__superglobals__refresh'));
                 Builtin\JitThrow::registerDeclarations($this);
                 $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending'));
+                Builtin\ReadonlyRaise::emitClearForStandaloneMain($this);
             }
             $this->builder->call(
                 $this->lookupFunction('__phpc_progress_note'),
@@ -532,6 +533,7 @@ class Context {
                 )
             );
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+                Builtin\ReadonlyRaise::emitAbortIfPendingForStandaloneMain($this);
                 Builtin\PendingHeaders::emitFlushForStandalone($this);
             }
             $this->builder->call($this->shutdownFunc);
@@ -1177,7 +1179,8 @@ class Context {
     public function freeDeadVariables(
         PHPLLVM\Value\Function_ $func,
         PHPLLVM\BasicBlock $basicBlock,
-        Block $block
+        Block $block,
+        ?Operand $skipOperand = null
     ): void {
         $coalesceResults = new \SplObjectStorage();
         foreach ($block->opCodes as $blockOp) {
@@ -1185,7 +1188,28 @@ class Context {
                 $coalesceResults[$block->getOperand($blockOp->arg1)] = true;
             }
         }
+        $returnVarNames = [];
+        foreach ($block->opCodes as $blockOp) {
+            if (OpCode::TYPE_RETURN !== $blockOp->type || null === $blockOp->arg1) {
+                continue;
+            }
+            $returnOp = $block->getOperand($blockOp->arg1);
+            $name = OperandName::resolve($returnOp);
+            if (null !== $name) {
+                $returnVarNames[$name] = true;
+            }
+        }
+        if (null !== $skipOperand) {
+            $name = OperandName::resolve($skipOperand);
+            if (null !== $name) {
+                $returnVarNames[$name] = true;
+            }
+        }
         foreach ($block->orig->deadOperands as $op) {
+            $name = OperandName::resolve($op);
+            if (null !== $name && isset($returnVarNames[$name])) {
+                continue;
+            }
             if ($coalesceResults->contains($op)) {
                 continue;
             }

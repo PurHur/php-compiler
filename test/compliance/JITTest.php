@@ -185,8 +185,9 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'coalesce_chain')) {
                 continue;
             }
-            // string/number loose == juggling is VM-only until ArrayBuiltinHelper string-long compare (#3644).
-            if (str_contains($name, 'loose_numeric_string')) {
+            // var_dump() not JIT-implemented; int↔string loose == IR guarded by LooseScientificStringJitCompileTest (#3658).
+            // MCJIT execute for loose == still segfaults (jit-runtime-probe #98); compile-only JIT gates cover #3644/#3658.
+            if (str_contains($name, 'loose_numeric_string') || str_contains($name, 'loose_scientific_string')) {
                 continue;
             }
             if (str_contains($name, 'loose_int_empty_string')) {
@@ -290,6 +291,10 @@ class JITTest extends BaseTest {
             }
             // PHP 8.4 asymmetric visibility is VM-only until JIT property guards (#3165).
             if (str_contains($name, 'asymmetric_visibility')) {
+                continue;
+            }
+            // BackedEnum::from/tryFrom VM-only until JIT lowering (#3114, #3076).
+            if (str_contains($name, 'enum_from') || str_contains($name, 'enum_try_from')) {
                 continue;
             }
             yield $name => $case;

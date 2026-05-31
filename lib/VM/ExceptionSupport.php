@@ -120,4 +120,26 @@ final class ExceptionSupport
     {
         return 0;
     }
+
+    /**
+     * Map a materialized VM Throwable object to a native PHP exception for PHPUnit / uncaught exit (#3114, #195).
+     */
+    public static function nativeUncaughtThrowable(ObjectEntry $entry, string $message): \Throwable
+    {
+        $lc = strtolower($entry->class->name);
+
+        return match ($lc) {
+            self::CLASS_VALUE_ERROR => new \ValueError($message),
+            self::CLASS_TYPE_ERROR => new \TypeError($message),
+            self::CLASS_DIVISION_BY_ZERO_ERROR => new \DivisionByZeroError($message),
+            self::CLASS_ARGUMENT_COUNT_ERROR => new \ArgumentCountError($message),
+            self::CLASS_PARSE_ERROR => new \ParseError($message),
+            self::CLASS_UNHANDLED_MATCH_ERROR => new \UnhandledMatchError($message),
+            self::CLASS_ASSERTION_ERROR => new \AssertionError($message),
+            self::CLASS_ERROR => new \Error($message),
+            self::CLASS_LOGIC_EXCEPTION => new \LogicException($message),
+            self::CLASS_EXCEPTION => new \Exception($message),
+            default => new \Exception($message),
+        };
+    }
 }

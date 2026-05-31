@@ -3712,20 +3712,25 @@ class Compiler {
             if (null !== $dimFetch) {
                 $this->compileArrayDimFetchRead($dimFetch, $leftBlock);
                 $leftSlot = $this->compileOperand($dimFetch->result, $leftBlock, true);
-                $leftBlock->addOpCode(new OpCode(
-                    OpCode::TYPE_ASSIGN,
-                    $resultSlot,
-                    $resultSlot,
-                    $leftSlot
-                ));
+                // ??= left branch: skip store when result is the assign lvalue (php-src: no write when set).
+                if (!$this->operandsChainEqual($resultOperand, $expr->left)) {
+                    $leftBlock->addOpCode(new OpCode(
+                        OpCode::TYPE_ASSIGN,
+                        $resultSlot,
+                        $resultSlot,
+                        $leftSlot
+                    ));
+                }
             } else {
                 $leftSlot = $this->compileOperand($expr->left, $leftBlock, true);
-                $leftBlock->addOpCode(new OpCode(
-                    OpCode::TYPE_ASSIGN,
-                    $resultSlot,
-                    $resultSlot,
-                    $leftSlot
-                ));
+                if (!$this->operandsChainEqual($resultOperand, $expr->left)) {
+                    $leftBlock->addOpCode(new OpCode(
+                        OpCode::TYPE_ASSIGN,
+                        $resultSlot,
+                        $resultSlot,
+                        $leftSlot
+                    ));
+                }
             }
         }
 
@@ -4226,12 +4231,9 @@ class Compiler {
         if (null !== $fetch) {
             return $this->resolveIssetTargetFromArrayDimFetch($fetch, $block);
         }
-        $propFetch = $this->unwrapPropertyFetch($operand);
+        $propFetch = $this->findCoalescePropertyFetch($operand, $block);
         if (null !== $propFetch) {
-            return [
-                $this->compileOperand($propFetch->var, $block, true),
-                $this->compileOperand($propFetch->name, $block, true),
-            ];
+            return $this->resolveIssetTargetFromPropertyFetch($propFetch, $block);
         }
         if (null !== $this->unwrapVariableOperand($operand)) {
             return $this->resolveIssetTarget($operand, $block);

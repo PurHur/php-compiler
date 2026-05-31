@@ -65,6 +65,12 @@ final class UnsetHelper
         if ($dimOp instanceof Literal) {
             $prop = $context->type->object->propertyFetch($receiver, $declaringClass, $dimOp->value);
             if (null !== $prop->objectPropertySlot && null !== $prop->objectPropertyType) {
+                ReadonlyClassGuard::emitBeforePropertyStore(
+                    $context,
+                    $prop,
+                    $context->jitEnclosingBlock,
+                    'unset'
+                );
                 $context->type->object->propertyStore(
                     $prop->objectPropertySlot,
                     $null,
@@ -77,6 +83,12 @@ final class UnsetHelper
         $nameVar = $context->getVariableFromOp($dimOp);
         $prop = $context->type->object->propertyFetchDynamic($receiver, $declaringClass, $nameVar);
         if (null !== $prop->objectPropertySlot && null !== $prop->objectPropertyType) {
+            ReadonlyClassGuard::emitBeforePropertyStore(
+                $context,
+                $prop,
+                $context->jitEnclosingBlock,
+                'unset'
+            );
             $context->type->object->propertyStore(
                 $prop->objectPropertySlot,
                 $null,

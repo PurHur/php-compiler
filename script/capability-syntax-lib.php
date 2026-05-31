@@ -35,7 +35,11 @@ function syntaxRowDefinitions(): array
             'construct' => 'Anonymous class `new class { }`',
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_NEW', 'TYPE_METHODCALL_INIT'],
             'issue' => 1233,
-            'notes' => ['php-cfg inline Stmt\\Class_ in parseExpr_New; synthetic AnonymousClass@line name'],
+            'aot' => true,
+            'notes' => [
+                'php-cfg inline Stmt\\Class_ in parseExpr_New; synthetic AnonymousClass@line name',
+                'AOT: user AnonymousClass@* methods lowered when PHP_COMPILER_SELFHOST_AOT=1 (#3098)',
+            ],
             'probe' => '$o = new class { public function f(): int { return 42; } }; echo $o->f();',
         ],
         [
@@ -47,6 +51,7 @@ function syntaxRowDefinitions(): array
                 'Backed enum case objects with `->name` / `->value`; string context coerces to backed scalar (#3518)',
                 '`Foo::Bar` singleton fetch; `enum_exists` registry; `implements` interface list + instance methods + `instanceof` (#3373)',
                 'static methods (#2299); `Enum::cases()` VM (#3308)',
+                '`BackedEnum::from()` / `tryFrom()` VM lookup with Zend-parity ValueError (#3114); JIT deferred',
             ],
             'probe' => 'interface L { public function n(): string; } enum S: string implements L { case A = "a"; public function n(): string { return $this->name; } } echo S::A->n();',
         ],
@@ -645,7 +650,21 @@ function syntaxRowDefinitions(): array
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_NEW', 'TYPE_ASSIGN', 'TYPE_PROPERTY_FETCH'],
             'issue' => 1360,
             'notes' => ['php-cfg Class_::flags MODIFIER_READONLY; VM rejects instance property writes after __construct'],
-            'probe' => 'readonly class R { public int $x = 0; } $o = new R(); $o->x = 1;',
+            'probe' => 'readonly class R { public function __construct(public int $x) {} } $o = new R(0); $o->x = 1;',
+        ],
+        [
+            'id' => 'readonly_property',
+            'construct' => 'readonly properties (per-property)',
+            'opcodes' => ['TYPE_DECLARE_PROPERTY', 'TYPE_NEW', 'TYPE_ASSIGN', 'TYPE_PROPERTY_FETCH'],
+            'issue' => 3149,
+            'jit' => true,
+            'aot' => true,
+            'notes' => [
+                'php-cfg readonly / propertyFlags MODIFIER_READONLY; VM/JIT reject writes and unset() after __construct',
+                'JIT ReadonlyClassGuard IR + ReadonlyPropertyTest; MCJIT execute + compliance phpt',
+                'php-src: Zend/zend_object_handlers.c zend_std_write_property / zend_std_unset_property',
+            ],
+            'probe' => 'class C { public readonly int $x; public function __construct() { $this->x = 1; } } $c = new C(); $c->x = 2;',
         ],
         [
             'id' => 'property_hooks',

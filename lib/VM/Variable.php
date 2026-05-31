@@ -658,6 +658,13 @@ final class Variable {
                 $this->streamResource = false;
                 $this->array = $var->array;
                 break;
+            case self::TYPE_ENUM_CASE:
+                $this->enumCase(new EnumCaseEntry(
+                    $var->enumCase->enumClass,
+                    $var->enumCase->caseName,
+                    clone $var->enumCase->backingValue,
+                ));
+                break;
             default:
                 var_dump($var);
                 throw new \LogicException("Unsupported type copy: {$var->type}");
@@ -713,6 +720,9 @@ restart:
                 return $self->float === $other->float;
             case TYPE_PAIR_OBJECT_OBJECT:
                 return $self->object->looseEquals($other->object);
+            case TYPE_PAIR_ENUM_CASE_ENUM_CASE:
+                return $self->enumCase->enumClass === $other->enumCase->enumClass
+                    && $self->enumCase->caseName === $other->enumCase->caseName;
             case TYPE_PAIR_BOOLEAN_BOOLEAN:
                 return $self->bool === $other->bool;
             case TYPE_PAIR_NULL_NULL:
@@ -749,6 +759,24 @@ restart:
         return (float) $s;
     }
 
+    /**
+     * Int↔string loose == uses integer numeric strings only (#3658, Zend zend_compare_scalar).
+     *
+     * Scientific-notation strings like '0e123' are not valid integer numeric strings and do not
+     * match via float coercion (0 == '0e123' → false). Non-numeric strings still compare as 0 (#3644).
+     */
+    private static function looseIntegerFromString(string $s): ?int
+    {
+        if (!is_numeric($s)) {
+            return 0;
+        }
+        if (((string) (int) $s) === $s) {
+            return (int) $s;
+        }
+
+        return null;
+    }
+
     private function looseEqual(Variable $self, Variable $other): bool {
         if ($self->type === self::TYPE_NULL) {
             switch ($other->type) {
@@ -781,15 +809,23 @@ restart:
             if ('' === $self->string) {
                 return false;
             }
+            $parsed = self::looseIntegerFromString($self->string);
+            if (null === $parsed) {
+                return false;
+            }
 
-            return $other->integer == self::looseNumericFromString($self->string);
+            return $other->integer == $parsed;
         }
         if ($self->type === self::TYPE_INTEGER && $other->type === self::TYPE_STRING) {
             if ('' === $other->string) {
                 return false;
             }
+            $parsed = self::looseIntegerFromString($other->string);
+            if (null === $parsed) {
+                return false;
+            }
 
-            return $self->integer == self::looseNumericFromString($other->string);
+            return $self->integer == $parsed;
         }
         if ($self->type === self::TYPE_STRING && $other->type === self::TYPE_FLOAT) {
             return $other->float == self::looseNumericFromString($self->string);
@@ -1423,6 +1459,7 @@ const TYPE_PAIR_FLOAT_INTEGER = 513;
 const TYPE_PAIR_FLOAT_FLOAT = 514;
 const TYPE_PAIR_STRING_STRING = 1028;
 const TYPE_PAIR_OBJECT_OBJECT = 1285;
+const TYPE_PAIR_ENUM_CASE_ENUM_CASE = 2313;
 const TYPE_PAIR_BOOLEAN_BOOLEAN = 771;
 const TYPE_PAIR_NULL_NULL = 0;
 const TYPE_PAIR_ARRAY_ARRAY = 1542;

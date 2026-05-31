@@ -30,6 +30,16 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'gettype_object_resource.phpt',
         'is_countable.phpt',
         'crc32c.phpt',
+        'anonymous_class.phpt',
+        'anonymous_class_ctor.phpt',
+        'readonly_property_write.phpt',
+        'readonly_property_unset.phpt',
+        'readonly_property_inc.phpt',
+        'readonly_property_dec.phpt',
+        'readonly_property_compound_assign.phpt',
+        'readonly_property_dot_assign.phpt',
+        'readonly_property_promoted.phpt',
+        'readonly_property_coalesce_assign.phpt',
     ];
 
     /**
@@ -82,6 +92,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         return [
             'enum_instanceof.php' => ['enum_instanceof.php'],
             'loose_numeric_string_eq.php' => ['loose_numeric_string_eq.php'],
+            'loose_scientific_string_eq.php' => ['loose_scientific_string_eq.php'],
             'bool_increment.php' => ['bool_increment.php'],
             'intdiv_division_by_zero.php' => ['intdiv_division_by_zero.php'],
             'array_union_plus.php' => ['array_union_plus.php'],
