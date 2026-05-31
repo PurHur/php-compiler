@@ -61,7 +61,8 @@ final class SelfHostBuiltinPolicy
         + self::CATEGORY_JSON
         + self::CATEGORY_NUMERIC
         + self::CATEGORY_PASSWORD
-        + self::CATEGORY_PROCESS;
+        + self::CATEGORY_PROCESS
+        + self::CATEGORY_SESSION;
 
     /** @var array<string, string>|null */
     private static ?array $vmOnlyDeferredCache = null;
@@ -73,6 +74,16 @@ final class SelfHostBuiltinPolicy
         'getallheaders' => 'output', 'header_list' => 'output',
         'headers_sent' => 'output', 'register_shutdown_function' => 'output',
         'set_error_handler' => 'error', 'restore_error_handler' => 'error',
+    ];
+
+    /** Session builtins for AOT user scripts under PHP_COMPILER_SELFHOST_AOT (#1891, #1967). */
+    private const CATEGORY_SESSION = [
+        'session_start' => 'session',
+        'session_id' => 'session',
+        'session_name' => 'session',
+        'session_write_close' => 'session',
+        'session_destroy' => 'session',
+        'session_regenerate_id' => 'session',
     ];
 
     /** @var array<string, string> */

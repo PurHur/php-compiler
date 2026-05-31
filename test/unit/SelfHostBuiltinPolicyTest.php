@@ -48,6 +48,10 @@ final class SelfHostBuiltinPolicyTest extends TestCase
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('hash'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('preg_match'));
         $this->assertTrue(SelfHostBuiltinPolicy::isRequiredForBundle('shell_exec'));
+        $this->assertTrue(SelfHostBuiltinPolicy::isRequiredForBundle('session_start'));
+        $this->assertSame('session', SelfHostBuiltinPolicy::categoryFor('session_start'));
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('session_start'));
         $this->assertSame('process', SelfHostBuiltinPolicy::categoryFor('shell_exec'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('shell_exec'));
         putenv('PHP_COMPILER_SELFHOST_AOT=1');

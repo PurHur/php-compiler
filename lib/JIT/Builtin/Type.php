@@ -705,6 +705,7 @@ class Type extends Builtin {
             $fntypeSessionApply
         );
         $this->context->registerFunction('__phpc_session_destroy_apply', $fnSessionDestroy);
+        SessionStart::registerRuntimeDeclaration($this->context);
         SessionStart::implement($this->context);
         SessionWriteClose::implement($this->context);
         SessionRegenerateId::implement($this->context);

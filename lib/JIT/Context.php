@@ -299,6 +299,12 @@ class Context {
             }
         }
         $lc = strtolower($proxyName);
+        $internal = $this->resolveRegisteredInternalBuiltin($lc);
+        if (null !== $internal) {
+            $this->functionProxies[$lc] = $internal;
+
+            return $internal;
+        }
         $this->functionProxies[$lc] = new Call\ExternalMethod($proxyName);
 
         return $this->functionProxies[$lc];
@@ -308,7 +314,17 @@ class Context {
     {
         $lc = strtolower($proxyName);
         if (isset($this->functionProxies[$lc])) {
-            return $this->functionProxies[$lc];
+            $existing = $this->functionProxies[$lc];
+            if ($existing instanceof Call\ExternalMethod) {
+                $internal = $this->resolveRegisteredInternalBuiltin($lc);
+                if (null !== $internal) {
+                    $this->functionProxies[$lc] = $internal;
+
+                    return $internal;
+                }
+            }
+
+            return $existing;
         }
         if (preg_match('/^(.+)\\\\([^\\\\]+)::(.+)$/', $lc, $matches)) {
             $shortKey = $matches[2].'::'.$matches[3];
@@ -323,6 +339,34 @@ class Context {
             $globalFn = substr($lc, strrpos($lc, '\\') + 1);
             if (isset($this->functionProxies[$globalFn])) {
                 return $this->functionProxies[$globalFn];
+            }
+            $internal = $this->resolveRegisteredInternalBuiltin($globalFn);
+            if (null !== $internal) {
+                $this->functionProxies[$globalFn] = $internal;
+
+                return $internal;
+            }
+        }
+        $internal = $this->resolveRegisteredInternalBuiltin($lc);
+        if (null !== $internal) {
+            $this->functionProxies[$lc] = $internal;
+
+            return $internal;
+        }
+
+        return null;
+    }
+
+    private function resolveRegisteredInternalBuiltin(string $lc): ?FuncInternal
+    {
+        foreach ($this->modules as $module) {
+            foreach ($module->getFunctions() as $func) {
+                if (!$func instanceof FuncInternal) {
+                    continue;
+                }
+                if (strtolower($func->getName()) === $lc) {
+                    return $func;
+                }
             }
         }
 
