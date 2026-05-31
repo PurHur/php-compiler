@@ -82,6 +82,20 @@ final class StrIncrementBuiltinTest extends TestCase
         $this->runDecrement('A');
     }
 
+    public function testDecrementSingleLowercaseUnderflowThrows(): void
+    {
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage('str_decrement(): Argument #1 ($string) "a" is out of decrement range');
+        $this->runDecrement('a');
+    }
+
+    public function testDecrementEmptyThrows(): void
+    {
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage('str_decrement(): Argument #1 ($string) must not be empty');
+        $this->runDecrement('');
+    }
+
     private function runIncrement(string $value): string
     {
         return $this->runBuiltin(new str_increment(), $value);
