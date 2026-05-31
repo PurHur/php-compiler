@@ -139,6 +139,11 @@ final class VmFs
         return @link($target, $link);
     }
 
+    public static function symlink(string $target, string $link): bool
+    {
+        return @symlink($target, $link);
+    }
+
     /** Prefix for multipart upload temps (lib/Web/Superglobals.php, AOT sg_set_file_entry). */
     public const UPLOAD_TEMP_PREFIX = 'phpc_upload_';
 
