@@ -138,6 +138,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'password_get_info')) {
                 continue;
             }
+            // round() precision/mode uses __compiler_round: VM + AOT (#3522); MCJIT until runtime link stable.
+            if (str_contains($name, 'round_precision_mode')) {
+                continue;
+            }
             // phpversion/php_sapi_name/php_uname MCJIT: VM + AOT (#3174); umbrella JITTest skips until stable.
             if (str_contains($name, 'phpversion')) {
                 continue;

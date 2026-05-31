@@ -6422,7 +6422,7 @@ class InternalArgInfo
         'rewind' => ['bool', 'fp' => ''],
         'rewinddir' => ['', 'dir_handle=' => ''],
         'rmdir' => ['bool', 'dirname' => 'string', 'context=' => ''],
-        'round' => ['int', 'number' => 'float', 'precision=' => 'int', 'mode=' => 'int'],
+        'round' => ['float', 'number' => 'float', 'precision=' => 'int', 'mode=' => 'int'],
         'rpm_close' => ['bool', 'rpmr' => ''],
         'rpm_get_tag' => ['', 'rpmr' => '', 'tagnum' => 'int'],
         'rpm_is_valid' => ['bool', 'filename' => 'string'],
