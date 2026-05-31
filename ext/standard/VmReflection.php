@@ -9,6 +9,7 @@ use PHPCompiler\Func;
 use PHPCompiler\Func\Internal as FuncInternal;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\Variable;
@@ -641,6 +642,62 @@ final class VmReflection
         }
 
         return $result;
+    }
+
+    /**
+     * get_mangled_object_vars() — all set instance properties with Zend-mangled keys (issue #3497).
+     *
+     * php-src: ext/standard/var.c — PHP_FUNCTION(get_mangled_object_vars)
+     */
+    public static function getMangledObjectVars(Variable $object, Context $ctx): Variable
+    {
+        $object = $object->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $object->type) {
+            throw new \LogicException('get_mangled_object_vars() argument must be an object in this compiler build');
+        }
+        $obj = $object->toObject();
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach ($obj->class->properties as $meta) {
+            if (!$obj->hasProperty($meta->name)) {
+                continue;
+            }
+            $value = $obj->getProperty($meta->name)->resolveIndirect();
+            if (Variable::TYPE_NULL === $value->type) {
+                continue;
+            }
+            $key = self::manglePropertyKey($meta, $ctx);
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $ht->add($key, $copy);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Zend property hash key for ZEND_PROP_PURPOSE_DEBUG (php-src zend_mangle_property_name).
+     */
+    public static function manglePropertyKey(ClassProperty $meta, Context $ctx): string
+    {
+        if (MethodVisibility::isPublic($meta->visibility)) {
+            return $meta->name;
+        }
+        if (($meta->visibility & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+            return "\0*\0".$meta->name;
+        }
+
+        return "\0".self::declaringClassDisplay($meta, $ctx)."\0".$meta->name;
+    }
+
+    private static function declaringClassDisplay(ClassProperty $meta, Context $ctx): string
+    {
+        if ('' !== $meta->declaringClassLc && isset($ctx->classes[$meta->declaringClassLc])) {
+            return $ctx->classes[$meta->declaringClassLc]->name;
+        }
+
+        return $meta->declaringClassLc;
     }
 
     /** Default visibility filter: public | protected | private (php-src get_class_methods). */
