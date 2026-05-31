@@ -110,6 +110,24 @@ try {
         $this->assertVmCliExit('<?php throw new Exception("boom");', null);
     }
 
+    public function testCatchVariableAfterNestedTryInCatchBody(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+try {
+    throw new Exception("x");
+} catch (Exception $e) {
+    try {
+        echo "inner\n";
+    } catch (Exception $ignored) {
+    }
+    echo $e->getMessage(), "\n";
+}
+',
+            "inner\nx\n"
+        );
+    }
+
     /** Guards bin/vm.php stdin path (compliance PHPTs); Runtime-only tests miss merge resume (#195). */
     public function testThrowExceptionCaughtViaVmCli(): void
     {
