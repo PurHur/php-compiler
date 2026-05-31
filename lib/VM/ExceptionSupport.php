@@ -121,6 +121,23 @@ final class ExceptionSupport
         return 0;
     }
 
+    /** Stamp throw-statement line on a Throwable before dispatch (#195). */
+    public static function stampThrowLine(Variable $thrown, int $line): void
+    {
+        $var = $thrown->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            return;
+        }
+        $obj = $var->toObject();
+        if (!self::objectImplementsThrowable($obj)) {
+            return;
+        }
+        if ($line < 1) {
+            $line = 1;
+        }
+        $obj->getProperty(self::PROP_LINE)->int($line);
+    }
+
     /**
      * Map a materialized VM Throwable object to a native PHP exception for PHPUnit / uncaught exit (#3114, #195).
      */

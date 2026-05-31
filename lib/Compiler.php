@@ -3653,9 +3653,11 @@ class Compiler {
         if (null === $throwSlot) {
             $throwSlot = $this->compileOperand($expr->expr, $block, true);
         }
+        $line = $expr->getLine();
         $ops[] = new OpCode(
             OpCode::TYPE_THROW,
-            $throwSlot
+            $throwSlot,
+            $line > 0 ? $line : null
         );
 
         return $ops;
@@ -5011,9 +5013,12 @@ class Compiler {
                     return [new OpCode(OpCode::TYPE_RETHROW)];
                 }
 
+                $line = $terminal->getLine();
+
                 return [new OpCode(
                     OpCode::TYPE_THROW,
-                    $this->compileOperand($terminal->expr, $block, true)
+                    $this->compileOperand($terminal->expr, $block, true),
+                    $line > 0 ? $line : null
                 )];
             case 'Terminal_Unset':
                 $ops = [];

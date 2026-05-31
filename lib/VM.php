@@ -2346,6 +2346,9 @@ restart:
                     break;
                 case OpCode::TYPE_THROW:
                     $thrown = $frame->scope[$op->arg1]->resolveIndirect();
+                    if (null !== $op->arg2) {
+                        VM\ExceptionSupport::stampThrowLine($thrown, (int) $op->arg2);
+                    }
                     if ($this->frameIsPropertySetHook($frame)) {
                         $this->context->propertyHookSetAborted = true;
                     }

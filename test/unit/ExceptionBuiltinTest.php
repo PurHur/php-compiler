@@ -58,6 +58,20 @@ try {
         );
     }
 
+    public function testExceptionGetLineIsThrowSite(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+try {
+    throw new Exception("boom");
+} catch (Exception $e) {
+    echo $e->getLine() >= 1 ? "line_ok\n" : "line_bad\n";
+}
+',
+            "line_ok\n"
+        );
+    }
+
     public function testUncaughtExceptionNonZeroExit(): void
     {
         $bin = realpath(__DIR__ . '/../../bin/vm.php');
