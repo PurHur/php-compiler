@@ -505,6 +505,8 @@ require_once __DIR__.'/../../../ext/standard/number_format.php';
 require_once __DIR__.'/../../../ext/standard/ob_end_flush.php';
 require_once __DIR__.'/../../../ext/standard/ob_get_clean.php';
 require_once __DIR__.'/../../../ext/standard/ob_get_level.php';
+require_once __DIR__.'/../../../ext/standard/ob_implicit_flush.php';
+require_once __DIR__.'/../../../ext/standard/JitObImplicitFlush.php';
 require_once __DIR__.'/../../../ext/standard/ob_start.php';
 require_once __DIR__.'/../../../ext/standard/octdec.php';
 require_once __DIR__.'/../../../ext/standard/ord.php';

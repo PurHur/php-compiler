@@ -278,6 +278,7 @@ static const char *phpc_builtin_functions[] = {
     "ob_get_contents",
     "ob_get_length",
     "ob_get_level",
+    "ob_implicit_flush",
     "ob_start",
     "octdec",
     "ord",

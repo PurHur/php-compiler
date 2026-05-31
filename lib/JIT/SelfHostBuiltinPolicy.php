@@ -70,7 +70,7 @@ final class SelfHostBuiltinPolicy
     /** @var array<string, string> */
     private const CATEGORY_OUTPUT = [
         'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_end_flush' => 'output',
-        'ob_get_level' => 'output', 'flush' => 'output',
+        'ob_get_level' => 'output', 'ob_implicit_flush' => 'output', 'flush' => 'output',
         'getallheaders' => 'output', 'header_list' => 'output', 'headers_list' => 'output',
         'headers_sent' => 'output', 'header_register_callback' => 'output',
         'register_shutdown_function' => 'output',
