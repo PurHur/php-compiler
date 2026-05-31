@@ -117,6 +117,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'count_recursive')) {
                 continue;
             }
+            // User __destruct() is VM-only until refcount/GC ordering is stable in JIT (#3144).
+            if (str_contains($name, 'class_destruct')) {
+                continue;
+            }
             // preg_last_error_msg() MCJIT path unsafe with preg_match stub runtime (#3110).
             if (str_contains($name, 'preg_last_error_msg')) {
                 continue;

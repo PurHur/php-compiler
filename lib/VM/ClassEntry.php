@@ -39,6 +39,8 @@ class ClassEntry {
     public array $interfaces = [];
     /** User method or VM builtin handler (issues #1360, #1366). */
     public ?Func $constructor = null;
+    /** User `__destruct` when declared (#3144). */
+    public ?Func $destructor = null;
     public array $properties = [];
     /** @var array<string, Func> method name (lowercase) => callable */
     public array $methods = [];

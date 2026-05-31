@@ -25,6 +25,7 @@ use PHPCompiler\VM\GeneratorState;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ObjectLifetime;
 use PHPCompiler\VM\ObjectPropertyIterator;
 use PHPCompiler\VM\ScriptExit;
 use PHPCompiler\VM\TypeCheck;
@@ -57,23 +58,30 @@ class VM {
     }
 
     public function run(Block $block): int {
-        if (!is_null($block->handler)) {
+        ObjectLifetime::setVm($this);
+        try {
+            if (!is_null($block->handler)) {
+                $frame = $block->getFrame($this->context);
+                $this->seedScriptPath($frame);
+                $block->handler->execute($frame);
+
+                return self::SUCCESS;
+            }
+
             $frame = $block->getFrame($this->context);
             $this->seedScriptPath($frame);
-            $block->handler->execute($frame);
-            return self::SUCCESS;
+            $this->context->push($frame);
+
+            $result = $this->runFrames();
+            if ('' !== $frame->scriptPath) {
+                $this->context->scriptStack->pop();
+            }
+
+            return $result;
+        } finally {
+            ObjectLifetime::runShutdownDestructors();
+            ObjectLifetime::clearVm();
         }
-
-        $frame = $block->getFrame($this->context);
-        $this->seedScriptPath($frame);
-        $this->context->push($frame);
-
-        $result = $this->runFrames();
-        if ('' !== $frame->scriptPath) {
-            $this->context->scriptStack->pop();
-        }
-
-        return $result;
     }
 
     /**
@@ -2371,9 +2379,12 @@ restart:
             $this->context->scriptStack->pop();
             if (null !== $frame->parent) {
                 $this->markObjectConstructedIfLeavingConstruct($frame);
+                $child = $frame;
                 $frame = $frame->parent;
+                $this->releaseFrameObjectRefs($child);
                 goto restart;
             }
+            $this->releaseFrameObjectRefs($frame);
             goto nextframe;
         }
 
@@ -2386,12 +2397,16 @@ restart:
         $gen = $this->findGeneratorState($frame);
         if (null !== $gen) {
             $gen->markReturned(null);
+            $this->releaseFrameObjectRefs($frame);
             goto nextframe;
         }
         if ($frame->ephemeral && null !== $frame->parent) {
+            $child = $frame;
             $frame = $frame->parent;
+            $this->releaseFrameObjectRefs($child);
             goto restart;
         }
+        $this->releaseFrameObjectRefs($frame);
         goto nextframe;
 
         return_value_complete:
@@ -2410,7 +2425,9 @@ restart:
             }
         }
         $this->markObjectConstructedIfLeavingConstruct($frame);
+        $callee = $frame;
         $caller = $this->context->pop();
+        $this->releaseFrameObjectRefs($callee);
         if (null !== $caller) {
             $caller->callArgs = [];
             $caller->callArgEntries = [];
@@ -2419,11 +2436,15 @@ restart:
         }
         // Nested return <call>(): callee may finish with an empty run stack (#1885).
         if (null !== $frame->parent && null !== $frame->returnVar) {
+            $child = $frame;
             $frame = $frame->parent;
+            $this->releaseFrameObjectRefs($child);
             goto restart;
         }
         if ($frame->ephemeral && null !== $frame->parent) {
+            $child = $frame;
             $frame = $frame->parent;
+            $this->releaseFrameObjectRefs($child);
             goto restart;
         }
 
@@ -4288,6 +4309,9 @@ restart:
         if (null === $entry->constructor && null !== $parent->constructor) {
             $entry->constructor = $parent->constructor;
         }
+        if (null === $entry->destructor && null !== $parent->destructor) {
+            $entry->destructor = $parent->destructor;
+        }
         if ($parent->readonly) {
             $entry->readonly = true;
         }
@@ -4474,6 +4498,9 @@ restart:
                         unset($entry->abstractMethods[$name]);
                         if ('__construct' === $name) {
                             $entry->constructor = $method;
+                        }
+                        if ('__destruct' === $name) {
+                            $entry->destructor = $method;
                         }
                     } else {
                         $entry->abstractMethods[$name] = true;
@@ -4883,6 +4910,54 @@ restart:
         }
 
         return false;
+    }
+
+    /**
+     * Invoke user __destruct() once (Zend zend_objects_destroy_object; #3144).
+     */
+    public function invokeUserDestructor(ObjectEntry $object): void
+    {
+        if ($object->destructorInvoked) {
+            return;
+        }
+        $destructor = $object->class->destructor;
+        if (null === $destructor) {
+            $object->destructorInvoked = true;
+
+            return;
+        }
+        $object->destructorInvoked = true;
+        $thisVar = new Variable();
+        $thisVar->object($object);
+        ObjectLifetime::addRef($object);
+
+        $savedStack = $this->context->swapRunStack(null);
+        try {
+            $child = $destructor->getFrame($this->context, null);
+            $thisIdx = $destructor->block->slotIndexForVariableName('this');
+            if (null !== $thisIdx) {
+                $child->scope[$thisIdx] = $thisVar;
+            }
+            $child->calledArgs = [$thisVar];
+            $this->context->push($child);
+            $result = $this->runFrames();
+            if (self::SUCCESS !== $result) {
+                throw new \LogicException('__destruct() failed in this compiler build');
+            }
+        } finally {
+            $this->context->swapRunStack($savedStack);
+            ObjectLifetime::releaseRef($object);
+        }
+    }
+
+    private function releaseFrameObjectRefs(Frame $frame): void
+    {
+        foreach ($frame->scope as $slot) {
+            ObjectLifetime::releaseDirectObject($slot);
+        }
+        foreach ($frame->iterators as $iter) {
+            ObjectLifetime::releaseDirectObject($iter);
+        }
     }
 
 }
