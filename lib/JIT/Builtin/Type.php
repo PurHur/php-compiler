@@ -464,6 +464,11 @@ class Type extends Builtin {
         $fntypeUuencode = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnUuencode = $this->context->module->addFunction('__compiler_convert_uuencode', $fntypeUuencode);
         $this->context->registerFunction('__compiler_convert_uuencode', $fnUuencode);
+        $fntypeUtf8Latin1 = $this->context->context->functionType($strPtr, false, $strPtr);
+        $fnUtf8Encode = $this->context->module->addFunction('__compiler_utf8_encode', $fntypeUtf8Latin1);
+        $this->context->registerFunction('__compiler_utf8_encode', $fnUtf8Encode);
+        $fnUtf8Decode = $this->context->module->addFunction('__compiler_utf8_decode', $fntypeUtf8Latin1);
+        $this->context->registerFunction('__compiler_utf8_decode', $fnUtf8Decode);
         $fntypeUudecode = $this->context->context->functionType(
             $this->context->getTypeFromString('void'),
             false,

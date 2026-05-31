@@ -134,6 +134,7 @@ final class SelfHostBuiltinPolicy
         'chr' => 'string',
         'chunk_split' => 'string',
         'convert_uudecode' => 'string', 'convert_uuencode' => 'string',
+        'utf8_decode' => 'string', 'utf8_encode' => 'string',
         'pack' => 'string',
         'unpack' => 'string',
         'strtolower' => 'string', 'strtoupper' => 'string', 'strcmp' => 'string', 'strncmp' => 'string', 'substr_compare' => 'string', 'strtok' => 'string',

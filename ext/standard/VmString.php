@@ -1070,6 +1070,88 @@ final class VmString
         return $out;
     }
 
+    /** ISO-8859-1 to UTF-8 (php-src ext/standard/basic_functions.c — PHP_FUNCTION(utf8_encode)). */
+    public static function utf8_encode(string $data): string
+    {
+        $srcLen = self::byteLength($data);
+        if (0 === $srcLen) {
+            return '';
+        }
+        $out = '';
+        for ($i = 0; $i < $srcLen; ++$i) {
+            $c = self::byteOrd($data[$i]);
+            if ($c < 0x80) {
+                $out .= $data[$i];
+            } else {
+                $out .= \chr(0xC0 | ($c >> 6));
+                $out .= \chr(0x80 | ($c & 0x3F));
+            }
+        }
+
+        return $out;
+    }
+
+    /** UTF-8 to ISO-8859-1 (php-src ext/standard/basic_functions.c — PHP_FUNCTION(utf8_decode)). */
+    public static function utf8_decode(string $data): string
+    {
+        $srcLen = self::byteLength($data);
+        if (0 === $srcLen) {
+            return '';
+        }
+        $out = '';
+        for ($i = 0; $i < $srcLen; ) {
+            $c = self::byteOrd($data[$i]);
+            if ($c < 0x80) {
+                $out .= $data[$i];
+                ++$i;
+                continue;
+            }
+            if (($c & 0xE0) === 0xC0) {
+                if ($c < 0xC2 || $i + 1 >= $srcLen || (self::byteOrd($data[$i + 1]) & 0xC0) !== 0x80) {
+                    $out .= '?';
+                    ++$i;
+                    continue;
+                }
+                $cp = (($c & 0x1F) << 6) | (self::byteOrd($data[$i + 1]) & 0x3F);
+                $out .= \chr($cp <= 0xFF ? $cp : 0x3F);
+                $i += 2;
+                continue;
+            }
+            if (($c & 0xF0) === 0xE0) {
+                if ($i + 2 >= $srcLen
+                    || (self::byteOrd($data[$i + 1]) & 0xC0) !== 0x80
+                    || (self::byteOrd($data[$i + 2]) & 0xC0) !== 0x80) {
+                    $out .= '?';
+                    ++$i;
+                    continue;
+                }
+                $cp = (($c & 0x0F) << 12)
+                    | ((self::byteOrd($data[$i + 1]) & 0x3F) << 6)
+                    | (self::byteOrd($data[$i + 2]) & 0x3F);
+                $out .= \chr($cp >= 0x800 && $cp <= 0xFF ? $cp : 0x3F);
+                $i += 3;
+                continue;
+            }
+            if (($c & 0xF8) === 0xF0) {
+                if ($i + 3 >= $srcLen
+                    || (self::byteOrd($data[$i + 1]) & 0xC0) !== 0x80
+                    || (self::byteOrd($data[$i + 2]) & 0xC0) !== 0x80
+                    || (self::byteOrd($data[$i + 3]) & 0xC0) !== 0x80) {
+                    $out .= '?';
+                    ++$i;
+                    continue;
+                }
+                $out .= '?';
+                $i += 4;
+                continue;
+            }
+            $out .= '?';
+            ++$i;
+        }
+
+        return $out;
+    }
+
     private static function uuEnc(int $c): string
     {
         if (0 === $c) {
