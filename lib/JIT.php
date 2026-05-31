@@ -4421,7 +4421,10 @@ class JIT {
         if (null !== $innerResumeName) {
             return true;
         }
-        if ($yfIdx <= $prefixStart || !JIT\GeneratorHelper::prefixOpcodesSafeForYieldFromInit($block, $yfIdx)) {
+        if (
+            $yfIdx <= $prefixStart
+            || !JIT\GeneratorHelper::prefixSegmentSafeForYieldFromInit($block, $prefixStart, $yfIdx)
+        ) {
             return false;
         }
 

@@ -310,7 +310,15 @@ final class GeneratorHelper
 
     public static function prefixOpcodesSafeForYieldFromInit(Block $block, int $yieldFromIndex): bool
     {
-        for ($i = 0; $i < $yieldFromIndex; ++$i) {
+        return self::prefixSegmentSafeForYieldFromInit($block, 0, $yieldFromIndex);
+    }
+
+    /**
+     * True when [$start, $end) contains no yield / yield from (safe to compile for container setup).
+     */
+    public static function prefixSegmentSafeForYieldFromInit(Block $block, int $start, int $end): bool
+    {
+        for ($i = $start; $i < $end; ++$i) {
             $type = $block->opCodes[$i]->type;
             if (OpCode::TYPE_YIELD === $type || OpCode::TYPE_YIELD_FROM === $type) {
                 return false;
