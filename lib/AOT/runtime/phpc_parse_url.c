@@ -23,6 +23,8 @@ extern void __hashtable__setStringKeyLong(__hashtable__ *ht, __string__ *key, lo
 #define PHP_URL_SCHEME 0
 #define PHP_URL_HOST 1
 #define PHP_URL_PORT 2
+#define PHP_URL_USER 3
+#define PHP_URL_PASS 4
 #define PHP_URL_PATH 5
 #define PHP_URL_QUERY 6
 #define PHP_URL_FRAGMENT 7
@@ -31,6 +33,8 @@ typedef struct {
     char *scheme;
     char *host;
     int port;
+    char *user;
+    char *pass;
     char *path;
     char *query;
     char *fragment;
@@ -121,6 +125,8 @@ static void pu_parts_init(pu_parts_t *parts)
     parts->scheme = NULL;
     parts->host = NULL;
     parts->port = 0;
+    parts->user = NULL;
+    parts->pass = NULL;
     parts->path = NULL;
     parts->query = NULL;
     parts->fragment = NULL;
@@ -130,6 +136,8 @@ static void pu_parts_free(pu_parts_t *parts)
 {
     free(parts->scheme);
     free(parts->host);
+    free(parts->user);
+    free(parts->pass);
     free(parts->path);
     free(parts->query);
     free(parts->fragment);
@@ -196,6 +204,26 @@ static int pu_parse_parts(__string__ *url, pu_parts_t *parts)
                 auth_buf[auth_len] = '\0';
                 at = strrchr(auth_buf, '@');
                 if (at != NULL) {
+                    char *colon;
+                    *at = '\0';
+                    colon = strchr(auth_buf, ':');
+                    if (colon != NULL) {
+                        *colon = '\0';
+                        parts->pass = pu_strdup0(colon + 1);
+                        if (NULL == parts->pass) {
+                            pu_parts_free(parts);
+
+                            return -1;
+                        }
+                    }
+                    if (auth_buf[0] != '\0') {
+                        parts->user = pu_strdup0(auth_buf);
+                        if (NULL == parts->user) {
+                            pu_parts_free(parts);
+
+                            return -1;
+                        }
+                    }
                     memmove(auth_buf, at + 1, strlen(at + 1) + 1);
                 }
                 port_sep = strchr(auth_buf, ':');
@@ -292,6 +320,22 @@ static void pu_write_component(__value__ *out, int component, pu_parts_t *parts)
             }
 
             return;
+        case PHP_URL_USER:
+            if (parts->user == NULL || parts->user[0] == '\0') {
+                __value__writeNull(out);
+            } else {
+                __value__writeString(out, pu_cstr(parts->user));
+            }
+
+            return;
+        case PHP_URL_PASS:
+            if (parts->pass == NULL || parts->pass[0] == '\0') {
+                __value__writeNull(out);
+            } else {
+                __value__writeString(out, pu_cstr(parts->pass));
+            }
+
+            return;
         case PHP_URL_PATH:
             __value__writeString(out, pu_cstr(parts->path != NULL ? parts->path : ""));
 
@@ -368,6 +412,8 @@ void __phpc_parse_url_assoc(__string__ *url, __value__ *out)
     if (parts.port > 0) {
         __hashtable__setStringKeyLong(ht, pu_cstr("port"), (long long) parts.port);
     }
+    pu_maybe_set_string(ht, "user", parts.user);
+    pu_maybe_set_string(ht, "pass", parts.pass);
     pu_maybe_set_string(ht, "path", parts.path);
     pu_maybe_set_string(ht, "query", parts.query);
     pu_maybe_set_string(ht, "fragment", parts.fragment);
