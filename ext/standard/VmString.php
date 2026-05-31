@@ -1170,6 +1170,8 @@ final class VmString
         $scheme = null;
         $host = null;
         $port = null;
+        $user = null;
+        $pass = null;
         $path = '';
         $query = null;
         $fragment = null;
@@ -1187,7 +1189,18 @@ final class VmString
                 $authority = false === $end ? $rest : substr($rest, 0, $end);
                 $rest = false === $end ? '' : substr($rest, $end);
                 if (str_contains($authority, '@')) {
-                    $authority = substr($authority, strrpos($authority, '@') + 1);
+                    $atPos = strrpos($authority, '@');
+                    $userinfo = substr($authority, 0, $atPos);
+                    $authority = substr($authority, $atPos + 1);
+                    if ('' !== $userinfo) {
+                        $colonPos = strpos($userinfo, ':');
+                        if (false !== $colonPos) {
+                            $user = substr($userinfo, 0, $colonPos);
+                            $pass = substr($userinfo, $colonPos + 1);
+                        } else {
+                            $user = $userinfo;
+                        }
+                    }
                 }
                 if (str_contains($authority, ':')) {
                     [$host, $portStr] = explode(':', $authority, 2);
@@ -1211,6 +1224,8 @@ final class VmString
             'scheme' => $scheme,
             'host' => $host,
             'port' => $port,
+            'user' => $user,
+            'pass' => $pass,
             'path' => $path,
             'query' => $query,
             'fragment' => $fragment,
@@ -1234,6 +1249,10 @@ final class VmString
                 return $host;
             case \PHP_URL_PORT:
                 return $port;
+            case \PHP_URL_USER:
+                return $user;
+            case \PHP_URL_PASS:
+                return $pass;
             case \PHP_URL_PATH:
                 return $path;
             case \PHP_URL_QUERY:
