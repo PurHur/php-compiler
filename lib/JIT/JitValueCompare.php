@@ -641,7 +641,12 @@ final class JitValueCompare
         $endPtrSlot = $context->builder->alloca($i8p, 1, 'loose_strlong_strtol_end');
         $nullEnd = $i8p->constNull();
         $context->builder->store($nullEnd, $endPtrSlot);
-        $parsed = $context->builder->call($context->lookupFunction('strtol'), $charPtr, $endPtrSlot, $i64->constInt(10, false));
+        $parsed = $context->builder->call(
+            $context->lookupFunction('strtol'),
+            $charPtr,
+            $endPtrSlot,
+            $context->getTypeFromString('int32')->constInt(10, false)
+        );
         $parsedI64 = $parsed->typeOf() === $i64 ? $parsed : $context->builder->zExt($parsed, $i64);
         $intMatch = $context->builder->and(
             $isIntegerNumeric,
@@ -722,7 +727,12 @@ final class JitValueCompare
         $endPtrSlot = $context->builder->alloca($i8p, 1, 'loose_str_is_int_end');
         $nullEnd = $i8p->constNull();
         $context->builder->store($nullEnd, $endPtrSlot);
-        $context->builder->call($context->lookupFunction('strtol'), $charPtr, $endPtrSlot, $i64->constInt(10, false));
+        $context->builder->call(
+            $context->lookupFunction('strtol'),
+            $charPtr,
+            $endPtrSlot,
+            $context->getTypeFromString('int32')->constInt(10, false)
+        );
         $endPtr = $context->builder->load($endPtrSlot);
         $endOffset = $context->builder->sub(
             $context->builder->ptrToInt($endPtr, $i64),
