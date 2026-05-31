@@ -32,9 +32,12 @@ final class parse_str extends Internal
             throw new \LogicException('parse_str() argument #1 must be a string in this compiler build');
         }
         if (1 === $argc) {
-            throw new \LogicException(
-                'parse_str() without a result array is not supported in this compiler build'
-            );
+            $caller = VmScope::requireCaller($frame);
+            $params = [];
+            \parse_str($encoded->toString(), $params);
+            VmParseStr::importIntoCaller($caller, $params);
+
+            return;
         }
 
         $resultArg = $frame->calledArgs[1];
@@ -62,9 +65,9 @@ final class parse_str extends Internal
             throw new \LogicException('parse_str() requires one or two arguments in this compiler build');
         }
         if (1 === \count($args)) {
-            throw new \LogicException(
-                'parse_str() without a result array is not supported in this compiler build'
-            );
+            JitParseStr::parseIntoScope($context, $args[0]);
+
+            return $context->getTypeFromString('int32')->constInt(0, false);
         }
 
         JitParseStr::parse($context, $args[0], $args[1]);

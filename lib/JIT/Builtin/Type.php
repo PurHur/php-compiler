@@ -821,14 +821,6 @@ class Type extends Builtin {
             $fntypeHttpBuildQuery
         );
         $this->context->registerFunction('__compiler_http_build_query', $fnHttpBuildQuery);
-        $fntypeParseStr = $this->context->context->functionType(
-            $this->context->getTypeFromString('void'),
-            false,
-            $this->context->getTypeFromString('__hashtable__*'),
-            $strPtr
-        );
-        $fnParseStr = $this->context->module->addFunction('__compiler_parse_str', $fntypeParseStr);
-        $this->context->registerFunction('__compiler_parse_str', $fnParseStr);
         // $this->maskedarray->register();
         // $this->nativearray->register();
     }
