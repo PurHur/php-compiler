@@ -625,11 +625,13 @@ class Block {
             }
             if (null !== $frame && 'this' === self::resolveVariableName($op)) {
                 if (!empty($frame->callArgs)) {
-                    $scope[$pos] = $frame->callArgs[0];
+                    $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    $scope[$pos]->copyFrom($frame->callArgs[0]);
                     continue;
                 }
                 if (!empty($frame->calledArgs)) {
-                    $scope[$pos] = $frame->calledArgs[0];
+                    $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    $scope[$pos]->copyFrom($frame->calledArgs[0]);
                     continue;
                 }
             }
