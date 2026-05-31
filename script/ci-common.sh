@@ -916,6 +916,22 @@ ci_run_bootstrap_m3_strict() {
     "$_CI_SCRIPT_DIR/bootstrap-selfhost-helloworld-probe.sh"
 }
 
+# M4 gen-2 strict native emit (issue #2075); default on in ci-local (#2112); after M3 strict gates.
+ci_run_bootstrap_m4_gen2_strict() {
+  if [[ "${BOOTSTRAP_M4_GEN2_STRICT_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "bootstrap-m4-gen2-strict: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "bootstrap-m4-gen2-strict (BOOTSTRAP_M4_GEN2_STRICT_GATE=1, issue #2112/#2075)..."
+  if ! BOOTSTRAP_M4_GEN2_STRICT=1 "$_CI_SCRIPT_DIR/bootstrap-loop-gen1-link.sh"; then
+    echo "bootstrap-m4-gen2-strict: failed — see docs/bootstrap-selfhost.md (#2112)" >&2
+    return 1
+  fi
+}
+
 # M4 bootstrap-loop dry-run probe in ci-local LLVM tail (issue #2058); after M3 strict gates.
 # M5 bootstrap driver: native helloworld compile driver emits + runs gen-2 without Zend on compile (#1521).
 ci_run_bootstrap_m5_driver_smoke() {

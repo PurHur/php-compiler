@@ -1708,6 +1708,38 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#1866', $docSelfhost);
     }
 
+    public function testCiLocalHonorsBootstrapM4Gen2StrictGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_m4_gen2_strict', $local);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('BOOTSTRAP_M4_GEN2_STRICT_GATE', $common);
+        $this->assertStringContainsString('BOOTSTRAP_M4_GEN2_STRICT_GATE:-1', $common);
+        $this->assertStringContainsString('bootstrap-loop-gen1-link.sh', $common);
+        $this->assertStringContainsString('BOOTSTRAP_M4_GEN2_STRICT=1', $common);
+
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'BOOTSTRAP_M4_GEN2_STRICT_GATE="${BOOTSTRAP_M4_GEN2_STRICT_GATE:-1}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#2112', $defaults);
+    }
+
+    public function testLocalCiMatrixDocumentsBootstrapM4Gen2StrictGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('BOOTSTRAP_M4_GEN2_STRICT_GATE', $doc);
+        $this->assertStringContainsString('bootstrap-loop-gen1-link.sh', $doc);
+        $this->assertMatchesRegularExpression('/\| `BOOTSTRAP_M4_GEN2_STRICT_GATE` \| `1` \|/', $doc);
+
+        $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
+        $this->assertStringContainsString('BOOTSTRAP_M4_GEN2_STRICT_GATE', $docSelfhost);
+        $this->assertStringContainsString('BOOTSTRAP_M4_GEN2_STRICT_GATE=0', $docSelfhost);
+        $this->assertStringContainsString('#2112', $docSelfhost);
+    }
+
     public function testCiDefaultsEnvDefinesBootstrapLibSpineVmSmokeGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');

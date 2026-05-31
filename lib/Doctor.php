@@ -167,6 +167,7 @@ final class Doctor
         $ns3Default = $defaults['NORTH_STAR3_VERIFY_GATE'] ?? '0';
         $ns4Default = $defaults['NORTH_STAR4_VERIFY_GATE'] ?? '0';
         $m3HelloStrictDefault = $defaults['BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE'] ?? '0';
+        $m4Gen2StrictDefault = $defaults['BOOTSTRAP_M4_GEN2_STRICT_GATE'] ?? '1';
         $m3SmokeStrictDefault = $defaults['BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE'] ?? '1';
         $m3SmokeProbeDefault = $defaults['BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE'] ?? '1';
         $runtimeSmokeProbeDefault = $defaults['BOOTSTRAP_RUNTIME_COMPILE_SMOKE_PROBE_GATE'] ?? '1';
@@ -230,6 +231,10 @@ final class Doctor
         fwrite(STDOUT, "   BOOTSTRAP_M3_HELLOWORLD_STRICT=1 … helloworld-probe.sh  (no Zend fallback; #1493)\n");
         fwrite(STDOUT, "   Emit TU: test/selfhost/compiler_helloworld_smoke/compile_driver.php (#1768)\n\n");
 
+        fwrite(STDOUT, "3b. M4 gen-2 strict (ci-local LLVM tail)\n");
+        fwrite(STDOUT, "   BOOTSTRAP_M4_GEN2_STRICT_GATE=".(self::gateEnabled('BOOTSTRAP_M4_GEN2_STRICT_GATE', $m4Gen2StrictDefault) ? '1' : '0')." (default {$m4Gen2StrictDefault}) — bootstrap-loop-gen1-link.sh ([#2112](https://github.com/PurHur/php-compiler/issues/2112))\n");
+        fwrite(STDOUT, "   BOOTSTRAP_M4_GEN2_STRICT=1 ./script/bootstrap-loop-gen1-link.sh  (no Zend fallback; #2075)\n\n");
+
         fwrite(STDOUT, "4. Presenter / fast CI\n");
         fwrite(STDOUT, "   NORTH_STAR2_VERIFY_GATE=".(self::gateEnabled('NORTH_STAR2_VERIFY_GATE', $ns2Default) ? '1' : '0')." (default {$ns2Default}) — ci-fast\n");
         fwrite(STDOUT, "   NORTH_STAR3_VERIFY_GATE=".(self::gateEnabled('NORTH_STAR3_VERIFY_GATE', $ns3Default) ? '1' : '0')." (default {$ns3Default}) — ci-fast opt-in ([#2396](https://github.com/PurHur/php-compiler/issues/2396))\n");
@@ -254,6 +259,7 @@ final class Doctor
 
         fwrite(STDOUT, "5. M4 loop\n");
         fwrite(STDOUT, "   BOOTSTRAP_LOOP_PROBE_GATE=".(self::gateEnabled('BOOTSTRAP_LOOP_PROBE_GATE', $loopProbeDefault) ? '1' : '0')." (default {$loopProbeDefault}) — ci-fast ./script/bootstrap-loop-probe.sh --dry-run\n");
+        fwrite(STDOUT, "   BOOTSTRAP_M4_GEN2_STRICT_GATE=".(self::gateEnabled('BOOTSTRAP_M4_GEN2_STRICT_GATE', $m4Gen2StrictDefault) ? '1' : '0')." (default {$m4Gen2StrictDefault}) — ci-local LLVM tail gen-1 link strict ([#2112](https://github.com/PurHur/php-compiler/issues/2112))\n");
         fwrite(STDOUT, "   BOOTSTRAP_M4_LOOP_PROBE=".(self::gateEnabled('BOOTSTRAP_M4_LOOP_PROBE', $m4LoopProbeDefault) ? '1' : '0')." (default {$m4LoopProbeDefault}) — ci-local LLVM tail full M4 ladder (#2780, #2058)\n");
         fwrite(STDOUT, "   SELFHOST_M4_GEN2_SYNC_GATE=".(self::gateEnabled('SELFHOST_M4_GEN2_SYNC_GATE', $m4Gen2SyncDefault) ? '1' : '0')." (default {$m4Gen2SyncDefault}) — ci-fast check-selfhost-m4-gen2-sync.php (#2115, #2175)\n\n");
 
