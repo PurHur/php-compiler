@@ -700,4 +700,32 @@ final class VmReflection
 
         return $result;
     }
+
+    /**
+     * Called class for get_called_class() (issue #3218).
+     *
+     * php-src: ext/standard/basic_functions.c — php_get_called_class()
+     */
+    public static function getCalledClass(Frame $frame): string
+    {
+        $current = $frame->parent;
+        if (null === $current) {
+            throw new \Error('get_called_class() must be called from within a class');
+        }
+        if (null !== $current->calledClass && '' !== $current->calledClass) {
+            return $current->calledClass;
+        }
+        if (null === $current->block || null === $current->block->func || null === $current->block->func->class) {
+            throw new \Error('get_called_class() must be called from within a class');
+        }
+        $thisIdx = $current->block->slotIndexForVariableName('this');
+        if (null !== $thisIdx && isset($current->scope[$thisIdx])) {
+            $thisVar = $current->scope[$thisIdx]->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $thisVar->type) {
+                return $thisVar->toObject()->class->name;
+            }
+        }
+
+        return $current->block->func->class->value;
+    }
 }
