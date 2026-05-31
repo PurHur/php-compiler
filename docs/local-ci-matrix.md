@@ -144,6 +144,8 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `THROWSWEB_SERVE_AOT_SMOKE_GATE` | `1` | `ci-local.sh` (`ci_run_throws_web_serve_aot_smoke`) | `examples-web-smoke.sh --throws-only --aot` — 007 `phpc serve --aot` caught invalid POST ([#2390](https://github.com/PurHur/php-compiler/issues/2390), [#2387](https://github.com/PurHur/php-compiler/issues/2387)); set `0` to skip |
 | `THROWSWEB_SERVE_JIT_SMOKE_GATE` | `1` | `ci-fast.sh` (`ci_run_throws_web_serve_jit_smoke`) | `examples-web-smoke.sh --throws-only --jit` — 007 `phpc serve --jit` caught invalid POST ([#2435](https://github.com/PurHur/php-compiler/issues/2435), [#2408](https://github.com/PurHur/php-compiler/issues/2408)); set `0` to skip |
 | `THROWSWEB_DEPLOY_SMOKE_GATE` | `0` | `deploy-smoke.sh`, `ci-local.sh` | Opt-in 007 deploy + `PHPC_DEPLOY_ROOT` caught invalid POST CGI ([#2124](https://github.com/PurHur/php-compiler/issues/2124), [#2264](https://github.com/PurHur/php-compiler/issues/2264)); VM curls stay on `THROWS_WEB_SMOKE_GATE=1` ([#2125](https://github.com/PurHur/php-compiler/issues/2125)) |
+| `FASTCGI_WEB_SMOKE_GATE` | `1` | `ci-fast.sh`, `ci-local.sh` | `examples-web-smoke.sh --fastcgi-only` / 009 health + PATH_INFO curls ([#2351](https://github.com/PurHur/php-compiler/issues/2351), default-on [#2369](https://github.com/PurHur/php-compiler/issues/2369)); set `0` to skip |
+| `FASTCGI_WEB_AOT_SMOKE_GATE` | `1` | `ci-local.sh` (`ci_run_fastcgi_web_aot_execute`) | `FastCGIWebAotExecuteTest` / `EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh` ([#2352](https://github.com/PurHur/php-compiler/issues/2352), default-on [#2369](https://github.com/PurHur/php-compiler/issues/2369)); set `0` to skip |
 | `DEPLOY_SMOKE_ALL` | `0` | `Makefile` `deploy-smoke` | When `1`, `make deploy-smoke` delegates to `deploy-smoke-all.sh` (same as `make deploy-smoke-all`) ([#2077](https://github.com/PurHur/php-compiler/issues/2077)) |
 | `FASTCGI_WEB_DEPLOY_SMOKE_GATE` | `0` | `deploy-smoke.sh`, `ci-local.sh` | Opt-in 009 deploy + `PHPC_DEPLOY_ROOT` health + PATH_INFO CGI ([#2359](https://github.com/PurHur/php-compiler/issues/2359)); VM curls stay on `FASTCGI_WEB_SMOKE_GATE=1` ([#2351](https://github.com/PurHur/php-compiler/issues/2351)) |
 | `make deploy-smoke-all` | n/a | `script/deploy-smoke-all.sh` | Full deploy ladder 001–003 + opt-in 005/006/007/009; prints skip reasons when gates `0` — probe with `./phpc doctor --gates` ([#2077](https://github.com/PurHur/php-compiler/issues/2077), [#2359](https://github.com/PurHur/php-compiler/issues/2359)) |
@@ -309,22 +311,24 @@ THROWSWEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 007
 
 ## 009-FastCGIWeb gates ([#2331](https://github.com/PurHur/php-compiler/issues/2331), [#2351](https://github.com/PurHur/php-compiler/issues/2351))
 
-Progressive ladder (VM serve → AOT execute → deploy CGI). VM serve smoke is opt-in until default-on follow-up. Copy-paste ladder: `./phpc doctor --gates` (grep `009-FastCGIWeb`).
+Progressive ladder (VM serve → AOT execute → deploy CGI). VM serve and AOT execute smokes are default-on in `ci-fast` / `ci-local` ([#2369](https://github.com/PurHur/php-compiler/issues/2369)). Copy-paste ladder: `./phpc doctor --gates` (grep `009-FastCGIWeb`).
 
 | Stage | Variable | Default | When enabled |
 |-------|----------|---------|--------------|
 | FastCGI PHPUnit adapter | `FASTCGI_SMOKE_GATE` | `0` | `FASTCGI_SMOKE_GATE=1 ./script/ci-local.sh --filter 'FastCgiRecordTest\|FastCgiTest'` ([#173](https://github.com/PurHur/php-compiler/issues/173), [#1899](https://github.com/PurHur/php-compiler/issues/1899)) |
 | FastCGI worker CLI | _(n/a)_ | — | `./phpc fcgi --project examples/009-FastCGIWeb` · `./phpc fcgi --help` ([#2427](https://github.com/PurHur/php-compiler/issues/2427)) |
-| VM health + PATH_INFO | `FASTCGI_WEB_SMOKE_GATE` | `0` | `make examples-fastcgiweb-smoke` · `ci-fast` when `=1` ([#2351](https://github.com/PurHur/php-compiler/issues/2351)) |
-| AOT execute | `FASTCGI_WEB_AOT_SMOKE_GATE` | `0` | `EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh` ([#2352](https://github.com/PurHur/php-compiler/issues/2352)) |
+| VM health + PATH_INFO | `FASTCGI_WEB_SMOKE_GATE` | `1` | `make examples-fastcgiweb-smoke` · `ci-fast` default ([#2351](https://github.com/PurHur/php-compiler/issues/2351), [#2369](https://github.com/PurHur/php-compiler/issues/2369)) |
+| AOT execute | `FASTCGI_WEB_AOT_SMOKE_GATE` | `1` | `EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh` · `ci-local` LLVM tail ([#2352](https://github.com/PurHur/php-compiler/issues/2352), [#2369](https://github.com/PurHur/php-compiler/issues/2369)) |
 | Deploy CGI | `FASTCGI_WEB_DEPLOY_SMOKE_GATE` | `0` | `FASTCGI_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all` ([#2359](https://github.com/PurHur/php-compiler/issues/2359)); `make examples-fastcgiweb-deploy-smoke` (009 only) |
 
 ```bash
 ./phpc doctor --gates | grep -E 'FASTCGI|009-FastCGIWeb'
 FASTCGI_SMOKE_GATE=1 ./script/ci-local.sh --filter 'FastCgiRecordTest|FastCgiTest'
-FASTCGI_WEB_SMOKE_GATE=1 make examples-fastcgiweb-smoke
-FASTCGI_WEB_SMOKE_GATE=1 ./script/examples-web-smoke.sh --fastcgi-only
-FASTCGI_WEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh
+make examples-fastcgiweb-smoke
+./script/examples-web-smoke.sh --fastcgi-only
+EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh
+FASTCGI_WEB_SMOKE_GATE=0 ./script/ci-fast.sh   # opt-out 009 VM serve curls (#2369)
+FASTCGI_WEB_AOT_SMOKE_GATE=0 ./script/ci-local.sh   # opt-out 009 AOT execute (#2369)
 make examples-fastcgiweb-deploy-smoke
 FASTCGI_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 009
 ```
