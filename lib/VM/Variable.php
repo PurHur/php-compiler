@@ -452,7 +452,7 @@ final class Variable {
     }
 
     public function object(ObjectEntry $value): void {
-        if (self::TYPE_OBJECT === $this->type && $this->object->id === $value->id) {
+        if (self::TYPE_OBJECT === $this->type && isset($this->object) && $this->object->id === $value->id) {
             return;
         }
         $this->reset();
@@ -497,7 +497,7 @@ final class Variable {
     }
 
     public function reset(): void {
-        if (self::TYPE_OBJECT === $this->type) {
+        if (self::TYPE_OBJECT === $this->type && isset($this->object)) {
             ObjectLifetime::releaseRef($this->object);
         }
         $this->releaseArrayRef();
@@ -646,6 +646,10 @@ final class Variable {
                 $this->bool($var->bool);
                 break;
             case self::TYPE_OBJECT:
+                if (!isset($var->object)) {
+                    $this->null();
+                    break;
+                }
                 $this->object($var->object);
                 break;
             case self::TYPE_ENUM_CASE:
