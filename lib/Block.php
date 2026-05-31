@@ -1194,6 +1194,6 @@ class Block {
             || self::containsArrayAccessObjectOpcodes($root)
             || self::containsDynamicStaticPropertyOpcodes($root)
             || self::containsTypedNonVoidReturnOpcodes($root)
-            || self::containsClosureUseCaptureOpcodes($root);
+            || self::containsClosureByRefCaptureOpcodes($root);
     }
 }

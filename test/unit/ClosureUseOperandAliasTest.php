@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class ClosureUseOperandAliasTest extends TestCase
 {
-    public function testClosureUseReassignAfterCaptureCompilesViaVmFallback(): void
+    public function testClosureUseReassignAfterCaptureDoesNotRequireVmLowering(): void
     {
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(
@@ -28,6 +28,6 @@ PHP,
         );
         $this->assertNotNull($block);
         $this->assertTrue(Block::containsClosureUseCaptureOpcodes($block));
-        $this->assertTrue(Block::requiresVmLowering($block));
+        $this->assertFalse(Block::requiresVmLowering($block));
     }
 }
