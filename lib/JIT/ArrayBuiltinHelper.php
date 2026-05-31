@@ -3876,29 +3876,29 @@ final class ArrayBuiltinHelper
         }
 
         $i1 = $context->getTypeFromString('int1');
-        $allListsSlot = $context->builder->alloca($i1, 1, 'array_merge_all_lists');
-        $context->builder->store($context->constantFromBool(true), $allListsSlot);
+        $allReindexableSlot = $context->builder->alloca($i1, 1, 'array_merge_all_reindexable');
+        $context->builder->store($context->constantFromBool(true), $allReindexableSlot);
 
         $hts = [];
         foreach ($arrays as $array) {
             $ht = self::loadHashTable($context, $array);
             $hts[] = $ht;
-            $isList = \PHPCompiler\ext\standard\JitArrayIsList::hashTableIsList($context, $ht);
+            $isReindexable = \PHPCompiler\ext\standard\JitArrayIsList::hashTableIsReindexableList($context, $ht);
             $context->builder->store(
-                $context->builder->and($context->builder->load($allListsSlot), $isList),
-                $allListsSlot
+                $context->builder->and($context->builder->load($allReindexableSlot), $isReindexable),
+                $allReindexableSlot
             );
         }
 
         $listBb = BasicBlockHelper::append($context, 'array_merge_list');
         $assocBb = BasicBlockHelper::append($context, 'array_merge_assoc');
         $mergeDone = BasicBlockHelper::append($context, 'array_merge_done');
-        $context->builder->branchIf($context->builder->load($allListsSlot), $listBb, $assocBb);
+        $context->builder->branchIf($context->builder->load($allReindexableSlot), $listBb, $assocBb);
 
         $context->builder->positionAtEnd($listBb);
         $listResult = HashTableHelper::alloc($context);
         foreach ($hts as $ht) {
-            self::copyInto($context, $listResult, $ht);
+            self::copyReindexableInto($context, $listResult, $ht);
         }
         $listEndBb = $context->builder->getInsertBlock();
         $context->builder->branch($mergeDone);
@@ -4956,8 +4956,18 @@ final class ArrayBuiltinHelper
 
     public static function copyInto(Context $context, Value $dest, Value $src): void
     {
+        self::copyReindexableInto($context, $dest, $src);
+    }
+
+    /**
+     * Append values from a packed list or numeric-string-key list (#3607).
+     */
+    public static function copyReindexableInto(Context $context, Value $dest, Value $src): void
+    {
         $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
         $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
         $idxSlot = $context->builder->alloca($sizeT, 1, 'merge_idx');
         $context->builder->store($zero, $idxSlot);
         $num = $context->builder->call(
@@ -4968,6 +4978,9 @@ final class ArrayBuiltinHelper
         $done = BasicBlockHelper::append($context, 'merge_copy_done');
         $head = BasicBlockHelper::append($context, 'merge_copy_head');
         $body = BasicBlockHelper::append($context, 'merge_copy_body');
+        $bodyInt = BasicBlockHelper::append($context, 'merge_copy_body_int');
+        $bodyStr = BasicBlockHelper::append($context, 'merge_copy_body_str');
+        $bodyStore = BasicBlockHelper::append($context, 'merge_copy_body_store');
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($head);
@@ -4976,11 +4989,35 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
+        $presentInt = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $idx
+        );
+        $context->builder->branchIf($presentInt, $bodyInt, $bodyStr);
+
+        $context->builder->positionAtEnd($bodyInt);
+        $srcEntryInt = self::listEntryAt($context, $src, $idx);
+        $context->builder->branch($bodyStore);
+
+        $context->builder->positionAtEnd($bodyStr);
+        $idxI64 = $context->builder->zExt($idx, $i64);
+        $keyStr = \PHPCompiler\JIT\JitNativeString::formatIndexKey($context, $idxI64);
+        $srcEntryStr = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringKeyValue'),
+            $src,
+            $keyStr
+        );
+        $context->builder->branch($bodyStore);
+
+        $context->builder->positionAtEnd($bodyStore);
+        $srcEntry = $context->builder->phi($srcEntryInt->typeOf());
+        $srcEntry->addIncoming($srcEntryInt, $bodyInt);
+        $srcEntry->addIncoming($srcEntryStr, $bodyStr);
         $destMap = $context->structFieldMap['__hashtable__'];
         $destNextPtr = $context->builder->structGep($dest, $destMap['nextFreeElement']);
         $destIdx = $context->builder->load($destNextPtr);
-        self::copyPackedListEntry($context, $src, $idx, $dest, $destIdx);
-        $one = $sizeT->constInt(1, false);
+        self::copyPackedValueEntry($context, $srcEntry, $dest, $destIdx);
         $context->builder->store(
             $context->builder->addNoSignedWrap($idx, $one),
             $idxSlot
