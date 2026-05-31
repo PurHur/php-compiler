@@ -376,6 +376,18 @@ class Compiler {
                 return;
             }
         }
+        if ($this->cfgTypeUsesDnfShape($returnType)) {
+            $dnfArms = DnfType::armsFromCfgType(
+                $returnType,
+                fn (Op\Type\Intersection $t) => $this->intersectionNamesFromCfgType($t),
+                fn (Op\Type\Intersection $t) => $this->intersectionDisplayFromCfgType($t)
+            );
+            if (DnfType::hasConstraints($dnfArms)) {
+                $block->returnDnfConstraints = $dnfArms;
+
+                return;
+            }
+        }
         if ($returnType instanceof Op\Type\Literal) {
             if ('void' === $returnType->name) {
                 $block->returnTypeVoid = true;

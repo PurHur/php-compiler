@@ -564,10 +564,10 @@ function syntaxRowDefinitions(): array
             'opcodes' => ['TYPE_DECLARE_INTERFACE', 'TYPE_DECLARE_CLASS', 'TYPE_DECLARE_PROPERTY', 'TYPE_ARG_RECV'],
             'issue' => 3094,
             'notes' => [
-                'php-cfg Union + Intersection; TypeReconstructor TYPE_INTERSECTION; VM DnfCheck on param/property',
+                'php-cfg Union + Intersection; TypeReconstructor TYPE_INTERSECTION; VM DnfCheck on param/property/return',
                 'Parenthesized DNF only (php-parser 4.x); ref Zend/zend_compile.c',
             ],
-            'probe' => 'interface A {} interface B {} class C implements A, B {} function f((A&B)|null $x): int { return null === $x ? 0 : 1; } echo f(new C());',
+            'probe' => 'interface A {} interface B {} class C implements A, B {} function f(): (A&B)|null { return new C(); } echo null === f() ? 0 : 1;',
             'jit' => false,
             'aot' => false,
         ],

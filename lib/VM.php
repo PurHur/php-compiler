@@ -2408,7 +2408,16 @@ restart:
         return self::SUCCESS;
 
         return_void_complete:
-        $this->enforceReturnType($frame, null);
+        try {
+            $this->enforceReturnType($frame, null);
+        } catch (\TypeError $e) {
+            $catchFrame = $this->dispatchVmTypeError($e, $frame);
+            if (null !== $catchFrame) {
+                $frame = $catchFrame;
+                goto restart;
+            }
+            return self::FAIL;
+        }
         // Do not null returnVar: it may alias the caller result slot (#1885).
         $this->markObjectConstructedIfLeavingConstruct($frame);
         $gen = $this->findGeneratorState($frame);
@@ -2427,7 +2436,16 @@ restart:
         goto nextframe;
 
         return_value_complete:
-        $this->enforceReturnType($frame, $returnValue);
+        try {
+            $this->enforceReturnType($frame, $returnValue);
+        } catch (\TypeError $e) {
+            $catchFrame = $this->dispatchVmTypeError($e, $frame);
+            if (null !== $catchFrame) {
+                $frame = $catchFrame;
+                goto restart;
+            }
+            return self::FAIL;
+        }
         $gen = $this->findGeneratorState($frame);
         if (null !== $gen) {
             $gen->markReturned($returnValue);
@@ -4849,6 +4867,16 @@ restart:
                 $value,
                 $this->lateStaticClassLc($frame),
                 $this->context
+            );
+
+            return;
+        }
+        if (null !== $block->returnDnfConstraints && null !== $value) {
+            DnfCheck::assertMatches(
+                $value,
+                $block->returnDnfConstraints,
+                $this->context,
+                'Return value'
             );
 
             return;
