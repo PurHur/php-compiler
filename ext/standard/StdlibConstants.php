@@ -97,6 +97,16 @@ final class StdlibConstants
     /** preg_grep() flags (ext/pcre/php_pcre.c). */
     public const PREG_GREP_INVERT = 1;
 
+    /** glob() flags (ext/standard/dir.c / glob.h; values match php-src on Linux). */
+    public const GLOB_ERR = 1;
+    public const GLOB_MARK = 2;
+    public const GLOB_NOSORT = 4;
+    public const GLOB_NOCHECK = 16;
+    public const GLOB_NOESCAPE = 64;
+    public const GLOB_BRACE = 1024;
+    public const GLOB_ONLYDIR = 8192;
+    public const GLOB_AVAILABLE_FLAGS = 9303;
+
     /** Lowercase name => int value for VM\Context::constantFetch(). */
     public const CORE_INT_BY_NAME = [
         'str_pad_left' => self::STR_PAD_LEFT,
@@ -151,6 +161,14 @@ final class StdlibConstants
         'preg_split_delim_capture' => self::PREG_SPLIT_DELIM_CAPTURE,
         'preg_split_offset_capture' => self::PREG_SPLIT_OFFSET_CAPTURE,
         'preg_grep_invert' => self::PREG_GREP_INVERT,
+        'glob_err' => self::GLOB_ERR,
+        'glob_mark' => self::GLOB_MARK,
+        'glob_nosort' => self::GLOB_NOSORT,
+        'glob_nocheck' => self::GLOB_NOCHECK,
+        'glob_noescape' => self::GLOB_NOESCAPE,
+        'glob_brace' => self::GLOB_BRACE,
+        'glob_onlydir' => self::GLOB_ONLYDIR,
+        'glob_available_flags' => self::GLOB_AVAILABLE_FLAGS,
     ];
 
     /** Lowercase name => float value for VM\Context::constantFetch(). */
@@ -228,6 +246,14 @@ final class StdlibConstants
         'preg_split_delim_capture',
         'preg_split_offset_capture',
         'preg_grep_invert',
+        'glob_err',
+        'glob_mark',
+        'glob_nosort',
+        'glob_nocheck',
+        'glob_noescape',
+        'glob_brace',
+        'glob_onlydir',
+        'glob_available_flags',
         'm_e',
         'm_log2e',
         'm_log10e',
