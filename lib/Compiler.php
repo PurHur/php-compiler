@@ -2704,6 +2704,8 @@ class Compiler {
             $block->addOpCode($op);
         } elseif ($stmt instanceof Op\Stmt\TryCatch) {
             $merge = $this->compileCfgBranch($stmt->end, $block);
+            // Merge block is entered via TYPE_CATCH before catch locals exist (#195, #2084).
+            $merge->inheritUndefinedLocals = true;
             $try = $this->compileCfgBranch($stmt->try, $block);
             $try->inheritUndefinedLocals = true;
             $tryOp = new OpCode(OpCode::TYPE_TRY);
@@ -2725,11 +2727,13 @@ class Compiler {
             }
             if (null !== $stmt->finally) {
                 $compiledFinally = $this->compileCfgBranch($stmt->finally, $block);
+                // Catch runs before finally on throw; finally block must not inherit catch locals (#195).
+                $compiledFinally->inheritUndefinedLocals = true;
                 $finallyOp = new OpCode(OpCode::TYPE_FINALLY);
                 $finallyOp->block1 = $compiledFinally;
                 $finallyOp->block2 = $merge;
                 $block->addOpCode($finallyOp);
-                $this->rewriteTryMergeJumpsToFinally($try, $merge, $compiledFinally);
+                $this->rewriteMergeJumpsToFinally($try, $merge, $compiledFinally);
             }
         } elseif ($stmt instanceof Op\Stmt\Switch_) {
             $this->compileSwitchAsJumpIfChain($stmt, $block);
@@ -3204,11 +3208,13 @@ class Compiler {
                     }
                 }
                 $resultSlot = $this->compileOperand($expr->result, $block, false);
+                $line = $expr->getLine();
                 $return = [
                     new OpCode(
                         OpCode::TYPE_NEW,
                         $resultSlot,
                         $this->compileOperand($expr->class, $block, true),
+                        $line > 0 ? $line : null
                     )
                 ];
                 foreach ($this->compileCallArgSends($expr->args, $block) as $send) {
@@ -3651,9 +3657,11 @@ class Compiler {
         if (null === $throwSlot) {
             $throwSlot = $this->compileOperand($expr->expr, $block, true);
         }
+        $line = $expr->getLine();
         $ops[] = new OpCode(
             OpCode::TYPE_THROW,
-            $throwSlot
+            $throwSlot,
+            $line > 0 ? $line : null
         );
 
         return $ops;
@@ -3695,11 +3703,13 @@ class Compiler {
         if (null !== $mergeEcho && $resultSlot === $mergeEcho) {
             $resultSlot = $block->forceFreshVarSlot($expr->result);
         }
+        $line = $expr->getLine();
         $return = [
             new OpCode(
                 OpCode::TYPE_NEW,
                 $resultSlot,
                 $this->compileOperand($expr->class, $block, true),
+                $line > 0 ? $line : null
             ),
         ];
         foreach ($this->compileCallArgSends($expr->args, $block) as $send) {
@@ -4518,12 +4528,12 @@ class Compiler {
     }
 
     /**
-     * Normal try completion must run finally before merge; php-cfg jumps try straight to end (#2114).
+     * Normal try/catch completion must run finally before merge; php-cfg jumps straight to end (#2114, #195).
      */
-    private function rewriteTryMergeJumpsToFinally(Block $try, Block $merge, Block $finally): void
+    private function rewriteMergeJumpsToFinally(Block $source, Block $merge, Block $finally): void
     {
-        for ($i = 0; $i < $try->nOpCodes; ++$i) {
-            $op = $try->opCodes[$i];
+        for ($i = 0; $i < $source->nOpCodes; ++$i) {
+            $op = $source->opCodes[$i];
             if (OpCode::TYPE_JUMP === $op->type && $op->block1 === $merge) {
                 $op->block1 = $finally;
             }
@@ -4573,9 +4583,9 @@ class Compiler {
         if (null !== $slot) {
             return $slot;
         }
-        $name = $this->resolveCatchVariableName($catchVar);
-        if (null !== $name) {
-            return $compiledCatch->slotIndexForVariableName($name);
+        if (null !== $this->resolveCatchVariableName($catchVar)) {
+            // Catch body may reference $e only from nested try blocks (#195, #2084).
+            return $compiledCatch->getVarSlot($catchVar, false);
         }
 
         return null;
@@ -5009,9 +5019,12 @@ class Compiler {
                     return [new OpCode(OpCode::TYPE_RETHROW)];
                 }
 
+                $line = $terminal->getLine();
+
                 return [new OpCode(
                     OpCode::TYPE_THROW,
-                    $this->compileOperand($terminal->expr, $block, true)
+                    $this->compileOperand($terminal->expr, $block, true),
+                    $line > 0 ? $line : null
                 )];
             case 'Terminal_Unset':
                 $ops = [];

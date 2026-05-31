@@ -48,18 +48,23 @@ final class ExceptionSupport
 
     public static function objectImplementsThrowable(ObjectEntry $obj, ?Context $ctx = null): bool
     {
+        return self::classEntryImplementsThrowable($obj->class, $ctx);
+    }
+
+    public static function classEntryImplementsThrowable(ClassEntry $class, ?Context $ctx = null): bool
+    {
         if (null !== $ctx) {
-            return InterfaceCheck::entryImplements($obj->class, self::CLASS_THROWABLE, $ctx);
+            return InterfaceCheck::entryImplements($class, self::CLASS_THROWABLE, $ctx);
         }
-        $lc = strtolower($obj->class->name);
-        if (self::CLASS_EXCEPTION === $lc || self::CLASS_ERROR === $lc) {
+        $lc = strtolower($class->name);
+        if (self::CLASS_EXCEPTION === $lc || self::CLASS_ERROR === $lc || self::CLASS_LOGIC_EXCEPTION === $lc) {
             return true;
         }
         if (self::isBuiltinErrorSubclass($lc)) {
             return true;
         }
 
-        return in_array(self::CLASS_THROWABLE, $obj->class->interfaces, true);
+        return in_array(self::CLASS_THROWABLE, $class->interfaces, true);
     }
 
     public static function isBuiltinErrorSubclass(string $lc): bool
@@ -98,7 +103,16 @@ final class ExceptionSupport
         $receiver->getProperty(self::PROP_MESSAGE)->string($message);
         $receiver->getProperty(self::PROP_CODE)->int($code);
         $receiver->getProperty(self::PROP_FILE)->string(self::throwSiteFile($frame));
-        $receiver->getProperty(self::PROP_LINE)->int(self::throwSiteLine($frame));
+        $lineProp = $receiver->getProperty(self::PROP_LINE);
+        $line = 0;
+        $lineVar = $lineProp->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $lineVar->type) {
+            $line = $lineVar->toInt();
+        }
+        if ($line <= 0) {
+            $line = self::throwSiteLine($frame);
+        }
+        $lineProp->int($line);
         $receiver->constructed = true;
         if (null !== $frame->returnVar) {
             $frame->returnVar->null();
@@ -119,6 +133,33 @@ final class ExceptionSupport
     public static function throwSiteLine(Frame $frame): int
     {
         return 0;
+    }
+
+    /** Stamp throw-statement line on a Throwable before dispatch (#195). */
+    public static function stampThrowLine(Variable $thrown, int $line): void
+    {
+        $var = $thrown->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            return;
+        }
+        $obj = $var->toObject();
+        if (!self::objectImplementsThrowable($obj)) {
+            return;
+        }
+        $lineProp = $obj->getProperty(self::PROP_LINE);
+        $existing = 0;
+        $lineVar = $lineProp->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $lineVar->type) {
+            $existing = $lineVar->toInt();
+        }
+        // Preserve creation/rethrow line; only stamp inline `throw new` when still unset (#195).
+        if ($existing > 0) {
+            return;
+        }
+        if ($line < 1) {
+            $line = 1;
+        }
+        $lineProp->int($line);
     }
 
     /**

@@ -9,6 +9,7 @@
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Block;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
 use PHPCompiler\Runtime;
@@ -59,6 +60,12 @@ class Context {
 
     /** Handler frame whose catch chain resumes after a throw-path finally (issue #2114). */
     public ?Frame $pendingCatchResumeHandler = null;
+
+    /** Try handler for the innermost catch body exiting to merge (issue #195). */
+    public ?Frame $activeCatchHandlerFrame = null;
+
+    /** Merge block to enter after catch-path finally completes (#195, Zend zend_exceptions.c). */
+    public ?Block $pendingMergeAfterFinally = null;
 
     /** @var array<int, true> handler frame object id => finally already ran for current unwind */
     public array $completedFinallyHandlers = [];
