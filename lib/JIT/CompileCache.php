@@ -167,6 +167,7 @@ final class CompileCache
             return false;
         }
 
+        SuperglobalInit::rebindGlobalsFromModule($context);
         self::restoreExports($context, $block, $meta['exports']);
         self::$skipModuleFuncCompile = true;
 
