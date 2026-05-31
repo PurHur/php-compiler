@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable;
+
 /**
  * VM preg_match() — host PCRE via PHP for reference-compatible captures (issue #93).
  *
@@ -135,19 +138,74 @@ final class VmPreg
     }
 
     /**
-     * @return list<string>|false
+     * @return list<string>|list<array{0: string, 1: int}>|false
      */
-    public static function pregSplit(string $pattern, string $subject) {
+    public static function pregSplit(string $pattern, string $subject, int $limit = -1, int $flags = 0) {
         if (strlen($pattern) > self::MAX_PATTERN_BYTES) {
             return false;
         }
+        $allowed = StdlibConstants::PREG_SPLIT_NO_EMPTY
+            | StdlibConstants::PREG_SPLIT_DELIM_CAPTURE
+            | StdlibConstants::PREG_SPLIT_OFFSET_CAPTURE;
+        if (0 !== ($flags & ~$allowed)) {
+            throw new \LogicException(
+                'preg_split() flags must be a combination of PREG_SPLIT_* constants in this compiler build'
+            );
+        }
 
-        $result = \preg_split($pattern, $subject);
+        $result = \preg_split($pattern, $subject, $limit, $flags);
         self::syncLastErrorFromHost();
         if (false === $result) {
             return false;
         }
 
         return $result;
+    }
+
+    /**
+     * @param list<string>|list<array{0: string, 1: int}> $parts
+     */
+    public static function splitPartsToHashTable(array $parts, int $flags): HashTable
+    {
+        $offsetCapture = 0 !== ($flags & StdlibConstants::PREG_SPLIT_OFFSET_CAPTURE);
+        $ht = new HashTable();
+        foreach ($parts as $part) {
+            $ht->append(self::splitPartToVariable($part, $offsetCapture));
+        }
+
+        return $ht;
+    }
+
+    /**
+     * @param string|array{0: string, 1: int} $part
+     */
+    private static function splitPartToVariable(string|array $part, bool $offsetCapture): Variable
+    {
+        $var = new Variable();
+        if ($offsetCapture) {
+            if (!\is_array($part) || !isset($part[0], $part[1]) || !\is_string($part[0]) || !\is_int($part[1])) {
+                throw new \LogicException(
+                    'preg_split() internal offset capture shape invalid in this compiler build'
+                );
+            }
+            $pair = new HashTable();
+            $str = new Variable();
+            $str->string($part[0]);
+            $pair->append($str);
+            $off = new Variable();
+            $off->int($part[1]);
+            $pair->append($off);
+            $var->array($pair);
+
+            return $var;
+        }
+        if (!\is_string($part)) {
+            throw new \LogicException(
+                'preg_split() internal split part must be a string in this compiler build'
+            );
+        }
+        $var->string($part);
+
+        return $var;
     }
 }

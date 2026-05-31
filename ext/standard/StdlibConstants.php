@@ -89,6 +89,14 @@ final class StdlibConstants
     public const PATHINFO_FILENAME = 8;
     public const PATHINFO_ALL = 15;
 
+    /** preg_split() flags (ext/pcre/php_pcre.c). */
+    public const PREG_SPLIT_NO_EMPTY = 1;
+    public const PREG_SPLIT_DELIM_CAPTURE = 2;
+    public const PREG_SPLIT_OFFSET_CAPTURE = 4;
+
+    /** preg_grep() flags (ext/pcre/php_pcre.c). */
+    public const PREG_GREP_INVERT = 1;
+
     /** Lowercase name => int value for VM\Context::constantFetch(). */
     public const CORE_INT_BY_NAME = [
         'str_pad_left' => self::STR_PAD_LEFT,
@@ -139,6 +147,10 @@ final class StdlibConstants
         'extr_prefix_if_exists' => self::EXTR_PREFIX_IF_EXISTS,
         'extr_if_exists' => self::EXTR_IF_EXISTS,
         'extr_refs' => self::EXTR_REFS,
+        'preg_split_no_empty' => self::PREG_SPLIT_NO_EMPTY,
+        'preg_split_delim_capture' => self::PREG_SPLIT_DELIM_CAPTURE,
+        'preg_split_offset_capture' => self::PREG_SPLIT_OFFSET_CAPTURE,
+        'preg_grep_invert' => self::PREG_GREP_INVERT,
     ];
 
     /** Lowercase name => float value for VM\Context::constantFetch(). */
@@ -212,6 +224,10 @@ final class StdlibConstants
         'extr_prefix_if_exists',
         'extr_if_exists',
         'extr_refs',
+        'preg_split_no_empty',
+        'preg_split_delim_capture',
+        'preg_split_offset_capture',
+        'preg_grep_invert',
         'm_e',
         'm_log2e',
         'm_log10e',
