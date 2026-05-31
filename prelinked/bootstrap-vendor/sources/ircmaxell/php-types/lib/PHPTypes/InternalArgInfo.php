@@ -1834,6 +1834,7 @@ class InternalArgInfo
         'get_declared_classes' => ['array'],
         'get_declared_interfaces' => ['array'],
         'get_declared_traits' => ['array'],
+        'get_declared_functions' => ['array'],
         'get_defined_constants' => ['array', 'categorize=' => 'bool'],
         'get_defined_functions' => ['array'],
         'get_defined_vars' => ['array'],

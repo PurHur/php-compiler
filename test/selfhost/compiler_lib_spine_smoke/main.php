@@ -836,6 +836,7 @@ require_once __DIR__.'/../../../ext/standard/get_declared_enums_.php';
 require_once __DIR__.'/../../../ext/standard/get_declared_interfaces_.php';
 require_once __DIR__.'/../../../ext/standard/get_declared_classes_.php';
 require_once __DIR__.'/../../../ext/standard/get_declared_traits_.php';
+require_once __DIR__.'/../../../ext/standard/get_declared_functions_.php';
 require_once __DIR__.'/../../../ext/standard/get_defined_functions_.php';
 require_once __DIR__.'/../../../ext/standard/get_defined_constants_.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/macro_functions_spine_shim.php';

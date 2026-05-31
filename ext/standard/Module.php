@@ -383,6 +383,7 @@ class Module extends ModuleAbstract
             new get_declared_interfaces_(),
             new get_declared_classes_(),
             new get_declared_traits_(),
+            new get_declared_functions_(),
             new get_defined_functions_(),
             new debug_backtrace(),
             new class_exists_(),

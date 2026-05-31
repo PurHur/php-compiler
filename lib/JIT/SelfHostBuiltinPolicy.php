@@ -175,7 +175,7 @@ final class SelfHostBuiltinPolicy
         'usort' => 'array', 'uasort' => 'array', 'uksort' => 'array',
         'compact' => 'array', 'extract' => 'array', 'defined' => 'array', 'define' => 'array', 'constant' => 'array',
         'get_defined_constants' => 'array', 'get_defined_vars' => 'array', 'get_declared_interfaces' => 'array',
-        'get_declared_classes' => 'array', 'get_declared_traits' => 'array', 'get_defined_functions' => 'array',
+        'get_declared_classes' => 'array', 'get_declared_traits' => 'array', 'get_declared_functions' => 'array', 'get_defined_functions' => 'array',
         'get_loaded_extensions' => 'array',
         'class_exists' => 'array', 'interface_exists' => 'array', 'trait_exists' => 'array',
         'enum_exists' => 'array', 'get_declared_enums' => 'array', 'function_exists' => 'array', 'method_exists' => 'array',

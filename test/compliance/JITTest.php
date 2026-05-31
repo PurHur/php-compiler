@@ -94,8 +94,8 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'halt_compiler')) {
                 continue;
             }
-            // get_defined_functions() MCJIT: VM + dedicated PHPT (#3128); jit.php execute segfaults on merge runtime.
-            if (str_contains($name, 'get_defined_functions')) {
+            // get_defined_functions()/get_declared_functions() MCJIT: VM + dedicated PHPT (#3128/#3739); jit.php execute segfaults on merge runtime.
+            if (str_contains($name, 'get_defined_functions') || str_contains($name, 'get_declared_functions')) {
                 continue;
             }
             // stream_set_timeout/chunk_size MCJIT: VM + AOT (#3754); jit.php execute exit -1 until stable.
