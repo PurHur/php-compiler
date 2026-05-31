@@ -1865,6 +1865,30 @@ __string__ *__compiler_sprintf(__string__ *fmt, long long argc, __value__ *argv)
     return cstr_to_string(out);
 }
 
+extern void __phpc_ob_echo_substr(const char *s, unsigned long len);
+
+/**
+ * LLVM/AOT runtime: printf() subset — format, write via ob/SAPI echo, return byte length.
+ */
+long long __compiler_printf(__string__ *fmt, long long argc, __value__ *argv)
+{
+    __string__ *out;
+    const char *data;
+    size_t len;
+
+    out = __compiler_sprintf(fmt, argc, argv);
+    if (NULL == out) {
+        return 0;
+    }
+    data = nf_strdata(out);
+    len = nf_strlen(out);
+    if (len > 0 && NULL != data) {
+        __phpc_ob_echo_substr(data, (unsigned long) len);
+    }
+
+    return (long long) len;
+}
+
 /**
  * LLVM/AOT runtime: number_format() subset (int/float, custom separators).
  */

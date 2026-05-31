@@ -163,6 +163,7 @@ class Module extends ModuleAbstract
             new uasort_(),
             new uksort_(),
             new sprintf_(),
+            new printf_(),
             new array_values(),
             new array_keys(),
             new array_merge(),
