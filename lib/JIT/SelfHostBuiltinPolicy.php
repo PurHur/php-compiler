@@ -122,7 +122,7 @@ final class SelfHostBuiltinPolicy
         'sizeof' => 'string', 'gettype' => 'string', 'get_debug_type' => 'string', 'var_export' => 'string',
         'str_replace' => 'string', 'str_ireplace' => 'string', 'strtr' => 'string', 'str_rot13' => 'string',
         'str_increment' => 'string', 'str_decrement' => 'string', 'strval' => 'string',
-        'strip_tags' => 'string',         'sprintf' => 'string', 'chr' => 'string', 'number_format' => 'string',
+        'strip_tags' => 'string',         'sprintf' => 'string', 'printf' => 'string', 'chr' => 'string', 'number_format' => 'string',
         'phpversion' => 'string', 'php_sapi_name' => 'string', 'php_uname' => 'string',
         'version_compare' => 'string', 'extension_loaded' => 'string', 'get_loaded_extensions' => 'array',
         'soundex' => 'string',
