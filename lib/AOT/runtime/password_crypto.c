@@ -1,5 +1,5 @@
 /*
- * password_hash() / password_verify() for AOT/JIT (issue #172 follow-up).
+ * password_hash() / password_verify() / password_get_info() for AOT/JIT.
  * PASSWORD_DEFAULT / PASSWORD_BCRYPT via libcrypt(3); no OpenSSL.
  */
 
@@ -14,6 +14,12 @@
 #include <crypt.h>
 
 typedef struct __string__ __string__;
+typedef struct __hashtable__ __hashtable__;
+
+extern __hashtable__ *__hashtable__alloc(void);
+extern void __hashtable__setStringKeyString(__hashtable__ *ht, __string__ *key, __string__ *val);
+extern void __hashtable__setStringKeyLong(__hashtable__ *ht, __string__ *key, long long val);
+extern void __hashtable__setStringKeyHashtable(__hashtable__ *ht, __string__ *key, __hashtable__ *child);
 
 extern __string__ *__string__init(long long size, const char *value);
 
@@ -192,4 +198,107 @@ int __compiler_password_verify(__string__ *password, __string__ *hash)
     }
 
     return strcmp(computed, stored) == 0;
+}
+
+static int pc_bcrypt_valid(const char *h, size_t len)
+{
+    return len == 60 && h[0] == '$' && h[1] == '2' && h[2] == 'y';
+}
+
+static int pc_extract_ident(const char *h, size_t len, char *ident, size_t cap)
+{
+    const char *start;
+    const char *end;
+    size_t idlen;
+
+    if (len < 3 || h[0] != '$') {
+        return 0;
+    }
+    start = h + 1;
+    end = strchr(start, '$');
+    if (NULL == end) {
+        return 0;
+    }
+    idlen = (size_t) (end - start);
+    if (idlen + 1 > cap) {
+        return 0;
+    }
+    memcpy(ident, start, idlen);
+    ident[idlen] = '\0';
+
+    return 1;
+}
+
+static __hashtable__ *pc_password_info_unknown(void)
+{
+    __hashtable__ *ht = __hashtable__alloc();
+    __hashtable__ *opts = __hashtable__alloc();
+
+    __hashtable__setStringKeyString(ht, pc_string_from_cstr("algoName"), pc_string_from_cstr("unknown"));
+    __hashtable__setStringKeyHashtable(ht, pc_string_from_cstr("options"), opts);
+
+    return ht;
+}
+
+static __hashtable__ *pc_password_info_bcrypt(const char *h)
+{
+    long long cost = 10;
+    __hashtable__ *ht;
+    __hashtable__ *opts;
+
+    sscanf(h, "$2y$%lld$", &cost);
+    ht = __hashtable__alloc();
+    opts = __hashtable__alloc();
+    __hashtable__setStringKeyString(ht, pc_string_from_cstr("algo"), pc_string_from_cstr("2y"));
+    __hashtable__setStringKeyString(ht, pc_string_from_cstr("algoName"), pc_string_from_cstr("bcrypt"));
+    __hashtable__setStringKeyLong(opts, pc_string_from_cstr("cost"), cost);
+    __hashtable__setStringKeyHashtable(ht, pc_string_from_cstr("options"), opts);
+
+    return ht;
+}
+
+static __hashtable__ *pc_password_info_argon2(const char *h, const char *name)
+{
+    long long v = 0;
+    long long memory_cost = 65536;
+    long long time_cost = 4;
+    long long threads = 1;
+    __hashtable__ *ht;
+    __hashtable__ *opts;
+
+    sscanf(h, "v=%lld$m=%lld,t=%lld,p=%lld", &v, &memory_cost, &time_cost, &threads);
+    ht = __hashtable__alloc();
+    opts = __hashtable__alloc();
+    __hashtable__setStringKeyString(ht, pc_string_from_cstr("algo"), pc_string_from_cstr(name));
+    __hashtable__setStringKeyString(ht, pc_string_from_cstr("algoName"), pc_string_from_cstr(name));
+    __hashtable__setStringKeyLong(opts, pc_string_from_cstr("memory_cost"), memory_cost);
+    __hashtable__setStringKeyLong(opts, pc_string_from_cstr("time_cost"), time_cost);
+    __hashtable__setStringKeyLong(opts, pc_string_from_cstr("threads"), threads);
+    __hashtable__setStringKeyHashtable(ht, pc_string_from_cstr("options"), opts);
+
+    return ht;
+}
+
+__hashtable__ *__compiler_password_get_info(__string__ *hash)
+{
+    const char *h = pc_strdata(hash);
+    size_t len = pc_strlen(hash);
+    char ident[32];
+
+    if (!pc_extract_ident(h, len, ident, sizeof(ident))) {
+        return pc_password_info_unknown();
+    }
+    if (strcmp(ident, "2y") == 0 && pc_bcrypt_valid(h, len)) {
+        return pc_password_info_bcrypt(h);
+    }
+    if (strcmp(ident, "argon2i") == 0 && len >= sizeof("$argon2i$") - 1
+        && !memcmp(h, "$argon2i$", sizeof("$argon2i$") - 1)) {
+        return pc_password_info_argon2(h + sizeof("$argon2i$") - 1, "argon2i");
+    }
+    if (strcmp(ident, "argon2id") == 0 && len >= sizeof("$argon2id$") - 1
+        && !memcmp(h, "$argon2id$", sizeof("$argon2id$") - 1)) {
+        return pc_password_info_argon2(h + sizeof("$argon2id$") - 1, "argon2id");
+    }
+
+    return pc_password_info_unknown();
 }
