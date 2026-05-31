@@ -85,6 +85,46 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'readonly_inherited.php'));
     }
 
+    public function testReadonlyPropertyRejectsUnset(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public readonly int $x;
+    public function __construct() {
+        $this->x = 1;
+    }
+}
+$c = new C();
+unset($c->x);
+PHP;
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Cannot unset readonly property C::$x');
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_unset.php'));
+    }
+
+    public function testReadonlyPropertyAllowsUnsetOnNonReadonlyProperty(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public readonly int $x;
+    public int $y = 1;
+    public function __construct() {
+        $this->x = 1;
+    }
+}
+$c = new C();
+unset($c->y);
+echo isset($c->y) ? 'set' : 'unset';
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_unset_mutable.php'));
+        $this->assertSame('unset', ob_get_clean());
+    }
+
     public function testNonReadonlyPropertyStillMutable(): void
     {
         $runtime = new Runtime();

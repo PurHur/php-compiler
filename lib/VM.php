@@ -1448,7 +1448,13 @@ restart:
                             $this->invokeArrayAccessOffsetUnset($object, $key);
                             break;
                         }
-                        $this->unsetObjectProperty($object, $key->toString());
+                        $propName = $key->toString();
+                        $catchFrame = $this->enforceReadonlyPropertyUnset($object, $propName, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        $this->unsetObjectProperty($object, $propName);
                         break;
                     }
                     if (Variable::TYPE_ARRAY === $container->type) {
@@ -3061,6 +3067,27 @@ restart:
         } finally {
             $this->context->swapRunStack($savedStack);
         }
+    }
+
+    /** Reject unset() on readonly properties; returns catch frame or throws when uncaught. */
+    private function enforceReadonlyPropertyUnset(ObjectEntry $object, string $propName, Frame $frame): ?Frame
+    {
+        $declaringClass = $this->readonlyPropertyDeclaringClass($object, $propName);
+        if (null === $declaringClass) {
+            return null;
+        }
+
+        $thrown = VM\BuiltinExceptionSupport::materializeError(
+            $this->context,
+            sprintf('Cannot unset readonly property %s::$%s', $declaringClass, $propName)
+        );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
     }
 
     /** Reject readonly property writes; returns catch frame or throws when uncaught. */

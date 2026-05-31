@@ -13,8 +13,12 @@ use PHPLLVM\Builder;
  */
 final class ReadonlyClassGuard
 {
-    public static function emitBeforePropertyStore(Context $context, Variable $lvalue, ?Block $enclosingBlock): void
-    {
+    public static function emitBeforePropertyStore(
+        Context $context,
+        Variable $lvalue,
+        ?Block $enclosingBlock,
+        string $violation = 'modify'
+    ): void {
         if (null === $lvalue->objectPropertySlot) {
             return;
         }
@@ -26,7 +30,7 @@ final class ReadonlyClassGuard
         if (null === $lvalue->objectPropertyReceiver) {
             return;
         }
-        if (self::isConstructBlock($enclosingBlock)) {
+        if ('modify' === $violation && self::isConstructBlock($enclosingBlock)) {
             return;
         }
 
@@ -68,7 +72,9 @@ final class ReadonlyClassGuard
             $context->builder->positionAtEnd($failBlock);
             $declaringClass = $objectType->classNameForId($id);
             $message = sprintf(
-                'Cannot modify readonly property %s::$%s',
+                'unset' === $violation
+                    ? 'Cannot unset readonly property %s::$%s'
+                    : 'Cannot modify readonly property %s::$%s',
                 $declaringClass,
                 $propName
             );
