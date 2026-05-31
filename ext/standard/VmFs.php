@@ -556,4 +556,36 @@ final class VmFs
     {
         return @\chdir($path);
     }
+
+    /**
+     * disk_free_space() / diskfreespace() — bytes available on filesystem (php-src filestat.c).
+     *
+     * @return float|false
+     */
+    public static function diskFreeSpace(?string $path)
+    {
+        $path = $path ?? '.';
+        $result = @\disk_free_space($path);
+        if (false === $result) {
+            return false;
+        }
+
+        return (float) $result;
+    }
+
+    /**
+     * disk_total_space() / disktotalspace() — total bytes on filesystem (php-src filestat.c).
+     *
+     * @return float|false
+     */
+    public static function diskTotalSpace(?string $path)
+    {
+        $path = $path ?? '.';
+        $result = @\disk_total_space($path);
+        if (false === $result) {
+            return false;
+        }
+
+        return (float) $result;
+    }
 }
