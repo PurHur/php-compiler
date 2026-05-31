@@ -286,6 +286,12 @@ class Type extends Builtin {
         $fntypeFflush = $this->context->context->functionType($i32, false, $i64);
         $fnFflush = $this->context->module->addFunction('__compiler_fflush', $fntypeFflush);
         $this->context->registerFunction('__compiler_fflush', $fnFflush);
+        $fntypeStreamSetChunkSize = $this->context->context->functionType($i64, false, $i64, $i64);
+        $fnStreamSetChunkSize = $this->context->module->addFunction('__compiler_stream_set_chunk_size', $fntypeStreamSetChunkSize);
+        $this->context->registerFunction('__compiler_stream_set_chunk_size', $fnStreamSetChunkSize);
+        $fntypeStreamSetTimeout = $this->context->context->functionType($i32, false, $i64, $i64, $i64);
+        $fnStreamSetTimeout = $this->context->module->addFunction('__compiler_stream_set_timeout', $fntypeStreamSetTimeout);
+        $this->context->registerFunction('__compiler_stream_set_timeout', $fnStreamSetTimeout);
         $fntypeFtruncate = $this->context->context->functionType($i32, false, $i64, $i64);
         $fnFtruncate = $this->context->module->addFunction('__compiler_ftruncate', $fntypeFtruncate);
         $this->context->registerFunction('__compiler_ftruncate', $fnFtruncate);

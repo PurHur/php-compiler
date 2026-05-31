@@ -327,6 +327,8 @@ class Module extends ModuleAbstract
             new touch_(),
             new filetype(),
             new stream_context_create(),
+            new stream_set_chunk_size_(),
+            new stream_set_timeout_(),
             new fopen(),
             new fread(),
             new fgetc(),

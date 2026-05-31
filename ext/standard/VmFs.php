@@ -388,6 +388,46 @@ final class VmFs
         return @\fflush($fp);
     }
 
+    /**
+     * stream_set_chunk_size() — php-src ext/standard/streams.c (issue #3754).
+     *
+     * @return int|false previous chunk size
+     */
+    public static function streamSetChunkSize(int $handle, int $chunkSize) {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        $previous = @\stream_set_chunk_size($fp, $chunkSize);
+        if (false === $previous) {
+            return false;
+        }
+
+        return (int) $previous;
+    }
+
+    /**
+     * stream_set_timeout() — php-src ext/standard/streams.c (issue #3754).
+     */
+    public static function streamSetTimeout(int $handle, int $seconds, int $microseconds = 0): bool
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        if (@\stream_set_timeout($fp, $seconds, $microseconds)) {
+            return true;
+        }
+        $meta = @\stream_get_meta_data($fp);
+        if (!\is_array($meta)) {
+            return false;
+        }
+        $streamType = (string) ($meta['stream_type'] ?? '');
+
+        // php-src: read timeout applies to socket transports; memory/file are no-op success (#3754).
+        return !\in_array($streamType, ['tcp', 'udp', 'udg', 'unix', 'ssl', 'tls'], true);
+    }
+
     public static function ftruncate(int $handle, int $size): bool
     {
         $fp = self::lookup($handle);

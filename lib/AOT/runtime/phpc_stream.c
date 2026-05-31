@@ -21,6 +21,9 @@ extern __string__ *__string__init(long long size, const char *value);
 #define PHPC_MAX_STREAM_HANDLES 256
 
 static FILE *phpc_stream_handles[PHPC_MAX_STREAM_HANDLES];
+static int phpc_stream_chunk_size[PHPC_MAX_STREAM_HANDLES];
+
+#define PHPC_STREAM_DEFAULT_CHUNK_SIZE 8192
 
 static size_t phpc_string_len(__string__ *s)
 {
@@ -97,6 +100,7 @@ int64_t __compiler_fopen(__string__ *path, __string__ *mode)
     for (id = 3; id < PHPC_MAX_STREAM_HANDLES; id++) {
         if (NULL == phpc_stream_handles[id]) {
             phpc_stream_handles[id] = fp;
+            phpc_stream_chunk_size[id] = PHPC_STREAM_DEFAULT_CHUNK_SIZE;
 
             return id;
         }
@@ -267,6 +271,40 @@ int __compiler_fflush(int64_t handle)
     }
 
     return fflush(fp) == 0 ? 1 : 0;
+}
+
+int64_t __compiler_stream_set_chunk_size(int64_t handle, int64_t chunk_size)
+{
+    int previous;
+
+    if (handle <= 0 || handle >= PHPC_MAX_STREAM_HANDLES || NULL == phpc_stream_handles[handle]) {
+        return -1;
+    }
+    if (chunk_size <= 0) {
+        return -1;
+    }
+    previous = phpc_stream_chunk_size[handle];
+    if (0 == previous) {
+        previous = PHPC_STREAM_DEFAULT_CHUNK_SIZE;
+    }
+    phpc_stream_chunk_size[handle] = (int) chunk_size;
+
+    return (int64_t) previous;
+}
+
+int __compiler_stream_set_timeout(int64_t handle, int64_t seconds, int64_t microseconds)
+{
+    if (handle <= 0 || handle >= PHPC_MAX_STREAM_HANDLES || NULL == phpc_stream_handles[handle]) {
+        return 0;
+    }
+    if (seconds < 0 || microseconds < 0) {
+        return 0;
+    }
+    (void) seconds;
+    (void) microseconds;
+
+    /* AOT FILE* table is file-backed; socket timeout is applied in VM via host stream_set_timeout(). */
+    return 1;
 }
 
 int __compiler_ftruncate(int64_t handle, int64_t size)
