@@ -242,6 +242,7 @@ final class JitFilter
             $context->builder->structGep($strPtr, $map['length'])
         );
         $zero = $len->typeOf()->constInt(0, false);
+        $one = $len->typeOf()->constInt(1, false);
         $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $zero);
         $charPtr = $context->builder->structGep($strPtr, $map['value']);
         $endPtrSlot = $context->builder->alloca(
@@ -271,7 +272,35 @@ final class JitFilter
             $consumedAll
         );
 
-        return $context->builder->select($isEmpty, $context->constantFromBool(false), $numeric);
+        $i8 = $context->getTypeFromString('int8');
+        $firstByte = $context->builder->load($charPtr);
+        $isPlus = $context->builder->icmp(
+            Builder::INT_EQ,
+            $firstByte,
+            $i8->constInt(ord('+'), false)
+        );
+        $isMinus = $context->builder->icmp(
+            Builder::INT_EQ,
+            $firstByte,
+            $i8->constInt(ord('-'), false)
+        );
+        $hasSign = $context->builder->or($isPlus, $isMinus);
+        $digitOffset = $context->builder->select($hasSign, $one, $zero);
+        $digitOffsetI64 = $context->builder->zExt($digitOffset, $i64);
+        $remaining = $context->builder->sub($len, $digitOffset);
+        $moreThanOneDigit = $context->builder->icmp(Builder::INT_UGT, $remaining, $one);
+        $digitPtr = $context->builder->gep($charPtr, $digitOffsetI64);
+        $digitByte = $context->builder->load($digitPtr);
+        $isLeadingZero = $context->builder->icmp(
+            Builder::INT_EQ,
+            $digitByte,
+            $i8->constInt(ord('0'), false)
+        );
+        $leadingZeroInvalid = $context->builder->and($moreThanOneDigit, $isLeadingZero);
+        $noLeadingZeroIssue = $context->builder->not($leadingZeroInvalid);
+        $validDigits = $context->builder->and($numeric, $noLeadingZeroIssue);
+
+        return $context->builder->select($isEmpty, $context->constantFromBool(false), $validDigits);
     }
 
     private static function stringToInt64(Context $context, Value $strPtr): Value
