@@ -325,6 +325,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'dnf_')) {
                 continue;
             }
+            // highlight_string/highlight_file VM-only (#3164).
+            if (str_contains($name, 'highlight_string')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
