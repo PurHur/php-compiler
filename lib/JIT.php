@@ -9092,7 +9092,9 @@ class JIT {
     }
 
     /**
-     * @return array<int, int> LLVM argument index => VM type constraint
+     * LLVM argument index => VM type constraint.
+     *
+     * @return array<int, int>
      */
     private function paramTypeConstraintsForNativeCall(Block $block): array
     {
@@ -9132,7 +9134,9 @@ class JIT {
     }
 
     /**
-     * @return array<int, true> LLVM argument index => by-reference formal (issue #3161, #140)
+     * LLVM argument index => by-reference formal (issue #3161, #140).
+     *
+     * @return array<int, true>
      */
     private function paramByRefForNativeCall(Block $block): array
     {
