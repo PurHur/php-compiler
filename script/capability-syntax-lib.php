@@ -760,6 +760,22 @@ function syntaxRowDefinitions(): array
             'probe' => 'class Box {} $o = new Box(); $r = WeakReference::create($o); unset($o); echo $r->get() === null ? "1" : "0";',
         ],
         [
+            'id' => 'heredoc_nowdoc',
+            'construct' => 'Heredoc / nowdoc string literals (`<<<LABEL` / `<<<\'LABEL\'`)',
+            'opcodes' => ['TYPE_CONCAT', 'TYPE_ASSIGN'],
+            'issue' => 3187,
+            'notes' => [
+                'php-cfg Scalar_Encapsed → ConcatList; plain heredoc/nowdoc → Scalar_String (#178)',
+                'PhpParser FlexibleDocStringEmulator (PHP 7.3+ flexible closing labels)',
+                'php-src Zend/zend_compile.c zend_compile_encapsed_string',
+            ],
+            'probe' => <<<'PROBE'
+$n = "w"; echo <<<H
+{$n}
+H;
+PROBE,
+        ],
+        [
             'id' => 'datetime_oop',
             'construct' => 'DateTime / DateTimeZone OOP',
             'opcodes' => ['TYPE_NEW'],
@@ -925,6 +941,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'throw_expression' => '/\?\s*:\s*throw\b|\?\?\s*throw\b|&&\s*throw\b|\|\|\s*throw\b/',
         'heredoc_flexible_indent' => '/<<<\s*\w+\s*\r?\n\s+\S/',
         'array_access_interface' => '/implements\s+ArrayAccess|function\s+offsetGet\s*\(/',
+        'heredoc_nowdoc' => '/<<<[\'"]?\w+/',
     ];
 
     $scan = [];
