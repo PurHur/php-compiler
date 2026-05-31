@@ -1975,7 +1975,7 @@ restart:
                         break;
                     }
                     $key = $frame->scope[$op->arg3]->resolveIndirect();
-                    if ($key->is(Variable::TYPE_INTEGER)) {
+                    if ($key->is(Variable::TYPE_INTEGER) || $key->is(Variable::TYPE_FLOAT)) {
                         $ht->addIndex($key->toInt(), $frame->scope[$op->arg2]);
                     } else {
                         $ht->add($key->toString(), $frame->scope[$op->arg2]);
@@ -4877,7 +4877,7 @@ restart:
                     break;
                 }
                 $key = $frame->scope[$op->arg3]->resolveIndirect();
-                if ($key->is(Variable::TYPE_INTEGER)) {
+                if ($key->is(Variable::TYPE_INTEGER) || $key->is(Variable::TYPE_FLOAT)) {
                     $ht->addIndex($key->toInt(), $frame->scope[$op->arg2]);
                 } else {
                     $ht->add($key->toString(), $frame->scope[$op->arg2]);

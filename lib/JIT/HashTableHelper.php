@@ -1319,11 +1319,27 @@ final class HashTableHelper
 
             return;
         }
-        $index = $context->builder->truncOrBitCast(
+        $index = self::arrayKeyToIndex($context, $key);
+        self::setAtIndex($context, $ht, $index, $element);
+    }
+
+    /**
+     * php-src: float array keys truncate toward zero (zend_dval_to_lval).
+     */
+    private static function arrayKeyToIndex(Context $context, Variable $key): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        if (Variable::TYPE_NATIVE_DOUBLE === $key->type) {
+            return $context->builder->fptosi(
+                $context->helper->loadValue($key),
+                $sizeT
+            );
+        }
+
+        return $context->builder->truncOrBitCast(
             $context->helper->loadValue($key),
             $sizeT
         );
-        self::setAtIndex($context, $ht, $index, $element);
     }
 
     private static function addNativeElement(
@@ -1333,10 +1349,7 @@ final class HashTableHelper
         ?Variable $key
     ): void {
         if (null !== $key) {
-            $index = $context->builder->truncOrBitCast(
-                $context->helper->loadValue($key),
-                $context->getTypeFromString('size_t')
-            );
+            $index = self::arrayKeyToIndex($context, $key);
         } else {
             $index = $context->constantFromInteger($array->nextFreeElement, 'size_t');
             ++$array->nextFreeElement;
