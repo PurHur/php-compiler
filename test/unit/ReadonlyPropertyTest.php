@@ -149,7 +149,10 @@ PHP;
             <<<'PHP'
 <?php
 class C {
-    public readonly int $x = 1;
+    public readonly int $x;
+    public function __construct() {
+        $this->x = 1;
+    }
 }
 $c = new C();
 echo $c->x;
@@ -242,7 +245,7 @@ PHP;
         $stderr = $this->runJitCompileProbe(<<<'PHP'
 <?php
 class C {
-    public readonly int $x = 1;
+    public readonly int $x;
 }
 PHP
         );

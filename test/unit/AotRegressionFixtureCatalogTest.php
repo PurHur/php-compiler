@@ -31,7 +31,6 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'is_countable.phpt',
         'crc32c.phpt',
         'readonly_property_write.phpt',
-        'readonly_property_default.phpt',
     ];
 
     /**

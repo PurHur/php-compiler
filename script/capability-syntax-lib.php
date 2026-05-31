@@ -658,7 +658,7 @@ function syntaxRowDefinitions(): array
                 'JIT ReadonlyClassGuard IR + ReadonlyPropertyTest; MCJIT execute + compliance phpt',
                 'php-src: Zend/zend_object_handlers.c zend_std_write_property / zend_std_unset_property',
             ],
-            'probe' => 'class C { public readonly int $x = 1; } $c = new C(); $c->x = 2;',
+            'probe' => 'class C { public readonly int $x; public function __construct() { $this->x = 1; } } $c = new C(); $c->x = 2;',
         ],
         [
             'id' => 'property_hooks',
