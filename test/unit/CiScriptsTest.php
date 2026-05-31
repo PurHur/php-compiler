@@ -327,11 +327,11 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('009-FastCGIWeb', $common);
     }
 
-    public function testCiDefaultsEnvDefinesFastcgiWebSmokeGateOff(): void
+    public function testCiDefaultsEnvDefinesFastcgiWebSmokeGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString(
-            'FASTCGI_WEB_SMOKE_GATE="${FASTCGI_WEB_SMOKE_GATE:-0}"',
+            'FASTCGI_WEB_SMOKE_GATE="${FASTCGI_WEB_SMOKE_GATE:-1}"',
             $defaults
         );
     }
@@ -354,10 +354,10 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('--exclude-group selfhostprobe-aot-execute', $common);
     }
 
-    public function testCiDefaultsEnvDefinesFastcgiWebAotSmokeGateOff(): void
+    public function testCiDefaultsEnvDefinesFastcgiWebAotSmokeGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
-        $this->assertStringContainsString('FASTCGI_WEB_AOT_SMOKE_GATE="${FASTCGI_WEB_AOT_SMOKE_GATE:-0}"', $defaults);
+        $this->assertStringContainsString('FASTCGI_WEB_AOT_SMOKE_GATE="${FASTCGI_WEB_AOT_SMOKE_GATE:-1}"', $defaults);
         $this->assertStringContainsString('FASTCGI_SMOKE_GATE="${FASTCGI_SMOKE_GATE:-0}"', $defaults);
     }
 
@@ -381,7 +381,7 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ci_run_fastcgi_web_aot_execute', $body);
         $this->assertStringContainsString('--exclude-group fastcgiweb-aot-execute', $body);
         $this->assertStringContainsString('--group fastcgiweb-aot-execute', $body);
-        $this->assertStringContainsString('FASTCGI_WEB_AOT_SMOKE_GATE:-0', $body);
+        $this->assertStringContainsString('FASTCGI_WEB_AOT_SMOKE_GATE:-1', $body);
     }
 
     public function testCiLocalRunsFastcgiWebAotExecute(): void

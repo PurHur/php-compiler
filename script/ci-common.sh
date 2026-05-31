@@ -1131,7 +1131,7 @@ ci_run_fastcgi_smoke() {
 
 # Shell curl harness for 009-FastCGIWeb health + PATH_INFO (issue #2351).
 ci_run_fastcgi_web_smoke() {
-  if [[ "${FASTCGI_WEB_SMOKE_GATE:-0}" != "1" ]]; then
+  if [[ "${FASTCGI_WEB_SMOKE_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
@@ -1142,7 +1142,7 @@ ci_run_fastcgi_web_smoke() {
     echo "examples-web-smoke (009): skipped (cannot bind loopback TCP)"
     return 0
   fi
-  echo "examples-web-smoke (009): FastCGIWeb health + PATH_INFO curls (FASTCGI_WEB_SMOKE_GATE=1, #2351)..."
+  echo "examples-web-smoke (009): FastCGIWeb health + PATH_INFO curls (FASTCGI_WEB_SMOKE_GATE=1 default, #2351, #2369)..."
   "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --fastcgi-only
 }
 
@@ -1388,16 +1388,16 @@ ci_run_selfhostprobe_aot_smoke() {
   ci_run_phpunit --group selfhostprobe-aot-execute "$@"
 }
 
-# 009-FastCGIWeb AOT binary CLI execute (issue #2331); opt-in FASTCGI_WEB_AOT_SMOKE_GATE=1 (#2352).
+# 009-FastCGIWeb AOT binary CLI execute (issue #2331); default-on FASTCGI_WEB_AOT_SMOKE_GATE=1 (#2352, #2369).
 ci_run_fastcgi_web_aot_execute() {
-  if [[ "${FASTCGI_WEB_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+  if [[ "${FASTCGI_WEB_AOT_SMOKE_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if ! ci_llvm_ready; then
     echo "PHPUnit: FastCGIWeb AOT execute skipped (LLVM 9 not available)"
     return 0
   fi
-  echo "PHPUnit: FastCGIWeb AOT execute (@group fastcgiweb-aot-execute; FASTCGI_WEB_AOT_SMOKE_GATE=1, #2352)..."
+  echo "PHPUnit: FastCGIWeb AOT execute (@group fastcgiweb-aot-execute; FASTCGI_WEB_AOT_SMOKE_GATE=1 default, #2352, #2369)..."
   ci_run_phpunit --group fastcgiweb-aot-execute "$@"
 }
 

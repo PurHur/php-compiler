@@ -1075,8 +1075,8 @@ final class Doctor
         }
 
         $defaults = self::readCiDefaultsEnv($repoRoot);
-        $smokeDefault = $defaults['FASTCGI_WEB_SMOKE_GATE'] ?? '0';
-        $aotDefault = $defaults['FASTCGI_WEB_AOT_SMOKE_GATE'] ?? '0';
+        $smokeDefault = $defaults['FASTCGI_WEB_SMOKE_GATE'] ?? '1';
+        $aotDefault = $defaults['FASTCGI_WEB_AOT_SMOKE_GATE'] ?? '1';
         $deployDefault = $defaults['FASTCGI_WEB_DEPLOY_SMOKE_GATE'] ?? '0';
 
         $smokeOn = self::gateEnabled('FASTCGI_WEB_SMOKE_GATE', $smokeDefault);
@@ -1111,7 +1111,7 @@ final class Doctor
             $smokeDefault,
             $smokeOn,
             false,
-            'make examples-fastcgiweb-smoke · examples-web-smoke.sh --fastcgi-only · ci-fast when gate=1 (#2351)',
+            'make examples-fastcgiweb-smoke · examples-web-smoke.sh --fastcgi-only · ci-fast default (#2351, #2369)',
             '#2351'
         );
         $fcgiSmokeDefault = $defaults['FASTCGI_SMOKE_GATE'] ?? '0';
@@ -1128,10 +1128,10 @@ final class Doctor
         );
         $aotStatus = $aotOn && $llvmReady ? '✅' : '📋';
         $aotExecuteNote = $llvmReady
-            ? ($aotOn ? '#2352 · FASTCGI_WEB_AOT_SMOKE_GATE=1' : '#2352 · opt-in default 0')
+            ? ($aotOn ? '#2352 · FASTCGI_WEB_AOT_SMOKE_GATE=1 default' : '#2352 · opt-out default 1')
             : 'LLVM required; #2352 when gate=1';
         fwrite(STDOUT, "  [{$aotStatus}] Stage 2 AOT execute — FASTCGI_WEB_AOT_SMOKE_GATE default {$aotDefault} ({$aotExecuteNote})\n");
-        fwrite(STDOUT, "      Shell:   FASTCGI_WEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh\n");
+        fwrite(STDOUT, "      Shell:   EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh (FASTCGI_WEB_AOT_SMOKE_GATE=1 default)\n");
         fwrite(STDOUT, "      PHPUnit: ./script/ci-local.sh --filter FastCGIWebAotExecuteTest (when present)\n");
         $deployStatus = $deployOn && $llvmReady ? '✅' : '📋';
         $deployNote = $deployOn
