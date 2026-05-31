@@ -8,7 +8,7 @@
 | **VM** | Done | `GeneratorState`, `VM::GENERATOR_YIELD`, foreach over generators; keyed yield (#3085); `yield from` array + generator delegation |
 | **JIT (`bin/jit.php`)** | MCJIT resume (#3074) | Main script MCJIT when yield only in nested functions; `GeneratorHelper` switch-on-resume-ip; linear `yield`, prefix opcodes before each yield segment, packed-array `yield from`, nested `yield from inner()`, dynamic `yield from $g` |
 | **AOT (`phpc build`)** | Nested functions (#3115) | `GeneratorHelper` resume lowering for generator *functions*; script-scope top-level `yield` still blocked (`Runtime::standalone()` guard); AOT fixtures: `generator_yield*.phpt`, `generator_yield_from_*.phpt` |
-| **Bootstrap spine AOT** | Blocked | `script/bootstrap-lib.php` inventory flags `generator yield` in bundled `lib/` sources |
+| **Bootstrap spine AOT** | Nested generators OK | `lib/Block.php` iterator helpers use function-scope `yield` only; inventory flags **script-scope** yield (#2483) |
 
 Compliance PHPT: `test/compliance/GeneratorVMTest.php`, `GeneratorJITTest.php`, `test/fixtures/aot/cases/generator_*.phpt`.
 
