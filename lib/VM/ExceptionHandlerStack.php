@@ -50,16 +50,15 @@ final class ExceptionHandlerStack
 
     /**
      * Invoke handlers from innermost to outermost until one handles the exception.
+     *
+     * Handlers that return false are not removed from the stack (Zend parity).
      */
     public function dispatch(Context $context, Variable $exception): bool
     {
-        while ([] !== $this->stack) {
-            $index = \count($this->stack) - 1;
-            $handler = $this->stack[$index];
-            if (VmExceptionHandler::invoke($context, $handler, $exception)) {
+        for ($i = \count($this->stack) - 1; $i >= 0; $i--) {
+            if (VmExceptionHandler::invoke($context, $this->stack[$i], $exception)) {
                 return true;
             }
-            array_pop($this->stack);
         }
 
         return false;
