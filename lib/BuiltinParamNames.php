@@ -38,6 +38,8 @@ final class BuiltinParamNames
                 return ['filename', 'time', 'atime'];
             case 'getenv':
                 return ['name', 'local_only'];
+            case 'define':
+                return ['constant_name', 'value', 'case_insensitive'];
         }
 
         return null;
