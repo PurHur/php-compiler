@@ -7332,7 +7332,8 @@ class JIT {
                 // fall through to normal assign on the aliased lvalue
             } else {
                 // it's a kind!
-                $this->context->makeVariableFromValueOp($this->context->helper->loadValue($value), $resultOp);
+                $var = $this->context->makeVariableFromValueOp($this->context->helper->loadValue($value), $resultOp);
+                $var->compileTimeConstantName = $value->compileTimeConstantName;
 
                 return;
             }
