@@ -3072,13 +3072,14 @@ restart:
             return null;
         }
         $prop = $target->objectPropertyName ?? 'property';
-        if (!$this->isReadonlyPropertyWrite($owner->class, $prop)) {
+        $declaringClass = $this->readonlyPropertyDeclaringClass($owner, $prop);
+        if (null === $declaringClass) {
             return null;
         }
 
         $thrown = VM\BuiltinExceptionSupport::materializeError(
             $this->context,
-            sprintf('Cannot modify readonly property %s::$%s', $owner->class->name, $prop)
+            sprintf('Cannot modify readonly property %s::$%s', $declaringClass, $prop)
         );
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
@@ -3142,18 +3143,20 @@ restart:
         return null;
     }
 
-    private function isReadonlyPropertyWrite(ClassEntry $class, string $propName): bool
+    private function readonlyPropertyDeclaringClass(ObjectEntry $object, string $propName): ?string
     {
-        if ($class->readonly) {
-            return true;
+        if ($object->class->readonly) {
+            return $object->class->name;
         }
-        foreach ($class->properties as $property) {
-            if ($property->name === $propName && $property->readonly) {
-                return true;
-            }
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null === $meta || !$meta->readonly) {
+            return null;
+        }
+        if ('' !== $meta->declaringClassLc && isset($this->context->classes[$meta->declaringClassLc])) {
+            return $this->context->classes[$meta->declaringClassLc]->name;
         }
 
-        return false;
+        return $meta->declaringClassLc !== '' ? $meta->declaringClassLc : $object->class->name;
     }
 
     /** Reject asymmetric set visibility violations (#3165); returns message or null. */

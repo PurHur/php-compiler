@@ -51,15 +51,6 @@ final class ReadonlyClassGuard
         $storeBlock = $fn->appendBasicBlock('readonly_allow_store');
         $exitBlock = $fn->appendBasicBlock('readonly_guard_exit');
 
-        $className = $lvalue->objectPropertyClassName ?? 'class';
-        $message = sprintf(
-            'Cannot modify readonly property %s::$%s',
-            $className,
-            $propName
-        );
-        $msgLen = $context->constantFromInteger(strlen($message), 'size_t');
-        $msgCStr = self::stringDataPtrFromLiteral($context, $message);
-
         $checkBlock = $entry;
         foreach ($guardClassIds as $i => $id) {
             $matchBlock = $fn->appendBasicBlock('readonly_match_'.$id);
@@ -75,6 +66,14 @@ final class ReadonlyClassGuard
             $failBlock = $fn->appendBasicBlock('readonly_violation_'.$id);
             $context->builder->branch($failBlock);
             $context->builder->positionAtEnd($failBlock);
+            $declaringClass = $objectType->classNameForId($id);
+            $message = sprintf(
+                'Cannot modify readonly property %s::$%s',
+                $declaringClass,
+                $propName
+            );
+            $msgLen = $context->constantFromInteger(strlen($message), 'size_t');
+            $msgCStr = self::stringDataPtrFromLiteral($context, $message);
             $context->builder->call(
                 $context->lookupFunction('__compiler_jit_raise_logic_exception'),
                 $msgCStr,

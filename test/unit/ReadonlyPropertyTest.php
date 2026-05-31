@@ -65,6 +65,26 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'readonly_promoted.php'));
     }
 
+    public function testInheritedReadonlyPropertyUsesDeclaringClassInMessage(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class P {
+    public readonly int $x;
+    public function __construct() {
+        $this->x = 1;
+    }
+}
+class C extends P {}
+$c = new C();
+$c->x = 2;
+PHP;
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Cannot modify readonly property P::$x');
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_inherited.php'));
+    }
+
     public function testNonReadonlyPropertyStillMutable(): void
     {
         $runtime = new Runtime();
