@@ -61,6 +61,16 @@ class Type extends Builtin {
         );
         $fnNumberFormat = $this->context->module->addFunction('__compiler_number_format', $fntypeNumberFormat);
         $this->context->registerFunction('__compiler_number_format', $fnNumberFormat);
+        $f64 = $this->context->getTypeFromString('double');
+        $fntypeRound = $this->context->context->functionType(
+            $f64,
+            false,
+            $f64,
+            $this->context->getTypeFromString('int64'),
+            $this->context->getTypeFromString('int64')
+        );
+        $fnRound = $this->context->module->addFunction('__compiler_round', $fntypeRound);
+        $this->context->registerFunction('__compiler_round', $fnRound);
         $fntypeSprintf = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
