@@ -2727,7 +2727,7 @@ class Compiler {
             }
             if (null !== $stmt->finally) {
                 $compiledFinally = $this->compileCfgBranch($stmt->finally, $block);
-                // Finally runs before catch on throw; catch locals must not be inherited yet (#195).
+                // Catch runs before finally on throw; finally block must not inherit catch locals (#195).
                 $compiledFinally->inheritUndefinedLocals = true;
                 $finallyOp = new OpCode(OpCode::TYPE_FINALLY);
                 $finallyOp->block1 = $compiledFinally;

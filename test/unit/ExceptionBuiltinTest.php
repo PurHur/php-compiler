@@ -140,7 +140,7 @@ try {
     echo "f\n";
 }
 ',
-            "f\nx\n"
+            "x\nf\n"
         );
     }
 

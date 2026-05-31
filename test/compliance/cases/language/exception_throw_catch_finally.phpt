@@ -1,5 +1,5 @@
 --TEST--
-Language: catch variable with finally — finally runs before catch body (issue #195)
+Language: catch variable with finally — catch then finally (Zend zend_exceptions.c, #195)
 --FILE--
 <?php
 try {
@@ -10,5 +10,5 @@ try {
     echo "f\n";
 }
 --EXPECT--
-f
 x
+f

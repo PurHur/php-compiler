@@ -1312,6 +1312,16 @@ restart:
                         $frame = $resumeFrame;
                         goto restart;
                     }
+                    $mergeFrame = $this->resumeMergeAfterFinally($frame);
+                    if (null !== $mergeFrame) {
+                        $frame = $mergeFrame;
+                        goto restart;
+                    }
+                    $finallyFrame = $this->beginCatchExitFinallyUnwind($frame, $op->block1);
+                    if (null !== $finallyFrame) {
+                        $frame = $finallyFrame;
+                        goto restart;
+                    }
                     $frame = $this->frameForBranch($frame, $op->block1);
                     goto restart;
                 case OpCode::TYPE_JUMPIF:
@@ -2691,12 +2701,16 @@ restart:
     private function dispatchCatchForHandlerFrame(Frame $handler): ?Frame
     {
         $this->rewindHandlerToCatchChain($handler);
-        $finallyFrame = $this->enterFinallyHandlerForUnwind($handler);
+        $catchFrame = $this->enterMatchingCatchHandler($handler);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $finallyFrame = $this->enterFinallyHandlerForUnwind($handler, true);
         if (null !== $finallyFrame) {
             return $finallyFrame;
         }
 
-        return $this->enterMatchingCatchHandler($handler);
+        return null;
     }
 
     private function popTryHandlerIfAtMergeBlock(Frame $frame): void
@@ -2799,7 +2813,8 @@ restart:
                 $handler->pos = $handler->block->nOpCodes;
                 $catchFrame->parent = $mergeFrame;
             }
-            $this->clearTryCatchUnwindState();
+            $this->context->activeCatchHandlerFrame = $handler;
+            $this->clearThrowDispatchState();
 
             return $catchFrame;
         }
@@ -2807,7 +2822,7 @@ restart:
         return null;
     }
 
-    private function enterFinallyHandlerForUnwind(Frame $handler): ?Frame
+    private function enterFinallyHandlerForUnwind(Frame $handler, bool $resumeCatchAfter = true): ?Frame
     {
         $handlerId = spl_object_id($handler);
         if (isset($this->context->completedFinallyHandlers[$handlerId])) {
@@ -2818,9 +2833,41 @@ restart:
             return null;
         }
         $this->context->completedFinallyHandlers[$handlerId] = true;
-        $this->context->pendingCatchResumeHandler = $handler;
+        $this->context->pendingCatchResumeHandler = $resumeCatchAfter ? $handler : null;
 
         return $finallyOp->block1->getFrame($this->context, $handler);
+    }
+
+    /** Run finally after a matching catch body before the try/catch merge block (Zend order). */
+    private function beginCatchExitFinallyUnwind(Frame $frame, Block $target): ?Frame
+    {
+        if (null === $this->resolveActiveCatchException($frame) && null === $frame->activeCatchException) {
+            return null;
+        }
+        if (!isset($this->context->tryMergeBlockIds[spl_object_id($target)])) {
+            return null;
+        }
+        $handler = $this->context->activeCatchHandlerFrame;
+        if (null === $handler || !$this->hasPendingFinally($handler)) {
+            return null;
+        }
+        $this->context->pendingMergeAfterFinally = $target;
+        $this->context->activeCatchHandlerFrame = null;
+
+        return $this->enterFinallyHandlerForUnwind($handler, false);
+    }
+
+    private function resumeMergeAfterFinally(Frame $frame): ?Frame
+    {
+        $merge = $this->context->pendingMergeAfterFinally;
+        if (null === $merge) {
+            return null;
+        }
+        $this->context->pendingMergeAfterFinally = null;
+        $this->context->activeCatchHandlerFrame = null;
+        $frame->activeCatchException = null;
+
+        return $merge->getFrame($this->context, $frame);
     }
 
     private function findFinallyOpForHandler(Frame $handler): ?OpCode
@@ -2857,11 +2904,18 @@ restart:
         $this->raiseUncaughtException($thrown);
     }
 
-    private function clearTryCatchUnwindState(): void
+    private function clearThrowDispatchState(): void
     {
         $this->context->pendingException = null;
         $this->context->pendingCatchResumeHandler = null;
         $this->context->completedFinallyHandlers = [];
+    }
+
+    private function clearTryCatchUnwindState(): void
+    {
+        $this->clearThrowDispatchState();
+        $this->context->activeCatchHandlerFrame = null;
+        $this->context->pendingMergeAfterFinally = null;
         $this->clearPendingReturnState();
     }
 
@@ -2922,7 +2976,7 @@ restart:
         $this->context->pendingReturnValue = $value;
         $this->context->pendingReturnResumeFrame = $frame;
 
-        return $this->enterFinallyHandlerForUnwind($handler);
+        return $this->enterFinallyHandlerForUnwind($handler, true);
     }
 
     private function continueReturnFinallyChain(): ?Frame
@@ -2935,7 +2989,7 @@ restart:
             return null;
         }
 
-        return $this->enterFinallyHandlerForUnwind($handler);
+        return $this->enterFinallyHandlerForUnwind($handler, true);
     }
 
     private function schedulePendingReturnDispatch(): bool
