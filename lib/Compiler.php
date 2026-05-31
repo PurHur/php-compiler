@@ -3206,11 +3206,13 @@ class Compiler {
                     }
                 }
                 $resultSlot = $this->compileOperand($expr->result, $block, false);
+                $line = $expr->getLine();
                 $return = [
                     new OpCode(
                         OpCode::TYPE_NEW,
                         $resultSlot,
                         $this->compileOperand($expr->class, $block, true),
+                        $line > 0 ? $line : null
                     )
                 ];
                 foreach ($this->compileCallArgSends($expr->args, $block) as $send) {
@@ -3699,11 +3701,13 @@ class Compiler {
         if (null !== $mergeEcho && $resultSlot === $mergeEcho) {
             $resultSlot = $block->forceFreshVarSlot($expr->result);
         }
+        $line = $expr->getLine();
         $return = [
             new OpCode(
                 OpCode::TYPE_NEW,
                 $resultSlot,
                 $this->compileOperand($expr->class, $block, true),
+                $line > 0 ? $line : null
             ),
         ];
         foreach ($this->compileCallArgSends($expr->args, $block) as $send) {
@@ -4577,9 +4581,9 @@ class Compiler {
         if (null !== $slot) {
             return $slot;
         }
-        $name = $this->resolveCatchVariableName($catchVar);
-        if (null !== $name) {
-            return $compiledCatch->slotIndexForVariableName($name);
+        if (null !== $this->resolveCatchVariableName($catchVar)) {
+            // Catch body may reference $e only from nested try blocks (#195, #2084).
+            return $compiledCatch->getVarSlot($catchVar, false);
         }
 
         return null;

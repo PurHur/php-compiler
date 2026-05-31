@@ -29,6 +29,7 @@ class OpCode {
     const TYPE_RETURN = 17;
     const TYPE_MINUS = 18;
     const TYPE_DECLARE_CLASS = 19;
+    /** arg3 = new-expression startLine when known (#195). */
     const TYPE_NEW = 20;
     const TYPE_MUL = 21;
     const TYPE_DIV = 22;

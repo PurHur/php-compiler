@@ -1879,6 +1879,12 @@ restart:
                     }
                     $object = new ObjectEntry($class);
                     $this->initInstancePropertyDefaults($object);
+                    if (null !== $op->arg3 && VM\ExceptionSupport::classEntryImplementsThrowable($class, $this->context)) {
+                        $newLine = (int) $op->arg3;
+                        if ($newLine > 0) {
+                            $object->getProperty(VM\ExceptionSupport::PROP_LINE)->int($newLine);
+                        }
+                    }
                     $result->object($object);
                     $frame->call = $object->constructor;
                     $frame->callArgs = [$result];

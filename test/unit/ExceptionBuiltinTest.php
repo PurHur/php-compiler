@@ -72,6 +72,39 @@ try {
         );
     }
 
+    public function testRethrowPreservesOriginalLine(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+try {
+    throw new Exception("x");
+} catch (Exception $e) {
+    try {
+        throw $e;
+    } catch (Exception $e2) {
+        echo $e2->getLine() >= 1 ? "rethrow_ok\n" : "rethrow_bad\n";
+    }
+}
+',
+            "rethrow_ok\n"
+        );
+    }
+
+    public function testDeferredThrowUsesCreationLine(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+$e = new Exception("x");
+try {
+    throw $e;
+} catch (Exception $ex) {
+    echo $ex->getLine() >= 1 ? "deferred_ok\n" : "deferred_bad\n";
+}
+',
+            "deferred_ok\n"
+        );
+    }
+
     public function testUncaughtExceptionNonZeroExit(): void
     {
         $bin = realpath(__DIR__ . '/../../bin/vm.php');
