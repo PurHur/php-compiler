@@ -330,6 +330,8 @@ class Module extends ModuleAbstract
             new stream_context_create(),
             new stream_set_chunk_size_(),
             new stream_set_timeout_(),
+            new stream_set_write_buffer_(),
+            new stream_set_read_buffer_(),
             new fopen(),
             new fread(),
             new fgetc(),

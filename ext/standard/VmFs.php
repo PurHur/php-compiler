@@ -407,6 +407,42 @@ final class VmFs
     }
 
     /**
+     * stream_set_write_buffer() — php-src ext/standard/streams.c (issue #3755).
+     *
+     * @return int|false previous buffer size
+     */
+    public static function streamSetWriteBuffer(int $handle, int $buffer) {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        $previous = @\stream_set_write_buffer($fp, $buffer);
+        if (false === $previous) {
+            return false;
+        }
+
+        return (int) $previous;
+    }
+
+    /**
+     * stream_set_read_buffer() — php-src ext/standard/streams.c (issue #3755).
+     *
+     * @return int|false previous buffer size
+     */
+    public static function streamSetReadBuffer(int $handle, int $buffer) {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        $previous = @\stream_set_read_buffer($fp, $buffer);
+        if (false === $previous) {
+            return false;
+        }
+
+        return (int) $previous;
+    }
+
+    /**
      * stream_set_timeout() — php-src ext/standard/streams.c (issue #3754).
      */
     public static function streamSetTimeout(int $handle, int $seconds, int $microseconds = 0): bool

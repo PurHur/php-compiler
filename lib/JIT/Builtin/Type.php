@@ -292,6 +292,12 @@ class Type extends Builtin {
         $fntypeStreamSetTimeout = $this->context->context->functionType($i32, false, $i64, $i64, $i64);
         $fnStreamSetTimeout = $this->context->module->addFunction('__compiler_stream_set_timeout', $fntypeStreamSetTimeout);
         $this->context->registerFunction('__compiler_stream_set_timeout', $fnStreamSetTimeout);
+        $fntypeStreamSetWriteBuffer = $this->context->context->functionType($i64, false, $i64, $i64);
+        $fnStreamSetWriteBuffer = $this->context->module->addFunction('__compiler_stream_set_write_buffer', $fntypeStreamSetWriteBuffer);
+        $this->context->registerFunction('__compiler_stream_set_write_buffer', $fnStreamSetWriteBuffer);
+        $fntypeStreamSetReadBuffer = $this->context->context->functionType($i64, false, $i64, $i64);
+        $fnStreamSetReadBuffer = $this->context->module->addFunction('__compiler_stream_set_read_buffer', $fntypeStreamSetReadBuffer);
+        $this->context->registerFunction('__compiler_stream_set_read_buffer', $fnStreamSetReadBuffer);
         $fntypeFtruncate = $this->context->context->functionType($i32, false, $i64, $i64);
         $fnFtruncate = $this->context->module->addFunction('__compiler_ftruncate', $fntypeFtruncate);
         $this->context->registerFunction('__compiler_ftruncate', $fnFtruncate);
