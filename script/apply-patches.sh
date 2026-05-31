@@ -1520,8 +1520,7 @@ PY
 
 apply_php_types_array_shape_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
-  if grep -qF "preg_match('/array\\{/i', \$decl)" "$target" 2>/dev/null \
-    && ! grep -qF "preg_match('/^array\\{/i', \$decl)" "$target" 2>/dev/null; then
+  if patch_already_applied "$PATCH_DIR/php-types-array-shape.patch"; then
     echo "Skip php-types-array-shape.patch (already applied)"
     return 0
   fi
@@ -1531,14 +1530,16 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 text = path.read_text()
-old = "        if (preg_match('/^array\\\\{/i', $decl)) {\n            return new self(self::TYPE_ARRAY);\n        }\n"
-new = "        if (preg_match('/array\\\\{/i', $decl)) {\n            return new self(self::TYPE_ARRAY);\n        }\n"
+if "preg_match('/array\\{/i', $decl)" in text:
+    raise SystemExit(0)
+old = "        if (preg_match('/^array\\{/i', $decl)) {\n            return new self(self::TYPE_ARRAY);\n        }\n"
+new = "        if (preg_match('/array\\{/i', $decl)) {\n            return new self(self::TYPE_ARRAY);\n        }\n"
 if old in text:
     path.write_text(text.replace(old, new, 1))
     raise SystemExit(0)
 needle = "        if (strpos($decl, '|') !== false || strpos($decl, '&') !== false || strpos($decl, '(') !== false) {\n"
-insert = "        if (preg_match('/array\\\\{/i', $decl)) {\n            return new self(self::TYPE_ARRAY);\n        }\n" + needle
-if needle in text and "preg_match('/array\\\\{/i', $decl)" not in text:
+insert = "        if (preg_match('/array\\{/i', $decl)) {\n            return new self(self::TYPE_ARRAY);\n        }\n" + needle
+if needle in text:
     path.write_text(text.replace(needle, insert, 1))
     raise SystemExit(0)
 sys.stderr.write("php-types-array-shape: anchor not found\n")
