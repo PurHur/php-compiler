@@ -45,6 +45,8 @@ final class SelfHostBuiltinPolicy
         'getmygrgid' => 'numeric',
         'getmyinode' => 'numeric',
         'getrusage' => 'numeric',
+        'memory_get_peak_usage' => 'numeric',
+        'memory_get_usage' => 'numeric',
         'pi' => 'numeric',
     ];
 

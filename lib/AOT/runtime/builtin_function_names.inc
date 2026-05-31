@@ -145,6 +145,8 @@ static const char *phpc_builtin_functions[] = {
     "gethostname",
     "getmypid",
     "getrusage",
+    "memory_get_peak_usage",
+    "memory_get_usage",
     "gettype",
     "glob",
     "gmdate",
