@@ -11,8 +11,13 @@
 #include <string.h>
 
 typedef struct __string__ __string__;
+typedef struct __value__ __value__;
 
 extern __string__ *__string__init(long long size, const char *value);
+extern void __value__writeLong(__value__ *out, long long value);
+extern void __value__writeDouble(__value__ *out, double value);
+
+int phpc_basetozval_result(const char *str, long long base, long long *out_long, double *out_double);
 
 static const char digits[] = "0123456789abcdefghijklmnopqrstuvwxyz";
 
@@ -175,6 +180,42 @@ static __string__ *phpc_doubletobase(double fvalue, int base)
     }
 
     return __string__init((long long) (end - ptr), ptr);
+}
+
+void phpc_basetozval_write(__value__ *out, const char *str, long long base)
+{
+    int64_t lval;
+    double dval;
+    int is_double = 0;
+
+    if (NULL == out) {
+        return;
+    }
+
+    phpc_basetozval(str, (int) base, &lval, &dval, &is_double);
+
+    if (is_double) {
+        __value__writeDouble(out, dval);
+    } else {
+        __value__writeLong(out, (long long) lval);
+    }
+}
+
+int phpc_basetozval_result(const char *str, long long base, long long *out_long, double *out_double)
+{
+    int64_t lval = 0;
+    double dval = 0.0;
+    int is_double = 0;
+
+    phpc_basetozval(str, (int) base, &lval, &dval, &is_double);
+    if (NULL != out_long) {
+        *out_long = (long long) lval;
+    }
+    if (NULL != out_double) {
+        *out_double = dval;
+    }
+
+    return is_double;
 }
 
 __string__ *phpc_base_convert(const char *num, long long from_base, long long to_base)
