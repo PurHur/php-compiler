@@ -33,6 +33,14 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'anonymous_class.phpt',
         'anonymous_class_ctor.phpt',
         'anonymous_class_return_from_method.phpt',
+        'readonly_property_write.phpt',
+        'readonly_property_unset.phpt',
+        'readonly_property_inc.phpt',
+        'readonly_property_dec.phpt',
+        'readonly_property_compound_assign.phpt',
+        'readonly_property_dot_assign.phpt',
+        'readonly_property_promoted.phpt',
+        'readonly_property_coalesce_assign.phpt',
     ];
 
     /**

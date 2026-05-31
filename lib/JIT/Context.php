@@ -504,6 +504,7 @@ class Context {
                 $this->builder->call($this->lookupFunction('__superglobals__refresh'));
                 Builtin\JitThrow::registerDeclarations($this);
                 $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending'));
+                Builtin\ReadonlyRaise::emitClearForStandaloneMain($this);
             }
             $this->builder->call(
                 $this->lookupFunction('__phpc_progress_note'),
@@ -521,6 +522,7 @@ class Context {
                 )
             );
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+                Builtin\ReadonlyRaise::emitAbortIfPendingForStandaloneMain($this);
                 Builtin\PendingHeaders::emitFlushForStandalone($this);
             }
             $this->builder->call($this->shutdownFunc);

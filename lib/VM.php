@@ -1095,16 +1095,32 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_POST_INC:
-                    $this->executeIncDec($frame, $op, true, false);
+                    $catchFrame = $this->executeIncDec($frame, $op, true, false);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     break;
                 case OpCode::TYPE_PRE_INC:
-                    $this->executeIncDec($frame, $op, true, true);
+                    $catchFrame = $this->executeIncDec($frame, $op, true, true);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     break;
                 case OpCode::TYPE_POST_DEC:
-                    $this->executeIncDec($frame, $op, false, false);
+                    $catchFrame = $this->executeIncDec($frame, $op, false, false);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     break;
                 case OpCode::TYPE_PRE_DEC:
-                    $this->executeIncDec($frame, $op, false, true);
+                    $catchFrame = $this->executeIncDec($frame, $op, false, true);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     break;
                 case OpCode::TYPE_PLUS:
                 case OpCode::TYPE_MINUS:
@@ -1115,6 +1131,11 @@ restart:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
+                    $catchFrame = $this->enforceReadonlyForCompoundAssign($frame, $op, $arg2);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     try {
                         if (
                             $op->isIncDec
@@ -1148,6 +1169,11 @@ restart:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
+                    $catchFrame = $this->enforceReadonlyForCompoundAssign($frame, $op, $arg2);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $arg1->bitwiseOp($op->type, $arg2, $arg3);
                     break;
 
@@ -1159,6 +1185,11 @@ restart:
                     break;
                 case OpCode::TYPE_CONCAT:
                     $arg1 = $frame->scope[$op->arg1];
+                    $catchFrame = $this->enforceReadonlyForCompoundAssign($frame, $op, $arg1);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $arg2 = $this->coerceVariableToString($frame->scope[$op->arg2]);
                     $arg3 = $this->coerceVariableToString($frame->scope[$op->arg3]);
                     $arg1->string($arg2 . $arg3);
@@ -1448,7 +1479,13 @@ restart:
                             $this->invokeArrayAccessOffsetUnset($object, $key);
                             break;
                         }
-                        $this->unsetObjectProperty($object, $key->toString());
+                        $propName = $key->toString();
+                        $catchFrame = $this->enforceReadonlyPropertyUnset($object, $propName, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        $this->unsetObjectProperty($object, $propName);
                         break;
                     }
                     if (Variable::TYPE_ARRAY === $container->type) {
@@ -2410,12 +2447,17 @@ restart:
 
     /**
      * Pre/post increment/decrement with Zend bool preservation (#3552).
+     * Rejects ++/-- on readonly properties after construction (#3149).
      */
-    private function executeIncDec(Frame $frame, OpCode $op, bool $increment, bool $prefix): void
+    private function executeIncDec(Frame $frame, OpCode $op, bool $increment, bool $prefix): ?Frame
     {
         $read = $frame->scope[$op->arg2];
         $write = $frame->scope[$op->arg3];
         $result = $frame->scope[$op->arg1];
+        $catchFrame = $this->enforceReadonlyPropertyWrite($write, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
         $working = new Variable();
         $working->copyFrom($read->resolveIndirect());
         if ($prefix) {
@@ -2427,7 +2469,7 @@ restart:
             $write->copyFrom($working);
             $result->copyFrom($working);
 
-            return;
+            return null;
         }
         $old = new Variable();
         $old->copyFrom($working);
@@ -2438,6 +2480,8 @@ restart:
         }
         $write->copyFrom($working);
         $result->copyFrom($old);
+
+        return null;
     }
 
     protected function raise(string $message, Frame $frame): int
@@ -2618,10 +2662,16 @@ restart:
         $ops = $handler->block->opCodes;
         $n = $handler->block->nOpCodes;
         for ($i = 0; $i < $n; ++$i) {
+            if (!isset($ops[$i])) {
+                continue;
+            }
             if (OpCode::TYPE_TRY !== $ops[$i]->type) {
                 continue;
             }
             for ($j = $i + 1; $j < $n; ++$j) {
+                if (!isset($ops[$j])) {
+                    continue;
+                }
                 if (OpCode::TYPE_CATCH === $ops[$j]->type) {
                     $handler->pos = $j;
 
@@ -3063,6 +3113,40 @@ restart:
         }
     }
 
+    /** Reject unset() on readonly properties; returns catch frame or throws when uncaught. */
+    private function enforceReadonlyPropertyUnset(ObjectEntry $object, string $propName, Frame $frame): ?Frame
+    {
+        $declaringClass = $this->readonlyPropertyDeclaringClass($object, $propName);
+        if (null === $declaringClass) {
+            return null;
+        }
+
+        $thrown = VM\BuiltinExceptionSupport::materializeError(
+            $this->context,
+            sprintf('Cannot unset readonly property %s::$%s', $declaringClass, $propName)
+        );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /**
+     * Compound assignment ($obj->prop += 1) reuses one operand slot (arg1 === arg2).
+     * Reject when the lvalue is a readonly instance property after construction (#3149).
+     */
+    private function enforceReadonlyForCompoundAssign(Frame $frame, OpCode $op, Variable $lvalue): ?Frame
+    {
+        if ($op->arg1 !== $op->arg2) {
+            return null;
+        }
+
+        return $this->enforceReadonlyPropertyWrite($lvalue, $frame);
+    }
+
     /** Reject readonly property writes; returns catch frame or throws when uncaught. */
     private function enforceReadonlyPropertyWrite(Variable $lvalue, Frame $frame): ?Frame
     {
@@ -3072,13 +3156,14 @@ restart:
             return null;
         }
         $prop = $target->objectPropertyName ?? 'property';
-        if (!$this->isReadonlyPropertyWrite($owner->class, $prop)) {
+        $declaringClass = $this->readonlyPropertyDeclaringClass($owner, $prop);
+        if (null === $declaringClass) {
             return null;
         }
 
         $thrown = VM\BuiltinExceptionSupport::materializeError(
             $this->context,
-            sprintf('Cannot modify readonly property %s::$%s', $owner->class->name, $prop)
+            sprintf('Cannot modify readonly property %s::$%s', $declaringClass, $prop)
         );
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
@@ -3142,18 +3227,20 @@ restart:
         return null;
     }
 
-    private function isReadonlyPropertyWrite(ClassEntry $class, string $propName): bool
+    private function readonlyPropertyDeclaringClass(ObjectEntry $object, string $propName): ?string
     {
-        if ($class->readonly) {
-            return true;
+        if ($object->class->readonly) {
+            return $object->class->name;
         }
-        foreach ($class->properties as $property) {
-            if ($property->name === $propName && $property->readonly) {
-                return true;
-            }
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null === $meta || !$meta->readonly) {
+            return null;
+        }
+        if ('' !== $meta->declaringClassLc && isset($this->context->classes[$meta->declaringClassLc])) {
+            return $this->context->classes[$meta->declaringClassLc]->name;
         }
 
-        return false;
+        return $meta->declaringClassLc !== '' ? $meta->declaringClassLc : $object->class->name;
     }
 
     /** Reject asymmetric set visibility violations (#3165); returns message or null. */

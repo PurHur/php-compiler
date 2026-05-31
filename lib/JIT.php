@@ -5040,7 +5040,11 @@ class JIT {
                     $result = $this->context->getVariableFromOp($block->getOperand($op->arg1));
                     $left = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $right = $this->context->getVariableFromOp($block->getOperand($op->arg3));
-                    $this->context->type->string->concat($result, $left, $right);
+                    if (null !== $result->objectPropertySlot) {
+                        $this->compileObjectPropertyConcatOp($result, $left, $right);
+                    } else {
+                        $this->context->type->string->concat($result, $left, $right);
+                    }
                     $this->maybeRefreshIncludeBindingsBeforeUse();
                     break;
                 case OpCode::TYPE_CONST_FETCH:
@@ -7145,8 +7149,10 @@ class JIT {
             && Variable::KIND_VALUE === $result->kind
             && Variable::TYPE_STRING !== $result->type
             && !$value->isJitGenerator
+            && null === $result->objectPropertySlot
         ) {
             // ?? left branch fetch binds a superglobal lvalue; force-assign needs a stack slot (#866).
+            // Property lvalues keep objectPropertySlot so ReadonlyClassGuard runs on inc/dec (#3149).
             $slot = JIT\JitValueBox::alloc($this->context);
             $this->context->setVariableOp(
                 $resultOp,
@@ -8082,6 +8088,11 @@ class JIT {
         $writeOp = $this->operandAt($block, $op->arg3, 'inc/dec write');
         $resultOp = $this->operandAt($block, $op->arg1, 'inc/dec result');
         $read = $this->context->getVariableFromOpInScopes($readOp);
+        if (null !== $read->objectPropertySlot) {
+            $this->compileObjectPropertyIncDecOp($read, $resultOp, $increment, $prefix);
+
+            return;
+        }
 
         if (Variable::TYPE_NATIVE_BOOL === $read->type) {
             $this->assignOperand($writeOp, $read, true);
@@ -8148,6 +8159,99 @@ class JIT {
         );
         $newVal = $this->context->helper->binaryOp($arithOp, $read, $oneVar);
         $this->assignOperand($writeOp, $newVal, true);
+        if ($prefix) {
+            $this->assignOperand($resultOp, $newVal, true);
+        }
+    }
+
+    /** .= on object properties: concat into new string, guard readonly, store via slot (#3149). */
+    private function compileObjectPropertyConcatOp(Variable $dest, Variable $left, Variable $right): void
+    {
+        if (null === $dest->objectPropertySlot || null === $dest->objectPropertyType) {
+            throw new \LogicException('objectPropertySlot requires objectPropertyType');
+        }
+        $newVal = $this->compileConcatIntoNewString($left, $right);
+        JIT\ReadonlyClassGuard::emitBeforePropertyStore(
+            $this->context,
+            $dest,
+            $this->context->jitEnclosingBlock
+        );
+        $this->context->type->object->propertyStore(
+            $dest->objectPropertySlot,
+            $newVal,
+            $dest->objectPropertyType
+        );
+    }
+
+    /** Allocate a fresh native string holding left . right (php-src string concat semantics). */
+    private function compileConcatIntoNewString(Variable $left, Variable $right): Variable
+    {
+        $this->context->intrinsic->builder = $this->context->builder;
+        $left = JIT\JitNativeString::coerce($this->context, $left);
+        $right = JIT\JitNativeString::coerce($this->context, $right);
+        $leftVar = $this->context->helper->loadValue($left);
+        $rightVar = $this->context->helper->loadValue($right);
+        $map = $this->context->structFieldMap['__string__'];
+        $leftSize = $this->context->builder->load(
+            $this->context->builder->structGep($leftVar, $map['length'])
+        );
+        $rightSize = $this->context->builder->load(
+            $this->context->builder->structGep($rightVar, $map['length'])
+        );
+        $size = $this->context->builder->addNoUnsignedWrap(
+            $leftSize,
+            $this->context->builder->intCast($rightSize, $leftSize->typeOf())
+        );
+        $result = $this->context->builder->call(
+            $this->context->lookupFunction('__string__alloc'),
+            $size
+        );
+        $char = $this->context->builder->structGep($result, $map['value']);
+        $leftChar = $this->context->builder->structGep($leftVar, $map['value']);
+        $this->context->intrinsic->memcpy($char, $leftChar, $leftSize, false);
+        $char = $this->context->builder->gep($char, $leftSize);
+        $rightChar = $this->context->builder->structGep($rightVar, $map['value']);
+        $this->context->intrinsic->memcpy($char, $rightChar, $rightSize, false);
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $result
+        );
+    }
+
+    /** ++/-- on object properties: guard readonly and store via property slot (#3149). */
+    private function compileObjectPropertyIncDecOp(
+        Variable $read,
+        \PHPCfg\Operand $resultOp,
+        bool $increment,
+        bool $prefix
+    ): void {
+        if (null === $read->objectPropertySlot || null === $read->objectPropertyType) {
+            throw new \LogicException('objectPropertySlot requires objectPropertyType');
+        }
+        if (!$prefix) {
+            $this->assignOperand($resultOp, $read, true);
+        }
+        $arithOp = new OpCode($increment ? OpCode::TYPE_PLUS : OpCode::TYPE_MINUS);
+        $oneVar = new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $this->context->constantFromInteger(1)
+        );
+        $newVal = $this->context->helper->binaryOp($arithOp, $read, $oneVar);
+        JIT\ReadonlyClassGuard::emitBeforePropertyStore(
+            $this->context,
+            $read,
+            $this->context->jitEnclosingBlock
+        );
+        $this->context->type->object->propertyStore(
+            $read->objectPropertySlot,
+            $newVal,
+            $read->objectPropertyType
+        );
         if ($prefix) {
             $this->assignOperand($resultOp, $newVal, true);
         }
