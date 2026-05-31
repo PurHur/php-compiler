@@ -137,6 +137,8 @@ class Module extends ModuleAbstract
             new count_chars(),
             new convert_uudecode(),
             new convert_uuencode(),
+            new utf8_decode(),
+            new utf8_encode(),
             new str_word_count(),
             new str_contains(),
             new str_starts_with(),
