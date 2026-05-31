@@ -2810,15 +2810,63 @@ final class ArrayBuiltinHelper
     }
 
     /**
-     * Split a packed list array into consecutive chunks (array_chunk subset; matches VM HashTable::chunkCopy).
+     * Split an array into consecutive chunks (array_chunk subset; matches VM HashTable::chunkCopy).
+     *
+     * @param Value|null $preserveKeys i1 when the third argument is present; null for default false
      */
-    public static function buildChunkArray(Context $context, Variable $array, Value $size): Value
+    public static function buildChunkArray(
+        Context $context,
+        Variable $array,
+        Value $size,
+        ?Value $preserveKeys = null
+    ): Value {
+        if (null === $preserveKeys) {
+            return self::buildChunkArrayFast($context, $array, $size);
+        }
+
+        $fastBlock = BasicBlockHelper::append($context, 'array_chunk_fast');
+        $preserveBlock = BasicBlockHelper::append($context, 'array_chunk_preserve');
+        $doneBlock = BasicBlockHelper::append($context, 'array_chunk_branch_done');
+        $context->builder->branchIf($preserveKeys, $preserveBlock, $fastBlock);
+
+        $context->builder->positionAtEnd($fastBlock);
+        $fastResult = self::buildChunkArrayFast($context, $array, $size);
+        $fastEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($preserveBlock);
+        $preserveResult = self::buildChunkArrayPreserveKeys($context, $array, $size);
+        $preserveEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($fastResult->typeOf());
+        $phi->addIncoming($fastResult, $fastEnd);
+        $phi->addIncoming($preserveResult, $preserveEnd);
+
+        return $phi;
+    }
+
+    private static function buildChunkArrayFast(Context $context, Variable $array, Value $size): Value
     {
         if (self::isNativeArray($array->type)) {
             return self::buildChunkFromNativeArray($context, $array, $size);
         }
 
         return self::buildChunkFromHashTable(
+            $context,
+            self::loadHashTable($context, $array),
+            $size
+        );
+    }
+
+    private static function buildChunkArrayPreserveKeys(Context $context, Variable $array, Value $size): Value
+    {
+        if (self::isNativeArray($array->type)) {
+            return self::buildChunkPreserveKeysFromNativeArray($context, $array, $size);
+        }
+
+        return self::buildChunkPreserveKeysFromHashTable(
             $context,
             self::loadHashTable($context, $array),
             $size
@@ -3050,6 +3098,312 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($hasPartial, $finalizeFlush, $doneBlock);
 
         $context->builder->positionAtEnd($finalizeFlush);
+        $outIdx = $context->builder->load($outIdxSlot);
+        self::appendChunkHashtable($context, $out, $context->builder->load($chunkHtSlot), $outIdx);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $out;
+    }
+
+    private static function buildChunkPreserveKeysFromNativeArray(
+        Context $context,
+        Variable $array,
+        Value $size
+    ): Value {
+        $tag = 'acpkn'.(string) ++self::$copyListEntrySeq;
+        $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
+        $sizeT = $context->getTypeFromString('size_t');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+        $chunkSize = $context->builder->truncOrBitCast($size, $sizeT);
+
+        $out = HashTableHelper::alloc($context);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_chunk_pk_native_src_'.$tag);
+        $chunkCountSlot = $context->builder->alloca($sizeT, 1, 'array_chunk_pk_native_count_'.$tag);
+        $chunkHtSlot = $context->builder->alloca($htPtr, 1, 'array_chunk_pk_native_chunk_'.$tag);
+        $outIdxSlot = $context->builder->alloca($sizeT, 1, 'array_chunk_pk_native_out_'.$tag);
+        $context->builder->store($zero, $srcIdxSlot);
+        $context->builder->store($zero, $chunkCountSlot);
+        $context->builder->store($zero, $outIdxSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_chunk_pk_native_head_'.$tag);
+        $startChunk = BasicBlockHelper::append($context, 'array_chunk_pk_native_start_'.$tag);
+        $copyBlock = BasicBlockHelper::append($context, 'array_chunk_pk_native_copy_'.$tag);
+        $flushCheck = BasicBlockHelper::append($context, 'array_chunk_pk_native_flush_chk_'.$tag);
+        $flushBlock = BasicBlockHelper::append($context, 'array_chunk_pk_native_flush_'.$tag);
+        $advance = BasicBlockHelper::append($context, 'array_chunk_pk_native_advance_'.$tag);
+        $finalize = BasicBlockHelper::append($context, 'array_chunk_pk_native_finalize_'.$tag);
+        $finalizeFlush = BasicBlockHelper::append($context, 'array_chunk_pk_native_finalize_flush_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'array_chunk_pk_native_done_'.$tag);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $count);
+        $context->builder->branchIf($atEnd, $finalize, $startChunk);
+
+        $context->builder->positionAtEnd($startChunk);
+        $chunkCount = $context->builder->load($chunkCountSlot);
+        $needsChunk = $context->builder->icmp(Builder::INT_EQ, $chunkCount, $zero);
+        $newChunkBlock = BasicBlockHelper::append($context, 'array_chunk_pk_native_new_'.$tag);
+        $context->builder->branchIf($needsChunk, $newChunkBlock, $copyBlock);
+
+        $context->builder->positionAtEnd($newChunkBlock);
+        $newChunk = HashTableHelper::alloc($context);
+        $context->builder->store($newChunk, $chunkHtSlot);
+        $context->builder->branch($copyBlock);
+
+        $context->builder->positionAtEnd($copyBlock);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $chunkCount = $context->builder->load($chunkCountSlot);
+        $chunkHt = $context->builder->load($chunkHtSlot);
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $srcIdx);
+        if (Variable::TYPE_STRING === $elemType) {
+            $elem = new Variable($context, $elemType, Variable::KIND_VARIABLE, $slot);
+        } else {
+            $elem = new Variable(
+                $context,
+                $elemType,
+                Variable::KIND_VALUE,
+                $context->builder->load($slot)
+            );
+        }
+        HashTableHelper::setAtIndex($context, $chunkHt, $srcIdx, $elem);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($chunkCount, $one),
+            $chunkCountSlot
+        );
+        $context->builder->branch($flushCheck);
+
+        $context->builder->positionAtEnd($flushCheck);
+        $chunkCount = $context->builder->load($chunkCountSlot);
+        $shouldFlush = $context->builder->icmp(Builder::INT_SGE, $chunkCount, $chunkSize);
+        $context->builder->branchIf($shouldFlush, $flushBlock, $advance);
+
+        $context->builder->positionAtEnd($flushBlock);
+        $outIdx = $context->builder->load($outIdxSlot);
+        self::appendChunkHashtable($context, $out, $context->builder->load($chunkHtSlot), $outIdx);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($outIdx, $one),
+            $outIdxSlot
+        );
+        $context->builder->store($zero, $chunkCountSlot);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($context->builder->load($srcIdxSlot), $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($finalize);
+        $chunkCount = $context->builder->load($chunkCountSlot);
+        $hasPartial = $context->builder->icmp(Builder::INT_SGT, $chunkCount, $zero);
+        $context->builder->branchIf($hasPartial, $finalizeFlush, $doneBlock);
+
+        $context->builder->positionAtEnd($finalizeFlush);
+        $outIdx = $context->builder->load($outIdxSlot);
+        self::appendChunkHashtable($context, $out, $context->builder->load($chunkHtSlot), $outIdx);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $out;
+    }
+
+    private static function buildChunkPreserveKeysFromHashTable(Context $context, Value $src, Value $size): Value
+    {
+        $tag = 'acpk'.(string) ++self::$copyListEntrySeq;
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $chunkSize = $context->builder->truncOrBitCast($size, $sizeT);
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+
+        $out = HashTableHelper::alloc($context);
+        $chunkCountSlot = $context->builder->alloca($sizeT, 1, 'array_chunk_pk_count_'.$tag);
+        $chunkHtSlot = $context->builder->alloca($htPtr, 1, 'array_chunk_pk_chunk_'.$tag);
+        $outIdxSlot = $context->builder->alloca($sizeT, 1, 'array_chunk_pk_out_'.$tag);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_chunk_pk_src_'.$tag);
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_chunk_pk_walk_'.$tag);
+        $context->builder->store($zero, $chunkCountSlot);
+        $context->builder->store($zero, $outIdxSlot);
+        $context->builder->store($zero, $srcIdxSlot);
+
+        $flushChunkBlock = BasicBlockHelper::append($context, 'array_chunk_pk_flush_'.$tag);
+        $flushChunkContinue = BasicBlockHelper::append($context, 'array_chunk_pk_flush_cont_'.$tag);
+        $finalizeBlock = BasicBlockHelper::append($context, 'array_chunk_pk_finalize_'.$tag);
+        $finalizeFlushBlock = BasicBlockHelper::append($context, 'array_chunk_pk_finalize_flush_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'array_chunk_pk_done_'.$tag);
+
+        // Packed int keys (preserve original index).
+        $packedHead = BasicBlockHelper::append($context, 'array_chunk_pk_packed_head_'.$tag);
+        $packedCheck = BasicBlockHelper::append($context, 'array_chunk_pk_packed_check_'.$tag);
+        $packedSkip = BasicBlockHelper::append($context, 'array_chunk_pk_packed_skip_'.$tag);
+        $packedStart = BasicBlockHelper::append($context, 'array_chunk_pk_packed_start_'.$tag);
+        $packedNew = BasicBlockHelper::append($context, 'array_chunk_pk_packed_new_'.$tag);
+        $packedCopy = BasicBlockHelper::append($context, 'array_chunk_pk_packed_copy_'.$tag);
+        $packedFlushCheck = BasicBlockHelper::append($context, 'array_chunk_pk_packed_flush_chk_'.$tag);
+        $packedAdvance = BasicBlockHelper::append($context, 'array_chunk_pk_packed_advance_'.$tag);
+        $packedDone = BasicBlockHelper::append($context, 'array_chunk_pk_packed_done_'.$tag);
+        $context->builder->branch($packedHead);
+
+        $context->builder->positionAtEnd($packedHead);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $nextFree);
+        $context->builder->branchIf($atEnd, $packedDone, $packedCheck);
+
+        $context->builder->positionAtEnd($packedCheck);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $srcIdx
+        );
+        $context->builder->branchIf($isSet, $packedStart, $packedSkip);
+
+        $context->builder->positionAtEnd($packedSkip);
+        $context->builder->branch($packedAdvance);
+
+        $context->builder->positionAtEnd($packedStart);
+        $chunkCount = $context->builder->load($chunkCountSlot);
+        $needsChunk = $context->builder->icmp(Builder::INT_EQ, $chunkCount, $zero);
+        $context->builder->branchIf($needsChunk, $packedNew, $packedCopy);
+
+        $context->builder->positionAtEnd($packedNew);
+        $newChunk = HashTableHelper::alloc($context);
+        $context->builder->store($newChunk, $chunkHtSlot);
+        $context->builder->branch($packedCopy);
+
+        $context->builder->positionAtEnd($packedCopy);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $chunkHt = $context->builder->load($chunkHtSlot);
+        self::storeValueEntryAtIndex(
+            $context,
+            $chunkHt,
+            $srcIdx,
+            self::listEntryAt($context, $src, $srcIdx)
+        );
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($context->builder->load($chunkCountSlot), $one),
+            $chunkCountSlot
+        );
+        $context->builder->branch($packedFlushCheck);
+
+        $context->builder->positionAtEnd($packedFlushCheck);
+        $chunkCount = $context->builder->load($chunkCountSlot);
+        $shouldFlush = $context->builder->icmp(Builder::INT_SGE, $chunkCount, $chunkSize);
+        $context->builder->branchIf($shouldFlush, $flushChunkBlock, $packedAdvance);
+
+        $context->builder->positionAtEnd($flushChunkBlock);
+        $outIdx = $context->builder->load($outIdxSlot);
+        self::appendChunkHashtable($context, $out, $context->builder->load($chunkHtSlot), $outIdx);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($outIdx, $one),
+            $outIdxSlot
+        );
+        $context->builder->store($zero, $chunkCountSlot);
+        $context->builder->branch($flushChunkContinue);
+
+        $context->builder->positionAtEnd($flushChunkContinue);
+        $context->builder->branch($packedAdvance);
+
+        $context->builder->positionAtEnd($packedAdvance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($context->builder->load($srcIdxSlot), $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($packedHead);
+
+        // String keys (preserve original key).
+        $strInit = BasicBlockHelper::append($context, 'array_chunk_pk_str_init_'.$tag);
+        $strHead = BasicBlockHelper::append($context, 'array_chunk_pk_str_head_'.$tag);
+        $strBody = BasicBlockHelper::append($context, 'array_chunk_pk_str_body_'.$tag);
+        $strStart = BasicBlockHelper::append($context, 'array_chunk_pk_str_start_'.$tag);
+        $strNew = BasicBlockHelper::append($context, 'array_chunk_pk_str_new_'.$tag);
+        $strCopy = BasicBlockHelper::append($context, 'array_chunk_pk_str_copy_'.$tag);
+        $strFlushCheck = BasicBlockHelper::append($context, 'array_chunk_pk_str_flush_chk_'.$tag);
+        $strNext = BasicBlockHelper::append($context, 'array_chunk_pk_str_next_'.$tag);
+        $context->builder->positionAtEnd($packedDone);
+        $context->builder->branch($strInit);
+
+        $context->builder->positionAtEnd($strInit);
+        $head = $context->builder->load($context->builder->structGep($src, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $finalizeBlock, $strBody);
+
+        $context->builder->positionAtEnd($strBody);
+        $context->builder->branch($strStart);
+
+        $context->builder->positionAtEnd($strStart);
+        $chunkCount = $context->builder->load($chunkCountSlot);
+        $needsChunk = $context->builder->icmp(Builder::INT_EQ, $chunkCount, $zero);
+        $context->builder->branchIf($needsChunk, $strNew, $strCopy);
+
+        $context->builder->positionAtEnd($strNew);
+        $newChunk = HashTableHelper::alloc($context);
+        $context->builder->store($newChunk, $chunkHtSlot);
+        $context->builder->branch($strCopy);
+
+        $context->builder->positionAtEnd($strCopy);
+        $node = $context->builder->load($walkSlot);
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        self::storeValueEntryAtStringKey(
+            $context,
+            $context->builder->load($chunkHtSlot),
+            $keyStr,
+            $valEntry
+        );
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($context->builder->load($chunkCountSlot), $one),
+            $chunkCountSlot
+        );
+        $context->builder->branch($strFlushCheck);
+
+        $context->builder->positionAtEnd($strFlushCheck);
+        $chunkCount = $context->builder->load($chunkCountSlot);
+        $shouldFlush = $context->builder->icmp(Builder::INT_SGE, $chunkCount, $chunkSize);
+        $strFlushBlock = BasicBlockHelper::append($context, 'array_chunk_pk_str_flush_'.$tag);
+        $context->builder->branchIf($shouldFlush, $strFlushBlock, $strNext);
+
+        $context->builder->positionAtEnd($strFlushBlock);
+        $outIdx = $context->builder->load($outIdxSlot);
+        self::appendChunkHashtable($context, $out, $context->builder->load($chunkHtSlot), $outIdx);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($outIdx, $one),
+            $outIdxSlot
+        );
+        $context->builder->store($zero, $chunkCountSlot);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strNext);
+        $node = $context->builder->load($walkSlot);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($finalizeBlock);
+        $chunkCount = $context->builder->load($chunkCountSlot);
+        $hasPartial = $context->builder->icmp(Builder::INT_SGT, $chunkCount, $zero);
+        $context->builder->branchIf($hasPartial, $finalizeFlushBlock, $doneBlock);
+
+        $context->builder->positionAtEnd($finalizeFlushBlock);
         $outIdx = $context->builder->load($outIdxSlot);
         self::appendChunkHashtable($context, $out, $context->builder->load($chunkHtSlot), $outIdx);
         $context->builder->branch($doneBlock);
