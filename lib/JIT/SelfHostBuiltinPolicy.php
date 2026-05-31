@@ -33,6 +33,8 @@ final class SelfHostBuiltinPolicy
         'is_string' => 'numeric',
         'is_array' => 'numeric',
         'is_countable' => 'numeric',
+        'is_iterable' => 'numeric',
+        'iterator_count' => 'numeric',
         'is_null' => 'numeric',
         'is_numeric' => 'numeric',
         'time' => 'numeric',
@@ -147,6 +149,7 @@ final class SelfHostBuiltinPolicy
         'in_array' => 'array', 'array_search' => 'array', 'array_fill' => 'array', 'array_slice' => 'array', 'array_splice' => 'array',
         'array_key_exists' => 'array', 'array_key_first' => 'array', 'array_key_last' => 'array',
         'array_is_list' => 'array', 'array_map' => 'array', 'array_count' => 'array',
+        'iterator_apply' => 'array',
         // array_map: null + string builtins + closure/arrow (#142); [class,method] deferred (#1154)
         'array_push' => 'array', 'array_pop' => 'array', 'array_shift' => 'array', 'array_unshift' => 'array',
         'array_reverse' => 'array', 'array_filter' => 'array', 'array_walk' => 'array',

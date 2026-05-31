@@ -40,7 +40,7 @@ final class RuntimeIndirectInstanceMethodCall implements Call
         $obj = $this->loadReceiverObject($context);
         $classId = ClosureHelper::loadClassId($context, $obj);
 
-        return $this->dispatchByClassId($context, $classId, $obj, ...$args);
+        return $this->dispatchByClassId($context, $obj, $classId, ...$args);
     }
 
     private function loadReceiverObject(Context $context): Value
