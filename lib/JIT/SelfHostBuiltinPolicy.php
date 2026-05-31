@@ -43,6 +43,8 @@ final class SelfHostBuiltinPolicy
         'uniqid' => 'numeric',
         'getmypid' => 'numeric',
         'getrusage' => 'numeric',
+        'memory_get_peak_usage' => 'numeric',
+        'memory_get_usage' => 'numeric',
         'pi' => 'numeric',
     ];
 

@@ -650,6 +650,16 @@ class Type extends Builtin {
             $this->context->context->functionType($void, false, $i64, $valuePtr)
         );
         $this->context->registerFunction('__compiler_getrusage', $fnGetrusage);
+        $fnMemoryUsage = $this->context->module->addFunction(
+            '__compiler_memory_get_usage',
+            $this->context->context->functionType($void, false, $i64, $valuePtr)
+        );
+        $this->context->registerFunction('__compiler_memory_get_usage', $fnMemoryUsage);
+        $fnMemoryPeak = $this->context->module->addFunction(
+            '__compiler_memory_get_peak_usage',
+            $this->context->context->functionType($void, false, $i64, $valuePtr)
+        );
+        $this->context->registerFunction('__compiler_memory_get_peak_usage', $fnMemoryPeak);
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
         $fnGetDefinedFunctions = $this->context->module->addFunction(
             '__compiler_get_defined_functions_merge',

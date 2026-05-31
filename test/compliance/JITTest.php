@@ -105,6 +105,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'getrusage')) {
                 continue;
             }
+            // memory_get_usage() MCJIT: VM + AOT (#3134); umbrella JITTest skips until stable.
+            if (str_contains($name, 'memory_get_usage')) {
+                continue;
+            }
             // phpversion/php_sapi_name/php_uname MCJIT: VM + AOT (#3174); umbrella JITTest skips until stable.
             if (str_contains($name, 'phpversion')) {
                 continue;

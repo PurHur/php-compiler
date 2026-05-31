@@ -394,6 +394,8 @@ class Module extends ModuleAbstract
             new time(),
             new getmypid(),
             new getrusage(),
+            new memory_get_peak_usage(),
+            new memory_get_usage(),
             new microtime(),
             new gettimeofday(),
             new hrtime(),
