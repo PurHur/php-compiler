@@ -41,7 +41,7 @@ final class BackedEnum
             default => 'unknown',
         };
 
-        return $repr.' is not a valid backing value for enum "'.$enum->name.'"';
+        return $repr.' is not a valid backing value for enum '.$enum->name;
     }
 
     private static function backingValuesMatch(string $backedType, Variable $caseValue, Variable $arg): bool

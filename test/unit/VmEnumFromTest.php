@@ -25,7 +25,7 @@ PHP;
         $this->assertSame('Rednull', $output);
     }
 
-    public function testBackedEnumFromInvalidThrowsValueError(): void
+    public function testBackedEnumFromInvalidUncaught(): void
     {
         $code = <<<'PHP'
 <?php
@@ -35,7 +35,28 @@ PHP;
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile($code, 'enum_from_invalid.php');
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('"missing" is not a valid backing value for enum "Color"');
+        $this->expectExceptionMessage('"missing" is not a valid backing value for enum Color');
         $runtime->run($block);
+    }
+
+    public function testBackedEnumFromInvalidCaughtAsValueError(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum Color: string { case Red = 'red'; }
+try {
+    Color::from('missing');
+    echo 'no throw';
+} catch (ValueError $e) {
+    echo $e->getMessage();
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_from_caught.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame('"missing" is not a valid backing value for enum Color', $output);
     }
 }
