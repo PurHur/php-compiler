@@ -2405,6 +2405,219 @@ final class VmString
         return '\\' === $ch || "'" === $ch || '"' === $ch || "\0" === $ch;
     }
 
+    /**
+     * addcslashes() — prefix backslash before chars in charlist (php-src string.c php_addcslashes).
+     */
+    public static function addcslashes(string $string, string $charlist): string
+    {
+        $mask = self::buildAddcslashesCharMask($charlist);
+        $out = '';
+        $len = self::byteLength($string);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $string[$i];
+            if ($mask[self::byteOrd($ch)]) {
+                $out .= '\\'.$ch;
+            } else {
+                $out .= $ch;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * stripcslashes() — unescape C-style sequences (php-src string.c php_stripcslashes).
+     */
+    public static function stripcslashes(string $string): string
+    {
+        $out = '';
+        $len = self::byteLength($string);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $string[$i];
+            if ('\\' !== $ch) {
+                $out .= $ch;
+                continue;
+            }
+            if ($i + 1 >= $len) {
+                $out .= '\\';
+                break;
+            }
+            $next = $string[++$i];
+            switch ($next) {
+                case 'n':
+                    $out .= "\n";
+                    break;
+                case 'r':
+                    $out .= "\r";
+                    break;
+                case 'a':
+                    $out .= "\x07";
+                    break;
+                case 't':
+                    $out .= "\t";
+                    break;
+                case 'v':
+                    $out .= "\v";
+                    break;
+                case 'b':
+                    $out .= "\x08";
+                    break;
+                case 'f':
+                    $out .= "\f";
+                    break;
+                case 'e':
+                    $out .= "\x1B";
+                    break;
+                case 'x':
+                    if ($i + 2 < $len && self::isHexDigit($string[$i + 1]) && self::isHexDigit($string[$i + 2])) {
+                        $out .= self::byteChr((int) \hexdec($string[$i + 1].$string[$i + 2]));
+                        $i += 2;
+                    } else {
+                        $out .= 'x';
+                    }
+                    break;
+                default:
+                    if ($next >= '0' && $next <= '7') {
+                        $oct = $next;
+                        $digits = 1;
+                        while ($digits < 3 && $i + 1 < $len && $string[$i + 1] >= '0' && $string[$i + 1] <= '7') {
+                            $oct .= $string[++$i];
+                            ++$digits;
+                        }
+                        $out .= self::byteChr((int) \octdec($oct));
+                    } else {
+                        $out .= $next;
+                    }
+                    break;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * substr_replace() — replace substring slice (php-src string.c php_substr_replace).
+     */
+    public static function substr_replace(string $string, string $replace, int $offset, ?int $length = null): string
+    {
+        $strLen = self::byteLength($string);
+        if ($offset < 0) {
+            $offset += $strLen;
+            if ($offset < 0) {
+                $offset = 0;
+            }
+        } elseif ($offset > $strLen) {
+            $offset = $strLen;
+        }
+        $remain = $strLen - $offset;
+        if (null === $length) {
+            $length = $remain;
+        } elseif ($length < 0) {
+            $length += $remain;
+            if ($length < 0) {
+                $length = 0;
+            }
+        } elseif ($length > $remain) {
+            $length = $remain;
+        }
+
+        return self::byteSlice($string, 0, $offset)
+            .$replace
+            .self::byteSlice($string, $offset + $length);
+    }
+
+    /** @return array<int, bool> */
+    private static function buildAddcslashesCharMask(string $charlist): array
+    {
+        $expanded = self::expandAddcslashesCharlist($charlist);
+        $mask = array_fill(0, 256, false);
+        $len = self::byteLength($expanded);
+        for ($i = 0; $i < $len; ++$i) {
+            $c = self::byteOrd($expanded[$i]);
+            if ($i + 3 < $len
+                && '.' === $expanded[$i + 1]
+                && '.' === $expanded[$i + 2]
+                && self::byteOrd($expanded[$i + 3]) >= $c) {
+                for ($ord = $c; $ord <= self::byteOrd($expanded[$i + 3]); ++$ord) {
+                    $mask[$ord] = true;
+                }
+                $i += 3;
+            } else {
+                $mask[$c] = true;
+            }
+        }
+
+        return $mask;
+    }
+
+    private static function expandAddcslashesCharlist(string $charlist): string
+    {
+        $out = '';
+        $len = self::byteLength($charlist);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $charlist[$i];
+            if ('\\' !== $ch || $i + 1 >= $len) {
+                $out .= $ch;
+                continue;
+            }
+            $next = $charlist[++$i];
+            switch ($next) {
+                case 'n':
+                    $out .= "\n";
+                    break;
+                case 'r':
+                    $out .= "\r";
+                    break;
+                case 'a':
+                    $out .= "\x07";
+                    break;
+                case 't':
+                    $out .= "\t";
+                    break;
+                case 'v':
+                    $out .= "\v";
+                    break;
+                case 'b':
+                    $out .= "\x08";
+                    break;
+                case 'f':
+                    $out .= "\f";
+                    break;
+                case 'e':
+                    $out .= "\x1B";
+                    break;
+                case 'x':
+                    if ($i + 2 < $len && self::isHexDigit($charlist[$i + 1]) && self::isHexDigit($charlist[$i + 2])) {
+                        $out .= self::byteChr((int) \hexdec($charlist[$i + 1].$charlist[$i + 2]));
+                        $i += 2;
+                    } else {
+                        $out .= 'x';
+                    }
+                    break;
+                default:
+                    if ($next >= '0' && $next <= '7') {
+                        $oct = $next;
+                        $digits = 1;
+                        while ($digits < 3 && $i + 1 < $len && $charlist[$i + 1] >= '0' && $charlist[$i + 1] <= '7') {
+                            $oct .= $charlist[++$i];
+                            ++$digits;
+                        }
+                        $out .= self::byteChr((int) \octdec($oct));
+                    } else {
+                        $out .= $next;
+                    }
+                    break;
+            }
+        }
+
+        return $out;
+    }
+
+    private static function isHexDigit(string $ch): bool
+    {
+        return ($ch >= '0' && $ch <= '9') || ($ch >= 'a' && $ch <= 'f') || ($ch >= 'A' && $ch <= 'F');
+    }
+
     public static function asciiLcfirst(string $string): string
     {
         if ('' === $string) {
