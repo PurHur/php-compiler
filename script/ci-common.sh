@@ -899,9 +899,9 @@ ci_run_bootstrap_m3_compile_smoke_strict() {
     "$_CI_SCRIPT_DIR/bootstrap-selfhost-compile-smoke-probe.sh"
 }
 
-# M3 HelloWorld strict native emit (issue #1526); default off until emit_path=native stable in Docker.
+# M3 HelloWorld strict native emit (issue #1526); default on in ci-defaults (#1866).
 ci_run_bootstrap_m3_strict() {
-  if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE:-0}" != "1" ]]; then
+  if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if ! ci_llvm_ready; then

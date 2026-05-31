@@ -1680,7 +1680,7 @@ final class CiScriptsTest extends TestCase
 
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE', $common);
-        $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE:-0', $common);
+        $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE:-1', $common);
         $this->assertStringContainsString('bootstrap-selfhost-helloworld-probe.sh', $common);
         $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT=1', $common);
         $this->assertStringContainsString('BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1', $common);
@@ -1690,10 +1690,10 @@ final class CiScriptsTest extends TestCase
 
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString(
-            'BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE="${BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE:-0}"',
+            'BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE="${BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE:-1}"',
             $defaults
         );
-        $this->assertStringContainsString('#1526', $defaults);
+        $this->assertStringContainsString('#1866', $defaults);
     }
 
     public function testLocalCiMatrixDocumentsBootstrapM3StrictGate(): void
@@ -1703,7 +1703,9 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('bootstrap-selfhost-helloworld-probe.sh', $doc);
 
         $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
-        $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=1', $docSelfhost);
+        $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE', $docSelfhost);
+        $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=0', $docSelfhost);
+        $this->assertStringContainsString('#1866', $docSelfhost);
     }
 
     public function testCiDefaultsEnvDefinesBootstrapLibSpineVmSmokeGateOn(): void
