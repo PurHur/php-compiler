@@ -33,4 +33,25 @@ PHP;
         $block = $rt->parseAndCompileEmitSmoke($src, 'compile_block_internal_arg_forward.php');
         self::assertNotNull($block, 'JIT compile must not TypeError on compileBlockInternal arg #5');
     }
+
+    public function testExtendsChainStaticCallCompilesForJit(): void
+    {
+        $src = <<<'PHP'
+<?php
+class Base {
+    public static function who(): string {
+        return static::class;
+    }
+}
+class Child extends Base {
+    public function name(): string {
+        return static::who();
+    }
+}
+echo (new Child())->name();
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompileEmitSmoke($src, 'compile_block_internal_lsb_extends.php');
+        self::assertNotNull($block, 'extends-chain static:: must compile without arg forwarding TypeError');
+    }
 }
