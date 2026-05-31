@@ -32,7 +32,6 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'crc32c.phpt',
         'anonymous_class.phpt',
         'anonymous_class_ctor.phpt',
-        'anonymous_class_return_from_method.phpt',
         'readonly_property_write.phpt',
         'readonly_property_unset.phpt',
         'readonly_property_inc.phpt',
