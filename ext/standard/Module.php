@@ -315,6 +315,7 @@ class Module extends ModuleAbstract
             new fread(),
             new fgetc(),
             new fgets(),
+            new stream_get_line(),
             new fgetcsv(),
             new fputcsv(),
             new str_getcsv(),

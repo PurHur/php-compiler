@@ -346,6 +346,100 @@ __string__ *__compiler_fgets(int64_t handle, int64_t length)
     }
 }
 
+__string__ *__compiler_stream_get_line(int64_t handle, int64_t max_length, __string__ *ending)
+{
+    FILE *fp;
+    size_t ending_len;
+    const char *ending_data;
+
+    fp = phpc_resolve_stream(handle);
+    if (NULL == fp) {
+        return NULL;
+    }
+    if (max_length < 0) {
+        return NULL;
+    }
+    if (0 == max_length) {
+        max_length = 8192;
+    }
+    ending_len = phpc_string_len(ending);
+    ending_data = phpc_string_data(ending);
+    if (NULL == ending || 0 == ending_len) {
+        char *buf;
+        size_t got;
+
+        buf = (char *) malloc((size_t) max_length);
+        if (NULL == buf) {
+            return NULL;
+        }
+        got = fread(buf, 1, (size_t) max_length, fp);
+        if (0 == got && feof(fp)) {
+            free(buf);
+
+            return NULL;
+        }
+        if (0 == got && ferror(fp)) {
+            free(buf);
+
+            return NULL;
+        }
+        {
+            __string__ *result = __string__init((long long) got, buf);
+            free(buf);
+
+            return result;
+        }
+    }
+    {
+        char *buf;
+        size_t buf_len = 0;
+        size_t buf_cap = 64;
+
+        buf = (char *) malloc(buf_cap);
+        if (NULL == buf) {
+            return NULL;
+        }
+        while ((int64_t) buf_len < max_length) {
+            int c = fgetc(fp);
+            if (EOF == c) {
+                if (0 == buf_len && feof(fp)) {
+                    free(buf);
+
+                    return NULL;
+                }
+                break;
+            }
+            if (buf_len + 1 >= buf_cap) {
+                size_t new_cap = buf_cap < 64 ? 64 : buf_cap * 2;
+                char *grown = (char *) realloc(buf, new_cap);
+                if (NULL == grown) {
+                    free(buf);
+
+                    return NULL;
+                }
+                buf = grown;
+                buf_cap = new_cap;
+            }
+            buf[buf_len++] = (char) c;
+            if (buf_len >= ending_len && 0 == memcmp(buf + buf_len - ending_len, ending_data, ending_len)) {
+                buf_len -= ending_len;
+                break;
+            }
+        }
+        if (0 == buf_len && feof(fp)) {
+            free(buf);
+
+            return NULL;
+        }
+        {
+            __string__ *result = __string__init((long long) buf_len, buf);
+            free(buf);
+
+            return result;
+        }
+    }
+}
+
 int64_t __compiler_fseek(int64_t handle, int64_t offset, int64_t whence)
 {
     FILE *fp = phpc_resolve_stream(handle);

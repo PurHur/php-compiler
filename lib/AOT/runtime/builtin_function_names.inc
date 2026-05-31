@@ -314,6 +314,7 @@ static const char *phpc_builtin_functions[] = {
     "strcmp",
     "strcspn",
     "stream_context_create",
+    "stream_get_line",
     "strip_tags",
     "stripos",
     "stripslashes",

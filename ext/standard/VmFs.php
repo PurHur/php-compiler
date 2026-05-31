@@ -434,6 +434,51 @@ final class VmFs
     }
 
     /**
+     * php-src ext/standard/streamsfuncs.c — PHP_FUNCTION(stream_get_line).
+     */
+    public static function streamGetLine(int $handle, int $maxLength, ?string $ending = null) {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        if ($maxLength < 0) {
+            return false;
+        }
+        if (0 === $maxLength) {
+            $maxLength = 8192;
+        }
+        if (null === $ending || '' === $ending) {
+            $data = @\fread($fp, $maxLength);
+            if (false === $data || ('' === $data && \feof($fp))) {
+                return false;
+            }
+
+            return $data;
+        }
+
+        $result = '';
+        $endingLen = \strlen($ending);
+        while (\strlen($result) < $maxLength) {
+            $byte = @\fgetc($fp);
+            if (false === $byte) {
+                if ('' === $result && \feof($fp)) {
+                    return false;
+                }
+                break;
+            }
+            $result .= $byte;
+            if ($endingLen > 0 && \substr($result, -$endingLen) === $ending) {
+                return \substr($result, 0, -$endingLen);
+            }
+        }
+        if ('' === $result && \feof($fp)) {
+            return false;
+        }
+
+        return $result;
+    }
+
+    /**
      * @param list<string> $fields
      */
     public static function fputcsv(
