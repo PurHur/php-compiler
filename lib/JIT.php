@@ -5654,8 +5654,10 @@ class JIT {
 
                         return $returnBlock;
                     }
+                    $returnOperand = $block->getOperand($op->arg1);
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
-                        $this->context->freeDeadVariables($func, $returnBlock, $block);
+                        // php-cfg may mark inline `new class` temps dead before return (#3098).
+                        $this->context->freeDeadVariables($func, $returnBlock, $block, $returnOperand);
                     }
                     if ($this->isVoidLlvmFunction($func)) {
                         $this->context->builder->returnVoid();
@@ -6173,12 +6175,25 @@ class JIT {
 
     private function coerceReturnValue(Variable $return, PHPLLVM\Value $retval, ?string $expected): PHPLLVM\Value
     {
+        if ('__object__*' === $expected && Variable::TYPE_OBJECT === $return->type) {
+            return $retval;
+        }
         if ('__value__*' === $expected) {
             if (Variable::TYPE_VALUE === $return->type) {
                 return JIT\JitValueBox::valuePtrFromVariable($this->context, $return);
             }
             if (Variable::TYPE_NULL === $return->type) {
                 return $this->context->getTypeFromString('__value__*')->constNull();
+            }
+            if (Variable::TYPE_OBJECT === $return->type) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeObject'),
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $retval
+                );
+
+                return JIT\JitValueBox::pointer($this->context, $slot);
             }
             if (Variable::TYPE_STRING === $return->type) {
                 $slot = JIT\JitValueBox::alloc($this->context);
@@ -8392,6 +8407,25 @@ class JIT {
         }
 
         $proxyName = $this->resolveJitInstanceMethodProxyName($declaringClassLc, $methodLc);
+        $receiverVar = $this->context->getVariableFromOp($receiverOp);
+        $receiverUserType = $receiverOp->type?->userType;
+        $staticProxy = $this->context->resolveFunctionProxy($proxyName);
+        $needsRuntimeDispatch = null === $receiverUserType
+            || 'object' === strtolower(ltrim((string) $receiverUserType, '\\'))
+            || $staticProxy instanceof JIT\Call\ExternalMethod;
+        if ($needsRuntimeDispatch) {
+            $runtimeCandidates = $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLc);
+            if ([] !== $runtimeCandidates) {
+                $this->context->scope->toCall = new JIT\Call\RuntimeIndirectInstanceMethodCall(
+                    $receiverVar,
+                    $methodLc,
+                    $runtimeCandidates
+                );
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
         $resolvedClassLc = strstr($proxyName, '::', true) ?: $declaringClassLc;
         $declaringClassId = $this->context->type->object->lookup($resolvedClassLc);
         $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
@@ -8408,8 +8442,27 @@ class JIT {
             $className,
             $methodName
         );
-        $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
-        $this->context->scope->args = [$this->context->getVariableFromOp($receiverOp)];
+        $this->context->scope->toCall = $staticProxy;
+        $this->context->scope->args = [$receiverVar];
+    }
+
+    /**
+     * @return array<int, JIT\Call> class id => invoke proxy
+     */
+    private function buildRuntimeInstanceMethodCandidatesByClassId(string $methodLc): array
+    {
+        $methodLc = strtolower($methodLc);
+        $candidates = [];
+        foreach ($this->context->type->object->allClassNamesById() as $classId => $className) {
+            $classLc = strtolower(ltrim($className, '\\'));
+            $proxyName = $this->resolveJitInstanceMethodProxyName($classLc, $methodLc);
+            if (!$this->context->functionIsRegistered($proxyName)) {
+                continue;
+            }
+            $candidates[$classId] = $this->context->resolveFunctionProxy($proxyName);
+        }
+
+        return $candidates;
     }
 
     /**

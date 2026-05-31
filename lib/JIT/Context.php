@@ -1126,7 +1126,8 @@ class Context {
     public function freeDeadVariables(
         PHPLLVM\Value\Function_ $func,
         PHPLLVM\BasicBlock $basicBlock,
-        Block $block
+        Block $block,
+        ?Operand $skipOperand = null
     ): void {
         $coalesceResults = new \SplObjectStorage();
         foreach ($block->opCodes as $blockOp) {
@@ -1134,7 +1135,28 @@ class Context {
                 $coalesceResults[$block->getOperand($blockOp->arg1)] = true;
             }
         }
+        $returnVarNames = [];
+        foreach ($block->opCodes as $blockOp) {
+            if (OpCode::TYPE_RETURN !== $blockOp->type || null === $blockOp->arg1) {
+                continue;
+            }
+            $returnOp = $block->getOperand($blockOp->arg1);
+            $name = OperandName::resolve($returnOp);
+            if (null !== $name) {
+                $returnVarNames[$name] = true;
+            }
+        }
+        if (null !== $skipOperand) {
+            $name = OperandName::resolve($skipOperand);
+            if (null !== $name) {
+                $returnVarNames[$name] = true;
+            }
+        }
         foreach ($block->orig->deadOperands as $op) {
+            $name = OperandName::resolve($op);
+            if (null !== $name && isset($returnVarNames[$name])) {
+                continue;
+            }
             if ($coalesceResults->contains($op)) {
                 continue;
             }
