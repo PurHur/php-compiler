@@ -22,8 +22,12 @@ extern __string__ *__string__init(long long size, const char *value);
 
 static FILE *phpc_stream_handles[PHPC_MAX_STREAM_HANDLES];
 static int phpc_stream_chunk_size[PHPC_MAX_STREAM_HANDLES];
+static int phpc_stream_write_buffer[PHPC_MAX_STREAM_HANDLES];
+static int phpc_stream_read_buffer[PHPC_MAX_STREAM_HANDLES];
+static char phpc_stream_write_buffer_storage[PHPC_MAX_STREAM_HANDLES][8192];
 
 #define PHPC_STREAM_DEFAULT_CHUNK_SIZE 8192
+#define PHPC_STREAM_DEFAULT_BUFFER_SIZE 8192
 
 static size_t phpc_string_len(__string__ *s)
 {
@@ -101,6 +105,8 @@ int64_t __compiler_fopen(__string__ *path, __string__ *mode)
         if (NULL == phpc_stream_handles[id]) {
             phpc_stream_handles[id] = fp;
             phpc_stream_chunk_size[id] = PHPC_STREAM_DEFAULT_CHUNK_SIZE;
+            phpc_stream_write_buffer[id] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
+            phpc_stream_read_buffer[id] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
 
             return id;
         }
@@ -305,6 +311,75 @@ int __compiler_stream_set_timeout(int64_t handle, int64_t seconds, int64_t micro
 
     /* AOT FILE* table is file-backed; socket timeout is applied in VM via host stream_set_timeout(). */
     return 1;
+}
+
+static int phpc_apply_stream_buffer(FILE *fp, int64_t buffer, char *storage, size_t storage_size)
+{
+    if (0 == buffer) {
+        return setvbuf(fp, NULL, _IONBF, 0);
+    }
+    if (buffer < 0) {
+        return setvbuf(fp, NULL, _IOFBF, (size_t) PHPC_STREAM_DEFAULT_BUFFER_SIZE);
+    }
+    if ((size_t) buffer > storage_size) {
+        return setvbuf(fp, NULL, _IOFBF, (size_t) buffer);
+    }
+
+    return setvbuf(fp, storage, _IOFBF, (size_t) buffer);
+}
+
+int64_t __compiler_stream_set_write_buffer(int64_t handle, int64_t buffer)
+{
+    FILE *fp;
+    int previous;
+
+    if (handle <= 0 || handle >= PHPC_MAX_STREAM_HANDLES || NULL == phpc_stream_handles[handle]) {
+        return -1;
+    }
+    fp = phpc_stream_handles[handle];
+    previous = phpc_stream_write_buffer[handle];
+    if (0 == previous) {
+        previous = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
+    }
+    if (0 != phpc_apply_stream_buffer(fp, buffer, phpc_stream_write_buffer_storage[handle], sizeof(phpc_stream_write_buffer_storage[handle]))) {
+        return -1;
+    }
+    if (0 == buffer) {
+        phpc_stream_write_buffer[handle] = 0;
+    } else if (buffer < 0) {
+        phpc_stream_write_buffer[handle] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
+    } else {
+        phpc_stream_write_buffer[handle] = (int) buffer;
+    }
+
+    return (int64_t) previous;
+}
+
+int64_t __compiler_stream_set_read_buffer(int64_t handle, int64_t buffer)
+{
+    FILE *fp;
+    int previous;
+
+    if (handle <= 0 || handle >= PHPC_MAX_STREAM_HANDLES || NULL == phpc_stream_handles[handle]) {
+        return -1;
+    }
+    fp = phpc_stream_handles[handle];
+    previous = phpc_stream_read_buffer[handle];
+    if (0 == previous) {
+        previous = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
+    }
+    if (0 != phpc_apply_stream_buffer(fp, buffer, phpc_stream_write_buffer_storage[handle], sizeof(phpc_stream_write_buffer_storage[handle]))) {
+        return -1;
+    }
+    if (0 == buffer) {
+        phpc_stream_read_buffer[handle] = 0;
+    } else if (buffer < 0) {
+        phpc_stream_read_buffer[handle] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
+    } else {
+        phpc_stream_read_buffer[handle] = (int) buffer;
+    }
+
+    return (int64_t) previous;
 }
 
 int __compiler_ftruncate(int64_t handle, int64_t size)
