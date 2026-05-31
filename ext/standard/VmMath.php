@@ -200,6 +200,19 @@ final class VmMath
         return 1 === $mode ? $fnum : $num;
     }
 
+    public static function assignRadixToReturn(?Variable $returnVar, string $str, int $base): void
+    {
+        if (null === $returnVar) {
+            return;
+        }
+        $result = self::baseToZval($str, $base);
+        if (\is_int($result)) {
+            $returnVar->int($result);
+        } else {
+            $returnVar->float($result);
+        }
+    }
+
     public static function longToBase(int $arg, int $base): string
     {
         if ($base < 2 || $base > 36) {

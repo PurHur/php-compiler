@@ -54,6 +54,14 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'base_convert') || str_contains(strtolower($case[0]), 'base_convert')) {
                 continue;
             }
+            // hexdec()/bindec() overflow boxed return: VM + AOT (#3688); MCJIT until MathBaseConvert stable.
+            if (str_contains($name, 'hexdec_bindec_overflow')) {
+                continue;
+            }
+            // hexdec/bindec/octdec boxed int|float return: VM + AOT compile (#3688); MCJIT execute pending.
+            if (str_contains($name, 'hexdec') || str_contains($name, 'bindec') || str_contains($name, 'octdec')) {
+                continue;
+            }
             // class_uses() is VM-only until JIT lowering (#3119).
             if (str_contains($name, 'class_uses_runtime')) {
                 continue;

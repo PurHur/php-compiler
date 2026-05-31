@@ -590,6 +590,18 @@ class Module extends ModuleAbstract
             $context->registerFunction('strtod', $fn);
         }
         try {
+            $context->lookupFunction('phpc_basetozval_result');
+        } catch (\Throwable $e) {
+            $charPtr = $context->getTypeFromString('char*');
+            $i64 = $context->getTypeFromString('int64');
+            $i64Ptr = $context->getTypeFromString('int64*');
+            $doublePtr = $context->getTypeFromString('double*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $charPtr, $i64, $i64Ptr, $doublePtr);
+            $fn = $context->module->addFunction('phpc_basetozval_result', $ft);
+            $context->registerFunction('phpc_basetozval_result', $fn);
+        }
+        try {
             $context->lookupFunction('strlen');
         } catch (\Throwable $e) {
             $i8p = $context->getTypeFromString('int8*');
