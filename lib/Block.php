@@ -1116,6 +1116,38 @@ class Block {
     }
 
     /**
+     * Per-property or readonly-class property declarations — MCJIT uncaught violation exits
+     * with segfault instead of surfacing pending LogicException (#3149, #1360).
+     */
+    public static function containsReadonlyPropertyOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_PROPERTY === $op->type && $op->propertyReadonly) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * CFG regions that MCJIT must not execute yet; `bin/jit.php` runs the VM instead (#2114, #167).
      * Simple try/catch without `finally` may pass MCJIT when {@see TryCatchJitExecuteTest} is green.
      */
@@ -1126,6 +1158,7 @@ class Block {
             || self::containsExceptionHandlingOpcodesInScriptScope($root)
             || self::containsArrayAccessObjectOpcodes($root)
             || self::containsDynamicStaticPropertyOpcodes($root)
-            || self::containsTypedNonVoidReturnOpcodes($root);
+            || self::containsTypedNonVoidReturnOpcodes($root)
+            || self::containsReadonlyPropertyOpcodes($root);
     }
 }
