@@ -69,6 +69,8 @@ static const char *phpc_builtin_functions[] = {
     "cos",
     "count",
     "count_chars",
+    "convert_uudecode",
+    "convert_uuencode",
     "crc32",
     "crc32c",
     "date",

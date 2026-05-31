@@ -132,6 +132,8 @@ class Module extends ModuleAbstract
             new strrpos(),
             new substr_count(),
             new count_chars(),
+            new convert_uudecode(),
+            new convert_uuencode(),
             new str_word_count(),
             new str_contains(),
             new str_starts_with(),

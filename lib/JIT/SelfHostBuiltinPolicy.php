@@ -132,6 +132,7 @@ final class SelfHostBuiltinPolicy
         'bin2hex' => 'string',
         'chr' => 'string',
         'chunk_split' => 'string',
+        'convert_uudecode' => 'string', 'convert_uuencode' => 'string',
         'pack' => 'string',
         'unpack' => 'string',
         'strtolower' => 'string', 'strtoupper' => 'string', 'strcmp' => 'string', 'strncmp' => 'string', 'substr_compare' => 'string', 'strtok' => 'string',
