@@ -110,6 +110,10 @@ final class VmFilter
             }
             ++$i;
         }
+        // php-src ext/filter/logical_filters.c — reject leading zeros (except lone "0").
+        if ($len - $i > 1 && '0' === $s[$i]) {
+            return false;
+        }
         for (; $i < $len; ++$i) {
             $ch = $s[$i];
             if ($ch < '0' || $ch > '9') {
