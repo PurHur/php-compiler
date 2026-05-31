@@ -135,6 +135,7 @@ static const char *phpc_builtin_functions[] = {
     "get_declared_enums",
     "get_declared_interfaces",
     "get_declared_traits",
+    "get_declared_functions",
     "get_defined_constants",
     "get_defined_functions",
     "get_defined_vars",

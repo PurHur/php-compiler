@@ -24,6 +24,8 @@ final class GetDeclaredClassesTraitsFunctionsBuiltinTest extends BaseTest
             'get_declared_classes_jit.phpt',
             'get_declared_traits.phpt',
             'get_declared_traits_jit.phpt',
+            'get_declared_functions.phpt',
+            'get_declared_functions_jit.phpt',
             'get_defined_functions.phpt',
             'get_defined_functions_jit.phpt',
         ] as $file) {
@@ -37,6 +39,7 @@ final class GetDeclaredClassesTraitsFunctionsBuiltinTest extends BaseTest
         foreach ([
             'get_declared_classes.phpt',
             'get_declared_traits.phpt',
+            'get_declared_functions.phpt',
             'get_defined_functions.phpt',
         ] as $file) {
             $this->assertFileExists($root.'/'.$file);
