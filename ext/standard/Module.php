@@ -405,6 +405,7 @@ class Module extends ModuleAbstract
             new method_exists_(),
             new property_exists_(),
             new get_object_vars_(),
+            new get_mangled_object_vars_(),
             new get_class_(),
             new get_called_class_(),
             new get_class_vars_(),
