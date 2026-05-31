@@ -1116,6 +1116,9 @@ final class HashTable {
             case Variable::TYPE_INTEGER:
                 $value = $this->findIndex($index->toInt());
                 break;
+            case Variable::TYPE_FLOAT:
+                $value = $this->findIndex($index->toInt());
+                break;
             case Variable::TYPE_STRING:
                 $value = $this->find($index->toString());
                 break;

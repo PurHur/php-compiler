@@ -22,7 +22,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * array_key_exists() for arrays with int or string keys (subset of PHP).
+ * array_key_exists() for arrays with int, float, or string keys (php-src subset).
  */
 final class array_key_exists extends Internal
 {
@@ -43,7 +43,9 @@ final class array_key_exists extends Internal
             $emptyKey = new Variable();
             $emptyKey->string('');
             $key = $emptyKey;
-        } elseif (Variable::TYPE_INTEGER !== $key->type && Variable::TYPE_STRING !== $key->type) {
+        } elseif (Variable::TYPE_INTEGER !== $key->type
+            && Variable::TYPE_STRING !== $key->type
+            && Variable::TYPE_FLOAT !== $key->type) {
             throw new \LogicException('array_key_exists() key must be an integer or string in this compiler build');
         }
         $frame->returnVar->bool($array->toArray()->hasKey($key));
@@ -104,6 +106,18 @@ final class array_key_exists extends Internal
         }
         if (JITVariable::TYPE_NATIVE_LONG === $key->type) {
             $index = $context->builder->truncOrBitCast(
+                $context->helper->loadValue($key),
+                $context->getTypeFromString('size_t')
+            );
+
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSet'),
+                $ht,
+                $index
+            );
+        }
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $key->type) {
+            $index = $context->builder->fptosi(
                 $context->helper->loadValue($key),
                 $context->getTypeFromString('size_t')
             );
@@ -196,6 +210,29 @@ final class array_key_exists extends Internal
         );
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($afterLong);
+        $doubleBlock = $fn->appendBasicBlock('ake_vk_double');
+        $afterDouble = $fn->appendBasicBlock('ake_vk_after_double');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false)
+            ),
+            $doubleBlock,
+            $afterDouble
+        );
+        $context->builder->positionAtEnd($doubleBlock);
+        $indexFromDouble = $context->builder->fptosi(
+            $context->builder->call($context->lookupFunction('__value__readDouble'), $valPtr),
+            $sizeT
+        );
+        $doubleResult = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $indexFromDouble
+        );
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($afterDouble);
         $context->builder->branchIf(
             $context->builder->icmp(
                 Builder::INT_EQ,
@@ -214,6 +251,7 @@ final class array_key_exists extends Internal
         $phi = $context->builder->phi($i1);
         $phi->addIncoming($strResult, $stringBlock);
         $phi->addIncoming($longResult, $longBlock);
+        $phi->addIncoming($doubleResult, $doubleBlock);
         $phi->addIncoming($nullResult, $nullBlock);
         $phi->addIncoming($i1->constInt(0, false), $falseBlock);
 
