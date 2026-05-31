@@ -648,7 +648,7 @@ function syntaxRowDefinitions(): array
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_NEW', 'TYPE_ASSIGN', 'TYPE_PROPERTY_FETCH'],
             'issue' => 1360,
             'notes' => ['php-cfg Class_::flags MODIFIER_READONLY; VM rejects instance property writes after __construct'],
-            'probe' => 'readonly class R { public int $x = 0; } $o = new R(); $o->x = 1;',
+            'probe' => 'readonly class R { public function __construct(public int $x) {} } $o = new R(0); $o->x = 1;',
         ],
         [
             'id' => 'property_hooks',
