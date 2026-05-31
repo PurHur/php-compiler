@@ -59,4 +59,35 @@ PHP;
 
         $this->assertSame('"missing" is not a valid backing value for enum Color', $output);
     }
+
+    public function testIntBackedEnumFromAcceptsNumericString(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum Level: int { case Low = 1; case High = 9; }
+echo Level::from('9')->name;
+echo Level::from(1)->name;
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_from_int_string.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame('HighLow', $output);
+    }
+
+    public function testIntBackedEnumFromRejectsNonNumericString(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum Level: int { case Low = 1; }
+Level::from('1abc');
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_from_int_bad_string.php');
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Level::from(): Argument #1 ($value) must be of type int, string given');
+        $runtime->run($block);
+    }
 }
