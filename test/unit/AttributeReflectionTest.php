@@ -148,7 +148,7 @@ class B {}
 $attr = (new ReflectionClass(B::class))->getAttributes()[0];
 $attr->newInstance();
 PHP;
-        $this->expectException(\LogicException::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Attribute class "NonExistentAttribute" not found');
         $runtime->run($runtime->parseAndCompile($code, 'attr_missing.php'));
     }

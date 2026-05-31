@@ -740,7 +740,8 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'php-cfg preserves `attrGroups`; compiler stores attribute class names on TYPE_DECLARE_CLASS / TYPE_DECLARE_METHOD',
                 'VM reflection reads from VM ClassEntry; JIT/AOT mirror class+method attribute tables into VMContext for reflection',
-                'Read path: `getAttributes()` count + `ReflectionAttribute::getName()`; no `newInstance()` or parameter attributes',
+                'Read path: `getAttributes()` count + `ReflectionAttribute::getName()` + `newInstance()` with compile-time ctor args (#3206, #3216)',
+                'Parameter/property reflection attributes still deferred; JIT `newInstance()` deferred (#2467)',
             ],
             'probe' => '#[\AllowDynamicProperties] class B {} $a = (new ReflectionClass(B::class))->getAttributes(); echo count($a).$a[0]->getName();',
         ],
