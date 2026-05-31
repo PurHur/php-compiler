@@ -5,12 +5,19 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringStrWordCount as StrWordCountRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT helper for str_word_count() format 0 (ASCII letter words; issue #2382).
+ * LLVM JIT helper for str_word_count() (format 0 LLVM; formats 1/2 via C runtime — issue #3584).
  */
 final class JitStrWordCount
 {
@@ -105,5 +112,78 @@ final class JitStrWordCount
         );
 
         return $context->builder->or($isUpper, $isLower);
+    }
+
+    /**
+     * Build a compile-time __hashtable__ from VM word list / offset map (formats 1 and 2).
+     */
+    public static function hashTableFromVmResult(Context $context, array $result, int $format): Value
+    {
+        $ht = new HashTable();
+        if (1 === $format) {
+            foreach ($result as $word) {
+                $value = new Variable();
+                $value->string($word);
+                $ht->append($value);
+            }
+        } else {
+            foreach ($result as $pos => $word) {
+                $value = new Variable();
+                $value->string($word);
+                $ht->addIndex((int) $pos, $value);
+            }
+        }
+        $jit = HashTableHelper::variableFromVmHashTable($context, $ht);
+
+        return $jit->value;
+    }
+
+    /**
+     * Runtime lowering for format 1/2 (and optional $chars) via phpc_str_word_count.c.
+     */
+    public static function wordHashTableRuntime(
+        Context $context,
+        Value $str,
+        Value $format,
+        ?Value $chars
+    ): Value {
+        StrWordCountRuntime::ensureLinked($context);
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        $charsArg = $chars ?? $empty;
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_str_word_count_words'),
+            $str,
+            $format,
+            $charsArg
+        );
+    }
+
+    public static function compileTimeFormat(JITVariable $arg): int
+    {
+        if (JITVariable::TYPE_NATIVE_LONG !== $arg->type
+            || JITVariable::KIND_VALUE !== $arg->kind) {
+            throw new \LogicException('str_word_count() format must be a compile-time integer in this compiler build');
+        }
+        if (null !== ($arg->compileTimeLong ?? null)) {
+            return (int) $arg->compileTimeLong;
+        }
+
+        throw new \LogicException('str_word_count() format must be a compile-time integer in this compiler build');
+    }
+
+    public static function jitFormatArg(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readLong'),
+                $arg->value
+            );
+        }
+
+        return JitLongArg::lower($context, $arg, 'str_word_count() argument #2 ($format)');
     }
 }
