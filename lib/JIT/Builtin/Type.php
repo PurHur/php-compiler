@@ -886,6 +886,19 @@ class Type extends Builtin {
         $fntypeGethostname = $this->context->context->functionType($strPtr, false);
         $fnGethostname = $this->context->module->addFunction('__compiler_gethostname', $fntypeGethostname);
         $this->context->registerFunction('__compiler_gethostname', $fnGethostname);
+        $i64 = $this->context->getTypeFromString('int64');
+        $fntypeGetprotobynumber = $this->context->context->functionType($strPtr, false, $i64);
+        $fnGetprotobynumber = $this->context->module->addFunction(
+            '__compiler_getprotobynumber',
+            $fntypeGetprotobynumber
+        );
+        $this->context->registerFunction('__compiler_getprotobynumber', $fnGetprotobynumber);
+        $fntypeGetservbyport = $this->context->context->functionType($strPtr, false, $i64, $strPtr);
+        $fnGetservbyport = $this->context->module->addFunction(
+            '__compiler_getservbyport',
+            $fntypeGetservbyport
+        );
+        $this->context->registerFunction('__compiler_getservbyport', $fnGetservbyport);
         $fntypeTempnam = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr);
         $fnTempnam = $this->context->module->addFunction('__compiler_tempnam', $fntypeTempnam);
         $this->context->registerFunction('__compiler_tempnam', $fnTempnam);
