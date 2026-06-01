@@ -25,6 +25,8 @@ final class ReflectionSupport
 
     public const REFLECTION_ATTRIBUTE = 'reflectionattribute';
 
+    public const REFLECTION_ENUM = 'reflectionenum';
+
     public const REFLECTION_ENUM_UNIT_CASE = 'reflectionenumunitcase';
 
     public const REFLECTION_PARAMETER = 'reflectionparameter';
@@ -351,6 +353,20 @@ final class ReflectionSupport
         $obj = $receiver->toObject();
         if (strtolower($obj->class->name) !== self::REFLECTION_PARAMETER) {
             throw new \LogicException('Expected ReflectionParameter instance');
+        }
+
+        return $obj;
+    }
+
+    public static function requireReflectionEnum(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('ReflectionEnum method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (strtolower($obj->class->name) !== self::REFLECTION_ENUM) {
+            throw new \LogicException('Expected ReflectionEnum instance');
         }
 
         return $obj;
