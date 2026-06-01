@@ -1887,6 +1887,8 @@ class Object_ extends Type {
             // Invoke metadata for indirect holders (array elements, properties; issue #72).
             $this->defineProperty($id, '__closure_target', Variable::TYPE_STRING);
             $this->defineProperty($id, FiberHelper::TARGET_PROPERTY, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\JIT\ClosureBindHelper::BOUND_THIS_PROPERTY, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\JIT\ClosureBindHelper::BOUND_SCOPE_PROPERTY, Variable::TYPE_STRING);
         }
         if ('fiber' === $lcname) {
             $this->defineProperty($id, FiberHelper::TARGET_PROPERTY, Variable::TYPE_STRING);

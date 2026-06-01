@@ -559,6 +559,7 @@ class Context {
         $this->functionProxies['reflectionattribute::getname'] = new Call\ReflectionAttributeGetName();
 
         FiberHelper::registerJitMethods($this);
+        ClosureBindHelper::registerJitMethods($this);
     }
 
     public function compileToFile(string $file) {
