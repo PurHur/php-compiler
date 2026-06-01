@@ -8946,19 +8946,50 @@ class JIT {
         if (null === $keyArg) {
             return null;
         }
-        if (isset($block->constants[$keyArg])) {
-            $const = $block->constants[$keyArg];
-            if (VM\Variable::TYPE_INTEGER === $const->type) {
-                return new Variable(
-                    $this->context,
-                    Variable::TYPE_NATIVE_LONG,
-                    Variable::KIND_VALUE,
-                    $this->context->constantFromInteger($const->toInt(), 'int64')
-                );
-            }
+        $intKey = $this->tryCompileTimeArrayLiteralIntKey($block, $keyArg);
+        if (null !== $intKey) {
+            return new Variable(
+                $this->context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $this->context->constantFromInteger($intKey, 'int64')
+            );
         }
 
         return $this->context->getVariableFromOp($block->getOperand($keyArg));
+    }
+
+    /**
+     * Zend array-literal key: int keys and canonical numeric strings share one slot (#4151).
+     */
+    private function tryCompileTimeArrayLiteralIntKey(Block $block, int $keyArg): ?int
+    {
+        if (isset($block->constants[$keyArg])) {
+            $const = $block->constants[$keyArg];
+            if (VM\Variable::TYPE_INTEGER === $const->type) {
+                return $const->toInt();
+            }
+            if (VM\Variable::TYPE_STRING === $const->type) {
+                return VM\HashTable::tryIntFromNumericString($const->toString());
+            }
+            if (VM\Variable::TYPE_FLOAT === $const->type) {
+                return $const->toInt();
+            }
+        }
+        $op = $block->getOperand($keyArg);
+        if ($op instanceof Operand\Literal) {
+            if (is_int($op->value)) {
+                return $op->value;
+            }
+            if (is_string($op->value)) {
+                return VM\HashTable::tryIntFromNumericString($op->value);
+            }
+            if (is_float($op->value)) {
+                return (int) $op->value;
+            }
+        }
+
+        return null;
     }
 
     private function bumpNativeArrayNextFreeForExplicitIntKey(
