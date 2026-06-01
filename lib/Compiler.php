@@ -1940,13 +1940,18 @@ class Compiler {
                             }
                             $defaultSlot = $this->compileOperand($child->defaultVar, $result, true);
                             if (!isset($result->constants[$defaultSlot])) {
-                                $propName = '?';
-                                if ($child->name instanceof Operand\Literal && is_string($child->name->value)) {
-                                    $propName = $child->name->value;
+                                if ($this->propertyDefaultIsRuntimeNew($child)) {
+                                    // Per-instance `new` defaults: opcodes precede DECLARE_*; VM init at TYPE_NEW (#3391).
+                                    $defaultSlot = null;
+                                } else {
+                                    $propName = '?';
+                                    if ($child->name instanceof Operand\Literal && is_string($child->name->value)) {
+                                        $propName = $child->name->value;
+                                    }
+                                    $this->throwCompileLogic(
+                                        'Property default must be a compile-time constant (#3803): $'.$propName
+                                    );
                                 }
-                                $this->throwCompileLogic(
-                                    'Property default must be a compile-time constant (#3803): $'.$propName
-                                );
                             }
                         }
                     }
@@ -2337,6 +2342,24 @@ class Compiler {
         }
 
         return $slot;
+    }
+
+    /**
+     * Property default `new Class()` — deferred to instance creation (Zend zend_objects.c, #3391).
+     */
+    protected function propertyDefaultIsRuntimeNew(Op\Stmt\Property $prop): bool
+    {
+        if (null === $prop->defaultVar) {
+            return false;
+        }
+        if (null !== $prop->defaultBlock && [] !== $prop->defaultBlock->children) {
+            $last = $prop->defaultBlock->children[\count($prop->defaultBlock->children) - 1];
+            if ($last instanceof Op\Expr\New_) {
+                return true;
+            }
+        }
+
+        return $this->unwrapOperandChain($prop->defaultVar) instanceof Op\Expr\New_;
     }
 
     protected function tryFoldPropertyDefaultSlot(Op\Stmt\Property $prop, Block $block): ?int

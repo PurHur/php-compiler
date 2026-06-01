@@ -1,7 +1,5 @@
 --TEST--
 Property default new expressions create per-instance objects (issue #3391)
---SKIPIF--
-<?php die('skip PhptTestCase: property default new validated via VMTest (#3391)'); ?>
 --FILE--
 <?php
 class Box {

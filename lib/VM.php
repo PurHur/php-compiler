@@ -4572,17 +4572,23 @@ restart:
                     $pendingNewDefaultOps = [];
 
                     continue;
+                }
+                if (OpCode::TYPE_DECLARE_CLASS_CONST === $op->type) {
+                    foreach ($pendingNewDefaultOps as $pendingOp) {
+                        $this->executeClassBodyConstInitOpcode($frame, $pendingOp);
+                    }
+                    $pendingNewDefaultOps = [];
                 } else {
                     $pendingNewDefaultOps[] = $op;
 
                     continue;
                 }
-            } elseif ($this->isClassBodyConstInitOpcode($op->type)) {
-                $this->executeClassBodyConstInitOpcode($frame, $op);
-
-                continue;
             } elseif (OpCode::TYPE_NEW === $op->type) {
                 $pendingNewDefaultOps[] = $op;
+
+                continue;
+            } elseif ($this->isClassBodyConstInitOpcode($op->type)) {
+                $this->executeClassBodyConstInitOpcode($frame, $op);
 
                 continue;
             }

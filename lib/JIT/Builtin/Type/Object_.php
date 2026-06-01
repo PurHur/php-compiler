@@ -71,6 +71,9 @@ class Object_ extends Type {
 
     /** @var array<int, array<int, array{propertyType: int, type: int, value: int|float|bool|string|null}>> */
     private array $propertyDefaults = [];
+
+    /** @var array<int, array<int, int>> class id => property slot => instantiated class id (#3391) */
+    private array $runtimePropertyNewDefaults = [];
     /**
      * @var array<int, array<string, array{type: int, global: \PHPLLVM\Value}>>
      *     class id => property lc => typed LLVM global
@@ -288,6 +291,7 @@ class Object_ extends Type {
         if ($propCount > 0) {
             $this->initPropertySlots($obj, $propCount);
             $this->initPropertyDefaults($obj, $classId);
+            $this->initRuntimePropertyNewDefaults($obj, $classId);
             $this->initEmptyHashtableProperties($obj, $classId);
         }
 
@@ -355,6 +359,7 @@ class Object_ extends Type {
         if ($propCount > 0) {
             $this->initPropertySlots($obj, $propCount);
             $this->initPropertyDefaults($obj, $classId);
+            $this->initRuntimePropertyNewDefaults($obj, $classId);
             $this->initEmptyHashtableProperties($obj, $classId);
         }
 
@@ -428,6 +433,36 @@ class Object_ extends Type {
                 'value' => $entry['value'],
             ]);
             $this->propertyStore($slot, $var, $entry['propertyType']);
+        }
+    }
+
+    /**
+     * Per-instance property defaults from `new` expressions (#3391, Zend zend_objects.c).
+     */
+    private function initRuntimePropertyNewDefaults(PHPLLVM\Value $obj, int $classId): void
+    {
+        if (!isset($this->runtimePropertyNewDefaults[$classId])) {
+            return;
+        }
+        $restore = $this->context->builder->getInsertBlock();
+        $propertyTypes = [];
+        foreach ($this->properties[$classId] ?? [] as $propset) {
+            $propertyTypes[$propset[3]] = $propset[2];
+        }
+        foreach ($this->runtimePropertyNewDefaults[$classId] as $slotIndex => $newClassId) {
+            $slot = $this->propertySlotPtr($obj, $slotIndex);
+            $child = $this->allocate($newClassId);
+            if (!$this->hasConstructor($newClassId)) {
+                $this->markObjectConstructed($child);
+            }
+            $jitVar = new Variable(
+                $this->context,
+                Variable::TYPE_OBJECT,
+                Variable::KIND_VALUE,
+                $child
+            );
+            $this->propertyStore($slot, $jitVar, $propertyTypes[$slotIndex] ?? Variable::TYPE_OBJECT);
+            $this->context->builder->positionAtEnd($restore);
         }
     }
 
@@ -1755,6 +1790,20 @@ class Object_ extends Type {
         $this->properties[$classId][] = [
             $this->propNameMap[$name], $name, $type, count($this->properties[$classId]),
         ];
+    }
+
+    public function definePropertyRuntimeNewDefault(int $classId, string $name, string $newClassName): void
+    {
+        $newClassId = $this->lookup($newClassName);
+        foreach ($this->properties[$classId] as $propset) {
+            if ($propset[1] !== $name) {
+                continue;
+            }
+            $this->runtimePropertyNewDefaults[$classId][$propset[3]] = $newClassId;
+
+            return;
+        }
+        throw new \LogicException("Property {$name} not defined for class {$classId}");
     }
 
     public function definePropertyDefault(int $classId, string $name, VMVariable $value): void
