@@ -14,11 +14,24 @@ final class OutputBuffer
     /** @var list<string> */
     private static array $stack = [];
 
+    private static bool $implicitFlush = false;
+
     public static function reset(): void
     {
         self::$stack = [];
+        self::$implicitFlush = false;
         SapiOutput::reset();
         HeaderCallbackQueue::reset();
+    }
+
+    public static function setImplicitFlush(bool $on): void
+    {
+        self::$implicitFlush = $on;
+    }
+
+    public static function isImplicitFlush(): bool
+    {
+        return self::$implicitFlush;
     }
 
     public static function getLevel(): int
@@ -36,11 +49,17 @@ final class OutputBuffer
         if ([] === self::$stack) {
             SapiOutput::markStarted();
             echo $chunk;
+            if (self::$implicitFlush) {
+                self::flush();
+            }
 
             return;
         }
         $idx = count(self::$stack) - 1;
         self::$stack[$idx] .= $chunk;
+        if (self::$implicitFlush) {
+            self::flush();
+        }
     }
 
     public static function getClean(): string
