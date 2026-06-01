@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCfg\Op;
+use PHPCfg\Op\Expr\FirstClassCallable;
 use PHPCfg\Operand;
 use PHPTypes\Type;
 use SplObjectStorage;
@@ -187,7 +188,8 @@ class Analyzer
                 || $op instanceof Op\Expr\StaticCall
                 || $op instanceof Op\Expr\MethodCall
                 || $op instanceof Op\Expr\PropertyFetch
-                || $op instanceof Op\Expr\Param) {
+                || $op instanceof Op\Expr\Param
+                || $op instanceof FirstClassCallable) {
                 return null;
             } else {
                 throw new \LogicException('Unknown array write op: '.get_class($op));
