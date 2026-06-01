@@ -978,14 +978,37 @@ restart:
                     }
                     $arg3 = $frame->scope[$op->arg3];
                     if ($container->type === Variable::TYPE_STRING) {
-                        $offset = new Variable(Variable::TYPE_STRING_OFFSET);
-                        $offset->stringOffset(
-                            $container,
-                            $arg3->toInt(),
+                        $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+                        $byteIndex = Variable::stringOffsetIndexFromDim(
+                            $arg3,
                             $this->context->errors,
-                            '' !== $frame->scriptPath ? $frame->scriptPath : null
+                            $this->context,
+                            $frame,
+                            $scriptFile
                         );
-                        $arg1->indirect($offset);
+                        if ($forWrite) {
+                            $offset = new Variable(Variable::TYPE_STRING_OFFSET);
+                            $offset->stringOffset(
+                                $container,
+                                $byteIndex,
+                                $this->context->errors,
+                                $this->context,
+                                $frame,
+                                $scriptFile
+                            );
+                            $arg1->indirect($offset);
+                            break;
+                        }
+                        $readShell = new Variable(Variable::TYPE_STRING_OFFSET);
+                        $readShell->stringOffset(
+                            $container,
+                            $byteIndex,
+                            $this->context->errors,
+                            $this->context,
+                            $frame,
+                            $scriptFile
+                        );
+                        $arg1->string($readShell->toString());
                     } elseif ($container->type === Variable::TYPE_ARRAY) {
                         if ($this->context->isGlobalsTable($container)) {
                             if (!$forWrite && Variable::TYPE_STRING === $arg3->type
