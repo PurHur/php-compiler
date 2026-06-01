@@ -398,7 +398,7 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'magic_call_static')) {
                 continue;
             }
-            // Object class constants: VM-only until JIT execute path is stable (#3196).
+            // Object class constants: MCJIT execute segfaults in harness (#98); LLVM verify: ClassConstObjectJitCompileTest (#4021).
             if (str_contains($name, 'class_const_object')) {
                 continue;
             }
