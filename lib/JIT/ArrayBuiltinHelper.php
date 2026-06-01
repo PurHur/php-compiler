@@ -7654,18 +7654,20 @@ final class ArrayBuiltinHelper
     }
 
     /**
-     * array_unique() for arrays of scalar values (strict identity; subset of PHP).
+     * array_unique() for arrays of scalar values (ext/standard/array.c subset).
+     *
+     * @param int $flags SORT_REGULAR (identical) or SORT_STRING (string cast compare)
      */
-    public static function arrayUnique(Context $context, Variable $array): Value
+    public static function arrayUnique(Context $context, Variable $array, int $flags = 0): Value
     {
         if (self::isNativeArray($array->type)) {
-            return self::arrayUniqueHashTable($context, self::nativeListToHashTable($context, $array));
+            return self::arrayUniqueHashTable($context, self::nativeListToHashTable($context, $array), $flags);
         }
 
-        return self::arrayUniqueHashTable($context, self::loadHashTable($context, $array));
+        return self::arrayUniqueHashTable($context, self::loadHashTable($context, $array), $flags);
     }
 
-    private static function arrayUniqueHashTable(Context $context, Value $src): Value
+    private static function arrayUniqueHashTable(Context $context, Value $src, int $flags): Value
     {
         $dest = HashTableHelper::alloc($context);
         $map = $context->structFieldMap['__hashtable__'];
@@ -7703,7 +7705,7 @@ final class ArrayBuiltinHelper
 
         $context->builder->positionAtEnd($packedKeep);
         $valEntry = self::listEntryAt($context, $src, $idx);
-        $duplicate = self::destContainsPackedEntry($context, $dest, $valEntry);
+        $duplicate = self::destContainsPackedEntry($context, $dest, $valEntry, $flags);
         $context->builder->branchIf($duplicate, $packedSkip, $packedAdd);
 
         $context->builder->positionAtEnd($packedAdd);
@@ -7740,7 +7742,7 @@ final class ArrayBuiltinHelper
 
         $context->builder->positionAtEnd($strBody);
         $valEntry = $context->builder->structGep($node, $nodeMap['value']);
-        $duplicate = self::destContainsPackedEntry($context, $dest, $valEntry);
+        $duplicate = self::destContainsPackedEntry($context, $dest, $valEntry, $flags);
         $context->builder->branchIf($duplicate, $strSkip, $strAdd);
 
         $context->builder->positionAtEnd($strAdd);
@@ -7763,10 +7765,17 @@ final class ArrayBuiltinHelper
     }
 
     /**
-     * Strict duplicate check against a packed hashtable (reuses in_array lowering).
+     * Duplicate check against values already stored in $dest.
+     *
+     * @param int $flags SORT_REGULAR (identical) or SORT_STRING (string cast)
      */
-    private static function destContainsPackedEntry(Context $context, Value $dest, Value $entry): Value
+    private static function destContainsPackedEntry(Context $context, Value $dest, Value $entry, int $flags): Value
     {
+        $sortType = $flags & ~\PHPCompiler\ext\standard\StdlibConstants::SORT_FLAG_CASE;
+        if (\PHPCompiler\ext\standard\StdlibConstants::SORT_STRING === $sortType) {
+            return self::destContainsPackedEntryString($context, $dest, $entry);
+        }
+
         $valueMap = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($entry, $valueMap['type'])
@@ -7834,6 +7843,64 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($mergeBlock);
 
         return $context->builder->load($dupSlot);
+    }
+
+    /**
+     * SORT_STRING duplicate check: compare string casts (ext/standard string_compare_function).
+     */
+    private static function destContainsPackedEntryString(Context $context, Value $dest, Value $entry): Value
+    {
+        $strval = new strval();
+        $needleStr = $strval->valueToString($context, $entry);
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_unique_str_dup_idx');
+        $context->builder->store($zero, $idxSlot);
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $dest
+        );
+
+        $foundSlot = $context->builder->alloca(
+            $context->getTypeFromString('int1'),
+            1,
+            'array_unique_str_dup_found'
+        );
+        $context->builder->store($context->getTypeFromString('int1')->constInt(0, false), $foundSlot);
+
+        $done = BasicBlockHelper::append($context, 'array_unique_str_dup_done');
+        $head = BasicBlockHelper::append($context, 'array_unique_str_dup_head');
+        $body = BasicBlockHelper::append($context, 'array_unique_str_dup_body');
+        $foundBlock = BasicBlockHelper::append($context, 'array_unique_str_dup_found_block');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $num);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $candEntry = self::listEntryAt($context, $dest, $idx);
+        $candStr = $strval->valueToString($context, $candEntry);
+        $match = JitStringCompare::identical($context, $candStr, $needleStr);
+        $continueBlock = BasicBlockHelper::append($context, 'array_unique_str_dup_continue');
+        $context->builder->branchIf($match, $foundBlock, $continueBlock);
+
+        $context->builder->positionAtEnd($continueBlock);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($idx, $one),
+            $idxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($foundBlock);
+        $context->builder->store($context->getTypeFromString('int1')->constInt(1, false), $foundSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return $context->builder->load($foundSlot);
     }
 
     /**
