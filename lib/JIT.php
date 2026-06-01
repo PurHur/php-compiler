@@ -6157,10 +6157,17 @@ class JIT {
                     $this->context->pushScope();
                     $this->context->scope->classId = $this->context->type->object->declareEnum($nameOp);
                     $this->context->scope->className = strtolower($nameOp->value);
+                    if (null !== $op->arg2 && isset($block->constants[$op->arg2])) {
+                        $this->context->type->object->setEnumBackedType(
+                            $this->context->scope->classId,
+                            $block->constants[$op->arg2]->toString()
+                        );
+                    }
                     if (null !== $this->context->runtime->vmContext) {
                         $this->context->runtime->vmContext->enums[strtolower($nameOp->value)] = true;
                     }
                     $this->compileClass($op->block1, $this->context->scope->classId);
+                    $this->context->type->object->finishEnumClass($this->context->scope->classId);
                     $this->context->popScope();
                     break;
                 case OpCode::TYPE_DECLARE_CLASS:
@@ -7296,10 +7303,22 @@ class JIT {
                         }
                         $vm = new VM($this->context->runtime->vmContext);
                         $vmVar = VM\ClassConstMaterializer::materializeSlot($vm, $block, $op->arg2);
+                        if ($this->context->type->object->isEnumClassId($classId)) {
+                            $this->context->type->object->defineEnumCaseConst($classId, $name->value, $vmVar);
+                            break;
+                        }
                         $this->context->type->object->defineClassConst(
                             $classId,
                             $name->value,
                             $vmVar
+                        );
+                        break;
+                    }
+                    if ($this->context->type->object->isEnumClassId($classId)) {
+                        $this->context->type->object->defineEnumCaseConst(
+                            $classId,
+                            $name->value,
+                            $block->constants[$op->arg2]
                         );
                         break;
                     }
@@ -9298,6 +9317,11 @@ class JIT {
             $parentScopeAllows
         );
         $proxyName = $this->resolveJitStaticMethodProxyName($declaringClassLc, $methodLc);
+        if (!$this->context->functionIsRegistered($proxyName)) {
+            if ($this->context->type->object->isEnumClassLc($declaringClassLc) && 'cases' === $methodLc) {
+                $this->context->type->object->finishEnumClass($declaringClassId);
+            }
+        }
         if (!$this->context->functionIsRegistered($proxyName)) {
             if ($this->context->type->object->isExternalOnlyClass($declaringClassId)) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
