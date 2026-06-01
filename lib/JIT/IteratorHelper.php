@@ -215,7 +215,7 @@ final class IteratorHelper
     ): \PHPLLVM\Value {
         $slotKey = $array;
         if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
-            return IteratorProtocolHelper::compileForeachValid($context, $slotKey);
+            return IteratorProtocolHelper::compileForeachValid($context, $slotKey, $containerUserType);
         }
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
@@ -366,7 +366,7 @@ final class IteratorHelper
     ): Variable {
         $slotKey = $array;
         if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
-            return IteratorProtocolHelper::compileForeachKey($context, $slotKey);
+            return IteratorProtocolHelper::compileForeachKey($context, $slotKey, $containerUserType);
         }
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
@@ -436,7 +436,7 @@ final class IteratorHelper
     ): Variable {
         $slotKey = $array;
         if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
-            return IteratorProtocolHelper::compileForeachValue($context, $slotKey);
+            return IteratorProtocolHelper::compileForeachValue($context, $slotKey, $containerUserType);
         }
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
