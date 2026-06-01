@@ -11,6 +11,9 @@ require_once __DIR__.'/../LlvmToolchain.php';
 /**
  * LLVM compile-only: throw expressions with sequential try/catch (#4041).
  *
+ * AOT execute (catch dispatch) is tracked separately — EH in standalone binaries
+ * still falls through merge without running catch (see issue #4041 PR notes).
+ *
  * @group llvm
  */
 final class ThrowExpressionAotCompileTest extends TestCase

@@ -154,7 +154,12 @@ final class TryCatchHelper
         if (null === $handler) {
             $builder = $context->builder;
             $throwBlock = $builder->getInsertBlock();
-            $builder->positionAtEnd($throwBlock);
+            if (null === $throwBlock || null !== $throwBlock->getTerminator()) {
+                $throwBlock = self::appendBlock($func, 'throw_uncaught');
+                $builder->positionAtEnd($throwBlock);
+            } else {
+                $builder->positionAtEnd($throwBlock);
+            }
             $context->freeDeadVariables($func, $throwBlock, $block);
             $context->builder->call($context->lookupFunction('abort'));
             $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
@@ -172,7 +177,12 @@ final class TryCatchHelper
 
         $builder = $context->builder;
         $throwBlock = $builder->getInsertBlock();
-        $builder->positionAtEnd($throwBlock);
+        if (null === $throwBlock || null !== $throwBlock->getTerminator()) {
+            $throwBlock = self::appendBlock($func, 'throw_pending_'.self::blockSuffix($handler));
+            $builder->positionAtEnd($throwBlock);
+        } else {
+            $builder->positionAtEnd($throwBlock);
+        }
         $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
         $builder->branch($dispatchBb);
     }
