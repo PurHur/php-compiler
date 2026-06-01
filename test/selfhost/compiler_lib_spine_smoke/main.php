@@ -703,6 +703,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetMethod.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetMethods.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetProperties.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassNewLazyProxy.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassNewLazyGhost.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetName.php';
