@@ -27,20 +27,25 @@ final class array_chunk extends Internal
         }
         $array = $frame->calledArgs[0]->resolveIndirect();
         $size = $frame->calledArgs[1]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('array_chunk() first argument must be an array in this compiler build');
         }
         if (Variable::TYPE_INTEGER !== $size->type) {
             throw new \LogicException('array_chunk() size must be an integer in this compiler build');
         }
+        $chunkSize = $size->toInt();
+        if ($chunkSize <= 0) {
+            throw new \ValueError('array_chunk(): Argument #2 ($length) must be greater than 0');
+        }
         $preserveKeys = false;
         if (3 === $argc) {
             $preserveKeys = $frame->calledArgs[2]->resolveIndirect()->toBool();
         }
-        $frame->returnVar->array($array->toArray()->chunkCopy($size->toInt(), $preserveKeys));
+        $result = $array->toArray()->chunkCopy($chunkSize, $preserveKeys);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->array($result);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -49,16 +54,12 @@ final class array_chunk extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_chunk() requires two or three arguments in this compiler build');
         }
-        if (JITVariable::TYPE_NATIVE_LONG === $args[1]->type
-            && ($args[1]->isConstant ?? false)
-            && $args[1]->value <= 0) {
-            throw new \LogicException('array_chunk() size must be greater than zero');
-        }
         if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
             throw new \LogicException('array_chunk() size must be an integer in this compiler build');
         }
 
         $size = JitLongArg::lower($context, $args[1], 'array_chunk() size');
+        JitArrayChunk::emitRuntimeLengthGuard($context, $size);
         $preserveKeys = 3 === $argc
             ? JitBoolArg::lower($context, $args[2], 'array_chunk() preserve_keys')
             : null;
