@@ -54,6 +54,7 @@ final class Linker
         __DIR__.'/runtime/phpc_fs_dir.c',
         __DIR__.'/runtime/phpc_count_chars.c',
         __DIR__.'/runtime/phpc_gethostname.c',
+        __DIR__.'/runtime/phpc_gethostbynamel.c',
         __DIR__.'/runtime/phpc_network_services.c',
         __DIR__.'/runtime/phpc_getrusage.c',
         __DIR__.'/runtime/phpc_memory.c',
@@ -104,6 +105,7 @@ final class Linker
     private const RUNTIME_HOST_LIBC_BASENAMES = [
         'phpc_fs_dir.c',
         'phpc_gethostname.c',
+        'phpc_gethostbynamel.c',
         'phpc_network_services.c',
         'phpc_getrusage.c',
         'phpc_memory.c',

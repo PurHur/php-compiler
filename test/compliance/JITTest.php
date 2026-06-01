@@ -146,6 +146,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gethostname')) {
                 continue;
             }
+            // gethostbynamel() MCJIT: dedicated GethostbynamelJITTest (#3707).
+            if (str_contains($name, 'gethostbynamel')) {
+                continue;
+            }
             // getprotobynumber()/getservbyport() MCJIT: NetworkServicesJITTest (#3650).
             if (str_contains($name, 'getprotobynumber')) {
                 continue;
