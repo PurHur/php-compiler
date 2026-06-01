@@ -386,6 +386,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'ob_get_contents')) {
                 continue;
             }
+            // print_r()/var_dump() VM-only until debug export LLVM lowering (#3133).
+            if (str_contains($name, 'print_r') || str_contains($name, 'var_dump')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
