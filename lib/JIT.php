@@ -6346,8 +6346,10 @@ class JIT {
                     }
                     break;
                 case OpCode::TYPE_BEGIN_SILENCE:
+                    JIT\ErrorSilenceHelper::beginSilence($this->context);
+                    break;
                 case OpCode::TYPE_END_SILENCE:
-                    // VM-only silence today; JIT/AOT ignore (#3546).
+                    JIT\ErrorSilenceHelper::endSilence($this->context);
                     break;
                 default:
                     throw new \LogicException("Unknown JIT opcode: ". opcode_type_name($op->type));

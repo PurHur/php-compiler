@@ -415,7 +415,7 @@ function syntaxRowDefinitions(): array
             'issue' => 3546,
             'notes' => [
                 'php-cfg ErrorSuppressBlock + Simplifier preserve (#3546)',
-                'VM masks error_reporting; JIT/AOT no-op until native silence',
+                'VM masks error_reporting; JIT/AOT __compiler_begin_silence / __compiler_end_silence (#4070)',
             ],
             'probe' => 'echo @$undefined; @trigger_error("x", E_USER_NOTICE); echo "ok\\n";',
         ],

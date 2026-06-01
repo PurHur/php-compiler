@@ -2394,11 +2394,16 @@ long long __compiler_utf8_strlen(__string__ *input)
  */
 void __phpc_last_error_record(int type, const char *msg, size_t msg_len, const char *file, int line);
 
+extern int __compiler_phpc_error_level_enabled(int level);
+
 void __compiler_undefined_array_key_warning_cstr(const char *key, size_t len)
 {
     char msg[512];
 
     if (!key) {
+        return;
+    }
+    if (!__compiler_phpc_error_level_enabled(2)) {
         return;
     }
     snprintf(msg, sizeof msg, "Undefined array key \"%.*s\"", (int) len, key);
@@ -2410,6 +2415,9 @@ void __compiler_undefined_array_key_warning_long(long long key)
 {
     char msg[64];
 
+    if (!__compiler_phpc_error_level_enabled(2)) {
+        return;
+    }
     snprintf(msg, sizeof msg, "Undefined array key %lld", key);
     __phpc_last_error_record(2, msg, strlen(msg), "", 0);
     fprintf(stderr, "Warning: %s\n", msg);
@@ -2420,6 +2428,9 @@ extern int __phpc_error_handler_dispatch(int errno, const char *msg, size_t msg_
 void __compiler_trigger_error(const char *message, size_t len, int level)
 {
     if (!message) {
+        return;
+    }
+    if (!__compiler_phpc_error_level_enabled(level)) {
         return;
     }
     __phpc_last_error_record(level, message, len, "", 0);
