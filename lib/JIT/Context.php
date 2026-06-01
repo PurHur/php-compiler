@@ -620,6 +620,8 @@ class Context {
                 Builtin\PendingHeaders::emitFlushForStandalone($this);
                 Builtin\ObOutput::emitEndAllForStandalone($this);
             }
+            // User __destruct before __shutdown__ frees compile-time strings / sg_* (#4013).
+            $this->type->object->emitShutdownDestructorsCall();
             $this->builder->call($this->shutdownFunc);
             $this->builder->returnValue($i32->constInt(0, false));
         }

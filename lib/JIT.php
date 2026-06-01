@@ -204,6 +204,27 @@ class JIT {
         return 0 === $this->context->inlineIncludeDepth;
     }
 
+    /** Main `{main}` defers __destruct until `phpc_gc_run_shutdown_destructors` (#4013). */
+    private function emitJitDestructAllowDelref(Block $block): void
+    {
+        if (!$this->context->type->object->hasUserDestructors()) {
+            return;
+        }
+        \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
+        \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
+        $deferDelref = true;
+        if (null !== $block->func) {
+            $name = $block->func->name;
+            $deferDelref = '{main}' === $name
+                || '__destruct' === $name
+                || str_ends_with($name, '::__destruct');
+        }
+        $this->context->builder->call(
+            $this->context->lookupFunction('phpc_destruct_set_allow_delref'),
+            $this->context->getTypeFromString('int32')->constInt($deferDelref ? 0 : 1, false)
+        );
+    }
+
     /**
      * ?? on superglobals can disturb inherited include locals; restore before use (#866, #784).
      */
@@ -1047,7 +1068,12 @@ class JIT {
             $callbackType = $returnsByRef
                 ? '__value__*'
                 : ($this->cfgFunctionReturnCallbackType($block->func) ?? '__value__');
-            if ('__construct' === strtolower($block->func->name)) {
+            $methodLc = strtolower($block->func->name);
+            if (
+                '__construct' === $methodLc
+                || '__destruct' === $methodLc
+                || str_ends_with($methodLc, '::__destruct')
+            ) {
                 $callbackType = 'void';
             }
             $returnType = $this->context->getTypeFromString($callbackType);
@@ -4501,6 +4527,9 @@ class JIT {
         $builder = $this->context->builder;
         $builder->positionAtEnd($basicBlock);
         $this->context->jitCurrentBlock = $block;
+        if (null !== $block->func && $block->orig === $block->func->cfg) {
+            $this->emitJitDestructAllowDelref($block);
+        }
         if ([] !== $args) {
             $this->context->implicitThisArgument = null;
         }
@@ -6932,6 +6961,9 @@ class JIT {
         if ('__construct' === strtolower($cfgFunc->name)) {
             return 'void';
         }
+        if ('__destruct' === strtolower($cfgFunc->name)) {
+            return 'void';
+        }
         if ($cfgFunc->returnType instanceof Op\Type\Void_) {
             return 'void';
         }
@@ -7195,6 +7227,12 @@ class JIT {
                     if (null !== $methodBlock) {
                         if ('__construct' === $methodLc) {
                             $this->context->type->object->markHasConstructor($this->context->scope->classId);
+                        }
+                        if ('__destruct' === $methodLc) {
+                            $this->context->type->object->recordDestructorBlock(
+                                $this->context->scope->classId,
+                                $methodBlock
+                            );
                         }
                         if ($this->context->type->object->isTraitClass($this->context->scope->className ?? '')) {
                             $this->context->type->object->recordTraitMethodBlock(

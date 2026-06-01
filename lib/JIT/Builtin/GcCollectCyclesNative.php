@@ -18,6 +18,10 @@ final class GcCollectCyclesNative
 
         self::declare($context, 'phpc_gc_register', $void, [$i8p, $i32]);
         self::declare($context, 'phpc_gc_unregister', $void, [$i8p]);
+        self::declare($context, 'phpc_destruct_set_allow_delref', $void, [$i32]);
+        self::declare($context, 'phpc_destruct_delref_allowed', $context->getTypeFromString('int32'), []);
+        self::declare($context, 'phpc_destruct_try_invoke', $void, [$i8p]);
+        self::declare($context, 'phpc_gc_run_shutdown_destructors', $void, []);
         self::declare($context, '__compiler_gc_collect_cycles', $i64, []);
     }
 
