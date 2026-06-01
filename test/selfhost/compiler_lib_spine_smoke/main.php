@@ -206,6 +206,7 @@ require_once __DIR__.'/../../../ext/standard/JitBin2hex.php';
 require_once __DIR__.'/../../../ext/standard/JitChdir.php';
 require_once __DIR__.'/../../../ext/standard/JitChmod.php';
 require_once __DIR__.'/../../../ext/standard/JitChunkSplit.php';
+require_once __DIR__.'/../../../ext/standard/JitClassAlias.php';
 require_once __DIR__.'/../../../ext/standard/JitClassExists.php';
 require_once __DIR__.'/../../../ext/standard/JitClearstatcache.php';
 require_once __DIR__.'/../../../ext/standard/JitCopy.php';

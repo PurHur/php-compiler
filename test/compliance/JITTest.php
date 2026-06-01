@@ -86,10 +86,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'class_uses_runtime')) {
                 continue;
             }
-            // class_alias() is VM-only (#3095).
-            if (str_contains(strtolower($case[0]), 'class_alias')) {
-                continue;
-            }
             // new static() / : static return — VM late binding (#3412); JIT phase 2.
             if (str_contains($name, 'new_static') || str_contains($name, 'static_return_type')) {
                 continue;

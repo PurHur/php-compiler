@@ -99,6 +99,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitSessionStart.php',
         'ext/standard/JitSessionWriteClose.php',
         'ext/standard/JitChdir.php',
+        'ext/standard/JitClassAlias.php',
         'ext/standard/JitClassExists.php',
         'ext/standard/JitClearstatcache.php',
         'ext/standard/JitDeployPath.php',
