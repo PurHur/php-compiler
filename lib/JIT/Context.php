@@ -543,6 +543,7 @@ class Context {
         $this->functionProxies['weakmap::offsetset'] = new Call\WeakMapMethod('offsetset');
         $this->functionProxies['weakmap::offsetget'] = new Call\WeakMapMethod('offsetget');
         $this->functionProxies['weakmap::offsetexists'] = new Call\WeakMapMethod('offsetexists');
+        $this->functionProxies['weakmap::offsetunset'] = new Call\WeakMapMethod('offsetunset');
         $this->functionProxies['weakmap::count'] = new Call\WeakMapMethod('count');
 
         $this->functionProxies['reflectionclass::__construct'] = new Call\ReflectionClassConstruct();

@@ -122,6 +122,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'weak_reference_gc_jit')) {
                 continue;
             }
+            // WeakMap offsetUnset / foreach — MCJIT execute (#4084); compile: WeakMapOffsetUnsetJitCompileTest.
+            if (str_contains($name, 'weakmap_offsetunset_jit')) {
+                continue;
+            }
             // enum case ->name / ->value is VM-only until JIT enum case objects (#3420).
             if (str_contains($name, 'enum_case_name_value')) {
                 continue;
