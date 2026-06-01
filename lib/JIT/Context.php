@@ -1027,7 +1027,7 @@ class Context {
     }
 
     public function constantFromInteger(int $value, ?string $type = null): PHPLLVM\Value {
-        return $this->getTypeFromString($type === null ? 'long long' : $type)->constInt($value, false);
+        return $this->getTypeFromString($type === null ? 'long long' : $type)->constInt($value, $value < 0);
     }
 
     public function constantFromFloat(float $value, ?string $type = null): PHPLLVM\Value {

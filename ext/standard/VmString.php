@@ -3251,10 +3251,21 @@ final class VmString
         if ('' === $needle) {
             throw new \LogicException('strrpos(): Argument #2 ($needle) cannot be empty');
         }
-        if ($offset < 0) {
-            $offset = 0;
+        $hayLen = self::byteLength($haystack);
+        $minStart = 0;
+        $maxStart = null;
+        $suffixEnd = $hayLen + $offset;
+        if ($suffixEnd < $hayLen) {
+            if ($suffixEnd < 0) {
+                throw new \ValueError(sprintf(
+                    'strrpos(): Argument #3 ($offset) must be contained in argument #1 ($haystack)'
+                ));
+            }
+            $maxStart = $suffixEnd;
+        } else {
+            $minStart = $offset;
         }
-        $pos = self::findRSubstring($haystack, $needle, $offset);
+        $pos = self::findRSubstring($haystack, $needle, $minStart, $maxStart);
 
         return false === $pos ? false : $pos;
     }
@@ -3405,8 +3416,12 @@ final class VmString
     /**
      * @return int|false
      */
-    private static function findRSubstring(string $haystack, string $needle, int $offset)
-    {
+    private static function findRSubstring(
+        string $haystack,
+        string $needle,
+        int $offset,
+        ?int $maxStart = null
+    ) {
         $hayLen = self::byteLength($haystack);
         $needleLen = self::byteLength($needle);
         if (0 === $needleLen) {
@@ -3416,6 +3431,12 @@ final class VmString
             return false;
         }
         $limit = $hayLen - $needleLen;
+        if (null !== $maxStart && $maxStart < $limit) {
+            $limit = $maxStart;
+        }
+        if ($limit < $offset) {
+            return false;
+        }
         $last = false;
         for ($i = $offset; $i <= $limit; ++$i) {
             if (self::compareBytes($haystack, $needle, $needleLen, $i)) {

@@ -52,6 +52,7 @@ final class Linker
         __DIR__.'/runtime/phpc_quot_print.c',
         __DIR__.'/runtime/phpc_utf8_latin1.c',
         __DIR__.'/runtime/phpc_string_cslashes.c',
+        __DIR__.'/runtime/phpc_strrpos.c',
         __DIR__.'/runtime/filter_validate.c',
         __DIR__.'/runtime/phpc_fs_dir.c',
         __DIR__.'/runtime/phpc_dir.c',
