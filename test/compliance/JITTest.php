@@ -398,10 +398,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'class_const_object')) {
                 continue;
             }
-            // Object foreach is VM-only until IteratorHelper gains Iterator protocol (#3234).
-            if (str_contains($name, 'foreach_iterator')) {
-                continue;
-            }
             // gettimeofday() array sec compare is VM-only until boxed array fetch compare (#3208).
             if (str_contains($name, 'gettimeofday')) {
                 continue;

@@ -12,9 +12,8 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\IteratorHelper;
-use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\IteratorProtocolHelper;
 use PHPCompiler\JIT\Variable;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -36,9 +35,9 @@ final class JitIteratorWalk
             return self::countHashTable($context, $iterable);
         }
         if (Variable::TYPE_OBJECT === $iterable->type || Variable::TYPE_VALUE === $iterable->type) {
-            throw new \LogicException(
-                'iterator_count() on object Traversable is not supported by AOT in this compiler build'
-            );
+            if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $iterable, null)) {
+                return self::countIteratorObject($context, $iterable);
+            }
         }
 
         throw new \LogicException(
@@ -69,9 +68,9 @@ final class JitIteratorWalk
             return self::applyHashTable($context, $iterable, $closureCall);
         }
         if (Variable::TYPE_OBJECT === $iterable->type || Variable::TYPE_VALUE === $iterable->type) {
-            throw new \LogicException(
-                'iterator_apply() on object Traversable is not supported by AOT in this compiler build'
-            );
+            if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $iterable, null)) {
+                return self::applyIteratorObject($context, $iterable, $closureCall);
+            }
         }
 
         throw new \LogicException(
@@ -139,8 +138,8 @@ final class JitIteratorWalk
 
     private static function countIteratorObject(Context $context, Variable $iterable): Value
     {
-        $receiver = self::normalizeObjectReceiver($context, $iterable);
-        self::invokeIteratorMethod($context, $receiver, 'rewind');
+        $receiver = IteratorProtocolHelper::normalizeObjectReceiver($context, $iterable);
+        IteratorProtocolHelper::invokeIteratorMethod($context, $receiver, 'rewind');
         $countSlot = $context->builder->alloca($context->getTypeFromString('int64'), 1, 'iterator_count_obj_n');
         $context->builder->store(
             $context->getTypeFromString('int64')->constInt(0, false),
@@ -152,7 +151,7 @@ final class JitIteratorWalk
         $done = $fn->appendBasicBlock('iterator_count_obj_done');
         $context->builder->branch($head);
         $context->builder->positionAtEnd($head);
-        $valid = self::invokeIteratorMethodBool($context, $receiver, 'valid');
+        $valid = IteratorProtocolHelper::invokeIteratorMethodBool($context, $receiver, 'valid');
         $context->builder->branchIf($valid, $body, $done);
         $context->builder->positionAtEnd($body);
         $cur = $context->builder->load($countSlot);
@@ -160,7 +159,7 @@ final class JitIteratorWalk
             $context->builder->add($cur, $context->getTypeFromString('int64')->constInt(1, false)),
             $countSlot
         );
-        self::invokeIteratorMethod($context, $receiver, 'next');
+        IteratorProtocolHelper::invokeIteratorMethod($context, $receiver, 'next');
         $context->builder->branch($head);
         $context->builder->positionAtEnd($done);
 
@@ -200,7 +199,7 @@ final class JitIteratorWalk
         $key = IteratorHelper::compileKey($context, $array, null);
         $value = IteratorHelper::compileValue($context, $array, null);
         $result = $closureCall->call($context, $value, $key);
-        $keep = self::callbackTruthy($context, $result);
+        $keep = IteratorProtocolHelper::truthyI1($context, $result);
         $context->builder->branchIf($keep, $advance, $done);
         $context->builder->positionAtEnd($advance);
         $cur = $context->builder->load($countSlot);
@@ -234,7 +233,7 @@ final class JitIteratorWalk
         $value = GeneratorHelper::compileIterValue($context, $gen);
         $key = GeneratorHelper::compileIterKey($context, $gen);
         $result = $closureCall->call($context, $value, $key);
-        $keep = self::callbackTruthy($context, $result);
+        $keep = IteratorProtocolHelper::truthyI1($context, $result);
         $advance = $fn->appendBasicBlock('iterator_apply_gen_advance');
         $context->builder->branchIf($keep, $advance, $done);
         $context->builder->positionAtEnd($advance);
@@ -251,8 +250,8 @@ final class JitIteratorWalk
 
     private static function applyIteratorObject(Context $context, Variable $iterable, Call $closureCall): Value
     {
-        $receiver = self::normalizeObjectReceiver($context, $iterable);
-        self::invokeIteratorMethod($context, $receiver, 'rewind');
+        $receiver = IteratorProtocolHelper::normalizeObjectReceiver($context, $iterable);
+        IteratorProtocolHelper::invokeIteratorMethod($context, $receiver, 'rewind');
         $countSlot = $context->builder->alloca($context->getTypeFromString('int64'), 1, 'iterator_apply_obj_n');
         $context->builder->store(
             $context->getTypeFromString('int64')->constInt(0, false),
@@ -264,13 +263,13 @@ final class JitIteratorWalk
         $done = $fn->appendBasicBlock('iterator_apply_obj_done');
         $context->builder->branch($head);
         $context->builder->positionAtEnd($head);
-        $valid = self::invokeIteratorMethodBool($context, $receiver, 'valid');
+        $valid = IteratorProtocolHelper::invokeIteratorMethodBool($context, $receiver, 'valid');
         $context->builder->branchIf($valid, $body, $done);
         $context->builder->positionAtEnd($body);
-        $value = self::invokeIteratorMethodValue($context, $receiver, 'current');
-        $key = self::invokeIteratorMethodValue($context, $receiver, 'key');
+        $value = IteratorProtocolHelper::invokeIteratorMethodValue($context, $receiver, 'current');
+        $key = IteratorProtocolHelper::invokeIteratorMethodValue($context, $receiver, 'key');
         $result = $closureCall->call($context, $value, $key);
-        $keep = self::callbackTruthy($context, $result);
+        $keep = IteratorProtocolHelper::truthyI1($context, $result);
         $advance = $fn->appendBasicBlock('iterator_apply_obj_advance');
         $context->builder->branchIf($keep, $advance, $done);
         $context->builder->positionAtEnd($advance);
@@ -279,128 +278,10 @@ final class JitIteratorWalk
             $context->builder->add($cur, $context->getTypeFromString('int64')->constInt(1, false)),
             $countSlot
         );
-        self::invokeIteratorMethod($context, $receiver, 'next');
+        IteratorProtocolHelper::invokeIteratorMethod($context, $receiver, 'next');
         $context->builder->branch($head);
         $context->builder->positionAtEnd($done);
 
         return $context->builder->load($countSlot);
-    }
-
-    private static function callbackTruthy(Context $context, Value $result): Value
-    {
-        $ty = $context->getStringFromType($result->typeOf());
-        if ('int1' === $ty) {
-            return $result;
-        }
-        if ('int64' === $ty || 'int32' === $ty) {
-            return $context->builder->icmp(Builder::INT_NE, $result, $context->getTypeFromString('int64')->constInt(0, false));
-        }
-        $boxed = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VALUE, $result);
-
-        return (new boolval())->call($context, $boxed);
-    }
-
-    private static function normalizeObjectReceiver(Context $context, Variable $iterable): Variable
-    {
-        if (Variable::TYPE_OBJECT === $iterable->type) {
-            return $iterable;
-        }
-        if (Variable::TYPE_VALUE === $iterable->type) {
-            $obj = $context->builder->call(
-                $context->lookupFunction('__value__readObject'),
-                JitValueBox::valuePtrFromVariable($context, $iterable)
-            );
-
-            return new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
-        }
-
-        throw new \LogicException('iterator protocol requires an object traversable');
-    }
-
-    /**
-     * @return array<int, Call>
-     */
-    private static function methodCandidates(Context $context, string $methodLc): array
-    {
-        $methodLc = strtolower($methodLc);
-        $candidates = [];
-        foreach ($context->type->object->allClassNamesById() as $classId => $className) {
-            $classLc = strtolower(ltrim($className, '\\'));
-            $current = $classLc;
-            $visited = [];
-            while (!isset($visited[$current])) {
-                $visited[$current] = true;
-                $proxyName = $current.'::'.$methodLc;
-                if ($context->functionIsRegistered($proxyName)) {
-                    $candidates[$classId] = $context->resolveFunctionProxy($proxyName);
-                    break;
-                }
-                $current = $context->type->object->parentClassLc($current);
-                if (null === $current) {
-                    break;
-                }
-            }
-        }
-
-        return $candidates;
-    }
-
-    private static function resolveIteratorMethodProxy(Context $context, Variable $receiver, string $methodLc): Call
-    {
-        $methodLc = strtolower($methodLc);
-        if (null !== $receiver->userType && '' !== $receiver->userType) {
-            $classLc = strtolower(ltrim($receiver->userType, '\\'));
-            if ('object' !== $classLc) {
-                $proxyName = $classLc.'::'.$methodLc;
-                if ($context->functionIsRegistered($proxyName)) {
-                    return $context->resolveFunctionProxy($proxyName);
-                }
-            }
-        }
-        $candidates = self::methodCandidates($context, $methodLc);
-        if (1 === \count($candidates)) {
-            return reset($candidates);
-        }
-        if ([] === $candidates) {
-            throw new \LogicException("iterator protocol method {$methodLc}() is not available in this compile unit");
-        }
-
-        throw new \LogicException(
-            "iterator protocol method {$methodLc}() on a polymorphic object is not supported in this compiler build"
-        );
-    }
-
-    private static function invokeIteratorMethod(Context $context, Variable $receiver, string $methodLc): void
-    {
-        $proxy = self::resolveIteratorMethodProxy($context, $receiver, $methodLc);
-        $proxy->call($context, $receiver);
-    }
-
-    private static function invokeIteratorMethodBool(Context $context, Variable $receiver, string $methodLc): Value
-    {
-        $proxy = self::resolveIteratorMethodProxy($context, $receiver, $methodLc);
-        $result = $proxy->call($context, $receiver);
-
-        return self::callbackTruthy($context, $result);
-    }
-
-    private static function invokeIteratorMethodValue(Context $context, Variable $receiver, string $methodLc): Variable
-    {
-        $proxy = self::resolveIteratorMethodProxy($context, $receiver, $methodLc);
-        $result = $proxy->call($context, $receiver);
-        if ('int1' === $context->getStringFromType($result->typeOf())) {
-            $slot = JitValueBox::alloc($context);
-            JitValueBox::writeBool($context, $slot, $result);
-
-            return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
-        }
-        if ('int64' === $context->getStringFromType($result->typeOf())) {
-            $slot = JitValueBox::alloc($context);
-            JitValueBox::writeLong($context, $slot, $result);
-
-            return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
-        }
-
-        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VALUE, $result);
     }
 }

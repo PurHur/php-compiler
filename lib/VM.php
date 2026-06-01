@@ -91,32 +91,27 @@ class VM {
      */
     public function invokePhpFunction(Func\PHP $func, Variable ...$args): Variable
     {
-        $savedStack = $this->context->swapRunStack(null);
-        try {
-            $child = $func->getFrame($this->context, null);
-            $child->calledArgs = $args;
-            if (
-                [] !== $args
-                && null !== $func->block->func
-                && null !== $func->block->func->class
-            ) {
-                $thisIdx = $func->block->slotIndexForVariableName('this');
-                if (null !== $thisIdx) {
-                    $child->scope[$thisIdx] = $args[0];
-                }
+        $child = $func->getFrame($this->context, null);
+        $child->calledArgs = $args;
+        if (
+            [] !== $args
+            && null !== $func->block->func
+            && null !== $func->block->func->class
+        ) {
+            $thisIdx = $func->block->slotIndexForVariableName('this');
+            if (null !== $thisIdx) {
+                $child->scope[$thisIdx] = $args[0];
             }
-            $out = new Variable();
-            $child->returnVar = $out;
-            $this->context->push($child);
-            $result = $this->runFrames();
-            if (self::SUCCESS !== $result) {
-                throw new \LogicException('User function invocation failed in this compiler build');
-            }
-
-            return $out->resolveIndirect();
-        } finally {
-            $this->context->swapRunStack($savedStack);
         }
+        $out = new Variable();
+        $child->returnVar = $out;
+        $this->context->push($child);
+        $result = $this->runFrames();
+        if (self::SUCCESS !== $result) {
+            throw new \LogicException('User function invocation failed in this compiler build');
+        }
+
+        return $out->resolveIndirect();
     }
 
     /**
@@ -381,7 +376,10 @@ class VM {
             throw new \LogicException("Call to undefined method {$class->name}::{$methodLc}()");
         }
 
-        return $this->invokePhpFunction($class->methods[$methodLc], $receiver);
+        $recv = new Variable();
+        $recv->copyFrom($receiver);
+
+        return $this->invokePhpFunction($class->methods[$methodLc], $recv);
     }
 
     /**
@@ -3555,10 +3553,17 @@ restart:
 
     private function resolveForeachContainer(Frame $frame, int $slot): Variable
     {
-        $container = $this->context->foreachIterators[$slot]
-            ?? ($frame->iterators[$slot] ?? $frame->scope[$slot]);
+        if (isset($this->context->foreachIterators[$slot])) {
+            return $this->context->foreachIterators[$slot]->resolveIndirect();
+        }
+        if (isset($frame->iterators[$slot])) {
+            return $frame->iterators[$slot]->resolveIndirect();
+        }
+        if ($this->isForeachObjectIteratorSlot($slot)) {
+            throw new \LogicException('Foreach iterator container slot is not initialized');
+        }
 
-        return $container->resolveIndirect();
+        return $frame->scope[$slot]->resolveIndirect();
     }
 
     private function objectForeachIterator(int $slot): ObjectPropertyIterator

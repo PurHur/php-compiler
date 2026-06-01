@@ -174,6 +174,11 @@ final class IteratorHelper
     public static function compileReset(Context $context, Variable $array, ?string $containerUserType = null): void
     {
         $slotKey = $array;
+        if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
+            IteratorProtocolHelper::compileForeachReset($context, $array, $slotKey, $containerUserType);
+
+            return;
+        }
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
             $nodePtrType = $context->getTypeFromString('__objkey_node__*');
@@ -197,6 +202,9 @@ final class IteratorHelper
         ?string $containerUserType = null
     ): \PHPLLVM\Value {
         $slotKey = $array;
+        if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
+            return IteratorProtocolHelper::compileForeachValid($context, $slotKey);
+        }
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
             return self::compileValidObjectKeys($context, $array, $slotKey);
@@ -345,6 +353,9 @@ final class IteratorHelper
         ?string $containerUserType = null
     ): Variable {
         $slotKey = $array;
+        if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
+            return IteratorProtocolHelper::compileForeachKey($context, $slotKey);
+        }
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
             return self::compileKeyObject($context, $slotKey);
@@ -412,6 +423,9 @@ final class IteratorHelper
         ?string $containerUserType = null
     ): Variable {
         $slotKey = $array;
+        if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
+            return IteratorProtocolHelper::compileForeachValue($context, $slotKey);
+        }
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
             return self::compileValueObject($context, $slotKey);
@@ -425,6 +439,11 @@ final class IteratorHelper
         Variable $array,
         ?string $containerUserType = null
     ): Variable {
+        if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
+            throw new \LogicException(
+                'foreach by-reference over Iterator objects is not supported in this compiler build'
+            );
+        }
         $slotKey = $array;
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
