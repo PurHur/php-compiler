@@ -1348,6 +1348,38 @@ incdec_case = """            case 'Expr_PostInc':
 """
 anchors = [
     (
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [Type::array()];
+                }
+
+                return [Type::string()];
+            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [Type::array()];
+                }
+
+                return [Type::string()];
+            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+""" + incdec_case + """        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+    ),
+    (
         """            case 'Expr_MagicScriptConst':
                 if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
                     return [Type::int()];
