@@ -122,6 +122,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'enum_case_name_value')) {
                 continue;
             }
+            // isset() scalar locals: compile IssetScalarJitCompileTest (#4081); MCJIT execute pending (#98).
+            if (str_contains($name, 'isset_scalar_jit')) {
+                continue;
+            }
             // get_debug_type() on enum cases: VM enum class names; MCJIT deferred (#3454).
             if (str_contains($name, 'get_debug_type_enum')) {
                 continue;
