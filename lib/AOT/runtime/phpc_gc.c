@@ -18,6 +18,7 @@ typedef struct __value__ {
 
 extern __object__ *__value__readObject(__value__ *v);
 extern void phpc_weakref_clear_object(void *target);
+extern void phpc_weakref_clear_object_typed(void *target, int32_t typeinfo);
 extern void __mm__free(void *ptr);
 
 enum {
@@ -44,8 +45,23 @@ static void *phpc_gc_objects[PHPC_GC_MAX_OBJECTS];
 static int phpc_gc_prop_counts[PHPC_GC_MAX_OBJECTS];
 static unsigned char phpc_gc_marked[PHPC_GC_MAX_OBJECTS];
 static int phpc_gc_inbound[PHPC_GC_MAX_OBJECTS];
+static unsigned char phpc_destruct_invoked[PHPC_GC_MAX_OBJECTS];
 static int phpc_gc_count;
 static int phpc_gc_enabled = 1;
+/** 0 = defer refcount-zero destroy until {@see phpc_gc_run_shutdown_destructors} (#4013). */
+static int phpc_destruct_allow_delref = 1;
+
+extern void __object__invoke_destructor(void *obj);
+
+void phpc_destruct_set_allow_delref(int allow)
+{
+    phpc_destruct_allow_delref = allow ? 1 : 0;
+}
+
+int phpc_destruct_delref_allowed(void)
+{
+    return phpc_destruct_allow_delref;
+}
 
 static int phpc_gc_index_of(void *obj)
 {
@@ -70,6 +86,7 @@ void phpc_gc_register(void *obj, int prop_count)
     }
     phpc_gc_objects[phpc_gc_count] = obj;
     phpc_gc_prop_counts[phpc_gc_count] = prop_count > 0 ? prop_count : 0;
+    phpc_destruct_invoked[phpc_gc_count] = 0;
     ++phpc_gc_count;
 }
 
@@ -84,6 +101,73 @@ void phpc_gc_unregister(void *obj)
     if (idx < phpc_gc_count) {
         phpc_gc_objects[idx] = phpc_gc_objects[phpc_gc_count];
         phpc_gc_prop_counts[idx] = phpc_gc_prop_counts[phpc_gc_count];
+        phpc_destruct_invoked[idx] = phpc_destruct_invoked[phpc_gc_count];
+    }
+}
+
+static int phpc_destruct_index_of(void *obj)
+{
+    return phpc_gc_index_of(obj);
+}
+
+int phpc_destruct_already_invoked(void *obj)
+{
+    int idx = phpc_destruct_index_of(obj);
+
+    return idx >= 0 ? (int) phpc_destruct_invoked[idx] : 0;
+}
+
+void phpc_destruct_mark_invoked(void *obj)
+{
+    int idx = phpc_destruct_index_of(obj);
+
+    if (idx >= 0) {
+        phpc_destruct_invoked[idx] = 1;
+    }
+}
+
+void phpc_destruct_try_invoke(void *obj)
+{
+    phpc_object_header *hdr;
+
+    if (NULL == obj || phpc_destruct_already_invoked(obj)) {
+        return;
+    }
+    hdr = (phpc_object_header *) obj;
+    if (!hdr->constructed) {
+        return;
+    }
+    phpc_destruct_mark_invoked(obj);
+    __object__invoke_destructor(obj);
+}
+
+void phpc_object_release_storage(void *obj)
+{
+    phpc_object_header *hdr;
+
+    if (NULL == obj) {
+        return;
+    }
+    hdr = (phpc_object_header *) obj;
+    phpc_weakref_clear_object_typed(obj, hdr->ref.typeinfo);
+    phpc_gc_unregister(obj);
+    __mm__free(obj);
+}
+
+void phpc_gc_run_shutdown_destructors(void)
+{
+    int i;
+    int saved = phpc_destruct_allow_delref;
+
+    phpc_destruct_allow_delref = 1;
+    for (i = phpc_gc_count - 1; i >= 0; --i) {
+        if (!phpc_destruct_invoked[i]) {
+            phpc_destruct_try_invoke(phpc_gc_objects[i]);
+        }
+    }
+    phpc_destruct_allow_delref = saved;
+    while (phpc_gc_count > 0) {
+        phpc_object_release_storage(phpc_gc_objects[phpc_gc_count - 1]);
     }
 }
 

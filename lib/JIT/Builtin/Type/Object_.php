@@ -151,6 +151,153 @@ class Object_ extends Type {
 
     public function shutdown(): void
     {
+        $this->implementInvokeDestructor();
+        if (!$this->hasUserDestructors()) {
+            return;
+        }
+        \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
+        \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
+        $this->context->emitInShutdown(static function (\PHPCompiler\JIT\Context $ctx): void {
+            $ctx->builder->call($ctx->lookupFunction('phpc_gc_run_shutdown_destructors'));
+        });
+    }
+
+    public function hasUserDestructors(): bool
+    {
+        return [] !== $this->classIdsWithDestructor();
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function classIdsWithDestructor(): array
+    {
+        $ids = [];
+        foreach ($this->methodVisibility as $classId => $methods) {
+            if (isset($methods['__destruct'])) {
+                $ids[] = $classId;
+            }
+        }
+
+        return $ids;
+    }
+
+    private function implementInvokeDestructor(): void
+    {
+        if (null !== $this->context->module->getNamedFunction('__object__invoke_destructor')) {
+            return;
+        }
+        $objPtr = $this->context->getTypeFromString('__object__*');
+        $void = $this->context->getTypeFromString('void');
+        $fnType = $this->context->context->functionType($void, false, $objPtr);
+        $fn = $this->context->module->addFunction('__object__invoke_destructor', $fnType);
+        $this->context->registerFunction('__object__invoke_destructor', $fn);
+        $entry = $fn->appendBasicBlock('entry');
+        $this->context->builder->positionAtEnd($entry);
+        $obj = $fn->getParam(0);
+        $classIds = $this->classIdsWithDestructor();
+        if ([] === $classIds) {
+            $this->context->builder->returnVoid();
+            $this->context->builder->clearInsertionPosition();
+
+            return;
+        }
+        $constructed = $this->context->builder->load(
+            $this->context->builder->structGep($obj, $this->context->structFieldMap['__object__']['constructed'])
+        );
+        $notReady = $fn->appendBasicBlock('destruct_not_constructed');
+        $ready = $fn->appendBasicBlock('destruct_ready');
+        $done = $fn->appendBasicBlock('destruct_done');
+        $isReady = $this->context->builder->icmp(
+            PHPLLVM\Builder::INT_NE,
+            $constructed,
+            $this->context->getTypeFromString('int8')->constInt(0, false)
+        );
+        $this->context->builder->branchIf($isReady, $ready, $notReady);
+        $this->context->builder->positionAtEnd($notReady);
+        $this->context->builder->branch($done);
+        $this->context->builder->positionAtEnd($ready);
+        $this->emitDestructDispatchForObject($fn, $obj, $classIds);
+        $this->context->builder->branch($done);
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+        $this->context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * @param list<int> $classIds
+     */
+    private function emitDestructDispatchForObject(
+        PHPLLVM\Value\Function_ $fn,
+        PHPLLVM\Value $obj,
+        array $classIds
+    ): void {
+        $objMap = $this->context->structFieldMap['__object__'];
+        $classIdVal = $this->context->builder->load(
+            $this->context->builder->structGep($obj, $objMap['class_id'])
+        );
+        if (1 === \count($classIds)) {
+            $onlyId = $classIds[0];
+            $callBlock = $fn->appendBasicBlock('destruct_magic_single_call');
+            $done = $fn->appendBasicBlock('destruct_magic_single_done');
+            $expected = $this->context->constantFromInteger($onlyId, 'int64');
+            $isId = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $classIdVal, $expected);
+            $this->context->builder->branchIf($isId, $callBlock, $done);
+            $this->context->builder->positionAtEnd($callBlock);
+            $this->emitDestructMagicCallForClass($obj, $onlyId);
+            $this->context->builder->branch($done);
+            $this->context->builder->positionAtEnd($done);
+
+            return;
+        }
+        $done = $fn->appendBasicBlock('destruct_magic_done');
+        $fallback = $fn->appendBasicBlock('destruct_magic_unknown');
+        $caseBlocks = [];
+        foreach ($classIds as $id) {
+            $caseBlocks[] = $fn->appendBasicBlock('destruct_magic_class_'.$id);
+        }
+        $checkBlock = $this->context->builder->getInsertBlock();
+        foreach ($classIds as $i => $id) {
+            $this->context->builder->positionAtEnd($checkBlock);
+            $expected = $this->context->constantFromInteger($id, 'int64');
+            $isId = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $classIdVal, $expected);
+            $nextCheck = $i + 1 < \count($classIds)
+                ? $fn->appendBasicBlock('destruct_magic_try_'.($i + 1))
+                : $fallback;
+            $this->context->builder->branchIf($isId, $caseBlocks[$i], $nextCheck);
+            $this->context->builder->positionAtEnd($caseBlocks[$i]);
+            $this->emitDestructMagicCallForClass($obj, $id);
+            $this->context->builder->branch($done);
+            $checkBlock = $nextCheck;
+        }
+        $this->context->builder->positionAtEnd($fallback);
+        $this->context->builder->branch($done);
+        $this->context->builder->positionAtEnd($done);
+    }
+
+    private function emitDestructMagicCallForClass(PHPLLVM\Value $obj, int $classId): void
+    {
+        $className = $this->classNameForId($classId);
+        $proxyName = strtolower($className).'::'.'__destruct';
+        if (!$this->context->functionIsRegistered($proxyName)) {
+            return;
+        }
+        $refVirtual = $this->context->builder->pointerCast(
+            $obj,
+            $this->context->getTypeFromString('__ref__virtual*')
+        );
+        $this->context->refcount->addref($refVirtual);
+        $objVar = new Variable(
+            $this->context,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $obj
+        );
+        $toCall = $this->context->resolveFunctionProxy($proxyName);
+        $prevStrict = $this->context->callerStrictTypes;
+        $this->context->callerStrictTypes = false;
+        $toCall->call($this->context, $objVar);
+        $this->context->callerStrictTypes = $prevStrict;
     }
 
     private function implementLoadValueSlot(): void

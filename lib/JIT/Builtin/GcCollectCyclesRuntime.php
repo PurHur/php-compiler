@@ -26,7 +26,7 @@ final class GcCollectCyclesRuntime
             return;
         }
 
-        $probe = $context->module->getNamedFunction('__compiler_gc_collect_cycles');
+        $probe = $context->module->getNamedFunction('phpc_destruct_delref_allowed');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             return;
         }
@@ -46,6 +46,10 @@ final class GcCollectCyclesRuntime
             [
                 'phpc_gc_register',
                 'phpc_gc_unregister',
+                'phpc_destruct_set_allow_delref',
+                'phpc_destruct_delref_allowed',
+                'phpc_destruct_try_invoke',
+                'phpc_gc_run_shutdown_destructors',
                 '__compiler_gc_collect_cycles',
             ] as $fnName
         ) {

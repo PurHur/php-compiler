@@ -203,6 +203,21 @@ class JIT {
         return 0 === $this->context->inlineIncludeDepth;
     }
 
+    /** Main `{main}` defers __destruct until `phpc_gc_run_shutdown_destructors` (#4013). */
+    private function emitJitDestructAllowDelref(Block $block): void
+    {
+        if (!$this->context->type->object->hasUserDestructors()) {
+            return;
+        }
+        \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
+        \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
+        $isMain = null === $block->func || '{main}' === $block->func->name;
+        $this->context->builder->call(
+            $this->context->lookupFunction('phpc_destruct_set_allow_delref'),
+            $this->context->getTypeFromString('int32')->constInt($isMain ? 0 : 1, false)
+        );
+    }
+
     /**
      * ?? on superglobals can disturb inherited include locals; restore before use (#866, #784).
      */
@@ -4496,6 +4511,9 @@ class JIT {
         $builder = $this->context->builder;
         $builder->positionAtEnd($basicBlock);
         $this->context->jitCurrentBlock = $block;
+        if (null !== $block->func && $block->orig === $block->func->cfg) {
+            $this->emitJitDestructAllowDelref($block);
+        }
         if ([] !== $args) {
             $this->context->implicitThisArgument = null;
         }
