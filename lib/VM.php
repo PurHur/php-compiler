@@ -257,6 +257,30 @@ class VM {
         }
     }
 
+    /**
+     * True when $slot is an indirect binding shared with another local (Zend ref chain).
+     * Used by (unset) cast: only break references, not ordinary locals (#3517).
+     *
+     * @param array<int, Variable> $scope
+     */
+    private function slotIsReferenceBinding(Variable $slot, array $scope): bool
+    {
+        if (Variable::TYPE_INDIRECT !== $slot->type) {
+            return false;
+        }
+        $target = $slot->resolveIndirect();
+        foreach ($scope as $other) {
+            if ($other === $slot) {
+                continue;
+            }
+            if ($other === $target || $other->resolveIndirect() === $target) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** (string) cast on objects — invoke __toString (Zend zend_operators.c, issue #3421). */
     public function castObjectToString(ObjectEntry $object): string
     {
@@ -1044,7 +1068,7 @@ restart:
                     break;
                 case OpCode::TYPE_CAST_UNSET:
                     $src = $frame->scope[$op->arg2];
-                    if (Variable::TYPE_INDIRECT === $src->type) {
+                    if ($this->slotIsReferenceBinding($src, $frame->scope)) {
                         $src->reset();
                         $src->type = Variable::TYPE_UNDEFINED;
                     }
@@ -1506,7 +1530,8 @@ restart:
                         }
                         break;
                     }
-                    $container = $frame->scope[$op->arg2]->resolveIndirect();
+                    $containerSlot = $frame->scope[$op->arg2];
+                    $container = $containerSlot->resolveIndirect();
                     $key = $frame->scope[$op->arg3];
                     if (Variable::TYPE_OBJECT === $container->type) {
                         $object = $container->toObject();
@@ -1524,6 +1549,8 @@ restart:
                         break;
                     }
                     if (Variable::TYPE_ARRAY === $container->type) {
+                        $container->separateArrayForWrite();
+                        $container = $containerSlot->resolveIndirect();
                         $container->toArray()->offsetUnset($key);
                         break;
                     }
