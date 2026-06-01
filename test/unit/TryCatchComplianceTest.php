@@ -170,6 +170,25 @@ try {
         $this->assertSame("finally\n", ob_get_clean(), 'VM stdout');
     }
 
+    /** Issue #4120: throw expression as assignment RHS (Zend zend_compile.c). */
+    public function testThrowExpressionInAssignment(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+function f(): int {
+    $x = throw new LogicException("abort");
+    return $x;
+}
+try {
+    f();
+} catch (LogicException $e) {
+    echo $e->getMessage(), "\n";
+}
+',
+            "abort\n"
+        );
+    }
+
     public function testUncaughtThrowNonZeroExit(): void
     {
         $bin = realpath(__DIR__ . '/../../bin/vm.php');
