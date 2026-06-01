@@ -707,7 +707,7 @@ function syntaxRowDefinitions(): array
                 'SourcePreprocessor lowers hooks to __phpc_property_* methods (#3145)',
                 'VM dispatches set/get on property access; JIT PropertyHookDispatch (#3723)',
                 'AOT: user-class hook methods lower under PHP_COMPILER_SELFHOST_AOT; set-hook smoke in property_hook_set.phpt',
-                'MCJIT execute still segfaults when hook body calls str_contains (follow-up)',
+                'JIT: raw backing writes in set-hook bodies via jitPropertyHookRawProperty (#4025)',
             ],
             'probe' => 'class U { public string $e { set (string $v) { $this->e = $v; } } } $o = new U(); $o->e = "a@b"; echo $o->e;',
         ],

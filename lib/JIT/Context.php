@@ -52,6 +52,13 @@ class Context {
     /** User function CFG block while compiling its body (func_get_args / func_num_args, #197). */
     public ?Block $jitEnclosingBlock = null;
 
+    /**
+     * Backing property name for raw writes inside a lowering set-hook method (#4025).
+     *
+     * Mirrors VM {@see \PHPCompiler\Frame::$propertyHookRawProperty} at compile time.
+     */
+    public ?string $jitPropertyHookRawProperty = null;
+
     /** While lowering generator resume LLVM (issue #3074). */
     public bool $compilingGeneratorResume = false;
 

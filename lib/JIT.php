@@ -188,6 +188,7 @@ class JIT {
             $this->context->scopeStack = [];
             $this->context->inlineIncludeReturnOperands = [];
             $this->context->coalesceAssignTargets = new \SplObjectStorage();
+            $this->context->jitPropertyHookRawProperty = null;
             // Each queued CFG function gets a fresh try/catch stack — dispatch BBs are per-LLVM-function (#3012).
             $this->context->tryCatch->reset();
             $this->compileBlockInternal($run[0], $run[1], null, null, 0, false, ...$run[2]);
@@ -4514,6 +4515,11 @@ class JIT {
         $thisParamOffset = 0;
         if (null !== $block->func && $block->orig === $block->func->cfg) {
             $this->context->jitEnclosingBlock = $block;
+            $methodLc = strtolower($block->func->name);
+            if (str_contains($methodLc, '::')) {
+                $methodLc = substr($methodLc, strrpos($methodLc, '::') + 2);
+            }
+            $this->context->jitPropertyHookRawProperty = SourcePreprocessor\PropertyHooks::propertyNameFromSetHookMethod($methodLc);
         }
         if ([] !== $args) {
             if ($this->instanceMethodUsesThis($block)) {
