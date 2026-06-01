@@ -172,7 +172,7 @@ final class JitArrayElem
         return $resultPtr;
     }
 
-    private static function requireArrayArg(Context $context, JITVariable $array, string $fn): void
+    public static function requireArrayArg(Context $context, JITVariable $array, string $fn): void
     {
         if (JITVariable::TYPE_HASHTABLE === $array->type
             || ($array->type & JITVariable::IS_NATIVE_ARRAY)
@@ -200,7 +200,12 @@ final class JitArrayElem
 
             return;
         }
+        $okBlock = BasicBlockHelper::append($context, 'array_req_ok');
+        $errBlock = BasicBlockHelper::append($context, 'array_req_err');
+        $context->builder->branch($errBlock);
+        $context->builder->positionAtEnd($errBlock);
         self::emitErrorAndAbort($context, \sprintf(self::TYPE_ERROR, $fn, self::jitTypeLabel($array->type)));
+        $context->builder->positionAtEnd($okBlock);
     }
 
     private static function emitErrorAndAbort(Context $context, string $message): void
@@ -222,6 +227,8 @@ final class JitArrayElem
                 return 'bool';
             case JITVariable::TYPE_STRING:
                 return 'string';
+            case JITVariable::TYPE_OBJECT:
+                return 'object';
             default:
                 return 'mixed';
         }
