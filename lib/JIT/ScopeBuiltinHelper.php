@@ -391,6 +391,15 @@ final class ScopeBuiltinHelper
                 );
 
                 return;
+            case Variable::TYPE_NATIVE_DOUBLE:
+                HashTableHelper::setAtStringKey(
+                    $context,
+                    $ht,
+                    $keyStr,
+                    $element
+                );
+
+                return;
             case Variable::TYPE_VALUE:
                 $valuePtr = $context->helper->loadValue($element);
                 $valueMap = $context->structFieldMap['__value__'];
@@ -406,8 +415,10 @@ final class ScopeBuiltinHelper
                 );
                 $stringBlock = BasicBlockHelper::append($context, 'compact_val_string_'.$tag);
                 $longBlock = BasicBlockHelper::append($context, 'compact_val_long_'.$tag);
+                $doubleBlock = BasicBlockHelper::append($context, 'compact_val_double_'.$tag);
                 $done = BasicBlockHelper::append($context, 'compact_val_done_'.$tag);
                 $afterString = BasicBlockHelper::append($context, 'compact_val_after_string_'.$tag);
+                $afterLong = BasicBlockHelper::append($context, 'compact_val_after_long_'.$tag);
                 $context->builder->branchIf($isString, $stringBlock, $afterString);
 
                 $context->builder->positionAtEnd($stringBlock);
@@ -433,7 +444,7 @@ final class ScopeBuiltinHelper
                     $typeByte,
                     $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
                 );
-                $context->builder->branchIf($isLong, $longBlock, $done);
+                $context->builder->branchIf($isLong, $longBlock, $afterLong);
 
                 $context->builder->positionAtEnd($longBlock);
                 $longVal = $context->builder->call(
@@ -445,6 +456,27 @@ final class ScopeBuiltinHelper
                     $ht,
                     $keyStr,
                     $longVal
+                );
+                $context->builder->branch($done);
+
+                $context->builder->positionAtEnd($afterLong);
+                $isDouble = $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $typeByte,
+                    $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+                );
+                $context->builder->branchIf($isDouble, $doubleBlock, $done);
+
+                $context->builder->positionAtEnd($doubleBlock);
+                $doubleVal = $context->builder->call(
+                    $context->lookupFunction('__value__readDouble'),
+                    $valuePtr
+                );
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringKeyDouble'),
+                    $ht,
+                    $keyStr,
+                    $doubleVal
                 );
                 $context->builder->branch($done);
 
@@ -612,11 +644,13 @@ final class ScopeBuiltinHelper
         $tag = 'dv'.(string) ++self::$blockSeq;
         $stringBlock = BasicBlockHelper::append($context, 'gdv_val_string_'.$tag);
         $longBlock = BasicBlockHelper::append($context, 'gdv_val_long_'.$tag);
+        $doubleBlock = BasicBlockHelper::append($context, 'gdv_val_double_'.$tag);
         $boolBlock = BasicBlockHelper::append($context, 'gdv_val_bool_'.$tag);
         $htBlock = BasicBlockHelper::append($context, 'gdv_val_ht_'.$tag);
         $done = BasicBlockHelper::append($context, 'gdv_val_done_'.$tag);
         $afterString = BasicBlockHelper::append($context, 'gdv_val_after_string_'.$tag);
         $afterLong = BasicBlockHelper::append($context, 'gdv_val_after_long_'.$tag);
+        $afterDouble = BasicBlockHelper::append($context, 'gdv_val_after_double_'.$tag);
         $afterBool = BasicBlockHelper::append($context, 'gdv_val_after_bool_'.$tag);
 
         $isString = $context->builder->icmp(
@@ -661,6 +695,23 @@ final class ScopeBuiltinHelper
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($afterLong);
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyDouble'),
+            $ht,
+            $keyStr,
+            $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterDouble);
         $isBool = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
