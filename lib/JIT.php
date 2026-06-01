@@ -5359,6 +5359,28 @@ class JIT {
                             JIT\ValueEchoHelper::echoLiteral($this->context, 'Array');
                             break;
                         case Variable::TYPE_OBJECT:
+                            $classHint = $block->getOperand($argOffset)->type?->userType ?? null;
+                            $asString = JIT\MagicMethodDispatch::coerceObjectToString(
+                                $this->context,
+                                $arg,
+                                $classHint
+                            );
+                            if (null !== $asString) {
+                                $argValue = $this->context->helper->loadValue($asString);
+                                $offset = $this->context->structFieldIndex($argValue, 'length');
+                                $__str__length = $this->context->builder->load(
+                                    $this->context->builder->structGep($argValue, $offset)
+                                );
+                                $offset = $this->context->structFieldIndex($argValue, 'value');
+                                $__str__value = $this->context->builder->structGep($argValue, $offset);
+                                $sizeT = $this->context->getTypeFromString('size_t');
+                                $this->context->builder->call(
+                                    $this->context->lookupFunction('__phpc_ob_echo_substr'),
+                                    $__str__value,
+                                    $this->context->builder->zExt($__str__length, $sizeT)
+                                );
+                                break;
+                            }
                             JIT\ValueEchoHelper::echoLiteral($this->context, 'Object');
                             break;
 
@@ -6223,7 +6245,46 @@ class JIT {
                     $declaringClass = $this->resolvePropertyDeclaringClass($obj, $block, $propName);
                     $receiver = $this->loadPropertyFetchReceiver($obj);
                     $forceBranchMerge = $this->context->coalesceAssignTargets->contains($result);
+                    $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
                     if ($name instanceof Operand\Literal) {
+                        $classId = $this->context->type->object->lookup($declaringClass);
+                        if (
+                            $forWrite
+                            && !$this->context->type->object->hasProperty($classId, $name->value)
+                            && JIT\MagicMethodDispatch::hasInstanceMethod(
+                                $this->context->type->object,
+                                $classId,
+                                '__set'
+                            )
+                        ) {
+                            $lvalue = new Variable(
+                                $this->context,
+                                Variable::TYPE_NULL,
+                                Variable::KIND_VALUE,
+                                $this->context->getTypeFromString('__value__*')->constNull()
+                            );
+                            $lvalue->magicSetReceiver = $receiver;
+                            $lvalue->magicSetName = $name->value;
+                            if ($forceBranchMerge) {
+                                $this->assignOperand($result, $lvalue, true);
+                            } else {
+                                $this->context->scope->variables[$result] = $lvalue;
+                            }
+                            break;
+                        }
+                        if (!$forWrite) {
+                            $magicFetched = JIT\MagicMethodDispatch::tryEmitMagicGet(
+                                $this->context,
+                                $receiver,
+                                $declaringClass,
+                                $name->value,
+                                $block
+                            );
+                            if (null !== $magicFetched) {
+                                $this->assignOperandValue($result, $magicFetched);
+                                break;
+                            }
+                        }
                         $hookFetched = JIT\PropertyHookDispatch::tryEmitPropertyGet(
                             $this->context,
                             $receiver,
@@ -7525,6 +7586,23 @@ class JIT {
                 )
             );
             $result = $this->context->getVariableFromOp($resultOp);
+        }
+        if (null !== $result->magicSetReceiver && null !== $result->magicSetName) {
+            $receiverVar = new Variable(
+                $this->context,
+                Variable::TYPE_OBJECT,
+                Variable::KIND_VALUE,
+                $result->magicSetReceiver
+            );
+            if (JIT\MagicMethodDispatch::tryEmitMagicSet(
+                $this->context,
+                $receiverVar,
+                $result->magicSetName,
+                $value,
+                $this->context->jitEnclosingBlock
+            )) {
+                return;
+            }
         }
         if (null !== $result->objectPropertySlot) {
             if (null === $result->objectPropertyType) {
@@ -8935,6 +9013,17 @@ class JIT {
 
         $proxyName = $this->resolveJitInstanceMethodProxyName($declaringClassLc, $methodLc);
         $receiverVar = $this->context->getVariableFromOp($receiverOp);
+        if (!$this->context->functionIsRegistered($proxyName)) {
+            if (JIT\MagicMethodDispatch::tryInitMagicCall(
+                $this->context,
+                $declaringClassLc,
+                $methodName,
+                $receiverVar
+            )) {
+                return;
+            }
+            throw new \LogicException("Call to undefined method {$className}::{$methodLc}()");
+        }
         $receiverUserType = $receiverOp->type?->userType;
         $staticProxy = $this->context->resolveFunctionProxy($proxyName);
         $needsRuntimeDispatch = null === $receiverUserType
@@ -9168,6 +9257,20 @@ class JIT {
      */
     private function resolveJitOutgoingCall(JIT\Call $toCall, array $argEntries, array $argOperands): array
     {
+        if (null !== $this->context->scope->magicCallMethodName) {
+            $methodName = $this->context->scope->magicCallMethodName;
+            $this->context->scope->magicCallMethodName = null;
+            $rewritten = JIT\MagicMethodDispatch::rewriteOutgoingMagicCallArgs(
+                $this->context,
+                $methodName,
+                $argEntries,
+                $argOperands
+            );
+            if (null !== $rewritten) {
+                return $rewritten;
+            }
+        }
+
         foreach ($argEntries as $entry) {
             if (\is_array($entry) && isset($entry['unpack'])) {
                 return [

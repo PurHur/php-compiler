@@ -126,6 +126,11 @@ final class Variable {
     /** Declaring class name for readonly diagnostics (#1360). */
     public ?string $objectPropertyClassName = null;
 
+    /** __set dispatch when the property slot does not exist (#146, #4022). */
+    public ?\PHPLLVM\Value $magicSetReceiver = null;
+
+    public ?string $magicSetName = null;
+
     /** Native call proxy when this object is a JIT-lowered closure (#72). */
     public ?Call $closureCall = null;
 

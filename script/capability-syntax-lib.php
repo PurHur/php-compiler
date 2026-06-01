@@ -107,10 +107,10 @@ function syntaxRowDefinitions(): array
             'construct' => 'Magic methods `__get` / `__set` / `__call` / `__toString`',
             'opcodes' => [],
             'issue' => 146,
-            'jit' => false,
+            'jit' => true,
             'notes' => [
                 'Zend zend_object_handlers.c: zend_std_read_property, zend_std_write_property, zend_std_get_method, __toString cast',
-                'VM slow path on undeclared property read/write and missing method call; __callStatic (#3273); JIT deopt/fallback',
+                'VM slow path on undeclared property read/write and missing method call; JIT MagicMethodDispatch (#4022); __callStatic (#3273) VM-only',
             ],
             'probe' => 'class M { function __get(string $k): string { return $k; } } echo (new M)->foo;',
         ],

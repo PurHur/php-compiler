@@ -19,6 +19,9 @@ class Scope {
     public ?Call $toCall = null;
     public array $args = [];
 
+    /** Original method name when dispatching via __call (#146, #4022). */
+    public ?string $magicCallMethodName = null;
+
     /** Resume LLVM symbol when calling a user generator (#3074). */
     public ?string $generatorResumeCallee = null;
 
