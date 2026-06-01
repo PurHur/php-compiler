@@ -52,6 +52,12 @@ final class VmPassword
         return \password_get_info($hash);
     }
 
+    /** password_needs_rehash() — host PHP (ext/standard/password.c, issue #3279). */
+    public static function needsRehash(string $hash, int $algo, array $options = []): bool
+    {
+        return \password_needs_rehash($hash, $algo, $options);
+    }
+
     /** @param array<string, mixed> $info */
     public static function infoToHashTable(array $info): HashTable
     {

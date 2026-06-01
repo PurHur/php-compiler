@@ -997,6 +997,130 @@ final class VmString
         return $out;
     }
 
+    private const QPRINT_MAXL = 75;
+
+    /** quoted_printable_encode() — php-src ext/standard/quot_print.c. */
+    public static function quoted_printable_encode(string $str): string
+    {
+        $length = self::byteLength($str);
+        if (0 === $length) {
+            return '';
+        }
+        $hex = '0123456789ABCDEF';
+        $out = '';
+        $lp = 0;
+        for ($i = 0; $i < $length; ++$i) {
+            $c = self::byteOrd($str[$i]);
+            if (13 === $c && $i + 1 < $length && 10 === self::byteOrd($str[$i + 1])) {
+                $out .= "\r\n";
+                ++$i;
+                $lp = 0;
+
+                continue;
+            }
+            $nextIsCr = ($i + 1 < $length) && 13 === self::byteOrd($str[$i + 1]);
+            if (
+                $c < 32 || 127 === $c || 0 !== ($c & 0x80) || 61 === $c
+                || (32 === $c && $nextIsCr)
+            ) {
+                if (
+                    (($lp += 3) > self::QPRINT_MAXL && $c <= 0x7f)
+                    || ($c > 0x7f && $c <= 0xdf && ($lp + 3) > self::QPRINT_MAXL)
+                    || ($c > 0xdf && $c <= 0xef && ($lp + 6) > self::QPRINT_MAXL)
+                    || ($c > 0xef && $c <= 0xf4 && ($lp + 9) > self::QPRINT_MAXL)
+                ) {
+                    $out .= "=\r\n";
+                    $lp = 3;
+                }
+                $out .= '='.$hex[$c >> 4].$hex[$c & 0xf];
+            } else {
+                if ((++$lp) > self::QPRINT_MAXL) {
+                    $out .= "=\r\n";
+                    $lp = 1;
+                }
+                $out .= $str[$i];
+            }
+        }
+
+        return $out;
+    }
+
+    /** quoted_printable_decode() — php-src ext/standard/quot_print.c PHP_FUNCTION. */
+    public static function quoted_printable_decode(string $str): string
+    {
+        $inLen = self::byteLength($str);
+        if (0 === $inLen) {
+            return '';
+        }
+        $out = '';
+        $i = 0;
+        while ($i < $inLen) {
+            $ch = self::byteOrd($str[$i]);
+            if (61 === $ch) {
+                if (
+                    $i + 2 < $inLen
+                    && self::isHexDigit($str[$i + 1])
+                    && self::isHexDigit($str[$i + 2])
+                ) {
+                    $out .= \chr((self::hexDigitVal(self::byteOrd($str[$i + 1])) << 4)
+                        + self::hexDigitVal(self::byteOrd($str[$i + 2])));
+                    $i += 3;
+
+                    continue;
+                }
+                $k = 1;
+                while ($i + $k < $inLen) {
+                    $sk = self::byteOrd($str[$i + $k]);
+                    if (32 !== $sk && 9 !== $sk) {
+                        break;
+                    }
+                    ++$k;
+                }
+                if ($i + $k >= $inLen) {
+                    $i += $k;
+
+                    continue;
+                }
+                if (
+                    $i + $k + 1 < $inLen
+                    && 13 === self::byteOrd($str[$i + $k])
+                    && 10 === self::byteOrd($str[$i + $k + 1])
+                ) {
+                    $i += $k + 2;
+
+                    continue;
+                }
+                if ($i + $k < $inLen) {
+                    $sk = self::byteOrd($str[$i + $k]);
+                    if (13 === $sk || 10 === $sk) {
+                        $i += $k + 1;
+
+                        continue;
+                    }
+                }
+                $out .= $str[$i];
+                ++$i;
+            } else {
+                $out .= $str[$i];
+                ++$i;
+            }
+        }
+
+        return $out;
+    }
+
+    private static function hexDigitVal(int $c): int
+    {
+        if ($c >= 48 && $c <= 57) {
+            return $c - 48;
+        }
+        if ($c >= 65 && $c <= 70) {
+            return $c - 65 + 10;
+        }
+
+        return $c - 97 + 10;
+    }
+
     /** Unix-to-Unix encode (php-src ext/standard/uuencode.c — php_uuencode). */
     public static function convert_uuencode(string $src): string
     {

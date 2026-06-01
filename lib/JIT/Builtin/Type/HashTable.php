@@ -118,7 +118,6 @@ class HashTable extends Type
         $this->registerFn('__hashtable__sortStringKeyValuesNatural', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeyValuesNaturalCase', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeyValuesReverse', 'void', ['__hashtable__*']);
-
         $this->pointer = $this->context->getTypeFromString('__hashtable__*');
     }
 

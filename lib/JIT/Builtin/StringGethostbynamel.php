@@ -8,43 +8,17 @@ use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT MCJIT bodies for password_hash / password_verify / password_get_info runtime.
+ * JIT MCJIT body for __compiler_gethostbynamel.
  *
- * Links {@see lib/AOT/runtime/password_crypto.c} (libcrypt).
+ * Links {@see lib/AOT/runtime/phpc_gethostbynamel.c}.
  */
-final class StringPasswordCrypto
+final class StringGethostbynamel
 {
-    private const RUNTIME_SOURCE = __DIR__.'/../../AOT/runtime/password_crypto.c';
+    private const RUNTIME_SOURCE = __DIR__.'/../../AOT/runtime/phpc_gethostbynamel.c';
 
     public static function ensureLinked(Context $context): void
     {
-        self::preloadLibcrypt();
         self::implement($context);
-    }
-
-    /** MCJIT resolves libcrypt symbols from the host process (#172). */
-    public static function preloadLibcrypt(): void
-    {
-        static $loaded = 0;
-        if ($loaded) {
-            return;
-        }
-        if (!\extension_loaded('FFI')) {
-            return;
-        }
-        $selfHost = getenv('PHP_COMPILER_SELFHOST_AOT');
-        if ('1' === $selfHost || 'true' === strtolower((string) $selfHost)) {
-            $loaded = 1;
-
-            return;
-        }
-        try {
-            $dl = \FFI::cdef('void *dlopen(const char *filename, int flags);', 'libdl.so.2');
-            $dl->dlopen('libcrypt.so.1', 0x101);
-        } catch (\Throwable $e) {
-            // Best-effort: AOT links -lcrypt explicitly.
-        }
-        $loaded = 1;
     }
 
     public static function implement(Context $context): void
@@ -53,8 +27,8 @@ final class StringPasswordCrypto
             return;
         }
 
-        $existing = $context->module->getNamedFunction('__compiler_password_hash');
-        if (null !== $existing && $existing->countBasicBlocks() > 0) {
+        $probe = $context->module->getNamedFunction('__compiler_gethostbynamel');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -63,12 +37,12 @@ final class StringPasswordCrypto
         $bitcode = self::ensureBitcode();
         $data = file_get_contents($bitcode);
         if (false === $data || '' === $data) {
-            throw new \LogicException('Failed to read password JIT bitcode: '.$bitcode);
+            throw new \LogicException('Failed to read gethostbynamel JIT bitcode: '.$bitcode);
         }
-        $buffer = $context->llvm->createMemoryBufferWithString($data, 'password_crypto.bc');
+        $buffer = $context->llvm->createMemoryBufferWithString($data, 'phpc_gethostbynamel.bc');
         $runtimeModule = $buffer->parseBitcode($context->context);
         if (!$context->module->link($runtimeModule)) {
-            throw new \LogicException('Failed to link password JIT runtime bitcode');
+            throw new \LogicException('Failed to link gethostbynamel JIT runtime bitcode');
         }
 
         self::registerLinkedRuntime($context);
@@ -76,28 +50,18 @@ final class StringPasswordCrypto
 
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach (
-            [
-                '__compiler_password_hash',
-                '__compiler_password_verify',
-                '__compiler_crypt',
-                '__compiler_password_get_info',
-                '__compiler_password_needs_rehash',
-            ] as $name
-        ) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn) {
-                throw new \LogicException($name.' missing after password bitcode link');
-            }
-            $context->registerFunction($name, $fn);
+        $fn = $context->module->getNamedFunction('__compiler_gethostbynamel');
+        if (null === $fn) {
+            throw new \LogicException('__compiler_gethostbynamel missing after gethostbynamel bitcode link');
         }
+        $context->registerFunction('__compiler_gethostbynamel', $fn);
     }
 
     private static function ensureBitcode(): string
     {
         $source = realpath(self::RUNTIME_SOURCE);
         if (false === $source || !is_file($source)) {
-            throw new \LogicException('password runtime source not found: '.self::RUNTIME_SOURCE);
+            throw new \LogicException('gethostbynamel runtime source not found: '.self::RUNTIME_SOURCE);
         }
 
         $compiler = self::resolveCompiler();
@@ -106,19 +70,23 @@ final class StringPasswordCrypto
             throw new \LogicException('Cannot create JIT runtime cache: '.$cacheDir);
         }
 
-        $cache = $cacheDir.'/password_crypto-'.substr(sha1($source.filemtime($source).$compiler), 0, 16).'.bc';
+        $cache = $cacheDir.'/'.basename($source, '.c').'-'.substr(
+            sha1($source.filemtime($source).$compiler.'host'),
+            0,
+            16
+        ).'.bc';
         if (is_file($cache) && filemtime($cache) >= filemtime($source)) {
             return $cache;
         }
 
-        $includes = self::includeFlags();
+        $includes = self::hostLibcIncludeFlags();
         $cmd = escapeshellarg($compiler)
             .' -emit-llvm -c -fPIC -O2'.$includes.' '
             .escapeshellarg($source).' -o '.escapeshellarg($cache).' 2>&1';
         $output = shell_exec($cmd);
         if (!is_file($cache)) {
             throw new \LogicException(
-                'Failed to compile password JIT bitcode: '.trim((string) $output)
+                'Failed to compile gethostbynamel JIT bitcode: '.trim((string) $output)
             );
         }
 
@@ -144,10 +112,10 @@ final class StringPasswordCrypto
             }
         }
 
-        throw new \LogicException('No C compiler found for password JIT runtime bitcode');
+        throw new \LogicException('No C compiler found for gethostbynamel JIT runtime bitcode');
     }
 
-    private static function includeFlags(): string
+    private static function hostLibcIncludeFlags(): string
     {
         $flags = '';
         foreach (self::discoverSystemIncludeDirs() as $dir) {

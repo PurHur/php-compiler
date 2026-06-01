@@ -526,6 +526,18 @@ class Type extends Builtin {
             $fntypePasswordGetInfo
         );
         $this->context->registerFunction('__compiler_password_get_info', $fnPasswordGetInfo);
+        $fntypePasswordNeedsRehash = $this->context->context->functionType(
+            $this->context->getTypeFromString('int32'),
+            false,
+            $strPtr,
+            $i64,
+            $i64
+        );
+        $fnPasswordNeedsRehash = $this->context->module->addFunction(
+            '__compiler_password_needs_rehash',
+            $fntypePasswordNeedsRehash
+        );
+        $this->context->registerFunction('__compiler_password_needs_rehash', $fnPasswordNeedsRehash);
         $fntypeCrc32 = $this->context->context->functionType($i64, false, $strPtr, $i64);
         $fnCrc32 = $this->context->module->addFunction('__compiler_crc32', $fntypeCrc32);
         $this->context->registerFunction('__compiler_crc32', $fnCrc32);
@@ -557,6 +569,17 @@ class Type extends Builtin {
         $fntypeUuencode = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnUuencode = $this->context->module->addFunction('__compiler_convert_uuencode', $fntypeUuencode);
         $this->context->registerFunction('__compiler_convert_uuencode', $fnUuencode);
+        $fntypeQuotPrint = $this->context->context->functionType($strPtr, false, $strPtr);
+        $fnQuotEncode = $this->context->module->addFunction(
+            '__compiler_quoted_printable_encode',
+            $fntypeQuotPrint
+        );
+        $this->context->registerFunction('__compiler_quoted_printable_encode', $fnQuotEncode);
+        $fnQuotDecode = $this->context->module->addFunction(
+            '__compiler_quoted_printable_decode',
+            $fntypeQuotPrint
+        );
+        $this->context->registerFunction('__compiler_quoted_printable_decode', $fnQuotDecode);
         $fntypeUtf8Latin1 = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnUtf8Encode = $this->context->module->addFunction('__compiler_utf8_encode', $fntypeUtf8Latin1);
         $this->context->registerFunction('__compiler_utf8_encode', $fnUtf8Encode);
@@ -937,6 +960,12 @@ class Type extends Builtin {
         $fntypeGethostname = $this->context->context->functionType($strPtr, false);
         $fnGethostname = $this->context->module->addFunction('__compiler_gethostname', $fntypeGethostname);
         $this->context->registerFunction('__compiler_gethostname', $fnGethostname);
+        $fntypeGethostbynamel = $this->context->context->functionType($htPtr, false, $strPtr);
+        $fnGethostbynamel = $this->context->module->addFunction(
+            '__compiler_gethostbynamel',
+            $fntypeGethostbynamel
+        );
+        $this->context->registerFunction('__compiler_gethostbynamel', $fnGethostbynamel);
         $i64 = $this->context->getTypeFromString('int64');
         $fntypeGetprotobynumber = $this->context->context->functionType($strPtr, false, $i64);
         $fnGetprotobynumber = $this->context->module->addFunction(

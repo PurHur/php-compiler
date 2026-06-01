@@ -1,5 +1,5 @@
 /*
- * password_hash() / password_verify() / password_get_info() for AOT/JIT.
+ * password_hash() / password_verify() / password_get_info() / password_needs_rehash() for AOT/JIT.
  * PASSWORD_DEFAULT / PASSWORD_BCRYPT via libcrypt(3); no OpenSSL.
  */
 
@@ -16,10 +16,15 @@
 typedef struct __string__ __string__;
 typedef struct __hashtable__ __hashtable__;
 
+typedef struct __value__ __value__;
+
 extern __hashtable__ *__hashtable__alloc(void);
 extern void __hashtable__setStringKeyString(__hashtable__ *ht, __string__ *key, __string__ *val);
 extern void __hashtable__setStringKeyLong(__hashtable__ *ht, __string__ *key, long long val);
 extern void __hashtable__setStringKeyHashtable(__hashtable__ *ht, __string__ *key, __hashtable__ *child);
+extern __value__ *__hashtable__readStringKeyValue(__hashtable__ *ht, __string__ *key);
+extern __hashtable__ *__value__readHashtable(__value__ *v);
+extern long long __value__readLong(__value__ *v);
 
 extern __string__ *__string__init(long long size, const char *value);
 
@@ -301,4 +306,57 @@ __hashtable__ *__compiler_password_get_info(__string__ *hash)
     }
 
     return pc_password_info_unknown();
+}
+
+static int pc_hash_ident_is_bcrypt(const char *h, size_t len)
+{
+    char ident[32];
+
+    if (!pc_extract_ident(h, len, ident, sizeof(ident))) {
+        return 0;
+    }
+
+    return strcmp(ident, "2y") == 0 && pc_bcrypt_valid(h, len);
+}
+
+static long long pc_bcrypt_cost_from_hash(const char *h, size_t len)
+{
+    long long cost = BCRYPT_DEFAULT_COST;
+
+    if (!pc_bcrypt_valid(h, len)) {
+        return cost;
+    }
+    if (len >= 7 && !memcmp(h, "$2y$", 4)) {
+        cost = (long long) atoi(h + 4);
+        if (cost < 4) {
+            cost = BCRYPT_DEFAULT_COST;
+        }
+    }
+
+    return cost;
+}
+
+int __compiler_password_needs_rehash(__string__ *hash, int64_t algo, int64_t new_cost)
+{
+    const char *h;
+    size_t len;
+    long long old_cost;
+
+    if (!pc_algo_supported(algo)) {
+        return 0;
+    }
+    if (NULL == hash) {
+        return 1;
+    }
+    h = pc_strdata(hash);
+    len = pc_strlen(hash);
+    if (!pc_hash_ident_is_bcrypt(h, len)) {
+        return 1;
+    }
+    if (new_cost <= 0) {
+        new_cost = BCRYPT_DEFAULT_COST;
+    }
+    old_cost = pc_bcrypt_cost_from_hash(h, len);
+
+    return old_cost != new_cost ? 1 : 0;
 }

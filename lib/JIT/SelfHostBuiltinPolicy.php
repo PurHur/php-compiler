@@ -92,6 +92,7 @@ final class SelfHostBuiltinPolicy
         'password_hash' => 'password',
         'password_verify' => 'password',
         'password_get_info' => 'password',
+        'password_needs_rehash' => 'password',
         'crypt' => 'password',
     ];
 
@@ -119,6 +120,7 @@ final class SelfHostBuiltinPolicy
         'is_uploaded_file' => 'filesystem', 'move_uploaded_file' => 'filesystem', 'touch' => 'filesystem',
         'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem', 'tempnam' => 'filesystem', 'tmpfile' => 'filesystem',
         'getcwd' => 'filesystem', 'chdir' => 'filesystem', 'gethostname' => 'filesystem',
+        'gethostbynamel' => 'filesystem',
         'stream_context_create' => 'filesystem',
     ];
 
@@ -157,6 +159,7 @@ final class SelfHostBuiltinPolicy
         'version_compare' => 'string', 'extension_loaded' => 'string', 'get_loaded_extensions' => 'array',
         'soundex' => 'string',
         'base64_encode' => 'string', 'base64_decode' => 'string',
+        'quoted_printable_encode' => 'string', 'quoted_printable_decode' => 'string',
         'htmlspecialchars' => 'string', 'htmlspecialchars_decode' => 'string',
         'htmlentities' => 'string', 'html_entity_decode' => 'string',
         'get_html_translation_table' => 'string',
