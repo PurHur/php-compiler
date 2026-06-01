@@ -41,6 +41,9 @@ class Native implements Call {
     /** @var array<int, list<string>> LLVM arg index => intersection interface lc names (#3077) */
     public array $paramIntersectionConstraintsByArg = [];
 
+    /** @var array<int, list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>> LLVM arg index => DNF arms (#4008) */
+    public array $paramDnfConstraintsByArg = [];
+
     /** LLVM arg index => by-reference formal (issue #3161, #140). @var array<int, true> */
     public array $paramByRefByArg = [];
 
@@ -58,6 +61,7 @@ class Native implements Call {
         ?int $variadicArgIndex = null,
         array $paramTypeConstraintsByArg = [],
         array $paramIntersectionConstraintsByArg = [],
+        array $paramDnfConstraintsByArg = [],
         array $paramByRefByArg = [],
         array $paramNames = [],
         ?int $namedArgsVariadicIndex = null
@@ -69,6 +73,7 @@ class Native implements Call {
         $this->variadicArgIndex = $variadicArgIndex;
         $this->paramTypeConstraintsByArg = $paramTypeConstraintsByArg;
         $this->paramIntersectionConstraintsByArg = $paramIntersectionConstraintsByArg;
+        $this->paramDnfConstraintsByArg = $paramDnfConstraintsByArg;
         $this->paramByRefByArg = $paramByRefByArg;
         $this->paramNames = $paramNames;
         $this->namedArgsVariadicIndex = $namedArgsVariadicIndex;
@@ -104,6 +109,13 @@ class Native implements Call {
                     $context,
                     $arg,
                     $this->paramIntersectionConstraintsByArg[$index]
+                );
+            }
+            if (isset($this->paramDnfConstraintsByArg[$index])) {
+                \PHPCompiler\JIT\DnfParamCheck::enforce(
+                    $context,
+                    $arg,
+                    $this->paramDnfConstraintsByArg[$index]
                 );
             }
             $argValues[] = $this->compileArg($context, $arg, $index);

@@ -1126,6 +1126,7 @@ class JIT {
                     $variadicArgIndex,
                     $this->paramTypeConstraintsForNativeCall($block),
                     $this->paramIntersectionConstraintsForNativeCall($block),
+                    $this->paramDnfConstraintsForNativeCall($block),
                     $this->paramByRefForNativeCall($block),
                     $block->paramNames,
                     $block->variadicParamIndex
@@ -2616,6 +2617,9 @@ class JIT {
         }
         if ($param->variadic) {
             return $this->context->getTypeFromString('__hashtable__*');
+        }
+        if ($this->cfgParamDeclaredTypeUsesDnfShape($param)) {
+            return $this->context->getTypeFromString('__value__*');
         }
         if ($param->declaredType instanceof Op\Type\Literal
             && 'mixed' === strtolower($param->declaredType->name)
@@ -5706,6 +5710,14 @@ class JIT {
                         );
                     } else {
                         $return->addref();
+                        if (null !== $block->returnDnfConstraints) {
+                            JIT\DnfParamCheck::enforce(
+                                $this->context,
+                                $return,
+                                $block->returnDnfConstraints,
+                                'Return value'
+                            );
+                        }
                         $retval = $this->context->helper->loadValue($return);
                         $expected = $this->cfgFunctionReturnCallbackType($block->func);
                         if (null === $expected && null !== $this->context->activeFunction) {
@@ -6724,6 +6736,19 @@ class JIT {
         return false;
     }
 
+    private function cfgParamDeclaredTypeUsesDnfShape(\PHPCfg\Op\Expr\Param $param): bool
+    {
+        $declared = $param->declaredType;
+        if (!$declared instanceof Op\Type) {
+            return false;
+        }
+        if ($declared instanceof Op\Type\Union_ || $declared instanceof Op\Type\Intersection) {
+            return true;
+        }
+
+        return $declared instanceof Op\Type\Nullable;
+    }
+
     private function callbackTypeFromPhptype(Type $type): ?string
     {
         $allowsNull = $this->typeIncludesNull($type);
@@ -7492,6 +7517,7 @@ class JIT {
             )) {
                 return;
             }
+            // Property DNF checks: defer to VM path until LLVM lowering is stable (#4008).
             $this->context->type->object->propertyStore(
                 $result->objectPropertySlot,
                 $value,
@@ -9247,6 +9273,26 @@ class JIT {
                 continue;
             }
             $constraints[(int) $op->arg2 + $offset] = $block->paramIntersectionConstraints[$op->arg1];
+        }
+
+        return $constraints;
+    }
+
+    /**
+     * @return array<int, list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>>
+     */
+    private function paramDnfConstraintsForNativeCall(Block $block): array
+    {
+        $constraints = [];
+        $offset = $this->instanceMethodUsesThis($block) ? 1 : 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARG_RECV !== $op->type) {
+                continue;
+            }
+            if (!isset($block->paramDnfConstraints[$op->arg1])) {
+                continue;
+            }
+            $constraints[(int) $op->arg2 + $offset] = $block->paramDnfConstraints[$op->arg1];
         }
 
         return $constraints;
