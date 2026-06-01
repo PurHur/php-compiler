@@ -1,17 +1,15 @@
 --TEST--
-define() case_insensitive third argument (issue #3711, php-src basic_functions.c)
+define() case_insensitive third argument ignored (issue #4052, php-src basic_functions.c)
 --FILE--
 <?php
 echo define('MyConst', 42, true) ? '1' : '0', "\n";
 echo defined('myconst') ? '1' : '0', "\n";
-echo constant('MYCONST'), "\n";
+constant('MYCONST');
 echo define('CaseSens', 7) ? '1' : '0', "\n";
 echo defined('casesens') ? '1' : '0', "\n";
 echo defined('CaseSens') ? '1' : '0', "\n";
 --EXPECT--
 1
-1
-42
-1
 0
-1
+--EXPECT_EXIT--
+255

@@ -6019,14 +6019,9 @@ class JIT {
                         }
                         throw new \LogicException('Global constant value must be a compile-time constant');
                     }
-                    $caseInsensitive = false;
-                    if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
-                        $caseInsensitive = $block->constants[$op->arg3]->toBool();
-                    }
                     if (!$this->context->runtime->vmContext->defineConstant(
                         $nameOp->value,
-                        $block->constants[$op->arg2],
-                        $caseInsensitive
+                        $block->constants[$op->arg2]
                     )) {
                         // Spine may require bin/vm.php after tokenizer-compat shims (#2134).
                         if ($this->shouldUseSelfHostJitStubs()) {
