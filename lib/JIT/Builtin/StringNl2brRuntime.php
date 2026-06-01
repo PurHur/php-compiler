@@ -23,6 +23,7 @@ final class StringNl2brRuntime
 
     public static function implement(Context $context): void
     {
+        // AOT (STANDALONE): __compiler_nl2br comes from lib/AOT/runtime/phpc_nl2br.c via Linker.
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
             $fn = $context->module->getNamedFunction('__compiler_nl2br');
             if (null !== $fn) {
