@@ -526,6 +526,18 @@ class Type extends Builtin {
             $fntypePasswordGetInfo
         );
         $this->context->registerFunction('__compiler_password_get_info', $fnPasswordGetInfo);
+        $fntypePasswordNeedsRehash = $this->context->context->functionType(
+            $this->context->getTypeFromString('int32'),
+            false,
+            $strPtr,
+            $i64,
+            $i64
+        );
+        $fnPasswordNeedsRehash = $this->context->module->addFunction(
+            '__compiler_password_needs_rehash',
+            $fntypePasswordNeedsRehash
+        );
+        $this->context->registerFunction('__compiler_password_needs_rehash', $fnPasswordNeedsRehash);
         $fntypeCrc32 = $this->context->context->functionType($i64, false, $strPtr, $i64);
         $fnCrc32 = $this->context->module->addFunction('__compiler_crc32', $fntypeCrc32);
         $this->context->registerFunction('__compiler_crc32', $fnCrc32);
