@@ -58,6 +58,9 @@ class Object_ extends Type {
     private array $methodVisibility = [];
     /** @var array<int, array<string, int>> class id => property lc => visibility flags (#3159) */
     private array $propertyVisibility = [];
+
+    /** @var array<int, array<string, int>> class id => property lc => asymmetric set visibility (#3165) */
+    private array $propertySetVisibility = [];
     /** @var array<int, array<string, string>> class id => method lc => declared casing (#3118) */
     private array $methodDisplayNames = [];
     /** @var array<int, Block> class id => __destruct CFG block (#4013) */
@@ -120,6 +123,8 @@ class Object_ extends Type {
         \PHPCompiler\JIT\Builtin\ReadonlyRaise::ensureLinked($this->context);
         \PHPCompiler\JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
         \PHPCompiler\JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
+        \PHPCompiler\JIT\Builtin\ErrorRaise::registerDeclarations($this->context);
+        \PHPCompiler\JIT\Builtin\ErrorRaise::ensureLinked($this->context);
         // JitThrow linked on demand when compiling try/catch (#1056).
 
         $this->registerFn('__object__load_value_slot', 'void', ['void**', '__value__*']);
@@ -1962,9 +1967,21 @@ class Object_ extends Type {
         $this->propertyVisibility[$classId][strtolower($name)] = $visibilityFlags;
     }
 
+    public function definePropertySetVisibility(int $classId, string $name, int $setVisibilityFlags): void
+    {
+        if (0 !== $setVisibilityFlags) {
+            $this->propertySetVisibility[$classId][strtolower($name)] = $setVisibilityFlags;
+        }
+    }
+
     public function propertyVisibility(int $classId, string $name): int
     {
         return $this->propertyVisibility[$classId][strtolower($name)] ?? \PHPCfg\Func::FLAG_PUBLIC;
+    }
+
+    public function propertySetVisibility(int $classId, string $name): int
+    {
+        return $this->propertySetVisibility[$classId][strtolower($name)] ?? 0;
     }
 
     public function methodVisibility(int $classId, string $methodLc): int

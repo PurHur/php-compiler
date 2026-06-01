@@ -732,7 +732,7 @@ function syntaxRowDefinitions(): array
             'issue' => 3165,
             'jit' => false,
             'notes' => [
-                'Ast\\AsymmetricVisibilityRewriter normalizes private(set) for php-parser 4.x; VM enforces set visibility (#3165)',
+                'Ast\\AsymmetricVisibilityRewriter normalizes private(set) for php-parser 4.x; VM/JIT enforce set visibility with catchable Error (#3165, #4029)',
                 'php-src: Zend/zend_compile.c ZEND_ACC_*_SET; JIT/AOT follow-up',
             ],
             'probe' => 'class D { public private(set) string $n = "x"; } $d = new D(); echo $d->n; $d->n = "y";',

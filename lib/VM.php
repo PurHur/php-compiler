@@ -826,13 +826,11 @@ restart:
                         goto restart;
                     }
                     if (null !== ($msg = $this->asymmetricPropertyWriteMessage($arg2, $frame))) {
-                        $thrown = $this->logicExceptionVariable($msg);
-                        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+                        $catchFrame = $this->dispatchVmError($msg, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
                         }
-                        $this->raiseUncaughtException($thrown);
                     }
                     $arg2->copyFrom($arg3);
                     $arg1->copyFrom($arg3);
@@ -882,13 +880,11 @@ restart:
                         goto restart;
                     }
                     if (null !== ($msg = $this->asymmetricPropertyWriteMessage($lhs, $frame))) {
-                        $thrown = $this->logicExceptionVariable($msg);
-                        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+                        $catchFrame = $this->dispatchVmError($msg, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
                         }
-                        $this->raiseUncaughtException($thrown);
                     }
                     $rhs = $frame->scope[$op->arg2]->resolveIndirect();
                     $lhs->indirect($rhs);

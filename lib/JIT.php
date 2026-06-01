@@ -7168,6 +7168,11 @@ class JIT {
                         $name->value,
                         \PHPCompiler\MethodVisibility::mask($op->propertyVisibility)
                     );
+                    $this->context->type->object->definePropertySetVisibility(
+                        $classId,
+                        $name->value,
+                        (int) ($op->propertySetVisibility ?? 0)
+                    );
                     if ($op->propertyReadonly || $this->context->scope->classIsReadonly) {
                         $this->context->type->object->markPropertyReadonly($classId, $name->value);
                     }
@@ -7670,6 +7675,14 @@ class JIT {
                 $result,
                 $this->context->jitEnclosingBlock
             );
+            if (JIT\AsymmetricVisibilityGuard::emitBeforePropertyStore(
+                $this->context,
+                $this,
+                $result,
+                $this->context->jitEnclosingBlock
+            )) {
+                return;
+            }
             if (JIT\PropertyHookDispatch::emitSetHookIfNeeded(
                 $this->context,
                 $result,
@@ -8699,6 +8712,14 @@ class JIT {
             $dest,
             $this->context->jitEnclosingBlock
         );
+        if (JIT\AsymmetricVisibilityGuard::emitBeforePropertyStore(
+            $this->context,
+            $this,
+            $dest,
+            $this->context->jitEnclosingBlock
+        )) {
+            return;
+        }
         $this->context->type->object->propertyStore(
             $dest->objectPropertySlot,
             $newVal,
@@ -8770,6 +8791,14 @@ class JIT {
             $read,
             $this->context->jitEnclosingBlock
         );
+        if (JIT\AsymmetricVisibilityGuard::emitBeforePropertyStore(
+            $this->context,
+            $this,
+            $read,
+            $this->context->jitEnclosingBlock
+        )) {
+            return;
+        }
         $this->context->type->object->propertyStore(
             $read->objectPropertySlot,
             $newVal,
