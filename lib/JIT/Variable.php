@@ -139,6 +139,10 @@ final class Variable {
 
     public ?string $generatorResumeName = null;
 
+    public ?string $fiberResumeName = null;
+
+    public ?\PHPLLVM\Value $fiberStatePtr = null;
+
     /** MCJIT/AOT foreach over a {@see Generator} object (#3074, #3115). */
     public bool $isJitGenerator = false;
 
