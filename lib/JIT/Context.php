@@ -78,6 +78,13 @@ class Context {
     /** @var array<string, string> user func lc => resume LLVM symbol */
     public array $generatorCreators = [];
 
+    /**
+     * Catch-body CFG block id => LLVM entry for generator try/catch dispatch (#4069).
+     *
+     * @var array<int, \PHPLLVM\BasicBlock>
+     */
+    public array $generatorCatchDispatchEntry = [];
+
     /** CFG block currently being lowered (get_defined_vars snapshot, #3135). */
     public ?Block $jitCurrentBlock = null;
 

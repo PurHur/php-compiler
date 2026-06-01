@@ -2883,10 +2883,17 @@ restart:
                 $catchFrame->scope[$op->arg3]->copyFrom($caught);
             }
             $catchFrame->activeCatchException = $caught;
+            $gen = $this->findGeneratorState($handler);
+            if (null !== $gen) {
+                $catchFrame->generatorState = $gen;
+            }
             $mergeFrame = null;
             if (null !== $op->block2) {
                 $mergeFrame = $op->block2->getFrame($this->context, $handler);
                 $mergeFrame->parent = $handler->parent;
+                if (null !== $gen) {
+                    $mergeFrame->generatorState = $gen;
+                }
             }
             $this->skipTryCatchHandlerTail($handler);
             if (null !== $mergeFrame) {

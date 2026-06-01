@@ -84,6 +84,27 @@ PHP
             '123');
     }
 
+    public function testGeneratorTryCatchExecutesViaMcjit(): void
+    {
+        $this->assertMcjitOutput(<<<'PHP'
+<?php
+function gen() {
+    try {
+        yield 1;
+        throw new Exception('boom');
+        yield 2;
+    } catch (Exception $e) {
+        yield 'caught:boom';
+    }
+}
+foreach (gen() as $v) {
+    echo $v, "\n";
+}
+PHP
+            ,
+            "1\ncaught:boom\n");
+    }
+
     public function testRequiresVmLoweringSkipsNestedGeneratorBodies(): void
     {
         $runtime = new Runtime();
