@@ -24,10 +24,10 @@ final class strpbrk extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $haystack->type || Variable::TYPE_STRING !== $mask->type) {
-            throw new \LogicException('strpbrk() only supports strings in this compiler build');
-        }
-        $result = VmString::strpbrk($haystack->toString(), $mask->toString());
+        $result = VmString::strpbrk(
+            VmString::coerceOperand($haystack),
+            VmString::coerceOperand($mask)
+        );
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {

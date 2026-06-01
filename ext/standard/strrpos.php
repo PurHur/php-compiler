@@ -34,9 +34,8 @@ final class strrpos extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $haystack->type || Variable::TYPE_STRING !== $needle->type) {
-            throw new \LogicException('strrpos() only supports strings in this compiler build');
-        }
+        $haystackStr = VmString::coerceOperand($haystack);
+        $needleStr = VmString::coerceOperand($needle);
         $offset = 0;
         if (3 === $argc) {
             $offVar = $frame->calledArgs[2]->resolveIndirect();
@@ -45,7 +44,7 @@ final class strrpos extends Internal
             }
             $offset = $offVar->toInt();
         }
-        $result = VmString::strrpos($haystack->toString(), $needle->toString(), $offset);
+        $result = VmString::strrpos($haystackStr, $needleStr, $offset);
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {
