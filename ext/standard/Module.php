@@ -370,6 +370,8 @@ class Module extends ModuleAbstract
             new mkdir_(),
             new rmdir_(),
             new chmod_(),
+            new chown_(),
+            new lchown_(),
             new chgrp_(),
             new lchgrp_(),
             new umask_(),

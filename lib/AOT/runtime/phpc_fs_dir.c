@@ -9,6 +9,7 @@
 #include <fnmatch.h>
 #include <glob.h>
 #include <grp.h>
+#include <pwd.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -689,4 +690,60 @@ int __compiler_chgrp(__string__ *path, __value__ *group, int lchgrp_flag)
     }
 
     return chown(p, (uid_t) -1, gid) == 0 ? 1 : 0;
+}
+
+static uid_t phpc_resolve_uid(__value__ *user)
+{
+    int kind;
+    char *end;
+    long val;
+    struct passwd *pw;
+
+    if (NULL == user) {
+        return (uid_t) -1;
+    }
+    kind = phpc_value_kind(user);
+    if (PHPC_TYPE_NATIVE_LONG == kind) {
+        return (uid_t) __value__readLong(user);
+    }
+    if (PHPC_TYPE_STRING != kind) {
+        return (uid_t) -1;
+    }
+    {
+        const char *c = phpc_strdata(__value__readString(user));
+        val = strtol(c, &end, 10);
+        if ('\0' == *end && end != c) {
+            return (uid_t) val;
+        }
+        pw = getpwnam(c);
+        if (NULL != pw) {
+            return pw->pw_uid;
+        }
+    }
+
+    return (uid_t) -1;
+}
+
+/**
+ * chown()/lchown() runtime (issue #3241; php-src ext/standard/filestat.c).
+ * lchown_flag: 0 = chown(2), non-zero = lchown(2).
+ */
+int __compiler_chown(__string__ *path, __value__ *user, int lchown_flag)
+{
+    const char *p;
+    uid_t uid;
+
+    if (NULL == path || NULL == user) {
+        return 0;
+    }
+    p = phpc_strdata(path);
+    uid = phpc_resolve_uid(user);
+    if ((uid_t) -1 == uid) {
+        return 0;
+    }
+    if (lchown_flag) {
+        return fchownat(AT_FDCWD, p, uid, (gid_t) -1, AT_SYMLINK_NOFOLLOW) == 0 ? 1 : 0;
+    }
+
+    return chown(p, uid, (gid_t) -1) == 0 ? 1 : 0;
 }
