@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\Block;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ReadonlyRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCfg\Operand;
@@ -19,6 +21,33 @@ use PHPLLVM\Value;
 
 final class ClassConstFetchHelper
 {
+    /**
+     * Lower `$operand::class` when the class operand is not a compile-time literal (#4179).
+     *
+     * @return Value {@see __string__*}
+     */
+    public static function emitClassPseudoConstStringValue(
+        Object_ $objectType,
+        Block $block,
+        Variable $classVar
+    ): Value {
+        $literal = JitStringArg::compileTimeLiteral($classVar);
+        if (null !== $literal) {
+            $resolved = self::resolveJitClassNameString($objectType, $block, $literal);
+            $classId = $objectType->lookup($resolved);
+
+            return $objectType->jitContext()->builder->load(
+                $objectType->jitContext()->constantStringFromString($objectType->classNameForId($classId))
+            );
+        }
+
+        $context = $objectType->jitContext();
+        $nameStr = JitStringArg::lowerDominating($context, $classVar, '::class class operand');
+        $resolvedStr = self::emitScopeResolveClassNameString($objectType, $block, $nameStr);
+
+        return self::emitCanonicalClassNameFromResolved($objectType, $resolvedStr);
+    }
+
     public static function fetchDynamic(
         Object_ $objectType,
         int $classId,
@@ -126,6 +155,168 @@ final class ClassConstFetchHelper
         $lit->type = \PHPTypes\Type::string();
 
         return Variable::fromLiteral($context, $lit);
+    }
+
+    private static function resolveJitClassNameString(Object_ $objectType, Block $block, string $className): string
+    {
+        $lc = strtolower($className);
+        if ('self' === $lc) {
+            $scope = self::jitScopeClassName($objectType, $block);
+            if (null === $scope) {
+                throw new \LogicException('self:: used outside of class scope');
+            }
+
+            return $scope;
+        }
+        if ('static' === $lc) {
+            $scope = self::jitLateStaticClassName($objectType, $block);
+            if (null === $scope) {
+                throw new \LogicException('static:: used outside of class scope');
+            }
+
+            return $scope;
+        }
+        if ('parent' === $lc) {
+            $scope = self::jitScopeClassName($objectType, $block);
+            if (null === $scope) {
+                throw new \LogicException('parent:: used outside of class scope');
+            }
+            $parent = $objectType->parentClassDisplayName($scope);
+            if (null === $parent) {
+                throw new \LogicException('parent:: used when class has no parent');
+            }
+
+            return $parent;
+        }
+
+        return $className;
+    }
+
+    private static function jitScopeClassName(Object_ $objectType, Block $block): ?string
+    {
+        if (null !== $block->func && null !== $block->func->class) {
+            return $block->func->class->value;
+        }
+        $scopeName = $objectType->jitContext()->scope->className ?? '';
+        if ('' !== $scopeName) {
+            return $scopeName;
+        }
+
+        return null;
+    }
+
+    private static function jitLateStaticClassName(Object_ $objectType, Block $block): ?string
+    {
+        $called = $objectType->jitContext()->scope->calledClassName ?? '';
+        if ('' !== $called) {
+            return $called;
+        }
+
+        return self::jitScopeClassName($objectType, $block);
+    }
+
+    /**
+     * @return Value {@see __string__*}
+     */
+    private static function emitScopeResolveClassNameString(
+        Object_ $objectType,
+        Block $block,
+        Value $nameStr
+    ): Value {
+        $context = $objectType->jitContext();
+        $scopeClass = self::jitScopeClassName($objectType, $block);
+        if (null === $scopeClass) {
+            return $nameStr;
+        }
+        self::ensureStrCaseCmp($context);
+        $i32 = $context->getTypeFromString('int32');
+        $result = $nameStr;
+
+        foreach (
+            [
+                ['self', $scopeClass],
+                ['static', self::jitLateStaticClassName($objectType, $block) ?? $scopeClass],
+            ] as [$keyword, $resolvedName]
+        ) {
+            $keyGlobal = $context->builder->load($context->constantStringFromString($keyword));
+            $cmp = $context->builder->call(
+                $context->lookupFunction('strcasecmp'),
+                self::stringDataPtr($context, $nameStr),
+                self::stringDataPtr($context, $keyGlobal)
+            );
+            $isKw = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+            $resolvedGlobal = $context->builder->load(
+                $context->constantStringFromString($resolvedName)
+            );
+            $result = $context->builder->select($isKw, $resolvedGlobal, $result);
+        }
+
+        $parentName = $objectType->parentClassDisplayName($scopeClass);
+        if (null !== $parentName) {
+            $parentKey = $context->builder->load($context->constantStringFromString('parent'));
+            $cmp = $context->builder->call(
+                $context->lookupFunction('strcasecmp'),
+                self::stringDataPtr($context, $nameStr),
+                self::stringDataPtr($context, $parentKey)
+            );
+            $isParent = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+            $parentGlobal = $context->builder->load(
+                $context->constantStringFromString($parentName)
+            );
+            $result = $context->builder->select($isParent, $parentGlobal, $result);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return Value {@see __string__*}
+     */
+    private static function emitCanonicalClassNameFromResolved(Object_ $objectType, Value $resolvedNameStr): Value
+    {
+        $context = $objectType->jitContext();
+        self::ensureStrCaseCmp($context);
+        $i32 = $context->getTypeFromString('int32');
+        $strMap = $context->structFieldMap['__string__'];
+        $result = $context->builder->load($context->constantStringFromString(''));
+        foreach ($objectType->allClassNamesById() as $canonical) {
+            $lcGlobal = $context->builder->load(
+                $context->constantStringFromString(strtolower(ltrim($canonical, '\\')))
+            );
+            $cmp = $context->builder->call(
+                $context->lookupFunction('strcasecmp'),
+                self::stringDataPtr($context, $resolvedNameStr),
+                self::stringDataPtr($context, $lcGlobal)
+            );
+            $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+            $cand = $context->builder->load($context->constantStringFromString($canonical));
+            $result = $context->builder->select($isMatch, $cand, $result);
+        }
+
+        $len = $context->builder->load($context->builder->structGep($result, $strMap['length']));
+        $sizeT = $context->getTypeFromString('size_t');
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $sizeT->constInt(0, false));
+        $fn = BasicBlockHelper::parentFunction($context);
+        $entry = $context->builder->getInsertBlock();
+        $ok = $fn->appendBasicBlock('class_pseudo_const_ok');
+        $fail = $fn->appendBasicBlock('class_pseudo_const_fail');
+        $merge = $fn->appendBasicBlock('class_pseudo_const_merge');
+        $context->builder->branchIf($isEmpty, $fail, $ok);
+
+        $context->builder->positionAtEnd($fail);
+        $message = 'Unknown class for constant fetch';
+        $context->builder->call(
+            $context->lookupFunction('__compiler_jit_raise_logic_exception'),
+            self::messageDataPtr($context, $message),
+            $context->constantFromInteger(strlen($message), 'size_t')
+        );
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($ok);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($merge);
+
+        return $result;
     }
 
     /**

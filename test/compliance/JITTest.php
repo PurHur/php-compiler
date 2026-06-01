@@ -314,6 +314,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'stringable')) {
                 continue;
             }
+            // $variable::class MCJIT execute segfaults (#4179); VM + AOT green; JIT/AOT lint in ClassNameDynamicJITTest.
+            if (str_contains($name, 'class_name_dynamic')) {
+                continue;
+            }
             // Enum::cases() is VM-only until JIT enum case lowering (#3308).
             if (str_contains($name, 'enum_cases')) {
                 continue;
