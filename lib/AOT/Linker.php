@@ -28,6 +28,7 @@ final class Linker
         __DIR__.'/runtime/phpc_strnatcmp.c',
         __DIR__.'/runtime/phpc_strnatcasecmp.c',
         __DIR__.'/runtime/phpc_substr_compare.c',
+        __DIR__.'/runtime/phpc_substr_count.c',
         __DIR__.'/runtime/phpc_spaceship.c',
         __DIR__.'/runtime/phpc_levenshtein.c',
         __DIR__.'/runtime/phpc_strspn.c',

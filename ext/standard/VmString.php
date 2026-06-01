@@ -3147,22 +3147,26 @@ final class VmString
         }
         $hayLen = self::byteLength($haystack);
         $needleLen = self::byteLength($needle);
-        if ($offset < 0) {
-            $offset = 0;
+        $searchLen = $hayLen;
+        if (0 !== $offset) {
+            if ($offset < 0) {
+                $offset += $hayLen;
+            }
+            if ($offset < 0 || $offset > $hayLen) {
+                throw new \ValueError('substr_count(): Argument #3 ($offset) must be contained in argument #1 ($haystack)');
+            }
+            $searchLen = $hayLen - $offset;
         }
-        if ($offset >= $hayLen) {
-            return 0;
-        }
-        $end = $hayLen;
         if (null !== $length) {
             if ($length < 0) {
-                return 0;
+                $length += $searchLen;
             }
-            $end = $offset + $length;
-            if ($end > $hayLen) {
-                $end = $hayLen;
+            if ($length < 0 || $length > $searchLen) {
+                throw new \ValueError('substr_count(): Argument #4 ($length) must be contained in argument #1 ($haystack)');
             }
+            $searchLen = $length;
         }
+        $end = $offset + $searchLen;
         $limit = $end - $needleLen;
         if ($limit < $offset) {
             return 0;

@@ -18,6 +18,9 @@ echo substr_count('hello', 'z'), "\n";
 echo substr_count('banana', 'ana'), "\n";
 echo substr_count('hello world', 'o', 4), "\n";
 echo substr_count('abcabcabc', 'abc', 0, 6), "\n";
+echo substr_count('abcabc', 'bc', -1), "\n";
+echo substr_count('abcabc', 'bc', -3), "\n";
+echo substr_count('abcabc', 'bc', 0, -1), "\n";
 PHP;
 
     private const EXPECT = <<<'TXT'
@@ -27,6 +30,9 @@ PHP;
 1
 2
 2
+0
+1
+1
 TXT;
 
     public function testVmMatchesPhpSubset(): void
