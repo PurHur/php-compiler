@@ -1217,6 +1217,18 @@ final class Doctor
             'SELFHOSTPROBE_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=008 ./script/examples-aot-smoke.sh · north-star3-verify (#2407)',
             '#2407'
         );
+        $initParityDefault = $defaults['INIT_SELFHOSTPROBE_PARITY_GATE'] ?? '1';
+        $initParityOn = self::gateEnabled('INIT_SELFHOSTPROBE_PARITY_GATE', $initParityDefault);
+        self::printSessionsWebGateRow(
+            3,
+            'init template parity',
+            'INIT_SELFHOSTPROBE_PARITY_GATE',
+            $initParityDefault,
+            $initParityOn,
+            false,
+            './script/check-init-selfhostprobe-parity.sh · ci-fast inventory (#2238)',
+            '#2238'
+        );
         $rootReadme008Default = $defaults['ROOT_README_008_SYNC_GATE'] ?? '0';
         $rootReadme008On = self::gateEnabled('ROOT_README_008_SYNC_GATE', $rootReadme008Default);
         $rootReadme008Icon = $rootReadme008On ? '✅' : '⬜';
@@ -1233,6 +1245,7 @@ final class Doctor
         } else {
             fwrite(STDOUT, "  [📋] phpc init --profile selfhostprobe — #2220\n");
         }
+        fwrite(STDOUT, "      Parity:  ./script/check-init-selfhostprobe-parity.sh (INIT_SELFHOSTPROBE_PARITY_GATE=1 in ci-fast)\n");
         fwrite(STDOUT, "  Docs: examples/008-SelfHostProbe/README.md\n");
     }
 

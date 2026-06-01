@@ -232,6 +232,17 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('bootstrap-inventory-lint-snapshot', $result['stdout']);
     }
 
+    public function testDoctorGatesPrintsSelfhostprobeInitParityGate(): void
+    {
+        $result = $this->runPhpc(['doctor', '--gates', '--no-lint']);
+        $this->assertSame(0, $result['exit'], $result['stdout']."\n".$result['stderr']);
+        $this->assertStringContainsString('008-SelfHostProbe CI gates', $result['stdout']);
+        $this->assertStringContainsString('INIT_SELFHOSTPROBE_PARITY_GATE', $result['stdout']);
+        $this->assertStringContainsString('check-init-selfhostprobe-parity.sh', $result['stdout']);
+        $this->assertStringContainsString('phpc init --profile selfhostprobe', $result['stdout']);
+        $this->assertStringContainsString('#2238', $result['stdout']);
+    }
+
     public function testDoctorSelfhostMentionsBootstrapInventoryGatesProbe(): void
     {
         $result = $this->runPhpc(['doctor', '--selfhost']);
