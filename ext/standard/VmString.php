@@ -8,9 +8,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\Variable;
+
 final class VmString
 {
     public const TRIM_DEFAULT = " \t\n\r\0\x0B";
+
+    /**
+     * Coerce a string-search builtin operand to string (php-src _convert_to_string parity, #3549).
+     */
+    public static function coerceOperand(Variable $var): string
+    {
+        return $var->resolveIndirect()->toString();
+    }
 
     /** Regex metacharacters escaped by preg_quote() (PHP 8.2 byte subset). */
     private const PREG_QUOTE_ESCAPE = '.\\+*?[^]()$={}-|!<>:';

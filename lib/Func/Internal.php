@@ -57,7 +57,14 @@ abstract class Internal extends Func implements Handler, Call
             if (null !== JitStringArg::compileTimeLiteral($arg)) {
                 continue;
             }
-            if (\in_array($arg->type, [JITVariable::TYPE_STRING, JITVariable::TYPE_VALUE, JITVariable::TYPE_HASHTABLE], true)) {
+            if (\in_array($arg->type, [
+                JITVariable::TYPE_STRING,
+                JITVariable::TYPE_VALUE,
+                JITVariable::TYPE_HASHTABLE,
+                JITVariable::TYPE_NATIVE_LONG,
+                JITVariable::TYPE_NATIVE_DOUBLE,
+                JITVariable::TYPE_NATIVE_BOOL,
+            ], true)) {
                 continue;
             }
             throw new \LogicException("{$contextLabel} argument #".($i + 1).' must be a string in this compiler build');
