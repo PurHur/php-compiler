@@ -438,6 +438,15 @@ class Object_ extends Type {
         $ptrField = $this->context->builder->structGep($value, $map['value']);
         $objSlot = $this->context->builder->pointerCast($ptrField, $objPtr->pointerType(0));
         $this->context->builder->store($object, $objSlot);
+        // Zend zval object assignment retains the value (#4096); temp RHS delref must not drop last ref.
+        $refVirtual = $this->context->builder->pointerCast(
+            $object,
+            $this->context->getTypeFromString('__ref__virtual*')
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__ref__addref'),
+            $refVirtual
+        );
         $this->context->builder->returnVoid();
         $this->context->builder->clearInsertionPosition();
     }

@@ -4673,29 +4673,23 @@ class JIT {
                         $aliasVar = $this->context->getVariableFromOp($aliasOp);
                         $srcVar = $this->context->getVariableFromOp($block->getOperand($op->arg3));
                         if ($aliasVar === $srcVar) {
-                            if ([] !== $destOp->usages || $this->context->scope->variables->contains($destOp)) {
+                            if ([] !== $destOp->usages || $forceAssign) {
                                 $this->assignOperand($destOp, $value, $forceAssign);
                             }
                             break;
                         }
                     }
                     $this->assignOperand($aliasOp, $value, $forceAssign);
-                    $destUsed = [] !== $destOp->usages
-                        || $this->context->scope->variables->contains($destOp);
+                    $destUsed = [] !== $destOp->usages;
                     if ($destUsed || $forceAssign) {
                         $this->assignOperand($destOp, $value, $forceAssign);
                     }
                     $srcOp = $block->getOperand($op->arg3);
-                    if ($op->arg2 !== $op->arg3 && $this->context->hasVariableOp($srcOp)) {
-                        $this->context->getVariableFromOp($srcOp)->free();
+                    if ($op->arg2 !== $op->arg3) {
+                        $this->jitClearAssignTempOperand($srcOp);
                     }
-                    if (
-                        $destUsed
-                        && $op->arg1 !== $op->arg2
-                        && $op->arg1 !== $op->arg3
-                        && $this->context->hasVariableOp($destOp)
-                    ) {
-                        $this->context->getVariableFromOp($destOp)->free();
+                    if ($op->arg1 !== $op->arg2 && $op->arg1 !== $op->arg3) {
+                        $this->jitClearAssignTempOperand($destOp);
                     }
                     $this->maybeBindNamedVariable($aliasOp);
                     if ($op->arg1 === $op->arg2) {
@@ -5280,10 +5274,7 @@ class JIT {
                                     Variable::KIND_VARIABLE === $bound->kind
                                     && Variable::TYPE_VALUE === $bound->type
                                 ) {
-                                    $this->context->builder->call(
-                                        $this->context->lookupFunction('__value__writeNull'),
-                                        $bound->value
-                                    );
+                                    $this->jitWriteNullForUnset($bound->value);
                                     break;
                                 }
                             }
@@ -5312,10 +5303,7 @@ class JIT {
                                 Variable::KIND_VARIABLE === $target->kind
                                 && Variable::TYPE_VALUE === $target->type
                             ) {
-                                $this->context->builder->call(
-                                    $this->context->lookupFunction('__value__writeNull'),
-                                    $target->value
-                                );
+                                $this->jitWriteNullForUnset($target->value);
                                 break;
                             }
                             $target->free();
@@ -10182,6 +10170,72 @@ class JIT {
             }
             $this->context->builder->call($writeNull, $var->value);
         }
+    }
+
+    /**
+     * unset($var) on boxed locals: run __destruct before nulling when {main} defers delref destroy (#4096).
+     */
+    private function jitWriteNullForUnset(\PHPLLVM\Value $valueBoxPtr): void
+    {
+        if ($this->context->type->object->hasUserDestructors()) {
+            \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
+            \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
+            $map = $this->context->structFieldMap['__value__'];
+            $i8 = $this->context->getTypeFromString('int8');
+            $typeByte = $this->context->builder->load(
+                $this->context->builder->structGep($valueBoxPtr, $map['type'])
+            );
+            $isObject = $this->context->builder->icmp(
+                \PHPLLVM\Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_OBJECT, false)
+            );
+            $invokeBlock = JIT\BasicBlockHelper::append($this->context, 'unset_destruct_invoke');
+            $doneBlock = JIT\BasicBlockHelper::append($this->context, 'unset_destruct_done');
+            $this->context->builder->branchIf($isObject, $invokeBlock, $doneBlock);
+            $this->context->builder->positionAtEnd($invokeBlock);
+            $obj = $this->context->builder->call(
+                $this->context->lookupFunction('__value__readObject'),
+                $valueBoxPtr
+            );
+            $this->context->builder->call(
+                $this->context->lookupFunction('phpc_destruct_try_invoke'),
+                $this->context->builder->pointerCast($obj, $this->context->getTypeFromString('int8*'))
+            );
+            $this->context->builder->branch($doneBlock);
+            $this->context->builder->positionAtEnd($doneBlock);
+        }
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeNull'),
+            $valueBoxPtr
+        );
+    }
+
+    /** Drop assign RHS / result temps so block-end dead-operand free cannot re-delref (#4096). */
+    private function jitClearAssignTempOperand(Operand $op): void
+    {
+        $this->jitWriteNullOperand($op);
+        if ($this->context->scope->variables->contains($op)) {
+            $this->context->scope->variables->detach($op);
+        }
+    }
+
+    /** Mirror VM assign: clear dead assign-result / RHS temps (#4096). */
+    private function jitWriteNullOperand(Operand $op): void
+    {
+        if (!$this->context->hasVariableOp($op)) {
+            return;
+        }
+        $var = $this->context->getVariableFromOp($op);
+        if (Variable::KIND_VARIABLE === $var->kind && Variable::TYPE_VALUE === $var->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeNull'),
+                $var->value
+            );
+
+            return;
+        }
+        $var->free();
     }
 
     private function maybeBindNamedVariable(Operand $op): void
