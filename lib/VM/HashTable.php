@@ -596,6 +596,105 @@ final class HashTable {
     }
 
     /**
+     * array_merge_recursive(): copy this array, then merge each source recursively.
+     *
+     * php-src: ext/standard/array.c — php_array_merge_recursive()
+     *
+     * @param HashTable ...$others
+     */
+    public function mergeRecursiveCopy(HashTable ...$others): HashTable
+    {
+        $out = new self();
+        foreach ($this->iterateKeyed(true) as [$key, $value]) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $copy);
+            } else {
+                $out->add($key->toString(), $copy);
+            }
+        }
+        foreach ($others as $other) {
+            self::mergeRecursiveOverlay($out, $other);
+        }
+
+        return $out;
+    }
+
+    private static function mergeRecursiveOverlay(HashTable $dest, HashTable $src): void
+    {
+        foreach ($src->iterateKeyed(true) as [$key, $value]) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $dest->append($copy);
+            } else {
+                $k = $key->toString();
+                $existing = $dest->find($k);
+                if (null === $existing) {
+                    $dest->add($k, $copy);
+                } else {
+                    $existing = $existing->resolveIndirect();
+                    $overlay = $copy->resolveIndirect();
+                    if (Variable::TYPE_ARRAY === $existing->type && Variable::TYPE_ARRAY === $overlay->type) {
+                        $merged = $existing->toArray()->mergeRecursiveCopy($overlay->toArray());
+                        $slot = $dest->find($k);
+                        if (null !== $slot) {
+                            $slot->array($merged);
+                        }
+                    } else {
+                        $combined = self::mergeRecursiveCombineValues($existing, $overlay);
+                        $slot = $dest->find($k);
+                        if (null !== $slot) {
+                            $slot->copyFrom($combined);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static function mergeRecursiveCombineValues(Variable $existing, Variable $overlay): Variable
+    {
+        $existing = $existing->resolveIndirect();
+        $overlay = $overlay->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $existing->type && Variable::TYPE_ARRAY === $overlay->type) {
+            $merged = $existing->toArray()->mergeRecursiveCopy($overlay->toArray());
+            $out = new Variable();
+            $out->array($merged);
+
+            return $out;
+        }
+        $out = new Variable();
+        $out->array(new self());
+        $ht = $out->toArray();
+        if (Variable::TYPE_ARRAY === $existing->type) {
+            foreach ($existing->toArray()->iterateKeyed(true) as [, $element]) {
+                $elementCopy = new Variable();
+                $elementCopy->copyFrom($element);
+                $ht->append($elementCopy);
+            }
+        } else {
+            $elementCopy = new Variable();
+            $elementCopy->copyFrom($existing);
+            $ht->append($elementCopy);
+        }
+        if (Variable::TYPE_ARRAY === $overlay->type) {
+            foreach ($overlay->toArray()->iterateKeyed(true) as [, $element]) {
+                $elementCopy = new Variable();
+                $elementCopy->copyFrom($element);
+                $ht->append($elementCopy);
+            }
+        } else {
+            $elementCopy = new Variable();
+            $elementCopy->copyFrom($overlay);
+            $ht->append($elementCopy);
+        }
+
+        return $out;
+    }
+
+    /**
      * Array union ($left + $right): copy this array, then append keys from $other that are missing.
      * Left-hand keys win on collision (Zend zend_hash_merge / add_function parity, issue #3690).
      */

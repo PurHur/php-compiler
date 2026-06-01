@@ -185,6 +185,7 @@ class Module extends ModuleAbstract
             new array_values(),
             new array_keys(),
             new array_merge(),
+            new array_merge_recursive(),
             new array_slice(),
             new array_splice(),
             new array_chunk(),
