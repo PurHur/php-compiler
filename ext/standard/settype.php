@@ -21,7 +21,7 @@ use PHPLLVM\Value;
 /**
  * settype() — cast variable in place by type name (ext/standard/type.c).
  *
- * VM only (by-ref first parameter; JIT deferred #3112).
+ * VM + JIT in-place casts (ext/standard/type.c; JIT #3151).
  */
 final class settype extends Internal
 {
@@ -48,6 +48,10 @@ final class settype extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('settype() not implemented for JIT in this compiler build');
+        if (2 !== \count($args)) {
+            throw new \LogicException('settype() requires exactly two arguments');
+        }
+
+        return JitSettype::invoke($context, $args[0], $args[1]);
     }
 }

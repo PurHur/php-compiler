@@ -66,6 +66,7 @@ final class Linker
         __DIR__.'/runtime/phpc_ob.c',
         __DIR__.'/runtime/phpc_pow.c',
         __DIR__.'/runtime/phpc_round.c',
+        __DIR__.'/runtime/phpc_settype.c',
         __DIR__.'/runtime/phpc_parse_url.c',
         __DIR__.'/runtime/phpc_parse_str.c',
         __DIR__.'/runtime/phpc_compact.c',
