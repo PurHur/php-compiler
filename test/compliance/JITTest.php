@@ -34,7 +34,7 @@ class JITTest extends BaseTest {
                 continue;
             }
             // preserve_keys=true: VM + JIT/AOT via ArrayBuiltinHelper (#3524).
-            // array_replace_recursive(): VM + AOT via C overlay (#3166); MCJIT execute unstable.
+            // array_replace_recursive(): VM + AOT (#3166); MCJIT execute unstable (same as array_merge_recursive).
             if (str_contains(strtolower($case[0]), 'array_replace_recursive')) {
                 continue;
             }
