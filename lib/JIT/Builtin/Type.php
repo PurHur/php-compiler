@@ -787,6 +787,11 @@ class Type extends Builtin {
             $this->context->context->functionType($i32, false, $strPtr, $i32, $i8pppPtr)
         );
         $this->context->registerFunction('__phpc_scandir_vec', $fnScandirVec);
+        $fnFileVec = $this->context->module->addFunction(
+            '__phpc_file_vec',
+            $this->context->context->functionType($i32, false, $strPtr, $i32, $i8pppPtr)
+        );
+        $this->context->registerFunction('__phpc_file_vec', $fnFileVec);
         $fnStrvecFree = $this->context->module->addFunction(
             '__phpc_strvec_free',
             $this->context->context->functionType($void, false, $i8ppPtr, $i32)

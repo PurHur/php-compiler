@@ -11,7 +11,11 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for file() — file_get_contents + line split (issue #3765). */
+/**
+ * LLVM lowering for file() — file_get_contents + line split (issue #3765).
+ *
+ * Missing paths use {@see __compiler_file_get_contents} null (same as readfile false path).
+ */
 final class JitFile
 {
     private const FILE_IGNORE_NEW_LINES = 2;
@@ -19,43 +23,40 @@ final class JitFile
 
     public static function invoke(Context $context, Value $pathStr, Value $flagsI64): Value
     {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $i1 = $context->getTypeFromString('int1');
+
+        $exists = JitStat::pathExists($context, $pathStr);
+        $missing = $context->builder->icmp(Builder::INT_EQ, $exists, $i1->constInt(0, false));
+
+        $failBlock = BasicBlockHelper::append($context, 'file_fail');
+        $readBlock = BasicBlockHelper::append($context, 'file_read');
+        $doneBlock = BasicBlockHelper::append($context, 'file_done');
+        $context->builder->branchIf($missing, $failBlock, $readBlock);
+
+        $context->builder->positionAtEnd($readBlock);
         $contents = $context->builder->call(
             $context->lookupFunction('__compiler_file_get_contents'),
             $pathStr
         );
         $strPtrTy = $context->getTypeFromString('__string__*');
-        $failed = $context->builder->icmp(Builder::INT_EQ, $contents, $strPtrTy->constNull());
-
-        $failBlock = BasicBlockHelper::append($context, 'file_fail');
+        $readFailed = $context->builder->icmp(Builder::INT_EQ, $contents, $strPtrTy->constNull());
         $okBlock = BasicBlockHelper::append($context, 'file_ok');
-        $doneBlock = BasicBlockHelper::append($context, 'file_done');
-        $context->builder->branchIf($failed, $failBlock, $okBlock);
+        $context->builder->branchIf($readFailed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
-        $falseSlot = JitValueBox::alloc($context);
-        $falsePtr = JitValueBox::pointer($context, $falseSlot);
-        JitValueBox::writeBool($context, $falseSlot, $context->getTypeFromString('int1')->constInt(0, false));
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
         $ht = self::splitLines($context, $contents, $flagsI64);
-        $okSlot = JitValueBox::alloc($context);
-        $okPtr = JitValueBox::pointer($context, $okSlot);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            $okPtr,
-            $ht
-        );
-        $okTail = $context->builder->getInsertBlock();
+        $context->builder->call($context->lookupFunction('__value__writeHashtable'), $ptr, $ht);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
-        $valuePtrTy = $context->getTypeFromString('__value__*');
-        $result = $context->builder->phi($valuePtrTy);
-        $result->addIncoming($falsePtr, $failBlock);
-        $result->addIncoming($okPtr, $okTail);
 
-        return $result;
+        return $ptr;
     }
 
     private static function splitLines(Context $context, Value $contents, Value $flags): Value
