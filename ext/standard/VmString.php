@@ -2431,6 +2431,120 @@ final class VmString
         return $out;
     }
 
+    /**
+     * strtr() replace_pairs array form — longest-match substitution.
+     *
+     * @see php/php-src ext/standard/string.c php_strtr_array()
+     *
+     * @param array<string, string> $replacePairs
+     */
+    public static function strtrArray(string $string, array $replacePairs): string
+    {
+        $slen = self::byteLength($string);
+        if (0 === $slen) {
+            return '';
+        }
+        if ([] === $replacePairs) {
+            return $string;
+        }
+
+        $pairs = [];
+        foreach ($replacePairs as $from => $to) {
+            if (!\is_string($from)) {
+                $from = (string) $from;
+            }
+            if (!\is_string($to)) {
+                $to = (string) $to;
+            }
+            if ('' === $from) {
+                continue;
+            }
+            if (self::byteLength($from) > $slen) {
+                continue;
+            }
+            $pairs[$from] = $to;
+        }
+
+        if ([] === $pairs) {
+            return $string;
+        }
+
+        if (1 === \count($pairs)) {
+            $from = \array_key_first($pairs);
+            $to = $pairs[$from];
+            if (1 === self::byteLength($from)) {
+                return self::strtr($string, $from, self::byteSlice($to, 0, 1));
+            }
+
+            return self::strReplace($from, $to, $string);
+        }
+
+        return self::strtrArrayLongestMatch($string, $pairs);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     */
+    private static function strtrArrayLongestMatch(string $string, array $pairs): string
+    {
+        $slen = self::byteLength($string);
+        $minlen = $slen + 1;
+        $maxlen = 0;
+        $firstChars = [];
+        $lengths = [];
+
+        foreach ($pairs as $from => $to) {
+            $len = self::byteLength($from);
+            if ($len < $minlen) {
+                $minlen = $len;
+            }
+            if ($len > $maxlen) {
+                $maxlen = $len;
+            }
+            $firstChars[\ord($from[0])] = true;
+            $lengths[$len] = true;
+        }
+
+        if ($minlen > $maxlen) {
+            return $string;
+        }
+
+        $out = '';
+        $pos = 0;
+        $oldPos = 0;
+
+        while ($pos <= $slen - $minlen) {
+            if (isset($firstChars[\ord($string[$pos])])) {
+                $tryLen = $maxlen;
+                if ($tryLen > $slen - $pos) {
+                    $tryLen = $slen - $pos;
+                }
+                while ($tryLen >= $minlen) {
+                    if (isset($lengths[$tryLen])) {
+                        $key = self::byteSlice($string, $pos, $tryLen);
+                        if (isset($pairs[$key])) {
+                            $out .= self::byteSlice($string, $oldPos, $pos - $oldPos);
+                            $out .= $pairs[$key];
+                            $oldPos = $pos + $tryLen;
+                            $pos = $oldPos - 1;
+                            break;
+                        }
+                    }
+                    --$tryLen;
+                }
+            }
+            ++$pos;
+        }
+
+        if ('' !== $out) {
+            $out .= self::byteSlice($string, $oldPos);
+
+            return $out;
+        }
+
+        return $string;
+    }
+
     public static function nl2br(string $string, bool $useXhtml = true): string
     {
         $br = $useXhtml ? '<br />' : '<br>';
