@@ -146,6 +146,56 @@ final class VmArray
     }
 
     /**
+     * array_first() — first element value (php-src array.c, #3491).
+     *
+     * @throws \ValueError when {@param $ht} is empty
+     */
+    public static function valueFirst(HashTable $ht): Variable
+    {
+        $ht->iterReset();
+        if (!$ht->iterValid()) {
+            throw new \ValueError('array_first(): Argument #1 ($array) must not be empty');
+        }
+
+        return $ht->iterCurrentValue();
+    }
+
+    /**
+     * array_last() — last element value (php-src array.c, #3491).
+     *
+     * @throws \ValueError when {@param $ht} is empty
+     */
+    public static function valueLast(HashTable $ht): Variable
+    {
+        $ht->iterReset();
+        $last = null;
+        while ($ht->iterValid()) {
+            $last = $ht->iterCurrentValue();
+        }
+        if (null === $last) {
+            throw new \ValueError('array_last(): Argument #1 ($array) must not be empty');
+        }
+
+        return $last;
+    }
+
+    /**
+     * @throws \TypeError when {@param $value} is not an array
+     */
+    public static function requireArray(Variable $value, string $fn): HashTable
+    {
+        $v = $value->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $v->type) {
+            throw new \TypeError(
+                $fn.'(): Argument #1 ($array) must be of type array, '
+                .self::valueTypeLabel($v).' given'
+            );
+        }
+
+        return $v->toArray();
+    }
+
+    /**
      * array_pad() — pad packed list {@param $array} to abs({@param $length}) with {@param $value}.
      */
     public static function pad(HashTable $array, int $length, Variable $value): HashTable
