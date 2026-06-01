@@ -144,6 +144,7 @@ class Type extends Builtin {
         );
         $fnErrorReporting = $this->context->module->addFunction('__compiler_error_reporting', $fntypeErrorReporting);
         $this->context->registerFunction('__compiler_error_reporting', $fnErrorReporting);
+        CompactApplyArg::implement($this->context);
         $fntypeStripTags = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,

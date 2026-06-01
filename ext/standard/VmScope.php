@@ -79,12 +79,7 @@ final class VmScope
     {
         $caller = self::requireCaller($frame);
         $result = new HashTable();
-        foreach ($frame->calledArgs as $arg) {
-            $nameVar = $arg->resolveIndirect();
-            if (Variable::TYPE_STRING !== $nameVar->type) {
-                throw new \LogicException('compact() arguments must be string variable names in this compiler build');
-            }
-            $name = $nameVar->toString();
+        foreach (self::collectCompactNamesFromArgs($frame->calledArgs) as $name) {
             $slot = self::slotForName($caller, $name);
             if (null === $slot) {
                 continue;
@@ -96,6 +91,41 @@ final class VmScope
         }
 
         return $result;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function collectCompactNamesFromArgs(array $args): array
+    {
+        $names = [];
+        foreach ($args as $arg) {
+            $names = array_merge($names, self::collectCompactNames($arg->resolveIndirect()));
+        }
+
+        return $names;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function collectCompactNames(Variable $var): array
+    {
+        if (Variable::TYPE_STRING === $var->type) {
+            return [$var->toString()];
+        }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            $names = [];
+            foreach ($var->toArray()->iterateKeyed(true) as [, $valueVar]) {
+                $names = array_merge($names, self::collectCompactNames($valueVar->resolveIndirect()));
+            }
+
+            return $names;
+        }
+
+        throw new \LogicException(
+            'compact() arguments must be string variable names or arrays of names in this compiler build'
+        );
     }
 
     private static function callerVarIsSet(Variable $var): bool

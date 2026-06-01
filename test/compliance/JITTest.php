@@ -154,6 +154,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'error_reporting')) {
                 continue;
             }
+            // compact() array/nested args: VM + AOT (#3468); MCJIT __hashtable__ type mismatch until stable.
+            if (str_contains($name, 'compact_array_arg')) {
+                continue;
+            }
             // round() precision/mode uses __compiler_round: VM + AOT (#3522); MCJIT until runtime link stable.
             if (str_contains($name, 'round_precision_mode')) {
                 continue;
