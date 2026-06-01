@@ -6458,6 +6458,272 @@ final class ArrayBuiltinHelper
     }
 
     /**
+     * True when __string__* is fully consumed by base-10 strtol (integer numeric string; #3619).
+     */
+    private static function stringPtrIsIntegerNumeric(Context $context, Value $strPtr): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $len = $context->builder->load(
+            $context->builder->structGep($strPtr, $map['length'])
+        );
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $endPtrSlot = $context->builder->alloca($i8p, 1, 'array_sum_str_long_end');
+        $nullEnd = $i8p->constNull();
+        $context->builder->store($nullEnd, $endPtrSlot);
+        $context->builder->call(
+            $context->lookupFunction('strtol'),
+            $charPtr,
+            $endPtrSlot,
+            $context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $endPtr = $context->builder->load($endPtrSlot);
+        $endOffset = $context->builder->sub(
+            $context->builder->ptrToInt($endPtr, $i64),
+            $context->builder->ptrToInt($charPtr, $i64)
+        );
+
+        return $context->builder->icmp(Builder::INT_EQ, $endOffset, $len);
+    }
+
+    private static function stringPtrToDouble(Context $context, Value $strPtr): Value
+    {
+        $structName = $strPtr->typeOf()->getElementType()->getName();
+        $map = $context->structFieldMap[$structName];
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $endPtr = $context->getTypeFromString('int8**')->constNull();
+
+        return $context->builder->call($context->lookupFunction('strtod'), $charPtr, $endPtr);
+    }
+
+    /**
+     * Emit LLVM to accumulate a __string__* element into array_sum slots (#3619).
+     */
+    private static function arraySumAccumulateStringPtr(
+        Context $context,
+        Value $strPtr,
+        Value $sumIntSlot,
+        Value $sumFloatSlot,
+        Value $useFloatSlot,
+        string $tag
+    ): void {
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        $i1 = $context->getTypeFromString('int1');
+
+        $isIntNumeric = self::stringPtrIsIntegerNumeric($context, $strPtr);
+        $intBlock = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_str_int');
+        $floatBlock = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_str_float');
+        $strDone = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_str_done');
+        $context->builder->branchIf($isIntNumeric, $intBlock, $floatBlock);
+
+        $context->builder->positionAtEnd($intBlock);
+        $charPtr = $context->builder->structGep(
+            $strPtr,
+            $context->structFieldMap['__string__']['value']
+        );
+        $endPtrSlot = $context->builder->alloca(
+            $context->getTypeFromString('int8*'),
+            1,
+            'array_sum_'.$tag.'_strtol_end'
+        );
+        $context->builder->store($context->getTypeFromString('int8*')->constNull(), $endPtrSlot);
+        $longVal = $context->builder->call(
+            $context->lookupFunction('strtol'),
+            $charPtr,
+            $endPtrSlot,
+            $context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $useFloat = $context->builder->load($useFloatSlot);
+        $intAsFloat = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_str_int_f');
+        $intAsInt = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_str_int_i');
+        $intPathDone = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_str_int_done');
+        $context->builder->branchIf($useFloat, $intAsFloat, $intAsInt);
+
+        $context->builder->positionAtEnd($intAsInt);
+        $sumInt = $context->builder->load($sumIntSlot);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($sumInt, $longVal),
+            $sumIntSlot
+        );
+        $context->builder->branch($intPathDone);
+
+        $context->builder->positionAtEnd($intAsFloat);
+        $sumFloat = $context->builder->load($sumFloatSlot);
+        $context->builder->store(
+            $context->builder->fadd($sumFloat, $context->builder->sitofp($longVal, $double)),
+            $sumFloatSlot
+        );
+        $context->builder->branch($intPathDone);
+
+        $context->builder->positionAtEnd($intPathDone);
+        $context->builder->branch($strDone);
+
+        $context->builder->positionAtEnd($floatBlock);
+        $doubleVal = self::stringPtrToDouble($context, $strPtr);
+        $useFloatNow = $context->builder->load($useFloatSlot);
+        $promoteBlock = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_str_promote');
+        $addFloatBlock = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_str_add_float');
+        $floatPathDone = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_str_float_done');
+        $context->builder->branchIf($useFloatNow, $addFloatBlock, $promoteBlock);
+
+        $context->builder->positionAtEnd($promoteBlock);
+        $sumInt = $context->builder->load($sumIntSlot);
+        $context->builder->store(
+            $context->builder->fadd($context->builder->sitofp($sumInt, $double), $doubleVal),
+            $sumFloatSlot
+        );
+        $context->builder->store($i1->constInt(1, false), $useFloatSlot);
+        $context->builder->branch($floatPathDone);
+
+        $context->builder->positionAtEnd($addFloatBlock);
+        $sumFloat = $context->builder->load($sumFloatSlot);
+        $context->builder->store($context->builder->fadd($sumFloat, $doubleVal), $sumFloatSlot);
+        $context->builder->branch($floatPathDone);
+
+        $context->builder->positionAtEnd($floatPathDone);
+        $context->builder->branch($strDone);
+
+        $context->builder->positionAtEnd($strDone);
+    }
+
+    /**
+     * Emit LLVM to accumulate a string __value__* element into array_sum slots (#3619).
+     */
+    private static function arraySumAccumulateStringEntry(
+        Context $context,
+        Value $entry,
+        Value $sumIntSlot,
+        Value $sumFloatSlot,
+        Value $useFloatSlot,
+        string $tag
+    ): void {
+        $strPtr = $context->builder->call($context->lookupFunction('__value__readString'), $entry);
+        self::arraySumAccumulateStringPtr(
+            $context,
+            $strPtr,
+            $sumIntSlot,
+            $sumFloatSlot,
+            $useFloatSlot,
+            $tag
+        );
+    }
+
+    /**
+     * Emit LLVM to accumulate a __string__* element into array_product slots (#3619).
+     */
+    private static function arrayProductAccumulateStringPtr(
+        Context $context,
+        Value $strPtr,
+        Value $prodIntSlot,
+        Value $prodFloatSlot,
+        Value $useFloatSlot,
+        string $tag
+    ): void {
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        $i1 = $context->getTypeFromString('int1');
+
+        $isIntNumeric = self::stringPtrIsIntegerNumeric($context, $strPtr);
+        $intBlock = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_int');
+        $floatBlock = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_float');
+        $strDone = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_done');
+        $context->builder->branchIf($isIntNumeric, $intBlock, $floatBlock);
+
+        $context->builder->positionAtEnd($intBlock);
+        $charPtr = $context->builder->structGep(
+            $strPtr,
+            $context->structFieldMap['__string__']['value']
+        );
+        $endPtrSlot = $context->builder->alloca(
+            $context->getTypeFromString('int8*'),
+            1,
+            'array_product_'.$tag.'_strtol_end'
+        );
+        $context->builder->store($context->getTypeFromString('int8*')->constNull(), $endPtrSlot);
+        $longVal = $context->builder->call(
+            $context->lookupFunction('strtol'),
+            $charPtr,
+            $endPtrSlot,
+            $context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $useFloat = $context->builder->load($useFloatSlot);
+        $intAsFloat = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_int_f');
+        $intAsInt = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_int_i');
+        $intPathDone = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_int_done');
+        $context->builder->branchIf($useFloat, $intAsFloat, $intAsInt);
+
+        $context->builder->positionAtEnd($intAsInt);
+        $prodInt = $context->builder->load($prodIntSlot);
+        $context->builder->store(
+            $context->builder->mulNoSignedWrap($prodInt, $longVal),
+            $prodIntSlot
+        );
+        $context->builder->branch($intPathDone);
+
+        $context->builder->positionAtEnd($intAsFloat);
+        $prodFloat = $context->builder->load($prodFloatSlot);
+        $context->builder->store(
+            $context->builder->fmul($prodFloat, $context->builder->sitofp($longVal, $double)),
+            $prodFloatSlot
+        );
+        $context->builder->branch($intPathDone);
+
+        $context->builder->positionAtEnd($intPathDone);
+        $context->builder->branch($strDone);
+
+        $context->builder->positionAtEnd($floatBlock);
+        $doubleVal = self::stringPtrToDouble($context, $strPtr);
+        $useFloatNow = $context->builder->load($useFloatSlot);
+        $promoteBlock = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_promote');
+        $addFloatBlock = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_add_float');
+        $floatPathDone = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_float_done');
+        $context->builder->branchIf($useFloatNow, $addFloatBlock, $promoteBlock);
+
+        $context->builder->positionAtEnd($promoteBlock);
+        $prodInt = $context->builder->load($prodIntSlot);
+        $context->builder->store(
+            $context->builder->fmul($context->builder->sitofp($prodInt, $double), $doubleVal),
+            $prodFloatSlot
+        );
+        $context->builder->store($i1->constInt(1, false), $useFloatSlot);
+        $context->builder->branch($floatPathDone);
+
+        $context->builder->positionAtEnd($addFloatBlock);
+        $prodFloat = $context->builder->load($prodFloatSlot);
+        $context->builder->store($context->builder->fmul($prodFloat, $doubleVal), $prodFloatSlot);
+        $context->builder->branch($floatPathDone);
+
+        $context->builder->positionAtEnd($floatPathDone);
+        $context->builder->branch($strDone);
+
+        $context->builder->positionAtEnd($strDone);
+    }
+
+    /**
+     * Emit LLVM to accumulate a string __value__* element into array_product slots (#3619).
+     */
+    private static function arrayProductAccumulateStringEntry(
+        Context $context,
+        Value $entry,
+        Value $prodIntSlot,
+        Value $prodFloatSlot,
+        Value $useFloatSlot,
+        string $tag
+    ): void {
+        $strPtr = $context->builder->call($context->lookupFunction('__value__readString'), $entry);
+        self::arrayProductAccumulateStringPtr(
+            $context,
+            $strPtr,
+            $prodIntSlot,
+            $prodFloatSlot,
+            $useFloatSlot,
+            $tag
+        );
+    }
+
+    /**
      * array_sum() for packed lists (integers and floats; subset of PHP).
      */
     public static function arraySum(Context $context, Variable $array): Value
@@ -6512,6 +6778,10 @@ final class ArrayBuiltinHelper
 
         if (Variable::TYPE_VALUE === $elemType) {
             return self::arraySumNativeValue($context, $array);
+        }
+
+        if (Variable::TYPE_STRING === $elemType) {
+            return self::arraySumNativeString($context, $array);
         }
 
         if (Variable::TYPE_NATIVE_LONG !== $elemType) {
@@ -6580,6 +6850,8 @@ final class ArrayBuiltinHelper
         $afterLong = BasicBlockHelper::append($context, 'array_sum_ht_after_long');
         $longBlock = BasicBlockHelper::append($context, 'array_sum_ht_long');
         $doubleBlock = BasicBlockHelper::append($context, 'array_sum_ht_double');
+        $afterDouble = BasicBlockHelper::append($context, 'array_sum_ht_after_double');
+        $stringBlock = BasicBlockHelper::append($context, 'array_sum_ht_string');
         $continueBlock = BasicBlockHelper::append($context, 'array_sum_ht_continue');
         $doneBlock = BasicBlockHelper::append($context, 'array_sum_ht_done');
 
@@ -6610,7 +6882,26 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isLong, $longBlock, $afterLong);
 
         $context->builder->positionAtEnd($afterLong);
-        $context->builder->branchIf($isDouble, $doubleBlock, $continueBlock);
+        $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $continueBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
+        self::arraySumAccumulateStringEntry(
+            $context,
+            $entry,
+            $sumIntSlot,
+            $sumFloatSlot,
+            $useFloatSlot,
+            'ht'
+        );
+        $context->builder->branch($continueBlock);
 
         $context->builder->positionAtEnd($longBlock);
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
@@ -6711,6 +7002,8 @@ final class ArrayBuiltinHelper
         $afterLong = BasicBlockHelper::append($context, 'array_sum_nv_after_long');
         $longBlock = BasicBlockHelper::append($context, 'array_sum_nv_long');
         $doubleBlock = BasicBlockHelper::append($context, 'array_sum_nv_double');
+        $afterDouble = BasicBlockHelper::append($context, 'array_sum_nv_after_double');
+        $stringBlock = BasicBlockHelper::append($context, 'array_sum_nv_string');
         $continueBlock = BasicBlockHelper::append($context, 'array_sum_nv_continue');
         $doneBlock = BasicBlockHelper::append($context, 'array_sum_nv_done');
         $context->builder->branch($head);
@@ -6738,7 +7031,26 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isLong, $longBlock, $afterLong);
 
         $context->builder->positionAtEnd($afterLong);
-        $context->builder->branchIf($isDouble, $doubleBlock, $continueBlock);
+        $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $continueBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
+        self::arraySumAccumulateStringEntry(
+            $context,
+            $entry,
+            $sumIntSlot,
+            $sumFloatSlot,
+            $useFloatSlot,
+            'nv'
+        );
+        $context->builder->branch($continueBlock);
 
         $context->builder->positionAtEnd($longBlock);
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
@@ -6807,6 +7119,75 @@ final class ArrayBuiltinHelper
             $context->builder->siToFp($sumInt, $double)
         );
     }
+
+    /** Native packed __string__* list (compile-time string literals; #3619). */
+    private static function arraySumNativeString(Context $context, Variable $array): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        $i1 = $context->getTypeFromString('int1');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+
+        $sumIntSlot = $context->builder->alloca($i64, 1, 'array_sum_ns_int');
+        $sumFloatSlot = $context->builder->alloca($double, 1, 'array_sum_ns_float');
+        $useFloatSlot = $context->builder->alloca($i1, 1, 'array_sum_ns_use_float');
+        $context->builder->store($i64->constInt(0, false), $sumIntSlot);
+        $context->builder->store($double->constReal(0.0), $sumFloatSlot);
+        $context->builder->store($i1->constInt(0, false), $useFloatSlot);
+
+        if (0 === $array->nextFreeElement) {
+            return $context->builder->load($sumIntSlot);
+        }
+
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_sum_ns_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_sum_ns_head');
+        $body = BasicBlockHelper::append($context, 'array_sum_ns_body');
+        $accumulate = BasicBlockHelper::append($context, 'array_sum_ns_accumulate');
+        $continueBlock = BasicBlockHelper::append($context, 'array_sum_ns_continue');
+        $doneBlock = BasicBlockHelper::append($context, 'array_sum_ns_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $doneBlock, $body);
+
+        $context->builder->positionAtEnd($body);
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
+        $strPtr = $context->builder->load($slot);
+        $context->builder->branch($accumulate);
+
+        $context->builder->positionAtEnd($accumulate);
+        self::arraySumAccumulateStringPtr(
+            $context,
+            $strPtr,
+            $sumIntSlot,
+            $sumFloatSlot,
+            $useFloatSlot,
+            'ns'
+        );
+        $context->builder->branch($continueBlock);
+
+        $context->builder->positionAtEnd($continueBlock);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $useFloat = $context->builder->load($useFloatSlot);
+        $sumInt = $context->builder->load($sumIntSlot);
+        $sumFloat = $context->builder->load($sumFloatSlot);
+
+        return $context->builder->select(
+            $useFloat,
+            $sumFloat,
+            $context->builder->siToFp($sumInt, $double)
+        );
+    }
+
     /**
      * array_product() for packed lists (integers and floats; subset of PHP).
      */
@@ -6864,6 +7245,10 @@ final class ArrayBuiltinHelper
             return self::arrayProductNativeValue($context, $array);
         }
 
+        if (Variable::TYPE_STRING === $elemType) {
+            return self::arrayProductNativeString($context, $array);
+        }
+
         if (Variable::TYPE_NATIVE_LONG !== $elemType) {
             throw new \LogicException(
                 'array_product() only supports integer and float elements in this compiler build'
@@ -6901,6 +7286,74 @@ final class ArrayBuiltinHelper
         return $context->builder->load($prodSlot);
     }
 
+    /** Native packed __string__* list (compile-time string literals; #3619). */
+    private static function arrayProductNativeString(Context $context, Variable $array): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        $i1 = $context->getTypeFromString('int1');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+
+        $prodIntSlot = $context->builder->alloca($i64, 1, 'array_product_ns_int');
+        $prodFloatSlot = $context->builder->alloca($double, 1, 'array_product_ns_float');
+        $useFloatSlot = $context->builder->alloca($i1, 1, 'array_product_ns_use_float');
+        $context->builder->store($i64->constInt(1, false), $prodIntSlot);
+        $context->builder->store($double->constReal(1.0), $prodFloatSlot);
+        $context->builder->store($i1->constInt(0, false), $useFloatSlot);
+
+        if (0 === $array->nextFreeElement) {
+            return $context->builder->load($prodIntSlot);
+        }
+
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_product_ns_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_product_ns_head');
+        $body = BasicBlockHelper::append($context, 'array_product_ns_body');
+        $accumulate = BasicBlockHelper::append($context, 'array_product_ns_accumulate');
+        $continueBlock = BasicBlockHelper::append($context, 'array_product_ns_continue');
+        $doneBlock = BasicBlockHelper::append($context, 'array_product_ns_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $doneBlock, $body);
+
+        $context->builder->positionAtEnd($body);
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
+        $strPtr = $context->builder->load($slot);
+        $context->builder->branch($accumulate);
+
+        $context->builder->positionAtEnd($accumulate);
+        self::arrayProductAccumulateStringPtr(
+            $context,
+            $strPtr,
+            $prodIntSlot,
+            $prodFloatSlot,
+            $useFloatSlot,
+            'ns'
+        );
+        $context->builder->branch($continueBlock);
+
+        $context->builder->positionAtEnd($continueBlock);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $useFloat = $context->builder->load($useFloatSlot);
+        $prodInt = $context->builder->load($prodIntSlot);
+        $prodFloat = $context->builder->load($prodFloatSlot);
+
+        return $context->builder->select(
+            $useFloat,
+            $prodFloat,
+            $context->builder->siToFp($prodInt, $double)
+        );
+    }
+
     private static function arrayProductHashTable(Context $context, Value $ht): Value
     {
         $sizeT = $context->getTypeFromString('size_t');
@@ -6930,6 +7383,8 @@ final class ArrayBuiltinHelper
         $afterLong = BasicBlockHelper::append($context, 'array_product_ht_after_long');
         $longBlock = BasicBlockHelper::append($context, 'array_product_ht_long');
         $doubleBlock = BasicBlockHelper::append($context, 'array_product_ht_double');
+        $afterDouble = BasicBlockHelper::append($context, 'array_product_ht_after_double');
+        $stringBlock = BasicBlockHelper::append($context, 'array_product_ht_string');
         $continueBlock = BasicBlockHelper::append($context, 'array_product_ht_continue');
         $doneBlock = BasicBlockHelper::append($context, 'array_product_ht_done');
 
@@ -6960,7 +7415,26 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isLong, $longBlock, $afterLong);
 
         $context->builder->positionAtEnd($afterLong);
-        $context->builder->branchIf($isDouble, $doubleBlock, $continueBlock);
+        $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $continueBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
+        self::arrayProductAccumulateStringEntry(
+            $context,
+            $entry,
+            $prodIntSlot,
+            $prodFloatSlot,
+            $useFloatSlot,
+            'ht'
+        );
+        $context->builder->branch($continueBlock);
 
         $context->builder->positionAtEnd($longBlock);
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
@@ -7061,6 +7535,8 @@ final class ArrayBuiltinHelper
         $afterLong = BasicBlockHelper::append($context, 'array_product_nv_after_long');
         $longBlock = BasicBlockHelper::append($context, 'array_product_nv_long');
         $doubleBlock = BasicBlockHelper::append($context, 'array_product_nv_double');
+        $afterDouble = BasicBlockHelper::append($context, 'array_product_nv_after_double');
+        $stringBlock = BasicBlockHelper::append($context, 'array_product_nv_string');
         $continueBlock = BasicBlockHelper::append($context, 'array_product_nv_continue');
         $doneBlock = BasicBlockHelper::append($context, 'array_product_nv_done');
         $context->builder->branch($head);
@@ -7088,7 +7564,26 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isLong, $longBlock, $afterLong);
 
         $context->builder->positionAtEnd($afterLong);
-        $context->builder->branchIf($isDouble, $doubleBlock, $continueBlock);
+        $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $continueBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
+        self::arrayProductAccumulateStringEntry(
+            $context,
+            $entry,
+            $prodIntSlot,
+            $prodFloatSlot,
+            $useFloatSlot,
+            'nv'
+        );
+        $context->builder->branch($continueBlock);
 
         $context->builder->positionAtEnd($longBlock);
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
