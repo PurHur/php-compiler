@@ -59,6 +59,9 @@ class Object_ extends Type {
     private array $propertyVisibility = [];
     /** @var array<int, array<string, string>> class id => method lc => declared casing (#3118) */
     private array $methodDisplayNames = [];
+    /** @var array<int, Block> class id => __destruct CFG block (#4013) */
+    private array $destructorBlocks = [];
+
     /** @var array<int, true> class ids with a compiled __construct body */
     private array $hasConstructor = [];
     /** @var array<int, true> vendor/external classes without lowered methods (#2666) */
@@ -160,6 +163,11 @@ class Object_ extends Type {
         $this->context->emitInShutdown(static function (\PHPCompiler\JIT\Context $ctx): void {
             $ctx->builder->call($ctx->lookupFunction('phpc_gc_run_shutdown_destructors'));
         });
+    }
+
+    public function recordDestructorBlock(int $classId, Block $block): void
+    {
+        $this->destructorBlocks[$classId] = $block;
     }
 
     public function hasUserDestructors(): bool
@@ -282,6 +290,13 @@ class Object_ extends Type {
         if (!$this->context->functionIsRegistered($proxyName)) {
             return;
         }
+        $destructorBlock = $this->destructorBlocks[$classId] ?? null;
+        $prevEnclosing = $this->context->jitEnclosingBlock;
+        $prevCurrent = $this->context->jitCurrentBlock;
+        if (null !== $destructorBlock) {
+            $this->context->jitEnclosingBlock = $destructorBlock;
+            $this->context->jitCurrentBlock = $destructorBlock;
+        }
         $refVirtual = $this->context->builder->pointerCast(
             $obj,
             $this->context->getTypeFromString('__ref__virtual*')
@@ -295,9 +310,12 @@ class Object_ extends Type {
         );
         $toCall = $this->context->resolveFunctionProxy($proxyName);
         $prevStrict = $this->context->callerStrictTypes;
-        $this->context->callerStrictTypes = false;
+        $this->context->callerStrictTypes = null !== $destructorBlock ? $destructorBlock->strictTypes : false;
         $toCall->call($this->context, $objVar);
         $this->context->callerStrictTypes = $prevStrict;
+        $this->context->refcount->delref($refVirtual);
+        $this->context->jitEnclosingBlock = $prevEnclosing;
+        $this->context->jitCurrentBlock = $prevCurrent;
     }
 
     private function implementLoadValueSlot(): void

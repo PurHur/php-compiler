@@ -7108,6 +7108,12 @@ class JIT {
                         if ('__construct' === $methodLc) {
                             $this->context->type->object->markHasConstructor($this->context->scope->classId);
                         }
+                        if ('__destruct' === $methodLc) {
+                            $this->context->type->object->recordDestructorBlock(
+                                $this->context->scope->classId,
+                                $methodBlock
+                            );
+                        }
                         if ($this->context->type->object->isTraitClass($this->context->scope->className ?? '')) {
                             $this->context->type->object->recordTraitMethodBlock(
                                 $this->context->scope->classId,

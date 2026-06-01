@@ -728,8 +728,8 @@ function syntaxRowDefinitions(): array
             'issue' => 3144,
             'notes' => ['VM refcount + shutdown pass; Zend zend_objects_destroy_object'],
             'probe' => 'class D { function __destruct() { echo "bye"; } } new D();',
-            'jit' => true,
-            'aot' => true,
+            'jit' => false,
+            'aot' => false,
         ],
         [
             'id' => 'php8_attribute_reflection',

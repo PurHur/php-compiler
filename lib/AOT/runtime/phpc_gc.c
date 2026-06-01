@@ -166,8 +166,14 @@ void phpc_gc_run_shutdown_destructors(void)
         }
     }
     phpc_destruct_allow_delref = saved;
+    /* Remaining registry entries without __destruct were freed via delref; release any left. */
     while (phpc_gc_count > 0) {
-        phpc_object_release_storage(phpc_gc_objects[phpc_gc_count - 1]);
+        void *obj = phpc_gc_objects[phpc_gc_count - 1];
+        if (phpc_destruct_already_invoked(obj)) {
+            phpc_gc_unregister(obj);
+            continue;
+        }
+        phpc_object_release_storage(obj);
     }
 }
 
