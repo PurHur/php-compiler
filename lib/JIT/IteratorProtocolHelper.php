@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Call\RuntimeIndirectInstanceMethodCall;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -14,6 +15,9 @@ use PHPLLVM\Value;
  */
 final class IteratorProtocolHelper
 {
+    /** @var list<string> */
+    private const ITERATOR_IFACES_LC = ['iterator', 'iteratoraggregate'];
+
     public static function normalizeObjectReceiver(Context $context, Variable $iterable): Variable
     {
         if (Variable::TYPE_OBJECT === $iterable->type) {
@@ -53,7 +57,7 @@ final class IteratorProtocolHelper
         }
         try {
             $receiver = self::normalizeObjectReceiver($context, $container);
-            self::resolveIteratorMethodProxy($context, $receiver, 'rewind');
+            self::resolveIteratorMethodProxy($context, $receiver, 'rewind', $containerUserType);
 
             return true;
         } catch (\LogicException) {
@@ -137,14 +141,20 @@ final class IteratorProtocolHelper
     ): void {
         $receiver = self::resolveForeachReceiver($context, $container, $containerUserType);
         self::storeReceiver($context, $slotKey, $receiver);
-        self::invokeIteratorMethod($context, self::loadReceiver($context, $slotKey), 'rewind');
+        self::invokeIteratorMethod(
+            $context,
+            self::loadReceiver($context, $slotKey),
+            'rewind',
+            $containerUserType
+        );
         $i1 = $context->getTypeFromString('int1');
         $context->builder->store($i1->constInt(0, false), self::advanceSlot($context, $slotKey));
     }
 
     public static function compileForeachValid(
         Context $context,
-        Variable $slotKey
+        Variable $slotKey,
+        ?string $containerUserType = null
     ): Value {
         $receiver = self::loadReceiver($context, $slotKey);
         $advanceSlot = self::advanceSlot($context, $slotKey);
@@ -156,27 +166,34 @@ final class IteratorProtocolHelper
         $needsNext = $context->builder->load($advanceSlot);
         $context->builder->branchIf($needsNext, $maybeNext, $checkValid);
         $context->builder->positionAtEnd($maybeNext);
-        self::invokeIteratorMethod($context, $receiver, 'next');
+        self::invokeIteratorMethod($context, $receiver, 'next', $containerUserType);
         $context->builder->store($i1->constInt(0, false), $advanceSlot);
         $context->builder->branch($checkValid);
         $context->builder->positionAtEnd($checkValid);
 
-        return self::invokeIteratorMethodBool($context, $receiver, 'valid');
+        return self::invokeIteratorMethodBool($context, $receiver, 'valid', $containerUserType);
     }
 
-    public static function compileForeachKey(Context $context, Variable $slotKey): Variable
-    {
+    public static function compileForeachKey(
+        Context $context,
+        Variable $slotKey,
+        ?string $containerUserType = null
+    ): Variable {
         return self::invokeIteratorMethodValue(
             $context,
             self::loadReceiver($context, $slotKey),
-            'key'
+            'key',
+            $containerUserType
         );
     }
 
-    public static function compileForeachValue(Context $context, Variable $slotKey): Variable
-    {
+    public static function compileForeachValue(
+        Context $context,
+        Variable $slotKey,
+        ?string $containerUserType = null
+    ): Variable {
         $receiver = self::loadReceiver($context, $slotKey);
-        $value = self::invokeIteratorMethodValue($context, $receiver, 'current');
+        $value = self::invokeIteratorMethodValue($context, $receiver, 'current', $containerUserType);
         $i1 = $context->getTypeFromString('int1');
         $context->builder->store($i1->constInt(1, false), self::advanceSlot($context, $slotKey));
 
@@ -192,6 +209,9 @@ final class IteratorProtocolHelper
         $candidates = [];
         foreach ($context->type->object->allClassNamesById() as $classId => $className) {
             $classLc = strtolower(ltrim($className, '\\'));
+            if (!self::classImplementsIteratorProtocol($context, $classLc)) {
+                continue;
+            }
             $current = $classLc;
             $visited = [];
             while (!isset($visited[$current])) {
@@ -214,11 +234,12 @@ final class IteratorProtocolHelper
     public static function resolveIteratorMethodProxy(
         Context $context,
         Variable $receiver,
-        string $methodLc
+        string $methodLc,
+        ?string $containerUserType = null
     ): Call {
         $methodLc = strtolower($methodLc);
-        if (null !== $receiver->userType && '' !== $receiver->userType) {
-            $classLc = strtolower(ltrim($receiver->userType, '\\'));
+        if (null !== $containerUserType && '' !== $containerUserType) {
+            $classLc = strtolower(ltrim($containerUserType, '\\'));
             if ('object' !== $classLc) {
                 $proxyName = $classLc.'::'.$methodLc;
                 if ($context->functionIsRegistered($proxyName)) {
@@ -234,28 +255,49 @@ final class IteratorProtocolHelper
             throw new \LogicException("iterator protocol method {$methodLc}() is not available in this compile unit");
         }
 
-        throw new \LogicException(
-            "iterator protocol method {$methodLc}() on a polymorphic object is not supported in this compiler build"
-        );
+        return new RuntimeIndirectInstanceMethodCall($receiver, $methodLc, $candidates);
     }
 
-    public static function invokeIteratorMethod(Context $context, Variable $receiver, string $methodLc): void
+    private static function classImplementsIteratorProtocol(Context $context, string $classLc): bool
     {
-        $proxy = self::resolveIteratorMethodProxy($context, $receiver, $methodLc);
+        foreach ($context->type->object->allInterfacesForClassLc($classLc) as $ifaceLc) {
+            if (in_array($ifaceLc, self::ITERATOR_IFACES_LC, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function invokeIteratorMethod(
+        Context $context,
+        Variable $receiver,
+        string $methodLc,
+        ?string $containerUserType = null
+    ): void {
+        $proxy = self::resolveIteratorMethodProxy($context, $receiver, $methodLc, $containerUserType);
         $proxy->call($context, $receiver);
     }
 
-    public static function invokeIteratorMethodBool(Context $context, Variable $receiver, string $methodLc): Value
-    {
-        $proxy = self::resolveIteratorMethodProxy($context, $receiver, $methodLc);
+    public static function invokeIteratorMethodBool(
+        Context $context,
+        Variable $receiver,
+        string $methodLc,
+        ?string $containerUserType = null
+    ): Value {
+        $proxy = self::resolveIteratorMethodProxy($context, $receiver, $methodLc, $containerUserType);
         $result = $proxy->call($context, $receiver);
 
         return self::truthyI1($context, $result);
     }
 
-    public static function invokeIteratorMethodValue(Context $context, Variable $receiver, string $methodLc): Variable
-    {
-        $proxy = self::resolveIteratorMethodProxy($context, $receiver, $methodLc);
+    public static function invokeIteratorMethodValue(
+        Context $context,
+        Variable $receiver,
+        string $methodLc,
+        ?string $containerUserType = null
+    ): Variable {
+        $proxy = self::resolveIteratorMethodProxy($context, $receiver, $methodLc, $containerUserType);
         $result = $proxy->call($context, $receiver);
         if ('int1' === $context->getStringFromType($result->typeOf())) {
             $slot = JitValueBox::alloc($context);
@@ -288,6 +330,6 @@ final class IteratorProtocolHelper
         }
         $boxed = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VALUE, $result);
 
-        return (new boolval())->call($context, $boxed);
+        return (new \PHPCompiler\ext\standard\boolval())->call($context, $boxed);
     }
 }
