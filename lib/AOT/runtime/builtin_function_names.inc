@@ -173,6 +173,8 @@ static const char *phpc_builtin_functions[] = {
     "getdate",
     "getenv",
     "gethostname",
+    "getprotobynumber",
+    "getservbyport",
     "getmygrgid",
     "getmyinode",
     "getmypid",

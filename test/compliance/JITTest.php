@@ -142,6 +142,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gethostname')) {
                 continue;
             }
+            // getprotobynumber()/getservbyport() MCJIT: NetworkServicesJITTest (#3650).
+            if (str_contains($name, 'getprotobynumber')) {
+                continue;
+            }
             // substr() boxed int/class const MCJIT: VM passes (#587); execute segfaults until stable.
             if (str_contains($name, 'substr_jit')) {
                 continue;

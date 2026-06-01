@@ -391,6 +391,8 @@ class Module extends ModuleAbstract
             new tmpfile(),
             new getcwd_(),
             new gethostname(),
+            new getprotobynumber(),
+            new getservbyport(),
             new chdir_(),
             new putenv_(),
             new ini_set_(),
