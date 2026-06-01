@@ -1176,7 +1176,7 @@ final class HashTable {
     public function chunkCopy(int $size, bool $preserveKeys = false): HashTable
     {
         if ($size <= 0) {
-            throw new \LogicException('array_chunk() size must be greater than zero');
+            throw new \ValueError('array_chunk(): Argument #2 ($length) must be greater than 0');
         }
         if ($preserveKeys) {
             return $this->chunkCopyPreserveKeys($size);
