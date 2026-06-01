@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\Block;
 use PHPCompiler\LlvmToolchain;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
@@ -43,7 +44,7 @@ readonly class Box {
 $o = new Box();
 $o->v = 2;
 PHP;
-        $this->expectException(\Exception::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot modify readonly property Box::$v');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_after.php'));
     }
@@ -59,9 +60,28 @@ readonly class Box {
 $o = new Box();
 $o->v = 2;
 PHP;
-        $this->expectException(\Exception::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot modify readonly property Box::$v');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_no_ctor.php'));
+    }
+
+    public function testReadonlyClassDeclRequiresVmLoweringForBinJit(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(
+            <<<'PHP'
+<?php
+readonly class Box {
+    public function __construct(public int $v) {}
+}
+$b = new Box(1);
+$b->v = 2;
+PHP,
+            'readonly_class_vm_lower.php'
+        );
+        $this->assertNotNull($block);
+        $this->assertTrue(Block::containsReadonlyClassOpcodes($block));
+        $this->assertTrue(Block::requiresVmLowering($block));
     }
 
     public function testReadonlyClassFlagFromPhpCfg(): void
@@ -104,9 +124,9 @@ PHP;
             $ir,
             'JIT should lower readonly property write checks (#1360)'
         );
-        self::assertStringContainsString(
-            'readonly_violation',
-            $ir,
+        self::assertTrue(
+            str_contains($ir, 'readonly_violation')
+            || str_contains($ir, 'readonly_violate_'),
             'JIT should branch to readonly violation before post-construct stores (#1360)'
         );
     }

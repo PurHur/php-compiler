@@ -70,6 +70,17 @@ final class ReadonlyClassGuard
             $failBlock = $fn->appendBasicBlock('readonly_violation_'.$id);
             $context->builder->branch($failBlock);
             $context->builder->positionAtEnd($failBlock);
+            $constructed = $context->builder->load(
+                $context->builder->structGep($obj, $objMap['constructed'])
+            );
+            $notConstructed = $context->builder->icmp(
+                Builder::INT_EQ,
+                $constructed,
+                $context->getTypeFromString('int8')->constInt(0, false)
+            );
+            $violateBlock = $fn->appendBasicBlock('readonly_violate_'.$id);
+            $context->builder->branchIf($notConstructed, $storeBlock, $violateBlock);
+            $context->builder->positionAtEnd($violateBlock);
             $declaringClass = $objectType->classNameForId($id);
             $message = sprintf(
                 'unset' === $violation
@@ -85,6 +96,7 @@ final class ReadonlyClassGuard
                 $msgCStr,
                 $msgLen
             );
+            // returnVoid after pending raise: Func\JIT::execute throws catchable Error (#4082, #3149).
             $context->builder->returnVoid();
             $checkBlock = $nextCheck;
         }

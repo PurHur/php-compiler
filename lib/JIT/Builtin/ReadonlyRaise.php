@@ -252,7 +252,7 @@ final class ReadonlyRaise
         $copy($buf, 512);
         $msg = \FFI::string($buf);
         if ('' !== $msg) {
-            throw new \LogicException($msg);
+            throw new \Error($msg);
         }
     }
 

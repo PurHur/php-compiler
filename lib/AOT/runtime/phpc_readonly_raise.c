@@ -70,7 +70,7 @@ void phpc_jit_abort_if_pending_logic_exception(void)
     }
     fprintf(
         stderr,
-        "PHP Fatal error:  Uncaught LogicException: %s\n",
+        "PHP Fatal error:  Uncaught Error: %s\n",
         buf
     );
     exit(255);
