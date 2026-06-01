@@ -611,7 +611,7 @@ final class JitValueCompare
     }
 
     /**
-     * Loose == between native {@see __string__} and native long (#3658 int↔string, Zend zend_compare_scalar).
+     * Loose == between native {@see __string__} and native long (#4035, Zend zend_operators.c).
      */
     public static function looseEqualStringToNativeLong(
         Context $context,
@@ -623,16 +623,18 @@ final class JitValueCompare
             $context->builder->structGep($strPtr, $map['length'])
         );
         $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
         $i1 = $context->getTypeFromString('int1');
         $falseVal = $i1->constInt(0, false);
         $zeroLen = $context->builder->icmp(Builder::INT_EQ, $len, $len->typeOf()->constInt(0, false));
         $__native = $context->builder->intCast($nativeLong, $i64);
 
         $isIntegerNumeric = self::stringIsIntegerNumeric($context, $strPtr);
+        $isNumeric = self::stringIsNumeric($context, $strPtr);
+        $isFloatNumeric = $context->builder->and($isNumeric, $context->builder->not($isIntegerNumeric));
         $zeroLong = $context->builder->icmp(Builder::INT_EQ, $__native, $i64->constInt(0, false));
-        // Zend #3644: non-numeric strings compare as 0. Do not use strtod/is_numeric here —
-        // length-tracked __string__ buffers can make strtod fail while strtol still consumes a
-        // numeric prefix ('0e123'), which must not match via the non-numeric path (#3658).
+        // Zend #3644: non-numeric strings compare as 0. Do not use strtod here — length-tracked
+        // __string__ buffers can make strtod fail while strtol still consumes a numeric prefix.
         $noLeadingIntegerPrefix = self::stringStrtolConsumedNothing($context, $strPtr);
         $nonNumericMatch = $context->builder->and($noLeadingIntegerPrefix, $zeroLong);
 
@@ -652,8 +654,17 @@ final class JitValueCompare
             $isIntegerNumeric,
             $context->builder->icmp(Builder::INT_EQ, $parsedI64, $__native)
         );
+        $strDouble = self::stringToDouble($context, $strPtr);
+        $nativeDouble = $context->builder->sitofp($__native, $double);
+        $floatMatch = $context->builder->and(
+            $isFloatNumeric,
+            $context->builder->fcmp(Builder::REAL_OEQ, $strDouble, $nativeDouble)
+        );
 
-        $matched = $context->builder->or($nonNumericMatch, $intMatch);
+        $matched = $context->builder->or(
+            $nonNumericMatch,
+            $context->builder->or($intMatch, $floatMatch)
+        );
 
         return $context->builder->select($zeroLen, $falseVal, $matched);
     }

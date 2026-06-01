@@ -794,10 +794,10 @@ restart:
     }
 
     /**
-     * Int↔string loose == uses integer numeric strings only (#3658, Zend zend_compare_scalar).
+     * Int↔string loose == prefers exact integer numeric strings; other numeric strings (e.g. '0e5')
+     * fall back to {@see looseNumericFromString} (#4035, Zend zend_operators.c).
      *
-     * Scientific-notation strings like '0e123' are not valid integer numeric strings and do not
-     * match via float coercion (0 == '0e123' → false). Non-numeric strings still compare as 0 (#3644).
+     * Non-numeric strings still compare as 0 (#3644).
      */
     private static function looseIntegerFromString(string $s): ?int
     {
@@ -844,22 +844,28 @@ restart:
                 return false;
             }
             $parsed = self::looseIntegerFromString($self->string);
-            if (null === $parsed) {
-                return false;
+            if (null !== $parsed) {
+                return $other->integer == $parsed;
+            }
+            if (is_numeric($self->string)) {
+                return $other->integer == self::looseNumericFromString($self->string);
             }
 
-            return $other->integer == $parsed;
+            return false;
         }
         if ($self->type === self::TYPE_INTEGER && $other->type === self::TYPE_STRING) {
             if ('' === $other->string) {
                 return false;
             }
             $parsed = self::looseIntegerFromString($other->string);
-            if (null === $parsed) {
-                return false;
+            if (null !== $parsed) {
+                return $self->integer == $parsed;
+            }
+            if (is_numeric($other->string)) {
+                return $self->integer == self::looseNumericFromString($other->string);
             }
 
-            return $self->integer == $parsed;
+            return false;
         }
         if ($self->type === self::TYPE_STRING && $other->type === self::TYPE_FLOAT) {
             return $other->float == self::looseNumericFromString($self->string);
