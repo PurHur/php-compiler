@@ -631,7 +631,16 @@ final class Variable {
                 return;
         }
         if ($this->type === self::TYPE_VALUE || $this->type === self::TYPE_NULL) {
-            // TODO: free owned resources
+            if (
+                self::KIND_VARIABLE === $this->kind
+                && null === $this->objectPropertySlot
+            ) {
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__valueDelref'),
+                    $this->value
+                );
+            }
+
             return;
         }
         if ($this->type & self::IS_NATIVE_ARRAY) {

@@ -254,8 +254,8 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'count_recursive')) {
                 continue;
             }
-            // User __destruct() MCJIT/AOT: VM shutdown ordering ok; native invoke corrupts stdout (#4013).
-            if (str_contains($name, 'class_destruct') || str_contains($name, 'destruct_user')) {
+            // User __destruct() MCJIT execute: compile verified in UserDestructJitCompileTest (#4096); harness MCJIT SIGSEGV (#98).
+            if (str_contains($name, 'class_destruct') || str_contains($name, 'destruct_user') || str_contains($name, 'destruct_jit')) {
                 continue;
             }
             // preg_last_error_msg() MCJIT path unsafe with preg_match stub runtime (#3110).
