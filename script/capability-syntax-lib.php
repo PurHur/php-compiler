@@ -286,7 +286,7 @@ function syntaxRowDefinitions(): array
             'aot' => true,
             'notes' => [
                 'Zend zend_compile_const_expr / zend_constants.c — materialize at class definition; shared identity on fetch',
-                'VM: ClassConstMaterializer; JIT/AOT: immortal module-global object in __init__ (#4021); MCJIT execute: ClassConstObjectJitCompileTest',
+                'VM: ClassConstMaterializer; JIT/AOT: module-global singleton in __init__ (#4021, #4028); MCJIT: ClassConstObjectJitCompileTest + ClassConstObjectJitExecuteTest',
             ],
             'probe' => 'class C { public const X = new stdClass(); } echo (C::X instanceof stdClass && C::X === C::X) ? "1" : "0";',
         ],

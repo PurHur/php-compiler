@@ -394,10 +394,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'magic_call_static')) {
                 continue;
             }
-            // Object class constants: MCJIT execute segfaults in harness (#98); LLVM verify: ClassConstObjectJitCompileTest (#4021).
-            if (str_contains($name, 'class_const_object')) {
-                continue;
-            }
             // gettimeofday() array sec compare is VM-only until boxed array fetch compare (#3208).
             if (str_contains($name, 'gettimeofday')) {
                 continue;

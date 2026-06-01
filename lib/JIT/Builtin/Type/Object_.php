@@ -395,7 +395,7 @@ class Object_ extends Type {
         );
 
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
-            Refcount::TYPE_INFO_TYPE_OBJECT | Refcount::TYPE_INFO_NONREFCOUNTED,
+            Refcount::TYPE_INFO_TYPE_OBJECT | Refcount::TYPE_INFO_REFCOUNTED,
             false
         );
         $ref = $this->context->builder->pointerCast(
@@ -405,6 +405,11 @@ class Object_ extends Type {
         $this->context->builder->call(
             $this->context->lookupFunction('__ref__init'),
             $typeinfo,
+            $ref
+        );
+        // Module-global singleton: one permanent reference (php-src persistent zval).
+        $this->context->builder->call(
+            $this->context->lookupFunction('__ref__addref'),
             $ref
         );
 
@@ -2542,18 +2547,16 @@ class Object_ extends Type {
             throw new \LogicException("Missing class constant object global: {$globalName}");
         }
         $global = $this->classConstObjectGlobals[$globalName];
-        $slot = JitValueBox::alloc($this->context);
-        $this->context->builder->call(
-            $this->context->lookupFunction('__value__writeObject'),
-            JitValueBox::pointer($this->context, $slot),
-            $this->context->builder->load($global)
-        );
+        // Load the module-global immortal object directly (#3196, #4028). Boxing via
+        // __value__writeObject runs valueDelref on the prior slot tag (TYPE_OBJECT) and
+        // MCJIT execute can fault on immortal headers; native __object__* matches AOT.
+        $obj = $this->context->builder->load($global);
 
         return new Variable(
             $this->context,
-            Variable::TYPE_VALUE,
-            Variable::KIND_VARIABLE,
-            $slot
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $obj
         );
     }
 
