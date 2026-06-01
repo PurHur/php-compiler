@@ -92,6 +92,7 @@ final class SelfHostBuiltinPolicy
         'password_hash' => 'password',
         'password_verify' => 'password',
         'password_get_info' => 'password',
+        'password_needs_rehash' => 'password',
         'crypt' => 'password',
     ];
 

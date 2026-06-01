@@ -294,6 +294,7 @@ static const char *phpc_builtin_functions[] = {
     "password_hash",
     "password_verify",
     "password_get_info",
+    "password_needs_rehash",
     "pathinfo",
     "php_sapi_name",
     "php_uname",
