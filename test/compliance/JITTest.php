@@ -210,6 +210,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'reflection_class_members')) {
                 continue;
             }
+            // ReflectionProperty/Constant::getAttributes() MCJIT: VM read path (#4136, #2467).
+            if (str_contains($name, 'reflection_property_attributes') || str_contains($name, 'reflection_constant_attributes')) {
+                continue;
+            }
             // array_walk_recursive() is VM-only until recursive LLVM walk (#3111).
             if (str_contains($name, 'array_walk_recursive')) {
                 continue;

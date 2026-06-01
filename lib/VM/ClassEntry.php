@@ -74,6 +74,14 @@ class ClassEntry {
     public array $methodAttributeNames = [];
     /** @var array<string, list<\PHPCompiler\Compiler\AttributeEntry>> method attributes (#3206). */
     public array $methodAttributeEntries = [];
+    /** @var array<string, list<string>> property (lowercase) => attribute names (#4136). */
+    public array $propertyAttributeNames = [];
+    /** @var array<string, list<\PHPCompiler\Compiler\AttributeEntry>> property attributes (#4136). */
+    public array $propertyAttributeEntries = [];
+    /** @var array<string, list<string>> class constant (lowercase) => attribute names (#4136). */
+    public array $constAttributeNames = [];
+    /** @var array<string, list<\PHPCompiler\Compiler\AttributeEntry>> class constant attributes (#4136). */
+    public array $constAttributeEntries = [];
     /** @var array<string, list<\PHPCompiler\Compiler\ParameterMetadata>> method (lowercase) => params (#3340). */
     public array $methodParameterMetadata = [];
     /** @var array<string, string> method (lowercase) => trait FQCN when imported via use Trait (#3416). */
