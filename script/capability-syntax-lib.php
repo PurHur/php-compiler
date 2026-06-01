@@ -35,7 +35,11 @@ function syntaxRowDefinitions(): array
             'construct' => 'Anonymous class `new class { }`',
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_NEW', 'TYPE_METHODCALL_INIT'],
             'issue' => 1233,
-            'notes' => ['php-cfg inline Stmt\\Class_ in parseExpr_New; synthetic AnonymousClass@line name'],
+            'aot' => true,
+            'notes' => [
+                'php-cfg inline Stmt\\Class_ in parseExpr_New; synthetic AnonymousClass@line name',
+                'AOT: user AnonymousClass@* methods lowered when PHP_COMPILER_SELFHOST_AOT=1 (#3098)',
+            ],
             'probe' => '$o = new class { public function f(): int { return 42; } }; echo $o->f();',
         ],
         [
@@ -43,10 +47,12 @@ function syntaxRowDefinitions(): array
             'construct' => 'Enum declarations `enum Foo: string { case Bar = \'x\'; }`',
             'opcodes' => ['TYPE_DECLARE_ENUM', 'TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH'],
             'issue' => 1356,
+            'aot' => true,
             'notes' => [
                 'Backed enum case objects with `->name` / `->value`; string context coerces to backed scalar (#3518)',
                 '`Foo::Bar` singleton fetch; `enum_exists` registry; `implements` interface list + instance methods + `instanceof` (#3373)',
-                'static methods (#2299); `Enum::cases()` VM (#3308)',
+                'static methods (#2299); `Enum::cases()` VM (#3308); AOT fixture enum_backed.phpt (#3076)',
+                '`BackedEnum::from()` / `tryFrom()` VM lookup with Zend-parity ValueError (#3114); JIT deferred',
             ],
             'probe' => 'interface L { public function n(): string; } enum S: string implements L { case A = "a"; public function n(): string { return $this->name; } } echo S::A->n();',
         ],
@@ -190,6 +196,8 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'Lowered in php-cfg to === / jump-if / assign (#143)',
                 'Wave-3 literal-arm subset (#2398); acceptance PHPT (#2428)',
+                'Guard arms: expression patterns evaluated before === compare; nested match patterns (#3397); match_guard.phpt',
+                'Arm assignment side effects bind variables when arm matches (#3787); match_arm_assign.phpt',
             ],
             'probe' => 'echo match (2) { 1 => "a", 2 => "b", default => "c" };',
         ],
@@ -201,8 +209,8 @@ function syntaxRowDefinitions(): array
             'aot' => true,
             'notes' => [
                 'VM ClosureState + __invoke; use() by-value and by-ref (#3081, #3108); array_map/filter/usort callbacks (#3086)',
-                'JIT ClosureHelper: TYPE_CLOSURE + use() value/ref IR (#3092, #3108); indirect $arr[0]() via __closure_target (#3089, #3092)',
-                'AOT user scripts: real ClosureHelper lowering via PHP_COMPILER_AOT_USER_SCRIPT (#3725); bootstrap spine still stubs null',
+                'JIT ClosureHelper: TYPE_CLOSURE + use() value/ref IR (#3092, #3108); use ($x) MCJIT snapshot via aliasVariableOpFromSlot (#2483); use (&$x) bin/jit.php VM-fallback until MCJIT execute stable (#72, #2483); indirect $arr[0]() via __closure_target (#3089, #3092)',
+                'AOT user scripts: real ClosureHelper lowering via PHP_COMPILER_AOT_USER_SCRIPT (#3725); use (&$x) AOT fixture closure_use_byref.phpt (#2483); bootstrap spine still stubs null',
                 'bin/jit.php MCJIT execute still probe-dependent (#98)',
             ],
             'probe' => '$f = function ($x) { return $x + 1; }; echo $f(2);',
@@ -228,7 +236,7 @@ function syntaxRowDefinitions(): array
                 'MCJIT/AOT resume lowering for nested generator funcs (#3074, #3115); script-scope yield blocked',
                 'JIT linear `yield` + packed-array `yield from`; `yield from` generator + try/catch in generator JIT deferred',
                 'see docs/generators-jit-aot.md',
-                'AOT fixture generator_yield.phpt',
+                'AOT fixture generator_yield.phpt + generator_yield_keys.phpt',
             ],
             'probe' => 'function g() { yield 1; yield 2; } foreach (g() as $v) echo $v;',
         ],
@@ -286,7 +294,7 @@ function syntaxRowDefinitions(): array
             'construct' => 'Late static binding `static::method()` / `static::class`',
             'opcodes' => ['TYPE_STATICCALL_INIT', 'TYPE_CLASS_CONST_FETCH'],
             'issue' => 1231,
-            'notes' => ['VM/JIT called-class propagation; parent::method/class/$prop and static:: LSB (#1858, #3093)'],
+            'notes' => ['VM/JIT called-class propagation; parent::method/class/$prop and static:: LSB (#1858, #3093); child method override AOT fixture extends_method_override.phpt (#2483)'],
             'probe' => 'class C { public static function id(): string { return static::class; } } echo C::id();',
         ],
         [
@@ -355,6 +363,19 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'VM calls rewind/valid/current/key/next (Zend zend_iterators.c parity)',
                 'IteratorAggregate::getIterator(); TypeError for non-iterable objects',
+            ],
+            'probe' => null,
+        ],
+        [
+            'id' => 'array_access_interface',
+            'construct' => 'ArrayAccess interface — `$obj[$key]` read/write/isset/unset',
+            'opcodes' => ['TYPE_ARRAY_DIM_FETCH', 'TYPE_ARRAY_DIM_FETCH_WRITE', 'TYPE_ISSET', 'TYPE_UNSET'],
+            'issue' => 3331,
+            'jit' => false,
+            'aot' => false,
+            'notes' => [
+                'VM dispatches offsetGet/Set/Exists/Unset (Zend zend_object_handlers.c read_dimension)',
+                'Non-ArrayAccess objects keep Illegal offset; JIT VM fallback via requiresVmLowering',
             ],
             'probe' => null,
         ],
@@ -552,6 +573,19 @@ function syntaxRowDefinitions(): array
             'probe' => 'interface A {} interface B {} class C implements A, B {} function f(A&B $x): int { return 1; } f(new C());',
         ],
         [
+            'id' => 'dnf_types',
+            'construct' => 'DNF types (`(A&B)|null`, union of intersections)',
+            'opcodes' => ['TYPE_DECLARE_INTERFACE', 'TYPE_DECLARE_CLASS', 'TYPE_DECLARE_PROPERTY', 'TYPE_ARG_RECV'],
+            'issue' => 3094,
+            'notes' => [
+                'php-cfg Union + Intersection; TypeReconstructor TYPE_INTERSECTION; VM DnfCheck on param/property/return',
+                'Parenthesized DNF only (php-parser 4.x); ref Zend/zend_compile.c',
+            ],
+            'probe' => 'interface A {} interface B {} class C implements A, B {} function f(): (A&B)|null { return new C(); } echo null === f() ? 0 : 1;',
+            'jit' => false,
+            'aot' => false,
+        ],
+        [
             'id' => 'trait_decl',
             'construct' => '`trait` declarations with method bodies',
             'opcodes' => ['TYPE_DECLARE_TRAIT', 'TYPE_DECLARE_METHOD'],
@@ -572,7 +606,7 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'php-cfg-trait-use.patch; VM merges trait methods into class',
                 'JIT/AOT alias trait-merged methods onto using class (#3789)',
-                'TraitUseAdaptation alias/insteadof on VM (#3238); visibility `as` deferred #144',
+                'TraitUseAdaptation alias/insteadof/visibility on VM (#3238, #144)',
                 'Horizontal trait method collision fatals at compile time (#3416)',
             ],
             'probe' => 'trait T { public function m(): int { return 1; } } class C { use T; } echo (new C())->m();',
@@ -582,11 +616,12 @@ function syntaxRowDefinitions(): array
             'construct' => 'Trait use adaptations (`as` rename, `insteadof` precedence)',
             'opcodes' => ['TYPE_USE_TRAIT', 'TYPE_TRAIT_USE_ADAPTATION'],
             'issue' => 3238,
-            'jit' => false,
-            'aot' => false,
+            'jit' => true,
+            'aot' => true,
             'notes' => [
                 'Zend/zend_compile.c trait alias/precedence; VM applyTraitUsesWithAdaptations',
-                'Visibility `as private` deferred to #144',
+                'JIT/AOT batch trait use with insteadof/as (#2483, #3238)',
+                'Visibility `as private|protected` on trait alias — VM/JIT/AOT (#144, #2483)',
             ],
             'probe' => 'trait T { public function f(): int { return 1; } } class C { use T { f as r; } } echo (new C())->r();',
         ],
@@ -644,7 +679,21 @@ function syntaxRowDefinitions(): array
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_NEW', 'TYPE_ASSIGN', 'TYPE_PROPERTY_FETCH'],
             'issue' => 1360,
             'notes' => ['php-cfg Class_::flags MODIFIER_READONLY; VM rejects instance property writes after __construct'],
-            'probe' => 'readonly class R { public int $x = 0; } $o = new R(); $o->x = 1;',
+            'probe' => 'readonly class R { public function __construct(public int $x) {} } $o = new R(0); $o->x = 1;',
+        ],
+        [
+            'id' => 'readonly_property',
+            'construct' => 'readonly properties (per-property)',
+            'opcodes' => ['TYPE_DECLARE_PROPERTY', 'TYPE_NEW', 'TYPE_ASSIGN', 'TYPE_PROPERTY_FETCH'],
+            'issue' => 3149,
+            'jit' => true,
+            'aot' => true,
+            'notes' => [
+                'php-cfg readonly / propertyFlags MODIFIER_READONLY; VM/JIT reject writes and unset() after __construct',
+                'JIT ReadonlyClassGuard IR + ReadonlyPropertyTest; MCJIT execute + compliance phpt',
+                'php-src: Zend/zend_object_handlers.c zend_std_write_property / zend_std_unset_property',
+            ],
+            'probe' => 'class C { public readonly int $x; public function __construct() { $this->x = 1; } } $c = new C(); $c->x = 2;',
         ],
         [
             'id' => 'property_hooks',
@@ -674,6 +723,16 @@ function syntaxRowDefinitions(): array
             'probe' => 'class D { public private(set) string $n = "x"; } $d = new D(); echo $d->n; $d->n = "y";',
         ],
         [
+            'id' => 'class_destruct',
+            'construct' => 'User __destruct()',
+            'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_DECLARE_METHOD', 'TYPE_NEW'],
+            'issue' => 3144,
+            'notes' => ['VM refcount + shutdown pass; Zend zend_objects_destroy_object'],
+            'probe' => 'class D { function __destruct() { echo "bye"; } } new D();',
+            'jit' => false,
+            'aot' => false,
+        ],
+        [
             'id' => 'php8_attribute_reflection',
             'construct' => 'PHP 8 attributes — `ReflectionClass` / `ReflectionMethod` metadata',
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_DECLARE_METHOD'],
@@ -681,7 +740,8 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'php-cfg preserves `attrGroups`; compiler stores attribute class names on TYPE_DECLARE_CLASS / TYPE_DECLARE_METHOD',
                 'VM reflection reads from VM ClassEntry; JIT/AOT mirror class+method attribute tables into VMContext for reflection',
-                'Read path: `getAttributes()` count + `ReflectionAttribute::getName()`; no `newInstance()` or parameter attributes',
+                'Read path: `getAttributes()` count + `ReflectionAttribute::getName()` + `newInstance()` with compile-time ctor args (#3206, #3216)',
+                'Parameter/property reflection attributes still deferred; JIT `newInstance()` deferred (#2467)',
             ],
             'probe' => '#[\AllowDynamicProperties] class B {} $a = (new ReflectionClass(B::class))->getAttributes(); echo count($a).$a[0]->getName();',
         ],
@@ -698,6 +758,22 @@ function syntaxRowDefinitions(): array
                 'JIT: phpc_weakref.c registry + LLVM handlers (#3667)',
             ],
             'probe' => 'class Box {} $o = new Box(); $r = WeakReference::create($o); unset($o); echo $r->get() === null ? "1" : "0";',
+        ],
+        [
+            'id' => 'heredoc_nowdoc',
+            'construct' => 'Heredoc / nowdoc string literals (`<<<LABEL` / `<<<\'LABEL\'`)',
+            'opcodes' => ['TYPE_CONCAT', 'TYPE_ASSIGN'],
+            'issue' => 3187,
+            'notes' => [
+                'php-cfg Scalar_Encapsed → ConcatList; plain heredoc/nowdoc → Scalar_String (#178)',
+                'PhpParser FlexibleDocStringEmulator (PHP 7.3+ flexible closing labels)',
+                'php-src Zend/zend_compile.c zend_compile_encapsed_string',
+            ],
+            'probe' => <<<'PROBE'
+$n = "w"; echo <<<H
+{$n}
+H;
+PROBE,
         ],
         [
             'id' => 'datetime_oop',
@@ -851,6 +927,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'arrow_functions' => '/\bfn\s*\(/',
         'generator_yield' => '/\byield\b/',
         'class_name_const' => '/::class\b/',
+        'enum_declarations' => '/\benum\s+\w+/',
         'class_member_const' => '/\b(?:public|private|protected)\s+const\b/',
         'magic_const_class_method' => '/__CLASS__|__FUNCTION__|__METHOD__/',
         'magic_const_namespace' => '/__NAMESPACE__/',
@@ -863,6 +940,8 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'try_catch_throw' => '/\btry\s*\{/',
         'throw_expression' => '/\?\s*:\s*throw\b|\?\?\s*throw\b|&&\s*throw\b|\|\|\s*throw\b/',
         'heredoc_flexible_indent' => '/<<<\s*\w+\s*\r?\n\s+\S/',
+        'array_access_interface' => '/implements\s+ArrayAccess|function\s+offsetGet\s*\(/',
+        'heredoc_nowdoc' => '/<<<[\'"]?\w+/',
     ];
 
     $scan = [];
@@ -878,6 +957,12 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
     foreach (glob($root . '/test/bootstrap-aot/*.php') ?: [] as $php) {
         $scan[] = $php;
     }
+    $aotFixtures = $root . '/test/fixtures/aot/cases';
+    if (is_dir($aotFixtures)) {
+        foreach (glob($aotFixtures . '/*.phpt') ?: [] as $phpt) {
+            $scan[] = $phpt;
+        }
+    }
 
     foreach ($scan as $path) {
         $content = (string) file_get_contents($path);
@@ -885,7 +970,8 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         $body = $isPhpt && preg_match('/--FILE--\s*\n<\?php(.*?)(?:--EXPECT|$)/s', $content, $m)
             ? $m[1]
             : $content;
-        $tag = $isPhpt ? 'compliance PHPT' : 'bootstrap AOT';
+        $aotPhpt = $isPhpt && str_contains(str_replace('\\', '/', $path), '/test/fixtures/aot/');
+        $tag = $aotPhpt ? 'AOT PHPT' : ($isPhpt ? 'compliance PHPT' : 'bootstrap AOT');
         foreach ($patterns as $id => $pattern) {
             if (preg_match($pattern, $body)) {
                 $coverage[$id][] = $tag;

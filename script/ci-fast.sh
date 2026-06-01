@@ -74,6 +74,9 @@ if [[ "${MINIWEBAPP_VM_CLI_GATE:-1}" == "1" ]]; then
   ci_run_phpunit --filter 'MiniWebApp.*VmCli'
 fi
 
+# 003 VM OOP lint + phpc serve PATH_INFO curls (issues #2059, #2189). Opt-in until #2293 default-on.
+ci_run_miniwebapp_vm_oop
+
 # Nested return <call>() VM compliance (#1885, #1888). Default on; set NESTED_RETURN_COMPLIANCE_GATE=0 to skip.
 if [[ "${NESTED_RETURN_COMPLIANCE_GATE:-1}" == "1" ]]; then
   echo "PHPUnit (fast): nested return VM compliance (NestedReturn*)..."

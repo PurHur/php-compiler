@@ -13,8 +13,8 @@ use PHPCompiler\Web\Superglobals;
  */
 final class VmScope
 {
-    /** PHP EXTR_SKIP — do not overwrite variables that already hold a value. */
-    public const EXTR_SKIP = 6;
+    /** PHP EXTR_SKIP — do not overwrite variables that already hold a value (php_array.h). */
+    public const EXTR_SKIP = StdlibConstants::EXTR_SKIP;
 
     public static function requireCaller(Frame $frame): Frame
     {

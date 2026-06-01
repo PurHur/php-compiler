@@ -8,7 +8,7 @@ use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT MCJIT bodies for __compiler_password_hash / __compiler_password_verify.
+ * JIT MCJIT bodies for password_hash / password_verify / password_get_info runtime.
  *
  * Links {@see lib/AOT/runtime/password_crypto.c} (libcrypt).
  */
@@ -76,7 +76,14 @@ final class StringPasswordCrypto
 
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach (['__compiler_password_hash', '__compiler_password_verify'] as $name) {
+        foreach (
+            [
+                '__compiler_password_hash',
+                '__compiler_password_verify',
+                '__compiler_crypt',
+                '__compiler_password_get_info',
+            ] as $name
+        ) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
                 throw new \LogicException($name.' missing after password bitcode link');

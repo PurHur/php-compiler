@@ -14,17 +14,6 @@ use PHPUnit\Framework\TestCase;
  */
 final class UnsupportedRegistryTest extends TestCase
 {
-    /**
-     * @return array<string, array{string, int}>
-     */
-    public static function kindToIssueProvider(): array
-    {
-        return [
-            'yield from' => ['Expr_YieldFrom', 167],
-            'closure' => ['Expr_Closure', 72],
-            'arrow function' => ['Expr_ArrowFunction', 142],
-        ];
-    }
 
     public function testMatchNoLongerTrackedAsUnsupported(): void
     {
@@ -49,12 +38,20 @@ final class UnsupportedRegistryTest extends TestCase
         $this->assertNull(UnsupportedRegistry::trackingIssueForKind('Expr_PostDec'));
     }
 
-    /**
-     * @dataProvider kindToIssueProvider
-     */
-    public function testTrackingIssueForKind(string $kind, int $issue): void
+    public function testClosureAndArrowNoLongerTrackedAsUnsupported(): void
     {
-        $this->assertSame($issue, UnsupportedRegistry::trackingIssueForKind($kind));
+        $this->assertNull(UnsupportedRegistry::trackingIssueForKind('Expr_Closure'));
+        $this->assertNull(UnsupportedRegistry::trackingIssueForKind('Expr_ArrowFunction'));
+    }
+
+    public function testYieldFromNoLongerTrackedAsUnsupported(): void
+    {
+        $this->assertNull(UnsupportedRegistry::trackingIssueForKind('Expr_YieldFrom'));
+    }
+
+    public function testTryCatchStillTrackedAsUnsupported(): void
+    {
+        $this->assertSame(57, UnsupportedRegistry::trackingIssueForKind('Stmt_TryCatch'));
     }
 
     public function testUnknownKindReturnsNull(): void

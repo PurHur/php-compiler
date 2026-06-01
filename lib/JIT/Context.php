@@ -30,6 +30,7 @@ class Context {
     public PHPLLVM\Module $module;
     public PHPLLVM\BasicBlock $initBlock;
     public PHPLLVM\BasicBlock $shutdownBlock;
+    public PHPLLVM\BasicBlock $headerPreFlushBlock;
     public PHPLLVM\Builder $builder;
     public PHPLLVM\Intrinsic $intrinsic;
     public PHPLLVM\TargetData $targetData;
@@ -37,6 +38,7 @@ class Context {
     public ?PHPLLVM\Value\Function_ $main = null;
     public ?PHPLLVM\Value\Function_ $initFunc = null;
     public ?PHPLLVM\Value\Function_ $shutdownFunc = null;
+    public ?PHPLLVM\Value\Function_ $headerPreFlushFunc = null;
 
     public array $constants = [];
     public array $functions = [];
@@ -66,6 +68,9 @@ class Context {
 
     /** Call-site file strict_types while lowering FUNCCALL (issues #156, #1229). */
     public bool $callerStrictTypes = false;
+
+    /** When true, pow() lowering returns a boxed {@see __value__*} (power operator **). */
+    public bool $powReturnValueBox = false;
 
     /** Link-time source bytes for runtime_trivial_echo.php (M3 emit-helper #2559). */
     public ?string $m3EmitTuTrivialEchoSource = null;
@@ -109,6 +114,7 @@ class Context {
     public int $loadType;
     private static int $stringConstantCounter = 0;
     private ?string $debugFile = null;
+    private ?string $aotSourceFilename = null;
 
     public Helper $helper;
 
@@ -181,6 +187,17 @@ class Context {
     public function bindVariableByName(string $name, Variable $var): void
     {
         $resolved = $this->resolveRefAliasName($name);
+        if (isset($this->namedVariableBindings[$resolved])) {
+            $existing = $this->namedVariableBindings[$resolved];
+            // Closure use() snapshot reads must not rebind enclosing locals to MCJIT rvalues (#72).
+            if (
+                Variable::KIND_VARIABLE === $existing->kind
+                && Variable::KIND_VALUE === $var->kind
+                && null === $var->valueBoxAliasPtr
+            ) {
+                return;
+            }
+        }
         $this->namedVariableBindings[$resolved] = $var;
         foreach ($this->scope->variables as $scopeOp) {
             if (!$scopeOp instanceof Operand) {
@@ -273,9 +290,43 @@ class Context {
 
     public function resolveFunctionProxy(string $proxyName): Call
     {
+        $proxy = $this->lookupFunctionProxy($proxyName);
+        if (null !== $proxy) {
+            return $proxy;
+        }
+        if (LazyBuiltins::isEnabled($this->loadType) && $this->runtime->ensureJitBuiltinCompiled($proxyName)) {
+            $proxy = $this->lookupFunctionProxy($proxyName);
+            if (null !== $proxy) {
+                return $proxy;
+            }
+        }
+        $lc = strtolower($proxyName);
+        $internal = $this->resolveRegisteredInternalBuiltin($lc);
+        if (null !== $internal) {
+            $this->functionProxies[$lc] = $internal;
+
+            return $internal;
+        }
+        $this->functionProxies[$lc] = new Call\ExternalMethod($proxyName);
+
+        return $this->functionProxies[$lc];
+    }
+
+    private function lookupFunctionProxy(string $proxyName): ?Call
+    {
         $lc = strtolower($proxyName);
         if (isset($this->functionProxies[$lc])) {
-            return $this->functionProxies[$lc];
+            $existing = $this->functionProxies[$lc];
+            if ($existing instanceof Call\ExternalMethod) {
+                $internal = $this->resolveRegisteredInternalBuiltin($lc);
+                if (null !== $internal) {
+                    $this->functionProxies[$lc] = $internal;
+
+                    return $internal;
+                }
+            }
+
+            return $existing;
         }
         if (preg_match('/^(.+)\\\\([^\\\\]+)::(.+)$/', $lc, $matches)) {
             $shortKey = $matches[2].'::'.$matches[3];
@@ -291,12 +342,37 @@ class Context {
             if (isset($this->functionProxies[$globalFn])) {
                 return $this->functionProxies[$globalFn];
             }
+            $internal = $this->resolveRegisteredInternalBuiltin($globalFn);
+            if (null !== $internal) {
+                $this->functionProxies[$globalFn] = $internal;
+
+                return $internal;
+            }
         }
-        if (!isset($this->functionProxies[$lc])) {
-            $this->functionProxies[$lc] = new Call\ExternalMethod($proxyName);
+        $internal = $this->resolveRegisteredInternalBuiltin($lc);
+        if (null !== $internal) {
+            $this->functionProxies[$lc] = $internal;
+
+            return $internal;
         }
 
-        return $this->functionProxies[$lc];
+        return null;
+    }
+
+    private function resolveRegisteredInternalBuiltin(string $lc): ?FuncInternal
+    {
+        foreach ($this->modules as $module) {
+            foreach ($module->getFunctions() as $func) {
+                if (!$func instanceof FuncInternal) {
+                    continue;
+                }
+                if (strtolower($func->getName()) === $lc) {
+                    return $func;
+                }
+            }
+        }
+
+        return null;
     }
 
     public function recordExternalMethodStub(string $proxyName): void
@@ -403,6 +479,9 @@ class Context {
         $this->shutdownFunc = $this->module->addFunction('__shutdown__', $signature);
         $this->shutdownBlock = $this->shutdownFunc->appendBasicBlock('main');
 
+        $this->headerPreFlushFunc = $this->module->addFunction('__header_pre_flush__', $signature);
+        $this->headerPreFlushBlock = $this->headerPreFlushFunc->appendBasicBlock('main');
+
         foreach ($this->builtins as $builtin) {
             $builtin->initialize();
         }
@@ -504,6 +583,7 @@ class Context {
                 $this->builder->call($this->lookupFunction('__superglobals__refresh'));
                 Builtin\JitThrow::registerDeclarations($this);
                 $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending'));
+                Builtin\ReadonlyRaise::emitClearForStandaloneMain($this);
             }
             $this->builder->call(
                 $this->lookupFunction('__phpc_progress_note'),
@@ -521,7 +601,9 @@ class Context {
                 )
             );
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+                Builtin\ReadonlyRaise::emitAbortIfPendingForStandaloneMain($this);
                 Builtin\PendingHeaders::emitFlushForStandalone($this);
+                Builtin\ObOutput::emitEndAllForStandalone($this);
             }
             $this->builder->call($this->shutdownFunc);
             $this->builder->returnValue($i32->constInt(0, false));
@@ -644,10 +726,13 @@ class Context {
         $this->builder->returnVoid();
         $this->builder->positionAtEnd($this->shutdownBlock);
         $this->builder->returnVoid();
+        $this->builder->positionAtEnd($this->headerPreFlushBlock);
+        $this->builder->returnVoid();
 
         if (!is_null($this->debugFile)) {
             $this->module->printToFile($this->debugFile . '.bc');
         }
+        $this->registerAotDebugSourceGlobal();
         Progress::noteFunction('jit_context_compile_common_phase_seal_functions');
         $function = $this->module->getFirstFunction();
         while (null !== $function) {
@@ -665,9 +750,29 @@ class Context {
         Progress::noteFunction('jit_context_verify_done');
     }
 
+    private function registerAotDebugSourceGlobal(): void
+    {
+        if (!AotDebugSymbols::isEnabled()) {
+            return;
+        }
+        $path = $this->aotSourceFilename;
+        if (!is_string($path) || '' === $path || '-' === $path) {
+            return;
+        }
+        $normalized = str_replace('\\', '/', $path);
+        $const = $this->context->constString($normalized, true);
+        $global = $this->module->addGlobal($const->typeOf(), '__phpc_aot_source_file');
+        $global->setInitializer($const);
+    }
+
     public function setDebugFile(string $file): void {
         $this->debugFile = $file;
         $this->setDebug(true);
+    }
+
+    public function setAotSourceFilename(?string $filename): void
+    {
+        $this->aotSourceFilename = $filename;
     }
 
     public function setDebug(bool $value): void {
@@ -968,6 +1073,23 @@ class Context {
         }
     }
 
+    /**
+     * Temporarily position the builder at __header_pre_flush__ (header_register_callback, #3759).
+     *
+     * @param callable(self): void $emit
+     */
+    public function emitInHeaderPreFlush(callable $emit): void
+    {
+        $oldBuilder = $this->builder;
+        $this->builder = $this->context->builderCreate();
+        $this->builder->positionAtEnd($this->headerPreFlushBlock);
+        try {
+            $emit($this);
+        } finally {
+            $this->builder = $oldBuilder;
+        }
+    }
+
     public function makeVariableFromOp(
         PHPLLVM\Value\Function_ $func,
         PHPLLVM\BasicBlock $basicBlock,
@@ -998,6 +1120,46 @@ class Context {
 
     public function setVariableOp(Operand $op, Variable $var) {
         $this->scope->variables[$op] = $var;
+    }
+
+    /**
+     * php-cfg may use distinct {@see Operand\Temporary} objects for one scope slot (#72).
+     */
+    public function aliasVariableOpFromSlot(Block $block, Operand $op): bool
+    {
+        if ($this->scope->variables->contains($op)) {
+            return true;
+        }
+        $name = OperandName::resolve($op);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->resolveRefAliasName($name);
+            if (isset($this->namedVariableBindings[$resolved])) {
+                $this->scope->variables[$op] = $this->namedVariableBindings[$resolved];
+
+                return true;
+            }
+            foreach ($this->scope->variables as $scopeOp) {
+                if ($name === OperandName::resolve($scopeOp)) {
+                    $this->scope->variables[$op] = $this->scope->variables[$scopeOp];
+
+                    return true;
+                }
+            }
+        }
+        $slot = $block->slotForOperand($op);
+        if (null === $slot) {
+            return false;
+        }
+        foreach ($block->scopedOperands() as $scopeOp) {
+            if ($block->slotForOperand($scopeOp) !== $slot || !$this->scope->variables->contains($scopeOp)) {
+                continue;
+            }
+            $this->scope->variables[$op] = $this->scope->variables[$scopeOp];
+
+            return true;
+        }
+
+        return false;
     }
 
     public function hasVariableOp(Operand $op): bool {
@@ -1126,7 +1288,8 @@ class Context {
     public function freeDeadVariables(
         PHPLLVM\Value\Function_ $func,
         PHPLLVM\BasicBlock $basicBlock,
-        Block $block
+        Block $block,
+        ?Operand $skipOperand = null
     ): void {
         $coalesceResults = new \SplObjectStorage();
         foreach ($block->opCodes as $blockOp) {
@@ -1134,7 +1297,28 @@ class Context {
                 $coalesceResults[$block->getOperand($blockOp->arg1)] = true;
             }
         }
+        $returnVarNames = [];
+        foreach ($block->opCodes as $blockOp) {
+            if (OpCode::TYPE_RETURN !== $blockOp->type || null === $blockOp->arg1) {
+                continue;
+            }
+            $returnOp = $block->getOperand($blockOp->arg1);
+            $name = OperandName::resolve($returnOp);
+            if (null !== $name) {
+                $returnVarNames[$name] = true;
+            }
+        }
+        if (null !== $skipOperand) {
+            $name = OperandName::resolve($skipOperand);
+            if (null !== $name) {
+                $returnVarNames[$name] = true;
+            }
+        }
         foreach ($block->orig->deadOperands as $op) {
+            $name = OperandName::resolve($op);
+            if (null !== $name && isset($returnVarNames[$name])) {
+                continue;
+            }
             if ($coalesceResults->contains($op)) {
                 continue;
             }

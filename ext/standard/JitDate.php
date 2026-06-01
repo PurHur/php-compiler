@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Block;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringHrtime;
 use PHPCompiler\JIT\Builtin\StringMicrotime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\ScriptMagic;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\OpCode;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -37,6 +40,43 @@ final class JitDate
         return $raw->typeOf() === $i64
             ? $raw
             : $context->builder->zExt($raw, $i64);
+    }
+
+    public static function getmygrgid(Context $context): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $raw = $context->builder->call($context->lookupFunction('getgid'));
+
+        return $raw->typeOf() === $i64
+            ? $raw
+            : $context->builder->zExt($raw, $i64);
+    }
+
+    public static function getmyinode(Context $context): Value
+    {
+        $block = $context->jitEnclosingBlock;
+        if (!$block instanceof Block) {
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            $i1 = $context->getTypeFromString('int1');
+            JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+
+            return $ptr;
+        }
+
+        $path = ScriptMagic::stringForBlock($block, OpCode::SCRIPT_MAGIC_FILE);
+        if ('' === $path) {
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            $i1 = $context->getTypeFromString('int1');
+            JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+
+            return $ptr;
+        }
+
+        $pathStr = $context->builder->load($context->constantStringFromString($path));
+
+        return JitStat::pathFileInodeBoxed($context, $pathStr);
     }
 
     public static function microtime(Context $context, Value $asFloat): Value

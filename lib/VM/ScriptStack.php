@@ -37,6 +37,16 @@ final class ScriptStack
         return $this->stack[count($this->stack) - 1];
     }
 
+    /** Main entry script path (first pushed; ext/standard getmyinode parity). */
+    public function root(): string
+    {
+        if ([] === $this->stack) {
+            return '';
+        }
+
+        return $this->stack[0];
+    }
+
     public static function normalize(string $path): string
     {
         if ('' === $path || str_contains($path, "\0")) {

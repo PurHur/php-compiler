@@ -26,6 +26,8 @@ final class BuiltinParamNames
                 return ['var', 'type'];
             case 'register_shutdown_function':
                 return ['function', 'parameter'];
+            case 'header_register_callback':
+                return ['callback'];
             case 'headers_sent':
                 return ['file', 'line'];
             case 'modf':
@@ -38,6 +40,12 @@ final class BuiltinParamNames
                 return ['filename', 'time', 'atime'];
             case 'getenv':
                 return ['name', 'local_only'];
+            case 'define':
+                return ['constant_name', 'value', 'case_insensitive'];
+            case 'vsprintf':
+                return ['format', 'args'];
+            case 'sscanf':
+                return ['string', 'format'];
         }
 
         return null;

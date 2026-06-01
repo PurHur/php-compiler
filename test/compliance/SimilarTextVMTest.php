@@ -17,6 +17,10 @@ final class SimilarTextVMTest extends BaseTest
             __DIR__.'/cases/stdlib/similar_text.phpt',
             'similar_text.phpt'
         );
+        yield 'similar_text_percent.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/similar_text_percent.phpt',
+            'similar_text_percent.phpt'
+        );
     }
 
     public function setUp(): void

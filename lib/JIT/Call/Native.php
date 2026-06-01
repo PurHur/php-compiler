@@ -41,7 +41,7 @@ class Native implements Call {
     /** @var array<int, list<string>> LLVM arg index => intersection interface lc names (#3077) */
     public array $paramIntersectionConstraintsByArg = [];
 
-    /** @var array<int, true> LLVM arg index => by-reference formal (issue #3161, #140) */
+    /** LLVM arg index => by-reference formal (issue #3161, #140). @var array<int, true> */
     public array $paramByRefByArg = [];
 
     /** Declared parameter names by index (issue #3777). */

@@ -39,6 +39,46 @@ final class VmArray
     }
 
     /**
+     * Packed list or numeric-string keys 0..n-1 (Zend zend_hash numeric-key rules; #3607).
+     */
+    public static function isReindexableList(HashTable $ht): bool
+    {
+        if (self::isList($ht)) {
+            return true;
+        }
+        $n = $ht->getNumElements();
+        if (0 === $n) {
+            return true;
+        }
+        $expected = 0;
+        foreach ($ht->iterateKeyed() as $pair) {
+            $keyVar = $pair[0]->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $keyVar->type) {
+                $idx = $keyVar->toInt();
+            } elseif (Variable::TYPE_STRING === $keyVar->type) {
+                $s = $keyVar->toString();
+                if (!self::isCanonicalNonNegativeIntStringKey($s)) {
+                    return false;
+                }
+                $idx = (int) $s;
+            } else {
+                return false;
+            }
+            if ($idx !== $expected) {
+                return false;
+            }
+            ++$expected;
+        }
+
+        return $expected === $n;
+    }
+
+    private static function isCanonicalNonNegativeIntStringKey(string $s): bool
+    {
+        return '' !== $s && (string) (int) $s === $s && (int) $s >= 0;
+    }
+
+    /**
      * array_merge() subset: packed 0..n-1 lists append; string-key maps overwrite later keys (#2287).
      *
      * @param HashTable ...$others
@@ -46,7 +86,7 @@ final class VmArray
     public static function merge(HashTable $first, HashTable ...$others): HashTable
     {
         foreach ([$first, ...$others] as $ht) {
-            if (!self::isList($ht)) {
+            if (!self::isReindexableList($ht)) {
                 $out = $first->replaceCopy();
                 foreach ($others as $other) {
                     $out->mergeStringKeysFrom($other, true);
@@ -56,7 +96,32 @@ final class VmArray
             }
         }
 
-        return $first->mergeCopy(...$others);
+        if (self::isList($first) && self::allLists($others)) {
+            return $first->mergeCopy(...$others);
+        }
+
+        $out = new HashTable();
+        foreach ([$first, ...$others] as $ht) {
+            foreach ($ht->iterateKeyed(true) as [, $value]) {
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $out->append($copy);
+            }
+        }
+
+        return $out;
+    }
+
+    /** @param list<HashTable> $others */
+    private static function allLists(array $others): bool
+    {
+        foreach ($others as $ht) {
+            if (!self::isList($ht)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public static function keyFirst(HashTable $ht): ?Variable
@@ -78,6 +143,56 @@ final class VmArray
         }
 
         return $last;
+    }
+
+    /**
+     * array_first() — first element value (php-src array.c, #3491).
+     *
+     * @throws \ValueError when {@param $ht} is empty
+     */
+    public static function valueFirst(HashTable $ht): Variable
+    {
+        $ht->iterReset();
+        if (!$ht->iterValid()) {
+            throw new \ValueError('array_first(): Argument #1 ($array) must not be empty');
+        }
+
+        return $ht->iterCurrentValue();
+    }
+
+    /**
+     * array_last() — last element value (php-src array.c, #3491).
+     *
+     * @throws \ValueError when {@param $ht} is empty
+     */
+    public static function valueLast(HashTable $ht): Variable
+    {
+        $ht->iterReset();
+        $last = null;
+        while ($ht->iterValid()) {
+            $last = $ht->iterCurrentValue();
+        }
+        if (null === $last) {
+            throw new \ValueError('array_last(): Argument #1 ($array) must not be empty');
+        }
+
+        return $last;
+    }
+
+    /**
+     * @throws \TypeError when {@param $value} is not an array
+     */
+    public static function requireArray(Variable $value, string $fn): HashTable
+    {
+        $v = $value->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $v->type) {
+            throw new \TypeError(
+                $fn.'(): Argument #1 ($array) must be of type array, '
+                .self::valueTypeLabel($v).' given'
+            );
+        }
+
+        return $v->toArray();
     }
 
     /**

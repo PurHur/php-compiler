@@ -38,7 +38,7 @@ final class hash_ extends Internal
         $raw = false;
         if (3 === $argc) {
             $rawArg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_BOOL !== $rawArg->type) {
+            if (Variable::TYPE_BOOLEAN !== $rawArg->type) {
                 throw new \LogicException('hash() raw_output must be boolean in this compiler build');
             }
             $raw = $rawArg->toBool();

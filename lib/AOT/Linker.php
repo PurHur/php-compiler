@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\AOT;
 
+use PHPCompiler\JIT\AotDebugSymbols;
+
 /**
  * Link an LLVM object file into a standalone executable using the bundled toolchain.
  */
@@ -16,6 +18,7 @@ final class Linker
         __DIR__.'/runtime/phpc_pending_headers.c',
         __DIR__.'/runtime/superglobal_name.c',
         __DIR__.'/runtime/function_exists.c',
+        __DIR__.'/runtime/phpc_get_defined_functions.c',
         __DIR__.'/runtime/hash_crypto.c',
         __DIR__.'/runtime/phpc_microtime.c',
         __DIR__.'/runtime/phpc_hrtime.c',
@@ -31,34 +34,44 @@ final class Linker
         __DIR__.'/runtime/phpc_similar_text.c',
         __DIR__.'/runtime/phpc_soundex.c',
         __DIR__.'/runtime/phpc_str_incdec.c',
+        __DIR__.'/runtime/phpc_str_word_count.c',
         __DIR__.'/runtime/phpc_base_convert.c',
         __DIR__.'/runtime/phpc_metaphone.c',
         __DIR__.'/runtime/phpc_str_getcsv.c',
         __DIR__.'/runtime/phpc_uniqid.c',
         __DIR__.'/runtime/phpc_strtok.c',
+        __DIR__.'/runtime/compiler_wordwrap.c',
         __DIR__.'/runtime/password_crypto.c',
         __DIR__.'/runtime/crc32.c',
         __DIR__.'/runtime/crc32c.c',
         __DIR__.'/runtime/strtr.c',
+        __DIR__.'/runtime/phpc_array_merge_recursive.c',
+        __DIR__.'/runtime/phpc_uuencode.c',
+        __DIR__.'/runtime/phpc_utf8_latin1.c',
         __DIR__.'/runtime/filter_validate.c',
         __DIR__.'/runtime/phpc_fs_dir.c',
         __DIR__.'/runtime/phpc_count_chars.c',
         __DIR__.'/runtime/phpc_gethostname.c',
         __DIR__.'/runtime/phpc_getrusage.c',
+        __DIR__.'/runtime/phpc_memory.c',
         __DIR__.'/runtime/phpc_upload_temp.c',
         __DIR__.'/runtime/phpc_session_id_storage.c',
         __DIR__.'/runtime/phpc_session_name_storage.c',
+        __DIR__.'/runtime/phpc_session_state.c',
         __DIR__.'/runtime/phpc_value_box.c',
         __DIR__.'/runtime/phpc_session_lifecycle.c',
         __DIR__.'/runtime/phpc_session_storage.c',
         __DIR__.'/runtime/phpc_ob_storage.c',
         __DIR__.'/runtime/phpc_ob.c',
+        __DIR__.'/runtime/phpc_pow.c',
+        __DIR__.'/runtime/phpc_round.c',
         __DIR__.'/runtime/phpc_parse_url.c',
         __DIR__.'/runtime/phpc_parse_str.c',
         __DIR__.'/runtime/phpc_json_decode.c',
         __DIR__.'/runtime/phpc_unserialize.c',
         __DIR__.'/runtime/phpc_stream.c',
         __DIR__.'/runtime/phpc_gettype.c',
+        __DIR__.'/runtime/phpc_object_id.c',
         __DIR__.'/runtime/phpc_process.c',
         __DIR__.'/runtime/preg_match.c',
         __DIR__.'/runtime/phpc_pack.c',
@@ -86,6 +99,7 @@ final class Linker
         'phpc_fs_dir.c',
         'phpc_gethostname.c',
         'phpc_getrusage.c',
+        'phpc_memory.c',
         'phpc_upload_temp.c',
         'preg_match.c',
         'password_crypto.c',
@@ -149,6 +163,7 @@ final class Linker
             }
             $cmd = implode(' ', [
                 escapeshellarg($ld),
+                AotDebugSymbols::linkFlag(),
                 '-dynamic-linker /lib64/ld-linux-x86-64.so.2',
                 escapeshellarg('/usr/lib/x86_64-linux-gnu/crt1.o'),
                 escapeshellarg($crtbegin),
@@ -182,7 +197,7 @@ final class Linker
             // When linking with the bundled clang, ensure we can still resolve host libraries
             // (libpcre2-8, libcrypt, ...). Some bootstrap envs only ship the runtime .so/.a under
             // /usr/lib/x86_64-linux-gnu without a full sysroot lib tree.
-            $cmd = escapeshellarg($clang).' '.$objects.' -L/usr/lib/x86_64-linux-gnu -lm '.self::RUNTIME_LINK_LIBS.' -o '.escapeshellarg($executable);
+            $cmd = escapeshellarg($clang).' '.AotDebugSymbols::linkFlag().$objects.' -L/usr/lib/x86_64-linux-gnu -lm '.self::RUNTIME_LINK_LIBS.' -o '.escapeshellarg($executable);
             self::run($cmd, $env);
             self::unlinkIfTemp($runtimeObjects);
 
@@ -218,7 +233,7 @@ final class Linker
             $runtimeObject = $objectFile.'.runtime'.$index.'.o';
             ++$index;
             $sourceFlags = self::runtimeCIncludeFlagsFor(basename($source));
-            $cmd = escapeshellarg($compiler).' -c -fPIC -O2'.$sourceFlags.' '
+            $cmd = escapeshellarg($compiler).' -c -fPIC '.AotDebugSymbols::compileFlag().$sourceFlags.' '
                 .escapeshellarg($source).' -o '.escapeshellarg($runtimeObject);
             $captured = self::runCaptured($cmd, $env);
             if (0 !== $captured['code'] || !is_file($runtimeObject)) {
@@ -284,7 +299,7 @@ final class Linker
         } else {
             $flags = self::runtimeCIncludeFlags();
         }
-        if ('function_exists.c' === $basename) {
+        if ('function_exists.c' === $basename || 'phpc_get_defined_functions.c' === $basename) {
             $flags .= ' -I'.escapeshellarg(__DIR__.'/runtime');
         }
 
@@ -463,7 +478,7 @@ final class Linker
                 continue;
             }
             $cmd = escapeshellarg($path) . ' '
-                . $objects . ' -lm '.self::RUNTIME_LINK_LIBS.' -o ' . escapeshellarg($executable);
+                . AotDebugSymbols::linkFlag() . $objects . ' -lm '.self::RUNTIME_LINK_LIBS.' -o ' . escapeshellarg($executable);
             $captured = self::runCaptured($cmd, null);
             if (0 === $captured['code']) {
                 self::unlinkIfTemp($runtimeObjects);

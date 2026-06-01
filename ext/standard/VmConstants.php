@@ -19,10 +19,15 @@ final class VmConstants
         'false',
         'password_bcrypt',
         'password_default',
+        'crypt_std_des',
+        'crypt_ext_des',
+        'crypt_md5',
+        'crypt_blowfish',
         'filter_validate_int',
         'filter_validate_email',
         'input_get',
         'input_post',
+        ...Context::errorReportingConstantFetchNames(),
         ...StdlibConstants::CORE_FETCH_NAMES,
     ];
 

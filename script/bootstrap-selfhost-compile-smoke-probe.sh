@@ -42,6 +42,9 @@ if [[ ! -f "${SOURCE}" ]]; then
 fi
 
 INVENTORY_EMIT_DRIVER="${ROOT}/test/selfhost/compiler_compile_smoke/compile_driver.php"
+# shellcheck source=bootstrap-inventory-emit-default.sh
+source "$(dirname "$0")/bootstrap-inventory-emit-default.sh"
+bootstrap_resolve_inventory_emit_driver "${INVENTORY_EMIT_DRIVER}"
 if [[ ! -f "${INVENTORY_EMIT_DRIVER}" ]]; then
   echo "bootstrap-selfhost-compile-smoke-probe: missing ${INVENTORY_EMIT_DRIVER} (#3032)" >&2
   exit 1

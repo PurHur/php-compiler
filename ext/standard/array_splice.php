@@ -21,7 +21,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_splice() for packed list arrays (subset of PHP; LLVM via ArrayBuiltinHelper #1205).
+ * array_splice() — packed lists and associative arrays (LLVM packed path via #1205).
  */
 final class array_splice extends Internal
 {
@@ -31,7 +31,9 @@ final class array_splice extends Internal
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('array_splice() requires two to four arguments in this compiler build');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
+        $arrayArg = $frame->calledArgs[0];
+        $arrayArg->separateArrayForWrite();
+        $array = $arrayArg->resolveIndirect();
         $offset = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('array_splice() first argument must be an array in this compiler build');
@@ -49,15 +51,16 @@ final class array_splice extends Internal
             $length = $lengthArg->toInt();
         }
 
-        $replacement = [];
+        $replacement = null;
         if (4 === $argc) {
             $replacementArg = $frame->calledArgs[3]->resolveIndirect();
             if (Variable::TYPE_ARRAY === $replacementArg->type) {
-                foreach ($replacementArg->toArray()->iterate(true) as $value) {
-                    $replacement[] = $value;
-                }
+                $replacement = $replacementArg->toArray();
             } else {
-                $replacement[] = $replacementArg;
+                $replacement = new \PHPCompiler\VM\HashTable();
+                $copy = new Variable();
+                $copy->copyFrom($replacementArg);
+                $replacement->append($copy);
             }
         }
 

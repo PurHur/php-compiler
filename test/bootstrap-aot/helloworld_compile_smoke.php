@@ -78,8 +78,19 @@ function helloworld_compile_smoke(string $sourceFile, string $outFile): int
     try {
         $script = $runtime->parse($code, $resolved);
     } catch (\Throwable $e) {
-        $diag = $runtime->formatParseAndCompileNullDetail(null);
-        $extra = null !== $diag && '' !== $diag ? ' — '.$diag : ' — '.$e->getMessage();
+        $detail = \PHPCompiler\Runtime::getLastParseFailure();
+        if (null === $detail || '' === $detail) {
+            $detail = $runtime->formatParseAndCompileNullDetail(null);
+        }
+        if (null === $detail || '' === $detail) {
+            $detail = $e->getMessage();
+        }
+        echo sprintf("parseAndCompile failure: target=%s: %s\n", $resolved, $detail);
+        $excFile = $e->getFile();
+        if ('' !== $excFile && 0 !== $e->getLine()) {
+            echo sprintf("%s in %s:%d\n", $e::class, $excFile, $e->getLine());
+        }
+        $extra = null !== $detail && '' !== $detail ? ' — '.$detail : '';
         echo 'helloworld_compile_smoke: parse failed'.$extra."\n";
         echo "helloworld_compile_smoke: native emit failed at phase=parse\n";
 
@@ -88,6 +99,12 @@ function helloworld_compile_smoke(string $sourceFile, string $outFile): int
     $block = $runtime->compile($script);
     if (null === $block) {
         $detail = \PHPCompiler\Runtime::getLastParseFailure();
+        if (null === $detail || '' === $detail) {
+            $detail = $runtime->formatParseAndCompileNullDetail($script);
+        }
+        if (null !== $detail && '' !== $detail) {
+            echo sprintf("parseAndCompile failure: target=%s: %s\n", $resolved, $detail);
+        }
         $extra = null !== $detail && '' !== $detail ? ' — '.$detail : '';
         echo "helloworld_compile_smoke: parseAndCompile returned null (CFG/compile spine)".$extra."\n";
         echo "helloworld_compile_smoke: native emit failed at phase=parseAndCompile\n";

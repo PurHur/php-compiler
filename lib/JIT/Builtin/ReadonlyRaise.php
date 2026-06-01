@@ -54,7 +54,8 @@ final class ReadonlyRaise
             $flag->setInitializer($i8->constInt(0, false));
         }
         if (null === $context->module->getNamedGlobal('phpc_jit_pending_msg')) {
-            $context->module->addGlobal($msgTy, 'phpc_jit_pending_msg');
+            $msgGlobal = $context->module->addGlobal($msgTy, 'phpc_jit_pending_msg');
+            $msgGlobal->setInitializer($msgTy->constNull());
         }
     }
 
@@ -177,6 +178,24 @@ final class ReadonlyRaise
         }
     }
 
+    public static function emitClearForStandaloneMain(Context $context): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return;
+        }
+        self::registerDeclarations($context);
+        $context->builder->call($context->lookupFunction('phpc_jit_clear_pending_exception'));
+    }
+
+    public static function emitAbortIfPendingForStandaloneMain(Context $context): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return;
+        }
+        self::registerDeclarations($context);
+        $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_logic_exception'));
+    }
+
     public static function registerDeclarations(Context $context): void
     {
         $i8p = $context->getTypeFromString('int8*');
@@ -189,6 +208,7 @@ final class ReadonlyRaise
             'phpc_jit_clear_pending_exception' => [$void, false, []],
             'phpc_jit_has_pending_exception' => [$i32, false, []],
             'phpc_jit_copy_pending_exception' => [$void, false, [$i8p, $sizeT]],
+            'phpc_jit_abort_if_pending_logic_exception' => [$void, false, []],
         ];
         foreach ($decls as $name => [$ret, $vararg, $params]) {
             if (null !== $context->module->getNamedFunction($name)) {

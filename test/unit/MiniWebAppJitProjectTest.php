@@ -9,16 +9,17 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * JIT project smoke for examples/003-MiniWebApp (issues #587, #1759, #475).
+ * JIT project smoke for examples/003-MiniWebApp (issues #587, #1759, #475, #1801).
  *
  * @see https://github.com/PurHur/php-compiler/issues/587
  * @see https://github.com/PurHur/php-compiler/issues/1759
+ * @see https://github.com/PurHur/php-compiler/issues/1801
  */
 final class MiniWebAppJitProjectTest extends TestCase
 {
     private string $publicDir;
 
-    private string $jitBin;
+    private string $jitLauncher;
 
     private string $repoRoot;
 
@@ -40,12 +41,31 @@ final class MiniWebAppJitProjectTest extends TestCase
         if (!$this->jitRuntimeProbeOk()) {
             $this->markTestSkipped('JIT MCJIT probe failed — bin/jit.php not runnable (#587, #98)');
         }
-        $jit = realpath($this->repoRoot.'/bin/jit.php');
-        if (false === $jit) {
-            $this->markTestSkipped('bin/jit.php missing');
-        }
         $this->publicDir = dirname($index);
-        $this->jitBin = $jit;
+        $this->jitLauncher = $this->buildJitLauncher();
+    }
+
+    private function buildJitLauncher(): string
+    {
+        $project = $this->repoRoot.'/examples/003-MiniWebApp';
+        $output = sys_get_temp_dir().'/miniwebapp-jit-project-'.getmypid().'.jit';
+        @unlink($output);
+        $result = \PHPCompiler\Cli\PhpcBuild::buildProjectJit($this->repoRoot, $project, $output, false);
+        if (0 !== $result['exit']) {
+            $this->fail('phpc build --project --jit failed: '.$result['stderr'].$result['stdout']);
+        }
+        if (!is_executable($output)) {
+            $this->fail('JIT launcher not executable: '.$output);
+        }
+
+        return $output;
+    }
+
+    protected function tearDown(): void
+    {
+        if (isset($this->jitLauncher) && is_file($this->jitLauncher)) {
+            @unlink($this->jitLauncher);
+        }
     }
 
     /**
@@ -97,8 +117,7 @@ final class MiniWebAppJitProjectTest extends TestCase
 
         $cmd = array_merge(
             LlvmToolchain::envPrefix($this->repoRoot),
-            self::phpCommand(),
-            [$this->jitBin, 'index.php']
+            [$this->jitLauncher]
         );
         $result = $this->runCommand($cmd, $this->publicDir, $env);
         if (0 !== $result['code']) {

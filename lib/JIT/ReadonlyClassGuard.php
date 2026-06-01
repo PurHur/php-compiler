@@ -13,8 +13,12 @@ use PHPLLVM\Builder;
  */
 final class ReadonlyClassGuard
 {
-    public static function emitBeforePropertyStore(Context $context, Variable $lvalue, ?Block $enclosingBlock): void
-    {
+    public static function emitBeforePropertyStore(
+        Context $context,
+        Variable $lvalue,
+        ?Block $enclosingBlock,
+        string $violation = 'modify'
+    ): void {
         if (null === $lvalue->objectPropertySlot) {
             return;
         }
@@ -26,7 +30,7 @@ final class ReadonlyClassGuard
         if (null === $lvalue->objectPropertyReceiver) {
             return;
         }
-        if (self::isConstructBlock($enclosingBlock)) {
+        if ('modify' === $violation && self::isConstructBlock($enclosingBlock)) {
             return;
         }
 
@@ -51,15 +55,6 @@ final class ReadonlyClassGuard
         $storeBlock = $fn->appendBasicBlock('readonly_allow_store');
         $exitBlock = $fn->appendBasicBlock('readonly_guard_exit');
 
-        $className = $lvalue->objectPropertyClassName ?? 'class';
-        $message = sprintf(
-            'Cannot modify readonly property %s::$%s',
-            $className,
-            $propName
-        );
-        $msgLen = $context->constantFromInteger(strlen($message), 'size_t');
-        $msgCStr = self::stringDataPtrFromLiteral($context, $message);
-
         $checkBlock = $entry;
         foreach ($guardClassIds as $i => $id) {
             $matchBlock = $fn->appendBasicBlock('readonly_match_'.$id);
@@ -75,6 +70,16 @@ final class ReadonlyClassGuard
             $failBlock = $fn->appendBasicBlock('readonly_violation_'.$id);
             $context->builder->branch($failBlock);
             $context->builder->positionAtEnd($failBlock);
+            $declaringClass = $objectType->classNameForId($id);
+            $message = sprintf(
+                'unset' === $violation
+                    ? 'Cannot unset readonly property %s::$%s'
+                    : 'Cannot modify readonly property %s::$%s',
+                $declaringClass,
+                $propName
+            );
+            $msgLen = $context->constantFromInteger(strlen($message), 'size_t');
+            $msgCStr = self::stringDataPtrFromLiteral($context, $message);
             $context->builder->call(
                 $context->lookupFunction('__compiler_jit_raise_logic_exception'),
                 $msgCStr,
@@ -101,11 +106,10 @@ final class ReadonlyClassGuard
 
     private static function stringDataPtrFromLiteral(Context $context, string $message): \PHPLLVM\Value
     {
-        $strPtr = $context->builder->load($context->constantStringFromString($message));
-        $strMap = $context->structFieldMap['__string__'];
-
+        // Use php_cstr_* rodata (MethodRegistry / M3Emit pattern) — heap __string__ value GEP
+        // can yield a bad memcpy source for raise_logic_exception under MCJIT execute (#3149).
         return $context->builder->pointerCast(
-            $context->builder->structGep($strPtr, $strMap['value']),
+            $context->constantFromString($message),
             $context->getTypeFromString('int8*')
         );
     }

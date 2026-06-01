@@ -58,7 +58,29 @@ final class array_product extends Internal
                 }
                 continue;
             }
-            throw new \LogicException('array_product() only supports integer and float elements in this compiler build');
+            if (Variable::TYPE_STRING === $v->type) {
+                $s = $v->toString();
+                if (!\is_numeric($s)) {
+                    throw new \TypeError('Unsupported operand types: string');
+                }
+                $num = $v->toNumeric();
+                if (\is_int($num)) {
+                    if ($useFloat) {
+                        $prodFloat *= (float) $num;
+                    } else {
+                        $prodInt *= $num;
+                    }
+                } else {
+                    if (!$useFloat) {
+                        $useFloat = true;
+                        $prodFloat = (float) $prodInt * (float) $num;
+                    } else {
+                        $prodFloat *= (float) $num;
+                    }
+                }
+                continue;
+            }
+            throw new \LogicException('array_product() only supports integer, float, and numeric string elements in this compiler build');
         }
         if ($useFloat) {
             $frame->returnVar->float($prodFloat);

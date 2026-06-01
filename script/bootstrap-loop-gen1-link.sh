@@ -8,6 +8,9 @@ GEN1="build/bootstrap-loop-gen1"
 EMIT_HELPER="build/bootstrap-loop-gen1-compile"
 # bootstrap_loop_smoke/compile_driver.php delegates here; link helloworld bundle directly (#2893).
 INVENTORY_EMIT_DRIVER="${ROOT}/test/selfhost/compiler_helloworld_smoke/compile_driver.php"
+# shellcheck source=bootstrap-inventory-emit-default.sh
+source "$(dirname "$0")/bootstrap-inventory-emit-default.sh"
+bootstrap_resolve_inventory_emit_driver "${INVENTORY_EMIT_DRIVER}"
 GEN2_SOURCE="test/bootstrap-aot/compiler_smoke_standalone.php"
 GEN2_OUT="build/bootstrap-loop-gen2"
 GEN2_EXPECT_STDOUT_RE="compiler smoke"
@@ -97,7 +100,7 @@ if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
     m4_link_env=(env PHP_COMPILER_SELFHOST_AOT=1)
     m4_link_mode="selfhost stubs (no PHP_COMPILER_M3_COMPILE_DRIVER)"
   fi
-  echo "==> link gen-1 emit helper (inventory compile_driver, #3032)"
+  echo "==> link gen-1 emit helper (inventory compile_driver by default, #3032; BOOTSTRAP_M3_EMIT_HELPER_TU=1 for thin emit TU bisect)"
   rm -f "${EMIT_HELPER}" "build/.last-jit-func-bootstrap-loop-gen1-emit"
   export PHP_COMPILER_JIT_PROGRESS_FILE="build/.last-jit-func-bootstrap-loop-gen1-emit"
   set +e

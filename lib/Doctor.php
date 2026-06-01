@@ -165,8 +165,10 @@ final class Doctor
         $ns2Default = $defaults['NORTH_STAR2_VERIFY_GATE'] ?? '1';
         $ns2ThrowswebDefault = $defaults['NORTH_STAR2_THROWSWEB_GATE'] ?? '1';
         $ns3Default = $defaults['NORTH_STAR3_VERIFY_GATE'] ?? '0';
+        $ns4Default = $defaults['NORTH_STAR4_VERIFY_GATE'] ?? '0';
         $m3HelloStrictDefault = $defaults['BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE'] ?? '0';
-        $m3SmokeStrictDefault = $defaults['BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE'] ?? '0';
+        $m4Gen2StrictDefault = $defaults['BOOTSTRAP_M4_GEN2_STRICT_GATE'] ?? '1';
+        $m3SmokeStrictDefault = $defaults['BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE'] ?? '1';
         $m3SmokeProbeDefault = $defaults['BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE'] ?? '1';
         $runtimeSmokeProbeDefault = $defaults['BOOTSTRAP_RUNTIME_COMPILE_SMOKE_PROBE_GATE'] ?? '1';
         $runtimeSmokeStrictDefault = $defaults['BOOTSTRAP_RUNTIME_COMPILE_SMOKE_STRICT_GATE'] ?? '0';
@@ -177,6 +179,7 @@ final class Doctor
         $m4LoopProbeDefault = $defaults['BOOTSTRAP_M4_LOOP_PROBE'] ?? '0';
         $m4Gen2SyncDefault = $defaults['SELFHOST_M4_GEN2_SYNC_GATE'] ?? '1';
         $compilerDriverSmokeDefault = $defaults['COMPILER_DRIVER_SMOKE_GATE'] ?? '1';
+        $vmDriverExecuteDefault = $defaults['BOOTSTRAP_VM_DRIVER_EXECUTE_GATE'] ?? '1';
         $compilerUnitProbeDefault = $defaults['BOOTSTRAP_COMPILER_UNIT_PROBE_GATE'] ?? '1';
         $jitUnitProbeDefault = $defaults['BOOTSTRAP_JIT_UNIT_PROBE_GATE'] ?? '0';
         $vmUnitProbeDefault = $defaults['BOOTSTRAP_VM_UNIT_PROBE_GATE'] ?? '0';
@@ -205,6 +208,8 @@ final class Doctor
         fwrite(STDOUT, "   SELFHOST_SPINE_DEFERRED_SYNC_GATE=".(self::gateEnabled('SELFHOST_SPINE_DEFERRED_SYNC_GATE', $spineDeferredDefault) ? '1' : '0')." (default {$spineDeferredDefault})\n");
         fwrite(STDOUT, "   BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke\n");
         fwrite(STDOUT, "   BOOTSTRAP_LIB_SPINE_VM_SMOKE=1 make bootstrap-selfhost-lib-spine-vm-smoke\n");
+        fwrite(STDOUT, "   make bootstrap-selfhost-vm-driver-execute-probe\n");
+        fwrite(STDOUT, '   BOOTSTRAP_VM_DRIVER_EXECUTE_GATE='.(self::gateEnabled('BOOTSTRAP_VM_DRIVER_EXECUTE_GATE', $vmDriverExecuteDefault) ? '1' : '0')." (default {$vmDriverExecuteDefault}) — ci-local LLVM tail M2 VM driver execute ([#2201](https://github.com/PurHur/php-compiler/issues/2201), [#2227](https://github.com/PurHur/php-compiler/issues/2227))\n");
         fwrite(STDOUT, "   BOOTSTRAP_COMPILER_DRIVER_SMOKE=1 make bootstrap-selfhost-compiler-driver-smoke\n");
         fwrite(STDOUT, '   COMPILER_DRIVER_SMOKE_GATE='.(self::gateEnabled('COMPILER_DRIVER_SMOKE_GATE', $compilerDriverSmokeDefault) ? '1' : '0')." (default {$compilerDriverSmokeDefault}) — ci-local LLVM tail ([#2137](https://github.com/PurHur/php-compiler/issues/2137), [#2168](https://github.com/PurHur/php-compiler/issues/2168))\n");
         fwrite(STDOUT, "   make bootstrap-selfhost-compiler-unit-probe\n");
@@ -229,9 +234,14 @@ final class Doctor
         fwrite(STDOUT, "   BOOTSTRAP_M3_HELLOWORLD_STRICT=1 … helloworld-probe.sh  (no Zend fallback; #1493)\n");
         fwrite(STDOUT, "   Emit TU: test/selfhost/compiler_helloworld_smoke/compile_driver.php (#1768)\n\n");
 
+        fwrite(STDOUT, "3b. M4 gen-2 strict (ci-local LLVM tail)\n");
+        fwrite(STDOUT, "   BOOTSTRAP_M4_GEN2_STRICT_GATE=".(self::gateEnabled('BOOTSTRAP_M4_GEN2_STRICT_GATE', $m4Gen2StrictDefault) ? '1' : '0')." (default {$m4Gen2StrictDefault}) — bootstrap-loop-gen1-link.sh ([#2112](https://github.com/PurHur/php-compiler/issues/2112))\n");
+        fwrite(STDOUT, "   BOOTSTRAP_M4_GEN2_STRICT=1 ./script/bootstrap-loop-gen1-link.sh  (no Zend fallback; #2075)\n\n");
+
         fwrite(STDOUT, "4. Presenter / fast CI\n");
         fwrite(STDOUT, "   NORTH_STAR2_VERIFY_GATE=".(self::gateEnabled('NORTH_STAR2_VERIFY_GATE', $ns2Default) ? '1' : '0')." (default {$ns2Default}) — ci-fast\n");
         fwrite(STDOUT, "   NORTH_STAR3_VERIFY_GATE=".(self::gateEnabled('NORTH_STAR3_VERIFY_GATE', $ns3Default) ? '1' : '0')." (default {$ns3Default}) — ci-fast opt-in ([#2396](https://github.com/PurHur/php-compiler/issues/2396))\n");
+        fwrite(STDOUT, "   NORTH_STAR4_VERIFY_GATE=".(self::gateEnabled('NORTH_STAR4_VERIFY_GATE', $ns4Default) ? '1' : '0')." (default {$ns4Default}) — ci-local LLVM tail opt-in ([#2429](https://github.com/PurHur/php-compiler/issues/2429))\n");
         fwrite(STDOUT, "   BOOTSTRAP_TEST_SUBSET_GATE=".(self::gateEnabled('BOOTSTRAP_TEST_SUBSET_GATE', $testSubsetDefault) ? '1' : '0')." (default {$testSubsetDefault}) — ci-fast after inventory; phpc test --bootstrap ([#2069](https://github.com/PurHur/php-compiler/issues/2069))\n");
         fwrite(STDOUT, "   BOOTSTRAP_TEST_SUBSET_STRICT=".(self::gateEnabled('BOOTSTRAP_TEST_SUBSET_STRICT', $testSubsetStrictDefault) ? '1' : '0')." (default {$testSubsetStrictDefault}) — strict M3 tail when subset gate on\n");
         if (is_executable($repoRoot.'/script/north-star2-verify.sh')) {
@@ -252,6 +262,7 @@ final class Doctor
 
         fwrite(STDOUT, "5. M4 loop\n");
         fwrite(STDOUT, "   BOOTSTRAP_LOOP_PROBE_GATE=".(self::gateEnabled('BOOTSTRAP_LOOP_PROBE_GATE', $loopProbeDefault) ? '1' : '0')." (default {$loopProbeDefault}) — ci-fast ./script/bootstrap-loop-probe.sh --dry-run\n");
+        fwrite(STDOUT, "   BOOTSTRAP_M4_GEN2_STRICT_GATE=".(self::gateEnabled('BOOTSTRAP_M4_GEN2_STRICT_GATE', $m4Gen2StrictDefault) ? '1' : '0')." (default {$m4Gen2StrictDefault}) — ci-local LLVM tail gen-1 link strict ([#2112](https://github.com/PurHur/php-compiler/issues/2112))\n");
         fwrite(STDOUT, "   BOOTSTRAP_M4_LOOP_PROBE=".(self::gateEnabled('BOOTSTRAP_M4_LOOP_PROBE', $m4LoopProbeDefault) ? '1' : '0')." (default {$m4LoopProbeDefault}) — ci-local LLVM tail full M4 ladder (#2780, #2058)\n");
         fwrite(STDOUT, "   SELFHOST_M4_GEN2_SYNC_GATE=".(self::gateEnabled('SELFHOST_M4_GEN2_SYNC_GATE', $m4Gen2SyncDefault) ? '1' : '0')." (default {$m4Gen2SyncDefault}) — ci-fast check-selfhost-m4-gen2-sync.php (#2115, #2175)\n\n");
 
@@ -434,6 +445,12 @@ final class Doctor
             ? 'default on when gate=1 — ci-local MiniWebAppJitProjectTest (#587, #2183)'
             : 'opt-in default 0 — MINIWEBAPP_JIT_PROJECT_GATE=1 for project JIT (#587)';
         fwrite(STDOUT, '  003 project JIT  MINIWEBAPP_JIT_PROJECT_GATE='.($jitProjectOn ? '1' : '0')." (default {$jitProjectDefault}) — {$jitProjectDetail}\n");
+        $vmOopDefault = $defaultsWeb['MINIWEBAPP_VM_OOP_GATE'] ?? '0';
+        $vmOopOn = self::gateEnabled('MINIWEBAPP_VM_OOP_GATE', $vmOopDefault);
+        $vmOopDetail = $vmOopOn
+            ? 'opt-in when gate=1 — ci-fast check-miniwebapp-vm-oop.sh (#2189, #2059)'
+            : 'opt-in default 0 — MINIWEBAPP_VM_OOP_GATE=1 for VM serve OOP curls (#2189)';
+        fwrite(STDOUT, '  003 VM OOP e2e  MINIWEBAPP_VM_OOP_GATE='.($vmOopOn ? '1' : '0')." (default {$vmOopDefault}) — {$vmOopDetail}\n");
         fwrite(STDOUT, "  Full AOT tail    ./script/ci-local.sh --filter MiniWebAppAotExecuteTest   LLVM required\n");
         fwrite(STDOUT, "  Presenter bundle make north-star1-verify            --require-llvm / --skip-llvm-tail\n");
         fwrite(STDOUT, "  Script           ./script/north-star1-verify.sh    same as make target\n");
@@ -456,13 +473,14 @@ final class Doctor
             ? 'ready at '.$llvmInfo['dir'].' ('.$llvmInfo['source'].')'
             : 'missing — M0/M2 link steps need LLVM 9';
 
-        $m3StrictGate = getenv('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE');
-        $m3StrictOn = false !== $m3StrictGate && '1' === $m3StrictGate;
+        $defaults = self::readCiDefaultsEnv($repoRoot);
+        $m3HelloStrictDefault = $defaults['BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE'] ?? '1';
+        $m3StrictOn = self::gateEnabled('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE', $m3HelloStrictDefault);
         $m3StrictEnv = getenv('BOOTSTRAP_M3_HELLOWORLD_STRICT');
         $m3StrictProbe = false !== $m3StrictEnv && '1' === $m3StrictEnv;
         $m3Detail = $m3StrictOn || $m3StrictProbe
             ? 'strict probe enabled (GATE or BOOTSTRAP_M3_HELLOWORLD_STRICT=1)'
-            : 'default off — export BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=1 for ci-local LLVM tail (#1493)';
+            : 'ci-local LLVM tail strict gate off — default '.$m3HelloStrictDefault.' (#1866); opt-out BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=0';
 
         $ns2Script = $repoRoot.'/script/north-star2-verify.sh';
         $ns2Make = is_executable($ns2Script);
@@ -476,9 +494,17 @@ final class Doctor
         fwrite(STDOUT, "  Inventory        php script/bootstrap-inventory.php --check\n");
         fwrite(STDOUT, "  Wave gate        make bootstrap-wave-check\n");
         fwrite(STDOUT, "  M0 link          ./script/bootstrap-selfhost-link.sh\n");
+        fwrite(STDOUT, "  M0 link (no make) ./script/bootstrap-selfhost-gate.sh link (#2905)\n");
         fwrite(STDOUT, "  M2 spine link    BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke\n");
         fwrite(STDOUT, "  M2 VM smoke      BOOTSTRAP_LIB_SPINE_VM_SMOKE=1 make bootstrap-selfhost-lib-spine-vm-smoke\n");
         $defaultsPresenter = self::readCiDefaultsEnv($repoRoot);
+        $vmDriverExecuteDefaultPresenter = $defaultsPresenter['BOOTSTRAP_VM_DRIVER_EXECUTE_GATE'] ?? '1';
+        $vmDriverExecuteOn = self::gateEnabled('BOOTSTRAP_VM_DRIVER_EXECUTE_GATE', $vmDriverExecuteDefaultPresenter);
+        $vmDriverExecuteDetail = $vmDriverExecuteOn
+            ? 'BOOTSTRAP_VM_DRIVER_EXECUTE_GATE=1 (default) — ci-local LLVM tail M2 VM driver execute (#2201, #2227)'
+            : 'skipped (BOOTSTRAP_VM_DRIVER_EXECUTE_GATE=0 opt-out)';
+        fwrite(STDOUT, "  M2 VM driver     make bootstrap-selfhost-vm-driver-execute-probe\n");
+        fwrite(STDOUT, "                   {$vmDriverExecuteDetail}\n");
         $compilerDriverSmokeDefaultPresenter = $defaultsPresenter['COMPILER_DRIVER_SMOKE_GATE'] ?? '1';
         $compilerDriverSmokeOn = self::gateEnabled('COMPILER_DRIVER_SMOKE_GATE', $compilerDriverSmokeDefaultPresenter);
         $compilerDriverSmokeDetail = $compilerDriverSmokeOn
@@ -543,6 +569,11 @@ final class Doctor
         $ns3CiDetail = $ns3CiOn
             ? 'NORTH_STAR3_VERIFY_GATE=1 — ci-fast runs make north-star3-verify (#2396)'
             : 'opt-in NORTH_STAR3_VERIFY_GATE=1 for M3 unit probes in ci-fast (#2396)';
+        $ns4CiGate = getenv('NORTH_STAR4_VERIFY_GATE');
+        $ns4CiOn = false !== $ns4CiGate && '1' === $ns4CiGate;
+        $ns4CiDetail = $ns4CiOn
+            ? 'NORTH_STAR4_VERIFY_GATE=1 — ci-local LLVM tail runs make north-star4-verify (#2429)'
+            : 'opt-in NORTH_STAR4_VERIFY_GATE=1 for M4 presenter in ci-local (#2429)';
         $defaults = self::readCiDefaultsEnv($repoRoot);
         $ns2ThrowswebDefault = $defaults['NORTH_STAR2_THROWSWEB_GATE'] ?? '1';
         $ns2ThrowswebOn = self::gateEnabled('NORTH_STAR2_THROWSWEB_GATE', $ns2ThrowswebDefault);
@@ -578,6 +609,7 @@ final class Doctor
         }
         fwrite(STDOUT, "  Fast CI hook     {$ns2CiDetail}\n");
         fwrite(STDOUT, "  M3 ci-fast       {$ns3CiDetail}\n");
+        fwrite(STDOUT, "  M4 presenter     {$ns4CiDetail}\n");
         fwrite(STDOUT, "  Bootstrap subset {$subsetDetail}\n");
         fwrite(STDOUT, "  Docs             docs/bootstrap-selfhost.md · docs/self-host-target.md (#1492)\n");
     }
@@ -1060,8 +1092,8 @@ final class Doctor
         }
 
         $defaults = self::readCiDefaultsEnv($repoRoot);
-        $smokeDefault = $defaults['FASTCGI_WEB_SMOKE_GATE'] ?? '0';
-        $aotDefault = $defaults['FASTCGI_WEB_AOT_SMOKE_GATE'] ?? '0';
+        $smokeDefault = $defaults['FASTCGI_WEB_SMOKE_GATE'] ?? '1';
+        $aotDefault = $defaults['FASTCGI_WEB_AOT_SMOKE_GATE'] ?? '1';
         $deployDefault = $defaults['FASTCGI_WEB_DEPLOY_SMOKE_GATE'] ?? '0';
 
         $smokeOn = self::gateEnabled('FASTCGI_WEB_SMOKE_GATE', $smokeDefault);
@@ -1096,7 +1128,7 @@ final class Doctor
             $smokeDefault,
             $smokeOn,
             false,
-            'make examples-fastcgiweb-smoke · examples-web-smoke.sh --fastcgi-only · ci-fast when gate=1 (#2351)',
+            'make examples-fastcgiweb-smoke · examples-web-smoke.sh --fastcgi-only · ci-fast default (#2351, #2369)',
             '#2351'
         );
         $fcgiSmokeDefault = $defaults['FASTCGI_SMOKE_GATE'] ?? '0';
@@ -1113,10 +1145,10 @@ final class Doctor
         );
         $aotStatus = $aotOn && $llvmReady ? '✅' : '📋';
         $aotExecuteNote = $llvmReady
-            ? ($aotOn ? '#2352 · FASTCGI_WEB_AOT_SMOKE_GATE=1' : '#2352 · opt-in default 0')
+            ? ($aotOn ? '#2352 · FASTCGI_WEB_AOT_SMOKE_GATE=1 default' : '#2352 · opt-out default 1')
             : 'LLVM required; #2352 when gate=1';
         fwrite(STDOUT, "  [{$aotStatus}] Stage 2 AOT execute — FASTCGI_WEB_AOT_SMOKE_GATE default {$aotDefault} ({$aotExecuteNote})\n");
-        fwrite(STDOUT, "      Shell:   FASTCGI_WEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh\n");
+        fwrite(STDOUT, "      Shell:   EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh (FASTCGI_WEB_AOT_SMOKE_GATE=1 default)\n");
         fwrite(STDOUT, "      PHPUnit: ./script/ci-local.sh --filter FastCGIWebAotExecuteTest (when present)\n");
         $deployStatus = $deployOn && $llvmReady ? '✅' : '📋';
         $deployNote = $deployOn

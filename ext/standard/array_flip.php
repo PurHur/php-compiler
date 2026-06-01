@@ -46,9 +46,9 @@ final class array_flip extends Internal
             $stored = new Variable();
             $stored->copyFrom($key);
             if (Variable::TYPE_INTEGER === $val->type) {
-                $out->addIndex($val->toInt(), $stored);
+                $out->updateIndex($val->toInt(), $stored);
             } else {
-                $out->add($val->toString(), $stored);
+                $out->update($val->toString(), $stored);
             }
         }
         $frame->returnVar->array($out);

@@ -296,7 +296,6 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringUrldecode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringNl2br::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringUcwords::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringWordwrap::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringRandomBytes::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringJsonEncode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringSerialize::implement($this->context);

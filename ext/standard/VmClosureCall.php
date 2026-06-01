@@ -110,4 +110,23 @@ final class VmClosureCall
             }
         }
     }
+
+    /**
+     * Sort [key, value] pairs in place by value using a closure comparator (uasort subset).
+     *
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByValue(Context $context, array &$pairs, ClosureState $closure): void
+    {
+        $n = \count($pairs);
+        for ($i = 1; $i < $n; ++$i) {
+            $j = $i;
+            while ($j > 0 && self::invokeTwo($context, $closure, $pairs[$j - 1][1], $pairs[$j][1]) > 0) {
+                $tmp = $pairs[$j - 1];
+                $pairs[$j - 1] = $pairs[$j];
+                $pairs[$j] = $tmp;
+                --$j;
+            }
+        }
+    }
 }

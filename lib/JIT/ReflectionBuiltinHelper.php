@@ -31,9 +31,46 @@ final class ReflectionBuiltinHelper
 
     public static function classExistsLiteral(Context $context, string $className): Value
     {
-        $lc = strtolower($className);
-        $exists = self::objectBuiltin($context)->hasUserDeclaredClass($className)
-            || isset($context->runtime->vmContext->classes[$lc]);
+        $lc = strtolower(ltrim($className, '\\'));
+        $object = self::objectBuiltin($context);
+        $exists = $object->hasUserDeclaredClass($className)
+            && !$object->isTraitClass($lc)
+            && !$object->isInterfaceClassLc($lc);
+        if (!$exists && null !== $context->runtime->vmContext) {
+            $entry = $context->runtime->vmContext->classes[$lc] ?? null;
+            $exists = null !== $entry
+                && !$entry->isEnum
+                && !$entry->isInterface
+                && !$entry->isTrait;
+        }
+        $i1 = $context->getTypeFromString('int1');
+
+        return $i1->constInt($exists ? 1 : 0, false);
+    }
+
+    /** interface_exists() — user interfaces only (Zend; php-src basic_functions.c). */
+    public static function interfaceExistsLiteral(Context $context, string $interfaceName): Value
+    {
+        $lc = strtolower(ltrim($interfaceName, '\\'));
+        $exists = self::objectBuiltin($context)->isInterfaceClassLc($lc);
+        if (!$exists && null !== $context->runtime->vmContext) {
+            $entry = $context->runtime->vmContext->classes[$lc] ?? null;
+            $exists = null !== $entry && $entry->isInterface;
+        }
+        $i1 = $context->getTypeFromString('int1');
+
+        return $i1->constInt($exists ? 1 : 0, false);
+    }
+
+    /** trait_exists() — user traits only (Zend; php-src basic_functions.c). */
+    public static function traitExistsLiteral(Context $context, string $traitName): Value
+    {
+        $lc = strtolower(ltrim($traitName, '\\'));
+        $exists = self::objectBuiltin($context)->isTraitClass($lc);
+        if (!$exists && null !== $context->runtime->vmContext) {
+            $entry = $context->runtime->vmContext->classes[$lc] ?? null;
+            $exists = null !== $entry && $entry->isTrait;
+        }
         $i1 = $context->getTypeFromString('int1');
 
         return $i1->constInt($exists ? 1 : 0, false);

@@ -14,6 +14,9 @@ PROBE="${ROOT}/build/selfhost-compiler-unit-probe"
 EMIT_HELPER="${ROOT}/build/selfhost-compiler-unit-probe-emit"
 AOT_OUT="${ROOT}/build/compiler-unit-probe-aot"
 INVENTORY_EMIT_DRIVER="${ROOT}/test/selfhost/compiler_unit_probe/compile_driver.php"
+# shellcheck source=bootstrap-inventory-emit-default.sh
+source "$(dirname "$0")/bootstrap-inventory-emit-default.sh"
+bootstrap_resolve_inventory_emit_driver "${INVENTORY_EMIT_DRIVER}"
 M3_NATIVE_COMPILE=0
 M3_EMIT_PATH="none"
 M3_BLOCK_REASON="native emit helper not linked (set BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1)"

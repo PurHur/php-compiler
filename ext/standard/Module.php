@@ -55,6 +55,12 @@ class Module extends ModuleAbstract
             new sin(),
             new cos(),
             new tan(),
+            new acos(),
+            new asin(),
+            new atan(),
+            new sinh(),
+            new cosh(),
+            new tanh(),
             new is_nan(),
             new is_finite(),
             new is_infinite(),
@@ -73,9 +79,13 @@ class Module extends ModuleAbstract
             new settype(),
             new var_export(),
             new var_dump_(),
+            new print_r(),
             new gettype(),
             new get_debug_type(),
             new gc_collect_cycles(),
+            new gc_enable(),
+            new gc_disable(),
+            new gc_enabled(),
             new halt_compiler_(),
             new strval(),
             new int_min(),
@@ -106,6 +116,7 @@ class Module extends ModuleAbstract
             new is_numeric(),
             new is_scalar(),
             new is_countable(),
+            new is_iterable(),
             new is_resource_(),
             new lcfirst(),
             new ucfirst(),
@@ -131,6 +142,10 @@ class Module extends ModuleAbstract
             new strrpos(),
             new substr_count(),
             new count_chars(),
+            new convert_uudecode(),
+            new convert_uuencode(),
+            new utf8_decode(),
+            new utf8_encode(),
             new str_word_count(),
             new str_contains(),
             new str_starts_with(),
@@ -142,6 +157,8 @@ class Module extends ModuleAbstract
             new array_key_exists(),
             new array_key_first(),
             new array_key_last(),
+            new array_first(),
+            new array_last(),
             new array_is_list(),
             new in_array(),
             new array_push(),
@@ -163,9 +180,15 @@ class Module extends ModuleAbstract
             new uasort_(),
             new uksort_(),
             new sprintf_(),
+            new printf_(),
+            new vprintf_(),
+            new vfprintf_(),
+            new vsprintf(),
+            new sscanf(),
             new array_values(),
             new array_keys(),
             new array_merge(),
+            new array_merge_recursive(),
             new array_slice(),
             new array_splice(),
             new array_chunk(),
@@ -200,6 +223,8 @@ class Module extends ModuleAbstract
             new array_diff(),
             new array_intersect(),
             new iterator_to_array(),
+            new iterator_count(),
+            new iterator_apply(),
             new array_replace(),
             new array_replace_recursive(),
             new array_fill(),
@@ -208,6 +233,10 @@ class Module extends ModuleAbstract
             new array_combine(),
             new array_map(),
             new array_filter(),
+            new array_find(),
+            new array_find_key(),
+            new array_any(),
+            new array_all(),
             new array_walk(),
             new array_walk_recursive(),
             new array_reduce(),
@@ -226,6 +255,8 @@ class Module extends ModuleAbstract
             new crc32(),
             new password_hash(),
             new password_verify(),
+            new password_get_info(),
+            new crypt(),
             new random_bytes(),
             new random_int(),
             new uniqid(),
@@ -235,11 +266,15 @@ class Module extends ModuleAbstract
             new wordwrap(),
             new htmlspecialchars(),
             new htmlspecialchars_decode(),
+            new highlight_string(),
+            new highlight_file(),
             new htmlentities(),
             new html_entity_decode(),
+            new get_html_translation_table(),
             new strip_tags(),
             new header_(),
             new headers_sent(),
+            new header_register_callback(),
             new register_shutdown_function(),
             new setcookie(),
             new setrawcookie(),
@@ -251,9 +286,13 @@ class Module extends ModuleAbstract
             new session_regenerate_id(),
             new header_remove(),
             new header_list(),
+            new headers_list(),
             new getallheaders_(),
             new ob_start(),
             new ob_get_clean(),
+            new ob_get_contents(),
+            new ob_end_clean(),
+            new ob_get_length(),
             new ob_end_flush(),
             new flush_(),
             new ob_get_level(),
@@ -287,6 +326,11 @@ class Module extends ModuleAbstract
             new file_exists(),
             new filesize(),
             new filemtime(),
+            new disk_free_space(),
+            new disk_total_space(),
+            new diskfreespace(),
+            new disktotalspace(),
+            new dl(),
             new clearstatcache_(),
             new stat_(),
             new lstat_(),
@@ -298,6 +342,8 @@ class Module extends ModuleAbstract
             new is_executable(),
             new is_link(),
             new readlink(),
+            new link_(),
+            new symlink_(),
             new unlink(),
             new mkdir_(),
             new rmdir_(),
@@ -311,6 +357,10 @@ class Module extends ModuleAbstract
             new touch_(),
             new filetype(),
             new stream_context_create(),
+            new stream_set_chunk_size_(),
+            new stream_set_timeout_(),
+            new stream_set_write_buffer_(),
+            new stream_set_read_buffer_(),
             new fopen(),
             new fread(),
             new fgetc(),
@@ -323,6 +373,7 @@ class Module extends ModuleAbstract
             new rewind_(),
             new feof_(),
             new fflush_(),
+            new ftruncate_(),
             new fpassthru(),
             new fwrite(),
             new fclose(),
@@ -335,6 +386,7 @@ class Module extends ModuleAbstract
             new phpc_run_command(),
             new sys_get_temp_dir(),
             new tempnam(),
+            new tmpfile(),
             new getcwd_(),
             new gethostname(),
             new chdir_(),
@@ -347,6 +399,10 @@ class Module extends ModuleAbstract
             new get_defined_constants_(),
             new get_defined_vars_(),
             new get_declared_interfaces_(),
+            new get_declared_classes_(),
+            new get_declared_traits_(),
+            new get_declared_functions_(),
+            new get_defined_functions_(),
             new debug_backtrace(),
             new class_exists_(),
             new class_alias(),
@@ -363,7 +419,10 @@ class Module extends ModuleAbstract
             new method_exists_(),
             new property_exists_(),
             new get_object_vars_(),
+            new get_mangled_object_vars_(),
+            new get_object_id(),
             new get_class_(),
+            new get_called_class_(),
             new get_class_vars_(),
             new get_class_methods_(),
             new get_parent_class_(),
@@ -373,6 +432,8 @@ class Module extends ModuleAbstract
             new trigger_error_(),
             new set_error_handler_(),
             new restore_error_handler_(),
+            new set_exception_handler(),
+            new restore_exception_handler(),
             new error_get_last(),
             new error_clear_last(),
             new eval_(),
@@ -385,7 +446,11 @@ class Module extends ModuleAbstract
             new fnmatch(),
             new time(),
             new getmypid(),
+            new getmygrgid(),
+            new getmyinode(),
             new getrusage(),
+            new memory_get_peak_usage(),
+            new memory_get_usage(),
             new microtime(),
             new gettimeofday(),
             new hrtime(),
@@ -539,6 +604,18 @@ class Module extends ModuleAbstract
             $context->registerFunction('strtod', $fn);
         }
         try {
+            $context->lookupFunction('phpc_basetozval_result');
+        } catch (\Throwable $e) {
+            $charPtr = $context->getTypeFromString('char*');
+            $i64 = $context->getTypeFromString('int64');
+            $i64Ptr = $context->getTypeFromString('int64*');
+            $doublePtr = $context->getTypeFromString('double*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $charPtr, $i64, $i64Ptr, $doublePtr);
+            $fn = $context->module->addFunction('phpc_basetozval_result', $ft);
+            $context->registerFunction('phpc_basetozval_result', $fn);
+        }
+        try {
             $context->lookupFunction('strlen');
         } catch (\Throwable $e) {
             $i8p = $context->getTypeFromString('int8*');
@@ -581,6 +658,15 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p, $i8p);
             $fn = $context->module->addFunction('lstat', $ft);
             $context->registerFunction('lstat', $fn);
+        }
+        try {
+            $context->lookupFunction('statvfs');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i8p, $i8p);
+            $fn = $context->module->addFunction('statvfs', $ft);
+            $context->registerFunction('statvfs', $fn);
         }
         try {
             $context->lookupFunction('readlink');
@@ -638,6 +724,24 @@ class Module extends ModuleAbstract
             $context->registerFunction('rename', $fn);
         }
         try {
+            $context->lookupFunction('linkat');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i32, $i8p, $i32, $i8p, $i32);
+            $fn = $context->module->addFunction('linkat', $ft);
+            $context->registerFunction('linkat', $fn);
+        }
+        try {
+            $context->lookupFunction('symlinkat');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i8p, $i32, $i8p);
+            $fn = $context->module->addFunction('symlinkat', $ft);
+            $context->registerFunction('symlinkat', $fn);
+        }
+        try {
             $context->lookupFunction('chdir');
         } catch (\Throwable $e) {
             $i8p = $context->getTypeFromString('int8*');
@@ -654,7 +758,7 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('fabs', $ft);
             $context->registerFunction('fabs', $fn);
         }
-        foreach (['ceil', 'floor', 'round', 'sqrt', 'log', 'log10', 'exp', 'expm1', 'log1p', 'sin', 'cos', 'tan', 'pow', 'hypot', 'atan2', 'fmod'] as $name) {
+        foreach (['ceil', 'floor', 'round', 'sqrt', 'log', 'log10', 'exp', 'expm1', 'log1p', 'sin', 'cos', 'tan', 'acos', 'asin', 'atan', 'sinh', 'cosh', 'tanh', 'pow', 'hypot', 'atan2', 'fmod'] as $name) {
             try {
                 $context->lookupFunction($name);
             } catch (\Throwable $e) {

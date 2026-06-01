@@ -75,6 +75,18 @@ final class JitNativeString
         }
     }
 
+    /** Decimal string for a packed-list index (array_merge numeric-string keys; #3607). */
+    public static function formatIndexKey(Context $context, Value $indexI64): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+
+        return self::format(
+            $context,
+            $context->builder->truncOrBitCast($indexI64, $sizeT),
+            '%zu'
+        );
+    }
+
     private static function format(Context $context, Value $value, string $format): Value
     {
         $sizeT = $context->getTypeFromString('size_t');

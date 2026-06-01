@@ -6,8 +6,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
+use PHPCompiler\Func\Internal as FuncInternal;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\Variable;
@@ -98,6 +100,107 @@ final class VmReflection
             $value->string($entry->name);
             $result->append($value);
         }
+
+        return $result;
+    }
+
+    /**
+     * get_declared_classes() — numerically indexed class name list (issue #3128).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_classes)
+     */
+    public static function declaredClassesTable(Context $ctx): \PHPCompiler\VM\HashTable
+    {
+        $result = new \PHPCompiler\VM\HashTable();
+        foreach ($ctx->classes as $lc => $entry) {
+            if ($entry->isInterface || $entry->isTrait || $entry->isEnum || isset($ctx->classAliases[$lc])) {
+                continue;
+            }
+            $value = new Variable();
+            $value->string($entry->name);
+            $result->append($value);
+        }
+
+        return $result;
+    }
+
+    /**
+     * get_declared_traits() — numerically indexed trait name list (issue #3128).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_traits)
+     */
+    public static function declaredTraitsTable(Context $ctx): \PHPCompiler\VM\HashTable
+    {
+        $result = new \PHPCompiler\VM\HashTable();
+        foreach ($ctx->classes as $lc => $entry) {
+            if (!$entry->isTrait || isset($ctx->classAliases[$lc])) {
+                continue;
+            }
+            $value = new Variable();
+            $value->string($entry->name);
+            $result->append($value);
+        }
+
+        return $result;
+    }
+
+    /** @var list<string>|null */
+    private static ?array $internalFunctionNames = null;
+
+    /**
+     * Registered ext Module internal function names (php-src internal bucket).
+     *
+     * @return list<string>
+     */
+    public static function internalFunctionNameList(): array
+    {
+        if (null !== self::$internalFunctionNames) {
+            return self::$internalFunctionNames;
+        }
+        $names = [];
+        foreach ([new Module(), new \PHPCompiler\ext\types\Module()] as $module) {
+            foreach ($module->getFunctions() as $func) {
+                $names[] = $func->getName();
+            }
+        }
+        $names = array_values(array_unique($names));
+        sort($names);
+        self::$internalFunctionNames = $names;
+
+        return self::$internalFunctionNames;
+    }
+
+    /**
+     * get_defined_functions() — internal/user name lists (issue #3128).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_defined_functions)
+     */
+    public static function definedFunctionsTable(Context $ctx): \PHPCompiler\VM\HashTable
+    {
+        $result = new \PHPCompiler\VM\HashTable();
+
+        $internalVar = new Variable();
+        $internalVar->newArray();
+        $internalHt = $internalVar->toArray();
+        foreach (self::internalFunctionNameList() as $name) {
+            $value = new Variable();
+            $value->string($name);
+            $internalHt->append($value);
+        }
+        $result->add('internal', $internalVar);
+
+        $userVar = new Variable();
+        $userVar->newArray();
+        $userHt = $userVar->toArray();
+        foreach ($ctx->functions as $func) {
+            if ($func instanceof FuncInternal) {
+                continue;
+            }
+            $value = new Variable();
+            $value->string($func->getName());
+            $userHt->append($value);
+        }
+        $result->add('user', $userVar);
 
         return $result;
     }
@@ -244,7 +347,11 @@ final class VmReflection
         return $ctx->classes[$lc] ?? null;
     }
 
-    /** @return array<string, string> trait name => trait name (Zend class_uses map) */
+    /**
+     * trait name => trait name (Zend class_uses map).
+     *
+     * @return array<string, string>
+     */
     public static function traitUsesMap(ClassEntry $class): array
     {
         return $class->usedTraits;
@@ -261,7 +368,9 @@ final class VmReflection
     }
 
     /**
-     * @return array<string, string> interface name => interface name (Zend class_implements map)
+     * interface name => interface name (Zend class_implements map).
+     *
+     * @return array<string, string>
      */
     public static function classImplementsMap(ClassEntry $entry, Context $ctx): array
     {
@@ -535,6 +644,62 @@ final class VmReflection
         return $result;
     }
 
+    /**
+     * get_mangled_object_vars() — all set instance properties with Zend-mangled keys (issue #3497).
+     *
+     * php-src: ext/standard/var.c — PHP_FUNCTION(get_mangled_object_vars)
+     */
+    public static function getMangledObjectVars(Variable $object, Context $ctx): Variable
+    {
+        $object = $object->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $object->type) {
+            throw new \LogicException('get_mangled_object_vars() argument must be an object in this compiler build');
+        }
+        $obj = $object->toObject();
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach ($obj->class->properties as $meta) {
+            if (!$obj->hasProperty($meta->name)) {
+                continue;
+            }
+            $value = $obj->getProperty($meta->name)->resolveIndirect();
+            if (Variable::TYPE_NULL === $value->type) {
+                continue;
+            }
+            $key = self::manglePropertyKey($meta, $ctx);
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $ht->add($key, $copy);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Zend property hash key for ZEND_PROP_PURPOSE_DEBUG (php-src zend_mangle_property_name).
+     */
+    public static function manglePropertyKey(ClassProperty $meta, Context $ctx): string
+    {
+        if (MethodVisibility::isPublic($meta->visibility)) {
+            return $meta->name;
+        }
+        if (($meta->visibility & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+            return "\0*\0".$meta->name;
+        }
+
+        return "\0".self::declaringClassDisplay($meta, $ctx)."\0".$meta->name;
+    }
+
+    private static function declaringClassDisplay(ClassProperty $meta, Context $ctx): string
+    {
+        if ('' !== $meta->declaringClassLc && isset($ctx->classes[$meta->declaringClassLc])) {
+            return $ctx->classes[$meta->declaringClassLc]->name;
+        }
+
+        return $meta->declaringClassLc;
+    }
+
     /** Default visibility filter: public | protected | private (php-src get_class_methods). */
     public const METHOD_FILTER_DEFAULT = \PHPCfg\Func::FLAG_PUBLIC
         | \PHPCfg\Func::FLAG_PROTECTED
@@ -591,5 +756,33 @@ final class VmReflection
         }
 
         return $result;
+    }
+
+    /**
+     * Called class for get_called_class() (issue #3218).
+     *
+     * php-src: ext/standard/basic_functions.c — php_get_called_class()
+     */
+    public static function getCalledClass(Frame $frame): string
+    {
+        $current = $frame->parent;
+        if (null === $current) {
+            throw new \Error('get_called_class() must be called from within a class');
+        }
+        if (null !== $current->calledClass && '' !== $current->calledClass) {
+            return $current->calledClass;
+        }
+        if (null === $current->block || null === $current->block->func || null === $current->block->func->class) {
+            throw new \Error('get_called_class() must be called from within a class');
+        }
+        $thisIdx = $current->block->slotIndexForVariableName('this');
+        if (null !== $thisIdx && isset($current->scope[$thisIdx])) {
+            $thisVar = $current->scope[$thisIdx]->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $thisVar->type) {
+                return $thisVar->toObject()->class->name;
+            }
+        }
+
+        return $current->block->func->class->value;
     }
 }

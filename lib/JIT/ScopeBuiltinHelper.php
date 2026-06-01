@@ -68,17 +68,46 @@ final class ScopeBuiltinHelper
         $countSlot = $context->builder->alloca($i64, 1, 'extract_count');
         $context->builder->store($i64->constInt(0, false), $countSlot);
 
+        self::walkStringKeyNodes($context, $ht, $named, $flags, $countSlot);
+
+        return $context->builder->load($countSlot);
+    }
+
+    /**
+     * parse_str() one-arg: import every matching parsed key into named locals (issue #3708).
+     */
+    public static function importHashtableIntoScope(Context $context, Value $ht): void
+    {
+        $named = self::namedVariablesInScope($context);
+        if ([] === $named) {
+            return;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $flags = $i64->constInt(0, false);
+        self::walkStringKeyNodes($context, $ht, $named, $flags, null);
+    }
+
+    /**
+     * @param array<string, Variable> $named
+     */
+    private static function walkStringKeyNodes(
+        Context $context,
+        Value $ht,
+        array $named,
+        Value $flags,
+        ?Value $countSlot
+    ): void {
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
         $nodePtrType = $context->getTypeFromString('__strkey_node__*');
-        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'extract_walk');
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'scope_import_walk');
         $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
         $context->builder->store($head, $walkSlot);
 
-        $strHead = BasicBlockHelper::append($context, 'extract_str_head');
-        $strBody = BasicBlockHelper::append($context, 'extract_str_body');
-        $strNext = BasicBlockHelper::append($context, 'extract_str_next');
-        $strDone = BasicBlockHelper::append($context, 'extract_str_done');
+        $strHead = BasicBlockHelper::append($context, 'scope_import_str_head');
+        $strBody = BasicBlockHelper::append($context, 'scope_import_str_body');
+        $strNext = BasicBlockHelper::append($context, 'scope_import_str_next');
+        $strDone = BasicBlockHelper::append($context, 'scope_import_str_done');
         $context->builder->branch($strHead);
 
         $context->builder->positionAtEnd($strHead);
@@ -98,8 +127,6 @@ final class ScopeBuiltinHelper
         $context->builder->branch($strHead);
 
         $context->builder->positionAtEnd($strDone);
-
-        return $context->builder->load($countSlot);
     }
 
     /**
@@ -111,7 +138,7 @@ final class ScopeBuiltinHelper
         Value $valEntry,
         array $named,
         Value $flags,
-        Value $countSlot
+        ?Value $countSlot
     ): void {
         if ([] === $named) {
             return;
@@ -155,7 +182,7 @@ final class ScopeBuiltinHelper
         Variable $dest,
         Value $valEntry,
         Value $flags,
-        Value $countSlot,
+        ?Value $countSlot,
         \PHPLLVM\BasicBlock $merge
     ): void {
         $i64 = $context->getTypeFromString('int64');
@@ -183,8 +210,10 @@ final class ScopeBuiltinHelper
 
         $context->builder->positionAtEnd($assignBlock);
         self::assignFromValueEntry($context, $dest, $valEntry);
-        $prev = $context->builder->load($countSlot);
-        $context->builder->store($context->builder->addNoSignedWrap($prev, $one), $countSlot);
+        if (null !== $countSlot) {
+            $prev = $context->builder->load($countSlot);
+            $context->builder->store($context->builder->addNoSignedWrap($prev, $one), $countSlot);
+        }
         $context->builder->branch($merge);
     }
 
@@ -235,11 +264,8 @@ final class ScopeBuiltinHelper
         if (null === $flagsArg) {
             return $i64->constInt(VmScope::EXTR_SKIP, false);
         }
-        if (Variable::TYPE_NATIVE_LONG !== $flagsArg->type) {
-            throw new \LogicException('extract() flags must be an integer in this compiler build');
-        }
 
-        return $context->helper->loadValue($flagsArg);
+        return JitLongArg::lower($context, $flagsArg, 'extract() flags');
     }
 
     private static function storeVariableAtStringKey(

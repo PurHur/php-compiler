@@ -364,6 +364,70 @@ function bootstrapVendorPrelinkRelativePath(string $linkPath, string $targetPath
 }
 
 /**
+ * Prefer actionable compile stderr/stdout over generic phase tails (#3049).
+ *
+ * @param list<string> $output
+ */
+function bootstrapVendorPrelinkExtractCompileFailureDetail(array $output): ?string
+{
+    $parseFailure = null;
+    $typePhp = null;
+    $runtimeException = null;
+    $fatal = null;
+    $missingAutoload = null;
+    $lastNonEmpty = null;
+
+    foreach ($output as $raw) {
+        $line = trim((string) $raw);
+        if ('' === $line) {
+            continue;
+        }
+        $lastNonEmpty = $line;
+        if (str_contains($line, 'Missing vendor autoload')) {
+            $missingAutoload = $line;
+
+            continue;
+        }
+        if (str_contains($line, 'parseAndCompile failure:')) {
+            $parseFailure = $line;
+
+            continue;
+        }
+        if (preg_match('/Type\\.php:\\d+/', $line)) {
+            $typePhp = $line;
+
+            continue;
+        }
+        if (str_contains($line, 'RuntimeException in ') || str_contains($line, 'Uncaught ')) {
+            $runtimeException = $line;
+
+            continue;
+        }
+        if (str_contains($line, 'PHP Fatal error:') || str_contains($line, 'Fatal error:')) {
+            $fatal = $line;
+        }
+    }
+
+    if (null !== $missingAutoload) {
+        return $missingAutoload;
+    }
+    if (null !== $parseFailure) {
+        return $parseFailure;
+    }
+    if (null !== $typePhp) {
+        return $typePhp;
+    }
+    if (null !== $runtimeException) {
+        return $runtimeException;
+    }
+    if (null !== $fatal) {
+        return $fatal;
+    }
+
+    return $lastNonEmpty;
+}
+
+/**
  * AOT-compile vendor prelink bundles → prelinked .o (shared by warm and cold boot).
  *
  * @param array{version: int, generated_at: string, packages: array<string, array<string, mixed>>} $manifest
@@ -453,31 +517,19 @@ function bootstrapVendorPrelinkCompilePackages(
             ? 'compile exit '.$code.' (vendor bundle AOT — #1416, #2849)'
             : 'missing object file after compile';
 
-        $firstActionable = null;
-        foreach ($output as $line) {
-            $line = (string) $line;
-            if (str_contains($line, 'Missing vendor autoload')) {
-                $firstActionable = $line;
-                $blocker = 'vendor prelink must not require composer autoload (#2849)';
-                break;
-            }
-            if (str_contains($line, 'PHP Fatal error:') || str_contains($line, 'Fatal error:') || str_contains($line, 'Uncaught ')) {
-                $firstActionable = $line;
-                break;
-            }
+        $logPath = $buildBase.'.log';
+        file_put_contents($logPath, implode("\n", array_map('strval', $output))."\n");
+        $firstActionable = bootstrapVendorPrelinkExtractCompileFailureDetail($output);
+        if (null === $firstActionable && is_file($logPath)) {
+            $logLines = file($logPath, FILE_IGNORE_NEW_LINES) ?: [];
+            $firstActionable = bootstrapVendorPrelinkExtractCompileFailureDetail($logLines);
         }
-        if (null === $firstActionable && [] !== $output) {
-            $last = (string) end($output);
-            if ('' !== $last) {
-                $firstActionable = $last;
-            }
+        if (null !== $firstActionable && str_contains($firstActionable, 'Missing vendor autoload')) {
+            $blocker = 'vendor prelink must not require composer autoload (#2849)';
         }
         if (null !== $firstActionable) {
             $blocker .= ' — '.$firstActionable;
         }
-
-        $logPath = $buildBase.'.log';
-        file_put_contents($logPath, implode("\n", array_map('strval', $output))."\n");
         $manifest['packages'][$package]['status'] = 139 === $code ? 'compile_segfault' : 'compile_failed';
         $manifest['packages'][$package]['blocker'] = $blocker;
         fwrite(STDERR, "FAIL {$package}: {$blocker}\n");

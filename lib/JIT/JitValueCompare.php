@@ -611,8 +611,53 @@ final class JitValueCompare
     }
 
     /**
-     * Loose == between two native {@see __string__} operands (Zend zendi_smart_strcmp parity).
+     * Loose == between native {@see __string__} and native long (#3658 int↔string, Zend zend_compare_scalar).
      */
+    public static function looseEqualStringToNativeLong(
+        Context $context,
+        Value $strPtr,
+        Value $nativeLong
+    ): Value {
+        $map = $context->structFieldMap['__string__'];
+        $len = $context->builder->load(
+            $context->builder->structGep($strPtr, $map['length'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+        $zeroLen = $context->builder->icmp(Builder::INT_EQ, $len, $len->typeOf()->constInt(0, false));
+        $__native = $context->builder->intCast($nativeLong, $i64);
+
+        $isIntegerNumeric = self::stringIsIntegerNumeric($context, $strPtr);
+        $zeroLong = $context->builder->icmp(Builder::INT_EQ, $__native, $i64->constInt(0, false));
+        // Zend #3644: non-numeric strings compare as 0. Do not use strtod/is_numeric here —
+        // length-tracked __string__ buffers can make strtod fail while strtol still consumes a
+        // numeric prefix ('0e123'), which must not match via the non-numeric path (#3658).
+        $noLeadingIntegerPrefix = self::stringStrtolConsumedNothing($context, $strPtr);
+        $nonNumericMatch = $context->builder->and($noLeadingIntegerPrefix, $zeroLong);
+
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $i8p = $context->getTypeFromString('int8*');
+        $endPtrSlot = $context->builder->alloca($i8p, 1, 'loose_strlong_strtol_end');
+        $nullEnd = $i8p->constNull();
+        $context->builder->store($nullEnd, $endPtrSlot);
+        $parsed = $context->builder->call(
+            $context->lookupFunction('strtol'),
+            $charPtr,
+            $endPtrSlot,
+            $context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $parsedI64 = $parsed->typeOf() === $i64 ? $parsed : $context->builder->zExt($parsed, $i64);
+        $intMatch = $context->builder->and(
+            $isIntegerNumeric,
+            $context->builder->icmp(Builder::INT_EQ, $parsedI64, $__native)
+        );
+
+        $matched = $context->builder->or($nonNumericMatch, $intMatch);
+
+        return $context->builder->select($zeroLen, $falseVal, $matched);
+    }
+
     public static function looseEqualStringToString(
         Context $context,
         Value $leftStr,
@@ -663,6 +708,70 @@ final class JitValueCompare
         );
 
         return $context->builder->select($isEmpty, $context->constantFromBool(false), $numeric);
+    }
+
+    /**
+     * True when strtol(base 10) consumes no bytes — string has no leading integer prefix (#3644).
+     */
+    private static function stringStrtolConsumedNothing(Context $context, Value $strPtr): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $endPtrSlot = $context->builder->alloca($i8p, 1, 'loose_str_strtol_prefix_end');
+        $nullEnd = $i8p->constNull();
+        $context->builder->store($nullEnd, $endPtrSlot);
+        $context->builder->call(
+            $context->lookupFunction('strtol'),
+            $charPtr,
+            $endPtrSlot,
+            $context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $endPtr = $context->builder->load($endPtrSlot);
+        $endOffset = $context->builder->sub(
+            $context->builder->ptrToInt($endPtr, $i64),
+            $context->builder->ptrToInt($charPtr, $i64)
+        );
+
+        return $context->builder->icmp(
+            Builder::INT_EQ,
+            $endOffset,
+            $i64->constInt(0, false)
+        );
+    }
+
+    /**
+     * True when the entire string is an integer numeric string (strtol consumes all bytes).
+     */
+    private static function stringIsIntegerNumeric(Context $context, Value $strPtr): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $len = $context->builder->load(
+            $context->builder->structGep($strPtr, $map['length'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $len->typeOf()->constInt(0, false));
+
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $endPtrSlot = $context->builder->alloca($i8p, 1, 'loose_str_is_int_end');
+        $nullEnd = $i8p->constNull();
+        $context->builder->store($nullEnd, $endPtrSlot);
+        $context->builder->call(
+            $context->lookupFunction('strtol'),
+            $charPtr,
+            $endPtrSlot,
+            $context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $endPtr = $context->builder->load($endPtrSlot);
+        $endOffset = $context->builder->sub(
+            $context->builder->ptrToInt($endPtr, $i64),
+            $context->builder->ptrToInt($charPtr, $i64)
+        );
+        $consumedAll = $context->builder->icmp(Builder::INT_EQ, $endOffset, $len);
+
+        return $context->builder->select($isEmpty, $context->constantFromBool(false), $consumedAll);
     }
 
     private static function stringToDouble(Context $context, Value $strPtr): Value
