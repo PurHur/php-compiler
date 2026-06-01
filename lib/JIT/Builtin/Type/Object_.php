@@ -298,6 +298,15 @@ class Object_ extends Type {
             );
         }
 
+        $propCount = \count($this->properties[$classId] ?? []);
+        \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
+        \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
+        $this->context->builder->call(
+            $this->context->lookupFunction('phpc_gc_register'),
+            $this->context->builder->pointerCast($obj, $this->context->getTypeFromString('int8*')),
+            $this->context->constantFromInteger($propCount, 'int32')
+        );
+
         return $obj;
     }
 

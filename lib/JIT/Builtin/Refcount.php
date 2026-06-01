@@ -174,6 +174,7 @@ class Refcount extends Builtin {
     public function implement(): void {
         \PHPCompiler\JIT\Builtin\WeakRefRuntime::ensureLinked($this->context);
         \PHPCompiler\JIT\Builtin\WeakRefNative::registerDeclarations($this->context);
+        \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
         $this->implementInit();
         $this->implementAddref();
         $this->implementDelref();
@@ -525,6 +526,13 @@ class Refcount extends Builtin {
                         $this->context->getTypeFromString('int8*')
                     ),
                     $typeinfo
+                );
+                $this->context->builder->call(
+                    $this->context->lookupFunction('phpc_gc_unregister'),
+                    $this->context->builder->pointerCast(
+                        $refVirtual,
+                        $this->context->getTypeFromString('int8*')
+                    )
                 );
                 $this->context->memory->free($refVirtual);
     }

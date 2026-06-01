@@ -94,7 +94,7 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'new_static') || str_contains($name, 'static_return_type')) {
                 continue;
             }
-            // gc_collect_cycles() is VM-only (#3113).
+            // gc_collect_cycles() MCJIT execute unstable (#3160); compile: GcCollectCyclesJitCompileTest.
             if (str_contains($name, 'gc_collect_cycles')) {
                 continue;
             }

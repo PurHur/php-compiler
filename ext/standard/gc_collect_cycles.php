@@ -40,6 +40,10 @@ final class gc_collect_cycles extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('gc_collect_cycles() is not implemented for JIT in this compiler build');
+        if (\count($args) > 0) {
+            throw new \LogicException('gc_collect_cycles() takes no arguments');
+        }
+
+        return JitGcCollectCycles::invoke($context);
     }
 }
