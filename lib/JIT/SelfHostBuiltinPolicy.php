@@ -159,6 +159,7 @@ final class SelfHostBuiltinPolicy
         'version_compare' => 'string', 'extension_loaded' => 'string', 'get_loaded_extensions' => 'array',
         'soundex' => 'string',
         'base64_encode' => 'string', 'base64_decode' => 'string',
+        'quoted_printable_encode' => 'string', 'quoted_printable_decode' => 'string',
         'htmlspecialchars' => 'string', 'htmlspecialchars_decode' => 'string',
         'htmlentities' => 'string', 'html_entity_decode' => 'string',
         'get_html_translation_table' => 'string',

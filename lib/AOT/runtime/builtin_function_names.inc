@@ -315,6 +315,8 @@ static const char *phpc_builtin_functions[] = {
     "printf",
     "property_exists",
     "putenv",
+    "quoted_printable_decode",
+    "quoted_printable_encode",
     "quotemeta",
     "rad2deg",
     "random_bytes",
