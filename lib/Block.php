@@ -1233,7 +1233,6 @@ class Block {
         return self::containsGeneratorOpcodesInScriptScope($root)
             || self::containsFinallyOpcodesInScriptScope($root)
             || self::containsExceptionHandlingOpcodesInScriptScope($root)
-            || self::containsArrayAccessObjectOpcodes($root)
             || self::containsDynamicStaticPropertyOpcodes($root)
             || self::containsTypedNonVoidReturnOpcodes($root)
             || self::containsClosureByRefCaptureOpcodes($root)

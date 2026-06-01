@@ -26,6 +26,9 @@ final class UnsetHelper
         $container = $context->getVariableFromOp($containerOp);
         $dim = $context->getVariableFromOp($dimOp);
         if (Variable::TYPE_OBJECT === $container->type) {
+            if (ArrayAccessHelper::tryCompileOffsetUnset($context, $container, $dim, $containerOp)) {
+                return;
+            }
             self::compilePropertyUnset($context, $block, $containerOp, $dimOp);
 
             return;
