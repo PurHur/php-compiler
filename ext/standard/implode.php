@@ -32,16 +32,22 @@ final class implode extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException($this->getName().'() requires exactly two arguments in this compiler build');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException($this->getName().'() requires one or two arguments in this compiler build');
         }
-        $glue = $frame->calledArgs[0]->resolveIndirect()->toString();
-        $array = $frame->calledArgs[1]->resolveIndirect();
+        if (1 === $argc) {
+            $glue = '';
+            $array = $frame->calledArgs[0]->resolveIndirect();
+        } else {
+            $glue = $frame->calledArgs[0]->resolveIndirect()->toString();
+            $array = $frame->calledArgs[1]->resolveIndirect();
+        }
         if (null === $frame->returnVar) {
             return;
         }
         if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException($this->getName().'() second argument must be an array in this compiler build');
+            throw new \LogicException($this->getName().'() array argument must be an array in this compiler build');
         }
         $parts = [];
         foreach ($array->toArray()->iterate(true) as $value) {
@@ -54,11 +60,21 @@ final class implode extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException($this->getName().'() requires exactly two arguments in this compiler build');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException($this->getName().'() requires one or two arguments in this compiler build');
         }
-        $glue = $this->jitString($context, $args[0], $this->getName().'() glue');
-        $haystack = $this->loadHaystack($context, $args[1]);
+        if (1 === $argc) {
+            $i64 = $context->getTypeFromString('int64');
+            $glue = $context->builder->call(
+                $context->lookupFunction('__string__alloc'),
+                $i64->constInt(0, false)
+            );
+            $haystack = $this->loadHaystack($context, $args[0]);
+        } else {
+            $glue = $this->jitString($context, $args[0], $this->getName().'() glue');
+            $haystack = $this->loadHaystack($context, $args[1]);
+        }
 
         return JitImplode::implode($context, $glue, $haystack);
     }
@@ -78,6 +94,6 @@ final class implode extends Internal
             );
         }
 
-        throw new \LogicException($this->getName().'() second argument must be an array in this compiler build');
+        throw new \LogicException($this->getName().'() array argument must be an array in this compiler build');
     }
 }
