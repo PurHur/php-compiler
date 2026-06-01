@@ -168,6 +168,12 @@ class Context {
     /** @var array<int, PHPLLVM\Value> foreach object-key walk slots keyed by array Variable id */
     public array $foreachObjNodeSlots = [];
 
+    /** @var array<int, PHPLLVM\Value> Iterator protocol receiver (__object__*) per foreach container (#4011) */
+    public array $foreachIteratorReceiverSlots = [];
+
+    /** @var array<int, PHPLLVM\Value> Iterator protocol advance flag (int1) per foreach container (#4011) */
+    public array $foreachIteratorAdvanceSlots = [];
+
     /** @var array<string, Variable> */
     public array $jitGlobalVariables = [];
 

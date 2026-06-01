@@ -357,11 +357,9 @@ function syntaxRowDefinitions(): array
             'id' => 'foreach_iterator',
             'construct' => 'foreach over Iterator / IteratorAggregate objects',
             'opcodes' => ['TYPE_ITER_RESET', 'TYPE_ITER_VALID', 'TYPE_ITER_KEY', 'TYPE_ITER_VALUE'],
-            'issue' => 3234,
-            'jit' => false,
-            'aot' => false,
+            'issue' => 4011,
             'notes' => [
-                'VM calls rewind/valid/current/key/next (Zend zend_iterators.c parity)',
+                'VM + JIT/AOT call rewind/valid/current/key/next (Zend zend_iterators.c parity)',
                 'IteratorAggregate::getIterator(); TypeError for non-iterable objects',
             ],
             'probe' => null,
