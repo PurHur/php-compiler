@@ -147,6 +147,29 @@ final class VmFs
         return @chmod($path, $permissions);
     }
 
+    public static function resolveUserUid(Variable $user): ?int
+    {
+        if (Variable::TYPE_INTEGER === $user->type) {
+            return $user->toInt();
+        }
+        if (Variable::TYPE_STRING === $user->type) {
+            $name = $user->toString();
+            if ('' !== $name && ctype_digit($name)) {
+                return (int) $name;
+            }
+            if (\function_exists('posix_getpwnam')) {
+                $pw = @posix_getpwnam($name);
+                if (\is_array($pw) && isset($pw['uid'])) {
+                    return (int) $pw['uid'];
+                }
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
     public static function resolveGroupGid(Variable $group): ?int
     {
         if (Variable::TYPE_INTEGER === $group->type) {
@@ -168,6 +191,26 @@ final class VmFs
         }
 
         return null;
+    }
+
+    public static function chown(string $path, Variable $user): bool
+    {
+        $uid = self::resolveUserUid($user);
+        if (null === $uid) {
+            return false;
+        }
+
+        return @chown($path, $uid);
+    }
+
+    public static function lchown(string $path, Variable $user): bool
+    {
+        $uid = self::resolveUserUid($user);
+        if (null === $uid) {
+            return false;
+        }
+
+        return @lchown($path, $uid);
     }
 
     public static function chgrp(string $path, Variable $group): bool

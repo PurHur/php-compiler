@@ -416,6 +416,8 @@ class Type extends Builtin {
         );
         $fnChgrp = $this->context->module->addFunction('__compiler_chgrp', $fntypeChgrp);
         $this->context->registerFunction('__compiler_chgrp', $fnChgrp);
+        $fnChown = $this->context->module->addFunction('__compiler_chown', $fntypeChgrp);
+        $this->context->registerFunction('__compiler_chown', $fnChown);
         $fntypeMoveUploaded = $this->context->context->functionType(
             $i32,
             false,
