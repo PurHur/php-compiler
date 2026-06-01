@@ -112,12 +112,17 @@ final class VmPreg
         return $result;
     }
 
-    public static function pregReplace(string $pattern, string $replacement, string $subject) {
+    public static function pregReplace(
+        string $pattern,
+        string $replacement,
+        string $subject,
+        int $limit = -1
+    ) {
         if (strlen($pattern) > self::MAX_PATTERN_BYTES) {
             return false;
         }
 
-        $result = \preg_replace($pattern, $replacement, $subject);
+        $result = \preg_replace($pattern, $replacement, $subject, $limit);
         self::syncLastErrorFromHost();
         if (null === $result) {
             return false;
