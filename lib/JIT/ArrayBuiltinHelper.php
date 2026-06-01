@@ -1211,7 +1211,14 @@ final class ArrayBuiltinHelper
             $typeByte,
             $i8->constInt(Variable::TYPE_STRING & 0xff, false)
         );
-        $context->builder->branchIf($isString, $stringBlock, $longBlock);
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $afterString = BasicBlockHelper::append($context, 'ht_copy_packed_after_str_'.$tag);
+        $htBlock = BasicBlockHelper::append($context, 'ht_copy_packed_ht_'.$tag);
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
 
         $context->builder->positionAtEnd($stringBlock);
         $context->builder->call(
@@ -1219,6 +1226,18 @@ final class ArrayBuiltinHelper
             $dest,
             $destIndex,
             $context->builder->call($context->lookupFunction('__value__readString'), $srcEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $context->builder->branchIf($isHt, $htBlock, $longBlock);
+
+        $context->builder->positionAtEnd($htBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setHashtableAt'),
+            $dest,
+            $destIndex,
+            $context->builder->call($context->lookupFunction('__value__readHashtable'), $srcEntry)
         );
         $context->builder->branch($done);
 
@@ -5474,7 +5493,9 @@ final class ArrayBuiltinHelper
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($afterLong);
-        $context->builder->branchIf($isBool, $boolBlock, $done);
+        $afterBool = BasicBlockHelper::append($context, 'array_combine_sval_after_bool');
+        $htBlock = BasicBlockHelper::append($context, 'array_combine_sval_ht');
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
 
         $context->builder->positionAtEnd($boolBlock);
         $context->builder->call(
@@ -5485,6 +5506,23 @@ final class ArrayBuiltinHelper
                 $context->builder->call($context->lookupFunction('__value__readLong'), $valEntry),
                 $context->getTypeFromString('int1')
             )
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterBool);
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isHt, $htBlock, $done);
+
+        $context->builder->positionAtEnd($htBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyHashtable'),
+            $dest,
+            $keyStr,
+            $context->builder->call($context->lookupFunction('__value__readHashtable'), $valEntry)
         );
         $context->builder->branch($done);
 
@@ -8219,6 +8257,29 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($done);
 
         return $context->builder->load($foundSlot);
+    }
+
+    /**
+     * array_replace_recursive() — nested key merge (ext/standard/array.c parity; #3166).
+     */
+    public static function arrayReplaceRecursive(Context $context, Variable $first, Variable ...$others): Value
+    {
+        if (\count($others) < 1) {
+            throw new \LogicException('array_replace_recursive() requires at least two arguments');
+        }
+
+        $result = HashTableHelper::alloc($context);
+        self::overlayHashTable($context, $result, self::loadHashTable($context, $first));
+        $overlayFn = $context->lookupFunction('__compiler_array_replace_recursive_overlay');
+        foreach ($others as $other) {
+            $context->builder->call(
+                $overlayFn,
+                $result,
+                self::loadHashTable($context, $other)
+            );
+        }
+
+        return $result;
     }
 
     /**

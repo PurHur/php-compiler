@@ -182,7 +182,7 @@ final class SelfHostBuiltinPolicy
         'array_walk_recursive' => 'array', 'array_reduce' => 'array', 'array_combine' => 'array', 'array_fill_keys' => 'array', 'array_pad' => 'array', 'array_flip' => 'array', 'array_change_key_case' => 'array',
         'array_chunk' => 'array', 'array_column' => 'array',
         'array_product' => 'array', 'array_unique' => 'array', 'array_diff' => 'array', 'array_intersect' => 'array',
-        'array_replace' => 'array', 'array_sum' => 'array', 'sort' => 'array', 'rsort' => 'array',
+        'array_replace' => 'array', 'array_replace_recursive' => 'array', 'array_sum' => 'array', 'sort' => 'array', 'rsort' => 'array',
         'ksort' => 'array', 'krsort' => 'array', 'asort' => 'array', 'arsort' => 'array',
         'array_multisort' => 'array',
         'usort' => 'array', 'uasort' => 'array', 'uksort' => 'array',
