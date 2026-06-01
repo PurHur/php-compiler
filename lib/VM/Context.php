@@ -542,6 +542,23 @@ class Context {
         return null;;
     }
 
+    /**
+     * Active user frames, innermost first (matches debug_backtrace() order, #1378, #3626).
+     *
+     * @return list<Frame>
+     */
+    public function runStackFrames(): array
+    {
+        $frames = [];
+        $stack = $this->runStack;
+        while (null !== $stack) {
+            $frames[] = $stack->frame;
+            $stack = $stack->prev;
+        }
+
+        return $frames;
+    }
+
   /** Swap the run stack (nested user-function calls from VM builtins). */
     public function swapRunStack(?RunStackEntry $stack): ?RunStackEntry
     {

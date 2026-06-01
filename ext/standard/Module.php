@@ -26,6 +26,9 @@ class Module extends ModuleAbstract
             'LOCK_EX' => 2,
             'LOCK_UN' => 3,
             'LOCK_NB' => 4,
+            'DEBUG_BACKTRACE_PROVIDE_OBJECT' => VmDebugBacktrace::PROVIDE_OBJECT,
+            'DEBUG_BACKTRACE_IGNORE_ARGS' => VmDebugBacktrace::IGNORE_ARGS,
+            'DEBUG_BACKTRACE_IGNORE_STATIC_ARGS' => VmDebugBacktrace::IGNORE_STATIC_ARGS,
         ] as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
