@@ -177,17 +177,10 @@ static void arr_replace_packed_index(__hashtable__ *dest, size_t index, __value_
         && !arr_value_is_null(&dest->values[index])
         && arr_value_kind(&dest->values[index]) == PHPC_TYPE_HASHTABLE
     ) {
-        __hashtable__ *merged = __hashtable__alloc();
-
         __compiler_array_replace_recursive_overlay(
-            merged,
-            __value__readHashtable(&dest->values[index])
-        );
-        __compiler_array_replace_recursive_overlay(
-            merged,
+            __value__readHashtable(&dest->values[index]),
             __value__readHashtable(overlay_val)
         );
-        __hashtable__setHashtableAt(dest, index, merged);
 
         return;
     }
@@ -210,17 +203,10 @@ static void arr_replace_string_key(__hashtable__ *dest, __string__ *key, __value
         int okind = arr_value_kind(overlay_val);
 
         if (ekind == PHPC_TYPE_HASHTABLE && okind == PHPC_TYPE_HASHTABLE) {
-            __hashtable__ *merged = __hashtable__alloc();
-
             __compiler_array_replace_recursive_overlay(
-                merged,
-                __value__readHashtable(existing_val)
-            );
-            __compiler_array_replace_recursive_overlay(
-                merged,
+                __value__readHashtable(existing_val),
                 __value__readHashtable(overlay_val)
             );
-            __hashtable__setStringKeyHashtable(dest, key, merged);
 
             return;
         }

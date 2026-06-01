@@ -162,10 +162,12 @@ final class Linker
             && is_file($libgcc)
         ) {
             $env = self::toolchainEnvironment($llvmDir);
-            $objects = [escapeshellarg($objectFile)];
+            // Runtime objects before the LLVM object so C overlays (e.g. #3166) override empty JIT stubs.
+            $objects = [];
             foreach ($runtimeObjects as $runtimeObject) {
                 $objects[] = escapeshellarg($runtimeObject);
             }
+            $objects[] = escapeshellarg($objectFile);
             foreach ($vendorObjects as $vendorObject) {
                 $objects[] = escapeshellarg($vendorObject);
             }
@@ -195,10 +197,11 @@ final class Linker
         $clang = $llvmDir . '/clang-9';
         if (is_executable($clang)) {
             $env = self::toolchainEnvironment($llvmDir);
-            $objects = escapeshellarg($objectFile);
+            $objects = '';
             foreach ($runtimeObjects as $runtimeObject) {
                 $objects .= ' '.escapeshellarg($runtimeObject);
             }
+            $objects .= ' '.escapeshellarg($objectFile);
             foreach ($vendorObjects as $vendorObject) {
                 $objects .= ' '.escapeshellarg($vendorObject);
             }
@@ -473,10 +476,11 @@ final class Linker
         $linkers = [
             'clang-9', 'clang', 'clang-17', 'clang-14', 'gcc', 'cc',
         ];
-        $objects = escapeshellarg($objectFile);
+        $objects = '';
         foreach ($runtimeObjects as $runtimeObject) {
             $objects .= ' '.escapeshellarg($runtimeObject);
         }
+        $objects .= ' '.escapeshellarg($objectFile);
         foreach ($vendorObjects as $vendorObject) {
             $objects .= ' '.escapeshellarg($vendorObject);
         }
