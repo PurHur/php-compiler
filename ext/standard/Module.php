@@ -353,6 +353,7 @@ class Module extends ModuleAbstract
             new clearstatcache_(),
             new stat_(),
             new lstat_(),
+            new fstat_(),
             new fileperms(),
             new is_file(),
             new is_dir(),

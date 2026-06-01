@@ -103,6 +103,7 @@ final class SelfHostBuiltinPolicy
         'clearstatcache' => 'filesystem',
         'stat' => 'filesystem',
         'lstat' => 'filesystem',
+        'fstat' => 'filesystem',
         'is_file' => 'filesystem', 'is_dir' => 'filesystem', 'is_readable' => 'filesystem',
         'is_writable' => 'filesystem', 'file_get_contents' => 'filesystem', 'file_put_contents' => 'filesystem',
         'filemtime' => 'filesystem', 'fileperms' => 'filesystem', 'filesize' => 'filesystem', 'filetype' => 'filesystem',

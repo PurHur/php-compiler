@@ -53,4 +53,42 @@ final class JitStatArray
 
         return $result;
     }
+
+    /** @return Value */
+    public static function invokeHandle(Context $context, Value $handle): Value
+    {
+        $tag = 'fstat'.(string) ++self::$seq;
+        $i64 = $context->getTypeFromString('int64');
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        $ht = $context->builder->call(
+            $context->lookupFunction('__phpc_fstat'),
+            $context->builder->truncOrBitCast($handle, $i64)
+        );
+        $failed = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtrTy->constNull());
+        $failBlock = BasicBlockHelper::append($context, $tag.'_fail');
+        $okBlock = BasicBlockHelper::append($context, $tag.'_ok');
+        $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $falseSlot = JitValueBox::alloc($context);
+        $falsePtr = JitValueBox::pointer($context, $falseSlot);
+        JitValueBox::writeBool($context, $falseSlot, $context->getTypeFromString('int1')->constInt(0, false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $okSlot = JitValueBox::alloc($context);
+        $okPtr = JitValueBox::pointer($context, $okSlot);
+        $context->builder->call($context->lookupFunction('__value__writeHashtable'), $okPtr, $ht);
+        $okTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $result = $context->builder->phi($valuePtrTy);
+        $result->addIncoming($falsePtr, $failBlock);
+        $result->addIncoming($okPtr, $okTail);
+
+        return $result;
+    }
 }

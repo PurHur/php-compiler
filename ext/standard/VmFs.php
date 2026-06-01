@@ -81,6 +81,24 @@ final class VmFs
     }
 
     /**
+     * fstat() array for an open stream handle (issue #3482).
+     *
+     * @return HashTable|false
+     */
+    public static function fstat(int $handle) {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        $raw = @fstat($fp);
+        if (false === $raw) {
+            return false;
+        }
+
+        return self::phpStatArrayToHashTable($raw);
+    }
+
+    /**
      * @param array<int|string, int> $stat
      */
     private static function phpStatArrayToHashTable(array $stat): HashTable
