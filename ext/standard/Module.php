@@ -409,6 +409,7 @@ class Module extends ModuleAbstract
             new tmpfile(),
             new getcwd_(),
             new gethostname(),
+            new gethostbynamel(),
             new getprotobyname(),
             new getprotobynumber(),
             new getservbyname(),

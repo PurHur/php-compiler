@@ -120,6 +120,7 @@ final class SelfHostBuiltinPolicy
         'is_uploaded_file' => 'filesystem', 'move_uploaded_file' => 'filesystem', 'touch' => 'filesystem',
         'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem', 'tempnam' => 'filesystem', 'tmpfile' => 'filesystem',
         'getcwd' => 'filesystem', 'chdir' => 'filesystem', 'gethostname' => 'filesystem',
+        'gethostbynamel' => 'filesystem',
         'stream_context_create' => 'filesystem',
     ];
 
