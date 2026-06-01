@@ -6169,10 +6169,15 @@ class JIT {
                     $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
                     $this->context->scope->className = strtolower($nameOp->value);
                     if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
+                        $this->context->scope->classIsReadonly = VM\ClassFlags::isReadonly(
+                            $block->constants[$op->arg3]->toInt()
+                        );
                         $this->context->type->object->setClassReadonly(
                             $this->context->scope->classId,
-                            (bool) $block->constants[$op->arg3]->toInt()
+                            $this->context->scope->classIsReadonly
                         );
+                    } else {
+                        $this->context->scope->classIsReadonly = false;
                     }
                     $parentOp = null;
                     if (null !== $op->arg2) {
@@ -7163,7 +7168,7 @@ class JIT {
                         $name->value,
                         \PHPCompiler\MethodVisibility::mask($op->propertyVisibility)
                     );
-                    if ($op->propertyReadonly) {
+                    if ($op->propertyReadonly || $this->context->scope->classIsReadonly) {
                         $this->context->type->object->markPropertyReadonly($classId, $name->value);
                     }
                     if (null !== $op->arg2 && isset($block->constants[$op->arg2])) {

@@ -12,6 +12,8 @@ namespace PHPCompiler\JIT;
 class Scope {
     public int $classId = 0;
     public string $className = '';
+    /** True while lowering a `readonly class` body (#4082). */
+    public bool $classIsReadonly = false;
     /** Runtime called class for late static binding (issue #1231). */
     public string $calledClassName = '';
     public \SplObjectStorage $blockStorage;

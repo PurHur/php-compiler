@@ -1193,8 +1193,45 @@ class Block {
     }
 
     /**
-     * Per-property or readonly-class property declarations — MCJIT uncaught violation exits
-     * with segfault instead of surfacing pending LogicException (#3149, #1360).
+     * `readonly class` declarations — MCJIT execute for promoted/instance stores segfaults (#4082).
+     * Per-property `readonly` uses {@see containsReadonlyPropertyOpcodes}.
+     */
+    public static function containsReadonlyClassOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (
+                    OpCode::TYPE_DECLARE_CLASS === $op->type
+                    && null !== $op->arg3
+                    && isset($block->constants[$op->arg3])
+                    && VM\ClassFlags::isReadonly($block->constants[$op->arg3]->toInt())
+                ) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Per-property readonly declarations — MCJIT uncaught violation exits
+     * with segfault instead of surfacing pending exception (#3149, #1360).
      */
     public static function containsReadonlyPropertyOpcodes(?self $root): bool
     {
@@ -1275,6 +1312,7 @@ class Block {
             || self::containsTypedNonVoidReturnOpcodes($root)
             || self::containsClosureByRefCaptureOpcodes($root)
             || self::containsReadonlyPropertyOpcodes($root)
+            || self::containsReadonlyClassOpcodes($root)
             || self::containsFiberSuspendOpcodes($root);
     }
 }

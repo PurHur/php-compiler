@@ -686,7 +686,14 @@ function syntaxRowDefinitions(): array
             'construct' => 'readonly classes',
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_NEW', 'TYPE_ASSIGN', 'TYPE_PROPERTY_FETCH'],
             'issue' => 1360,
-            'notes' => ['php-cfg Class_::flags MODIFIER_READONLY; VM rejects instance property writes after __construct'],
+            'jit' => true,
+            'aot' => true,
+            'notes' => [
+                'php-cfg Class_::flags MODIFIER_READONLY; VM rejects instance property writes after __construct',
+                'JIT ReadonlyClassGuard + readonlyClassIds; bin/jit.php VM fallback via containsReadonlyClassOpcodes (#4082)',
+                'AOT pending raise + phpc_jit_abort_if_pending_logic_exception; compliance readonly_class_jit.phpt',
+                'php-src: Zend/zend_object_handlers.c readonly class write guard',
+            ],
             'probe' => 'readonly class R { public function __construct(public int $x) {} } $o = new R(0); $o->x = 1;',
         ],
         [
