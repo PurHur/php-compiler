@@ -117,7 +117,7 @@ final class DnfParamCheck
         return match ($arm['kind']) {
             'null' => Variable::TYPE_NULL === $arg->type
                 || (Variable::TYPE_VALUE === $arg->type && ($arg->isNullConstant ?? false)),
-            'literal' => self::scalarGivenLabel($arg) === $arm['name'],
+            'literal' => self::compileTimeMatchesLiteralArm($arg, $arm['name']),
             default => false,
         };
     }
@@ -162,8 +162,25 @@ final class DnfParamCheck
         return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $i1->constInt(0, false));
     }
 
+    private static function compileTimeMatchesLiteralArm(Variable $arg, string $name): bool
+    {
+        if ('true' === $name || 'false' === $name) {
+            if (Variable::TYPE_NATIVE_BOOL !== $arg->type) {
+                return false;
+            }
+            $isTrue = 0 !== (int) $arg->value;
+
+            return ('true' === $name) === $isTrue;
+        }
+
+        return self::scalarGivenLabel($arg) === $name;
+    }
+
     private static function emitLiteralMatches(Context $context, Variable $arg, string $name): Variable
     {
+        if ('true' === $name || 'false' === $name) {
+            return self::emitLiteralTrueFalseMatches($context, $arg, 'true' === $name);
+        }
         $i1 = $context->getTypeFromString('int1');
         $vmTy = match ($name) {
             'int' => \PHPCompiler\VM\Variable::TYPE_INTEGER,
@@ -192,6 +209,53 @@ final class DnfParamCheck
         }
 
         return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $i1->constInt(0, false));
+    }
+
+    private static function emitLiteralTrueFalseMatches(Context $context, Variable $arg, bool $expectTrue): Variable
+    {
+        $i1 = $context->getTypeFromString('int1');
+        $expected = $i1->constInt($expectTrue ? 1 : 0, false);
+        if (Variable::TYPE_NATIVE_BOOL === $arg->type) {
+            $ok = $context->builder->icmp(Builder::INT_EQ, $arg->value, $expected);
+
+            return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $ok);
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            $isBool = self::emitValueBoxTypeEquals($context, $arg, \PHPCompiler\VM\Variable::TYPE_BOOLEAN);
+            $valueOk = self::emitValueBoxBoolEquals($context, $arg, $expectTrue);
+            $ok = $context->builder->and(
+                $context->helper->loadValue($isBool),
+                $context->helper->loadValue($valueOk)
+            );
+
+            return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $ok);
+        }
+
+        return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $i1->constInt(0, false));
+    }
+
+    private static function emitValueBoxBoolEquals(Context $context, Variable $arg, bool $expectTrue): Variable
+    {
+        $i1 = $context->getTypeFromString('int1');
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $valueField = $context->builder->structGep($valuePtr, $map['value']);
+        $firstByte = $context->builder->inBoundsGEP(
+            $valueField,
+            $i32->constInt(0, false),
+            $i64->constInt(0, false)
+        );
+        $loaded = $context->builder->load($firstByte);
+        $ok = $context->builder->icmp(
+            Builder::INT_EQ,
+            $loaded,
+            $i8->constInt($expectTrue ? 1 : 0, false)
+        );
+
+        return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $ok);
     }
 
     /**

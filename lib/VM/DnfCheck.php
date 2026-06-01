@@ -73,13 +73,21 @@ final class DnfCheck
             return Variable::TYPE_NULL === $value->type;
         }
 
+        if (Variable::TYPE_BOOLEAN !== $value->type) {
+            return match ($name) {
+                'int' => Variable::TYPE_INTEGER === $value->type,
+                'float' => Variable::TYPE_FLOAT === $value->type,
+                'string' => Variable::TYPE_STRING === $value->type,
+                'array' => Variable::TYPE_ARRAY === $value->type,
+                'object' => Variable::TYPE_OBJECT === $value->type,
+                default => false,
+            };
+        }
+
         return match ($name) {
-            'int' => Variable::TYPE_INTEGER === $value->type,
-            'float' => Variable::TYPE_FLOAT === $value->type,
-            'bool' => Variable::TYPE_BOOLEAN === $value->type,
-            'string' => Variable::TYPE_STRING === $value->type,
-            'array' => Variable::TYPE_ARRAY === $value->type,
-            'object' => Variable::TYPE_OBJECT === $value->type,
+            'true' => $value->toBool(),
+            'false' => !$value->toBool(),
+            'bool' => true,
             default => false,
         };
     }
