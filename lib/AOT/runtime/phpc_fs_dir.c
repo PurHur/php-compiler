@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <fnmatch.h>
 #include <glob.h>
+#include <grp.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,6 +19,17 @@
 
 typedef struct __hashtable__ __hashtable__;
 typedef struct __string__ __string__;
+typedef struct __value__ {
+    int8_t type;
+    int8_t value[8];
+} __value__;
+
+#define PHPC_TYPE_NATIVE_LONG 1
+#define PHPC_TYPE_STRING 4
+
+extern long long __value__readLong(__value__ *v);
+extern __string__ *__value__readString(__value__ *v);
+
 extern __hashtable__ *__hashtable__alloc(void);
 extern void __hashtable__setStringAt(__hashtable__ *ht, size_t index, __string__ *val);
 extern void __hashtable__setStringKeyLong(__hashtable__ *ht, __string__ *key, long long val);
@@ -519,4 +531,69 @@ __string__ *__compiler_tempnam(__string__ *directory, __string__ *prefix)
     close(fd);
 
     return cstr_to_string(template);
+}
+
+static int phpc_value_kind(const __value__ *v)
+{
+    if (NULL == v) {
+        return 0;
+    }
+
+    return (int) (v->type & 0x7f);
+}
+
+static gid_t phpc_resolve_gid(__value__ *group)
+{
+    int kind;
+    char *end;
+    long val;
+    struct group *gr;
+
+    if (NULL == group) {
+        return (gid_t) -1;
+    }
+    kind = phpc_value_kind(group);
+    if (PHPC_TYPE_NATIVE_LONG == kind) {
+        return (gid_t) __value__readLong(group);
+    }
+    if (PHPC_TYPE_STRING != kind) {
+        return (gid_t) -1;
+    }
+    {
+        const char *c = phpc_strdata(__value__readString(group));
+        val = strtol(c, &end, 10);
+        if ('\0' == *end && end != c) {
+            return (gid_t) val;
+        }
+        gr = getgrnam(c);
+        if (NULL != gr) {
+            return gr->gr_gid;
+        }
+    }
+
+    return (gid_t) -1;
+}
+
+/**
+ * chgrp()/lchgrp() runtime (issue #3311; php-src ext/standard/filestat.c).
+ * lchgrp_flag: 0 = chgrp(2), non-zero = lchgrp(2).
+ */
+int __compiler_chgrp(__string__ *path, __value__ *group, int lchgrp_flag)
+{
+    const char *p;
+    gid_t gid;
+
+    if (NULL == path || NULL == group) {
+        return 0;
+    }
+    p = phpc_strdata(path);
+    gid = phpc_resolve_gid(group);
+    if ((gid_t) -1 == gid) {
+        return 0;
+    }
+    if (lchgrp_flag) {
+        return fchownat(AT_FDCWD, p, (uid_t) -1, gid, AT_SYMLINK_NOFOLLOW) == 0 ? 1 : 0;
+    }
+
+    return chown(p, (uid_t) -1, gid) == 0 ? 1 : 0;
 }
