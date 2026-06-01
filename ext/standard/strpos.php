@@ -19,7 +19,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * strpos() for two strings (subset of PHP; non-empty needle, no offset in JIT).
+ * strpos() for two strings (subset of PHP; non-empty needle, Zend offset window).
  */
 final class strpos extends Internal
 {
