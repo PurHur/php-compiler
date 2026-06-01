@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * LLVM compile-only verify for class constants with object expressions (#3196, #4021).
+ * LLVM compile-only verify for class constants with object expressions (#3196, #4021, #4028).
  *
  * php-src: Zend/zend_compile.c — zend_compile_const_expr; immortal singleton at class init.
  *
@@ -45,7 +45,6 @@ final class ClassConstObjectJitCompileTest extends TestCase
             $bc,
             'Expected immortal class-const object global in LLVM module'
         );
-
         $verify = new \ReflectionMethod($context, 'compileCommon');
         $verify->setAccessible(true);
         $verify->invoke($context);
