@@ -16,10 +16,13 @@ use PHPLLVM\Value;
  */
 final class strspn extends Internal
 {
+    use SpnJitExtended;
+
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('strspn() requires exactly two arguments in this compiler build');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2 || $argc > 4) {
+            throw new \LogicException('strspn() requires two to four arguments in this compiler build');
         }
         $str = $frame->calledArgs[0]->resolveIndirect();
         $mask = $frame->calledArgs[1]->resolveIndirect();
@@ -29,19 +32,37 @@ final class strspn extends Internal
         if (Variable::TYPE_STRING !== $str->type || Variable::TYPE_STRING !== $mask->type) {
             throw new \LogicException('strspn() requires two strings in this compiler build');
         }
-        $frame->returnVar->int(VmString::strspn($str->toString(), $mask->toString()));
+        $offset = 0;
+        if ($argc >= 3) {
+            $offVar = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $offVar->type) {
+                throw new \LogicException('strspn() offset must be an integer in this compiler build');
+            }
+            $offset = $offVar->toInt();
+        }
+        $length = null;
+        if (4 === $argc) {
+            $lenVar = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $lenVar->type) {
+                throw new \LogicException('strspn() length must be an integer in this compiler build');
+            }
+            $length = $lenVar->toInt();
+        }
+        $frame->returnVar->int(
+            VmString::strspn($str->toString(), $mask->toString(), $offset, $length)
+        );
     }
+
+    public Context $context;
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('strspn() requires exactly two arguments in this compiler build');
+        $this->context = $context;
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 4) {
+            throw new \LogicException('strspn() requires two to four arguments in this compiler build');
         }
-        $p0 = $this->stringDataPtr($context, $this->jitString($context, $args[0], 'strspn() argument #1'));
-        $p1 = $this->stringDataPtr($context, $this->jitString($context, $args[1], 'strspn() argument #2'));
-        $raw = $context->builder->call($context->lookupFunction('strspn'), $p0, $p1);
-        $i64 = $context->getTypeFromString('int64');
 
-        return $context->builder->zExt($raw, $i64);
+        return $this->callSpnExtended($context, $args, true, 'strspn');
     }
 }
