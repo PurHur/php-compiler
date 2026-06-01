@@ -386,6 +386,8 @@ class Module extends ModuleAbstract
             new fwrite(),
             new fclose(),
             new flock(),
+            new forward_static_call(),
+            new forward_static_call_array(),
             new getenv_(),
             new putenv_(),
             new shell_exec(),
