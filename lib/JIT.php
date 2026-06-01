@@ -211,10 +211,16 @@ class JIT {
         }
         \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
         \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
-        $isMain = null === $block->func || '{main}' === $block->func->name;
+        $deferDelref = true;
+        if (null !== $block->func) {
+            $name = $block->func->name;
+            $deferDelref = '{main}' === $name
+                || '__destruct' === $name
+                || str_ends_with($name, '::__destruct');
+        }
         $this->context->builder->call(
             $this->context->lookupFunction('phpc_destruct_set_allow_delref'),
-            $this->context->getTypeFromString('int32')->constInt($isMain ? 0 : 1, false)
+            $this->context->getTypeFromString('int32')->constInt($deferDelref ? 0 : 1, false)
         );
     }
 
@@ -1061,7 +1067,12 @@ class JIT {
             $callbackType = $returnsByRef
                 ? '__value__*'
                 : ($this->cfgFunctionReturnCallbackType($block->func) ?? '__value__');
-            if ('__construct' === strtolower($block->func->name)) {
+            $methodLc = strtolower($block->func->name);
+            if (
+                '__construct' === $methodLc
+                || '__destruct' === $methodLc
+                || str_ends_with($methodLc, '::__destruct')
+            ) {
                 $callbackType = 'void';
             }
             $returnType = $this->context->getTypeFromString($callbackType);
@@ -6842,6 +6853,9 @@ class JIT {
             return null;
         }
         if ('__construct' === strtolower($cfgFunc->name)) {
+            return 'void';
+        }
+        if ('__destruct' === strtolower($cfgFunc->name)) {
             return 'void';
         }
         if ($cfgFunc->returnType instanceof Op\Type\Void_) {

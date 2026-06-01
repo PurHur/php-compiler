@@ -155,14 +155,19 @@ class Object_ extends Type {
     public function shutdown(): void
     {
         $this->implementInvokeDestructor();
+    }
+
+    /** Emit shutdown destructor pass into the current IR insertion point (#4013). */
+    public function emitShutdownDestructorsCall(): void
+    {
         if (!$this->hasUserDestructors()) {
             return;
         }
         \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
         \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
-        $this->context->emitInShutdown(static function (\PHPCompiler\JIT\Context $ctx): void {
-            $ctx->builder->call($ctx->lookupFunction('phpc_gc_run_shutdown_destructors'));
-        });
+        $this->context->builder->call(
+            $this->context->lookupFunction('phpc_gc_run_shutdown_destructors')
+        );
     }
 
     public function recordDestructorBlock(int $classId, Block $block): void
@@ -225,8 +230,7 @@ class Object_ extends Type {
         $this->context->builder->positionAtEnd($notReady);
         $this->context->builder->branch($done);
         $this->context->builder->positionAtEnd($ready);
-        $this->emitDestructDispatchForObject($fn, $obj, $classIds);
-        $this->context->builder->branch($done);
+        $this->emitDestructDispatchForObject($fn, $obj, $classIds, $done);
         $this->context->builder->positionAtEnd($done);
         $this->context->builder->returnVoid();
         $this->context->builder->clearInsertionPosition();
@@ -238,7 +242,8 @@ class Object_ extends Type {
     private function emitDestructDispatchForObject(
         PHPLLVM\Value\Function_ $fn,
         PHPLLVM\Value $obj,
-        array $classIds
+        array $classIds,
+        PHPLLVM\BasicBlock $outerDone
     ): void {
         $objMap = $this->context->structFieldMap['__object__'];
         $classIdVal = $this->context->builder->load(
@@ -247,14 +252,15 @@ class Object_ extends Type {
         if (1 === \count($classIds)) {
             $onlyId = $classIds[0];
             $callBlock = $fn->appendBasicBlock('destruct_magic_single_call');
-            $done = $fn->appendBasicBlock('destruct_magic_single_done');
+            $skipBlock = $fn->appendBasicBlock('destruct_magic_single_skip');
             $expected = $this->context->constantFromInteger($onlyId, 'int64');
             $isId = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $classIdVal, $expected);
-            $this->context->builder->branchIf($isId, $callBlock, $done);
+            $this->context->builder->branchIf($isId, $callBlock, $skipBlock);
             $this->context->builder->positionAtEnd($callBlock);
             $this->emitDestructMagicCallForClass($obj, $onlyId);
-            $this->context->builder->branch($done);
-            $this->context->builder->positionAtEnd($done);
+            $this->context->builder->branch($outerDone);
+            $this->context->builder->positionAtEnd($skipBlock);
+            $this->context->builder->branch($outerDone);
 
             return;
         }
@@ -281,6 +287,7 @@ class Object_ extends Type {
         $this->context->builder->positionAtEnd($fallback);
         $this->context->builder->branch($done);
         $this->context->builder->positionAtEnd($done);
+        $this->context->builder->branch($outerDone);
     }
 
     private function emitDestructMagicCallForClass(PHPLLVM\Value $obj, int $classId): void
@@ -290,18 +297,15 @@ class Object_ extends Type {
         if (!$this->context->functionIsRegistered($proxyName)) {
             return;
         }
-        $destructorBlock = $this->destructorBlocks[$classId] ?? null;
-        $prevEnclosing = $this->context->jitEnclosingBlock;
-        $prevCurrent = $this->context->jitCurrentBlock;
-        if (null !== $destructorBlock) {
-            $this->context->jitEnclosingBlock = $destructorBlock;
-            $this->context->jitCurrentBlock = $destructorBlock;
-        }
         $refVirtual = $this->context->builder->pointerCast(
             $obj,
             $this->context->getTypeFromString('__ref__virtual*')
         );
         $this->context->refcount->addref($refVirtual);
+        $this->context->builder->call(
+            $this->context->lookupFunction('phpc_destruct_set_allow_delref'),
+            $this->context->getTypeFromString('int32')->constInt(0, false)
+        );
         $objVar = new Variable(
             $this->context,
             Variable::TYPE_OBJECT,
@@ -310,12 +314,9 @@ class Object_ extends Type {
         );
         $toCall = $this->context->resolveFunctionProxy($proxyName);
         $prevStrict = $this->context->callerStrictTypes;
-        $this->context->callerStrictTypes = null !== $destructorBlock ? $destructorBlock->strictTypes : false;
+        $this->context->callerStrictTypes = false;
         $toCall->call($this->context, $objVar);
         $this->context->callerStrictTypes = $prevStrict;
-        $this->context->refcount->delref($refVirtual);
-        $this->context->jitEnclosingBlock = $prevEnclosing;
-        $this->context->jitCurrentBlock = $prevCurrent;
     }
 
     private function implementLoadValueSlot(): void
