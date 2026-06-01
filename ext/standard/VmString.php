@@ -3466,7 +3466,20 @@ final class VmString
         return $out;
     }
 
-    public static function dirname(string $path): string
+    public static function dirname(string $path, int $levels = 1): string
+    {
+        if ($levels < 1) {
+            throw new \ValueError('dirname(): Argument #2 ($levels) must be greater than or equal to 1');
+        }
+        $result = $path;
+        for ($i = 0; $i < $levels; ++$i) {
+            $result = self::dirnameOnce($result);
+        }
+
+        return $result;
+    }
+
+    private static function dirnameOnce(string $path): string
     {
         $len = self::byteLength($path);
         if (0 === $len) {
