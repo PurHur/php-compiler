@@ -17,7 +17,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM\Value;
 
 /**
@@ -35,7 +35,7 @@ final class htmlspecialchars extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $v->type) {
+        if (VMVariable::TYPE_STRING !== $v->type) {
             throw new \LogicException('htmlspecialchars() only supports strings in this compiler build');
         }
         $string = $v->toString();
@@ -44,21 +44,21 @@ final class htmlspecialchars extends Internal
         $doubleEncode = true;
         if ($argc >= 2) {
             $flagsVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $flagsVar->type) {
+            if (VMVariable::TYPE_INTEGER !== $flagsVar->type) {
                 throw new \LogicException('htmlspecialchars() flags must be an integer in this compiler build');
             }
             $flags = $flagsVar->toInt();
         }
         if ($argc >= 3) {
             $encVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $encVar->type) {
+            if (VMVariable::TYPE_STRING !== $encVar->type) {
                 throw new \LogicException('htmlspecialchars() encoding must be a string in this compiler build');
             }
             $encoding = $encVar->toString();
         }
         if (4 === $argc) {
             $deVar = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $deVar->type) {
+            if (VMVariable::TYPE_BOOLEAN !== $deVar->type) {
                 throw new \LogicException('htmlspecialchars() double_encode must be a boolean in this compiler build');
             }
             $doubleEncode = $deVar->toBool();
@@ -75,6 +75,12 @@ final class htmlspecialchars extends Internal
         if ($argc < 1 || $argc > 4) {
             throw new \LogicException('htmlspecialchars() requires one to four arguments');
         }
+
+        $folded = self::tryCompileTimeHtmlspecialchars($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+
         if ($argc >= 3) {
             throw new \LogicException(
                 'htmlspecialchars() JIT only supports string and optional flags in this compiler build'
@@ -104,6 +110,89 @@ final class htmlspecialchars extends Internal
         }
 
         return JitHtmlspecialchars::escape($context, $str, $flags);
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function tryCompileTimeHtmlspecialchars(Context $context, array $args): ?Value
+    {
+        $argc = count($args);
+        $literal = JitStringArg::compileTimeLiteral($args[0]);
+        if (null === $literal || JITVariable::KIND_VALUE !== $args[0]->kind) {
+            return null;
+        }
+
+        $flags = ENT_QUOTES | ENT_SUBSTITUTE;
+        if ($argc >= 2) {
+            $flagsVal = self::compileTimeLong($context, $args[1]);
+            if (null === $flagsVal) {
+                return null;
+            }
+            $flags = $flagsVal;
+        }
+
+        $encoding = 'UTF-8';
+        if ($argc >= 3) {
+            $encodingLit = JitStringArg::compileTimeLiteral($args[2]);
+            if (null === $encodingLit || JITVariable::KIND_VALUE !== $args[2]->kind) {
+                return null;
+            }
+            $encoding = $encodingLit;
+        }
+
+        $doubleEncode = true;
+        if ($argc >= 4) {
+            $doubleEncodeVal = self::compileTimeBool($context, $args[3]);
+            if (null === $doubleEncodeVal) {
+                return null;
+            }
+            $doubleEncode = $doubleEncodeVal;
+        }
+
+        return $context->builder->load(
+            $context->constantStringFromString(
+                VmString::htmlspecialchars($literal, $flags, $encoding, $doubleEncode)
+            )
+        );
+    }
+
+    private static function compileTimeLong(Context $context, JITVariable $var): ?int
+    {
+        if (JITVariable::TYPE_NATIVE_LONG === $var->type
+            && JITVariable::KIND_VALUE === $var->kind) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
+                return (int) $lib->LLVMConstIntGetSExtValue($var->value->value);
+            }
+        }
+        if (null !== $var->compileTimeConstantName && null !== $context->runtime->vmContext) {
+            $phpVar = $context->runtime->vmContext->constantFetch($var->compileTimeConstantName);
+            if (null !== $phpVar && VMVariable::TYPE_INTEGER === $phpVar->resolveIndirect()->type) {
+                return $phpVar->resolveIndirect()->toInt();
+            }
+        }
+
+        return null;
+    }
+
+    private static function compileTimeBool(Context $context, JITVariable $var): ?bool
+    {
+        if (JITVariable::TYPE_NATIVE_BOOL === $var->type
+            && JITVariable::KIND_VALUE === $var->kind) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
+                return 0 !== (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
+            }
+        }
+        if (null !== $var->compileTimeConstantName && null !== $context->runtime->vmContext) {
+            $phpVar = $context->runtime->vmContext->constantFetch($var->compileTimeConstantName);
+            if (null !== $phpVar && VMVariable::TYPE_BOOLEAN === $phpVar->resolveIndirect()->type) {
+                return $phpVar->resolveIndirect()->toBool();
+            }
+        }
+
+        return null;
     }
 
 }

@@ -1792,6 +1792,63 @@ final class VmString
     }
 
     /**
+     * Length of an existing HTML entity at $pos when $double_encode=false (php-src html.c parity).
+     */
+    private static function htmlspecialcharsExistingEntityLen(string $string, int $pos, int $len): int
+    {
+        if ($pos >= $len || '&' !== $string[$pos]) {
+            return 0;
+        }
+        foreach ([
+            ['&amp;', 5],
+            ['&lt;', 4],
+            ['&gt;', 4],
+            ['&quot;', 6],
+            ['&#039;', 6],
+            ['&#39;', 5],
+        ] as [$entity, $entityLen]) {
+            if (self::entityAt($string, $pos, $len, $entity, $entityLen)) {
+                return $entityLen;
+            }
+        }
+
+        return self::htmlspecialcharsNumericEntityLen($string, $pos, $len);
+    }
+
+    /** @return int byte length including leading & and trailing ;, or 0 if not a numeric entity */
+    private static function htmlspecialcharsNumericEntityLen(string $string, int $pos, int $len): int
+    {
+        if ($pos + 3 > $len || '&' !== $string[$pos] || '#' !== $string[$pos + 1]) {
+            return 0;
+        }
+        $i = $pos + 2;
+        if ($i >= $len) {
+            return 0;
+        }
+        if ('x' === $string[$i] || 'X' === $string[$i]) {
+            ++$i;
+            if ($i >= $len || !ctype_xdigit($string[$i])) {
+                return 0;
+            }
+            while ($i < $len && ctype_xdigit($string[$i])) {
+                ++$i;
+            }
+        } else {
+            if (!ctype_digit($string[$i])) {
+                return 0;
+            }
+            while ($i < $len && ctype_digit($string[$i])) {
+                ++$i;
+            }
+        }
+        if ($i >= $len || ';' !== $string[$i]) {
+            return 0;
+        }
+
+        return $i - $pos + 1;
+    }
+
+    /**
      * strip_tags() subset: removes HTML/PHP tags; optional allow-list like "<b><p>".
      * HTML comments and PHP tags remove their inner content; other tags keep inner text.
      */
