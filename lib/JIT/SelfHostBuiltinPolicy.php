@@ -134,6 +134,10 @@ final class SelfHostBuiltinPolicy
     /** @var array<string, string> */
     private const CATEGORY_STRING = [
         'addslashes' => 'string',
+        'addcslashes' => 'string',
+        'stripslashes' => 'string',
+        'stripcslashes' => 'string',
+        'substr_replace' => 'string',
         'bin2hex' => 'string',
         'chr' => 'string',
         'chunk_split' => 'string',

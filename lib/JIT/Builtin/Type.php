@@ -583,6 +583,16 @@ class Type extends Builtin {
             $fntypeDebugBacktrace
         );
         $this->context->registerFunction('__compiler_jit_debug_backtrace', $fnDebugBacktrace);
+        $fntypeAddcslashes = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr);
+        $fnAddcslashes = $this->context->module->addFunction('__compiler_addcslashes', $fntypeAddcslashes);
+        $this->context->registerFunction('__compiler_addcslashes', $fnAddcslashes);
+        $fntypeStripcslashes = $this->context->context->functionType($strPtr, false, $strPtr);
+        $fnStripcslashes = $this->context->module->addFunction('__compiler_stripcslashes', $fntypeStripcslashes);
+        $this->context->registerFunction('__compiler_stripcslashes', $fnStripcslashes);
+        $i32 = $this->context->getTypeFromString('int32');
+        $fntypeSubstrReplace = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $i64, $i64, $i32);
+        $fnSubstrReplace = $this->context->module->addFunction('__compiler_substr_replace', $fntypeSubstrReplace);
+        $this->context->registerFunction('__compiler_substr_replace', $fnSubstrReplace);
         $fntypePregMatch = $this->context->context->functionType(
             $i64,
             false,
