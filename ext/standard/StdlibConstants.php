@@ -103,6 +103,11 @@ final class StdlibConstants
     public const PREG_OFFSET_CAPTURE = 256;
     public const PREG_UNMATCHED_AS_NULL = 512;
 
+    /** password_hash() algorithms (ext/standard/password.c). */
+    public const PASSWORD_BCRYPT = VmPassword::PASSWORD_BCRYPT;
+
+    public const PASSWORD_DEFAULT = VmPassword::PASSWORD_DEFAULT;
+
     /** glob() flags (ext/standard/dir.c / glob.h; values match php-src on Linux). */
     public const GLOB_ERR = 1;
     public const GLOB_MARK = 2;
@@ -179,6 +184,8 @@ final class StdlibConstants
         'glob_brace' => self::GLOB_BRACE,
         'glob_onlydir' => self::GLOB_ONLYDIR,
         'glob_available_flags' => self::GLOB_AVAILABLE_FLAGS,
+        'password_bcrypt' => self::PASSWORD_BCRYPT,
+        'password_default' => self::PASSWORD_DEFAULT,
     ];
 
     /** Lowercase name => float value for VM\Context::constantFetch(). */
@@ -264,6 +271,8 @@ final class StdlibConstants
         'glob_brace',
         'glob_onlydir',
         'glob_available_flags',
+        'password_bcrypt',
+        'password_default',
         'm_e',
         'm_log2e',
         'm_log10e',
