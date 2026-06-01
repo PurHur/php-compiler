@@ -34,7 +34,7 @@ MCJIT/AOT resume uses a **switch-on-IP state machine** (not LLVM coroutine passe
 4. **Resume**: restore locals and branch to the post-yield block.
 5. **`yield from`**: delegate to inner generator/array iterator; prefix opcodes materialize the container before resume (#2483).
 
-Deferred: try/catch inside generator bodies under MCJIT; script-scope top-level `yield` for AOT/bootstrap.
+MCJIT: `try` / `catch` / `finally` inside generator bodies lower via `GeneratorHelper` resume prefixes + `TryCatchHelper` (#4069). Script-scope top-level `yield` for AOT/bootstrap remains deferred.
 
 ## Related
 
