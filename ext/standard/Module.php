@@ -255,6 +255,8 @@ class Module extends ModuleAbstract
             new hex2bin(),
             new base64_encode(),
             new base64_decode(),
+            new quoted_printable_encode(),
+            new quoted_printable_decode(),
             new hash_(),
             new hash_hmac(),
             new hash_pbkdf2(),

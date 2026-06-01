@@ -569,6 +569,17 @@ class Type extends Builtin {
         $fntypeUuencode = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnUuencode = $this->context->module->addFunction('__compiler_convert_uuencode', $fntypeUuencode);
         $this->context->registerFunction('__compiler_convert_uuencode', $fnUuencode);
+        $fntypeQuotPrint = $this->context->context->functionType($strPtr, false, $strPtr);
+        $fnQuotEncode = $this->context->module->addFunction(
+            '__compiler_quoted_printable_encode',
+            $fntypeQuotPrint
+        );
+        $this->context->registerFunction('__compiler_quoted_printable_encode', $fnQuotEncode);
+        $fnQuotDecode = $this->context->module->addFunction(
+            '__compiler_quoted_printable_decode',
+            $fntypeQuotPrint
+        );
+        $this->context->registerFunction('__compiler_quoted_printable_decode', $fnQuotDecode);
         $fntypeUtf8Latin1 = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnUtf8Encode = $this->context->module->addFunction('__compiler_utf8_encode', $fntypeUtf8Latin1);
         $this->context->registerFunction('__compiler_utf8_encode', $fnUtf8Encode);
