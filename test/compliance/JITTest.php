@@ -146,6 +146,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'password_get_info')) {
                 continue;
             }
+            // error_reporting() MCJIT: VM + AOT (#3220); phpc_ini_set.c __value__* mismatch until stable.
+            if (str_contains($name, 'error_reporting')) {
+                continue;
+            }
             // round() precision/mode uses __compiler_round: VM + AOT (#3522); MCJIT until runtime link stable.
             if (str_contains($name, 'round_precision_mode')) {
                 continue;

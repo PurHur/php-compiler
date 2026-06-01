@@ -393,6 +393,7 @@ class Module extends ModuleAbstract
             new putenv_(),
             new ini_set_(),
             new ini_get_(),
+            new error_reporting(),
             new define_(),
             new defined_(),
             new constant_(),

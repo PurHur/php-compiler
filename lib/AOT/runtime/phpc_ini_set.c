@@ -15,6 +15,7 @@ typedef struct __value__ {
 
 extern __string__ *__string__init(long long size, const char *value);
 extern void __value__writeString(__value__ *out, __string__ *str);
+extern void __value__writeLong(__value__ *out, long long v);
 
 #define PHPC_TYPE_BOOL 2
 
@@ -139,6 +140,18 @@ void __compiler_ini_get(__string__ *option, __value__ *out)
     }
 
     free(opt);
+}
+
+void __compiler_error_reporting(int has_new_level, long long new_level, __value__ *out)
+{
+    long long old = phpc_ini_error_reporting;
+
+    if (has_new_level) {
+        phpc_ini_error_reporting = (int) new_level;
+    }
+    if (NULL != out) {
+        __value__writeLong(out, old);
+    }
 }
 
 void __compiler_ini_set(__string__ *option, __string__ *new_value, __value__ *out)

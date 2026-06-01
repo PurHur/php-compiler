@@ -22,9 +22,11 @@ final class IniRuntime
 
         $get = $context->module->getNamedFunction('__compiler_ini_get');
         $set = $context->module->getNamedFunction('__compiler_ini_set');
+        $errorReporting = $context->module->getNamedFunction('__compiler_error_reporting');
         if (
             null !== $get && $get->countBasicBlocks() > 0
             && null !== $set && $set->countBasicBlocks() > 0
+            && null !== $errorReporting && $errorReporting->countBasicBlocks() > 0
         ) {
             return;
         }
@@ -42,11 +44,13 @@ final class IniRuntime
 
         $get = $context->module->getNamedFunction('__compiler_ini_get');
         $set = $context->module->getNamedFunction('__compiler_ini_set');
-        if (null === $get || null === $set) {
-            throw new \LogicException('__compiler_ini_get/set missing after ini runtime bitcode link');
+        $errorReporting = $context->module->getNamedFunction('__compiler_error_reporting');
+        if (null === $get || null === $set || null === $errorReporting) {
+            throw new \LogicException('__compiler_ini_get/set/error_reporting missing after ini runtime bitcode link');
         }
         $context->registerFunction('__compiler_ini_get', $get);
         $context->registerFunction('__compiler_ini_set', $set);
+        $context->registerFunction('__compiler_error_reporting', $errorReporting);
     }
 
     private static function ensureBitcode(): string

@@ -75,6 +75,16 @@ final class VmIni
         return $old;
     }
 
+    public static function errorReporting(Context $ctx, ?int $newLevel = null): int
+    {
+        $old = $ctx->errors->getErrorReporting();
+        if (null !== $newLevel) {
+            $ctx->errors->setErrorReporting($newLevel);
+        }
+
+        return $old;
+    }
+
     public static function parseErrorReporting(string $value): int
     {
         $trimmed = trim($value);

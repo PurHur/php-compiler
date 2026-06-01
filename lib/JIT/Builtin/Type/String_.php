@@ -304,6 +304,7 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringGetenv::implement($this->context);
         \PHPCompiler\JIT\Builtin\IniSet::implement($this->context);
         \PHPCompiler\JIT\Builtin\IniGet::implement($this->context);
+        \PHPCompiler\JIT\Builtin\ErrorReporting::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringDeployPath::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringReadfile::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringFileGetContents::implement($this->context);
