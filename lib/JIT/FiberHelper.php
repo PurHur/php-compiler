@@ -283,7 +283,18 @@ final class FiberHelper
         if (null !== $resultOp) {
             $resultVar = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, JitValueBox::alloc($context));
             JitValueBox::copyFromPointer($context, $resultVar->value, $resumeArgField);
-            $jit->assignOperand($resultOp, $resultVar, true);
+            if ($context->hasVariableOp($resultOp)) {
+                $dest = $context->getVariableFromOp($resultOp);
+                if (Variable::KIND_VALUE === $dest->kind) {
+                    JitValueBox::copyFromPointer(
+                        $context,
+                        $dest->value,
+                        JitValueBox::valuePtrFromVariable($context, $resultVar)
+                    );
+                } else {
+                    $jit->assignOperandForced($resultOp, $resultVar);
+                }
+            }
         }
         $context->builder->store(
             $sizeT->constInt($nextResumeIp, false),
