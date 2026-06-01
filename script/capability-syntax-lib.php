@@ -578,11 +578,12 @@ function syntaxRowDefinitions(): array
             'issue' => 3094,
             'notes' => [
                 'php-cfg Union + Intersection; TypeReconstructor TYPE_INTERSECTION; VM DnfCheck on param/property/return',
+                'JIT/AOT DnfParamCheck at call sites + returns; __value__* param ABI (#4008); typed properties MCJIT assign still VM-only',
                 'Parenthesized DNF only (php-parser 4.x); ref Zend/zend_compile.c',
             ],
             'probe' => 'interface A {} interface B {} class C implements A, B {} function f(): (A&B)|null { return new C(); } echo null === f() ? 0 : 1;',
-            'jit' => false,
-            'aot' => false,
+            'jit' => true,
+            'aot' => true,
         ],
         [
             'id' => 'trait_decl',
