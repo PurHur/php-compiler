@@ -1812,6 +1812,14 @@ final class HashTableHelper
                     $context->helper->loadValue($element)
                 );
                 break;
+            case Variable::TYPE_NATIVE_DOUBLE:
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringKeyDouble'),
+                    $ht,
+                    $keyPtr,
+                    $context->helper->loadValue($element)
+                );
+                break;
             case Variable::TYPE_HASHTABLE:
                 $context->builder->call(
                     $context->lookupFunction('__hashtable__setStringKeyHashtable'),
