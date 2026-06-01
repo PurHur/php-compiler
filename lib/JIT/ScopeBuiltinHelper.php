@@ -10,6 +10,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block as CompilerBlock;
 use PHPCompiler\ext\standard\VmScope;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\Web\Superglobals;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -246,6 +247,8 @@ final class ScopeBuiltinHelper
     {
         $source = self::findVariableByName($context, $name);
         if (null === $source) {
+            self::emitCompactUndefinedVariableWarning($context, $name);
+
             return;
         }
         $keyStr = $context->builder->load($context->constantStringFromString($name));
@@ -719,5 +722,21 @@ final class ScopeBuiltinHelper
         $map = $context->structFieldMap['__string__'];
 
         return $context->builder->structGep($str, $map['value']);
+    }
+
+    private static function emitCompactUndefinedVariableWarning(Context $context, string $name): void
+    {
+        $message = "compact(): Undefined variable \${$name}";
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $msgLen = $sizeT->constInt(\strlen($message), false);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $msgLen,
+            $i32->constInt(ErrorReporter::E_WARNING, false)
+        );
     }
 }

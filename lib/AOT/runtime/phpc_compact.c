@@ -5,6 +5,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 typedef struct __string__ __string__;
@@ -49,6 +50,9 @@ extern void __hashtable__setStringKeyBool(__hashtable__ *ht, __string__ *key, in
 extern void __hashtable__setStringKeyHashtable(__hashtable__ *ht, __string__ *key, __hashtable__ *child);
 extern __string__ *__string__init(long long size, const char *value);
 extern __string__ *__string__separate(__string__ *s);
+extern void __compiler_trigger_error(const char *message, size_t len, int level);
+
+#define PHPC_COMPACT_ERR_LEVEL 2
 
 static int phpc_value_kind(const __value__ *v)
 {
@@ -126,6 +130,15 @@ static void phpc_compact_apply_name(
             phpc_compact_store_slot(result, key, binding_slots[i]);
 
             return;
+        }
+    }
+
+    {
+        char msg[128];
+        int n = snprintf(msg, sizeof(msg), "compact(): Undefined variable $%s", name);
+
+        if (n > 0) {
+            __compiler_trigger_error(msg, (size_t) n, PHPC_COMPACT_ERR_LEVEL);
         }
     }
 }
