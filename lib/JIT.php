@@ -4732,6 +4732,18 @@ class JIT {
                         );
                     }
                     $this->context->setVariableOp($destOp, $staticVar);
+                    $staticName = JIT\OperandName::resolve($destOp);
+                    if (null !== $staticName && '' !== $staticName) {
+                        $this->context->bindVariableByName($staticName, $staticVar);
+                    }
+                    $staticSlot = $block->slotForOperand($destOp);
+                    if (null !== $staticSlot) {
+                        foreach ($block->scopedOperands() as $scopeOp) {
+                            if ($block->slotForOperand($scopeOp) === $staticSlot) {
+                                $this->context->setVariableOp($scopeOp, $staticVar);
+                            }
+                        }
+                    }
                     break;
                 case OpCode::TYPE_VAR_FETCH:
                     $destOp = $block->getOperand($op->arg1);
@@ -6415,14 +6427,18 @@ class JIT {
                 JIT\JitValueBox::valuePtrFromVariable($this->context, $return)
             );
         }
-        $valuePtr = Variable::KIND_VARIABLE === $return->kind
-            ? JIT\JitValueBox::pointer($this->context, $return->value)
-            : JIT\BasicBlockHelper::entryAlloca(
+        if ($return->functionStaticGlobal) {
+            $valuePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $return);
+        } elseif (Variable::KIND_VARIABLE === $return->kind) {
+            $valuePtr = JIT\JitValueBox::pointer($this->context, $return->value);
+        } else {
+            $valuePtr = JIT\BasicBlockHelper::entryAlloca(
                 $this->context,
                 $this->context->getTypeFromString('__value__')
             );
-        if (Variable::KIND_VALUE === $return->kind) {
-            $this->context->builder->store($retval, $valuePtr);
+            if (Variable::KIND_VALUE === $return->kind) {
+                $this->context->builder->store($retval, $valuePtr);
+            }
         }
         if ('long long' === $expected || 'int64' === $expected) {
             return $this->context->builder->call(
@@ -7475,6 +7491,7 @@ class JIT {
             && Variable::TYPE_STRING !== $result->type
             && !$value->isJitGenerator
             && null === $result->objectPropertySlot
+            && !$result->functionStaticGlobal
         ) {
             // ?? left branch fetch binds a superglobal lvalue; force-assign needs a stack slot (#866).
             // Property lvalues keep objectPropertySlot so ReadonlyClassGuard runs on inc/dec (#3149).
@@ -7543,6 +7560,15 @@ class JIT {
                 $result->staticPropertyGlobal,
                 $value,
                 $result->staticPropertyType
+            );
+
+            return;
+        }
+        if ($result->functionStaticGlobal) {
+            JIT\JitValueBox::assignToPointer(
+                $this->context,
+                JIT\JitValueBox::valuePtrFromVariable($this->context, $result),
+                $value
             );
 
             return;
@@ -8445,7 +8471,10 @@ class JIT {
             $this->assignOperand($resultOp, $read, true);
         }
 
-        if (Variable::TYPE_VALUE === $read->type && Variable::KIND_VARIABLE === $read->kind) {
+        if (
+            Variable::TYPE_VALUE === $read->type
+            && (Variable::KIND_VARIABLE === $read->kind || $read->functionStaticGlobal)
+        ) {
             $readPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $read);
             $cur = $this->context->builder->call(
                 $this->context->lookupFunction('__value__readLong'),
