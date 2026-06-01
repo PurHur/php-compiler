@@ -18,6 +18,15 @@ final class JitNativeString
         if (Variable::TYPE_STRING === $var->type) {
             return $var;
         }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $magic = MagicMethodDispatch::coerceObjectToString($context, $var);
+            if (null !== $magic) {
+                return $magic;
+            }
+            throw new \LogicException(
+                'Cannot coerce JIT type '.Variable::getStringType($var->type).' to string for concat'
+            );
+        }
         if (Variable::TYPE_VALUE === $var->type) {
             return new Variable(
                 $context,
