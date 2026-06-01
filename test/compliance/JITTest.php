@@ -424,6 +424,10 @@ class JITTest extends BaseTest {
                 || str_contains($name, 'show_source')) {
                 continue;
             }
+            // get_meta_tags() VM-only until HTML meta LLVM lowering (#3703).
+            if (str_contains($name, 'get_meta_tags')) {
+                continue;
+            }
             // ob_get_contents/ob_end_clean/ob_get_length VM-only until LLVM ob read API (#3236).
             if (str_contains($name, 'ob_get_contents')) {
                 continue;
