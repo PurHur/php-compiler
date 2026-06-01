@@ -15,7 +15,6 @@ use PHPLLVM\Value;
  * class_alias() — register alternate class names (issue #3095).
  *
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(class_alias)
- * VM only: aliases are resolved at runtime via Context::registerClassAlias.
  */
 final class class_alias extends Internal
 {
@@ -48,6 +47,11 @@ final class class_alias extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('class_alias() is not implemented for JIT in this compiler build');
+        if (\count($args) < 2 || \count($args) > 3) {
+            throw new \LogicException('class_alias() requires two or three arguments in this compiler build');
+        }
+        $autoloadArg = 3 === \count($args) ? $args[2] : null;
+
+        return JitClassAlias::invoke($context, $args[0], $args[1], $autoloadArg);
     }
 }

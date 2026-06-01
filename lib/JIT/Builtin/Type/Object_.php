@@ -33,6 +33,8 @@ class Object_ extends Type {
     private array $enums = [];
     /** @var array<int, string> class id => canonical name */
     private array $classIdToName = [];
+    /** @var array<string, string> alias lc => canonical class lc (#3178) */
+    private array $classAliasToOriginalLc = [];
     /** @var array<string, string> declaring class lc => parent class lc (#1858) */
     private array $classParentLc = [];
     /** @var array<string, list<string>> class lc => interface lc names (#1357, #3077) */
@@ -809,6 +811,42 @@ class Object_ extends Type {
         }
 
         return isset($this->classIdToName[$this->classes[$lc]]);
+    }
+
+    /**
+     * Register an alternate name for a JIT-declared user class (class_alias, #3178).
+     *
+     * php-src: zend_register_class_alias_ex — v1: user classes only, no alias chains.
+     */
+    public function registerClassAlias(string $original, string $alias): bool
+    {
+        $aliasLc = strtolower(ltrim($alias, '\\'));
+        $originalLc = strtolower(ltrim($original, '\\'));
+
+        if (isset($this->classes[$aliasLc]) || isset($this->classAliasToOriginalLc[$aliasLc])) {
+            return false;
+        }
+        if (!isset($this->classes[$originalLc])) {
+            return false;
+        }
+        if (isset($this->classAliasToOriginalLc[$originalLc])) {
+            return false;
+        }
+        if (isset($this->enums[$originalLc])
+            || isset($this->interfaceClassLcs[$originalLc])
+            || isset($this->traitClassLcs[$originalLc])) {
+            return false;
+        }
+
+        $classId = $this->classes[$originalLc];
+        if (isset($this->externalOnlyClassIds[$classId])) {
+            return false;
+        }
+
+        $this->classes[$aliasLc] = $classId;
+        $this->classAliasToOriginalLc[$aliasLc] = $originalLc;
+
+        return true;
     }
 
     /**
