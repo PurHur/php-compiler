@@ -393,6 +393,7 @@ class Module extends ModuleAbstract
             new escapeshellcmd(),
             new phpc_run_command(),
             new sys_get_temp_dir(),
+            new sys_getloadavg(),
             new tempnam(),
             new tmpfile(),
             new getcwd_(),
