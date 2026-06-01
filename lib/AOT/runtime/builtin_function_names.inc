@@ -315,6 +315,7 @@ static const char *phpc_builtin_functions[] = {
     "rawurldecode",
     "rawurlencode",
     "readfile",
+    "readline",
     "readlink",
     "realpath",
     "register_shutdown_function",
