@@ -79,6 +79,9 @@ class Compiler {
     /** Class being compiled while lowering static property declarations (#3814). */
     private ?string $currentClassStaticPropertyCompile = null;
 
+    /** @var array<string, true> lowercase user function names declared `: never` (#4117). */
+    private array $neverFunctionNames = [];
+
     /** Script declares DNF-typed instance properties — MCJIT needs a try region (#4111). */
     private bool $scriptHasDnfTypedProperties = false;
 
@@ -284,6 +287,7 @@ class Compiler {
         $this->haltCompilerRemaining = null;
         $this->compiledClassStaticProperties = [];
         $this->currentClassStaticPropertyCompile = null;
+        $this->neverFunctionNames = [];
         $this->scriptHasDnfTypedProperties = false;
         $this->classCompileRegistry = new ClassCompileRegistry();
         $this->seen = new SplObjectStorage;
@@ -823,6 +827,8 @@ class Compiler {
                     } elseif ($this->isLoweredByFollowingThrow($child, $ops, $i)) {
                         break;
                     } elseif ($this->isUnreachableAfterThrow($child, $ops, $i)) {
+                        break;
+                    } elseif ($this->isUnreachableAfterNeverCall($child, $ops, $i)) {
                         break;
                     } elseif (
                         $child instanceof Op\Expr\PropertyFetch
@@ -2724,6 +2730,9 @@ class Compiler {
         if ($this->funcDeclReturnTypeIsGenerator($function->func)) {
             $this->markFunctionGenerator($funcBlock);
         }
+        if ($this->funcDeclReturnTypeIsNever($function->func)) {
+            $this->neverFunctionNames[strtolower($function->func->name)] = true;
+        }
         $operand = new Operand\Literal($function->func->name);
         $operand->type = Type::string();
         $return = new OpCode(
@@ -3531,6 +3540,54 @@ class Compiler {
             return $decl instanceof Operand\Literal
                 && is_string($decl->value)
                 && 'Generator' === $decl->value;
+        }
+
+        return false;
+    }
+
+    protected function funcDeclReturnTypeIsNever(CfgFunc $func): bool
+    {
+        $returnType = $func->returnType;
+        if ($returnType instanceof Op\Type\Never_) {
+            return true;
+        }
+        if ($returnType instanceof Op\Type\Literal && 'never' === strtolower($returnType->name)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function isNeverFunctionCallOp(Op $op): bool
+    {
+        if ($op instanceof Op\Expr\FuncCall) {
+            $name = $this->staticNameFromOperand($op->name);
+        } elseif ($op instanceof Op\Expr\NsFuncCall) {
+            $name = $this->staticNameFromOperand($op->nsName);
+        } else {
+            return false;
+        }
+        if (null === $name) {
+            return false;
+        }
+
+        return isset($this->neverFunctionNames[strtolower($name)]);
+    }
+
+    /**
+     * Ops after a call to a `: never` function in the same CFG block are unreachable (#4117).
+     *
+     * @param Op[] $ops
+     */
+    private function isUnreachableAfterNeverCall(Op $op, array $ops, int $index): bool
+    {
+        for ($j = $index - 1; $j >= 0; --$j) {
+            if ($this->isNeverFunctionCallOp($ops[$j])) {
+                return true;
+            }
+            if (!$ops[$j] instanceof Op\Expr) {
+                return false;
+            }
         }
 
         return false;
