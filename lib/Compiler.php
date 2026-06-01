@@ -4823,8 +4823,9 @@ class Compiler {
                     ];
                 }
             }
+            $canonical = $this->unwrapVariableOperand($expr);
 
-            return [$this->compileOperand($expr, $block, true), null];
+            return [$this->compileOperand(null !== $canonical ? $canonical : $expr, $block, true), null];
         }
 
         $this->throwCompileLogic('Unsupported isset target: ' . (is_object($expr) ? $expr->getType() : gettype($expr)));

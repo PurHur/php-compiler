@@ -834,6 +834,12 @@ restart:
                     }
                     $arg2->copyFrom($arg3);
                     $arg1->copyFrom($arg3);
+                    if ($op->arg2 !== $op->arg3) {
+                        $arg3->resolveIndirect()->null();
+                    }
+                    if ($op->arg1 !== $op->arg2 && $op->arg1 !== $op->arg3) {
+                        $arg1->resolveIndirect()->null();
+                    }
                     $strict = null !== $frame->parent
                         ? $frame->parent->block->strictTypes
                         : $frame->block->strictTypes;

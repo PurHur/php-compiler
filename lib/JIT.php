@@ -4680,9 +4680,27 @@ class JIT {
                         }
                     }
                     $this->assignOperand($aliasOp, $value, $forceAssign);
-                    $this->assignOperand($destOp, $value, $forceAssign);
+                    $destUsed = [] !== $destOp->usages
+                        || $this->context->scope->variables->contains($destOp);
+                    if ($destUsed || $forceAssign) {
+                        $this->assignOperand($destOp, $value, $forceAssign);
+                    }
+                    $srcOp = $block->getOperand($op->arg3);
+                    if ($op->arg2 !== $op->arg3 && $this->context->hasVariableOp($srcOp)) {
+                        $this->context->getVariableFromOp($srcOp)->free();
+                    }
+                    if (
+                        $destUsed
+                        && $op->arg1 !== $op->arg2
+                        && $op->arg1 !== $op->arg3
+                        && $this->context->hasVariableOp($destOp)
+                    ) {
+                        $this->context->getVariableFromOp($destOp)->free();
+                    }
                     $this->maybeBindNamedVariable($aliasOp);
-                    $this->maybeBindNamedVariable($destOp);
+                    if ($op->arg1 === $op->arg2) {
+                        $this->maybeBindNamedVariable($destOp);
+                    }
                     foreach ([$block->getOperand($op->arg2), $destOp] as $destOperand) {
                         if (!$this->context->hasVariableOp($destOperand)) {
                             continue;
@@ -5246,7 +5264,30 @@ class JIT {
                     break;
                 case OpCode::TYPE_UNSET:
                     if (null === $op->arg3) {
-                        $targetOp = $block->getOperand($op->arg2);
+                        $targetOp = null !== $op->arg2
+                            ? ($block->operandForScopeSlot($op->arg2) ?? $block->getOperand($op->arg2))
+                            : null;
+                        if (null === $targetOp) {
+                            break;
+                        }
+                        $this->context->aliasVariableOpFromSlot($block, $targetOp);
+                        $unsetName = JIT\OperandName::resolve($targetOp);
+                        if (null !== $unsetName && '' !== $unsetName) {
+                            $resolvedUnset = $this->context->resolveRefAliasName($unsetName);
+                            if (isset($this->context->namedVariableBindings[$resolvedUnset])) {
+                                $bound = $this->context->namedVariableBindings[$resolvedUnset];
+                                if (
+                                    Variable::KIND_VARIABLE === $bound->kind
+                                    && Variable::TYPE_VALUE === $bound->type
+                                ) {
+                                    $this->context->builder->call(
+                                        $this->context->lookupFunction('__value__writeNull'),
+                                        $bound->value
+                                    );
+                                    break;
+                                }
+                            }
+                        }
                         if (
                             !$this->context->hasVariableOp($targetOp)
                             && null === JIT\OperandName::resolve($targetOp)
@@ -5267,8 +5308,17 @@ class JIT {
                                 );
                                 break;
                             }
-                        }
-                        if ($this->context->hasVariableOp($targetOp)) {
+                            if (
+                                Variable::KIND_VARIABLE === $target->kind
+                                && Variable::TYPE_VALUE === $target->type
+                            ) {
+                                $this->context->builder->call(
+                                    $this->context->lookupFunction('__value__writeNull'),
+                                    $target->value
+                                );
+                                break;
+                            }
+                            $target->free();
                             $this->context->setVariableOp($targetOp, $this->jitNullVariable());
                         }
                     } else {
@@ -5737,6 +5787,7 @@ class JIT {
                     $returnBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($returnBlock);
                     $this->markJitThisConstructedIfLeavingConstruct($block);
+                    $this->releaseJitFunctionLocalsAtReturn($block);
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                         $this->context->freeDeadVariables($func, $returnBlock, $block);
                     }
@@ -10104,6 +10155,33 @@ class JIT {
         }
 
         return null;
+    }
+
+    /** Release boxed locals before user function return (Zend end of scope; #4096). */
+    private function releaseJitFunctionLocalsAtReturn(Block $block): void
+    {
+        if (null === $block->func) {
+            return;
+        }
+        $fnName = $block->func->name;
+        if ('{main}' === $fnName || str_ends_with($fnName, '::__destruct')) {
+            return;
+        }
+        $writeNull = $this->context->lookupFunction('__value__writeNull');
+        foreach ($block->eachNamedScopeSlot() as [$name, $slotIdx]) {
+            if ('this' === $name) {
+                continue;
+            }
+            $scopedOp = $block->operandForScopeSlot($slotIdx);
+            if (null === $scopedOp || !$this->context->hasVariableOp($scopedOp)) {
+                continue;
+            }
+            $var = $this->context->getVariableFromOp($scopedOp);
+            if (Variable::KIND_VARIABLE !== $var->kind || Variable::TYPE_VALUE !== $var->type) {
+                continue;
+            }
+            $this->context->builder->call($writeNull, $var->value);
+        }
     }
 
     private function maybeBindNamedVariable(Operand $op): void
