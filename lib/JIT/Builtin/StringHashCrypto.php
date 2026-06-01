@@ -51,7 +51,14 @@ final class StringHashCrypto
 
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach (['__compiler_hash', '__compiler_hash_hmac', '__compiler_hash_equals'] as $name) {
+        foreach (
+            [
+                '__compiler_hash',
+                '__compiler_hash_hmac',
+                '__compiler_hash_pbkdf2',
+                '__compiler_hash_equals',
+            ] as $name
+        ) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
                 throw new \LogicException($name.' missing after hash bitcode link');

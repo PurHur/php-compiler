@@ -29,6 +29,22 @@ final class VmHash
         return \hash_hmac($algo, $data, $key, $raw);
     }
 
+    /**
+     * hash_pbkdf2() — delegates to host PHP (issue #3773, ext/hash/hash_pbkdf2.c parity).
+     *
+     * @throws \ValueError unknown algorithm (PHP 8+)
+     */
+    public static function hashPbkdf2(
+        string $algo,
+        string $password,
+        string $salt,
+        int $iterations,
+        int $length = 0,
+        bool $raw = false
+    ): string {
+        return \hash_pbkdf2($algo, $password, $salt, $iterations, $length, $raw);
+    }
+
     /** Timing-safe string compare for hash_equals() (issue #2179). */
     public static function equals(string $known, string $user): bool
     {
