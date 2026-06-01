@@ -214,6 +214,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'preg_last_error_msg')) {
                 continue;
             }
+            // preg_replace() $limit: VM + AOT lint (#3605); MCJIT until __compiler_preg_replace gains limit.
+            if (str_contains($name, 'preg_replace_limit')) {
+                continue;
+            }
             // json_validate() MCJIT path unsafe until __compiler_json_validate link is stable (#3101).
             if (str_contains($name, 'json_validate')) {
                 continue;
