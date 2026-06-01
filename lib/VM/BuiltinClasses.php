@@ -40,6 +40,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionConstruct;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetReturnType;
+use PHPCompiler\VM\Builtin\ReflectionFunctionIsAnonymous;
 use PHPCompiler\VM\Builtin\ReflectionMethodConstruct;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetName;
@@ -239,6 +240,7 @@ final class BuiltinClasses
                 'getname' => new ReflectionFunctionGetName(),
                 'getparameters' => new ReflectionFunctionGetParameters(),
                 'getreturntype' => new ReflectionFunctionGetReturnType(),
+                'isanonymous' => new ReflectionFunctionIsAnonymous(),
             ] as $name => $method
         ) {
             $rf->methods[$name] = $method;

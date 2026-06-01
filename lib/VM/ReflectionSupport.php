@@ -465,6 +465,26 @@ final class ReflectionSupport
         return $nameVar->toString();
     }
 
+    public static function isReflectionFunctionAnonymous(ObjectEntry $reflection): bool
+    {
+        $state = $reflection->reflectionClosureState;
+
+        return null !== $state && $state->isUserClosure();
+    }
+
+    /**
+     * @return \PHPCompiler\Func\PHP
+     */
+    public static function resolveFunctionFromReflection(Context $ctx, ObjectEntry $reflection): \PHPCompiler\Func\PHP
+    {
+        $closure = $reflection->reflectionClosureState;
+        if (null !== $closure) {
+            return $closure->func;
+        }
+
+        return self::resolveUserFunction($ctx, self::functionNameFromReflection($reflection));
+    }
+
     public static function constantNameFromReflection(ObjectEntry $reflection): string
     {
         $nameVar = $reflection->getProperty(self::PROP_CONSTANT_NAME)->resolveIndirect();
