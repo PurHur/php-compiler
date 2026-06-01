@@ -135,6 +135,15 @@ class Type extends Builtin {
         );
         $fnIniGet = $this->context->module->addFunction('__compiler_ini_get', $fntypeIniGet);
         $this->context->registerFunction('__compiler_ini_get', $fnIniGet);
+        $fntypeErrorReporting = $this->context->context->functionType(
+            $this->context->getTypeFromString('void'),
+            false,
+            $this->context->getTypeFromString('int32'),
+            $this->context->getTypeFromString('int64'),
+            $this->context->getTypeFromString('__value__*')
+        );
+        $fnErrorReporting = $this->context->module->addFunction('__compiler_error_reporting', $fntypeErrorReporting);
+        $this->context->registerFunction('__compiler_error_reporting', $fnErrorReporting);
         $fntypeStripTags = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
