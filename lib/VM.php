@@ -2027,10 +2027,11 @@ restart:
                         break;
                     }
                     $key = $frame->scope[$op->arg3]->resolveIndirect();
+                    $value = $frame->scope[$op->arg2];
                     if ($key->is(Variable::TYPE_INTEGER) || $key->is(Variable::TYPE_FLOAT)) {
-                        $ht->addIndex($key->toInt(), $frame->scope[$op->arg2]);
+                        $ht->updateIndex($key->toInt(), $value);
                     } else {
-                        $ht->add($key->toString(), $frame->scope[$op->arg2]);
+                        $ht->update($key->toString(), $value);
                     }
                     break;
                 case OpCode::TYPE_ARRAY_SPREAD:
