@@ -40,6 +40,27 @@ PHP;
         self::assertStringNotContainsString('Call to undefined static method', $stderr);
     }
 
+    public function testInstanceMethodCallableCompiles(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $code = <<<'PHP'
+<?php
+class Greeter {
+    public function greet() { return 'hello'; }
+    public function add(int $a, int $b): int { return $a + $b; }
+}
+$obj = new Greeter();
+$call = $obj->greet(...);
+echo $call(), "\n";
+$add = $obj->add(...);
+echo $add(2, 3), "\n";
+PHP;
+        $stderr = $this->runJitProbeInSubprocess($code);
+        self::assertStringNotContainsString('Unknown array write op', $stderr);
+        self::assertStringNotContainsString('Module verification failed', $stderr);
+        self::assertStringNotContainsString('Variable function calls not yet supported', $stderr);
+    }
+
     public function testCompilerFoldsAssignChainToLiteralCallee(): void
     {
         $code = <<<'PHP'

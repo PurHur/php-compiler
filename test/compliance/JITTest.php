@@ -354,10 +354,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'array_union')) {
                 continue;
             }
-            // Instance method first-class callable is VM-only until JIT bound-method FCC (#3566).
-            if (str_contains($name, 'first_class_callable_method')) {
-                continue;
-            }
             // User enum DECLARE_ENUM segfaults in MCJIT until enum lowering is stable (#3518).
             if (str_contains($name, 'enum_') || str_contains($name, 'abstract_enum')) {
                 continue;

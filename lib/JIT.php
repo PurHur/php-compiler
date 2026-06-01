@@ -4864,9 +4864,7 @@ class JIT {
                     JIT\HashTableHelper::initArray($this->context, $result);
                     if (null !== $op->arg2) {
                         $element = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                        $key = null !== $op->arg3
-                            ? $this->context->getVariableFromOp($block->getOperand($op->arg3))
-                            : null;
+                        $key = $this->jitArrayElementKeyVariable($block, $op->arg3);
                         JIT\HashTableHelper::addElement($this->context, $result, $element, $key);
                         $this->bumpNativeArrayNextFreeForExplicitIntKey($result, $op->arg3, $block);
                     }
@@ -4874,9 +4872,7 @@ class JIT {
                 case OpCode::TYPE_ADD_ARRAY_ELEMENT:
                     $result = $this->context->getVariableFromOp($block->getOperand($op->arg1));
                     $element = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $key = null !== $op->arg3
-                        ? $this->context->getVariableFromOp($block->getOperand($op->arg3))
-                        : null;
+                    $key = $this->jitArrayElementKeyVariable($block, $op->arg3);
                     JIT\HashTableHelper::addElement($this->context, $result, $element, $key);
                     $this->bumpNativeArrayNextFreeForExplicitIntKey($result, $op->arg3, $block);
                     break;
@@ -5797,6 +5793,13 @@ class JIT {
                             break;
                         }
                         $nameSlot = $block->slotForOperand($nameOp);
+                        if (
+                            JIT\BoundMethodCallableHelper::isBoundMethodArrayCallee($nameOp, $nameVar)
+                            && $this->tryInitBoundMethodFccDirect($block, $nameSlot)
+                        ) {
+                            $this->context->scope->argOperands = [];
+                            break;
+                        }
                         if (null !== $nameSlot) {
                             $this->foldCompileTimeStringFromSlot($block, $nameSlot, $nameVar);
                         }
@@ -8652,6 +8655,26 @@ class JIT {
         }
     }
 
+    private function jitArrayElementKeyVariable(Block $block, ?int $keyArg): ?Variable
+    {
+        if (null === $keyArg) {
+            return null;
+        }
+        if (isset($block->constants[$keyArg])) {
+            $const = $block->constants[$keyArg];
+            if (VM\Variable::TYPE_INTEGER === $const->type) {
+                return new Variable(
+                    $this->context,
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::KIND_VALUE,
+                    $this->context->constantFromInteger($const->toInt(), 'int64')
+                );
+            }
+        }
+
+        return $this->context->getVariableFromOp($block->getOperand($keyArg));
+    }
+
     private function bumpNativeArrayNextFreeForExplicitIntKey(
         Variable $array,
         ?int $keyArg,
@@ -8804,6 +8827,30 @@ class JIT {
     /**
      * @param Operand\Literal|Operand\Variable|Operand\Temporary $receiverOp
      */
+    /**
+     * Fold `$obj->method(...)` FCC array callables to direct instance dispatch (#4040).
+     */
+    private function tryInitBoundMethodFccDirect(Block $block, ?int $calleeSlot): bool
+    {
+        if (null === $calleeSlot) {
+            return false;
+        }
+        $methodLc = JIT\BoundMethodCallableHelper::resolveMethodLcFromCalleeSlot($block, $calleeSlot);
+        if (null === $methodLc) {
+            return false;
+        }
+        $receiverOp = JIT\BoundMethodCallableHelper::resolveBoundMethodReceiverOperand($block, $calleeSlot);
+        if (null === $receiverOp) {
+            return false;
+        }
+        if (null === $receiverOp->type || Type::TYPE_OBJECT !== $receiverOp->type->type) {
+            return false;
+        }
+        $this->initJitMethodCall($block, $receiverOp, $methodLc);
+
+        return true;
+    }
+
     private function initJitMethodCall(Block $block, Operand $receiverOp, string $methodName): void
     {
         if ('__invoke' === strtolower($methodName)) {
