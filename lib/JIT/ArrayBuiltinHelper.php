@@ -8272,11 +8272,9 @@ final class ArrayBuiltinHelper
         self::overlayHashTable($context, $result, self::loadHashTable($context, $first));
         $overlayFn = $context->lookupFunction('__compiler_array_replace_recursive_overlay');
         foreach ($others as $other) {
-            $context->builder->call(
-                $overlayFn,
-                $result,
-                self::loadHashTable($context, $other)
-            );
+            $srcHt = HashTableHelper::alloc($context);
+            self::overlayHashTable($context, $srcHt, self::loadHashTable($context, $other));
+            $context->builder->call($overlayFn, $result, $srcHt);
         }
 
         return $result;

@@ -197,7 +197,7 @@ static void arr_replace_packed_index(__hashtable__ *dest, size_t index, __value_
 
 static void arr_replace_string_key(__hashtable__ *dest, __string__ *key, __value__ *overlay_val)
 {
-    __value__ *existing_val = __hashtable__readStringKeyValue(dest, key);
+    __value__ *existing_val = __hashtable__peekStringKeyValue(dest, key);
 
     if (arr_value_is_null(existing_val)) {
         arr_ht_set_string_key_value(dest, key, overlay_val);
