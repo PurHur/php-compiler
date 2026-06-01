@@ -49,7 +49,7 @@ final class gettype extends Internal
 
             return;
         }
-        if ($v->isStreamResource()) {
+        if ($v->isStreamResource() || $v->isDirResource()) {
             $frame->returnVar->string('resource');
 
             return;

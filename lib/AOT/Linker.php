@@ -54,6 +54,7 @@ final class Linker
         __DIR__.'/runtime/phpc_string_cslashes.c',
         __DIR__.'/runtime/filter_validate.c',
         __DIR__.'/runtime/phpc_fs_dir.c',
+        __DIR__.'/runtime/phpc_dir.c',
         __DIR__.'/runtime/phpc_count_chars.c',
         __DIR__.'/runtime/phpc_gethostname.c',
         __DIR__.'/runtime/phpc_gethostbynamel.c',
@@ -106,6 +107,7 @@ final class Linker
     /** Runtime units that need host libc headers (glob/scandir; llvm sysroot lacks linux/limits.h). */
     private const RUNTIME_HOST_LIBC_BASENAMES = [
         'phpc_fs_dir.c',
+        'phpc_dir.c',
         'phpc_gethostname.c',
         'phpc_gethostbynamel.c',
         'phpc_network_services.c',
