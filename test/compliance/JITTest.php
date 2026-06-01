@@ -58,6 +58,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'strspn_strcspn_offset')) {
                 continue;
             }
+            // strspn()/strcspn() empty mask: VM + AOT (#4119); MCJIT phpc_strspn_ex execute pending.
+            if (str_contains($name, 'strspn_empty_mask')) {
+                continue;
+            }
             // vsprintf()/sscanf() VM + AOT (#3190); MCJIT execute segfaults (argv hashtable pack, same as vfprintf).
             if (str_contains($name, 'vsprintf_basic') || str_contains($name, 'sscanf_int')) {
                 continue;
