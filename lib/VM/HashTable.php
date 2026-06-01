@@ -187,6 +187,9 @@ final class HashTable {
 
     public function keyExists(Variable $index): bool
     {
+        if (Variable::TYPE_INDIRECT === $index->type) {
+            $index = $index->resolveIndirect();
+        }
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
                 return null !== $this->findIndex($index->toInt());
@@ -198,6 +201,9 @@ final class HashTable {
     }
 
     public function findVariable(Variable $index, bool $forWrite): ?Variable {
+        if (Variable::TYPE_INDIRECT === $index->type) {
+            $index = $index->resolveIndirect();
+        }
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
                 $result = $this->findIndex($index->toInt());
