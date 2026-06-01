@@ -13,16 +13,19 @@ final class VmFilter
 {
     public const FILTER_VALIDATE_INT = 257;
     public const FILTER_VALIDATE_EMAIL = 274;
+    /** php-src ext/filter/php_filter.h — PHP_FILTER_FLAG_NULL_ON_FAILURE */
+    public const FILTER_NULL_ON_FAILURE = 134217728;
     public const INPUT_POST = 0;
     public const INPUT_GET = 1;
 
     public static function filterVar(Variable $value, int $filter, ?Variable $options = null): Variable
     {
+        $nullOnFailure = self::hasNullOnFailureFlag($options);
         if (self::FILTER_VALIDATE_INT === $filter) {
-            return self::validateInt($value);
+            return self::validateInt($value, $nullOnFailure);
         }
         if (self::FILTER_VALIDATE_EMAIL === $filter) {
-            return self::validateEmail($value);
+            return self::validateEmail($value, $nullOnFailure);
         }
 
         throw new \LogicException(
@@ -44,54 +47,67 @@ final class VmFilter
         );
     }
 
-    private static function validateInt(Variable $value): Variable
+    private static function hasNullOnFailureFlag(?Variable $options): bool
+    {
+        if (null === $options || $options->isUndefined() || Variable::TYPE_NULL === $options->type) {
+            return false;
+        }
+        if (Variable::TYPE_INTEGER !== $options->type) {
+            throw new \LogicException('filter_var() options must be an integer flag bitmask');
+        }
+
+        return 0 !== ($options->toInt() & self::FILTER_NULL_ON_FAILURE);
+    }
+
+    private static function failureResult(bool $nullOnFailure): Variable
     {
         $out = new Variable();
-        if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
+        if ($nullOnFailure) {
+            $out->null();
+        } else {
             $out->bool(false);
+        }
 
-            return $out;
+        return $out;
+    }
+
+    private static function validateInt(Variable $value, bool $nullOnFailure = false): Variable
+    {
+        if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
+            return self::failureResult($nullOnFailure);
         }
         if (Variable::TYPE_INTEGER === $value->type) {
+            $out = new Variable();
             $out->int($value->toInt());
 
             return $out;
         }
         if (Variable::TYPE_STRING !== $value->type) {
-            $out->bool(false);
-
-            return $out;
+            return self::failureResult($nullOnFailure);
         }
         $s = $value->toString();
         if ('' === $s || !self::isIntegerString($s)) {
-            $out->bool(false);
-
-            return $out;
+            return self::failureResult($nullOnFailure);
         }
+        $out = new Variable();
         $out->int((int) $s);
 
         return $out;
     }
 
-    private static function validateEmail(Variable $value): Variable
+    private static function validateEmail(Variable $value, bool $nullOnFailure = false): Variable
     {
-        $out = new Variable();
         if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
-            $out->bool(false);
-
-            return $out;
+            return self::failureResult($nullOnFailure);
         }
         if (Variable::TYPE_STRING !== $value->type) {
-            $out->bool(false);
-
-            return $out;
+            return self::failureResult($nullOnFailure);
         }
         $s = $value->toString();
         if (!self::isValidEmailSubset($s)) {
-            $out->bool(false);
-
-            return $out;
+            return self::failureResult($nullOnFailure);
         }
+        $out = new Variable();
         $out->string($s);
 
         return $out;
@@ -109,6 +125,10 @@ final class VmFilter
                 return false;
             }
             ++$i;
+        }
+        // php-src ext/filter/logical_filters.c — reject leading zeros (except lone "0").
+        if ($len - $i > 1 && '0' === $s[$i]) {
+            return false;
         }
         for (; $i < $len; ++$i) {
             $ch = $s[$i];

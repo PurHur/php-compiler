@@ -1,16 +1,16 @@
-# Generators (`yield`) — VM, JIT fallback, and AOT path (#167)
+# Generators (`yield`) — VM, JIT, and AOT path (#167)
 
 ## Current state
 
 | Layer | Status | Mechanism |
 |-------|--------|-----------|
 | **Compiler** | Done | `TYPE_YIELD` / `TYPE_YIELD_FROM`; `Block::$isGenerator` |
-| **VM** | Done | `GeneratorState`, `VM::GENERATOR_YIELD`, foreach over generators |
+| **VM** | Done | `GeneratorState`, `VM::GENERATOR_YIELD`, foreach over generators; keyed yield (#3085); `yield from` array + generator delegation |
 | **JIT (`bin/jit.php`)** | MCJIT resume (#3074) | Main script MCJIT when yield only in nested functions; `GeneratorHelper` switch-on-resume-ip; linear `yield`, prefix opcodes before each yield segment, packed-array `yield from`, nested `yield from inner()`, dynamic `yield from $g` |
-| **AOT (`phpc build`)** | Blocked | `Runtime::standalone()` throws before link |
-| **Bootstrap spine AOT** | Blocked | `script/bootstrap-lib.php` inventory flags `generator yield` |
+| **AOT (`phpc build`)** | Nested functions (#3115) | `GeneratorHelper` resume lowering for generator *functions*; script-scope top-level `yield` still blocked (`Runtime::standalone()` guard); AOT fixtures: `generator_yield*.phpt`, `generator_yield_from_*.phpt` |
+| **Bootstrap spine AOT** | Nested generators OK | `lib/Block.php` iterator helpers use function-scope `yield` only; inventory flags **script-scope** yield (#2483) |
 
-Compliance PHPT: `test/compliance/GeneratorVMTest.php`, `GeneratorJITTest.php`.
+Compliance PHPT: `test/compliance/GeneratorVMTest.php`, `GeneratorJITTest.php`, `test/fixtures/aot/cases/generator_*.phpt`.
 
 ## Compile-time detection (SSOT)
 
@@ -21,35 +21,24 @@ Compliance PHPT: `test/compliance/GeneratorVMTest.php`, `GeneratorJITTest.php`.
 Used by:
 
 - `bin/jit.php` — skip `$runtime->jit()` when script-scope yield or EH; nested generator bodies use `GeneratorHelper` (#3074)
-- `Runtime::standalone()` — fail fast for AOT
-- `JIT::compileBlock()` — stub generator function bodies instead of lowering opcodes
+- `Runtime::standalone()` — fail fast for AOT when script-scope yield is present
+- `JIT::compileBlock()` — stub generator function bodies instead of lowering opcodes (legacy path; nested generator calls use `GeneratorHelper` resume)
 
-## Native lowering options
+## Native lowering (implemented)
 
-### Option A — Permanent VM fallback (low risk)
+MCJIT/AOT resume uses a **switch-on-IP state machine** (not LLVM coroutine passes):
 
-Keep MCJIT for non-generator code; generator calls always dispatch to the existing VM (`GeneratorState`, `advanceGeneratorIteration`). Matches today's `bin/jit.php` behavior. Minimal LLVM work; generators stay slower than native loops.
+1. **Per generator function**: split CFG at each `TYPE_YIELD` into resume segments.
+2. **State struct**: spill live locals into a heap frame compatible with `GeneratorState`.
+3. **Prologue**: generator call returns a wrapper without entering the body until `next`/`foreach`.
+4. **Resume**: restore locals and branch to the post-yield block.
+5. **`yield from`**: delegate to inner generator/array iterator; prefix opcodes materialize the container before resume (#2483).
 
-### Option B — LLVM coroutines (high effort, full native)
-
-1. **Per generator function**: split CFG at each `TYPE_YIELD` into coroutine suspend points.
-2. **State struct**: spill live locals + `$this` + iterator state into a heap `GeneratorState`-compatible frame (reuse `lib/VM/GeneratorState.php` layout or a native mirror).
-3. **Prologue**: `FUNCCALL_EXEC` on generator returns a wrapper object without entering the body.
-4. **Resume**: foreach / manual `next` calls a resume intrinsic that restores locals and branches to the post-yield block.
-5. **`yield from`**: delegate to inner generator's resume loop (array path can stay eager in VM or lower to iterator glue).
-
-Requires LLVM coroutine passes (or hand-rolled switch-on-IP state machine like many C++20-less compilers). Must interoperate with refcounting and exceptions (#2114) before generators-in-try is safe in JIT.
-
-### Recommended sequence
-
-1. ✅ VM + JIT fallback + compile-time guards (this issue)
-2. EH stability in MCJIT (#2114) — share `requiresVmLowering` gate
-3. ✅ MCJIT resume lowering for generator *calls* while main script stays native (#3074)
-4. ✅ Switch-on-IP lowering for generators with prefix opcodes per resume segment, packed-array `yield from`, nested generator delegation, and dynamic `yield from $g` (#3074); try/catch inside generators still deferred
-5. AOT link only after JIT path is stable; remove bootstrap inventory blocker last
+Deferred: try/catch inside generator bodies under MCJIT; script-scope top-level `yield` for AOT/bootstrap.
 
 ## Related
 
 - [capabilities-syntax.md](capabilities-syntax.md) — matrix row for generators
-- [unsupported-syntax.md](unsupported-syntax.md) — lint mapping for `Expr_YieldFrom`
+- [unsupported-syntax.md](unsupported-syntax.md) — `Expr_YieldFrom` no longer lint-tracked (#167 closed)
 - `lib/VM/GeneratorState.php`, `lib/VM.php` (`TYPE_YIELD*` cases)
+- Wave 4 epic ([#2483](https://github.com/PurHur/php-compiler/issues/2483)): child issues #72, #142, #101, #144, #167 closed; VM/JIT/AOT nested generators + trait adaptations green; script-scope yield and MCJIT closure `use (&$x)` execute remain honestly deferred in `docs/capabilities-syntax.md`

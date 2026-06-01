@@ -401,6 +401,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
     public function testHelloWorldProbeDocumentsInventoryEmitDriverDefaultOn(): void
     {
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-probe.sh');
+        $this->assertStringContainsString('bootstrap_resolve_inventory_emit_driver', $script);
         $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER', $script);
         $this->assertStringContainsString('INVENTORY_EMIT_DRIVER=', $script);
         $this->assertStringContainsString('inventory compile_driver', $script);

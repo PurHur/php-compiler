@@ -9,6 +9,7 @@
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Block;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
 use PHPCompiler\Runtime;
@@ -33,6 +34,13 @@ class Context {
     private array $loadedCompileUnits = [];
     private ?RunStackEntry $runStack = null;
     public array $constants = [];
+
+    /**
+     * Case-insensitive user constants: lowercase name => canonical key in $constants (#3711).
+     *
+     * @var array<string, string>
+     */
+    private array $caseInsensitiveConstantNames = [];
 
     /** @var array<string, Variable> */
     private array $superglobalVars = [];
@@ -60,6 +68,12 @@ class Context {
     /** Handler frame whose catch chain resumes after a throw-path finally (issue #2114). */
     public ?Frame $pendingCatchResumeHandler = null;
 
+    /** Try handler for the innermost catch body exiting to merge (issue #195). */
+    public ?Frame $activeCatchHandlerFrame = null;
+
+    /** Merge block to enter after catch-path finally completes (#195, Zend zend_exceptions.c). */
+    public ?Block $pendingMergeAfterFinally = null;
+
     /** @var array<int, true> handler frame object id => finally already ran for current unwind */
     public array $completedFinallyHandlers = [];
 
@@ -76,6 +90,8 @@ class Context {
     public bool $pendingReturnDispatch = false;
 
     public ErrorReporter $errors;
+
+    public ExceptionHandlerStack $exceptionHandlers;
 
     public ScriptStack $scriptStack;
 
@@ -108,6 +124,7 @@ class Context {
     public function __construct(Runtime $runtime) {
         $this->runtime = $runtime;
         $this->errors = new ErrorReporter();
+        $this->exceptionHandlers = new ExceptionHandlerStack();
         $this->scriptStack = new ScriptStack();
         BuiltinClasses::register($this);
     }
@@ -135,7 +152,23 @@ class Context {
             case 'password_bcrypt':
             case 'password_default':
                 $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmPassword::PASSWORD_DEFAULT);
+                $var->int(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_DEFAULT);
+                return $var;
+            case 'crypt_std_des':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_STD_DES);
+                return $var;
+            case 'crypt_ext_des':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_EXT_DES);
+                return $var;
+            case 'crypt_md5':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_MD5);
+                return $var;
+            case 'crypt_blowfish':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_BLOWFISH);
                 return $var;
             case 'filter_validate_int':
                 $var = new Variable(Variable::TYPE_INTEGER);
@@ -144,6 +177,10 @@ class Context {
             case 'filter_validate_email':
                 $var = new Variable(Variable::TYPE_INTEGER);
                 $var->int(\PHPCompiler\ext\standard\VmFilter::FILTER_VALIDATE_EMAIL);
+                return $var;
+            case 'filter_null_on_failure':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmFilter::FILTER_NULL_ON_FAILURE);
                 return $var;
             case 'input_get':
                 $var = new Variable(Variable::TYPE_INTEGER);
@@ -179,7 +216,40 @@ class Context {
         if (isset($this->constants[$name])) {
             return $this->constants[$name];
         }
+        $lc = strtolower($name);
+        if (isset($this->caseInsensitiveConstantNames[$lc])) {
+            return $this->constants[$this->caseInsensitiveConstantNames[$lc]];
+        }
+
         return null;
+    }
+
+    /** @var list<string> */
+    private const ERROR_REPORTING_CONSTANT_NAMES = [
+        'e_error',
+        'e_warning',
+        'e_parse',
+        'e_notice',
+        'e_core_error',
+        'e_core_warning',
+        'e_compile_error',
+        'e_compile_warning',
+        'e_user_error',
+        'e_user_warning',
+        'e_user_notice',
+        'e_strict',
+        'e_recoverable_error',
+        'e_deprecated',
+        'e_user_deprecated',
+        'e_all',
+    ];
+
+    /**
+     * @return list<string> lowercase names registered for constantFetch()
+     */
+    public static function errorReportingConstantFetchNames(): array
+    {
+        return self::ERROR_REPORTING_CONSTANT_NAMES;
     }
 
     public static function errorReportingConstant(string $name): ?int
@@ -198,7 +268,7 @@ class Context {
             'e_user_notice' => ErrorReporter::E_USER_NOTICE,
             'e_strict' => 2048,
             'e_recoverable_error' => 4096,
-            'e_deprecated' => 8192,
+            'e_deprecated' => ErrorReporter::E_DEPRECATED,
             'e_user_deprecated' => ErrorReporter::E_USER_DEPRECATED,
             'e_all' => E_ALL,
             default => null,
@@ -207,18 +277,42 @@ class Context {
 
     public function isUserConstantDefined(string $name): bool
     {
-        return isset($this->constants[$name]);
+        if (isset($this->constants[$name])) {
+            return true;
+        }
+
+        return isset($this->caseInsensitiveConstantNames[strtolower($name)]);
     }
 
     /**
      * Register a user constant (const / define). Returns false if already defined.
      */
-    public function defineConstant(string $name, Variable $value): bool
+    public function defineConstant(string $name, Variable $value, bool $caseInsensitive = false): bool
     {
         if (isset($this->constants[$name])) {
             return false;
         }
+        $lc = strtolower($name);
+        if (isset($this->caseInsensitiveConstantNames[$lc])) {
+            return false;
+        }
+        if (!$caseInsensitive) {
+            foreach ($this->constants as $existingName => $_) {
+                if (0 === strcasecmp($existingName, $name)) {
+                    return false;
+                }
+            }
+            $this->constants[$name] = clone $value;
+
+            return true;
+        }
+        foreach ($this->constants as $existingName => $_) {
+            if (0 === strcasecmp($existingName, $name)) {
+                return false;
+            }
+        }
         $this->constants[$name] = clone $value;
+        $this->caseInsensitiveConstantNames[$lc] = $name;
 
         return true;
     }
@@ -446,6 +540,23 @@ class Context {
             return $return->frame;
         }
         return null;;
+    }
+
+    /**
+     * Active user frames, innermost first (matches debug_backtrace() order, #1378, #3626).
+     *
+     * @return list<Frame>
+     */
+    public function runStackFrames(): array
+    {
+        $frames = [];
+        $stack = $this->runStack;
+        while (null !== $stack) {
+            $frames[] = $stack->frame;
+            $stack = $stack->prev;
+        }
+
+        return $frames;
     }
 
   /** Swap the run stack (nested user-function calls from VM builtins). */

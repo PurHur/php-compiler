@@ -14,15 +14,37 @@ final class OutputBuffer
     /** @var list<string> */
     private static array $stack = [];
 
+    private static bool $implicitFlush = false;
+
     public static function reset(): void
     {
         self::$stack = [];
+        self::$implicitFlush = false;
         SapiOutput::reset();
+        HeaderCallbackQueue::reset();
+    }
+
+    public static function setImplicitFlush(bool $on): void
+    {
+        self::$implicitFlush = $on;
+    }
+
+    public static function isImplicitFlush(): bool
+    {
+        return self::$implicitFlush;
     }
 
     public static function getLevel(): int
     {
         return count(self::$stack);
+    }
+
+    /**
+     * @return list<string> copy of active buffer contents per level (outer → inner)
+     */
+    public static function getBuffers(): array
+    {
+        return self::$stack;
     }
 
     public static function start(): void
@@ -35,11 +57,17 @@ final class OutputBuffer
         if ([] === self::$stack) {
             SapiOutput::markStarted();
             echo $chunk;
+            if (self::$implicitFlush) {
+                self::flush();
+            }
 
             return;
         }
         $idx = count(self::$stack) - 1;
         self::$stack[$idx] .= $chunk;
+        if (self::$implicitFlush) {
+            self::flush();
+        }
     }
 
     public static function getClean(): string
@@ -51,6 +79,38 @@ final class OutputBuffer
         return array_pop(self::$stack);
     }
 
+    /** ob_get_contents() — read active buffer without ending (ext/standard/output.c, issue #3236). */
+    public static function getContents(): ?string
+    {
+        if ([] === self::$stack) {
+            return null;
+        }
+
+        return self::$stack[count(self::$stack) - 1];
+    }
+
+    /** ob_get_length() — byte length of active buffer (issue #3236). */
+    public static function getLength(): ?int
+    {
+        $contents = self::getContents();
+        if (null === $contents) {
+            return null;
+        }
+
+        return strlen($contents);
+    }
+
+    /** ob_end_clean() — discard active buffer and pop level (issue #3236). */
+    public static function endClean(): bool
+    {
+        if ([] === self::$stack) {
+            return false;
+        }
+        array_pop(self::$stack);
+
+        return true;
+    }
+
     public static function endFlush(): void
     {
         if ([] === self::$stack) {
@@ -59,11 +119,19 @@ final class OutputBuffer
         self::append(array_pop(self::$stack));
     }
 
-    /** flush() — fflush stdout; ob buffers unchanged until ob_end_flush (issue #3388, php-src php_flush). */
+    /** flush() — sapi_flush / fflush(stdout) (issue #3388, php-src basic_functions.c PHP_FUNCTION(flush)). */
     public static function flush(): void
     {
         if (\defined('STDOUT') && \is_resource(\STDOUT)) {
             @\fflush(\STDOUT);
+        }
+    }
+
+    /** php_output_end_all parity — flush remaining ob levels at request shutdown (issue #3675). */
+    public static function endAllAtShutdown(): void
+    {
+        while ([] !== self::$stack) {
+            self::endFlush();
         }
     }
 }

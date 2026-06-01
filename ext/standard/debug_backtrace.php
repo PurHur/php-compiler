@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * debug_backtrace() — minimal stack trace array (issue #1378).
+ * debug_backtrace() — stack trace array (issue #1378; options #3626).
  *
  * VM: walks Frame parent chain. JIT: {@see JitDebugBacktrace} (compile-time frames; #1378, #1870, #1056).
  */
@@ -24,25 +24,33 @@ final class debug_backtrace extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException(
-                'debug_backtrace() options are not supported in this compiler build'
-            );
+        $argc = \count($frame->calledArgs);
+        if ($argc > 2) {
+            throw new \LogicException('debug_backtrace() accepts at most two arguments');
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->copyFrom(VmDebugBacktrace::build($frame, true));
+        $options = 0;
+        $limit = 0;
+        if ($argc >= 1) {
+            $options = $frame->calledArgs[0]->resolveIndirect()->toInt();
+        }
+        if ($argc >= 2) {
+            $limit = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        }
+        $frame->returnVar->copyFrom(VmDebugBacktrace::build($frame, $options, $limit));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 0) {
-            throw new \LogicException(
-                'debug_backtrace() options are not supported in this compiler build'
-            );
+        $argc = \count($args);
+        if ($argc > 2) {
+            throw new \LogicException('debug_backtrace() accepts at most two arguments');
         }
 
-        return JitDebugBacktrace::invoke($context);
+        $optionsArg = $argc >= 1 ? $args[0] : null;
+
+        return JitDebugBacktrace::invoke($context, $optionsArg);
     }
 }

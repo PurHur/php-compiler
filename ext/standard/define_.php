@@ -32,7 +32,11 @@ final class define_ extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('define() requires VM context');
         }
-        $ok = $frame->vmContext->defineConstant($nameVar->toString(), $value);
+        $caseInsensitive = false;
+        if (\count($frame->calledArgs) >= 3) {
+            $caseInsensitive = $frame->calledArgs[2]->resolveIndirect()->toBool();
+        }
+        $ok = $frame->vmContext->defineConstant($nameVar->toString(), $value, $caseInsensitive);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }
@@ -51,7 +55,14 @@ final class define_ extends Internal
         }
         $name = $args[0]->compileTimeString;
         $value = self::compileTimeVmVariable($context, $args[1]);
-        if (!$context->runtime->vmContext->defineConstant($name, $value)) {
+        $caseInsensitive = false;
+        if (\count($args) >= 3) {
+            if (JITVariable::TYPE_NATIVE_BOOL !== $args[2]->type || null === $args[2]->value->value) {
+                throw new \LogicException('define() case_insensitive must be a boolean literal in this compiler build');
+            }
+            $caseInsensitive = 0 !== (int) $context->llvm->lib->LLVMConstIntGetZExtValue($args[2]->value->value);
+        }
+        if (!$context->runtime->vmContext->defineConstant($name, $value, $caseInsensitive)) {
             throw new \LogicException("Cannot redefine constant {$name}");
         }
         $i1 = $context->getTypeFromString('int1');

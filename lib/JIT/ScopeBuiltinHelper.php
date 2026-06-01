@@ -10,6 +10,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block as CompilerBlock;
 use PHPCompiler\ext\standard\VmScope;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\Web\Superglobals;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -68,17 +69,46 @@ final class ScopeBuiltinHelper
         $countSlot = $context->builder->alloca($i64, 1, 'extract_count');
         $context->builder->store($i64->constInt(0, false), $countSlot);
 
+        self::walkStringKeyNodes($context, $ht, $named, $flags, $countSlot);
+
+        return $context->builder->load($countSlot);
+    }
+
+    /**
+     * parse_str() one-arg: import every matching parsed key into named locals (issue #3708).
+     */
+    public static function importHashtableIntoScope(Context $context, Value $ht): void
+    {
+        $named = self::namedVariablesInScope($context);
+        if ([] === $named) {
+            return;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $flags = $i64->constInt(0, false);
+        self::walkStringKeyNodes($context, $ht, $named, $flags, null);
+    }
+
+    /**
+     * @param array<string, Variable> $named
+     */
+    private static function walkStringKeyNodes(
+        Context $context,
+        Value $ht,
+        array $named,
+        Value $flags,
+        ?Value $countSlot
+    ): void {
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
         $nodePtrType = $context->getTypeFromString('__strkey_node__*');
-        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'extract_walk');
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'scope_import_walk');
         $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
         $context->builder->store($head, $walkSlot);
 
-        $strHead = BasicBlockHelper::append($context, 'extract_str_head');
-        $strBody = BasicBlockHelper::append($context, 'extract_str_body');
-        $strNext = BasicBlockHelper::append($context, 'extract_str_next');
-        $strDone = BasicBlockHelper::append($context, 'extract_str_done');
+        $strHead = BasicBlockHelper::append($context, 'scope_import_str_head');
+        $strBody = BasicBlockHelper::append($context, 'scope_import_str_body');
+        $strNext = BasicBlockHelper::append($context, 'scope_import_str_next');
+        $strDone = BasicBlockHelper::append($context, 'scope_import_str_done');
         $context->builder->branch($strHead);
 
         $context->builder->positionAtEnd($strHead);
@@ -98,8 +128,6 @@ final class ScopeBuiltinHelper
         $context->builder->branch($strHead);
 
         $context->builder->positionAtEnd($strDone);
-
-        return $context->builder->load($countSlot);
     }
 
     /**
@@ -111,7 +139,7 @@ final class ScopeBuiltinHelper
         Value $valEntry,
         array $named,
         Value $flags,
-        Value $countSlot
+        ?Value $countSlot
     ): void {
         if ([] === $named) {
             return;
@@ -155,7 +183,7 @@ final class ScopeBuiltinHelper
         Variable $dest,
         Value $valEntry,
         Value $flags,
-        Value $countSlot,
+        ?Value $countSlot,
         \PHPLLVM\BasicBlock $merge
     ): void {
         $i64 = $context->getTypeFromString('int64');
@@ -183,8 +211,10 @@ final class ScopeBuiltinHelper
 
         $context->builder->positionAtEnd($assignBlock);
         self::assignFromValueEntry($context, $dest, $valEntry);
-        $prev = $context->builder->load($countSlot);
-        $context->builder->store($context->builder->addNoSignedWrap($prev, $one), $countSlot);
+        if (null !== $countSlot) {
+            $prev = $context->builder->load($countSlot);
+            $context->builder->store($context->builder->addNoSignedWrap($prev, $one), $countSlot);
+        }
         $context->builder->branch($merge);
     }
 
@@ -196,37 +226,133 @@ final class ScopeBuiltinHelper
 
         $result = HashTableHelper::alloc($context);
         foreach ($nameArgs as $arg) {
-            $name = self::resolveCompactName($context, $arg);
-            $source = self::findVariableByName($context, $name);
-            if (null === $source) {
-                continue;
-            }
-            $keyStr = $context->builder->load($context->constantStringFromString($name));
-            self::storeVariableAtStringKey($context, $result, $keyStr, $source);
+            self::addCompactArgument($context, $result, $arg);
         }
 
         return $result;
     }
 
-    private static function resolveCompactName(Context $context, Variable $arg): string
+    private static function addCompactArgument(Context $context, Value $result, Variable $arg): void
     {
         if (null !== $arg->compileTimeString) {
-            return $arg->compileTimeString;
+            self::addCompactByName($context, $result, $arg->compileTimeString);
+
+            return;
         }
-        if (Variable::TYPE_STRING === $arg->type) {
-            throw new \LogicException(
-                'compact() arguments must be string variable names in this compiler build'
+
+        self::applyRuntimeCompactArgument($context, $result, $arg);
+    }
+
+    private static function addCompactByName(Context $context, Value $result, string $name): void
+    {
+        $source = self::findVariableByName($context, $name);
+        if (null === $source) {
+            self::emitCompactUndefinedVariableWarning($context, $name);
+
+            return;
+        }
+        $keyStr = $context->builder->load($context->constantStringFromString($name));
+        self::storeVariableAtStringKey($context, $result, $keyStr, $source);
+    }
+
+    private static function applyRuntimeCompactArgument(Context $context, Value $result, Variable $arg): void
+    {
+        $names = self::tryCompileTimeCompactNames($arg);
+        if (null !== $names) {
+            foreach ($names as $name) {
+                self::addCompactByName($context, $result, $name);
+            }
+
+            return;
+        }
+
+        $named = self::namedVariablesInScope($context);
+        if ([] === $named) {
+            return;
+        }
+
+        $scopeNames = array_keys($named);
+        $bindingCount = \count($scopeNames);
+        $charPtr = $context->getTypeFromString('char*');
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $i64 = $context->getTypeFromString('int64');
+        foreach ($named as $scopeVar) {
+            if (null === $scopeVar->valueBoxAliasPtr) {
+                JitValueBox::promoteNativeLvalueToValueBox($context, $scopeVar);
+            }
+        }
+
+        $namesArrayTy = $charPtr->arrayType($bindingCount);
+        $slotsArrayTy = $valuePtrTy->arrayType($bindingCount);
+        $namesAlloc = BasicBlockHelper::entryAlloca($context, $namesArrayTy);
+        $slotsAlloc = BasicBlockHelper::entryAlloca($context, $slotsArrayTy);
+        $zero = $i64->constInt(0, false);
+
+        foreach ($scopeNames as $i => $scopeName) {
+            $idx = $i64->constInt($i, false);
+            $nameSlot = $context->builder->gep($namesAlloc, $zero, $idx);
+            $valueSlot = $context->builder->gep($slotsAlloc, $zero, $idx);
+            $nameGlobal = $context->builder->load($context->constantStringFromString($scopeName));
+            $context->builder->store(
+                self::stringDataPtr($context, $nameGlobal),
+                $nameSlot
             );
-        }
-        if (Variable::TYPE_VALUE === $arg->type) {
-            throw new \LogicException(
-                'compact() arguments must be string variable names in this compiler build'
+            $context->builder->store(
+                JitValueBox::valuePtrFromVariable($context, $named[$scopeName]),
+                $valueSlot
             );
         }
 
-        throw new \LogicException(
-            'compact() arguments must be string variable names in this compiler build'
+        $argPtr = self::compactArgValuePtr($context, $arg);
+        $namesPtr = $context->builder->pointerCast($namesAlloc, $charPtr->pointerType(0));
+        $slotsPtr = $context->builder->pointerCast($slotsAlloc, $valuePtrTy->pointerType(0));
+        $context->builder->call(
+            $context->lookupFunction('__compiler_compact_apply_arg'),
+            $result,
+            $argPtr,
+            $namesPtr,
+            $slotsPtr,
+            $i64->constInt($bindingCount, false)
         );
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private static function tryCompileTimeCompactNames(Variable $arg): ?array
+    {
+        if (null !== $arg->compileTimeString) {
+            return [$arg->compileTimeString];
+        }
+
+        return null;
+    }
+
+    private static function compactArgValuePtr(Context $context, Variable $arg): Value
+    {
+        if (JitValueBox::isValueOperand($arg)) {
+            return JitValueBox::valuePtrFromVariable($context, $arg);
+        }
+
+        if (ArrayBuiltinHelper::isNativeArray($arg->type) || Variable::TYPE_HASHTABLE === $arg->type) {
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            $ht = ArrayBuiltinHelper::loadHashTable($context, $arg);
+            $context->refcount->addref($ht);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                $ptr,
+                $ht
+            );
+
+            return $ptr;
+        }
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        JitValueBox::assignToPointer($context, $ptr, $arg);
+
+        return $ptr;
     }
 
     private static function resolveFlags(Context $context, ?Variable $flagsArg): Value
@@ -235,11 +361,8 @@ final class ScopeBuiltinHelper
         if (null === $flagsArg) {
             return $i64->constInt(VmScope::EXTR_SKIP, false);
         }
-        if (Variable::TYPE_NATIVE_LONG !== $flagsArg->type) {
-            throw new \LogicException('extract() flags must be an integer in this compiler build');
-        }
 
-        return $context->helper->loadValue($flagsArg);
+        return JitLongArg::lower($context, $flagsArg, 'extract() flags');
     }
 
     private static function storeVariableAtStringKey(
@@ -599,5 +722,21 @@ final class ScopeBuiltinHelper
         $map = $context->structFieldMap['__string__'];
 
         return $context->builder->structGep($str, $map['value']);
+    }
+
+    private static function emitCompactUndefinedVariableWarning(Context $context, string $name): void
+    {
+        $message = "compact(): Undefined variable \${$name}";
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $msgLen = $sizeT->constInt(\strlen($message), false);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $msgLen,
+            $i32->constInt(ErrorReporter::E_WARNING, false)
+        );
     }
 }

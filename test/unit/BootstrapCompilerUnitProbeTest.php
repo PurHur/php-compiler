@@ -30,11 +30,11 @@ final class BootstrapCompilerUnitProbeTest extends TestCase
         $this->assertStringContainsString('compiler unit probe compile OK', $source);
     }
 
-    /** Issue #2879: inventory compile_driver without *_m3_emit_native_entry.php. */
-    public function testCompilerUnitProbeDocumentsInventoryEmitDriverOptIn(): void
+    /** Issue #3024 / #2879: inventory compile_driver default-on (no *_m3_emit_native_entry.php). */
+    public function testCompilerUnitProbeDocumentsInventoryEmitDriverDefaultOn(): void
     {
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-compiler-unit-probe.sh');
-        $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER', $script);
+        $this->assertStringContainsString('bootstrap_resolve_inventory_emit_driver', $script);
         $this->assertStringContainsString('inventory compile_driver', $script);
         $this->assertFileExists(self::$root.'/test/selfhost/compiler_unit_probe/compile_driver.php');
     }

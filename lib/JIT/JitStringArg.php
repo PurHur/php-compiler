@@ -18,6 +18,15 @@ final class JitStringArg
     /** @return Value */
     public static function lower(Context $context, Variable $arg, string $contextLabel = 'argument'): Value
     {
+        if (\in_array($arg->type, [
+            Variable::TYPE_NATIVE_LONG,
+            Variable::TYPE_NATIVE_DOUBLE,
+            Variable::TYPE_NATIVE_BOOL,
+        ], true)) {
+            $coerced = JitNativeString::coerce($context, $arg);
+
+            return $context->helper->loadValue($coerced);
+        }
         if (Variable::TYPE_VALUE === $arg->type) {
             return $context->builder->call(
                 $context->lookupFunction('__value__readString'),

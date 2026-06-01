@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
@@ -13,8 +14,8 @@ use PHPCompiler\Web\Superglobals;
  */
 final class VmScope
 {
-    /** PHP EXTR_SKIP — do not overwrite variables that already hold a value. */
-    public const EXTR_SKIP = 6;
+    /** PHP EXTR_SKIP — do not overwrite variables that already hold a value (php_array.h). */
+    public const EXTR_SKIP = StdlibConstants::EXTR_SKIP;
 
     public static function requireCaller(Frame $frame): Frame
     {
@@ -79,14 +80,10 @@ final class VmScope
     {
         $caller = self::requireCaller($frame);
         $result = new HashTable();
-        foreach ($frame->calledArgs as $arg) {
-            $nameVar = $arg->resolveIndirect();
-            if (Variable::TYPE_STRING !== $nameVar->type) {
-                throw new \LogicException('compact() arguments must be string variable names in this compiler build');
-            }
-            $name = $nameVar->toString();
+        foreach (self::collectCompactNamesFromArgs($frame->calledArgs) as $name) {
             $slot = self::slotForName($caller, $name);
             if (null === $slot) {
+                self::compactUndefinedVariableWarning($frame, $name);
                 continue;
             }
             $value = $caller->scope[$slot];
@@ -96,6 +93,56 @@ final class VmScope
         }
 
         return $result;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function collectCompactNamesFromArgs(array $args): array
+    {
+        $names = [];
+        foreach ($args as $arg) {
+            $names = array_merge($names, self::collectCompactNames($arg->resolveIndirect()));
+        }
+
+        return $names;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function collectCompactNames(Variable $var): array
+    {
+        if (Variable::TYPE_STRING === $var->type) {
+            return [$var->toString()];
+        }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            $names = [];
+            foreach ($var->toArray()->iterateKeyed(true) as [, $valueVar]) {
+                $names = array_merge($names, self::collectCompactNames($valueVar->resolveIndirect()));
+            }
+
+            return $names;
+        }
+
+        throw new \LogicException(
+            'compact() arguments must be string variable names or arrays of names in this compiler build'
+        );
+    }
+
+    private static function compactUndefinedVariableWarning(Frame $frame, string $name): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $file = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+        $frame->vmContext->errors->triggerError(
+            "compact(): Undefined variable \${$name}",
+            ErrorReporter::E_WARNING,
+            $file,
+            $frame->vmContext,
+            $frame
+        );
     }
 
     private static function callerVarIsSet(Variable $var): bool

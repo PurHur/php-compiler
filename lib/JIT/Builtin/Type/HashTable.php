@@ -144,6 +144,7 @@ class HashTable extends Type
     public function implement(): void
     {
         $this->ensureLibcStringCompare();
+        $this->ensureLibcStrtol();
         \PHPCompiler\JIT\Builtin\StringStrnatcmp::ensureLinked($this->context);
         \PHPCompiler\JIT\Builtin\StringStrnatcasecmp::ensureLinked($this->context);
         $this->implementAlloc();
@@ -187,6 +188,21 @@ class HashTable extends Type
         $this->implementSortStringKeyValuesNatural();
         $this->implementSortStringKeyValuesNaturalCase();
         $this->implementSortStringKeyValuesReverse();
+    }
+
+    private function ensureLibcStrtol(): void
+    {
+        try {
+            $this->context->lookupFunction('strtol');
+        } catch (\Throwable $e) {
+            $i8p = $this->context->getTypeFromString('int8*');
+            $i8pp = $this->context->getTypeFromString('int8**');
+            $i32 = $this->context->getTypeFromString('int32');
+            $i64 = $this->context->getTypeFromString('int64');
+            $ft = $this->context->context->functionType($i64, false, $i8p, $i8pp, $i32);
+            $fn = $this->context->module->addFunction('strtol', $ft);
+            $this->context->registerFunction('strtol', $fn);
+        }
     }
 
     private function ensureLibcStringCompare(): void
@@ -1613,11 +1629,94 @@ class HashTable extends Type
         $this->context->builder->branch($loopHead);
 
         $this->context->builder->positionAtEnd($notFound);
-        $this->context->builder->branch($done);
+        $this->tryLookupPackedIntFromStringKey($fn, $notFound, $ht, $key, $resultSlot, $done);
 
         $this->context->builder->positionAtEnd($done);
 
         return $this->context->builder->load($resultSlot);
+    }
+
+    /**
+     * Zend numeric-string → int key fallback when string-key chain misses (#3679).
+     */
+    private function tryLookupPackedIntFromStringKey(
+        PHPLLVM\Value\Function_ $fn,
+        PHPLLVM\BasicBlock $entryBlock,
+        PHPLLVM\Value $ht,
+        PHPLLVM\Value $key,
+        PHPLLVM\Value $resultSlot,
+        PHPLLVM\BasicBlock $done
+    ): void {
+        $tryInt = $fn->appendBasicBlock('strkey_lookup_try_int');
+        $parseInt = $fn->appendBasicBlock('strkey_lookup_parse_int');
+        $intFound = $fn->appendBasicBlock('strkey_lookup_int_found');
+        $skipInt = $fn->appendBasicBlock('strkey_lookup_skip_int');
+
+        $this->context->builder->positionAtEnd($entryBlock);
+        $this->context->builder->branch($tryInt);
+
+        $this->context->builder->positionAtEnd($tryInt);
+        $isIntKey = $this->stringIsIntegerNumericKey($key);
+        $this->context->builder->branchIf($isIntKey, $parseInt, $skipInt);
+
+        $this->context->builder->positionAtEnd($parseInt);
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $i8p = $this->context->getTypeFromString('int8*');
+        $i64 = $this->context->getTypeFromString('int64');
+        $endPtrSlot = $this->context->builder->alloca($i8p, 1, 'strkey_lookup_strtol_end');
+        $this->context->builder->store($i8p->constNull(), $endPtrSlot);
+        $parsed = $this->context->builder->call(
+            $this->context->lookupFunction('strtol'),
+            $this->stringDataPtr($key),
+            $endPtrSlot,
+            $this->context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $index = $this->context->builder->truncOrBitCast($parsed, $sizeT);
+        $isSet = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $index
+        );
+        $this->context->builder->branchIf($isSet, $intFound, $skipInt);
+
+        $this->context->builder->positionAtEnd($intFound);
+        $htMap = $this->context->structFieldMap['__hashtable__'];
+        $entry = $this->listEntryAt($ht, $htMap, $index);
+        $this->context->builder->store($entry, $resultSlot);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($skipInt);
+        $this->context->builder->branch($done);
+    }
+
+    /** True when strtol(base 10) consumes the entire __string__ (integer numeric string). */
+    private function stringIsIntegerNumericKey(PHPLLVM\Value $strPtr): PHPLLVM\Value
+    {
+        $map = $this->context->structFieldMap['__string__'];
+        $len = $this->context->builder->load(
+            $this->context->builder->structGep($strPtr, $map['length'])
+        );
+        $i64 = $this->context->getTypeFromString('int64');
+        $i8p = $this->context->getTypeFromString('int8*');
+        $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $len, $len->typeOf()->constInt(0, false));
+
+        $charPtr = $this->context->builder->structGep($strPtr, $map['value']);
+        $endPtrSlot = $this->context->builder->alloca($i8p, 1, 'strkey_is_int_end');
+        $this->context->builder->store($i8p->constNull(), $endPtrSlot);
+        $this->context->builder->call(
+            $this->context->lookupFunction('strtol'),
+            $charPtr,
+            $endPtrSlot,
+            $this->context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $endPtr = $this->context->builder->load($endPtrSlot);
+        $endOffset = $this->context->builder->sub(
+            $this->context->builder->ptrToInt($endPtr, $i64),
+            $this->context->builder->ptrToInt($charPtr, $i64)
+        );
+        $consumedAll = $this->context->builder->icmp(Builder::INT_EQ, $endOffset, $len);
+
+        return $this->context->builder->select($isEmpty, $this->context->constantFromBool(false), $consumedAll);
     }
 
     private function implementSortPacked(): void

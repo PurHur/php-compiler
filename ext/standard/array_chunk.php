@@ -8,13 +8,14 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_chunk() — packed lists (JIT/AOT) and preserve_keys=true assoc arrays (VM).
+ * array_chunk() — packed lists and preserve_keys=true (VM + JIT/AOT).
  */
 final class array_chunk extends Internal
 {
@@ -48,18 +49,6 @@ final class array_chunk extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_chunk() requires two or three arguments in this compiler build');
         }
-        if (3 === $argc) {
-            if (JITVariable::TYPE_NATIVE_BOOL === $args[2]->type && ($args[2]->isConstant ?? false) && $args[2]->value) {
-                throw new \LogicException('array_chunk() preserve_keys=true is not supported in JIT in this compiler build');
-            }
-            if (!(JITVariable::TYPE_NULL === $args[2]->type
-                || ($args[2]->isNullConstant ?? false)
-                || (JITVariable::TYPE_NATIVE_BOOL === $args[2]->type && ($args[2]->isConstant ?? false) && !$args[2]->value))) {
-                throw new \LogicException(
-                    'array_chunk() preserve_keys must be omitted or compile-time false in this compiler build'
-                );
-            }
-        }
         if (JITVariable::TYPE_NATIVE_LONG === $args[1]->type
             && ($args[1]->isConstant ?? false)
             && $args[1]->value <= 0) {
@@ -70,7 +59,10 @@ final class array_chunk extends Internal
         }
 
         $size = JitLongArg::lower($context, $args[1], 'array_chunk() size');
+        $preserveKeys = 3 === $argc
+            ? JitBoolArg::lower($context, $args[2], 'array_chunk() preserve_keys')
+            : null;
 
-        return ArrayBuiltinHelper::buildChunkArray($context, $args[0], $size);
+        return ArrayBuiltinHelper::buildChunkArray($context, $args[0], $size, $preserveKeys);
     }
 }

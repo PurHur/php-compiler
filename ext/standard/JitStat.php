@@ -22,6 +22,9 @@ final class JitStat
     /** sizeof(struct stat) on Linux x86_64 glibc */
     private const STAT_BUF_SIZE = 144;
 
+    /** offsetof(struct stat, st_ino) on Linux x86_64 glibc */
+    private const STAT_INO_OFFSET = 8;
+
     /** offsetof(struct stat, st_mode) on Linux x86_64 glibc */
     private const STAT_MODE_OFFSET = 24;
 
@@ -30,6 +33,18 @@ final class JitStat
 
     /** offsetof(struct stat, st_mtime) on Linux x86_64 glibc */
     private const STAT_MTIME_OFFSET = 88;
+
+    /** sizeof(struct statvfs) on Linux x86_64 glibc */
+    private const STATVFS_BUF_SIZE = 112;
+
+    /** offsetof(struct statvfs, f_frsize) on Linux x86_64 glibc */
+    private const STATVFS_FRSIZE_OFFSET = 8;
+
+    /** offsetof(struct statvfs, f_blocks) on Linux x86_64 glibc */
+    private const STATVFS_BLOCKS_OFFSET = 16;
+
+    /** offsetof(struct statvfs, f_bavail) on Linux x86_64 glibc */
+    private const STATVFS_BAVAIL_OFFSET = 32;
 
     private const S_IFMT = 0xF000;
     private const S_IFIFO = 0x1000;
@@ -175,6 +190,51 @@ final class JitStat
     }
 
     /** @return Value */
+    public static function pathFileInodeBoxed(Context $context, Value $str): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $pathPtr = $context->builder->structGep($str, $map['value']);
+        $i8 = $context->getTypeFromString('int8');
+        $bufType = $i8->arrayType(self::STAT_BUF_SIZE);
+        $buf = $context->builder->alloca($bufType, 1, 'fileinode_stat_buf');
+        $i8p = $context->getTypeFromString('int8*');
+        $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        $ret = $context->builder->call(
+            $context->lookupFunction('stat'),
+            $pathPtr,
+            $bufPtr
+        );
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i32->constInt(0, false);
+        $failed = $context->builder->icmp(Builder::INT_NE, $ret, $zero);
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $id = (string) (++self::$blockSerial);
+        $failBlock = BasicBlockHelper::append($context, 'fileinode_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'fileinode_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'fileinode_done_'.$id);
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $bytePtr = $context->builder->gep($bufPtr, $i64->constInt(self::STAT_INO_OFFSET, false));
+        $inoPtr = $context->builder->pointerCast($bytePtr, $i64->pointerType(0));
+        $ino64 = $context->builder->load($inoPtr);
+        JitValueBox::writeLong($context, $slot, $ino64);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
+    }
+
+    /** @return Value */
     public static function pathFilePermsBoxed(Context $context, Value $str): Value
     {
         $mode = self::loadModeOrFail($context, $str);
@@ -243,6 +303,70 @@ final class JitStat
         $mtimePtr = $context->builder->pointerCast($bytePtr, $i64->pointerType(0));
         $mtime64 = $context->builder->load($mtimePtr);
         JitValueBox::writeLong($context, $slot, $mtime64);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
+    }
+
+    /** @return Value */
+    public static function pathDiskFreeSpaceBoxed(Context $context, Value $str): Value
+    {
+        return self::pathDiskSpaceBoxed($context, $str, self::STATVFS_BAVAIL_OFFSET);
+    }
+
+    /** @return Value */
+    public static function pathDiskTotalSpaceBoxed(Context $context, Value $str): Value
+    {
+        return self::pathDiskSpaceBoxed($context, $str, self::STATVFS_BLOCKS_OFFSET);
+    }
+
+    private static function pathDiskSpaceBoxed(Context $context, Value $str, int $countOffset): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $pathPtr = $context->builder->structGep($str, $map['value']);
+        $i8 = $context->getTypeFromString('int8');
+        $bufType = $i8->arrayType(self::STATVFS_BUF_SIZE);
+        $buf = $context->builder->alloca($bufType, 1, 'diskspace_statvfs_buf');
+        $i8p = $context->getTypeFromString('int8*');
+        $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        $ret = $context->builder->call(
+            $context->lookupFunction('statvfs'),
+            $pathPtr,
+            $bufPtr
+        );
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i32->constInt(0, false);
+        $failed = $context->builder->icmp(Builder::INT_NE, $ret, $zero);
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $id = (string) (++self::$blockSerial);
+        $failBlock = BasicBlockHelper::append($context, 'diskspace_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'diskspace_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'diskspace_done_'.$id);
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $frsizePtr = $context->builder->pointerCast(
+            $context->builder->gep($bufPtr, $i64->constInt(self::STATVFS_FRSIZE_OFFSET, false)),
+            $i64->pointerType(0)
+        );
+        $countPtr = $context->builder->pointerCast(
+            $context->builder->gep($bufPtr, $i64->constInt($countOffset, false)),
+            $i64->pointerType(0)
+        );
+        $frsize = $context->builder->load($frsizePtr);
+        $count = $context->builder->load($countPtr);
+        $bytes = $context->builder->mul($count, $frsize);
+        JitValueBox::writeLong($context, $slot, $bytes);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);

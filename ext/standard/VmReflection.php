@@ -6,8 +6,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
+use PHPCompiler\Func\Internal as FuncInternal;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\Variable;
@@ -98,6 +100,107 @@ final class VmReflection
             $value->string($entry->name);
             $result->append($value);
         }
+
+        return $result;
+    }
+
+    /**
+     * get_declared_classes() — numerically indexed class name list (issue #3128).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_classes)
+     */
+    public static function declaredClassesTable(Context $ctx): \PHPCompiler\VM\HashTable
+    {
+        $result = new \PHPCompiler\VM\HashTable();
+        foreach ($ctx->classes as $lc => $entry) {
+            if ($entry->isInterface || $entry->isTrait || $entry->isEnum || isset($ctx->classAliases[$lc])) {
+                continue;
+            }
+            $value = new Variable();
+            $value->string($entry->name);
+            $result->append($value);
+        }
+
+        return $result;
+    }
+
+    /**
+     * get_declared_traits() — numerically indexed trait name list (issue #3128).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_traits)
+     */
+    public static function declaredTraitsTable(Context $ctx): \PHPCompiler\VM\HashTable
+    {
+        $result = new \PHPCompiler\VM\HashTable();
+        foreach ($ctx->classes as $lc => $entry) {
+            if (!$entry->isTrait || isset($ctx->classAliases[$lc])) {
+                continue;
+            }
+            $value = new Variable();
+            $value->string($entry->name);
+            $result->append($value);
+        }
+
+        return $result;
+    }
+
+    /** @var list<string>|null */
+    private static ?array $internalFunctionNames = null;
+
+    /**
+     * Registered ext Module internal function names (php-src internal bucket).
+     *
+     * @return list<string>
+     */
+    public static function internalFunctionNameList(): array
+    {
+        if (null !== self::$internalFunctionNames) {
+            return self::$internalFunctionNames;
+        }
+        $names = [];
+        foreach ([new Module(), new \PHPCompiler\ext\types\Module()] as $module) {
+            foreach ($module->getFunctions() as $func) {
+                $names[] = $func->getName();
+            }
+        }
+        $names = array_values(array_unique($names));
+        sort($names);
+        self::$internalFunctionNames = $names;
+
+        return self::$internalFunctionNames;
+    }
+
+    /**
+     * get_defined_functions() — internal/user name lists (issue #3128).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_defined_functions)
+     */
+    public static function definedFunctionsTable(Context $ctx): \PHPCompiler\VM\HashTable
+    {
+        $result = new \PHPCompiler\VM\HashTable();
+
+        $internalVar = new Variable();
+        $internalVar->newArray();
+        $internalHt = $internalVar->toArray();
+        foreach (self::internalFunctionNameList() as $name) {
+            $value = new Variable();
+            $value->string($name);
+            $internalHt->append($value);
+        }
+        $result->add('internal', $internalVar);
+
+        $userVar = new Variable();
+        $userVar->newArray();
+        $userHt = $userVar->toArray();
+        foreach ($ctx->functions as $func) {
+            if ($func instanceof FuncInternal) {
+                continue;
+            }
+            $value = new Variable();
+            $value->string($func->getName());
+            $userHt->append($value);
+        }
+        $result->add('user', $userVar);
 
         return $result;
     }
@@ -244,7 +347,11 @@ final class VmReflection
         return $ctx->classes[$lc] ?? null;
     }
 
-    /** @return array<string, string> trait name => trait name (Zend class_uses map) */
+    /**
+     * trait name => trait name (Zend class_uses map).
+     *
+     * @return array<string, string>
+     */
     public static function traitUsesMap(ClassEntry $class): array
     {
         return $class->usedTraits;
@@ -261,7 +368,9 @@ final class VmReflection
     }
 
     /**
-     * @return array<string, string> interface name => interface name (Zend class_implements map)
+     * interface name => interface name (Zend class_implements map).
+     *
+     * @return array<string, string>
      */
     public static function classImplementsMap(ClassEntry $entry, Context $ctx): array
     {
@@ -535,6 +644,62 @@ final class VmReflection
         return $result;
     }
 
+    /**
+     * get_mangled_object_vars() — all set instance properties with Zend-mangled keys (issue #3497).
+     *
+     * php-src: ext/standard/var.c — PHP_FUNCTION(get_mangled_object_vars)
+     */
+    public static function getMangledObjectVars(Variable $object, Context $ctx): Variable
+    {
+        $object = $object->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $object->type) {
+            throw new \LogicException('get_mangled_object_vars() argument must be an object in this compiler build');
+        }
+        $obj = $object->toObject();
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach ($obj->class->properties as $meta) {
+            if (!$obj->hasProperty($meta->name)) {
+                continue;
+            }
+            $value = $obj->getProperty($meta->name)->resolveIndirect();
+            if (Variable::TYPE_NULL === $value->type) {
+                continue;
+            }
+            $key = self::manglePropertyKey($meta, $ctx);
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $ht->add($key, $copy);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Zend property hash key for ZEND_PROP_PURPOSE_DEBUG (php-src zend_mangle_property_name).
+     */
+    public static function manglePropertyKey(ClassProperty $meta, Context $ctx): string
+    {
+        if (MethodVisibility::isPublic($meta->visibility)) {
+            return $meta->name;
+        }
+        if (($meta->visibility & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+            return "\0*\0".$meta->name;
+        }
+
+        return "\0".self::declaringClassDisplay($meta, $ctx)."\0".$meta->name;
+    }
+
+    private static function declaringClassDisplay(ClassProperty $meta, Context $ctx): string
+    {
+        if ('' !== $meta->declaringClassLc && isset($ctx->classes[$meta->declaringClassLc])) {
+            return $ctx->classes[$meta->declaringClassLc]->name;
+        }
+
+        return $meta->declaringClassLc;
+    }
+
     /** Default visibility filter: public | protected | private (php-src get_class_methods). */
     public const METHOD_FILTER_DEFAULT = \PHPCfg\Func::FLAG_PUBLIC
         | \PHPCfg\Func::FLAG_PROTECTED
@@ -591,5 +756,194 @@ final class VmReflection
         }
 
         return $result;
+    }
+
+    /**
+     * Called class for get_called_class() (issue #3218).
+     *
+     * php-src: ext/standard/basic_functions.c — php_get_called_class()
+     */
+    public static function getCalledClass(Frame $frame): string
+    {
+        $current = $frame->parent;
+        if (null === $current) {
+            throw new \Error('get_called_class() must be called from within a class');
+        }
+        if (null !== $current->calledClass && '' !== $current->calledClass) {
+            return $current->calledClass;
+        }
+        if (null === $current->block || null === $current->block->func || null === $current->block->func->class) {
+            throw new \Error('get_called_class() must be called from within a class');
+        }
+        $thisIdx = $current->block->slotIndexForVariableName('this');
+        if (null !== $thisIdx && isset($current->scope[$thisIdx])) {
+            $thisVar = $current->scope[$thisIdx]->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $thisVar->type) {
+                return $thisVar->toObject()->class->name;
+            }
+        }
+
+        return $current->block->func->class->value;
+    }
+
+    /** php-src ReflectionProperty::IS_* visibility bitmask (not PHPCfg flags). */
+    public const REFLECTION_IS_PUBLIC = 256;
+
+    public const REFLECTION_IS_PROTECTED = 512;
+
+    public const REFLECTION_IS_PRIVATE = 1024;
+
+    /**
+     * Class hierarchy from $entry to root parent (child-first).
+     *
+     * @return list<ClassEntry>
+     */
+    public static function classHierarchyChain(ClassEntry $entry, Context $ctx): array
+    {
+        $chain = [$entry];
+        $current = $entry;
+        while (null !== $current->parentLc && isset($ctx->classes[$current->parentLc])) {
+            $current = $ctx->classes[$current->parentLc];
+            $chain[] = $current;
+        }
+
+        return $chain;
+    }
+
+    public static function matchesReflectionVisibilityFilter(int $cfgVisibility, int $filter): bool
+    {
+        if (0 === $filter) {
+            return true;
+        }
+
+        return (self::visibilityToReflectionBitmask($cfgVisibility) & $filter) !== 0;
+    }
+
+    public static function visibilityToReflectionBitmask(int $cfgVisibility): int
+    {
+        if (($cfgVisibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+            return self::REFLECTION_IS_PRIVATE;
+        }
+        if (($cfgVisibility & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+            return self::REFLECTION_IS_PROTECTED;
+        }
+
+        return self::REFLECTION_IS_PUBLIC;
+    }
+
+    /**
+     * Instance properties visible on $entry (child overrides parent), php-src ReflectionClass::getProperties.
+     *
+     * @return list<ClassProperty>
+     */
+    public static function collectClassPropertiesForReflection(ClassEntry $entry, Context $ctx, int $filter = 0): array
+    {
+        $byLc = [];
+        foreach (array_reverse(self::classHierarchyChain($entry, $ctx)) as $class) {
+            foreach ($class->properties as $prop) {
+                if (!self::matchesReflectionVisibilityFilter($prop->visibility, $filter)) {
+                    continue;
+                }
+                $byLc[strtolower($prop->name)] = $prop;
+            }
+        }
+
+        return array_values($byLc);
+    }
+
+    /**
+     * Methods visible on $entry (child overrides parent), php-src ReflectionClass::getMethods.
+     *
+     * @return list<array{methodLc: string, display: string, declaring: ClassEntry}>
+     */
+    public static function collectClassMethodsForReflection(ClassEntry $entry, Context $ctx, int $filter = 0): array
+    {
+        $byLc = [];
+        foreach (array_reverse(self::classHierarchyChain($entry, $ctx)) as $class) {
+            foreach ($class->methods as $methodLc => $_func) {
+                $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                if (!self::matchesReflectionVisibilityFilter($vis, $filter)) {
+                    continue;
+                }
+                $byLc[$methodLc] = [
+                    'methodLc' => $methodLc,
+                    'display' => $class->methodNames[$methodLc] ?? $methodLc,
+                    'declaring' => $class,
+                ];
+            }
+        }
+
+        return array_values($byLc);
+    }
+
+    /**
+     * ReflectionClass::getProperties() result array (#3815).
+     */
+    public static function reflectionPropertiesArray(
+        Context $ctx,
+        ClassEntry $entry,
+        string $reflectedClassName,
+        int $filter = 0
+    ): Variable {
+        $rpClass = $ctx->classes[\PHPCompiler\VM\ReflectionSupport::REFLECTION_PROPERTY] ?? null;
+        if (null === $rpClass) {
+            throw new \LogicException('ReflectionProperty is not registered in this compiler build');
+        }
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (self::collectClassPropertiesForReflection($entry, $ctx, $filter) as $prop) {
+            $obj = new \PHPCompiler\VM\ObjectEntry($rpClass);
+            $obj->constructed = true;
+            $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME)->string($reflectedClassName);
+            $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_PROPERTY_NAME)->string($prop->name);
+            $slot = new Variable(Variable::TYPE_OBJECT);
+            $slot->object($obj);
+            $ht->append($slot);
+        }
+
+        return $result;
+    }
+
+    /**
+     * ReflectionClass::getMethods() result array (#3815).
+     */
+    public static function reflectionMethodsArray(
+        Context $ctx,
+        ClassEntry $entry,
+        string $reflectedClassName,
+        int $filter = 0
+    ): Variable {
+        $rmClass = $ctx->classes[\PHPCompiler\VM\ReflectionSupport::REFLECTION_METHOD] ?? null;
+        if (null === $rmClass) {
+            throw new \LogicException('ReflectionMethod is not registered in this compiler build');
+        }
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (self::collectClassMethodsForReflection($entry, $ctx, $filter) as $spec) {
+            $obj = new \PHPCompiler\VM\ObjectEntry($rmClass);
+            $obj->constructed = true;
+            $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME)->string($reflectedClassName);
+            $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_METHOD_NAME)->string($spec['display']);
+            $slot = new Variable(Variable::TYPE_OBJECT);
+            $slot->object($obj);
+            $ht->append($slot);
+        }
+
+        return $result;
+    }
+
+    public static function optionalReflectionFilterArg(Frame $frame, int $argIndex): int
+    {
+        if (\count($frame->calledArgs) <= $argIndex) {
+            return 0;
+        }
+        $filterArg = $frame->calledArgs[$argIndex]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $filterArg->type) {
+            return 0;
+        }
+
+        return $filterArg->toInt();
     }
 }

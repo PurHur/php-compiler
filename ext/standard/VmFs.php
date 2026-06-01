@@ -134,6 +134,16 @@ final class VmFs
         return @rename($from, $to);
     }
 
+    public static function hardLink(string $target, string $link): bool
+    {
+        return @link($target, $link);
+    }
+
+    public static function symlink(string $target, string $link): bool
+    {
+        return @symlink($target, $link);
+    }
+
     /** Prefix for multipart upload temps (lib/Web/Superglobals.php, AOT sg_set_file_entry). */
     public const UPLOAD_TEMP_PREFIX = 'phpc_upload_';
 
@@ -289,6 +299,19 @@ final class VmFs
         return $id;
     }
 
+    /** @return int|false */
+    public static function tmpfile()
+    {
+        $fp = @\tmpfile();
+        if (false === $fp) {
+            return false;
+        }
+        $id = ++self::$nextHandleId;
+        self::$handles[$id] = $fp;
+
+        return $id;
+    }
+
     public static function fread(int $handle, int $length) {
         $fp = self::lookup($handle);
         if (null === $fp) {
@@ -381,6 +404,92 @@ final class VmFs
         }
 
         return @\fflush($fp);
+    }
+
+    /**
+     * stream_set_chunk_size() — php-src ext/standard/streams.c (issue #3754).
+     *
+     * @return int|false previous chunk size
+     */
+    public static function streamSetChunkSize(int $handle, int $chunkSize) {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        $previous = @\stream_set_chunk_size($fp, $chunkSize);
+        if (false === $previous) {
+            return false;
+        }
+
+        return (int) $previous;
+    }
+
+    /**
+     * stream_set_write_buffer() — php-src ext/standard/streams.c (issue #3755).
+     *
+     * @return int|false previous buffer size
+     */
+    public static function streamSetWriteBuffer(int $handle, int $buffer) {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        $previous = @\stream_set_write_buffer($fp, $buffer);
+        if (false === $previous) {
+            return false;
+        }
+
+        return (int) $previous;
+    }
+
+    /**
+     * stream_set_read_buffer() — php-src ext/standard/streams.c (issue #3755).
+     *
+     * @return int|false previous buffer size
+     */
+    public static function streamSetReadBuffer(int $handle, int $buffer) {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        $previous = @\stream_set_read_buffer($fp, $buffer);
+        if (false === $previous) {
+            return false;
+        }
+
+        return (int) $previous;
+    }
+
+    /**
+     * stream_set_timeout() — php-src ext/standard/streams.c (issue #3754).
+     */
+    public static function streamSetTimeout(int $handle, int $seconds, int $microseconds = 0): bool
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        if (@\stream_set_timeout($fp, $seconds, $microseconds)) {
+            return true;
+        }
+        $meta = @\stream_get_meta_data($fp);
+        if (!\is_array($meta)) {
+            return false;
+        }
+        $streamType = (string) ($meta['stream_type'] ?? '');
+
+        // php-src: read timeout applies to socket transports; memory/file are no-op success (#3754).
+        return !\in_array($streamType, ['tcp', 'udp', 'udg', 'unix', 'ssl', 'tls'], true);
+    }
+
+    public static function ftruncate(int $handle, int $size): bool
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+
+        return @\ftruncate($fp, $size);
     }
 
     public static function ftell(int $handle) {
@@ -518,6 +627,28 @@ final class VmFs
         return isset(self::$handles[$handle]);
     }
 
+    /**
+     * get_resources() — active stream handles (php-src basic_functions.c / zend_list.c, #3646).
+     *
+     * @throws \ValueError when $type is not a supported resource type filter
+     */
+    public static function getResourcesTable(?string $type = null): HashTable
+    {
+        if (null !== $type && 'stream' !== $type) {
+            throw new \ValueError('get_resources(): Argument #1 ($type) must be a valid resource type');
+        }
+        $ht = new HashTable();
+        $index = 1;
+        foreach (self::$handles as $id => $fp) {
+            $value = new Variable();
+            $value->streamHandle((int) $id);
+            $ht->addIndex($index, $value);
+            ++$index;
+        }
+
+        return $ht;
+    }
+
     private static function lookup(int $handle): mixed
     {
         return self::$handles[$handle] ?? null;
@@ -540,5 +671,37 @@ final class VmFs
     public static function chdir(string $path): bool
     {
         return @\chdir($path);
+    }
+
+    /**
+     * disk_free_space() / diskfreespace() — bytes available on filesystem (php-src filestat.c).
+     *
+     * @return float|false
+     */
+    public static function diskFreeSpace(?string $path)
+    {
+        $path = $path ?? '.';
+        $result = @\disk_free_space($path);
+        if (false === $result) {
+            return false;
+        }
+
+        return (float) $result;
+    }
+
+    /**
+     * disk_total_space() / disktotalspace() — total bytes on filesystem (php-src filestat.c).
+     *
+     * @return float|false
+     */
+    public static function diskTotalSpace(?string $path)
+    {
+        $path = $path ?? '.';
+        $result = @\disk_total_space($path);
+        if (false === $result) {
+            return false;
+        }
+
+        return (float) $result;
     }
 }

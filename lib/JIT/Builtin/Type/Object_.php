@@ -13,6 +13,8 @@ use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCompiler\Block;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\ClassConstFetchHelper;
+use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\Builtin\Refcount;
 use PHPCompiler\JIT\Builtin\Type;
@@ -31,6 +33,8 @@ class Object_ extends Type {
     private array $enums = [];
     /** @var array<int, string> class id => canonical name */
     private array $classIdToName = [];
+    /** @var array<string, string> alias lc => canonical class lc (#3178) */
+    private array $classAliasToOriginalLc = [];
     /** @var array<string, string> declaring class lc => parent class lc (#1858) */
     private array $classParentLc = [];
     /** @var array<string, list<string>> class lc => interface lc names (#1357, #3077) */
@@ -296,6 +300,15 @@ class Object_ extends Type {
             );
         }
 
+        $propCount = \count($this->properties[$classId] ?? []);
+        \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
+        \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
+        $this->context->builder->call(
+            $this->context->lookupFunction('phpc_gc_register'),
+            $this->context->builder->pointerCast($obj, $this->context->getTypeFromString('int8*')),
+            $this->context->constantFromInteger($propCount, 'int32')
+        );
+
         return $obj;
     }
 
@@ -526,6 +539,11 @@ class Object_ extends Type {
         if (isset($this->readonlyClassIds[$parentId])) {
             $this->readonlyClassIds[$childId] = true;
         }
+        if (isset($this->readonlyPropertyNames[$parentId])) {
+            foreach ($this->readonlyPropertyNames[$parentId] as $propLc => $_) {
+                $this->readonlyPropertyNames[$childId][$propLc] = true;
+            }
+        }
     }
 
     public function hasReadonlyClasses(): bool
@@ -673,6 +691,9 @@ class Object_ extends Type {
             if ($current === $wantLc) {
                 return true;
             }
+            if (in_array($wantLc, $this->allInterfacesForClassLc($current), true)) {
+                return true;
+            }
             $parent = $this->classParentLc[$current] ?? null;
             if (null === $parent) {
                 return false;
@@ -793,6 +814,42 @@ class Object_ extends Type {
     }
 
     /**
+     * Register an alternate name for a JIT-declared user class (class_alias, #3178).
+     *
+     * php-src: zend_register_class_alias_ex — v1: user classes only, no alias chains.
+     */
+    public function registerClassAlias(string $original, string $alias): bool
+    {
+        $aliasLc = strtolower(ltrim($alias, '\\'));
+        $originalLc = strtolower(ltrim($original, '\\'));
+
+        if (isset($this->classes[$aliasLc]) || isset($this->classAliasToOriginalLc[$aliasLc])) {
+            return false;
+        }
+        if (!isset($this->classes[$originalLc])) {
+            return false;
+        }
+        if (isset($this->classAliasToOriginalLc[$originalLc])) {
+            return false;
+        }
+        if (isset($this->enums[$originalLc])
+            || isset($this->interfaceClassLcs[$originalLc])
+            || isset($this->traitClassLcs[$originalLc])) {
+            return false;
+        }
+
+        $classId = $this->classes[$originalLc];
+        if (isset($this->externalOnlyClassIds[$classId])) {
+            return false;
+        }
+
+        $this->classes[$aliasLc] = $classId;
+        $this->classAliasToOriginalLc[$aliasLc] = $originalLc;
+
+        return true;
+    }
+
+    /**
      * @return array<int, string>
      */
     public function allClassNamesById(): array
@@ -825,6 +882,53 @@ class Object_ extends Type {
                 }
             }
             $names[] = $resolved ?? $ifaceLc;
+        }
+
+        return $names;
+    }
+
+    /**
+     * User and builtin classes from DECLARE_CLASS (issue #3128).
+     *
+     * @return list<string>
+     */
+    public function allDeclaredClassNames(): array
+    {
+        $names = [];
+        foreach (array_keys($this->classes) as $classLc) {
+            if (isset($this->interfaceClassLcs[$classLc])
+                || isset($this->traitClassLcs[$classLc])
+                || isset($this->enums[$classLc])) {
+                continue;
+            }
+            $resolved = null;
+            foreach ($this->classIdToName as $name) {
+                if (strtolower(ltrim($name, '\\')) === $classLc) {
+                    $resolved = $name;
+                    break;
+                }
+            }
+            $names[] = $resolved ?? $classLc;
+        }
+
+        return $names;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function allDeclaredTraitNames(): array
+    {
+        $names = [];
+        foreach (array_keys($this->traitClassLcs) as $traitLc) {
+            $resolved = null;
+            foreach ($this->classIdToName as $name) {
+                if (strtolower(ltrim($name, '\\')) === $traitLc) {
+                    $resolved = $name;
+                    break;
+                }
+            }
+            $names[] = $resolved ?? $traitLc;
         }
 
         return $names;
@@ -1747,6 +1851,16 @@ class Object_ extends Type {
         return isset($this->traitClassLcs[strtolower(ltrim($classLc, '\\'))]);
     }
 
+    /**
+     * Lowercase trait names from DECLARE_TRAIT (trait_exists() JIT, #2312).
+     *
+     * @return list<string>
+     */
+    public function traitClassLowerNames(): array
+    {
+        return array_keys($this->traitClassLcs);
+    }
+
     public function recordTraitMethodSource(int $classId, string $methodLc, string $traitLc): void
     {
         $this->classTraitMethodSources[$classId][strtolower($methodLc)] = strtolower(ltrim($traitLc, '\\'));
@@ -1840,6 +1954,29 @@ class Object_ extends Type {
         }
 
         return $this->jitConstantFromEntry($this->classConstants[$classId][$key]);
+    }
+
+    public function classConstFetchDynamic(int $classId, Variable $nameVar, Operand $classOp): Variable
+    {
+        return ClassConstFetchHelper::fetchDynamic($this, $classId, $nameVar, $classOp);
+    }
+
+    public function jitContext(): Context
+    {
+        return $this->context;
+    }
+
+    /**
+     * @return list<array{0: string, 1: array{type: int, value: int|float|bool|string|null}}>
+     */
+    public function classConstantsForId(int $classId): array
+    {
+        $out = [];
+        foreach ($this->classConstants[$classId] ?? [] as $key => $entry) {
+            $out[] = [$key, $entry];
+        }
+
+        return $out;
     }
 
     public function defineStaticProperty(int $classId, string $name, int $jitType, ?VMVariable $default = null): void

@@ -31,7 +31,7 @@ final class GeneratorJitCompileTest extends TestCase
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
-function gen(): Generator {
+function gen() {
     yield 1;
     yield 2;
 }
@@ -71,7 +71,7 @@ PHP
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
-function gen(): Generator {
+function gen() {
     yield 'a' => 1;
     yield 'b' => 2;
 }
@@ -101,7 +101,7 @@ PHP
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
-function gen(): Generator {
+function gen() {
     yield from [1, 2, 3];
 }
 foreach (gen() as $v) {
@@ -130,7 +130,7 @@ PHP
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
-function gen(): Generator {
+function gen() {
     yield 1;
     yield from [2, 3];
     yield 4;
@@ -196,11 +196,11 @@ PHP
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
-function inner(): Generator {
+function inner() {
     yield 1;
     yield 2;
 }
-function outer(): Generator {
+function outer() {
     $g = inner();
     yield from $g;
     yield 3;
@@ -234,7 +234,7 @@ PHP
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
-function gen(): Generator {
+function gen() {
     $x = 5;
     yield $x;
     $x = 10;

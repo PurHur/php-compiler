@@ -25,6 +25,9 @@ use PHPLLVM\Value;
  */
 final class array_combine extends Internal
 {
+    public const LENGTH_MISMATCH_ERROR =
+        'array_combine(): Argument #1 ($keys) and argument #2 ($values) must have the same number of elements';
+
     public function execute(Frame $frame): void
     {
         if (2 !== \count($frame->calledArgs)) {
@@ -32,9 +35,6 @@ final class array_combine extends Internal
         }
         $keysArg = $frame->calledArgs[0]->resolveIndirect();
         $valuesArg = $frame->calledArgs[1]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_ARRAY !== $keysArg->type || Variable::TYPE_ARRAY !== $valuesArg->type) {
             throw new \LogicException('array_combine() requires two arrays in this compiler build');
         }
@@ -47,8 +47,9 @@ final class array_combine extends Internal
             $values[] = $value;
         }
         if (\count($keys) !== \count($values)) {
-            $frame->returnVar->bool(false);
-
+            throw new \ValueError(self::LENGTH_MISMATCH_ERROR);
+        }
+        if (null === $frame->returnVar) {
             return;
         }
         $ht = new HashTable();

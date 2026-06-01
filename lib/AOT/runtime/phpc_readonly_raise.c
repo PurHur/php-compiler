@@ -1,9 +1,12 @@
 /*
- * Pending LogicException for JIT readonly property writes (issue #1360).
+ * Pending LogicException for JIT readonly property writes (issue #1360, #3149).
  *
  * Native JIT code records a message and returns; Func\JIT::execute throws in PHP.
+ * Standalone AOT main calls phpc_jit_abort_if_pending_logic_exception after user code.
  */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define PHPC_JIT_PENDING_MAX 512
@@ -50,4 +53,25 @@ void __compiler_jit_raise_logic_exception(const char *msg, unsigned long len)
     memcpy(phpc_jit_pending_msg, msg, len);
     phpc_jit_pending_msg[len] = '\0';
     phpc_jit_pending_set = 1;
+}
+
+/** Standalone AOT: turn pending readonly violation into process fatal (issue #3149). */
+void phpc_jit_abort_if_pending_logic_exception(void)
+{
+    char buf[PHPC_JIT_PENDING_MAX];
+
+    if (!phpc_jit_pending_set) {
+        return;
+    }
+    phpc_jit_copy_pending_exception(buf, sizeof buf);
+    if ('\0' == buf[0]) {
+        strncpy(buf, "Cannot modify readonly property", sizeof buf - 1);
+        buf[sizeof buf - 1] = '\0';
+    }
+    fprintf(
+        stderr,
+        "PHP Fatal error:  Uncaught LogicException: %s\n",
+        buf
+    );
+    exit(255);
 }

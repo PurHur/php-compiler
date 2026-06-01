@@ -36,4 +36,71 @@ final class VmFilterTest extends TestCase
         $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
         $this->assertFalse($out->toBool());
     }
+
+    public function testValidateIntRejectsLeadingZero(): void
+    {
+        $v = new Variable();
+        $v->string('0123');
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_INT);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+    }
+
+    public function testValidateIntAcceptsPlainDecimal(): void
+    {
+        $v = new Variable();
+        $v->string('123');
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_INT);
+        $this->assertSame(Variable::TYPE_INTEGER, $out->type);
+        $this->assertSame(123, $out->toInt());
+    }
+
+    public function testValidateIntAcceptsLoneZero(): void
+    {
+        $v = new Variable();
+        $v->string('0');
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_INT);
+        $this->assertSame(Variable::TYPE_INTEGER, $out->type);
+        $this->assertSame(0, $out->toInt());
+    }
+
+    public function testNullOnFailureReturnsNullForInvalidInt(): void
+    {
+        $v = new Variable();
+        $v->string('not-int');
+        $flag = new Variable();
+        $flag->int(VmFilter::FILTER_NULL_ON_FAILURE);
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_INT, $flag);
+        $this->assertSame(Variable::TYPE_NULL, $out->type);
+    }
+
+    public function testNullOnFailureStillReturnsFalseWithoutFlag(): void
+    {
+        $v = new Variable();
+        $v->string('not-int');
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_INT);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+    }
+
+    public function testNullOnFailureReturnsNullForInvalidEmail(): void
+    {
+        $v = new Variable();
+        $v->string('not-an-email');
+        $flag = new Variable();
+        $flag->int(VmFilter::FILTER_NULL_ON_FAILURE);
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_EMAIL, $flag);
+        $this->assertSame(Variable::TYPE_NULL, $out->type);
+    }
+
+    public function testIsIntegerStringRejectsLeadingZeros(): void
+    {
+        $this->assertFalse(VmFilter::isIntegerString('0123'));
+        $this->assertFalse(VmFilter::isIntegerString('00'));
+        $this->assertFalse(VmFilter::isIntegerString('-0123'));
+        $this->assertTrue(VmFilter::isIntegerString('0'));
+        $this->assertTrue(VmFilter::isIntegerString('-0'));
+        $this->assertTrue(VmFilter::isIntegerString('123'));
+        $this->assertTrue(VmFilter::isIntegerString('-42'));
+    }
 }

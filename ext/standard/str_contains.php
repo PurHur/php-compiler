@@ -34,17 +34,15 @@ final class str_contains extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $haystack->type || Variable::TYPE_STRING !== $needle->type) {
-            throw new \LogicException('str_contains() only supports strings in this compiler build');
-        }
-        $needleStr = $needle->toString();
+        $haystackStr = VmString::coerceOperand($haystack);
+        $needleStr = VmString::coerceOperand($needle);
         if ('' === $needleStr) {
             $frame->returnVar->bool(true);
 
             return;
         }
         $frame->returnVar->bool(
-            false !== VmString::strpos($haystack->toString(), $needleStr)
+            false !== VmString::strpos($haystackStr, $needleStr)
         );
     }
 

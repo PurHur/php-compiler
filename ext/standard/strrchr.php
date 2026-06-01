@@ -24,10 +24,10 @@ final class strrchr extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $haystack->type || Variable::TYPE_STRING !== $needle->type) {
-            throw new \LogicException('strrchr() only supports strings in this compiler build');
-        }
-        $result = VmString::strrchr($haystack->toString(), $needle->toString());
+        $result = VmString::strrchr(
+            VmString::coerceOperand($haystack),
+            VmString::coerceOperand($needle)
+        );
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {

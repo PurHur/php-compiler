@@ -13,14 +13,18 @@ use PHPLLVM\Value;
 /** LLVM entry {@see __phpc_session_start_apply} — bool in caller {@see __value__} out-slot (#1882). */
 final class SessionStart
 {
+    public const RUNTIME_C_SYMBOL = 'phpc_session_start_runtime';
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+        $fn = $context->lookupFunction('__phpc_session_start_apply');
+        if ($fn->countBasicBlocks() > 0) {
             return;
         }
 
-        $fn = $context->lookupFunction('__phpc_session_start_apply');
-        if ($fn->countBasicBlocks() > 0) {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            self::implementStandaloneForwarder($context, $fn);
+
             return;
         }
 
@@ -49,6 +53,27 @@ final class SessionStart
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDone);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+    }
+
+    public static function registerRuntimeDeclaration(Context $context): void
+    {
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $void = $context->context->voidType();
+        $sig = $context->context->functionType($void, false, $valuePtr);
+        $runtimeFn = $context->module->addFunction(self::RUNTIME_C_SYMBOL, $sig);
+        $context->registerFunction(self::RUNTIME_C_SYMBOL, $runtimeFn);
+    }
+
+    private static function implementStandaloneForwarder(Context $context, Value $fn): void
+    {
+        $entry = $fn->appendBasicBlock('ss_forward');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->call(
+            $context->lookupFunction(self::RUNTIME_C_SYMBOL),
+            $fn->getParam(0)
+        );
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
     }

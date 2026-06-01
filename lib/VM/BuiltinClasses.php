@@ -26,6 +26,8 @@ use PHPCompiler\VM\Builtin\ReflectionAttributeNewInstance;
 use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethod;
+use PHPCompiler\VM\Builtin\ReflectionClassGetMethods;
+use PHPCompiler\VM\Builtin\ReflectionClassGetProperties;
 use PHPCompiler\VM\Builtin\ReflectionClassNewLazyProxy;
 use PHPCompiler\VM\Builtin\ReflectionConstantConstruct;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetName;
@@ -40,6 +42,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetReturnType;
 use PHPCompiler\VM\Builtin\ReflectionMethodConstruct;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeGetName;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeIsBuiltin;
@@ -194,6 +197,8 @@ final class BuiltinClasses
         $rm->methodVisibility['getattributes'] = $pub;
         $rm->methods['getparameters'] = new ReflectionMethodGetParameters();
         $rm->methodVisibility['getparameters'] = $pub;
+        $rm->methods['getname'] = new ReflectionMethodGetName();
+        $rm->methodVisibility['getname'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_METHOD] = $rm;
 
         $rc = new ClassEntry('ReflectionClass');
@@ -205,6 +210,10 @@ final class BuiltinClasses
         $rc->methodVisibility['getattributes'] = $pub;
         $rc->methods['getmethod'] = new ReflectionClassGetMethod();
         $rc->methodVisibility['getmethod'] = $pub;
+        $rc->methods['getproperties'] = new ReflectionClassGetProperties();
+        $rc->methodVisibility['getproperties'] = $pub;
+        $rc->methods['getmethods'] = new ReflectionClassGetMethods();
+        $rc->methodVisibility['getmethods'] = $pub;
         $rc->methods['newlazyproxy'] = new ReflectionClassNewLazyProxy();
         $rc->methodVisibility['newlazyproxy'] = $pub;
 

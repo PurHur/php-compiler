@@ -8,9 +8,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\Variable;
+
 final class VmString
 {
     public const TRIM_DEFAULT = " \t\n\r\0\x0B";
+
+    /**
+     * Coerce a string-search builtin operand to string (php-src _convert_to_string parity, #3549).
+     */
+    public static function coerceOperand(Variable $var): string
+    {
+        return $var->resolveIndirect()->toString();
+    }
 
     /** Regex metacharacters escaped by preg_quote() (PHP 8.2 byte subset). */
     private const PREG_QUOTE_ESCAPE = '.\\+*?[^]()$={}-|!<>:';
@@ -160,18 +170,18 @@ final class VmString
             throw new \ValueError('wordwrap(): Argument #4 ($cut) cannot be true when argument #2 ($width) is 0');
         }
 
-        if (1 === $breakLen && !$cut) {
-            return self::wordwrapFastSingleByteBreak($text, $len, $width, $break[0]);
+        if ($cut) {
+            return self::wordwrapCutFixedWidth($text, $len, $width, $break);
         }
-        if (1 === $breakLen && $cut) {
-            return self::wordwrapCutFixedWidth($text, $len, $width, $break[0]);
+        if (1 === $breakLen) {
+            return self::wordwrapFastSingleByteBreak($text, $len, $width, $break[0]);
         }
 
         return self::wordwrapGeneral($text, $len, $width, $break, $breakLen);
     }
 
-    /** cut=true, single-byte break — fixed-width chunks (AOT self-host safe). */
-    private static function wordwrapCutFixedWidth(string $text, int $len, int $width, string $breakByte): string
+    /** cut=true — fixed-width chunks with full $break between segments (php-src php_wordwrap). */
+    private static function wordwrapCutFixedWidth(string $text, int $len, int $width, string $break): string
     {
         if ($width < 1) {
             return $text;
@@ -179,7 +189,7 @@ final class VmString
         $out = '';
         for ($i = 0; $i < $len; $i += $width) {
             if ($i > 0) {
-                $out .= $breakByte;
+                $out .= $break;
             }
             $out .= self::byteSlice($text, $i, $width);
         }
@@ -761,15 +771,48 @@ final class VmString
         return 0;
     }
 
-    public static function strspn(string $str, string $mask): int
+    /**
+     * @return array{0: int, 1: int} start offset and segment length (php_spn_common_handler)
+     */
+    private static function normalizeSpnBounds(int $strLen, int $start, ?int $length): array
+    {
+        $remainLen = $strLen;
+        if ($start < 0) {
+            $start += $remainLen;
+            if ($start < 0) {
+                $start = 0;
+            }
+        } elseif ($start > $remainLen) {
+            $start = $remainLen;
+        }
+        $remainLen -= $start;
+        if (null === $length) {
+            $length = $remainLen;
+        } elseif ($length < 0) {
+            $length += $remainLen;
+            if ($length < 0) {
+                $length = 0;
+            }
+        } elseif ($length > $remainLen) {
+            $length = $remainLen;
+        }
+
+        return [$start, $length];
+    }
+
+    public static function strspn(string $str, string $mask, int $offset = 0, ?int $length = null): int
     {
         if ('' === $mask) {
             throw new \ValueError('strspn(): Argument #2 ($characters) must not be empty');
         }
         $slen = self::byteLength($str);
         $mlen = self::byteLength($mask);
+        [$start, $len] = self::normalizeSpnBounds($slen, $offset, $length);
+        if (0 === $len) {
+            return 0;
+        }
         $count = 0;
-        for ($i = 0; $i < $slen; ++$i) {
+        for ($i = $start; $i < $start + $len; ++$i) {
             if (!self::byteInSet($str[$i], $mask, $mlen)) {
                 break;
             }
@@ -779,15 +822,19 @@ final class VmString
         return $count;
     }
 
-    public static function strcspn(string $str, string $mask): int
+    public static function strcspn(string $str, string $mask, int $offset = 0, ?int $length = null): int
     {
         if ('' === $mask) {
             throw new \ValueError('strcspn(): Argument #2 ($characters) must not be empty');
         }
         $slen = self::byteLength($str);
         $mlen = self::byteLength($mask);
+        [$start, $len] = self::normalizeSpnBounds($slen, $offset, $length);
+        if (0 === $len) {
+            return 0;
+        }
         $count = 0;
-        for ($i = 0; $i < $slen; ++$i) {
+        for ($i = $start; $i < $start + $len; ++$i) {
             if (self::byteInSet($str[$i], $mask, $mlen)) {
                 break;
             }
@@ -950,6 +997,222 @@ final class VmString
         return $out;
     }
 
+    /** Unix-to-Unix encode (php-src ext/standard/uuencode.c — php_uuencode). */
+    public static function convert_uuencode(string $src): string
+    {
+        $srcLen = self::byteLength($src);
+        if (0 === $srcLen) {
+            return "`\n";
+        }
+        $len = 45;
+        $out = '';
+        $i = 0;
+        while ($i + 3 <= $srcLen) {
+            $ee = $i + $len;
+            if ($ee > $srcLen) {
+                $ee = $srcLen;
+                $len = $ee - $i;
+                if (0 !== ($len % 3)) {
+                    $ee = $i + (int) (floor($len / 3) * 3);
+                }
+            }
+            $out .= self::uuEnc($len);
+            while ($i < $ee) {
+                $b0 = self::byteOrd($src[$i]);
+                $b1 = self::byteOrd($src[$i + 1]);
+                $b2 = self::byteOrd($src[$i + 2]);
+                $out .= self::uuEnc($b0 >> 2);
+                $out .= self::uuEnc((($b0 << 4) & 060) | (($b1 >> 4) & 017));
+                $out .= self::uuEnc((($b1 << 2) & 074) | (($b2 >> 6) & 03));
+                $out .= self::uuEnc($b2 & 077);
+                $i += 3;
+            }
+            if (45 === $len) {
+                $out .= "\n";
+            }
+        }
+        if ($i < $srcLen) {
+            if (45 === $len) {
+                $out .= self::uuEnc($srcLen - $i);
+                $len = 0;
+            }
+            $b0 = self::byteOrd($src[$i]);
+            $b1 = ($i + 1 < $srcLen) ? self::byteOrd($src[$i + 1]) : 0;
+            $b2 = ($i + 2 < $srcLen) ? self::byteOrd($src[$i + 2]) : 0;
+            $out .= self::uuEnc($b0 >> 2);
+            $out .= self::uuEnc((($b0 << 4) & 060) | (($b1 >> 4) & 017));
+            $out .= ($srcLen - $i > 1)
+                ? self::uuEnc((($b1 << 2) & 074) | (($b2 >> 6) & 03))
+                : self::uuEnc(0);
+            $out .= ($srcLen - $i > 2)
+                ? self::uuEnc($b2 & 077)
+                : self::uuEnc(0);
+        }
+        if ($len < 45) {
+            $out .= "\n";
+        }
+        $out .= self::uuEnc(0)."\n";
+
+        return $out;
+    }
+
+    /**
+     * Unix-to-Unix decode (php-src ext/standard/uuencode.c — php_uudecode).
+     *
+     * @return string|false
+     */
+    public static function convert_uudecode(string $src) {
+        $srcLen = self::byteLength($src);
+        if (0 === $srcLen) {
+            return false;
+        }
+        $totalLen = 0;
+        $out = '';
+        $i = 0;
+        while ($i < $srcLen) {
+            $len = self::uuDec(self::byteOrd($src[$i]));
+            ++$i;
+            if (0 === $len) {
+                break;
+            }
+            if ($len > $srcLen) {
+                return false;
+            }
+            $totalLen += $len;
+            $ee = $i + (45 === $len ? 60 : (int) floor($len * 1.33));
+            if ($ee > $srcLen) {
+                return false;
+            }
+            while ($i < $ee) {
+                if ($i + 4 > $srcLen) {
+                    return false;
+                }
+                $out .= \chr(self::uuDec(self::byteOrd($src[$i])) << 2 | self::uuDec(self::byteOrd($src[$i + 1])) >> 4);
+                $out .= \chr(self::uuDec(self::byteOrd($src[$i + 1])) << 4 | self::uuDec(self::byteOrd($src[$i + 2])) >> 2);
+                $out .= \chr(self::uuDec(self::byteOrd($src[$i + 2])) << 6 | self::uuDec(self::byteOrd($src[$i + 3])));
+                $i += 4;
+            }
+            if ($len < 45) {
+                break;
+            }
+            ++$i;
+        }
+        $written = self::byteLength($out);
+        if ($written < $totalLen) {
+            $len = $totalLen;
+            if ($len > $written) {
+                $out .= \chr(self::uuDec(self::byteOrd($src[$i])) << 2 | self::uuDec(self::byteOrd($src[$i + 1])) >> 4);
+                if ($len > 1) {
+                    $out .= \chr(self::uuDec(self::byteOrd($src[$i + 1])) << 4 | self::uuDec(self::byteOrd($src[$i + 2])) >> 2);
+                    if ($len > 2) {
+                        $out .= \chr(self::uuDec(self::byteOrd($src[$i + 2])) << 6 | self::uuDec(self::byteOrd($src[$i + 3])));
+                    }
+                }
+            }
+        }
+        if (self::byteLength($out) !== $totalLen) {
+            return self::byteSlice($out, 0, $totalLen);
+        }
+
+        return $out;
+    }
+
+    /** ISO-8859-1 to UTF-8 (php-src ext/standard/basic_functions.c — PHP_FUNCTION(utf8_encode)). */
+    public static function utf8_encode(string $data): string
+    {
+        $srcLen = self::byteLength($data);
+        if (0 === $srcLen) {
+            return '';
+        }
+        $out = '';
+        for ($i = 0; $i < $srcLen; ++$i) {
+            $c = self::byteOrd($data[$i]);
+            if ($c < 0x80) {
+                $out .= $data[$i];
+            } else {
+                $out .= \chr(0xC0 | ($c >> 6));
+                $out .= \chr(0x80 | ($c & 0x3F));
+            }
+        }
+
+        return $out;
+    }
+
+    /** UTF-8 to ISO-8859-1 (php-src ext/standard/basic_functions.c — PHP_FUNCTION(utf8_decode)). */
+    public static function utf8_decode(string $data): string
+    {
+        $srcLen = self::byteLength($data);
+        if (0 === $srcLen) {
+            return '';
+        }
+        $out = '';
+        for ($i = 0; $i < $srcLen; ) {
+            $c = self::byteOrd($data[$i]);
+            if ($c < 0x80) {
+                $out .= $data[$i];
+                ++$i;
+                continue;
+            }
+            if (($c & 0xE0) === 0xC0) {
+                if ($c < 0xC2 || $i + 1 >= $srcLen || (self::byteOrd($data[$i + 1]) & 0xC0) !== 0x80) {
+                    $out .= '?';
+                    ++$i;
+                    continue;
+                }
+                $cp = (($c & 0x1F) << 6) | (self::byteOrd($data[$i + 1]) & 0x3F);
+                $out .= \chr($cp <= 0xFF ? $cp : 0x3F);
+                $i += 2;
+                continue;
+            }
+            if (($c & 0xF0) === 0xE0) {
+                if ($i + 2 >= $srcLen
+                    || (self::byteOrd($data[$i + 1]) & 0xC0) !== 0x80
+                    || (self::byteOrd($data[$i + 2]) & 0xC0) !== 0x80) {
+                    $out .= '?';
+                    ++$i;
+                    continue;
+                }
+                $cp = (($c & 0x0F) << 12)
+                    | ((self::byteOrd($data[$i + 1]) & 0x3F) << 6)
+                    | (self::byteOrd($data[$i + 2]) & 0x3F);
+                $out .= \chr($cp >= 0x800 && $cp <= 0xFF ? $cp : 0x3F);
+                $i += 3;
+                continue;
+            }
+            if (($c & 0xF8) === 0xF0) {
+                if ($i + 3 >= $srcLen
+                    || (self::byteOrd($data[$i + 1]) & 0xC0) !== 0x80
+                    || (self::byteOrd($data[$i + 2]) & 0xC0) !== 0x80
+                    || (self::byteOrd($data[$i + 3]) & 0xC0) !== 0x80) {
+                    $out .= '?';
+                    ++$i;
+                    continue;
+                }
+                $out .= '?';
+                $i += 4;
+                continue;
+            }
+            $out .= '?';
+            ++$i;
+        }
+
+        return $out;
+    }
+
+    private static function uuEnc(int $c): string
+    {
+        if (0 === $c) {
+            return '`';
+        }
+
+        return \chr(($c & 077) + 32);
+    }
+
+    private static function uuDec(int $c): int
+    {
+        return ($c - 32) & 077;
+    }
+
     /** application/x-www-form-urlencoded (space as '+'). */
     public static function urlencode(string $data): string
     {
@@ -1036,6 +1299,8 @@ final class VmString
         $scheme = null;
         $host = null;
         $port = null;
+        $user = null;
+        $pass = null;
         $path = '';
         $query = null;
         $fragment = null;
@@ -1053,7 +1318,18 @@ final class VmString
                 $authority = false === $end ? $rest : substr($rest, 0, $end);
                 $rest = false === $end ? '' : substr($rest, $end);
                 if (str_contains($authority, '@')) {
-                    $authority = substr($authority, strrpos($authority, '@') + 1);
+                    $atPos = strrpos($authority, '@');
+                    $userinfo = substr($authority, 0, $atPos);
+                    $authority = substr($authority, $atPos + 1);
+                    if ('' !== $userinfo) {
+                        $colonPos = strpos($userinfo, ':');
+                        if (false !== $colonPos) {
+                            $user = substr($userinfo, 0, $colonPos);
+                            $pass = substr($userinfo, $colonPos + 1);
+                        } else {
+                            $user = $userinfo;
+                        }
+                    }
                 }
                 if (str_contains($authority, ':')) {
                     [$host, $portStr] = explode(':', $authority, 2);
@@ -1077,6 +1353,8 @@ final class VmString
             'scheme' => $scheme,
             'host' => $host,
             'port' => $port,
+            'user' => $user,
+            'pass' => $pass,
             'path' => $path,
             'query' => $query,
             'fragment' => $fragment,
@@ -1100,6 +1378,10 @@ final class VmString
                 return $host;
             case \PHP_URL_PORT:
                 return $port;
+            case \PHP_URL_USER:
+                return $user;
+            case \PHP_URL_PASS:
+                return $pass;
             case \PHP_URL_PATH:
                 return $path;
             case \PHP_URL_QUERY:
@@ -1257,7 +1539,7 @@ final class VmString
             return $input;
         }
         if ('' === $padString) {
-            throw new \LogicException('str_pad(): Argument #3 ($pad_string) cannot be empty');
+            throw new \ValueError('str_pad(): Argument #3 ($pad_string) must be a non-empty string');
         }
         $need = $padLength - $inputLen;
         if (2 === $padType) {
@@ -1280,10 +1562,9 @@ final class VmString
         string $encoding = 'UTF-8',
         bool $doubleEncode = true
     ): string {
-        if ('UTF-8' !== $encoding) {
-            throw new \LogicException('htmlspecialchars() only supports UTF-8 in this compiler build');
+        if (!self::isUtf8Encoding($encoding)) {
+            return \htmlspecialchars($string, $flags, $encoding, $doubleEncode);
         }
-        unset($doubleEncode);
         $quoteBoth = 0 !== ($flags & ENT_QUOTES);
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
         $out = '';
@@ -1292,6 +1573,14 @@ final class VmString
             $ch = $string[$i];
             switch ($ch) {
                 case '&':
+                    if (!$doubleEncode) {
+                        $entityLen = self::htmlspecialcharsExistingEntityLen($string, $i, $len);
+                        if ($entityLen > 0) {
+                            $out .= substr($string, $i, $entityLen);
+                            $i += $entityLen - 1;
+                            break;
+                        }
+                    }
                     $out .= '&amp;';
                     break;
                 case '<':
@@ -1312,6 +1601,56 @@ final class VmString
         }
 
         return $out;
+    }
+
+    /**
+     * get_html_translation_table() — character => entity map (ext/standard/html.c, #3637).
+     *
+     * @return \PHPCompiler\VM\HashTable
+     */
+    public static function getHtmlTranslationTable(
+        int $table = HTML_SPECIALCHARS,
+        int $flags = ENT_COMPAT,
+        string $encoding = 'UTF-8'
+    ): \PHPCompiler\VM\HashTable {
+        if ('UTF-8' !== $encoding) {
+            throw new \LogicException(
+                'get_html_translation_table() only supports UTF-8 in this compiler build'
+            );
+        }
+        $quoteBoth = ENT_QUOTES === ($flags & ENT_QUOTES);
+        $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
+
+        if (HTML_SPECIALCHARS === $table) {
+            $entries = [
+                '&' => '&amp;',
+                '<' => '&lt;',
+                '>' => '&gt;',
+            ];
+            if ($quoteBoth || $quoteDouble) {
+                $entries['"'] = '&quot;';
+            }
+            if ($quoteBoth) {
+                $entries["'"] = '&#039;';
+            }
+        } else {
+            $entries = HtmlEntityTable::entitiesEntQuotes();
+            if (!$quoteBoth && !$quoteDouble) {
+                unset($entries['"']);
+            }
+            if (!$quoteBoth) {
+                unset($entries["'"]);
+            }
+        }
+
+        $ht = new \PHPCompiler\VM\HashTable();
+        foreach ($entries as $key => $value) {
+            $var = new \PHPCompiler\VM\Variable();
+            $var->string($value);
+            $ht->add($key, $var);
+        }
+
+        return $ht;
     }
 
     /** htmlentities() — same subset as htmlspecialchars(); PHP default flags ENT_COMPAT (#2472). */
@@ -1388,6 +1727,68 @@ final class VmString
         }
 
         return true;
+    }
+
+    private static function isUtf8Encoding(string $encoding): bool
+    {
+        return 0 === strcasecmp($encoding, 'UTF-8');
+    }
+
+    /**
+     * Length of an existing HTML entity at $pos when $double_encode=false (php-src html.c parity).
+     */
+    private static function htmlspecialcharsExistingEntityLen(string $string, int $pos, int $len): int
+    {
+        if ($pos >= $len || '&' !== $string[$pos]) {
+            return 0;
+        }
+        foreach ([
+            ['&amp;', 5],
+            ['&lt;', 4],
+            ['&gt;', 4],
+            ['&quot;', 6],
+            ['&#039;', 6],
+            ['&#39;', 5],
+        ] as [$entity, $entityLen]) {
+            if (self::entityAt($string, $pos, $len, $entity, $entityLen)) {
+                return $entityLen;
+            }
+        }
+
+        return self::htmlspecialcharsNumericEntityLen($string, $pos, $len);
+    }
+
+    /** @return int byte length including leading & and trailing ;, or 0 if not a numeric entity */
+    private static function htmlspecialcharsNumericEntityLen(string $string, int $pos, int $len): int
+    {
+        if ($pos + 3 > $len || '&' !== $string[$pos] || '#' !== $string[$pos + 1]) {
+            return 0;
+        }
+        $i = $pos + 2;
+        if ($i >= $len) {
+            return 0;
+        }
+        if ('x' === $string[$i] || 'X' === $string[$i]) {
+            ++$i;
+            if ($i >= $len || !ctype_xdigit($string[$i])) {
+                return 0;
+            }
+            while ($i < $len && ctype_xdigit($string[$i])) {
+                ++$i;
+            }
+        } else {
+            if (!ctype_digit($string[$i])) {
+                return 0;
+            }
+            while ($i < $len && ctype_digit($string[$i])) {
+                ++$i;
+            }
+        }
+        if ($i >= $len || ';' !== $string[$i]) {
+            return 0;
+        }
+
+        return $i - $pos + 1;
     }
 
     /**
@@ -2077,6 +2478,120 @@ final class VmString
         return $out;
     }
 
+    /**
+     * strtr() replace_pairs array form — longest-match substitution.
+     *
+     * @see php/php-src ext/standard/string.c php_strtr_array()
+     *
+     * @param array<string, string> $replacePairs
+     */
+    public static function strtrArray(string $string, array $replacePairs): string
+    {
+        $slen = self::byteLength($string);
+        if (0 === $slen) {
+            return '';
+        }
+        if ([] === $replacePairs) {
+            return $string;
+        }
+
+        $pairs = [];
+        foreach ($replacePairs as $from => $to) {
+            if (!\is_string($from)) {
+                $from = (string) $from;
+            }
+            if (!\is_string($to)) {
+                $to = (string) $to;
+            }
+            if ('' === $from) {
+                continue;
+            }
+            if (self::byteLength($from) > $slen) {
+                continue;
+            }
+            $pairs[$from] = $to;
+        }
+
+        if ([] === $pairs) {
+            return $string;
+        }
+
+        if (1 === \count($pairs)) {
+            $from = \array_key_first($pairs);
+            $to = $pairs[$from];
+            if (1 === self::byteLength($from)) {
+                return self::strtr($string, $from, self::byteSlice($to, 0, 1));
+            }
+
+            return self::strReplace($from, $to, $string);
+        }
+
+        return self::strtrArrayLongestMatch($string, $pairs);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     */
+    private static function strtrArrayLongestMatch(string $string, array $pairs): string
+    {
+        $slen = self::byteLength($string);
+        $minlen = $slen + 1;
+        $maxlen = 0;
+        $firstChars = [];
+        $lengths = [];
+
+        foreach ($pairs as $from => $to) {
+            $len = self::byteLength($from);
+            if ($len < $minlen) {
+                $minlen = $len;
+            }
+            if ($len > $maxlen) {
+                $maxlen = $len;
+            }
+            $firstChars[\ord($from[0])] = true;
+            $lengths[$len] = true;
+        }
+
+        if ($minlen > $maxlen) {
+            return $string;
+        }
+
+        $out = '';
+        $pos = 0;
+        $oldPos = 0;
+
+        while ($pos <= $slen - $minlen) {
+            if (isset($firstChars[\ord($string[$pos])])) {
+                $tryLen = $maxlen;
+                if ($tryLen > $slen - $pos) {
+                    $tryLen = $slen - $pos;
+                }
+                while ($tryLen >= $minlen) {
+                    if (isset($lengths[$tryLen])) {
+                        $key = self::byteSlice($string, $pos, $tryLen);
+                        if (isset($pairs[$key])) {
+                            $out .= self::byteSlice($string, $oldPos, $pos - $oldPos);
+                            $out .= $pairs[$key];
+                            $oldPos = $pos + $tryLen;
+                            $pos = $oldPos - 1;
+                            break;
+                        }
+                    }
+                    --$tryLen;
+                }
+            }
+            ++$pos;
+        }
+
+        if ('' !== $out) {
+            $out .= self::byteSlice($string, $oldPos);
+
+            return $out;
+        }
+
+        return $string;
+    }
+
     public static function nl2br(string $string, bool $useXhtml = true): string
     {
         $br = $useXhtml ? '<br />' : '<br>';
@@ -2699,29 +3214,30 @@ final class VmString
         $extension = self::pathExtension($path);
         $filename = self::pathFilename($path);
 
-        if (15 === $flags) {
-            return [
-                'dirname' => $dirname,
-                'basename' => $basename,
-                'extension' => $extension,
-                'filename' => $filename,
-            ];
+        $mask = $flags & 15;
+        if (0 === $mask) {
+            return [];
         }
 
-        switch ($flags) {
-            case 1:
-                return $dirname;
-            case 2:
-                return $basename;
-            case 4:
-                return $extension;
-            case 8:
-                return $filename;
-            default:
-                throw new \LogicException(
-                    'pathinfo() flags not supported in this compiler build (use 1, 2, 4, 8, or 15)'
-                );
+        $parts = [];
+        if ($mask & 1) {
+            $parts['dirname'] = $dirname;
         }
+        if ($mask & 2) {
+            $parts['basename'] = $basename;
+        }
+        if ($mask & 4) {
+            $parts['extension'] = $extension;
+        }
+        if ($mask & 8) {
+            $parts['filename'] = $filename;
+        }
+
+        if (1 === \count($parts)) {
+            return reset($parts);
+        }
+
+        return $parts;
     }
 
     public static function pathExtension(string $path): string

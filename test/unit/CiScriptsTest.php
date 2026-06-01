@@ -327,11 +327,11 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('009-FastCGIWeb', $common);
     }
 
-    public function testCiDefaultsEnvDefinesFastcgiWebSmokeGateOff(): void
+    public function testCiDefaultsEnvDefinesFastcgiWebSmokeGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString(
-            'FASTCGI_WEB_SMOKE_GATE="${FASTCGI_WEB_SMOKE_GATE:-0}"',
+            'FASTCGI_WEB_SMOKE_GATE="${FASTCGI_WEB_SMOKE_GATE:-1}"',
             $defaults
         );
     }
@@ -354,10 +354,10 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('--exclude-group selfhostprobe-aot-execute', $common);
     }
 
-    public function testCiDefaultsEnvDefinesFastcgiWebAotSmokeGateOff(): void
+    public function testCiDefaultsEnvDefinesFastcgiWebAotSmokeGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
-        $this->assertStringContainsString('FASTCGI_WEB_AOT_SMOKE_GATE="${FASTCGI_WEB_AOT_SMOKE_GATE:-0}"', $defaults);
+        $this->assertStringContainsString('FASTCGI_WEB_AOT_SMOKE_GATE="${FASTCGI_WEB_AOT_SMOKE_GATE:-1}"', $defaults);
         $this->assertStringContainsString('FASTCGI_SMOKE_GATE="${FASTCGI_SMOKE_GATE:-0}"', $defaults);
     }
 
@@ -381,7 +381,7 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ci_run_fastcgi_web_aot_execute', $body);
         $this->assertStringContainsString('--exclude-group fastcgiweb-aot-execute', $body);
         $this->assertStringContainsString('--group fastcgiweb-aot-execute', $body);
-        $this->assertStringContainsString('FASTCGI_WEB_AOT_SMOKE_GATE:-0', $body);
+        $this->assertStringContainsString('FASTCGI_WEB_AOT_SMOKE_GATE:-1', $body);
     }
 
     public function testCiLocalRunsFastcgiWebAotExecute(): void
@@ -1371,7 +1371,19 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE', $doc);
         $this->assertStringContainsString('BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE', $doc);
         $this->assertMatchesRegularExpression('/\| `BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE` \| `1` \|/', $doc);
-        $this->assertMatchesRegularExpression('/\| `BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE` \| `0` \|/', $doc);
+        $this->assertMatchesRegularExpression('/\| `BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE` \| `1` \|/', $doc);
+    }
+
+    public function testCiDefaultsEnvDefinesBootstrapM3CompileSmokeStrictGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE="${BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE:-1}"', $defaults);
+    }
+
+    public function testCiDockerRunPassesBootstrapM3CompileSmokeStrictGateDefaultOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE=${BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE:-1}', $body);
     }
 
     public function testCiDefaultsEnvDefinesBootstrapVendorInventorySyncGateOn(): void
@@ -1559,6 +1571,40 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#2396', $doc);
     }
 
+    public function testCiLocalHonorsNorthStar4VerifyGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_north_star4_verify', $local);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('NORTH_STAR4_VERIFY_GATE', $common);
+        $this->assertStringContainsString('NORTH_STAR4_VERIFY_GATE:-0', $common);
+        $this->assertStringContainsString('north-star4-verify', $common);
+        $this->assertStringContainsString('make -C', $common);
+        $this->assertFileExists(dirname(__DIR__, 2).'/script/north-star4-verify.sh');
+
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'NORTH_STAR4_VERIFY_GATE="${NORTH_STAR4_VERIFY_GATE:-0}"',
+            $defaults
+        );
+
+        $docker = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString(
+            'NORTH_STAR4_VERIFY_GATE=${NORTH_STAR4_VERIFY_GATE:-0}',
+            $docker
+        );
+    }
+
+    public function testLocalCiMatrixDocumentsNorthStar4VerifyGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('NORTH_STAR4_VERIFY_GATE', $doc);
+        $this->assertStringContainsString('north-star4-verify', $doc);
+        $this->assertMatchesRegularExpression('/\| `NORTH_STAR4_VERIFY_GATE` \| `0` \|/', $doc);
+        $this->assertStringContainsString('#2429', $doc);
+    }
+
     public function testCiFastHonorsBootstrapTestSubsetGate(): void
     {
         $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
@@ -1634,7 +1680,7 @@ final class CiScriptsTest extends TestCase
 
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE', $common);
-        $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE:-0', $common);
+        $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE:-1', $common);
         $this->assertStringContainsString('bootstrap-selfhost-helloworld-probe.sh', $common);
         $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT=1', $common);
         $this->assertStringContainsString('BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1', $common);
@@ -1644,10 +1690,10 @@ final class CiScriptsTest extends TestCase
 
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString(
-            'BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE="${BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE:-0}"',
+            'BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE="${BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE:-1}"',
             $defaults
         );
-        $this->assertStringContainsString('#1526', $defaults);
+        $this->assertStringContainsString('#1866', $defaults);
     }
 
     public function testLocalCiMatrixDocumentsBootstrapM3StrictGate(): void
@@ -1657,7 +1703,41 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('bootstrap-selfhost-helloworld-probe.sh', $doc);
 
         $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
-        $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=1', $docSelfhost);
+        $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE', $docSelfhost);
+        $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=0', $docSelfhost);
+        $this->assertStringContainsString('#1866', $docSelfhost);
+    }
+
+    public function testCiLocalHonorsBootstrapM4Gen2StrictGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_m4_gen2_strict', $local);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('BOOTSTRAP_M4_GEN2_STRICT_GATE', $common);
+        $this->assertStringContainsString('BOOTSTRAP_M4_GEN2_STRICT_GATE:-1', $common);
+        $this->assertStringContainsString('bootstrap-loop-gen1-link.sh', $common);
+        $this->assertStringContainsString('BOOTSTRAP_M4_GEN2_STRICT=1', $common);
+
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'BOOTSTRAP_M4_GEN2_STRICT_GATE="${BOOTSTRAP_M4_GEN2_STRICT_GATE:-1}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#2112', $defaults);
+    }
+
+    public function testLocalCiMatrixDocumentsBootstrapM4Gen2StrictGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('BOOTSTRAP_M4_GEN2_STRICT_GATE', $doc);
+        $this->assertStringContainsString('bootstrap-loop-gen1-link.sh', $doc);
+        $this->assertMatchesRegularExpression('/\| `BOOTSTRAP_M4_GEN2_STRICT_GATE` \| `1` \|/', $doc);
+
+        $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
+        $this->assertStringContainsString('BOOTSTRAP_M4_GEN2_STRICT_GATE', $docSelfhost);
+        $this->assertStringContainsString('BOOTSTRAP_M4_GEN2_STRICT_GATE=0', $docSelfhost);
+        $this->assertStringContainsString('#2112', $docSelfhost);
     }
 
     public function testCiDefaultsEnvDefinesBootstrapLibSpineVmSmokeGateOn(): void
@@ -1689,6 +1769,40 @@ final class CiScriptsTest extends TestCase
 
         $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
         $this->assertStringContainsString('BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE=1', $docSelfhost);
+    }
+
+    public function testCiDefaultsEnvDefinesBootstrapVmDriverExecuteGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'BOOTSTRAP_VM_DRIVER_EXECUTE_GATE="${BOOTSTRAP_VM_DRIVER_EXECUTE_GATE:-1}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#2227', $defaults);
+        $this->assertStringContainsString('#2201', $defaults);
+    }
+
+    public function testCiLocalHonorsBootstrapVmDriverExecuteGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_vm_driver_execute_probe', $local);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('BOOTSTRAP_VM_DRIVER_EXECUTE_GATE', $common);
+        $this->assertStringContainsString('BOOTSTRAP_VM_DRIVER_EXECUTE_GATE:-1', $common);
+        $this->assertStringContainsString('bootstrap-selfhost-vm-driver-execute-probe.sh', $common);
+    }
+
+    public function testLocalCiMatrixDocumentsBootstrapVmDriverExecuteGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('BOOTSTRAP_VM_DRIVER_EXECUTE_GATE', $doc);
+        $this->assertStringContainsString('bootstrap-selfhost-vm-driver-execute-probe.sh', $doc);
+        $this->assertStringContainsString('#2227', $doc);
+
+        $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
+        $this->assertStringContainsString('BOOTSTRAP_VM_DRIVER_EXECUTE_GATE=1', $docSelfhost);
+        $this->assertStringContainsString('BOOTSTRAP_VM_DRIVER_EXECUTE_GATE=0', $docSelfhost);
     }
 
     public function testCiDefaultsEnvDefinesCompilerDriverSmokeGateDefaultOn(): void
@@ -1948,7 +2062,17 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('docker-only', $body);
         $this->assertStringContainsString('environment prerequisites missing', $body);
         $this->assertStringContainsString('./script/docker-exec.sh', $body);
+        $this->assertStringContainsString('bootstrap-selfhost-gate.sh', $body);
         $this->assertStringContainsString('do not nest', $body);
+        $this->assertStringContainsString('selfhost_preflight_warn_nested_docker', $body);
+        $this->assertStringContainsString('#2757', $body);
+        $this->assertStringContainsString('issues/1492', $body);
+    }
+
+    public function testDockerExecWarnsOnNestedDockerInInnerCommand(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/docker-exec.sh');
+        $this->assertStringContainsString('selfhost_preflight_warn_nested_docker', $body);
     }
 
     public function testBootstrapScriptsSourceSelfhostPreflight(): void
@@ -1997,6 +2121,17 @@ final class CiScriptsTest extends TestCase
         $cap = (string) file_get_contents($root.'/script/docker-capability-matrix.sh');
         $this->assertStringContainsString('ci-docker-run.sh', $cap);
         $this->assertStringContainsString('ci_docker_create', $cap);
+    }
+
+    public function testDockerExecRejectsNestedDockerInInnerCommand(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/docker-exec.sh');
+        $this->assertStringContainsString('_docker_exec_reject_nested_docker', $body);
+        $this->assertStringContainsString('docker info', $body);
+        $this->assertStringContainsString('#2674', $body);
+        $this->assertStringContainsString('#2757', $body);
+        $this->assertStringContainsString('bootstrap-selfhost-gate', $body);
+        $this->assertStringContainsString('environment misuse', $body);
     }
 
     /** Tar-fallback must not leak docker create containers (#2708). */
@@ -2524,6 +2659,41 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('MINIWEBAPP_VM_CLI_GATE', $body);
         $this->assertStringContainsString("MiniWebApp.*VmCli", $body);
         $this->assertStringContainsString('PhpcLintProjectTest', $body);
+    }
+
+    public function testCiCommonDefinesMiniWebAppVmOopGateOptIn(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_miniwebapp_vm_oop', $common);
+        $this->assertStringContainsString('MINIWEBAPP_VM_OOP_GATE:-0', $common);
+        $this->assertStringContainsString('check-miniwebapp-vm-oop.sh', $common);
+
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'MINIWEBAPP_VM_OOP_GATE="${MINIWEBAPP_VM_OOP_GATE:-0}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#2189', $defaults);
+
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('ci_run_miniwebapp_vm_oop', $fast);
+
+        $this->assertFileExists(dirname(__DIR__, 2).'/script/check-miniwebapp-vm-oop.sh');
+    }
+
+    public function testLocalCiMatrixDocumentsMiniWebAppVmOopGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('MINIWEBAPP_VM_OOP_GATE', $doc);
+        $this->assertStringContainsString('check-miniwebapp-vm-oop.sh', $doc);
+        $this->assertMatchesRegularExpression('/\| `MINIWEBAPP_VM_OOP_GATE` \| `0` \|/', $doc);
+        $this->assertStringContainsString('#2189', $doc);
+    }
+
+    public function testCiDockerRunPassesMiniWebAppVmOopGateEnv(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('MINIWEBAPP_VM_OOP_GATE=${MINIWEBAPP_VM_OOP_GATE:-0}', $body);
     }
 
     public function testCiDefaultsEnvDefinesNestedReturnComplianceGateOn(): void

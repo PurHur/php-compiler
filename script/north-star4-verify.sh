@@ -91,7 +91,7 @@ ns4_print_m4_next_steps() {
     echo "north-star4-verify: M4 ladder green (gen-1→gen-2 native + gen-2→gen-3 spine when step 6 ran)"
   fi
   echo "north-star4-verify: Generation ladder — docs/bootstrap-generations.md"
-  echo "north-star4-verify: Next strict CI — BOOTSTRAP_M4_GEN2_STRICT_GATE=1 in ci-local.sh (#2112)"
+  echo "north-star4-verify: M4 gen-2 strict CI gate default-on in ci-local.sh (#2112); opt-out BOOTSTRAP_M4_GEN2_STRICT_GATE=0"
   echo "north-star4-verify: Next compiled driver — argv bin/compile.php -o (not just M3 env bridge; #1937, #1521)"
   echo "north-star4-verify: Native gen-2 emit — BOOTSTRAP_M4_GEN2_STRICT=1 BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1 ./script/bootstrap-loop-gen1-link.sh (#2115, #2075)"
   echo "north-star4-verify: Opt-in ci-local — NORTH_STAR4_VERIFY_GATE=1 ./script/ci-local.sh (#2429)"

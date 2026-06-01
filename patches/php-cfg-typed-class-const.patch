@@ -34,3 +34,4 @@
 +            $this->block->children[] = $constOp;
          }
      }
+ 

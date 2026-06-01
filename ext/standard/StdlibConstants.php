@@ -8,6 +8,7 @@ namespace PHPCompiler\ext\standard;
  * Zend predefined constants for ext/standard (php-src basic_functions.c PHP_MINIT).
  *
  * @see ext/standard/basic_functions.c — STR_PAD_*, ENT_*, PHP_ROUND_*, M_*
+ * @see ext/standard/php_array.h — SORT_*, EXTR_*
  * @see ext/standard/php_math.h — M_PI, M_E, …
  */
 final class StdlibConstants
@@ -35,6 +36,10 @@ final class StdlibConstants
     public const STR_PAD_RIGHT = 1;
     public const STR_PAD_BOTH = 2;
 
+    /** get_html_translation_table() table selector (ext/standard/html.c). */
+    public const HTML_SPECIALCHARS = 0;
+    public const HTML_ENTITIES = 1;
+
     /** htmlspecialchars() / htmlentities() flags (ext/standard/html.c). */
     public const ENT_COMPAT = 2;
     public const ENT_QUOTES = 3;
@@ -57,6 +62,26 @@ final class StdlibConstants
     public const CASE_LOWER = 0;
     public const CASE_UPPER = 1;
 
+    /** sort() / array_multisort() flags (ext/standard/php_array.h). */
+    public const SORT_REGULAR = 0;
+    public const SORT_NUMERIC = 1;
+    public const SORT_STRING = 2;
+    public const SORT_DESC = 3;
+    public const SORT_ASC = 4;
+    public const SORT_LOCALE_STRING = 5;
+    public const SORT_NATURAL = 6;
+    public const SORT_FLAG_CASE = 8;
+
+    /** extract() flags (ext/standard/php_array.h). */
+    public const EXTR_OVERWRITE = 0;
+    public const EXTR_SKIP = 1;
+    public const EXTR_PREFIX_SAME = 2;
+    public const EXTR_PREFIX_ALL = 3;
+    public const EXTR_PREFIX_INVALID = 4;
+    public const EXTR_PREFIX_IF_EXISTS = 5;
+    public const EXTR_IF_EXISTS = 6;
+    public const EXTR_REFS = 0x100;
+
     /** pathinfo() component flags (ext/standard/basic_functions.c). */
     public const PATHINFO_DIRNAME = 1;
     public const PATHINFO_BASENAME = 2;
@@ -64,11 +89,42 @@ final class StdlibConstants
     public const PATHINFO_FILENAME = 8;
     public const PATHINFO_ALL = 15;
 
+    /** preg_split() flags (ext/pcre/php_pcre.c). */
+    public const PREG_SPLIT_NO_EMPTY = 1;
+    public const PREG_SPLIT_DELIM_CAPTURE = 2;
+    public const PREG_SPLIT_OFFSET_CAPTURE = 4;
+
+    /** preg_grep() flags (ext/pcre/php_pcre.c). */
+    public const PREG_GREP_INVERT = 1;
+
+    /** preg_match() / preg_match_all() flags (ext/pcre/php_pcre.c). */
+    public const PREG_PATTERN_ORDER = 1;
+    public const PREG_SET_ORDER = 2;
+    public const PREG_OFFSET_CAPTURE = 256;
+    public const PREG_UNMATCHED_AS_NULL = 512;
+
+    /** password_hash() algorithms (ext/standard/password.c). */
+    public const PASSWORD_BCRYPT = VmPassword::PASSWORD_BCRYPT;
+
+    public const PASSWORD_DEFAULT = VmPassword::PASSWORD_DEFAULT;
+
+    /** glob() flags (ext/standard/dir.c / glob.h; values match php-src on Linux). */
+    public const GLOB_ERR = 1;
+    public const GLOB_MARK = 2;
+    public const GLOB_NOSORT = 4;
+    public const GLOB_NOCHECK = 16;
+    public const GLOB_NOESCAPE = 64;
+    public const GLOB_BRACE = 1024;
+    public const GLOB_ONLYDIR = 8192;
+    public const GLOB_AVAILABLE_FLAGS = 9303;
+
     /** Lowercase name => int value for VM\Context::constantFetch(). */
     public const CORE_INT_BY_NAME = [
         'str_pad_left' => self::STR_PAD_LEFT,
         'str_pad_right' => self::STR_PAD_RIGHT,
         'str_pad_both' => self::STR_PAD_BOTH,
+        'html_specialchars' => self::HTML_SPECIALCHARS,
+        'html_entities' => self::HTML_ENTITIES,
         'ent_compat' => self::ENT_COMPAT,
         'ent_quotes' => self::ENT_QUOTES,
         'ent_noquotes' => self::ENT_NOQUOTES,
@@ -96,6 +152,40 @@ final class StdlibConstants
         'fnm_casefold' => VmFnmatch::FNM_CASEFOLD,
         'count_normal' => VmArray::COUNT_NORMAL,
         'count_recursive' => VmArray::COUNT_RECURSIVE,
+        'sort_regular' => self::SORT_REGULAR,
+        'sort_numeric' => self::SORT_NUMERIC,
+        'sort_string' => self::SORT_STRING,
+        'sort_desc' => self::SORT_DESC,
+        'sort_asc' => self::SORT_ASC,
+        'sort_locale_string' => self::SORT_LOCALE_STRING,
+        'sort_natural' => self::SORT_NATURAL,
+        'sort_flag_case' => self::SORT_FLAG_CASE,
+        'extr_overwrite' => self::EXTR_OVERWRITE,
+        'extr_skip' => self::EXTR_SKIP,
+        'extr_prefix_same' => self::EXTR_PREFIX_SAME,
+        'extr_prefix_all' => self::EXTR_PREFIX_ALL,
+        'extr_prefix_invalid' => self::EXTR_PREFIX_INVALID,
+        'extr_prefix_if_exists' => self::EXTR_PREFIX_IF_EXISTS,
+        'extr_if_exists' => self::EXTR_IF_EXISTS,
+        'extr_refs' => self::EXTR_REFS,
+        'preg_split_no_empty' => self::PREG_SPLIT_NO_EMPTY,
+        'preg_split_delim_capture' => self::PREG_SPLIT_DELIM_CAPTURE,
+        'preg_split_offset_capture' => self::PREG_SPLIT_OFFSET_CAPTURE,
+        'preg_grep_invert' => self::PREG_GREP_INVERT,
+        'preg_pattern_order' => self::PREG_PATTERN_ORDER,
+        'preg_set_order' => self::PREG_SET_ORDER,
+        'preg_offset_capture' => self::PREG_OFFSET_CAPTURE,
+        'preg_unmatched_as_null' => self::PREG_UNMATCHED_AS_NULL,
+        'glob_err' => self::GLOB_ERR,
+        'glob_mark' => self::GLOB_MARK,
+        'glob_nosort' => self::GLOB_NOSORT,
+        'glob_nocheck' => self::GLOB_NOCHECK,
+        'glob_noescape' => self::GLOB_NOESCAPE,
+        'glob_brace' => self::GLOB_BRACE,
+        'glob_onlydir' => self::GLOB_ONLYDIR,
+        'glob_available_flags' => self::GLOB_AVAILABLE_FLAGS,
+        'password_bcrypt' => self::PASSWORD_BCRYPT,
+        'password_default' => self::PASSWORD_DEFAULT,
     ];
 
     /** Lowercase name => float value for VM\Context::constantFetch(). */
@@ -124,6 +214,8 @@ final class StdlibConstants
         'str_pad_left',
         'str_pad_right',
         'str_pad_both',
+        'html_specialchars',
+        'html_entities',
         'ent_compat',
         'ent_quotes',
         'ent_noquotes',
@@ -151,6 +243,36 @@ final class StdlibConstants
         'fnm_casefold',
         'count_normal',
         'count_recursive',
+        'sort_regular',
+        'sort_numeric',
+        'sort_string',
+        'sort_desc',
+        'sort_asc',
+        'sort_locale_string',
+        'sort_natural',
+        'sort_flag_case',
+        'extr_overwrite',
+        'extr_skip',
+        'extr_prefix_same',
+        'extr_prefix_all',
+        'extr_prefix_invalid',
+        'extr_prefix_if_exists',
+        'extr_if_exists',
+        'extr_refs',
+        'preg_split_no_empty',
+        'preg_split_delim_capture',
+        'preg_split_offset_capture',
+        'preg_grep_invert',
+        'glob_err',
+        'glob_mark',
+        'glob_nosort',
+        'glob_nocheck',
+        'glob_noescape',
+        'glob_brace',
+        'glob_onlydir',
+        'glob_available_flags',
+        'password_bcrypt',
+        'password_default',
         'm_e',
         'm_log2e',
         'm_log10e',

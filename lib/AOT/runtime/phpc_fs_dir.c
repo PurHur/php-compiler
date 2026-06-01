@@ -24,6 +24,11 @@ extern void __hashtable__setStringKeyLong(__hashtable__ *ht, __string__ *key, lo
 extern void __hashtable__setLongAt(__hashtable__ *ht, size_t index, long long val);
 extern __string__ *__string__init(long long size, const char *value);
 
+/* PHP GLOB_ONLYDIR (ext/standard/dir.c; Linux php-src registers 8192). */
+#ifndef PHP_GLOB_ONLYDIR
+#define PHP_GLOB_ONLYDIR 8192
+#endif
+
 static size_t phpc_strlen(__string__ *s)
 {
     if (NULL == s) {
@@ -287,9 +292,10 @@ int __phpc_fnmatch(__string__ *pattern, __string__ *filename, int flags)
 /** Collect glob matches; returns count (>= 0) or -1 on error. Caller frees with __phpc_strvec_free. */
 int __phpc_glob_vec(__string__ *pattern, int flags, char ***out_items)
 {
-    const char *pat; glob_t g; int rc; size_t i; size_t count;
+    const char *pat; glob_t g; int rc; size_t i; size_t count; size_t kept; int onlydir;
     if (NULL == out_items) return -1; *out_items = NULL;
     if (NULL == pattern) return -1;
+    onlydir = (0 != (flags & PHP_GLOB_ONLYDIR));
     pat = phpc_strdata(pattern); memset(&g, 0, sizeof(g));
     rc = glob(pat, flags, NULL, &g);
     if (GLOB_NOMATCH == rc) return 0;
@@ -297,13 +303,30 @@ int __phpc_glob_vec(__string__ *pattern, int flags, char ***out_items)
     count = g.gl_pathc; if (0 == count) { globfree(&g); return 0; }
     *out_items = (char **) malloc(count * sizeof(char *));
     if (NULL == *out_items) { globfree(&g); return -1; }
+    kept = 0;
     for (i = 0; i < count; i++) {
-        (*out_items)[i] = strdup(g.gl_pathv[i]);
-        if (NULL == (*out_items)[i]) {
-            __phpc_strvec_free(*out_items, (int) i); *out_items = NULL; globfree(&g); return -1;
+        if (onlydir && !phpc_path_is_dir(g.gl_pathv[i])) {
+            continue;
+        }
+        (*out_items)[kept] = strdup(g.gl_pathv[i]);
+        if (NULL == (*out_items)[kept]) {
+            __phpc_strvec_free(*out_items, (int) kept); *out_items = NULL; globfree(&g); return -1;
+        }
+        kept++;
+    }
+    globfree(&g);
+    if (0 == kept) {
+        free(*out_items);
+        *out_items = NULL;
+        return 0;
+    }
+    if (kept < count) {
+        char **shrunk = (char **) realloc(*out_items, kept * sizeof(char *));
+        if (NULL != shrunk) {
+            *out_items = shrunk;
         }
     }
-    globfree(&g); return (int) count;
+    return (int) kept;
 }
 
 int __phpc_scandir_vec(__string__ *path, int sorting_order, char ***out_items)
@@ -346,10 +369,12 @@ __hashtable__ *__phpc_glob(__string__ *pattern, int flags)
     int rc;
     __hashtable__ *ht;
     size_t i;
+    int onlydir;
 
     if (NULL == pattern) {
         return NULL;
     }
+    onlydir = (0 != (flags & PHP_GLOB_ONLYDIR));
     pat = phpc_strdata(pattern);
     memset(&g, 0, sizeof(g));
     rc = glob(pat, flags, NULL, &g);
@@ -360,8 +385,15 @@ __hashtable__ *__phpc_glob(__string__ *pattern, int flags)
         return NULL;
     }
     ht = __hashtable__alloc();
-    for (i = 0; i < g.gl_pathc; i++) {
-        __hashtable__setStringAt(ht, i, cstr_to_string(g.gl_pathv[i]));
+    {
+        size_t at = 0;
+        for (i = 0; i < g.gl_pathc; i++) {
+            if (onlydir && !phpc_path_is_dir(g.gl_pathv[i])) {
+                continue;
+            }
+            __hashtable__setStringAt(ht, at, cstr_to_string(g.gl_pathv[i]));
+            at++;
+        }
     }
     globfree(&g);
 

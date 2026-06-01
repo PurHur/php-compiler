@@ -15,13 +15,14 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * array_key_exists() for arrays with int or string keys (subset of PHP).
+ * array_key_exists() for arrays with int, float, or string keys (php-src subset).
  */
 final class array_key_exists extends Internal
 {
@@ -38,7 +39,13 @@ final class array_key_exists extends Internal
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('array_key_exists() second argument must be an array in this compiler build');
         }
-        if (Variable::TYPE_INTEGER !== $key->type && Variable::TYPE_STRING !== $key->type) {
+        if (Variable::TYPE_NULL === $key->type) {
+            $emptyKey = new Variable();
+            $emptyKey->string('');
+            $key = $emptyKey;
+        } elseif (Variable::TYPE_INTEGER !== $key->type
+            && Variable::TYPE_STRING !== $key->type
+            && Variable::TYPE_FLOAT !== $key->type) {
             throw new \LogicException('array_key_exists() key must be an integer or string in this compiler build');
         }
         $frame->returnVar->bool($array->toArray()->hasKey($key));
@@ -55,30 +62,15 @@ final class array_key_exists extends Internal
         $array = $args[1];
         if (JITVariable::TYPE_HASHTABLE === $array->type) {
             $ht = $context->helper->loadValue($array);
-            if (JITVariable::TYPE_STRING === $key->type) {
-                return $context->builder->call(
-                    $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
-                    $ht,
-                    $this->jitString($context, $key, 'array_key_exists() key')
-                );
-            }
-            if (JITVariable::TYPE_NATIVE_LONG === $key->type) {
-                $index = $context->builder->truncOrBitCast(
-                    $context->helper->loadValue($key),
-                    $context->getTypeFromString('size_t')
-                );
 
-                return $context->builder->call(
-                    $context->lookupFunction('__hashtable__offsetIsSet'),
-                    $ht,
-                    $index
-                );
-            }
-            throw new \LogicException(
-                'array_key_exists() key must be an integer or string in this compiler build'
-            );
+            return self::jitKeyExistsOnHashTable($context, $ht, $key);
         }
         if ($array->type & JITVariable::IS_NATIVE_ARRAY) {
+            if (JITVariable::TYPE_NULL === $key->type
+                || JITVariable::TYPE_STRING === $key->type
+                || JITVariable::TYPE_VALUE === $key->type) {
+                return $context->constantFromInteger(0, 'int1');
+            }
             if (JITVariable::TYPE_NATIVE_LONG !== $key->type) {
                 throw new \LogicException(
                     'array_key_exists() on native arrays only supports integer keys in this compiler build'
@@ -95,5 +87,174 @@ final class array_key_exists extends Internal
         throw new \LogicException(
             'array_key_exists() second argument must be an array in this compiler build'
         );
+    }
+
+    /**
+     * php-src: null lookup key coerces to empty string (ext/standard/array.c).
+     */
+    private static function jitKeyExistsOnHashTable(Context $context, Value $ht, JITVariable $key): Value
+    {
+        if (JITVariable::TYPE_NULL === $key->type) {
+            return self::jitEmptyStringKeyExists($context, $ht);
+        }
+        if (JITVariable::TYPE_STRING === $key->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+                $ht,
+                (new self())->jitString($context, $key, 'array_key_exists() key')
+            );
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $key->type) {
+            $index = $context->builder->truncOrBitCast(
+                $context->helper->loadValue($key),
+                $context->getTypeFromString('size_t')
+            );
+
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSet'),
+                $ht,
+                $index
+            );
+        }
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $key->type) {
+            $index = $context->builder->fptosi(
+                $context->helper->loadValue($key),
+                $context->getTypeFromString('size_t')
+            );
+
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSet'),
+                $ht,
+                $index
+            );
+        }
+        if (JITVariable::TYPE_VALUE === $key->type) {
+            return self::jitKeyExistsValueBoxKey($context, $ht, $key);
+        }
+
+        throw new \LogicException(
+            'array_key_exists() key must be an integer or string in this compiler build'
+        );
+    }
+
+    private static function jitEmptyStringKeyExists(Context $context, Value $ht): Value
+    {
+        $emptyKey = $context->builder->load($context->constantStringFromString(''));
+
+        return $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+            $ht,
+            $emptyKey
+        );
+    }
+
+    private static function jitKeyExistsValueBoxKey(Context $context, Value $ht, JITVariable $key): Value
+    {
+        if (JITVariable::TYPE_VALUE !== $key->type) {
+            throw new \LogicException('jitKeyExistsValueBoxKey requires TYPE_VALUE');
+        }
+        $valPtr = JITVariable::KIND_VARIABLE === $key->kind
+            ? JitValueBox::pointer($context, $key->value)
+            : $context->helper->loadValue($key);
+        $valueMap = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        $sizeT = $context->getTypeFromString('size_t');
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valPtr, $valueMap['type'])
+        );
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $stringBlock = $fn->appendBasicBlock('ake_vk_str');
+        $longBlock = $fn->appendBasicBlock('ake_vk_long');
+        $nullBlock = $fn->appendBasicBlock('ake_vk_null');
+        $falseBlock = $fn->appendBasicBlock('ake_vk_false');
+        $merge = $fn->appendBasicBlock('ake_vk_merge');
+        $afterString = $fn->appendBasicBlock('ake_vk_after_str');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_STRING, false)
+            ),
+            $stringBlock,
+            $afterString
+        );
+        $context->builder->positionAtEnd($stringBlock);
+        $keyStr = $context->builder->call($context->lookupFunction('__value__readString'), $valPtr);
+        $strResult = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+            $ht,
+            $keyStr
+        );
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($afterString);
+        $afterLong = $fn->appendBasicBlock('ake_vk_after_long');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_NATIVE_LONG, false)
+            ),
+            $longBlock,
+            $afterLong
+        );
+        $context->builder->positionAtEnd($longBlock);
+        $index = $context->builder->truncOrBitCast(
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valPtr),
+            $sizeT
+        );
+        $longResult = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $index
+        );
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($afterLong);
+        $doubleBlock = $fn->appendBasicBlock('ake_vk_double');
+        $afterDouble = $fn->appendBasicBlock('ake_vk_after_double');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false)
+            ),
+            $doubleBlock,
+            $afterDouble
+        );
+        $context->builder->positionAtEnd($doubleBlock);
+        $indexFromDouble = $context->builder->fptosi(
+            $context->builder->call($context->lookupFunction('__value__readDouble'), $valPtr),
+            $sizeT
+        );
+        $doubleResult = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $indexFromDouble
+        );
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($afterDouble);
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_NULL, false)
+            ),
+            $nullBlock,
+            $falseBlock
+        );
+        $context->builder->positionAtEnd($nullBlock);
+        $nullResult = self::jitEmptyStringKeyExists($context, $ht);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($falseBlock);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($merge);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($strResult, $stringBlock);
+        $phi->addIncoming($longResult, $longBlock);
+        $phi->addIncoming($doubleResult, $doubleBlock);
+        $phi->addIncoming($nullResult, $nullBlock);
+        $phi->addIncoming($i1->constInt(0, false), $falseBlock);
+
+        return $phi;
     }
 }

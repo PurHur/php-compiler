@@ -29,6 +29,7 @@ class OpCode {
     const TYPE_RETURN = 17;
     const TYPE_MINUS = 18;
     const TYPE_DECLARE_CLASS = 19;
+    /** arg3 = new-expression startLine when known (#195). */
     const TYPE_NEW = 20;
     const TYPE_MUL = 21;
     const TYPE_DIV = 22;
@@ -85,6 +86,7 @@ class OpCode {
     const TYPE_METHODCALL_INIT = 85;
     const TYPE_DECLARE_CLASS_CONST = 86;
     const TYPE_CLASS_CONST_FETCH = 87;
+    /** arg2 = throw-statement startLine when known (#195). */
     const TYPE_THROW = 88;
     const TYPE_INSTANCEOF = 89;
     const TYPE_STATIC_PROPERTY_FETCH = 90;

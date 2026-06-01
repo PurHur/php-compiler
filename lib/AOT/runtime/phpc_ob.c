@@ -20,6 +20,7 @@ void __value__writeString(struct __value__ *out, struct __string__ *str);
 struct __string__ *__string__init(long long len, const char *value);
 
 int __phpc_sapi_output_started = 0;
+static int ob_implicit_flush_enabled = 0;
 
 static int ob_active_index(void)
 {
@@ -33,6 +34,9 @@ static void ob_append_bytes(const char *data, size_t len)
         if (data && len > 0) {
             __phpc_sapi_output_started = 1;
             fwrite(data, 1, len, stdout);
+        }
+        if (ob_implicit_flush_enabled) {
+            fflush(stdout);
         }
         return;
     }
@@ -48,6 +52,9 @@ static void ob_append_bytes(const char *data, size_t len)
     pos += (unsigned long) len;
     __phpc_ob_len[idx] = pos;
     __phpc_ob_storage[idx][pos] = '\0';
+    if (ob_implicit_flush_enabled) {
+        fflush(stdout);
+    }
 }
 
 void __phpc_ob_start(void)
@@ -151,4 +158,24 @@ void __phpc_shutdown_mark_registered(void)
 void __phpc_flush(void)
 {
     fflush(stdout);
+}
+
+void __phpc_ob_end_all(void)
+{
+    while (__phpc_ob_level > 0) {
+        __phpc_ob_level--;
+        int idx = __phpc_ob_level;
+        unsigned long len = __phpc_ob_len[idx];
+        if (len > 0) {
+            ob_append_bytes(__phpc_ob_storage[idx], (size_t) len);
+        }
+        __phpc_ob_len[idx] = 0;
+        __phpc_ob_storage[idx][0] = '\0';
+    }
+    fflush(stdout);
+}
+
+void __phpc_ob_implicit_flush(int enable)
+{
+    ob_implicit_flush_enabled = enable ? 1 : 0;
 }

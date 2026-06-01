@@ -1,0 +1,2 @@
+# Minimal subset for harness images without /etc/services (issue #3650).
+http		80/tcp		www		# WorldWideWeb HTTP

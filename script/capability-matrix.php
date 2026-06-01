@@ -80,8 +80,17 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     } elseif ('uksort' === $fn->getName() && preg_match('/callables are deferred/i', $source)) {
         $notes[] = 'callbacks: strcmp JIT; strcasecmp VM; closures deferred (#3143)';
     }
+    if ('uasort' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
+        $notes[] = 'callbacks: strcmp JIT; strcasecmp VM; VM closure comparator (#3086, #3582)';
+    } elseif ('uasort' === $fn->getName() && preg_match('/callables are deferred/i', $source)) {
+        $notes[] = 'callbacks: strcmp JIT; strcasecmp VM; closures deferred (#1211)';
+    }
     if ('array_filter' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
         $notes[] = 'callbacks: string builtins; VM closure callbacks (#3086)';
+    }
+    if (in_array($fn->getName(), ['array_find', 'array_find_key', 'array_any', 'array_all'], true)
+        && str_contains($source, 'VmArrayValueCallback')) {
+        $notes[] = 'callbacks: string builtins/user functions; VM closure callbacks (#3073)';
     }
     if ('array_walk_recursive' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
         $notes[] = 'callbacks: VM closure + string builtins; JIT/AOT recursive walk deferred (#3111)';

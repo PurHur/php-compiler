@@ -58,7 +58,29 @@ final class array_sum extends Internal
                 }
                 continue;
             }
-            throw new \LogicException('array_sum() only supports integer and float elements in this compiler build');
+            if (Variable::TYPE_STRING === $v->type) {
+                $s = $v->toString();
+                if (!\is_numeric($s)) {
+                    throw new \TypeError('Unsupported operand types: string');
+                }
+                $num = $v->toNumeric();
+                if (\is_int($num)) {
+                    if ($useFloat) {
+                        $sumFloat += (float) $num;
+                    } else {
+                        $sumInt += $num;
+                    }
+                } else {
+                    if (!$useFloat) {
+                        $useFloat = true;
+                        $sumFloat = (float) $sumInt + (float) $num;
+                    } else {
+                        $sumFloat += (float) $num;
+                    }
+                }
+                continue;
+            }
+            throw new \LogicException('array_sum() only supports integer, float, and numeric string elements in this compiler build');
         }
         if ($useFloat) {
             $frame->returnVar->float($sumFloat);

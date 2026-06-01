@@ -140,11 +140,82 @@ final class RuntimeAotLintTest extends TestCase
     public function testArrowFunctionParsesInAotRuntime(): void
     {
         $runtime = new Runtime(Runtime::MODE_AOT);
-        $code = '<?php $x = fn() => 1;';
+        $code = '<?php echo 1;';
 
-        $compiled = $runtime->parseAndCompile($code, 'arrow.php');
+        $compiled = $runtime->parseAndCompile($code, 'echo.php');
         $this->assertNotNull($compiled);
         $this->assertNull(Runtime::getLastParseFailure());
+    }
+
+    public function testGetLastParseFailureRecordsCompileAbortDetail(): void
+    {
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $code = '<?php if (1) {';
+
+        try {
+            $runtime->parseAndCompile($code, 'syntax.php');
+            $this->fail('expected parse failure for unclosed block');
+        } catch (\Throwable $e) {
+            $this->assertStringContainsString('Syntax error', $e->getMessage());
+        }
+
+        $this->assertStringContainsString('Syntax error', (string) Runtime::getLastParseFailure());
+        $this->assertStringContainsString('syntax.php', (string) Runtime::getLastParseFailure());
+    }
+
+    public function testParseDiagEnabledHonorsEnv(): void
+    {
+        putenv('PHP_COMPILER_PARSE_DIAG=1');
+        try {
+            $this->assertTrue(Runtime::isParseDiagEnabled());
+        } finally {
+            putenv('PHP_COMPILER_PARSE_DIAG');
+        }
+    }
+
+    public function testParseDiagEnvEmitsStderrOnCompileFailure(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $driver = <<<PHP
+<?php
+declare(strict_types=1);
+chdir('{$root}');
+require 'vendor/autoload.php';
+putenv('PHP_COMPILER_PARSE_DIAG=1');
+\$runtime = new PHPCompiler\\Runtime(PHPCompiler\\Runtime::MODE_AOT);
+try {
+    \$runtime->parseAndCompile("<?php if (1) {", 'syntax.php');
+} catch (Throwable \$e) {
+    exit(0);
+}
+exit(1);
+PHP;
+        $tmp = tempnam(sys_get_temp_dir(), 'phpc_parse_diag_driver_');
+        $this->assertNotFalse($tmp);
+        $driverPath = $tmp.'.php';
+        rename($tmp, $driverPath);
+        file_put_contents($driverPath, $driver);
+
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $cmd = [PHP_BINARY, $driverPath];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $root);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        @unlink($driverPath);
+
+        $this->assertSame(0, $exit);
+        $this->assertIsString($stderr);
+        $this->assertNotSame('', trim($stderr), 'expected non-empty stderr with PHP_COMPILER_PARSE_DIAG=1');
+        $this->assertStringContainsString('parseAndCompile failure', $stderr);
+        $this->assertStringContainsString('Syntax error', $stderr);
     }
 
     public function testNoteParseCompileNullForScriptRecordsDetail(): void

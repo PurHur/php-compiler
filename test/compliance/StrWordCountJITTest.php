@@ -20,5 +20,13 @@ final class StrWordCountJITTest extends BaseTest
             __DIR__.'/cases/stdlib/str_word_count_jit.phpt',
             'str_word_count_jit.phpt'
         );
+        yield 'str_word_count_format1_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/str_word_count_format1_jit.phpt',
+            'str_word_count_format1_jit.phpt'
+        );
+        yield 'str_word_count_format2_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/str_word_count_format2_jit.phpt',
+            'str_word_count_format2_jit.phpt'
+        );
     }
 }

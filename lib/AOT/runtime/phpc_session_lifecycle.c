@@ -100,7 +100,7 @@ void __phpc_session_generate_new_id(void)
     session_store_id(out, 32);
 }
 
-void __phpc_session_start_apply(__value__ *out)
+void phpc_session_start_runtime(__value__ *out)
 {
     if (__phpc_session_active) {
         __value__writeBool(out, 0);
@@ -114,11 +114,9 @@ void __phpc_session_start_apply(__value__ *out)
         __phpc_session_name_len = 9;
     }
 
-    if (__phpc_session_id_len <= 0) {
-        if (!phpc_session_apply_incoming_cookie()) {
-            __phpc_session_generate_new_id();
-            phpc_session_emit_setcookie();
-        }
+    if (!phpc_session_apply_incoming_cookie()) {
+        __phpc_session_generate_new_id();
+        phpc_session_emit_setcookie();
     }
 
     if (0 == sg_SESSION) {

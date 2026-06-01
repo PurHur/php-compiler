@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -21,6 +22,60 @@ final class VmDate
     public static function getmypid(): int
     {
         return (int) \getmypid();
+    }
+
+    /** getmygrgid() — real group id (ext/standard/basic_functions.c, #3611). */
+    public static function getmygrgid(): int
+    {
+        if (\function_exists('posix_getgid')) {
+            return (int) \posix_getgid();
+        }
+        if (\function_exists('getgid')) {
+            return (int) \getgid();
+        }
+
+        throw new \LogicException('getmygrgid() requires POSIX support in this compiler build');
+    }
+
+    /**
+     * getmyinode() — inode of the executed script (ext/standard/basic_functions.c, #3611).
+     *
+     * @return int|false
+     */
+    public static function getmyinode(Frame $frame)
+    {
+        $path = self::executedFilename($frame);
+        if ('' === $path || '-' === $path) {
+            return false;
+        }
+        $stat = @\stat($path);
+        if (false === $stat) {
+            return false;
+        }
+
+        return (int) ($stat['ino'] ?? 0);
+    }
+
+    private static function executedFilename(Frame $frame): string
+    {
+        if (null !== $frame->vmContext) {
+            $root = $frame->vmContext->scriptStack->root();
+            if ('' !== $root) {
+                return $root;
+            }
+        }
+        $f = $frame;
+        while (null !== $f->parent) {
+            $f = $f->parent;
+        }
+        if ('' !== $f->scriptPath) {
+            return $f->scriptPath;
+        }
+        if (null !== $f->block) {
+            return $f->block->scriptPath();
+        }
+
+        return '';
     }
 
     public static function date(string $format, ?int $timestamp = null): string

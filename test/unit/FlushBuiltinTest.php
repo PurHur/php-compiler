@@ -20,11 +20,31 @@ echo 'end';
 ob_end_flush();
 PHP;
 
+    private const SHUTDOWN_CODE = <<<'PHP'
+ob_start();
+echo 'chunk';
+flush();
+echo ob_get_level();
+PHP;
+
+    private const SHUTDOWN_AOT_CODE = <<<'PHP'
+ob_start();
+echo 'chunk';
+flush();
+PHP;
+
     private const EXPECT = "1\nbufend";
+    private const SHUTDOWN_EXPECT = 'chunk1';
+    private const SHUTDOWN_AOT_EXPECT = 'chunk';
 
     public function testVmMatchesPhpSubset(): void
     {
         $this->assertSame(self::EXPECT, $this->runBin('bin/vm.php', self::CODE));
+    }
+
+    public function testVmShutdownObFlushMatchesPhpSubset(): void
+    {
+        $this->assertSame(self::SHUTDOWN_EXPECT, $this->runBin('bin/vm.php', self::SHUTDOWN_CODE));
     }
 
     /**
@@ -36,16 +56,28 @@ PHP;
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
-        $this->assertSame(self::EXPECT, $this->runAotBinary());
+        $this->assertSame(self::EXPECT, $this->runAotBinary(self::CODE));
     }
 
-    private function runAotBinary(): string
+    /**
+     * @group llvm
+     * @group jit
+     */
+    public function testAotShutdownObFlushMatchesPhpSubset(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $this->assertSame(self::SHUTDOWN_AOT_EXPECT, $this->runAotBinary(self::SHUTDOWN_AOT_CODE));
+    }
+
+    private function runAotBinary(string $code): string
     {
         $repo = dirname(__DIR__, 2);
         $tmp = tempnam(sys_get_temp_dir(), 'phpc_flush_');
         $out = $tmp.'_bin';
         $this->assertNotFalse($tmp);
-        file_put_contents($tmp, "<?php\n".self::CODE);
+        file_put_contents($tmp, "<?php\n".$code);
         $env = $_ENV;
         LlvmToolchain::applyProcessEnv($env, $repo);
         $compile = proc_open(

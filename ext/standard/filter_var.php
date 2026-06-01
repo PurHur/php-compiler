@@ -33,8 +33,10 @@ final class filter_var extends Internal
         $options = null;
         if (3 === $argc) {
             $options = $frame->calledArgs[2]->resolveIndirect();
-            if (!$options->isUndefined() && Variable::TYPE_NULL !== $options->type) {
-                throw new \LogicException('filter_var() options are not supported in this compiler build');
+            if (!$options->isUndefined()
+                && Variable::TYPE_NULL !== $options->type
+                && Variable::TYPE_INTEGER !== $options->type) {
+                throw new \LogicException('filter_var() options must be an integer flag bitmask');
             }
         }
         self::writeReturn($frame, VmFilter::filterVar($value, $filter->toInt(), $options));
@@ -45,12 +47,17 @@ final class filter_var extends Internal
         if (\count($args) < 2 || \count($args) > 3) {
             throw new \LogicException('filter_var() requires two or three arguments in this compiler build');
         }
-        if (\count($args) > 2 && JITVariable::TYPE_NULL !== $args[2]->type) {
-            throw new \LogicException('filter_var() options are not supported in this compiler build');
+        $optionsArg = \count($args) > 2 ? $args[2] : null;
+        if (null !== $optionsArg
+            && JITVariable::TYPE_NULL !== $optionsArg->type
+            && JITVariable::TYPE_NATIVE_LONG !== $optionsArg->type
+            && JITVariable::TYPE_VALUE !== $optionsArg->type) {
+            throw new \LogicException('filter_var() options must be an integer flag bitmask');
         }
 
         $value = JitFilter::asValueVar($context, $args[0]);
         $filterVal = JitFilter::loadFilterId($context, $args[1]);
+        $nullOnFailure = JitFilter::loadNullOnFailureFlag($context, $optionsArg);
         $i64 = $context->getTypeFromString('int64');
         $isInt = $context->builder->icmp(
             Builder::INT_EQ,
@@ -65,11 +72,17 @@ final class filter_var extends Internal
 
         $context->builder->positionAtEnd($intBlock);
         $intResult = JitFilter::validateInt($context, $value);
+        if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
+            $intResult = JitFilter::applyNullOnFailure($context, $intResult, $nullOnFailure);
+        }
         $intTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($otherBlock);
         $otherResult = JitFilter::validateEmail($context, $value);
+        if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
+            $otherResult = JitFilter::applyNullOnFailure($context, $otherResult, $nullOnFailure);
+        }
         $otherTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
@@ -95,6 +108,9 @@ final class filter_var extends Internal
                 break;
             case Variable::TYPE_BOOLEAN:
                 $frame->returnVar->bool($result->toBool());
+                break;
+            case Variable::TYPE_NULL:
+                $frame->returnVar->null();
                 break;
             default:
                 throw new \LogicException('filter_var() returned unexpected type');

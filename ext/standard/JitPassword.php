@@ -47,6 +47,27 @@ final class JitPassword
         );
     }
 
+    public static function crypt(Context $context, Value $password, Value $salt): Value
+    {
+        StringPasswordCrypto::ensureLinked($context);
+
+        $digest = $context->builder->call(
+            $context->lookupFunction('__compiler_crypt'),
+            $password,
+            $salt
+        );
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $digest
+        );
+
+        return $ptr;
+    }
+
     private static function nullableStringToValue(Context $context, Value $digest): Value
     {
         $id = (string) (++self::$blockSerial);

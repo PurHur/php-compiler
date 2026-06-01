@@ -167,6 +167,7 @@ final class CompileCache
             return false;
         }
 
+        SuperglobalInit::rebindGlobalsFromModule($context);
         self::restoreExports($context, $block, $meta['exports']);
         self::$skipModuleFuncCompile = true;
 
@@ -295,6 +296,7 @@ final class CompileCache
         $parts[] = $llvmDir;
         $parts[] = hash_file('sha256', __DIR__.'/../JIT/Context.php') ?: '';
         $parts[] = hash_file('sha256', __DIR__.'/../Runtime.php') ?: '';
+        $parts[] = LazyBuiltins::fingerprintSegment();
 
         $cached = hash('sha256', implode("\0", $parts));
 

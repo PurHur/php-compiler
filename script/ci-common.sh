@@ -391,6 +391,24 @@ ci_run_miniwebapp_lint_zero_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-miniwebapp-lint-zero.php
 }
 
+# 003-MiniWebApp VM OOP lint + phpc serve curls (issues #2059, #2189); opt-in MINIWEBAPP_VM_OOP_GATE=1.
+ci_run_miniwebapp_vm_oop() {
+  if [[ "${MINIWEBAPP_VM_OOP_GATE:-0}" != "1" ]]; then
+    echo "MiniWebApp VM OOP: skipped (MINIWEBAPP_VM_OOP_GATE=0 default; set 1 to opt in, issue #2189)"
+    return 0
+  fi
+  if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+    echo "MiniWebApp VM OOP: MINIWEBAPP_VM_OOP_GATE=1 requires serve tests; unset PHP_COMPILER_SKIP_SERVE_TESTS (#2189)" >&2
+    exit 1
+  fi
+  if ! ci_can_bind_loopback; then
+    echo "MiniWebApp VM OOP: skipped (cannot bind loopback TCP)"
+    return 0
+  fi
+  echo "MiniWebApp VM OOP (MINIWEBAPP_VM_OOP_GATE=1, issue #2189)..."
+  "$_CI_SCRIPT_DIR/check-miniwebapp-vm-oop.sh"
+}
+
 ci_run_init_sessionsweb_parity_check() {
   if [[ "${INIT_SESSIONSWEB_PARITY_GATE:-1}" != "1" ]]; then
     return 0
@@ -611,9 +629,9 @@ ci_run_bootstrap_lib_spine_vm_smoke() {
   "$_CI_SCRIPT_DIR/bootstrap-selfhost-lib-spine-vm-smoke.sh"
 }
 
-# M2 VM driver execute: spine-linked bin/vm.php run() dispatch (#2201); opt-in (#2227).
+# M2 VM driver execute: spine-linked bin/vm.php run() dispatch (#2201); default-on (#2227).
 ci_run_bootstrap_vm_driver_execute_probe() {
-  if [[ "${BOOTSTRAP_VM_DRIVER_EXECUTE_GATE:-0}" != "1" ]]; then
+  if [[ "${BOOTSTRAP_VM_DRIVER_EXECUTE_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if ! ci_llvm_ready; then
@@ -773,6 +791,25 @@ ci_run_north_star3_verify() {
   make -C "$_CI_REPO_ROOT" north-star3-verify
 }
 
+# M4 strict-loop presenter in ci-local LLVM tail (issue #2429, #2379); default off — opt-in with NORTH_STAR4_VERIFY_GATE=1.
+ci_run_north_star4_verify() {
+  if [[ "${NORTH_STAR4_VERIFY_GATE:-0}" != "1" ]]; then
+    echo "north-star4-verify: skipped (NORTH_STAR4_VERIFY_GATE=0 default; set 1 to opt in, issue #2429)"
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "north-star4-verify: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  local ns4_script="$_CI_SCRIPT_DIR/north-star4-verify.sh"
+  if [[ ! -x "$ns4_script" ]]; then
+    echo "north-star4-verify: skipped (script missing — run from repo root)"
+    return 0
+  fi
+  echo "north-star4-verify (NORTH_STAR4_VERIFY_GATE=1, issue #2429)..."
+  make -C "$_CI_REPO_ROOT" north-star4-verify
+}
+
 # M4 bootstrap-loop dry-run probe (issue #1777, #1498); default off until M3 strict is stable.
 ci_run_bootstrap_loop_probe() {
   if [[ "${BOOTSTRAP_LOOP_PROBE_GATE:-0}" != "1" ]]; then
@@ -845,9 +882,9 @@ ci_run_bootstrap_runtime_compile_smoke_strict() {
     "$_CI_SCRIPT_DIR/bootstrap-selfhost-runtime-compile-smoke.sh"
 }
 
-# M3 compile-smoke strict native emit (issue #1937); default off until emit_path=native stable.
+# M3 compile-smoke strict native emit (issue #1937); default on in ci-local (#2165); skipped when LLVM missing.
 ci_run_bootstrap_m3_compile_smoke_strict() {
-  if [[ "${BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE:-0}" != "1" ]]; then
+  if [[ "${BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if ! ci_llvm_ready; then
@@ -862,9 +899,9 @@ ci_run_bootstrap_m3_compile_smoke_strict() {
     "$_CI_SCRIPT_DIR/bootstrap-selfhost-compile-smoke-probe.sh"
 }
 
-# M3 HelloWorld strict native emit (issue #1526); default off until emit_path=native stable in Docker.
+# M3 HelloWorld strict native emit (issue #1526); default on in ci-defaults (#1866).
 ci_run_bootstrap_m3_strict() {
-  if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE:-0}" != "1" ]]; then
+  if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if ! ci_llvm_ready; then
@@ -877,6 +914,22 @@ ci_run_bootstrap_m3_strict() {
     BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
     BOOTSTRAP_M3_HELLOWORLD_STRICT=1 \
     "$_CI_SCRIPT_DIR/bootstrap-selfhost-helloworld-probe.sh"
+}
+
+# M4 gen-2 strict native emit (issue #2075); default on in ci-local (#2112); after M3 strict gates.
+ci_run_bootstrap_m4_gen2_strict() {
+  if [[ "${BOOTSTRAP_M4_GEN2_STRICT_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "bootstrap-m4-gen2-strict: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "bootstrap-m4-gen2-strict (BOOTSTRAP_M4_GEN2_STRICT_GATE=1, issue #2112/#2075)..."
+  if ! BOOTSTRAP_M4_GEN2_STRICT=1 "$_CI_SCRIPT_DIR/bootstrap-loop-gen1-link.sh"; then
+    echo "bootstrap-m4-gen2-strict: failed — see docs/bootstrap-selfhost.md (#2112)" >&2
+    return 1
+  fi
 }
 
 # M4 bootstrap-loop dry-run probe in ci-local LLVM tail (issue #2058); after M3 strict gates.
@@ -1094,7 +1147,7 @@ ci_run_fastcgi_smoke() {
 
 # Shell curl harness for 009-FastCGIWeb health + PATH_INFO (issue #2351).
 ci_run_fastcgi_web_smoke() {
-  if [[ "${FASTCGI_WEB_SMOKE_GATE:-0}" != "1" ]]; then
+  if [[ "${FASTCGI_WEB_SMOKE_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
@@ -1105,7 +1158,7 @@ ci_run_fastcgi_web_smoke() {
     echo "examples-web-smoke (009): skipped (cannot bind loopback TCP)"
     return 0
   fi
-  echo "examples-web-smoke (009): FastCGIWeb health + PATH_INFO curls (FASTCGI_WEB_SMOKE_GATE=1, #2351)..."
+  echo "examples-web-smoke (009): FastCGIWeb health + PATH_INFO curls (FASTCGI_WEB_SMOKE_GATE=1 default, #2351, #2369)..."
   "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --fastcgi-only
 }
 
@@ -1351,16 +1404,16 @@ ci_run_selfhostprobe_aot_smoke() {
   ci_run_phpunit --group selfhostprobe-aot-execute "$@"
 }
 
-# 009-FastCGIWeb AOT binary CLI execute (issue #2331); opt-in FASTCGI_WEB_AOT_SMOKE_GATE=1 (#2352).
+# 009-FastCGIWeb AOT binary CLI execute (issue #2331); default-on FASTCGI_WEB_AOT_SMOKE_GATE=1 (#2352, #2369).
 ci_run_fastcgi_web_aot_execute() {
-  if [[ "${FASTCGI_WEB_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+  if [[ "${FASTCGI_WEB_AOT_SMOKE_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if ! ci_llvm_ready; then
     echo "PHPUnit: FastCGIWeb AOT execute skipped (LLVM 9 not available)"
     return 0
   fi
-  echo "PHPUnit: FastCGIWeb AOT execute (@group fastcgiweb-aot-execute; FASTCGI_WEB_AOT_SMOKE_GATE=1, #2352)..."
+  echo "PHPUnit: FastCGIWeb AOT execute (@group fastcgiweb-aot-execute; FASTCGI_WEB_AOT_SMOKE_GATE=1 default, #2352, #2369)..."
   ci_run_phpunit --group fastcgiweb-aot-execute "$@"
 }
 

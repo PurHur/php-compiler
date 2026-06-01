@@ -24,6 +24,13 @@ final class SimilarTextBuiltinTest extends TestCase
         $this->assertEqualsWithDelta(60.0, $percent, 0.0001);
     }
 
+    public function testPercentHelloHallo(): void
+    {
+        $percent = 0.0;
+        $this->runSimilarText('hello', 'hallo', $percent);
+        $this->assertEqualsWithDelta(80.0, $percent, 0.0001);
+    }
+
     public function testEmptyStrings(): void
     {
         $this->assertSame(0, $this->runSimilarText('', ''));

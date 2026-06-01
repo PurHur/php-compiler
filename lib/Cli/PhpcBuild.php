@@ -8,6 +8,7 @@ use PHPCompiler\AOT\ProjectGraph;
 use PHPCompiler\Lint\Issue;
 use PHPCompiler\Lint\Linter;
 use PHPCompiler\Lint\UnsupportedRegistry;
+use PHPCompiler\Web\ManifestValidator;
 use PHPCompiler\Web\ProjectManifest;
 
 /**
@@ -114,6 +115,30 @@ final class PhpcBuild
         }
 
         return 0;
+    }
+
+    /**
+     * Non-entry compile units from ProjectGraph (manifest includes, literal includes, PSR-4).
+     *
+     * @return array{includes: list<string>, errors: list<string>}
+     */
+    public static function resolveGraphIncludePaths(string $projectDir, string $entry): array
+    {
+        $graph = ProjectGraph::resolve($projectDir);
+        if ([] !== $graph['errors']) {
+            return ['includes' => [], 'errors' => $graph['errors']];
+        }
+
+        $entryKey = realpath($entry) ?: $entry;
+        $includes = [];
+        foreach ($graph['files'] as $path) {
+            $key = realpath($path) ?: $path;
+            if ($key !== $entryKey) {
+                $includes[] = $path;
+            }
+        }
+
+        return ['includes' => $includes, 'errors' => []];
     }
 
     /**
@@ -544,5 +569,262 @@ final class PhpcBuild
         $formatted = ProjectGraph::formatFileList($projectRoot, [$absolutePath]);
 
         return $formatted[0] ?? $absolutePath;
+    }
+
+    /**
+     * Default JIT launcher path: manifest binary + ".jit" (issue #1801).
+     */
+    public static function resolveJitOutputPath(string $projectDir, ?string $explicitOutput = null): ?string
+    {
+        if (null !== $explicitOutput && '' !== $explicitOutput) {
+            return InvokeCwd::resolve($explicitOutput);
+        }
+
+        $binary = ProjectManifest::resolveBinaryOutputPath($projectDir);
+        if (null === $binary) {
+            return null;
+        }
+
+        return $binary.'.jit';
+    }
+
+    /**
+     * phpc build --project --jit: emit an executable launcher that runs bin/jit.php on the entry (#1801).
+     *
+     * @return array{exit: int, stdout: string, stderr: string, output: ?string}
+     */
+    public static function buildProjectJit(
+        string $repoRoot,
+        string $projectDir,
+        ?string $outputPath = null,
+        bool $verbose = false
+    ): array {
+        $errors = ManifestValidator::validateForBuild($projectDir);
+        if ([] !== $errors) {
+            return [
+                'exit' => 1,
+                'stdout' => '',
+                'stderr' => implode("\n", $errors)."\n",
+                'output' => null,
+            ];
+        }
+
+        $entry = ProjectManifest::resolveEntryPath($projectDir);
+        $output = self::resolveJitOutputPath($projectDir, $outputPath);
+        if (null === $entry || null === $output) {
+            return [
+                'exit' => 1,
+                'stdout' => '',
+                'stderr' => "phpc build --project --jit: could not resolve entry or output path\n",
+                'output' => null,
+            ];
+        }
+
+        $repoReal = realpath($repoRoot);
+        $projectReal = realpath($projectDir);
+        $entryReal = realpath($entry);
+        if (false === $repoReal || false === $projectReal || false === $entryReal) {
+            return [
+                'exit' => 1,
+                'stdout' => '',
+                'stderr' => "phpc build --project --jit: could not resolve project paths\n",
+                'output' => null,
+            ];
+        }
+
+        $parent = dirname($output);
+        if ('' !== $parent && !is_dir($parent) && !mkdir($parent, 0777, true) && !is_dir($parent)) {
+            return [
+                'exit' => 1,
+                'stdout' => '',
+                'stderr' => "phpc build --project --jit: cannot create output directory: {$parent}\n",
+                'output' => null,
+            ];
+        }
+
+        $launcher = self::renderJitLauncherScript($repoReal, $projectReal, $entryReal);
+        if (false === file_put_contents($output, $launcher)) {
+            return [
+                'exit' => 1,
+                'stdout' => '',
+                'stderr' => "phpc build --project --jit: failed to write {$output}\n",
+                'output' => null,
+            ];
+        }
+        chmod($output, 0755);
+
+        $stdout = 'Wrote JIT launcher '.$output."\n";
+        if ($verbose) {
+            $graph = ProjectGraph::resolve($projectDir);
+            if ([] === $graph['errors']) {
+                $units = ProjectGraph::formatFileList($projectDir, $graph['files']);
+                $stdout .= 'compile units ('.count($units).'): '.implode(', ', $units)."\n";
+            }
+        }
+
+        return [
+            'exit' => 0,
+            'stdout' => $stdout,
+            'stderr' => self::formatJitBuildSuccessTrailer($projectDir, $output, $entryReal),
+            'output' => $output,
+        ];
+    }
+
+    /**
+     * Dry-run for phpc build --project --jit: manifest + entry only (no AOT graph gate).
+     */
+    public static function preflightProjectJit(string $projectDir): int
+    {
+        $errors = ManifestValidator::validateForBuild($projectDir);
+        if ([] !== $errors) {
+            foreach ($errors as $message) {
+                fwrite(STDERR, $message."\n");
+            }
+
+            return 1;
+        }
+
+        $entry = ProjectManifest::resolveEntryPath($projectDir);
+        $output = self::resolveJitOutputPath($projectDir);
+        if (null === $entry || null === $output) {
+            fwrite(STDERR, "phpc build --project --jit: could not resolve entry or output path\n");
+
+            return 1;
+        }
+
+        $root = ProjectManifest::resolveProjectDir($projectDir);
+        if (null !== $root) {
+            fwrite(STDOUT, 'entry: '.self::displayPath($root, $entry)."\n");
+        }
+        fwrite(STDOUT, 'jit launcher: '.$output."\n");
+
+        return 0;
+    }
+
+    /**
+     * @return array{exec_cwd: string, entry_arg: string}
+     */
+    public static function resolveJitExecContext(string $projectDir, string $entryPath): array
+    {
+        $projectReal = realpath($projectDir) ?: $projectDir;
+        $entryReal = realpath($entryPath) ?: $entryPath;
+        $publicDir = ProjectManifest::resolvePublicDir($projectReal);
+        if (is_dir($publicDir)) {
+            $publicReal = realpath($publicDir) ?: $publicDir;
+            if (str_starts_with($entryReal, $publicReal.DIRECTORY_SEPARATOR)
+                || $entryReal === $publicReal) {
+                return [
+                    'exec_cwd' => $publicReal,
+                    'entry_arg' => basename($entryReal),
+                ];
+            }
+        }
+
+        $prefix = $projectReal.DIRECTORY_SEPARATOR;
+        if (str_starts_with($entryReal, $prefix)) {
+            return [
+                'exec_cwd' => $projectReal,
+                'entry_arg' => substr($entryReal, strlen($prefix)),
+            ];
+        }
+
+        return [
+            'exec_cwd' => dirname($entryReal),
+            'entry_arg' => basename($entryReal),
+        ];
+    }
+
+    public static function renderJitLauncherScript(string $repoRoot, string $projectDir, string $entryPath): string
+    {
+        $repoRoot = realpath($repoRoot) ?: $repoRoot;
+        $projectDir = realpath($projectDir) ?: $projectDir;
+        $entryPath = realpath($entryPath) ?: $entryPath;
+        $context = self::resolveJitExecContext($projectDir, $entryPath);
+        $jitBin = $repoRoot.'/bin/jit.php';
+
+        $lines = [
+            '#!/bin/bash',
+            '# Generated by phpc build --project --jit (issue #1801)',
+            'set -euo pipefail',
+            'REPO_ROOT='.self::shellQuote($repoRoot),
+            'PROJECT_ROOT='.self::shellQuote($projectDir),
+            'EXEC_CWD='.self::shellQuote($context['exec_cwd']),
+            'ENTRY_SCRIPT='.self::shellQuote($context['entry_arg']),
+            'JIT_BIN='.self::shellQuote($jitBin),
+            'if [[ -f "${REPO_ROOT}/script/php-env.sh" ]]; then',
+            '  # shellcheck disable=SC1091',
+            '  source "${REPO_ROOT}/script/php-env.sh"',
+            'fi',
+            'cd "${EXEC_CWD}"',
+            'exec "${PHP_BIN:-php}" "${JIT_BIN}" "${ENTRY_SCRIPT}" "$@"',
+        ];
+
+        return implode("\n", $lines)."\n";
+    }
+
+    public static function formatJitBuildSuccessTrailer(
+        string $projectDir,
+        string $launcherPath,
+        string $entryPath
+    ): string {
+        $root = ProjectManifest::resolveProjectDir($projectDir);
+        if (null === $root) {
+            return '';
+        }
+        $launcherRel = self::displayPath($root, $launcherPath);
+        $entry = ProjectManifest::resolveEntryPath($root);
+        $cgi = self::defaultExecuteProbeCgiEnv($root, $entry);
+        $prefix = '';
+        foreach (['QUERY_STRING', 'REQUEST_METHOD'] as $key) {
+            if (isset($cgi[$key])) {
+                $prefix .= $key.'='.$cgi[$key].' ';
+            }
+        }
+        $launcherReal = realpath($launcherPath) ?: $launcherPath;
+        $rootReal = realpath($root) ?: $root;
+        $probeTarget = str_starts_with($launcherReal, $rootReal.DIRECTORY_SEPARATOR)
+            ? './'.$launcherRel
+            : $launcherReal;
+        $probe = trim($prefix).$probeTarget.' | wc -c';
+
+        return implode("\n", [
+            '',
+            '---',
+            "JIT launcher {$launcherRel} (runs bin/jit.php on entry). Quick execute probe:",
+            "  cd ".basename($root)." && {$probe}",
+            '  # or: phpc run --project . --cgi-env QUERY_STRING=route=home --cgi-env REQUEST_METHOD=GET',
+            'Requires LLVM 9 + JIT MCJIT probe (phpc doctor --jit-probe).',
+            '---',
+            '',
+        ]);
+    }
+
+    /**
+     * @param array{exit: int, stdout: string, stderr: string, output: ?string} $result
+     */
+    public static function emitJitBuildOutput(array $result, bool $verbose): void
+    {
+        if ('' !== $result['stdout']) {
+            fwrite(STDOUT, $result['stdout']);
+            if (!str_ends_with($result['stdout'], "\n")) {
+                fwrite(STDOUT, "\n");
+            }
+        }
+        if ('' !== $result['stderr'] && ($verbose || 0 === $result['exit'])) {
+            fwrite(STDERR, $result['stderr']);
+            if (!str_ends_with($result['stderr'], "\n")) {
+                fwrite(STDERR, "\n");
+            }
+        } elseif ('' !== $result['stderr'] && 0 !== $result['exit']) {
+            fwrite(STDERR, $result['stderr']);
+            if (!str_ends_with($result['stderr'], "\n")) {
+                fwrite(STDERR, "\n");
+            }
+        }
+    }
+
+    private static function shellQuote(string $value): string
+    {
+        return "'".str_replace("'", "'\\''", $value)."'";
     }
 }

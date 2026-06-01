@@ -12,7 +12,10 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** preg_replace() — VM via VmPreg; JIT/AOT via __compiler_preg_replace (issue #1176). */
+/**
+ * preg_replace() — VM via VmPreg; JIT/AOT via __compiler_preg_replace (issue #1176).
+ * Optional $limit (4th arg): VM (#3605); JIT/AOT deferred until native runtime supports it.
+ */
 final class preg_replace extends Internal
 {
     public function __construct()
@@ -23,9 +26,9 @@ final class preg_replace extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if (3 !== $argc) {
+        if ($argc < 3 || $argc > 4) {
             throw new \LogicException(
-                'preg_replace() requires exactly three arguments in this compiler build'
+                'preg_replace() expects 3 to 4 arguments in this compiler build'
             );
         }
         $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_replace() pattern');
@@ -36,7 +39,17 @@ final class preg_replace extends Internal
                 'preg_replace() subject must be a string in this compiler build'
             );
         }
-        $result = VmPreg::pregReplace($pattern, $replacement, $subjectVar->toString());
+        $limit = -1;
+        if (4 === $argc) {
+            $limitVar = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $limitVar->type) {
+                throw new \LogicException(
+                    'preg_replace() limit must be an integer in this compiler build'
+                );
+            }
+            $limit = $limitVar->toInt();
+        }
+        $result = VmPreg::pregReplace($pattern, $replacement, $subjectVar->toString(), $limit);
         if (null === $frame->returnVar) {
             return;
         }
@@ -49,9 +62,15 @@ final class preg_replace extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (3 !== \count($args)) {
+        $argc = \count($args);
+        if ($argc < 3 || $argc > 4) {
             throw new \LogicException(
-                'preg_replace() requires exactly three arguments in this compiler build'
+                'preg_replace() expects 3 to 4 arguments in this compiler build'
+            );
+        }
+        if ($argc >= 4) {
+            throw new \LogicException(
+                'preg_replace() limit is not supported in JIT/AOT in this compiler build (issue #3605)'
             );
         }
 
