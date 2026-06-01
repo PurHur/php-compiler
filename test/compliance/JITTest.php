@@ -410,8 +410,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'dnf_')) {
                 continue;
             }
-            // highlight_string/highlight_file VM-only (#3164).
-            if (str_contains($name, 'highlight_string')) {
+            // highlight_string/highlight_file/show_source VM-only (#3164, #3447).
+            if (str_contains($name, 'highlight_string')
+                || str_contains($name, 'highlight_file')
+                || str_contains($name, 'show_source')) {
                 continue;
             }
             // ob_get_contents/ob_end_clean/ob_get_length VM-only until LLVM ob read API (#3236).

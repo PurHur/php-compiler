@@ -270,6 +270,7 @@ class Module extends ModuleAbstract
             new htmlspecialchars_decode(),
             new highlight_string(),
             new highlight_file(),
+            new show_source(),
             new htmlentities(),
             new html_entity_decode(),
             new get_html_translation_table(),
