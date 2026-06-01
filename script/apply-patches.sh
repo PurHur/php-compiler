@@ -1464,6 +1464,33 @@ PY
   echo "Applied php-types-incdec-type.patch (overlay)"
 }
 
+apply_php_types_throw_expr_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  if grep -q "case 'Expr_Throw':" "$target" 2>/dev/null; then
+    echo "Skip php-types-throw-expr.patch (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+old = """            case 'Expr_Exit':
+            case 'Iterator_Reset':
+                return [Type::null()];"""
+new = """            case 'Expr_Exit':
+            case 'Expr_Throw':
+            case 'Iterator_Reset':
+                return [Type::null()];"""
+if old not in text:
+    sys.stderr.write("php-types-throw-expr: TypeReconstructor Expr_Exit anchor not found\n")
+    raise SystemExit(1)
+path.write_text(text.replace(old, new, 1))
+PY
+  echo "Applied php-types-throw-expr.patch (overlay)"
+}
+
 apply_php_types_str_bool_fns_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php"
   if grep -q "'str_contains' => \['bool'" "$target" 2>/dev/null; then
@@ -2195,6 +2222,10 @@ apply_patch() {
   fi
   if [[ "$(basename "$patch")" == "php-types-incdec-type.patch" ]]; then
     apply_php_types_incdec_type_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-types-throw-expr.patch" ]]; then
+    apply_php_types_throw_expr_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-types-fromdecl-junk-fragments.patch" ]]; then
