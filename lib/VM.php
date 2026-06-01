@@ -2038,7 +2038,14 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
+                    $forWrite = $frame->pos < $frame->block->nOpCodes
+                        && OpCode::TYPE_ASSIGN === $frame->block->opCodes[$frame->pos]->type
+                        && (int) $frame->block->opCodes[$frame->pos]->arg2 === (int) $op->arg1;
                     if ($propertyObject->hasProperty($name)) {
+                        if ($forWrite) {
+                            $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
+                            break;
+                        }
                         $hookValue = $this->fetchPropertyWithHooks($propertyObject, $name, $frame);
                         if (null !== $hookValue) {
                             $result->copyFrom($hookValue);
@@ -2047,9 +2054,6 @@ restart:
                         }
                         break;
                     }
-                    $forWrite = $frame->pos < $frame->block->nOpCodes
-                        && OpCode::TYPE_ASSIGN === $frame->block->opCodes[$frame->pos]->type
-                        && (int) $frame->block->opCodes[$frame->pos]->arg2 === (int) $op->arg1;
                     if ($forWrite) {
                         $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
                         break;
@@ -3304,13 +3308,12 @@ restart:
             return false;
         }
         $meta = $this->classPropertyMeta($owner, $propName);
-        if (null === $meta || null === $meta->setHookMethodLc) {
+        $setLc = $meta?->setHookMethodLc
+            ?? strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($propName));
+        if (!isset($owner->class->methods[$setLc])) {
             return false;
         }
-        if (!isset($owner->class->methods[$meta->setHookMethodLc])) {
-            return false;
-        }
-        $func = $owner->class->methods[$meta->setHookMethodLc];
+        $func = $owner->class->methods[$setLc];
         if (!$func instanceof Func\PHP) {
             return false;
         }
@@ -3331,13 +3334,12 @@ restart:
             return null;
         }
         $meta = $this->classPropertyMeta($object, $name);
-        if (null === $meta || null === $meta->getHookMethodLc) {
+        $getLc = $meta?->getHookMethodLc
+            ?? strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($name));
+        if (!isset($object->class->methods[$getLc])) {
             return null;
         }
-        if (!isset($object->class->methods[$meta->getHookMethodLc])) {
-            return null;
-        }
-        $func = $object->class->methods[$meta->getHookMethodLc];
+        $func = $object->class->methods[$getLc];
         if (!$func instanceof Func\PHP) {
             return null;
         }
@@ -3351,7 +3353,7 @@ restart:
     {
         $savedStack = $this->context->swapRunStack(null);
         try {
-            $child = $func->getFrame($this->context, $parentFrame);
+            $child = $func->getFrame($this->context, null);
             $child->propertyHookRawProperty = $rawProperty;
             $child->calledArgs = $args;
             if (

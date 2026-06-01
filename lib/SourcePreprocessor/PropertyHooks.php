@@ -150,6 +150,18 @@ final class PropertyHooks
         $methods = [];
         $rest = trim($hookSource);
         while ('' !== $rest) {
+            if (preg_match('/^get\s*=>\s*/s', $rest)) {
+                $rest = preg_replace('/^get\s*=>\s*/', '', $rest, 1) ?? $rest;
+                [$expr, $rest] = $this->takeUntilSemicolon($rest);
+                $body = '{ return '.$expr.'; }';
+                $method = self::GET_METHOD_PREFIX.$prop;
+                $methods[] = "    public function {$method}() {$body}";
+                if (!isset($this->registry[$lcClass][$prop])) {
+                    $this->registry[$lcClass][$prop] = [];
+                }
+                $this->registry[$lcClass][$prop]['get'] = $method;
+                continue;
+            }
             if (preg_match('/^get\s*\{/s', $rest)) {
                 $rest = preg_replace('/^get\s*/', '', $rest, 1) ?? $rest;
                 [$body, $rest] = $this->takeBraceBody($rest);
@@ -159,6 +171,26 @@ final class PropertyHooks
                     $this->registry[$lcClass][$prop] = [];
                 }
                 $this->registry[$lcClass][$prop]['get'] = $method;
+                continue;
+            }
+            if (preg_match('/^set\s*=>\s*/s', $rest)) {
+                $rest = preg_replace('/^set\s*=>\s*/', '', $rest, 1) ?? $rest;
+                [$stmt, $rest] = $this->takeUntilSemicolon($rest);
+                $stmt = rtrim($stmt);
+                if ('' !== $stmt && !str_ends_with($stmt, ';')) {
+                    $stmt .= ';';
+                }
+                $backingWrite = '$this->'.$prop.' = $value;';
+                if (!preg_match('/\$this\s*->\s*'.preg_quote($prop, '/').'\s*=/', $stmt)) {
+                    $stmt = '' === $stmt ? $backingWrite : $stmt.' '.$backingWrite;
+                }
+                $body = '{ '.$stmt.' }';
+                $method = self::SET_METHOD_PREFIX.$prop;
+                $methods[] = "    public function {$method}(\$value) {$body}";
+                if (!isset($this->registry[$lcClass][$prop])) {
+                    $this->registry[$lcClass][$prop] = [];
+                }
+                $this->registry[$lcClass][$prop]['set'] = $method;
                 continue;
             }
             if (preg_match('/^set\s*\(/s', $rest)) {
@@ -181,6 +213,57 @@ final class PropertyHooks
         }
 
         return $methods;
+    }
+
+    /**
+     * @return array{0: string, 1: string} [expression/statement, remainder after ';']
+     */
+    private function takeUntilSemicolon(string $source): array
+    {
+        $source = ltrim($source);
+        $len = strlen($source);
+        $depthParen = 0;
+        $depthBrace = 0;
+        $depthBracket = 0;
+        $inString = false;
+        $stringChar = '';
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $source[$i];
+            if ($inString) {
+                if ('\\' === $ch) {
+                    ++$i;
+                    continue;
+                }
+                if ($ch === $stringChar) {
+                    $inString = false;
+                }
+                continue;
+            }
+            if ('"' === $ch || '\'' === $ch) {
+                $inString = true;
+                $stringChar = $ch;
+                continue;
+            }
+            if ('(' === $ch) {
+                ++$depthParen;
+            } elseif (')' === $ch && $depthParen > 0) {
+                --$depthParen;
+            } elseif ('{' === $ch) {
+                ++$depthBrace;
+            } elseif ('}' === $ch && $depthBrace > 0) {
+                --$depthBrace;
+            } elseif ('[' === $ch) {
+                ++$depthBracket;
+            } elseif (']' === $ch && $depthBracket > 0) {
+                --$depthBracket;
+            } elseif (';' === $ch && 0 === $depthParen && 0 === $depthBrace && 0 === $depthBracket) {
+                $chunk = rtrim(substr($source, 0, $i));
+
+                return [$chunk, ltrim(substr($source, $i + 1))];
+            }
+        }
+
+        return [rtrim($source), ''];
     }
 
     /**

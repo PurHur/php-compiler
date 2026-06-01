@@ -4553,7 +4553,8 @@ class JIT {
             if (str_contains($methodLc, '::')) {
                 $methodLc = substr($methodLc, strrpos($methodLc, '::') + 2);
             }
-            $this->context->jitPropertyHookRawProperty = SourcePreprocessor\PropertyHooks::propertyNameFromSetHookMethod($methodLc);
+            $this->context->jitPropertyHookRawProperty = SourcePreprocessor\PropertyHooks::propertyNameFromSetHookMethod($methodLc)
+                ?? SourcePreprocessor\PropertyHooks::propertyNameFromGetHookMethod($methodLc);
         }
         if ([] !== $args) {
             if ($this->instanceMethodUsesThis($block)) {
