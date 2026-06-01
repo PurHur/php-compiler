@@ -14,12 +14,14 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * strrpos() for two strings (subset of PHP; non-empty needle, offset starts search suffix).
+ * strrpos() for two strings (subset of PHP; non-empty needle; Zend offset window).
  */
 final class strrpos extends Internal
 {
@@ -61,16 +63,36 @@ final class strrpos extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('strrpos() requires two or three arguments');
         }
-        if (3 === $argc && JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-            throw new \LogicException('strrpos() offset must be an integer in this compiler build');
+        $hayLit = JitStringArg::compileTimeLiteral($args[0]);
+        $needleLit = JitStringArg::compileTimeLiteral($args[1]);
+        $offsetLit = 3 === $argc ? self::tryCompileTimeInt($context, $args[2]) : 0;
+        if (null !== $hayLit && null !== $needleLit && null !== $offsetLit) {
+            $pos = VmString::strrpos($hayLit, $needleLit, $offsetLit);
+
+            return $context->constantFromInteger(
+                false === $pos ? JitStrrpos::NOT_FOUND : $pos,
+                'int64'
+            );
         }
 
         $hay = $this->jitString($context, $args[0], 'strrpos() argument #1');
         $needle = $this->jitString($context, $args[1], 'strrpos() argument #2');
         $offset = 3 === $argc
-            ? $context->builder->truncOrBitCast($context->helper->loadValue($args[2]), $context->getTypeFromString('int64'))
+            ? JitLongArg::lower($context, $args[2], 'strrpos() offset')
             : null;
 
         return JitStrrpos::find($context, $hay, $needle, $offset);
+    }
+
+    private static function tryCompileTimeInt(Context $context, JITVariable $arg): ?int
+    {
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($arg->value->value)) {
+                return (int) $lib->LLVMConstIntGetSExtValue($arg->value->value);
+            }
+        }
+
+        return null;
     }
 }

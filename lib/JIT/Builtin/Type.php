@@ -177,6 +177,15 @@ class Type extends Builtin {
         );
         $fnUtf8Strlen = $this->context->module->addFunction('__compiler_utf8_strlen', $fntypeUtf8Strlen);
         $this->context->registerFunction('__compiler_utf8_strlen', $fnUtf8Strlen);
+        $fntypeStrrpos = $this->context->context->functionType(
+            $i64,
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('__string__*'),
+            $i64
+        );
+        $fnStrrpos = $this->context->module->addFunction('__compiler_strrpos', $fntypeStrrpos);
+        $this->context->registerFunction('__compiler_strrpos', $fnStrrpos);
         HttpResponseCode::implement($this->context);
         SessionId::implement($this->context);
         SessionName::implement($this->context);
