@@ -323,6 +323,7 @@ class Module extends ModuleAbstract
             new pathinfo(),
             new file_get_contents(),
             new readfile(),
+            new readline(),
             new file_put_contents(),
             new file_exists(),
             new filesize(),
