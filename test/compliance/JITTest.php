@@ -346,7 +346,7 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'pre_post_inc')) {
                 continue;
             }
-            // Property hooks: LLVM dispatch lands in #3723; MCJIT still crashes on hook classes (#3145).
+            // Property hooks: raw-write guard #4025; MCJIT execute gated by jit-runtime-probe (#98).
             if (str_contains($name, 'property_hook')) {
                 continue;
             }

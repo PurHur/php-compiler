@@ -31,7 +31,7 @@ final class PropertyHookDispatch
         if (null === $lvalue->objectPropertyReceiver) {
             return false;
         }
-        if (self::isRawHookWrite($lvalue->objectPropertyName, $enclosingBlock)) {
+        if (self::isRawHookWrite($context, $lvalue->objectPropertyName, $enclosingBlock)) {
             return false;
         }
         $className = $lvalue->objectPropertyClassName ?? 'stdclass';
@@ -66,7 +66,7 @@ final class PropertyHookDispatch
         string $propertyName,
         ?Block $enclosingBlock
     ): ?Value {
-        if (self::isRawHookWrite($propertyName, $enclosingBlock)) {
+        if (self::isRawHookWrite($context, $propertyName, $enclosingBlock)) {
             return null;
         }
         $hookLc = strtolower(PropertyHooks::getHookMethodName($propertyName));
@@ -90,20 +90,35 @@ final class PropertyHookDispatch
         return $hookValue;
     }
 
-    private static function isRawHookWrite(string $propertyName, ?Block $block): bool
+    private static function isRawHookWrite(Context $context, string $propertyName, ?Block $block): bool
     {
+        if (null !== $context->jitPropertyHookRawProperty
+            && $context->jitPropertyHookRawProperty === $propertyName) {
+            return true;
+        }
+        $block = $context->jitCurrentBlock ?? $block;
         if (null === $block || null === $block->func) {
             return false;
         }
         $funcName = strtolower($block->func->name);
+        if (str_contains($funcName, '::')) {
+            $funcName = substr($funcName, strrpos($funcName, '::') + 2);
+        }
+        $rawFromMethod = PropertyHooks::propertyNameFromSetHookMethod($funcName);
+        if (null !== $rawFromMethod && $rawFromMethod === $propertyName) {
+            return true;
+        }
         $wantSet = strtolower(PropertyHooks::setHookMethodName($propertyName));
         if ($funcName === $wantSet) {
             return true;
         }
         if (null !== $block->func->class) {
-            $qualified = strtolower($block->func->class->value.'::'.$wantSet);
+            $classVal = $block->func->class->value ?? null;
+            if (is_string($classVal) && '' !== $classVal) {
+                $qualified = strtolower($classVal.'::'.$wantSet);
 
-            return $funcName === $qualified;
+                return $funcName === $qualified || strtolower($block->func->name) === $qualified;
+            }
         }
 
         return false;
