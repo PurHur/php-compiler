@@ -946,4 +946,48 @@ final class VmReflection
 
         return $filterArg->toInt();
     }
+
+    /**
+     * Build a constructed ReflectionEnumUnitCase for an enum case (#4121).
+     */
+    public static function newReflectionEnumUnitCase(
+        Context $ctx,
+        ClassEntry $enumEntry,
+        string $caseName
+    ): \PHPCompiler\VM\ObjectEntry {
+        $reucClass = $ctx->classes[\PHPCompiler\VM\ReflectionSupport::REFLECTION_ENUM_UNIT_CASE] ?? null;
+        if (null === $reucClass) {
+            throw new \LogicException('ReflectionEnumUnitCase is not registered in this compiler build');
+        }
+        $caseLc = strtolower($caseName);
+        if (!isset($enumEntry->enumCaseCanonicalNames[$caseLc])) {
+            throw new \LogicException('Enum '.$enumEntry->name.' has no case named '.$caseName);
+        }
+        $obj = new \PHPCompiler\VM\ObjectEntry($reucClass);
+        $obj->constructed = true;
+        $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME)->string($enumEntry->name);
+        $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_ENUM_CASE_NAME)->string(
+            $enumEntry->enumCaseCanonicalNames[$caseLc]
+        );
+
+        return $obj;
+    }
+
+    /**
+     * ReflectionEnum::getCases() result array (#4121).
+     */
+    public static function reflectionEnumCasesArray(Context $ctx, ClassEntry $enumEntry): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach ($enumEntry->enumCases as $case) {
+            $obj = self::newReflectionEnumUnitCase($ctx, $enumEntry, $case['name']);
+            $slot = new Variable(Variable::TYPE_OBJECT);
+            $slot->object($obj);
+            $ht->append($slot);
+        }
+
+        return $result;
+    }
 }

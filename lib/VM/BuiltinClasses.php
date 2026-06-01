@@ -32,6 +32,11 @@ use PHPCompiler\VM\Builtin\ReflectionClassNewLazyProxy;
 use PHPCompiler\VM\Builtin\ReflectionConstantConstruct;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetName;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetValue;
+use PHPCompiler\VM\Builtin\ReflectionEnumConstruct;
+use PHPCompiler\VM\Builtin\ReflectionEnumGetCase;
+use PHPCompiler\VM\Builtin\ReflectionEnumGetCases;
+use PHPCompiler\VM\Builtin\ReflectionEnumGetName;
+use PHPCompiler\VM\Builtin\ReflectionEnumIsBacked;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseConstruct;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetName;
@@ -261,6 +266,21 @@ final class BuiltinClasses
         $ctx->classes[ReflectionSupport::REFLECTION_CONSTANT] = $rconst;
 
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS] = $rc;
+
+        $renum = new ClassEntry('ReflectionEnum');
+        $renum->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
+        $renum->constructor = new ReflectionEnumConstruct();
+        $renum->methods['__construct'] = $renum->constructor;
+        $renum->methodVisibility['__construct'] = $pub;
+        $renum->methods['getname'] = new ReflectionEnumGetName();
+        $renum->methodVisibility['getname'] = $pub;
+        $renum->methods['isbacked'] = new ReflectionEnumIsBacked();
+        $renum->methodVisibility['isbacked'] = $pub;
+        $renum->methods['getcases'] = new ReflectionEnumGetCases();
+        $renum->methodVisibility['getcases'] = $pub;
+        $renum->methods['getcase'] = new ReflectionEnumGetCase();
+        $renum->methodVisibility['getcase'] = $pub;
+        $ctx->classes[ReflectionSupport::REFLECTION_ENUM] = $renum;
 
         $reuc = new ClassEntry('ReflectionEnumUnitCase');
         $reuc->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
