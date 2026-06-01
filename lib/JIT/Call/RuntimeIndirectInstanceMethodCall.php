@@ -117,7 +117,10 @@ final class RuntimeIndirectInstanceMethodCall implements Call
             $proxy = $this->candidatesByClassId[$id];
             assert($proxy instanceof Call);
             $raw = $proxy->call($context, ...$callArgs);
-            $context->builder->store($raw, $resultSlot);
+            $context->builder->store(
+                JitValueBox::coerceToValuePtrForStore($context, $raw),
+                $resultSlot
+            );
             $context->builder->branch($merge);
         }
 

@@ -80,6 +80,13 @@ final class Variable {
     /** Boxed foreach / SplObjectStorage offset key for $arr[$key] = … (issue #86). */
     public ?Variable $writableValueBoxKey = null;
 
+    /** Writable ArrayAccess $obj[$key] assignment target (#3331, #4012). */
+    public ?Variable $writableArrayAccessReceiver = null;
+
+    public ?Variable $writableArrayAccessKey = null;
+
+    public bool $isArrayAccessWritableOffset = false;
+
     /** String literal value when this variable represents a constant string operand. */
     public ?string $compileTimeString = null;
 
