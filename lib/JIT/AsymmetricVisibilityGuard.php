@@ -85,7 +85,7 @@ final class AsymmetricVisibilityGuard
         assert($fn instanceof \PHPLLVM\Value\Function_);
         $entry = $context->builder->getInsertBlock();
         $failBlock = $fn->appendBasicBlock('asymmetric_violation');
-        $continueBlock = $fn->appendBasicBlock('asymmetric_continue');
+        $exitBlock = $fn->appendBasicBlock('asymmetric_guard_exit');
 
         $context->builder->positionAtEnd($entry);
         $context->builder->branch($failBlock);
@@ -104,10 +104,11 @@ final class AsymmetricVisibilityGuard
                 $msgCStr,
                 $msgLen
             );
-            $context->builder->branch($continueBlock);
+            // returnVoid after pending raise — same as ReadonlyClassGuard (#3149, #4020).
+            $context->builder->returnVoid();
         }
 
-        $context->builder->positionAtEnd($continueBlock);
+        $context->builder->positionAtEnd($exitBlock);
     }
 
     private static function isSubclassOf(Object_ $object, string $childLc, string $parentLc): bool

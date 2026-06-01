@@ -406,8 +406,8 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gettimeofday')) {
                 continue;
             }
-            // Uncaught asymmetric_visibility fatal: MCJIT execute unstable on property fetch (#4029, #98).
-            if (str_contains($name, 'asymmetric_visibility') && !str_contains($name, 'jit_try')) {
+            // Uncaught asymmetric_visibility fatal: MCJIT execute unstable (#4029, #98); *_jit.phpt uses try/catch (#4020).
+            if (str_contains($name, 'asymmetric_visibility') && !str_contains($name, 'jit')) {
                 continue;
             }
             // DNF typed properties: MCJIT segfault on assign (pre-#4008); params/returns JIT OK.
