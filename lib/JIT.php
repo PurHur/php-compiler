@@ -5016,7 +5016,8 @@ class JIT {
                         $value = JIT\IteratorHelper::compileValueByRef(
                             $this->context,
                             $array,
-                            self::foreachContainerUserType($arrayOp)
+                            self::foreachContainerUserType($arrayOp),
+                            $this
                         );
                         $this->context->setVariableOp($block->getOperand($op->arg1), $value);
                         break;

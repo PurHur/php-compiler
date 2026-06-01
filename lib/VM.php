@@ -2330,9 +2330,15 @@ restart:
                     $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
                     if ($this->isForeachObjectIteratorSlot((int) $op->arg2)) {
                         if ((bool) $op->arg3) {
-                            throw new \LogicException(
-                                'foreach by-reference over Iterator objects is not supported in this compiler build'
+                            $catchFrame = $this->dispatchVmError(
+                                'An iterator cannot be used with foreach by reference',
+                                $frame
                             );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
                         }
                         $value = $this->invokeForeachInstanceMethod($frame, $container, 'current');
                         $frame->scope[$op->arg1]->copyFrom($value);
