@@ -112,6 +112,31 @@ final class VmPreg
         return $result;
     }
 
+    /**
+     * @param string|list<string> $subject
+     *
+     * @return string|list<string>|false|null
+     */
+    public static function pregFilter(
+        string $pattern,
+        string $replacement,
+        string|array $subject,
+        int $limit = -1,
+        int $flags = 0
+    ) {
+        if (strlen($pattern) > self::MAX_PATTERN_BYTES) {
+            return false;
+        }
+
+        $result = \preg_filter($pattern, $replacement, $subject, $limit, $flags);
+        self::syncLastErrorFromHost();
+        if (false === $result) {
+            return false;
+        }
+
+        return $result;
+    }
+
     public static function pregReplace(
         string $pattern,
         string $replacement,

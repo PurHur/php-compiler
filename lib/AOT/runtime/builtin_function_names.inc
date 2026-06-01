@@ -306,6 +306,7 @@ static const char *phpc_builtin_functions[] = {
     "phpversion",
     "pi",
     "pow",
+    "preg_filter",
     "preg_grep",
     "preg_last_error",
     "preg_last_error_msg",

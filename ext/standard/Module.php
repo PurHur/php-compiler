@@ -214,6 +214,7 @@ class Module extends ModuleAbstract
             new preg_match(),
             new preg_match_all(),
             new preg_grep(),
+            new preg_filter(),
             new preg_replace(),
             new preg_replace_callback(),
             new preg_split(),
