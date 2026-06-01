@@ -41,6 +41,10 @@ static int phpc_ini_error_reporting = 32767;
 static int phpc_ini_display_errors = 1;
 static char phpc_ini_memory_limit[64] = "128M";
 
+/** Nesting depth for `@` (issue #3546 / #4070). */
+static int phpc_silence_depth = 0;
+static int phpc_silence_saved_error_reporting = 0;
+
 static void ini_write_bool_false(__value__ *out)
 {
     if (NULL == out) {
@@ -151,6 +155,32 @@ void __compiler_error_reporting(int has_new_level, long long new_level, __value_
     }
     if (NULL != out) {
         __value__writeLong(out, old);
+    }
+}
+
+/** Non-zero when errno should be emitted (Zend EG(error_reporting) & level). */
+int __compiler_phpc_error_level_enabled(int level)
+{
+    return (phpc_ini_error_reporting & level) != 0;
+}
+
+void __compiler_begin_silence(void)
+{
+    if (0 == phpc_silence_depth) {
+        phpc_silence_saved_error_reporting = phpc_ini_error_reporting;
+        phpc_ini_error_reporting = 0;
+    }
+    ++phpc_silence_depth;
+}
+
+void __compiler_end_silence(void)
+{
+    if (phpc_silence_depth <= 0) {
+        return;
+    }
+    --phpc_silence_depth;
+    if (0 == phpc_silence_depth) {
+        phpc_ini_error_reporting = phpc_silence_saved_error_reporting;
     }
 }
 

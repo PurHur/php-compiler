@@ -144,6 +144,14 @@ class Type extends Builtin {
         );
         $fnErrorReporting = $this->context->module->addFunction('__compiler_error_reporting', $fntypeErrorReporting);
         $this->context->registerFunction('__compiler_error_reporting', $fnErrorReporting);
+        $fntypeSilence = $this->context->context->functionType(
+            $this->context->getTypeFromString('void'),
+            false
+        );
+        $fnBeginSilence = $this->context->module->addFunction('__compiler_begin_silence', $fntypeSilence);
+        $this->context->registerFunction('__compiler_begin_silence', $fnBeginSilence);
+        $fnEndSilence = $this->context->module->addFunction('__compiler_end_silence', $fntypeSilence);
+        $this->context->registerFunction('__compiler_end_silence', $fnEndSilence);
         CompactApplyArg::implement($this->context);
         $fntypeStripTags = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),

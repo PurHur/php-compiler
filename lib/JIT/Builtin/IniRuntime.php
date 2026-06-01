@@ -23,10 +23,14 @@ final class IniRuntime
         $get = $context->module->getNamedFunction('__compiler_ini_get');
         $set = $context->module->getNamedFunction('__compiler_ini_set');
         $errorReporting = $context->module->getNamedFunction('__compiler_error_reporting');
+        $beginSilence = $context->module->getNamedFunction('__compiler_begin_silence');
+        $endSilence = $context->module->getNamedFunction('__compiler_end_silence');
         if (
             null !== $get && $get->countBasicBlocks() > 0
             && null !== $set && $set->countBasicBlocks() > 0
             && null !== $errorReporting && $errorReporting->countBasicBlocks() > 0
+            && null !== $beginSilence && $beginSilence->countBasicBlocks() > 0
+            && null !== $endSilence && $endSilence->countBasicBlocks() > 0
         ) {
             return;
         }
@@ -45,12 +49,16 @@ final class IniRuntime
         $get = $context->module->getNamedFunction('__compiler_ini_get');
         $set = $context->module->getNamedFunction('__compiler_ini_set');
         $errorReporting = $context->module->getNamedFunction('__compiler_error_reporting');
-        if (null === $get || null === $set || null === $errorReporting) {
-            throw new \LogicException('__compiler_ini_get/set/error_reporting missing after ini runtime bitcode link');
+        $beginSilence = $context->module->getNamedFunction('__compiler_begin_silence');
+        $endSilence = $context->module->getNamedFunction('__compiler_end_silence');
+        if (null === $get || null === $set || null === $errorReporting || null === $beginSilence || null === $endSilence) {
+            throw new \LogicException('__compiler_ini_get/set/error_reporting/silence missing after ini runtime bitcode link');
         }
         $context->registerFunction('__compiler_ini_get', $get);
         $context->registerFunction('__compiler_ini_set', $set);
         $context->registerFunction('__compiler_error_reporting', $errorReporting);
+        $context->registerFunction('__compiler_begin_silence', $beginSilence);
+        $context->registerFunction('__compiler_end_silence', $endSilence);
     }
 
     private static function ensureBitcode(): string
