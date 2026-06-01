@@ -46,10 +46,12 @@ final class LooseNumericStringEqualsTest extends TestCase
         $this->assertFalse(self::intVar(1)->equals(self::strVar('')));
     }
 
-    public function testScientificNotationStringNotLooselyEqualToInteger(): void
+    public function testScientificNotationStringLooselyEqualToIntegerWhenCoercedToZero(): void
     {
-        $this->assertFalse(self::intVar(0)->equals(self::strVar('0e123')));
-        $this->assertFalse(self::strVar('0e123')->equals(self::intVar(0)));
+        $this->assertTrue(self::intVar(0)->equals(self::strVar('0e5')));
+        $this->assertTrue(self::strVar('0e5')->equals(self::intVar(0)));
+        $this->assertTrue(self::intVar(0)->equals(self::strVar('0e123')));
+        $this->assertTrue(self::strVar('0e123')->equals(self::intVar(0)));
         $this->assertFalse(self::intVar(1)->equals(self::strVar('1abc')));
     }
 }
