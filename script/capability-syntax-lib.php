@@ -208,7 +208,8 @@ function syntaxRowDefinitions(): array
             'issue' => 72,
             'aot' => true,
             'notes' => [
-                'VM ClosureState + __invoke; use() by-value and by-ref (#3081, #3108); array_map/filter/usort callbacks (#3086)',
+                'VM ClosureState + __invoke; Closure::bind/bindTo (#3266, #3673); JIT bindTo/bind + bound invoke via ClosureBindHelper (#4192)',
+                'use() by-value and by-ref (#3081, #3108); array_map/filter/usort callbacks (#3086)',
                 'JIT ClosureHelper: TYPE_CLOSURE + use() value/ref IR (#3092, #3108); use ($x) MCJIT snapshot via aliasVariableOpFromSlot (#2483); use (&$x) bin/jit.php VM-fallback until MCJIT execute stable (#72, #2483); indirect $arr[0]() via __closure_target (#3089, #3092)',
                 'AOT user scripts: real ClosureHelper lowering via PHP_COMPILER_AOT_USER_SCRIPT (#3725); use (&$x) AOT fixture closure_use_byref.phpt (#2483); bootstrap spine still stubs null',
                 'bin/jit.php MCJIT execute still probe-dependent (#98)',
