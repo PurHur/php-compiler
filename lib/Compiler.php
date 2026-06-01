@@ -1966,7 +1966,6 @@ class Compiler {
                     $declared = null !== $propertyDeclName
                         ? Type::fromDecl($propertyDeclName)
                         : $this->typeFromPropertyDecl($child);
-                    AttributeNames::assertNoDuplicates(AttributeNames::fromOp($child));
                     if ($child->static && null !== $this->currentClassStaticPropertyCompile) {
                         $staticPropName = $this->staticNameFromOperand($child->name);
                         if (null !== $staticPropName) {
@@ -2025,6 +2024,9 @@ class Compiler {
                         $declare->propertyVisibility = MethodVisibility::mask($child->visibility);
                         $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($child);
                     }
+                    $declare->attributeNames = AttributeNames::fromOp($child);
+                    $this->assignAttributeMetadata($declare, $child);
+                    AttributeNames::assertNoDuplicates($declare->attributeNames);
                     $result->addOpCode($declare);
                     break;
                 case Op\Stmt\ClassMethod::class:

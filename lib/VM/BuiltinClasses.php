@@ -28,8 +28,10 @@ use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethod;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethods;
 use PHPCompiler\VM\Builtin\ReflectionClassGetProperties;
+use PHPCompiler\VM\Builtin\ReflectionClassGetReflectionConstant;
 use PHPCompiler\VM\Builtin\ReflectionClassNewLazyProxy;
 use PHPCompiler\VM\Builtin\ReflectionConstantConstruct;
+use PHPCompiler\VM\Builtin\ReflectionConstantGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetName;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetValue;
 use PHPCompiler\VM\Builtin\ReflectionEnumConstruct;
@@ -55,6 +57,7 @@ use PHPCompiler\VM\Builtin\ReflectionNamedTypeIsBuiltin;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetType;
 use PHPCompiler\VM\Builtin\ReflectionPropertyConstruct;
+use PHPCompiler\VM\Builtin\ReflectionPropertyGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetName;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetValue;
 use PHPCompiler\VM\Builtin\ReflectionTypeAllowsNull;
@@ -220,6 +223,8 @@ final class BuiltinClasses
         $rc->methodVisibility['getproperties'] = $pub;
         $rc->methods['getmethods'] = new ReflectionClassGetMethods();
         $rc->methodVisibility['getmethods'] = $pub;
+        $rc->methods['getreflectionconstant'] = new ReflectionClassGetReflectionConstant();
+        $rc->methodVisibility['getreflectionconstant'] = $pub;
         $rc->methods['newlazyproxy'] = new ReflectionClassNewLazyProxy();
         $rc->methodVisibility['newlazyproxy'] = $pub;
 
@@ -233,6 +238,8 @@ final class BuiltinClasses
         $rp->methodVisibility['getname'] = $pub;
         $rp->methods['getvalue'] = new ReflectionPropertyGetValue();
         $rp->methodVisibility['getvalue'] = $pub;
+        $rp->methods['getattributes'] = new ReflectionPropertyGetAttributes();
+        $rp->methodVisibility['getattributes'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_PROPERTY] = $rp;
 
         $rf = new ClassEntry('ReflectionFunction');
@@ -263,6 +270,8 @@ final class BuiltinClasses
         $rconst->methodVisibility['getname'] = $pub;
         $rconst->methods['getvalue'] = new ReflectionConstantGetValue();
         $rconst->methodVisibility['getvalue'] = $pub;
+        $rconst->methods['getattributes'] = new ReflectionConstantGetAttributes();
+        $rconst->methodVisibility['getattributes'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_CONSTANT] = $rconst;
 
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS] = $rc;

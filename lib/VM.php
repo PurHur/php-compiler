@@ -4637,6 +4637,7 @@ restart:
                     $pendingTraits = [];
                     $name = $frame->scope[$op->arg1];
                     $default = is_null($op->arg2) ? null : $frame->scope[$op->arg2];
+                    $propLc = strtolower($name->toString());
                     $entry->properties[] = new VM\ClassProperty(
                         $name->toString(),
                         $default,
@@ -4646,6 +4647,12 @@ restart:
                         strtolower($entry->name),
                         (int) ($op->propertySetVisibility ?? 0)
                     );
+                    if ([] !== $op->attributeNames) {
+                        $entry->propertyAttributeNames[$propLc] = $op->attributeNames;
+                    }
+                    if ([] !== $op->attributeEntries) {
+                        $entry->propertyAttributeEntries[$propLc] = $op->attributeEntries;
+                    }
                     break;
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:
                     $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
@@ -4733,6 +4740,12 @@ restart:
                         }
                     }
                     $entry->constants[$name] = $value;
+                    if ([] !== $op->attributeNames) {
+                        $entry->constAttributeNames[$name] = $op->attributeNames;
+                    }
+                    if ([] !== $op->attributeEntries) {
+                        $entry->constAttributeEntries[$name] = $op->attributeEntries;
+                    }
                     if (null !== $op->deprecatedMetadata) {
                         $entry->constDeprecated[$name] = $op->deprecatedMetadata;
                     }

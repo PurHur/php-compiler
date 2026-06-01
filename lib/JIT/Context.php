@@ -542,6 +542,11 @@ class Context {
         $this->functionProxies['reflectionclass::getname'] = new Call\ReflectionClassGetName();
         $this->functionProxies['reflectionclass::getattributes'] = new Call\ReflectionClassGetAttributes();
         $this->functionProxies['reflectionclass::getmethod'] = new Call\ReflectionClassGetMethod();
+        $this->functionProxies['reflectionclass::getreflectionconstant'] = new Call\ReflectionClassGetReflectionConstant();
+        $this->functionProxies['reflectionproperty::__construct'] = new Call\ReflectionPropertyConstruct();
+        $this->functionProxies['reflectionproperty::getattributes'] = new Call\ReflectionPropertyGetAttributes();
+        $this->functionProxies['reflectionconstant::__construct'] = new Call\ReflectionConstantConstruct();
+        $this->functionProxies['reflectionconstant::getattributes'] = new Call\ReflectionConstantGetAttributes();
         $this->functionProxies['reflectionmethod::getattributes'] = new Call\ReflectionMethodGetAttributes();
         $this->functionProxies['reflectionattribute::getname'] = new Call\ReflectionAttributeGetName();
 
