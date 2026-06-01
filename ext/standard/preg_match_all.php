@@ -26,18 +26,35 @@ final class preg_match_all extends Internal
         if ($argc < 2 || $argc > 5) {
             throw new \LogicException('preg_match_all() requires 2 to 5 arguments in this compiler build');
         }
-        if ($argc >= 3) {
-            throw new \LogicException(
-                'preg_match_all() with $matches by-reference is not supported in VM in this compiler build (issue #107)'
-            );
+        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_match_all() pattern');
+        $subject = VmReflection::stringArg($frame->calledArgs[1], 'preg_match_all() subject');
+
+        $flags = 0;
+        $offset = 0;
+        $hasMatches = $argc >= 3;
+        if ($argc >= 4) {
+            $flagsVar = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $flagsVar->type) {
+                throw new \LogicException('preg_match_all() flags must be an integer in this compiler build');
+            }
+            $flags = $flagsVar->toInt();
         }
-        $patternVar = $frame->calledArgs[0]->resolveIndirect();
-        $subjectVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $patternVar->type || Variable::TYPE_STRING !== $subjectVar->type) {
-            throw new \LogicException('preg_match_all() pattern and subject must be strings in this compiler build');
+        if ($argc >= 5) {
+            $offsetVar = $frame->calledArgs[4]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $offsetVar->type) {
+                throw new \LogicException('preg_match_all() offset must be an integer in this compiler build');
+            }
+            $offset = $offsetVar->toInt();
         }
 
-        $result = VmPreg::pregMatchAll($patternVar->toString(), $subjectVar->toString());
+        $hostMatches = [];
+        $result = VmPreg::pregMatchAll($pattern, $subject, $hostMatches, $flags, $offset);
+
+        if ($hasMatches) {
+            $target = $frame->calledArgs[2]->resolveIndirect();
+            $replacement = VmJson::import($hostMatches);
+            $target->copyFrom($replacement);
+        }
 
         if (null === $frame->returnVar) {
             return;

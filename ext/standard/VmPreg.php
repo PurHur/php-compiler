@@ -48,9 +48,31 @@ final class VmPreg
         self::$lastError = \preg_last_error();
     }
 
-    /**
-     * @param-out array $matches
-     */
+    public static function validatePregMatchFlags(int $flags): void
+    {
+        $allowed = self::PREG_MATCH_ALLOWED_FLAGS;
+        if (0 !== ($flags & ~$allowed)) {
+            throw new \LogicException(
+                'preg_match() flags must be a combination of PREG_OFFSET_CAPTURE and PREG_UNMATCHED_AS_NULL in this compiler build'
+            );
+        }
+    }
+
+    public static function validatePregMatchAllFlags(int $flags): void
+    {
+        $allowed = self::PREG_MATCH_ALLOWED_FLAGS
+            | StdlibConstants::PREG_PATTERN_ORDER
+            | StdlibConstants::PREG_SET_ORDER;
+        if (0 !== ($flags & ~$allowed)) {
+            throw new \LogicException(
+                'preg_match_all() flags must be a combination of PREG_PATTERN_ORDER, PREG_SET_ORDER, PREG_OFFSET_CAPTURE, and PREG_UNMATCHED_AS_NULL in this compiler build'
+            );
+        }
+    }
+
+    private const PREG_MATCH_ALLOWED_FLAGS = StdlibConstants::PREG_OFFSET_CAPTURE
+        | StdlibConstants::PREG_UNMATCHED_AS_NULL;
+
     public static function pregMatch(
         string $pattern,
         string $subject,
@@ -61,14 +83,9 @@ final class VmPreg
         if (strlen($pattern) > self::MAX_PATTERN_BYTES) {
             return false;
         }
-        if (0 !== $flags) {
-            throw new \LogicException('preg_match() flags are not supported in this compiler build');
-        }
-        if (0 !== $offset) {
-            throw new \LogicException('preg_match() offset is not supported in this compiler build');
-        }
+        self::validatePregMatchFlags($flags);
 
-        $result = \preg_match($pattern, $subject, $matches);
+        $result = \preg_match($pattern, $subject, $matches, $flags, $offset);
         self::syncLastErrorFromHost();
 
         return $result;
@@ -87,14 +104,9 @@ final class VmPreg
         if (strlen($pattern) > self::MAX_PATTERN_BYTES) {
             return false;
         }
-        if (0 !== $flags) {
-            throw new \LogicException('preg_match_all() flags are not supported in this compiler build');
-        }
-        if (0 !== $offset) {
-            throw new \LogicException('preg_match_all() offset is not supported in this compiler build');
-        }
+        self::validatePregMatchAllFlags($flags);
 
-        $result = \preg_match_all($pattern, $subject, $matches);
+        $result = \preg_match_all($pattern, $subject, $matches, $flags, $offset);
         self::syncLastErrorFromHost();
 
         return $result;

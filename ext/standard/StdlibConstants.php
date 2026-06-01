@@ -97,6 +97,12 @@ final class StdlibConstants
     /** preg_grep() flags (ext/pcre/php_pcre.c). */
     public const PREG_GREP_INVERT = 1;
 
+    /** preg_match() / preg_match_all() flags (ext/pcre/php_pcre.c). */
+    public const PREG_PATTERN_ORDER = 1;
+    public const PREG_SET_ORDER = 2;
+    public const PREG_OFFSET_CAPTURE = 256;
+    public const PREG_UNMATCHED_AS_NULL = 512;
+
     /** glob() flags (ext/standard/dir.c / glob.h; values match php-src on Linux). */
     public const GLOB_ERR = 1;
     public const GLOB_MARK = 2;
@@ -161,6 +167,10 @@ final class StdlibConstants
         'preg_split_delim_capture' => self::PREG_SPLIT_DELIM_CAPTURE,
         'preg_split_offset_capture' => self::PREG_SPLIT_OFFSET_CAPTURE,
         'preg_grep_invert' => self::PREG_GREP_INVERT,
+        'preg_pattern_order' => self::PREG_PATTERN_ORDER,
+        'preg_set_order' => self::PREG_SET_ORDER,
+        'preg_offset_capture' => self::PREG_OFFSET_CAPTURE,
+        'preg_unmatched_as_null' => self::PREG_UNMATCHED_AS_NULL,
         'glob_err' => self::GLOB_ERR,
         'glob_mark' => self::GLOB_MARK,
         'glob_nosort' => self::GLOB_NOSORT,
