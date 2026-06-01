@@ -570,11 +570,6 @@ final class VmString
     ): int {
         $len1 = self::byteLength($string1);
         $len2 = self::byteLength($string2);
-        if ($len1 > 255 || $len2 > 255) {
-            throw new \ValueError(
-                'levenshtein(): Argument #1 ($string1) or #2 ($string2) must be less than 256 characters'
-            );
-        }
         if ($insertionCost < 1 || $replacementCost < 1 || $deletionCost < 1) {
             throw new \ValueError(
                 'levenshtein(): insertion, replacement, and deletion costs must be larger than zero'

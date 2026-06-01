@@ -1,15 +1,14 @@
 /*
- * levenshtein() runtime for VM/JIT/AOT (issue #2406).
- * Byte-oriented edit distance; max 255 bytes per string; no PHP internal wrappers.
+ * levenshtein() runtime for VM/JIT/AOT (issue #2406, #4150).
+ * Byte-oriented edit distance; no PHP internal wrappers.
  */
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
-#define PHPC_LEV_MAX_LEN 255
-
-static int phpc_levenshtein_row(
+static int64_t phpc_levenshtein_row(
     const unsigned char *s1,
     size_t len1,
     const unsigned char *s2,
@@ -19,8 +18,14 @@ static int phpc_levenshtein_row(
     int64_t del_cost
 )
 {
-    int64_t prev[PHPC_LEV_MAX_LEN + 1];
-    int64_t cur[PHPC_LEV_MAX_LEN + 1];
+    size_t row_len = len2 + 1;
+    int64_t *prev = (int64_t *) malloc(row_len * sizeof(int64_t));
+    int64_t *cur = (int64_t *) malloc(row_len * sizeof(int64_t));
+    if (NULL == prev || NULL == cur) {
+        free(prev);
+        free(cur);
+        return -1;
+    }
 
     for (size_t j = 0; j <= len2; ++j) {
         prev[j] = (int64_t) j * ins_cost;
@@ -47,7 +52,11 @@ static int phpc_levenshtein_row(
         }
     }
 
-    return (int) prev[len2];
+    int64_t result = prev[len2];
+    free(prev);
+    free(cur);
+
+    return result;
 }
 
 int phpc_levenshtein(
@@ -67,9 +76,6 @@ int phpc_levenshtein(
 
     size_t len1 = strlen(s1);
     size_t len2 = strlen(s2);
-    if (len1 > PHPC_LEV_MAX_LEN || len2 > PHPC_LEV_MAX_LEN) {
-        return -1;
-    }
     if (ins_cost < 1) {
         ins_cost = 1;
     }
@@ -87,7 +93,7 @@ int phpc_levenshtein(
         return (int) ((int64_t) len1 * del_cost);
     }
 
-    return (int) phpc_levenshtein_row(
+    int64_t dist = phpc_levenshtein_row(
         (const unsigned char *) s1,
         len1,
         (const unsigned char *) s2,
@@ -96,4 +102,9 @@ int phpc_levenshtein(
         rep_cost,
         del_cost
     );
+    if (dist < 0) {
+        return -1;
+    }
+
+    return (int) dist;
 }
