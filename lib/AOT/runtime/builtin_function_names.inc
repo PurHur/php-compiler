@@ -121,6 +121,7 @@ static const char *phpc_builtin_functions[] = {
     "fgetc",
     "fgetcsv",
     "fgets",
+    "file",
     "file_exists",
     "file_get_contents",
     "file_put_contents",

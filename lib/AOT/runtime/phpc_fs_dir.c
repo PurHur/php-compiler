@@ -368,6 +368,99 @@ int __phpc_scandir_vec(__string__ *path, int sorting_order, char ***out_items)
     free(namelist); return n;
 }
 
+/** file() flags (ext/standard/file.c). */
+#define PHP_FILE_IGNORE_NEW_LINES 2
+#define PHP_FILE_SKIP_EMPTY_LINES 4
+
+static char *phpc_file_dup_line(const char *line, size_t len, int ignore_nl)
+{
+    size_t end = len;
+    char *copy;
+
+    while (end > 0 && ignore_nl && ('\n' == line[end - 1] || '\r' == line[end - 1])) {
+        end--;
+    }
+    copy = (char *) malloc(end + 1);
+    if (NULL == copy) {
+        return NULL;
+    }
+    if (end > 0) {
+        memcpy(copy, line, end);
+    }
+    copy[end] = '\0';
+
+    return copy;
+}
+
+/** Collect file() lines; returns count (>= 0) or -1 on error. Caller frees with __phpc_strvec_free. */
+int __phpc_file_vec(__string__ *path, int flags, char ***out_items)
+{
+    const char *pathstr;
+    FILE *fp;
+    char *line = NULL;
+    size_t cap = 0;
+    ssize_t nread;
+    char **items = NULL;
+    size_t count = 0;
+    size_t cap_items = 0;
+    int ignore_nl = (0 != (flags & PHP_FILE_IGNORE_NEW_LINES));
+    int skip_empty = (0 != (flags & PHP_FILE_SKIP_EMPTY_LINES));
+
+    if (NULL == out_items) {
+        return -1;
+    }
+    *out_items = NULL;
+    if (NULL == path) {
+        return -1;
+    }
+    pathstr = phpc_strdata(path);
+    if (NULL == pathstr || '\0' == pathstr[0]) {
+        return -1;
+    }
+    fp = fopen(pathstr, "rb");
+    if (NULL == fp) {
+        return -1;
+    }
+    while ((nread = getline(&line, &cap, fp)) != -1) {
+        size_t len = (size_t) nread;
+        char *dup;
+
+        if (len > 0 && '\0' == line[len - 1]) {
+            len--;
+        }
+        dup = phpc_file_dup_line(line, len, ignore_nl);
+        if (NULL == dup) {
+            free(line);
+            fclose(fp);
+            __phpc_strvec_free(items, (int) count);
+            return -1;
+        }
+        if (skip_empty && '\0' == dup[0]) {
+            free(dup);
+            continue;
+        }
+        if (count >= cap_items) {
+            size_t new_cap = cap_items ? cap_items * 2 : 16;
+            char **grown = (char **) realloc(items, new_cap * sizeof(char *));
+            if (NULL == grown) {
+                free(dup);
+                free(line);
+                fclose(fp);
+                __phpc_strvec_free(items, (int) count);
+                return -1;
+            }
+            items = grown;
+            cap_items = new_cap;
+        }
+        items[count++] = dup;
+    }
+    free(line);
+    fclose(fp);
+    *out_items = items;
+
+    return (int) count;
+}
+
 void __phpc_strvec_free(char **items, int count)
 {
     int i; if (NULL == items) return;
