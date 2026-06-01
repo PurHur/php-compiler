@@ -39,6 +39,14 @@ final class OutputBuffer
         return count(self::$stack);
     }
 
+    /**
+     * @return list<string> copy of active buffer contents per level (outer → inner)
+     */
+    public static function getBuffers(): array
+    {
+        return self::$stack;
+    }
+
     public static function start(): void
     {
         self::$stack[] = '';
