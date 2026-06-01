@@ -394,6 +394,16 @@ class Type extends Builtin {
         );
         $fnCopy = $this->context->module->addFunction('__compiler_copy', $fntypeCopy);
         $this->context->registerFunction('__compiler_copy', $fnCopy);
+        $valuePtr = $this->context->getTypeFromString('__value__*');
+        $fntypeChgrp = $this->context->context->functionType(
+            $i32,
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $valuePtr,
+            $i32
+        );
+        $fnChgrp = $this->context->module->addFunction('__compiler_chgrp', $fntypeChgrp);
+        $this->context->registerFunction('__compiler_chgrp', $fnChgrp);
         $fntypeMoveUploaded = $this->context->context->functionType(
             $i32,
             false,

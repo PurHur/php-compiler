@@ -129,6 +129,49 @@ final class VmFs
         return @chmod($path, $permissions);
     }
 
+    public static function resolveGroupGid(Variable $group): ?int
+    {
+        if (Variable::TYPE_INTEGER === $group->type) {
+            return $group->toInt();
+        }
+        if (Variable::TYPE_STRING === $group->type) {
+            $name = $group->toString();
+            if ('' !== $name && ctype_digit($name)) {
+                return (int) $name;
+            }
+            if (\function_exists('posix_getgrnam')) {
+                $gr = @posix_getgrnam($name);
+                if (\is_array($gr) && isset($gr['gid'])) {
+                    return (int) $gr['gid'];
+                }
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    public static function chgrp(string $path, Variable $group): bool
+    {
+        $gid = self::resolveGroupGid($group);
+        if (null === $gid) {
+            return false;
+        }
+
+        return @chgrp($path, $gid);
+    }
+
+    public static function lchgrp(string $path, Variable $group): bool
+    {
+        $gid = self::resolveGroupGid($group);
+        if (null === $gid) {
+            return false;
+        }
+
+        return @lchgrp($path, $gid);
+    }
+
     public static function rename(string $from, string $to): bool
     {
         return @rename($from, $to);
