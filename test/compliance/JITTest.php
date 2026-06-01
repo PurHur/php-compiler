@@ -50,7 +50,7 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'readline_exists')) {
                 continue;
             }
-            // Fiber::suspend() MCJIT execute segfault (#4019); VM + AOT green; bin/jit.php VM-fallback.
+            // Fiber::suspend() MCJIT execute segfault (#4019, #4097); VM + AOT green; bin/jit.php VM-fallback.
             if (str_contains($name, 'fiber_jit')) {
                 continue;
             }

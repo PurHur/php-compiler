@@ -1268,6 +1268,20 @@ class Block {
     /** Script or nested closure uses Fiber::suspend() (#4019). */
     public static function containsFiberSuspendOpcodes(?self $root): bool
     {
+        return self::walkFiberSuspendOpcodes($root, false);
+    }
+
+    /**
+     * Top-level script scope only (skips nested TYPE_FUNCDEF bodies; issue #4097).
+     * Fiber callbacks compile to MCJIT resume functions like generator bodies (#3074).
+     */
+    public static function containsFiberSuspendOpcodesInScriptScope(?self $root): bool
+    {
+        return self::walkFiberSuspendOpcodes($root, true);
+    }
+
+    private static function walkFiberSuspendOpcodes(?self $root, bool $skipFuncDefs): bool
+    {
         if (null === $root) {
             return false;
         }
@@ -1294,6 +1308,15 @@ class Block {
                 }
                 foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
                     if ($sub instanceof self) {
+                        if ($skipFuncDefs && $sub === $op->block1) {
+                            if (
+                                OpCode::TYPE_FUNCDEF === $op->type
+                                || OpCode::TYPE_DECLARE_METHOD === $op->type
+                                || OpCode::TYPE_CLOSURE === $op->type
+                            ) {
+                                continue;
+                            }
+                        }
                         $stack[] = $sub;
                     }
                 }

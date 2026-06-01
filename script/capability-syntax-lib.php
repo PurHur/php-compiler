@@ -249,7 +249,7 @@ function syntaxRowDefinitions(): array
             'aot' => true,
             'notes' => [
                 'VM FiberState + builtin Fiber class (#3130); php-src Zend/zend_fibers.c',
-                'JIT/AOT resume lowering (#4019); AOT native execute green; bin/jit.php VM-fallback until MCJIT execute stable',
+                'JIT/AOT resume lowering (#4019); AOT native execute green; script-scope MCJIT gate in Block::containsFiberSuspendOpcodesInScriptScope (#4097); bin/jit.php VM-fallback until jit-runtime-probe green',
             ],
             'probe' => '$f = new Fiber(function (): void { Fiber::suspend(1); }); echo $f->start();',
         ],
