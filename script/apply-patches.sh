@@ -220,7 +220,7 @@ patch_already_applied() {
         && [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/YieldFrom.php" ]]
       ;;
     php-cfg-asymmetric-visibility.patch)
-      grep -q 'setVisibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null \
+      grep -q 'public int \$setVisibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null \
         && grep -q 'promotionSetVisibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null
       ;;
     php-cfg-assertion-expr-property.patch)
@@ -439,6 +439,73 @@ insert = method_path.read_text().rstrip("\n") + "\n\n"
 parser_path.write_text(text.replace(anchor, insert + anchor, 1))
 PY
   echo "Applied php-cfg yield-from overlay"
+}
+
+# Vendor may ship promotionSetVisibility on Param before Property gains setVisibility (#3165, #1492).
+apply_php_cfg_asymmetric_visibility_overlay() {
+  local prop="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php"
+  local param="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php"
+  if [[ ! -f "$prop" || ! -f "$param" ]]; then
+    return 0
+  fi
+  local has_prop=0 has_param=0
+  if grep -q 'public int \$setVisibility' "$prop" 2>/dev/null; then
+    has_prop=1
+  fi
+  if grep -q 'promotionSetVisibility' "$param" 2>/dev/null; then
+    has_param=1
+  fi
+  if [[ $has_prop -eq 1 && $has_param -eq 1 ]]; then
+    echo "Skip php-cfg-asymmetric-visibility.patch (already applied)"
+    return 0
+  fi
+  if [[ $has_prop -eq 0 ]]; then
+    python3 - "$prop" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+if 'public int $setVisibility' in text:
+    raise SystemExit(0)
+needle = "    public $declaredType;\n"
+insert = (
+    needle
+    + "\n"
+    + "    /** PHP 8.4 asymmetric set visibility (0 = same as read; issue #3165). */\n"
+    + "    public int $setVisibility = 0;\n"
+)
+if needle not in text:
+    sys.stderr.write("php-cfg-asymmetric-visibility: Property.php declaredType anchor missing\n")
+    raise SystemExit(1)
+path.write_text(text.replace(needle, insert, 1))
+PY
+    echo "Applied php-cfg-asymmetric-visibility.patch (Property overlay)"
+  fi
+  if [[ $has_param -eq 0 ]]; then
+    python3 - "$param" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+if 'promotionSetVisibility' in text:
+    raise SystemExit(0)
+needle = "    public bool $promotionReadonly = false;\n"
+insert = (
+    needle
+    + "\n"
+    + "    /** Constructor promotion: asymmetric set visibility (#3165). */\n"
+    + "    public int $promotionSetVisibility = 0;\n"
+)
+if needle not in text:
+    sys.stderr.write("php-cfg-asymmetric-visibility: Param.php promotionReadonly anchor missing\n")
+    raise SystemExit(1)
+path.write_text(text.replace(needle, insert, 1))
+PY
+    echo "Applied php-cfg-asymmetric-visibility.patch (Param overlay)"
+  fi
+  return 0
 }
 
 apply_php_cfg_incdec_expr_overlay() {
@@ -2149,6 +2216,10 @@ apply_patch() {
   fi
   if [[ "$(basename "$patch")" == "php-cfg-union-type.patch" ]]; then
     apply_php_cfg_union_type_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-asymmetric-visibility.patch" ]]; then
+    apply_php_cfg_asymmetric_visibility_overlay
     return $?
   fi
   if patch_already_applied "$patch"; then
