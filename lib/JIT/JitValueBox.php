@@ -602,4 +602,23 @@ final class JitValueBox
 
         return self::normalizeValuePtr($context, self::pointer($context, $slot));
     }
+
+    /**
+     * Instance method calls may return {@see __value__} or {@see __value__*} (#3098, #4012).
+     */
+    public static function coerceToValuePtrForStore(Context $context, Value $raw): Value
+    {
+        $tyName = $context->getStringFromType($raw->typeOf());
+        if ('__value__*' === $tyName) {
+            return self::normalizeValuePtr($context, $raw);
+        }
+        if ('__value__' === $tyName) {
+            $slot = self::alloc($context);
+            $context->builder->store($raw, $slot);
+
+            return self::pointer($context, $slot);
+        }
+
+        return self::normalizeValuePtr($context, $raw);
+    }
 }

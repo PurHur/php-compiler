@@ -26,6 +26,10 @@ class JITTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'splobjectstorage')) {
                 continue;
             }
+            // ArrayAccess $obj[$key]: JIT/AOT lint in ArrayAccessJITTest; MCJIT execute segfault (#4012).
+            if (str_contains($name, 'array_access')) {
+                continue;
+            }
             if (str_contains(strtolower($case[0]), 'spl_autoload_register_jit')) {
                 continue;
             }

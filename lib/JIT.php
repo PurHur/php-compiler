@@ -4814,6 +4814,33 @@ class JIT {
                         }
                         break;
                     }
+                    if (Variable::TYPE_OBJECT === $value->type && null !== $op->arg3) {
+                        $arrayAccess = JIT\ArrayAccessHelper::tryCompileDimFetch(
+                            $this->context,
+                            $value,
+                            $dim,
+                            $containerOp,
+                            $forWrite
+                        );
+                        if (null !== $arrayAccess) {
+                            if ($forWrite) {
+                                $this->context->setVariableOp($resultOp, $arrayAccess);
+                            } elseif ($forceBranchMerge) {
+                                $this->assignOperand($resultOp, $arrayAccess, true);
+                            } else {
+                                $this->assignOperand($resultOp, $arrayAccess);
+                            }
+                            break;
+                        }
+                        if (JIT\ArrayAccessHelper::isKnownNonArrayAccessObject(
+                            $this->context,
+                            $value,
+                            $containerOp
+                        )) {
+                            JIT\ArrayAccessHelper::emitIllegalOffset($this->context);
+                            break;
+                        }
+                    }
                     if ($value->type & Variable::IS_NATIVE_ARRAY && $this->context->analyzer->needsBoundsCheck($value, $dimOp)) {
                         $this->context->builder->call(
                             $this->context->lookupFunction('__nativearray__boundscheck'),
@@ -7492,6 +7519,11 @@ class JIT {
                 $result->writableValueBoxKey,
                 $value
             );
+
+            return;
+        }
+        if ($result->isArrayAccessWritableOffset) {
+            JIT\ArrayAccessHelper::assignWritableOffset($this->context, $result, $value);
 
             return;
         }
