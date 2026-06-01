@@ -48,6 +48,33 @@ final class VmFs
         return (int) $stat['mtime'];
     }
 
+    public static function fileAtime(string $path) {
+        $stat = @stat($path);
+        if (false === $stat) {
+            return false;
+        }
+
+        return (int) $stat['atime'];
+    }
+
+    public static function fileCtime(string $path) {
+        $stat = @stat($path);
+        if (false === $stat) {
+            return false;
+        }
+
+        return (int) $stat['ctime'];
+    }
+
+    public static function fileInode(string $path) {
+        $stat = @stat($path);
+        if (false === $stat) {
+            return false;
+        }
+
+        return (int) $stat['ino'];
+    }
+
     public static function filePerms(string $path) {
         $stat = @stat($path);
         if (false === $stat) {
