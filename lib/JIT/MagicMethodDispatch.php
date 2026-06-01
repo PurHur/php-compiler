@@ -99,6 +99,45 @@ final class MagicMethodDispatch
         return $result;
     }
 
+    /**
+     * @return Value|null lowered __get return value for a runtime property name (`$obj->$name`)
+     */
+    public static function tryEmitMagicGetDynamic(
+        Context $context,
+        Value $receiver,
+        string $declaringClass,
+        Value $nameStr,
+        ?Block $enclosingBlock
+    ): ?Value {
+        $classId = $context->type->object->lookup($declaringClass);
+        if (!self::hasInstanceMethod($context->type->object, $classId, '__get')) {
+            return null;
+        }
+        $proxy = self::resolveInstanceMethodProxy($context, $declaringClass, '__get');
+        if (null === $proxy) {
+            return null;
+        }
+        $receiverVar = new Variable(
+            $context,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $receiver
+        );
+        $nameArg = new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $nameStr
+        );
+        $toCall = $context->resolveFunctionProxy($proxy);
+        $prevStrict = $context->callerStrictTypes;
+        $context->callerStrictTypes = $enclosingBlock?->strictTypes ?? false;
+        $result = $toCall->call($context, $receiverVar, $nameArg);
+        $context->callerStrictTypes = $prevStrict;
+
+        return $result;
+    }
+
     public static function tryEmitMagicSet(
         Context $context,
         Variable $receiver,

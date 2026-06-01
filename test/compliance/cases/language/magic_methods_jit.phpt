@@ -1,5 +1,5 @@
 --TEST--
-language: magic methods __get __set __call __toString JIT (issue #4022)
+language: magic methods __get __set __call __toString JIT (issue #4022, #4066)
 --FILE--
 <?php
 class M {

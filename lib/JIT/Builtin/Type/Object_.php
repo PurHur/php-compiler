@@ -21,8 +21,10 @@ use PHPCompiler\JIT\Builtin\Refcount;
 use PHPCompiler\JIT\Builtin\Type;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNativeString;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\MagicMethodDispatch;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM;
@@ -2956,11 +2958,7 @@ class Object_ extends Type {
             throw new \LogicException('Dynamic property fetch requires at least one declared property on '.$class);
         }
 
-        $nameStr = JitNativeString::coerce($this->context, $nameVar);
-        if (Variable::TYPE_STRING !== $nameStr->type) {
-            throw new \LogicException('Dynamic property name must coerce to string');
-        }
-        $runtimeName = $this->context->helper->loadValue($nameStr);
+        $runtimeName = JitStringArg::lowerDominating($this->context, $nameVar, 'dynamic property name');
 
         $fn = BasicBlockHelper::parentFunction($this->context);
         $entry = $this->context->builder->getInsertBlock();
@@ -2986,7 +2984,20 @@ class Object_ extends Type {
             $checkBlock = $nextCheck;
         }
         $this->context->builder->positionAtEnd($fallback);
-        $this->context->builder->call($this->context->lookupFunction('abort'));
+        $magicRaw = MagicMethodDispatch::tryEmitMagicGetDynamic(
+            $this->context,
+            $obj,
+            $class,
+            $runtimeName,
+            null
+        );
+        if (null !== $magicRaw) {
+            $valuePtr = JitValueBox::coerceToValuePtrForStore($this->context, $magicRaw);
+            JitValueBox::copyFromPointer($this->context, $destSlot, $valuePtr);
+            $this->context->builder->branch($done);
+        } else {
+            $this->context->builder->call($this->context->lookupFunction('abort'));
+        }
         $this->context->builder->positionAtEnd($done);
         $this->context->builder->branch($exit);
         $this->context->builder->positionAtEnd($exit);
