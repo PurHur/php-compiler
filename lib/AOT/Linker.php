@@ -40,6 +40,7 @@ final class Linker
         __DIR__.'/runtime/phpc_str_getcsv.c',
         __DIR__.'/runtime/phpc_uniqid.c',
         __DIR__.'/runtime/phpc_strtok.c',
+        __DIR__.'/runtime/phpc_nl2br.c',
         __DIR__.'/runtime/compiler_wordwrap.c',
         __DIR__.'/runtime/password_crypto.c',
         __DIR__.'/runtime/crc32.c',
@@ -93,6 +94,7 @@ final class Linker
         __DIR__.'/runtime/phpc_reflection_attr.c',
         __DIR__.'/runtime/phpc_cli_argv.c',
         __DIR__.'/runtime/phpc_weakref.c',
+        __DIR__.'/runtime/phpc_gc.c',
     ];
 
     private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt';

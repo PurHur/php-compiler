@@ -153,6 +153,14 @@ class Type extends Builtin {
         );
         $fnStripTags = $this->context->module->addFunction('__compiler_strip_tags', $fntypeStripTags);
         $this->context->registerFunction('__compiler_strip_tags', $fnStripTags);
+        $fntypeNl2br = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $i8
+        );
+        $fnNl2br = $this->context->module->addFunction('__compiler_nl2br', $fntypeNl2br);
+        $this->context->registerFunction('__compiler_nl2br', $fnNl2br);
         $i64 = $this->context->getTypeFromString('int64');
         $fntypeUtf8Strlen = $this->context->context->functionType(
             $i64,
