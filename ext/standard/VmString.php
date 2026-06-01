@@ -2982,9 +2982,11 @@ final class VmString
         if ('' === $needle) {
             throw new \LogicException('strpos(): Argument #2 ($needle) cannot be empty');
         }
-        if ($offset < 0) {
-            $offset = 0;
-        }
+        $offset = self::normalizeContainedStringOffset(
+            self::byteLength($haystack),
+            $offset,
+            'strpos'
+        );
         $pos = self::findSubstring($haystack, $needle, $offset);
 
         return false === $pos ? false : $pos;
@@ -3234,9 +3236,11 @@ final class VmString
         if ('' === $needle) {
             throw new \LogicException('stripos(): Argument #2 ($needle) cannot be empty');
         }
-        if ($offset < 0) {
-            $offset = 0;
-        }
+        $offset = self::normalizeContainedStringOffset(
+            self::byteLength($haystack),
+            $offset,
+            'stripos'
+        );
         $pos = self::findSubstringCaseInsensitive($haystack, $needle, $offset);
 
         return false === $pos ? false : $pos;
@@ -3328,6 +3332,31 @@ final class VmString
         }
 
         return $byte;
+    }
+
+    /**
+     * PHP 8+ strpos/stripos offset: negative counts from end; must lie in [-hayLen, hayLen].
+     *
+     * @see php/php-src ext/standard/string.c php_strpos()
+     */
+    private static function normalizeContainedStringOffset(
+        int $hayLen,
+        int $offset,
+        string $functionName,
+        int $argNum = 3
+    ): int {
+        if ($offset < 0) {
+            $offset += $hayLen;
+        }
+        if ($offset < 0 || $offset > $hayLen) {
+            throw new \ValueError(sprintf(
+                '%s(): Argument #%d ($offset) must be contained in argument #1 ($haystack)',
+                $functionName,
+                $argNum
+            ));
+        }
+
+        return $offset;
     }
 
     /**
