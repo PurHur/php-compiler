@@ -13,11 +13,17 @@ use PHPLLVM;
  */
 final class TypeErrorRaise
 {
+    private const PENDING_TYPE_ERROR = 1;
+
+    private const PENDING_ARGUMENT_COUNT_ERROR = 2;
+
     private static ?int $hasPendingAddress = null;
 
     private static ?int $copyPendingAddress = null;
 
     private static ?int $clearPendingAddress = null;
+
+    private static ?int $pendingKindAddress = null;
 
     public static function ensureLinked(Context $context): void
     {
@@ -47,10 +53,20 @@ final class TypeErrorRaise
 
     public static function emitRaise(Context $context, string $message): void
     {
+        self::emitPendingMessage($context, $message, '__compiler_jit_raise_type_error');
+    }
+
+    public static function emitArgumentCountError(Context $context, string $message): void
+    {
+        self::emitPendingMessage($context, $message, '__compiler_jit_raise_argument_count_error');
+    }
+
+    private static function emitPendingMessage(Context $context, string $message, string $callee): void
+    {
         $msgLen = $context->constantFromInteger(strlen($message), 'size_t');
         $msgCStr = self::stringDataPtrFromLiteral($context, $message);
         $context->builder->call(
-            $context->lookupFunction('__compiler_jit_raise_type_error'),
+            $context->lookupFunction($callee),
             $msgCStr,
             $msgLen
         );
@@ -186,6 +202,24 @@ final class TypeErrorRaise
         }
     }
 
+    public static function emitClearForStandaloneMain(Context $context): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return;
+        }
+        self::registerDeclarations($context);
+        $context->builder->call($context->lookupFunction('phpc_jit_type_error_clear_pending'));
+    }
+
+    public static function emitAbortIfPendingForStandaloneMain(Context $context): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return;
+        }
+        self::registerDeclarations($context);
+        $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+    }
+
     public static function registerDeclarations(Context $context): void
     {
         $i8p = $context->getTypeFromString('int8*');
@@ -195,9 +229,12 @@ final class TypeErrorRaise
 
         $decls = [
             '__compiler_jit_raise_type_error' => [$void, false, [$i8p, $sizeT]],
+            '__compiler_jit_raise_argument_count_error' => [$void, false, [$i8p, $sizeT]],
             'phpc_jit_type_error_clear_pending' => [$void, false, []],
             'phpc_jit_type_error_has_pending' => [$i32, false, []],
+            'phpc_jit_type_error_pending_kind_get' => [$i32, false, []],
             'phpc_jit_type_error_copy_pending' => [$void, false, [$i8p, $sizeT]],
+            'phpc_jit_abort_if_pending_type_error' => [$void, false, []],
         ];
         foreach ($decls as $name => [$ret, $vararg, $params]) {
             if (null !== $context->module->getNamedFunction($name)) {
@@ -214,6 +251,7 @@ final class TypeErrorRaise
         self::$hasPendingAddress = $engine->getFunctionAddress('phpc_jit_type_error_has_pending');
         self::$copyPendingAddress = $engine->getFunctionAddress('phpc_jit_type_error_copy_pending');
         self::$clearPendingAddress = $engine->getFunctionAddress('phpc_jit_type_error_clear_pending');
+        self::$pendingKindAddress = $engine->getFunctionAddress('phpc_jit_type_error_pending_kind_get');
     }
 
     public static function clearPendingAtRunEntry(): void
@@ -229,6 +267,7 @@ final class TypeErrorRaise
     {
         if (null === self::$hasPendingAddress || 0 === self::$hasPendingAddress
             || null === self::$copyPendingAddress || 0 === self::$copyPendingAddress
+            || null === self::$pendingKindAddress || 0 === self::$pendingKindAddress
         ) {
             return;
         }
@@ -236,11 +275,16 @@ final class TypeErrorRaise
         if (0 === $has()) {
             return;
         }
+        $kindFn = self::callableFromAddress('int(*)()', self::$pendingKindAddress);
+        $kind = $kindFn();
         $buf = \FFI::new('char[512]');
         $copy = self::callableFromAddress('void(*)(char*, size_t)', self::$copyPendingAddress);
         $copy($buf, 512);
         $msg = \FFI::string($buf);
         if ('' !== $msg) {
+            if (self::PENDING_ARGUMENT_COUNT_ERROR === $kind) {
+                throw new \ArgumentCountError($msg);
+            }
             throw new \TypeError($msg);
         }
     }

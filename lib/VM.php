@@ -2656,6 +2656,8 @@ restart:
             return null;
         } catch (\DivisionByZeroError $e) {
             return $this->dispatchVmDivisionByZeroError($e, $callerFrame);
+        } catch (\ArgumentCountError $e) {
+            return $this->dispatchVmArgumentCountError($e, $callerFrame);
         } catch (\TypeError $e) {
             return $this->dispatchVmTypeError($e, $callerFrame);
         } catch (\ValueError $e) {
@@ -2684,6 +2686,21 @@ restart:
     private function dispatchVmTypeError(\TypeError $error, Frame $frame): ?Frame
     {
         $thrown = VM\BuiltinExceptionSupport::materializeTypeError($this->context, $error->getMessage());
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /**
+     * Bridge native ArgumentCountError from stdlib builtins into user catch handlers (#4034).
+     */
+    private function dispatchVmArgumentCountError(\ArgumentCountError $error, Frame $frame): ?Frame
+    {
+        $thrown = VM\BuiltinExceptionSupport::materializeArgumentCountError($this->context, $error->getMessage());
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
             return $catchFrame;

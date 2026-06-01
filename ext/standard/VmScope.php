@@ -26,6 +26,18 @@ final class VmScope
         return $frame->parent;
     }
 
+    /**
+     * One-arg parse_str() may only populate the global symbol table ({main}), not function locals (#4034).
+     *
+     * php-src: ext/standard/basic_functions.c — php_parse_str without result array
+     */
+    public static function requireMainScriptForParseStrOneArg(Frame $caller): void
+    {
+        if (null === $caller->block || !$caller->block->isMainScript()) {
+            throw new \ArgumentCountError('parse_str() expects exactly 2 arguments, 1 given');
+        }
+    }
+
     public static function slotForName(Frame $caller, string $name): ?int
     {
         return $caller->block->slotIndexForVariableName($name);

@@ -1,5 +1,5 @@
 --TEST--
-stdlib parse_str() without $result populates {main} locals only (#3708, #4034)
+stdlib parse_str() one-arg inside function throws ArgumentCountError (#4034)
 --FILE--
 <?php
 function t(): void {
