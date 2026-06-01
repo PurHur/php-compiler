@@ -102,6 +102,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'hexdec') || str_contains($name, 'bindec') || str_contains($name, 'octdec')) {
                 continue;
             }
+            // intval() optional $base: VM + AOT (#4174); MCJIT strtol/base path until MCJIT stable.
+            if (str_contains($name, 'intval_base')) {
+                continue;
+            }
             // class_uses() is VM-only until JIT lowering (#3119).
             if (str_contains($name, 'class_uses_runtime')) {
                 continue;
