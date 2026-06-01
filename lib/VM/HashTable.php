@@ -168,13 +168,30 @@ final class HashTable {
         return $result;
     }
 
+    /**
+     * Zend zend_hash numeric-string key coercion (zend_hash.c; issue #3679).
+     * Canonical decimal strings (e.g. "1", "-2") map to int keys; "01" and "foo" do not.
+     */
+    public static function tryIntFromNumericString(string $key): ?int
+    {
+        if ('' === $key || !preg_match('/^-?\d+$/', $key)) {
+            return null;
+        }
+        $int = (int) $key;
+        if ((string) $int !== $key) {
+            return null;
+        }
+
+        return $int;
+    }
+
     public function keyExists(Variable $index): bool
     {
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
                 return null !== $this->findIndex($index->toInt());
             case Variable::TYPE_STRING:
-                return null !== $this->find($index->toString());
+                return null !== $this->findByStringKey($index->toString());
             default:
                 throw new \LogicException("Unknown index type {$index->type}");
         }
@@ -186,7 +203,7 @@ final class HashTable {
                 $result = $this->findIndex($index->toInt());
                 break;
             case Variable::TYPE_STRING:
-                $result = $this->find($index->toString());
+                $result = $this->findByStringKey($index->toString());
                 break;
             default:
                 throw new \LogicException("Unknown index type {$index->type}");
@@ -196,9 +213,14 @@ final class HashTable {
             if ($forWrite) {
                 if ($index->type === Variable::TYPE_INTEGER) {
                     return $this->addIndex($index->toInt(), $result);
-                } else {
-                    return $this->add($index->toString(), $result);
                 }
+                $keyStr = $index->toString();
+                $intKey = self::tryIntFromNumericString($keyStr);
+                if (null !== $intKey) {
+                    return $this->addIndex($intKey, $result);
+                }
+
+                return $this->add($keyStr, $result);
             }
         }
         return $result;
@@ -217,14 +239,27 @@ final class HashTable {
     }
 
     public function find(string $key): ?Variable {
+        return $this->findByStringKey($key);
+    }
+
+    private function findByStringKey(string $key): ?Variable
+    {
         $this->assertConsistent();
         if ($this->flags & self::FLAG_UNINITIALIZED) {
             return null;
+        }
+        $intKey = self::tryIntFromNumericString($key);
+        if (null !== $intKey) {
+            $bucket = $this->findBucket($intKey, null);
+            if (null !== $bucket) {
+                return $bucket->value;
+            }
         }
         $bucket = $this->findBucket($this->hash($key), $key);
         if (is_null($bucket)) {
             return null;
         }
+
         return $bucket->value;
     }
 
@@ -1219,7 +1254,7 @@ final class HashTable {
                 $value = $this->findIndex($index->toInt());
                 break;
             case Variable::TYPE_STRING:
-                $value = $this->find($index->toString());
+                $value = $this->findByStringKey($index->toString());
                 break;
             default:
                 return false;
@@ -1239,7 +1274,7 @@ final class HashTable {
                 $stored = $this->findIndex($index->toInt());
                 break;
             case Variable::TYPE_STRING:
-                $stored = $this->find($index->toString());
+                $stored = $this->findByStringKey($index->toString());
                 break;
             default:
                 throw new \LogicException("Unknown index type {$index->type}");
@@ -1265,7 +1300,7 @@ final class HashTable {
                 $bucket = $this->findBucket($index->toInt(), null);
                 break;
             case Variable::TYPE_STRING:
-                $bucket = $this->findBucket($this->hash($index->toString()), $index->toString());
+                $bucket = $this->findBucketByStringKey($index->toString());
                 break;
             default:
                 throw new \LogicException("Unknown index type {$index->type}");
@@ -1280,6 +1315,19 @@ final class HashTable {
         $bucket->value->reset();
         $bucket->value->type = Variable::TYPE_UNDEFINED;
         --$this->numElements;
+    }
+
+    private function findBucketByStringKey(string $key): ?HashTableBucket
+    {
+        $intKey = self::tryIntFromNumericString($key);
+        if (null !== $intKey) {
+            $bucket = $this->findBucket($intKey, null);
+            if (null !== $bucket) {
+                return $bucket;
+            }
+        }
+
+        return $this->findBucket($this->hash($key), $key);
     }
 
     public function append(Variable $data): ?Variable {
@@ -1334,18 +1382,38 @@ final class HashTable {
     }
 
     public function add(string $key, Variable $data): ?Variable {
+        $intKey = self::tryIntFromNumericString($key);
+        if (null !== $intKey) {
+            return $this->addIndex($intKey, $data);
+        }
+
         return $this->addOrUpdate($this->hash($key), $key, $data, self::ADD);
     }
 
     public function addNew(string $key, Variable $data): ?Variable {
+        $intKey = self::tryIntFromNumericString($key);
+        if (null !== $intKey) {
+            return $this->addNewIndex($intKey, $data);
+        }
+
         return $this->addOrUpdate($this->hash($key), $key, $data, self::ADD_NEW);
     }
 
     public function update(string $key, Variable $data): ?Variable {
+        $intKey = self::tryIntFromNumericString($key);
+        if (null !== $intKey) {
+            return $this->updateIndex($intKey, $data);
+        }
+
         return $this->addOrUpdate($this->hash($key), $key, $data, self::UPDATE);
     }
 
     public function updateIndirect(string $key, Variable $data): ?Variable {
+        $intKey = self::tryIntFromNumericString($key);
+        if (null !== $intKey) {
+            return $this->updateIndirectIndex($intKey, $data);
+        }
+
         return $this->addOrUpdate($this->hash($key), $key, $data, self::UPDATE | self::UPDATE_INDIRECT);
     }
 
