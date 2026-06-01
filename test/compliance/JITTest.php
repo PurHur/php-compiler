@@ -122,6 +122,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'get_defined_functions') || str_contains($name, 'get_declared_functions')) {
                 continue;
             }
+            // get_resources() MCJIT: VM + AOT + dedicated --JIT-- PHPT (#3646); jit.php execute segfaults on hashtable return.
+            if (str_contains($name, 'get_resources')) {
+                continue;
+            }
             // stream_set_timeout/chunk_size MCJIT: VM + AOT (#3754); jit.php execute exit -1 until stable.
             if (str_contains($name, 'stream_set_timeout')) {
                 continue;

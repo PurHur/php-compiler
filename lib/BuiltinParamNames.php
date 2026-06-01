@@ -46,6 +46,10 @@ final class BuiltinParamNames
                 return ['format', 'args'];
             case 'sscanf':
                 return ['string', 'format'];
+            case 'get_resources':
+                return ['resource_type'];
+            case 'get_defined_constants':
+                return ['categorize'];
         }
 
         return null;

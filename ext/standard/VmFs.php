@@ -627,6 +627,28 @@ final class VmFs
         return isset(self::$handles[$handle]);
     }
 
+    /**
+     * get_resources() — active stream handles (php-src basic_functions.c / zend_list.c, #3646).
+     *
+     * @throws \ValueError when $type is not a supported resource type filter
+     */
+    public static function getResourcesTable(?string $type = null): HashTable
+    {
+        if (null !== $type && 'stream' !== $type) {
+            throw new \ValueError('get_resources(): Argument #1 ($type) must be a valid resource type');
+        }
+        $ht = new HashTable();
+        $index = 1;
+        foreach (self::$handles as $id => $fp) {
+            $value = new Variable();
+            $value->streamHandle((int) $id);
+            $ht->addIndex($index, $value);
+            ++$index;
+        }
+
+        return $ht;
+    }
+
     private static function lookup(int $handle): mixed
     {
         return self::$handles[$handle] ?? null;
