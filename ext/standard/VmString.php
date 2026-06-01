@@ -3574,6 +3574,21 @@ final class VmString
             return reset($parts);
         }
 
+        // php-src php_pathinfo(): multiple bits (not PATHINFO_ALL) → single string by priority.
+        if (15 !== $mask) {
+            if ($mask & 1) {
+                return $dirname;
+            }
+            if ($mask & 2) {
+                return $basename;
+            }
+            if ($mask & 4) {
+                return $extension;
+            }
+
+            return $filename;
+        }
+
         return $parts;
     }
 
