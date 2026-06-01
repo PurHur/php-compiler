@@ -142,6 +142,8 @@ static const char *phpc_builtin_functions[] = {
     "fseek",
     "ftell",
     "ftruncate",
+    "forward_static_call",
+    "forward_static_call_array",
     "func_get_args",
     "func_num_args",
     "function_exists",

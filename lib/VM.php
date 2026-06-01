@@ -14,6 +14,7 @@ require_once __DIR__.'/OpCodeNames.php';
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Func;
 use PHPCompiler\ext\standard\VmEval;
+use PHPCompiler\ext\standard\VmForwardStaticCall;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\CastSupport;
 use PHPCompiler\VM\ClassEntry;
@@ -110,6 +111,34 @@ class VM {
             $result = $this->runFrames();
             if (self::SUCCESS !== $result) {
                 throw new \LogicException('User function invocation failed in this compiler build');
+            }
+
+            return $out->resolveIndirect();
+        } finally {
+            $this->context->swapRunStack($savedStack);
+        }
+    }
+
+    /**
+     * Invoke a static method in the caller's late-static scope (forward_static_call, #3197).
+     */
+    public function invokeStaticWithCalledScope(
+        string $calledScopeClass,
+        string $methodName,
+        Variable ...$args
+    ): Variable {
+        $func = VmForwardStaticCall::resolveStaticMethod($this->context, $calledScopeClass, $methodName);
+        $savedStack = $this->context->swapRunStack(null);
+        try {
+            $child = $func->getFrame($this->context, null);
+            $child->calledClass = $calledScopeClass;
+            $child->calledArgs = $args;
+            $out = new Variable();
+            $child->returnVar = $out;
+            $this->context->push($child);
+            $result = $this->runFrames();
+            if (self::SUCCESS !== $result) {
+                throw new \LogicException('Static method invocation failed in this compiler build');
             }
 
             return $out->resolveIndirect();
