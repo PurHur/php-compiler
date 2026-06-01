@@ -785,4 +785,165 @@ final class VmReflection
 
         return $current->block->func->class->value;
     }
+
+    /** php-src ReflectionProperty::IS_* visibility bitmask (not PHPCfg flags). */
+    public const REFLECTION_IS_PUBLIC = 256;
+
+    public const REFLECTION_IS_PROTECTED = 512;
+
+    public const REFLECTION_IS_PRIVATE = 1024;
+
+    /**
+     * Class hierarchy from $entry to root parent (child-first).
+     *
+     * @return list<ClassEntry>
+     */
+    public static function classHierarchyChain(ClassEntry $entry, Context $ctx): array
+    {
+        $chain = [$entry];
+        $current = $entry;
+        while (null !== $current->parentLc && isset($ctx->classes[$current->parentLc])) {
+            $current = $ctx->classes[$current->parentLc];
+            $chain[] = $current;
+        }
+
+        return $chain;
+    }
+
+    public static function matchesReflectionVisibilityFilter(int $cfgVisibility, int $filter): bool
+    {
+        if (0 === $filter) {
+            return true;
+        }
+
+        return (self::visibilityToReflectionBitmask($cfgVisibility) & $filter) !== 0;
+    }
+
+    public static function visibilityToReflectionBitmask(int $cfgVisibility): int
+    {
+        if (($cfgVisibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+            return self::REFLECTION_IS_PRIVATE;
+        }
+        if (($cfgVisibility & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+            return self::REFLECTION_IS_PROTECTED;
+        }
+
+        return self::REFLECTION_IS_PUBLIC;
+    }
+
+    /**
+     * Instance properties visible on $entry (child overrides parent), php-src ReflectionClass::getProperties.
+     *
+     * @return list<ClassProperty>
+     */
+    public static function collectClassPropertiesForReflection(ClassEntry $entry, Context $ctx, int $filter = 0): array
+    {
+        $byLc = [];
+        foreach (array_reverse(self::classHierarchyChain($entry, $ctx)) as $class) {
+            foreach ($class->properties as $prop) {
+                if (!self::matchesReflectionVisibilityFilter($prop->visibility, $filter)) {
+                    continue;
+                }
+                $byLc[strtolower($prop->name)] = $prop;
+            }
+        }
+
+        return array_values($byLc);
+    }
+
+    /**
+     * Methods visible on $entry (child overrides parent), php-src ReflectionClass::getMethods.
+     *
+     * @return list<array{methodLc: string, display: string, declaring: ClassEntry}>
+     */
+    public static function collectClassMethodsForReflection(ClassEntry $entry, Context $ctx, int $filter = 0): array
+    {
+        $byLc = [];
+        foreach (array_reverse(self::classHierarchyChain($entry, $ctx)) as $class) {
+            foreach ($class->methods as $methodLc => $_func) {
+                $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                if (!self::matchesReflectionVisibilityFilter($vis, $filter)) {
+                    continue;
+                }
+                $byLc[$methodLc] = [
+                    'methodLc' => $methodLc,
+                    'display' => $class->methodNames[$methodLc] ?? $methodLc,
+                    'declaring' => $class,
+                ];
+            }
+        }
+
+        return array_values($byLc);
+    }
+
+    /**
+     * ReflectionClass::getProperties() result array (#3815).
+     */
+    public static function reflectionPropertiesArray(
+        Context $ctx,
+        ClassEntry $entry,
+        string $reflectedClassName,
+        int $filter = 0
+    ): Variable {
+        $rpClass = $ctx->classes[\PHPCompiler\VM\ReflectionSupport::REFLECTION_PROPERTY] ?? null;
+        if (null === $rpClass) {
+            throw new \LogicException('ReflectionProperty is not registered in this compiler build');
+        }
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (self::collectClassPropertiesForReflection($entry, $ctx, $filter) as $prop) {
+            $obj = new \PHPCompiler\VM\ObjectEntry($rpClass);
+            $obj->constructed = true;
+            $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME)->string($reflectedClassName);
+            $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_PROPERTY_NAME)->string($prop->name);
+            $slot = new Variable(Variable::TYPE_OBJECT);
+            $slot->object($obj);
+            $ht->append($slot);
+        }
+
+        return $result;
+    }
+
+    /**
+     * ReflectionClass::getMethods() result array (#3815).
+     */
+    public static function reflectionMethodsArray(
+        Context $ctx,
+        ClassEntry $entry,
+        string $reflectedClassName,
+        int $filter = 0
+    ): Variable {
+        $rmClass = $ctx->classes[\PHPCompiler\VM\ReflectionSupport::REFLECTION_METHOD] ?? null;
+        if (null === $rmClass) {
+            throw new \LogicException('ReflectionMethod is not registered in this compiler build');
+        }
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (self::collectClassMethodsForReflection($entry, $ctx, $filter) as $spec) {
+            $obj = new \PHPCompiler\VM\ObjectEntry($rmClass);
+            $obj->constructed = true;
+            $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME)->string($reflectedClassName);
+            $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_METHOD_NAME)->string($spec['display']);
+            $slot = new Variable(Variable::TYPE_OBJECT);
+            $slot->object($obj);
+            $ht->append($slot);
+        }
+
+        return $result;
+    }
+
+    public static function optionalReflectionFilterArg(Frame $frame, int $argIndex): int
+    {
+        if (\count($frame->calledArgs) <= $argIndex) {
+            return 0;
+        }
+        $filterArg = $frame->calledArgs[$argIndex]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $filterArg->type) {
+            return 0;
+        }
+
+        return $filterArg->toInt();
+    }
 }

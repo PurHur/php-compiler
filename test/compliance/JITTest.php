@@ -190,6 +190,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'reflection_oop')) {
                 continue;
             }
+            // ReflectionClass::getProperties/getMethods are VM-only (#3815).
+            if (str_contains($name, 'reflection_class_members')) {
+                continue;
+            }
             // array_walk_recursive() is VM-only until recursive LLVM walk (#3111).
             if (str_contains($name, 'array_walk_recursive')) {
                 continue;
