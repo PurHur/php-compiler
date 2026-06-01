@@ -26,7 +26,7 @@ final class ExceptionTrace
             return;
         }
         $object->getProperty('trace')->copyFrom(
-            VmDebugBacktrace::build($frame, true)
+            VmDebugBacktrace::build($frame)
         );
     }
 
