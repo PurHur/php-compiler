@@ -611,6 +611,7 @@ class Context {
                 $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending'));
                 Builtin\ReadonlyRaise::emitClearForStandaloneMain($this);
                 Builtin\TypeErrorRaise::emitClearForStandaloneMain($this);
+                Builtin\ErrorRaise::emitClearForStandaloneMain($this);
             }
             $this->builder->call(
                 $this->lookupFunction('__phpc_progress_note'),
@@ -630,6 +631,7 @@ class Context {
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
                 Builtin\ReadonlyRaise::emitAbortIfPendingForStandaloneMain($this);
                 Builtin\TypeErrorRaise::emitAbortIfPendingForStandaloneMain($this);
+                Builtin\ErrorRaise::emitAbortIfPendingForStandaloneMain($this);
                 Builtin\PendingHeaders::emitFlushForStandalone($this);
                 Builtin\ObOutput::emitEndAllForStandalone($this);
             }
@@ -701,6 +703,7 @@ class Context {
             );
             Builtin\ReadonlyRaise::bindJitEngine($engine);
             Builtin\TypeErrorRaise::bindJitEngine($engine);
+            Builtin\ErrorRaise::bindJitEngine($engine);
             Builtin\JitThrow::bindJitEngine($engine);
             foreach ($this->exports as $export) {
                 $export[2]->handler = $this->result->getHandler($export[0], $export[1]);
@@ -723,6 +726,7 @@ class Context {
         );
         Builtin\ReadonlyRaise::bindJitEngine($engine);
         Builtin\TypeErrorRaise::bindJitEngine($engine);
+        Builtin\ErrorRaise::bindJitEngine($engine);
         Builtin\JitThrow::bindJitEngine($engine);
         foreach ($this->exports as $export) {
             $export[2]->handler = $this->result->getHandler($export[0], $export[1]);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\JitThrow;
 use PHPCompiler\OpCode;
 use PHPLLVM\BasicBlock;
@@ -139,6 +140,43 @@ final class TryCatchHelper
         if (null !== $saved) {
             $builder->positionAtEnd($saved);
         }
+    }
+
+    /**
+     * Raise a catchable Error inside an active try block (asymmetric visibility #4029).
+     */
+    public static function emitCatchableErrorMessage(
+        Context $context,
+        \PHPCompiler\JIT $jit,
+        string $message
+    ): void {
+        JitThrow::registerDeclarations($context);
+        JitThrow::ensureLinked($context);
+        $handler = $context->tryCatch->handlerStack[array_key_last($context->tryCatch->handlerStack)] ?? null;
+        if (null === $handler) {
+            ErrorRaise::emitRaise($context, $message);
+
+            return;
+        }
+        $func = $context->builder->getInsertBlock()->getParent();
+        assert($func instanceof Function_);
+        $dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, []);
+
+        $object = $context->type->object;
+        $classId = $object->lookup('Error');
+        $obj = $object->allocate($classId);
+        $object->markObjectConstructed($obj);
+        $msgStr = $context->builder->load($context->constantStringFromString($message));
+        $msgVar = new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $msgStr
+        );
+        $object->storeInstanceProperty($obj, 'Error', 'message', $msgVar);
+
+        $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
+        $context->builder->branch($dispatchBb);
     }
 
     public static function emitThrow(

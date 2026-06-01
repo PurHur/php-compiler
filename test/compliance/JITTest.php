@@ -402,8 +402,8 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gettimeofday')) {
                 continue;
             }
-            // PHP 8.4 asymmetric visibility is VM-only until JIT property guards (#3165).
-            if (str_contains($name, 'asymmetric_visibility')) {
+            // Uncaught asymmetric_visibility fatal: MCJIT execute unstable on property fetch (#4029, #98).
+            if (str_contains($name, 'asymmetric_visibility') && !str_contains($name, 'jit_try')) {
                 continue;
             }
             // DNF typed properties: MCJIT segfault on assign (pre-#4008); params/returns JIT OK.
