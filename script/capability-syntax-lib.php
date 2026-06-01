@@ -234,7 +234,7 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'VM GeneratorState + foreach; keyed yield (#3085)',
                 'MCJIT/AOT resume lowering for nested generator funcs (#3074, #3115); script-scope yield blocked',
-                'JIT linear `yield` + packed-array `yield from`; `yield from` generator + try/catch in generator JIT deferred',
+                'JIT linear `yield` + `yield from` array/generator delegation (#3074, #4014); try/catch in generator JIT deferred',
                 'see docs/generators-jit-aot.md',
                 'AOT fixture generator_yield.phpt + generator_yield_keys.phpt',
             ],
