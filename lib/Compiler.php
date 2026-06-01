@@ -2278,6 +2278,10 @@ class Compiler {
             }
         }
         if (Type::TYPE_UNION === $type->type) {
+            // PHPTypes Type::mixed() — untyped properties and `mixed` hints must not coerce writes (#2256).
+            if (str_contains($type->toString(), 'callable')) {
+                return $return;
+            }
             $members = [];
             foreach ($type->subTypes as $sub) {
                 $mapped = Variable::mapFromType($sub);
@@ -4846,6 +4850,31 @@ class Compiler {
         return null;
     }
 
+    /**
+     * php-cfg may emit StaticPropertyFetch + Terminal_Unset on the fetch result temp (#2256).
+     */
+    protected function findStaticPropertyFetchForUnset(Operand $expr, Block $block): ?Op\Expr\StaticPropertyFetch
+    {
+        $direct = $this->unwrapStaticPropertyFetch($expr);
+        if (null !== $direct) {
+            return $direct;
+        }
+        $target = $expr;
+        while ($target instanceof Temporary) {
+            foreach ($block->orig->children as $child) {
+                if ($child instanceof Op\Expr\StaticPropertyFetch && $child->result === $target) {
+                    return $child;
+                }
+            }
+            if (null === $target->original) {
+                break;
+            }
+            $target = $target->original;
+        }
+
+        return null;
+    }
+
     protected function requireOperandSlot(?int $slot, string $context): int
     {
         if (null === $slot) {
@@ -5049,12 +5078,19 @@ class Compiler {
             case 'Terminal_Unset':
                 $ops = [];
                 foreach ($terminal->exprs as $unsetExpr) {
-                    if ($unsetExpr instanceof Op\Expr\StaticPropertyFetch) {
+                    $staticPropertyFetch = $unsetExpr instanceof Op\Expr\StaticPropertyFetch
+                        ? $unsetExpr
+                        : ($unsetExpr instanceof Operand ? $this->findStaticPropertyFetchForUnset($unsetExpr, $block) : null);
+                    if (null !== $staticPropertyFetch) {
                         $ops[] = new OpCode(
                             OpCode::TYPE_STATIC_PROPERTY_UNSET,
                             null,
-                            $this->compileOperand($unsetExpr->class, $block, true),
-                            $this->compileStaticPropertyNameSlot($unsetExpr->name, $unsetExpr->class, $block)
+                            $this->compileOperand($staticPropertyFetch->class, $block, true),
+                            $this->compileStaticPropertyNameSlot(
+                                $staticPropertyFetch->name,
+                                $staticPropertyFetch->class,
+                                $block
+                            )
                         );
                         continue;
                     }
