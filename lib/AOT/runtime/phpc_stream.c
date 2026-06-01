@@ -185,8 +185,15 @@ __string__ *__compiler_fread(int64_t handle, int64_t length)
     return result;
 }
 
+extern int __compiler_is_dir_resource(int64_t handle);
+
+#define PHPC_DIR_HANDLE_BASE ((int64_t) 0x10000000)
+
 int __compiler_is_resource(int64_t handle)
 {
+    if (handle >= PHPC_DIR_HANDLE_BASE && __compiler_is_dir_resource(handle)) {
+        return 1;
+    }
     /* fopen() handles start at 3; 1/2 are stdio aliases in phpc_resolve_stream (#3519). */
     if (handle <= 2) {
         return 0;

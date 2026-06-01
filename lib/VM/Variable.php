@@ -79,6 +79,8 @@ final class Variable {
     /** Stream handle from fopen()/similar; distinguishes handle ints from plain integers (#3519). */
     public bool $streamResource = false;
 
+    public bool $dirResource = false;
+
     /** Lvalue proxy for __set dispatch when the property slot does not exist (#146). */
     public ?ObjectEntry $magicSetTarget = null;
 
@@ -138,6 +140,7 @@ final class Variable {
         $this->resetScalars();
         $this->type = self::TYPE_ARRAY;
         $this->streamResource = false;
+        $this->dirResource = false;
         $this->array = $ht;
     }
 
@@ -178,17 +181,31 @@ final class Variable {
         $this->type = self::TYPE_INTEGER;
         $this->integer = $value;
         $this->streamResource = false;
+        $this->dirResource = false;
     }
 
     public function streamHandle(int $value): void
     {
         $this->int($value);
         $this->streamResource = true;
+        $this->dirResource = false;
+    }
+
+    public function dirHandle(int $value): void
+    {
+        $this->int($value);
+        $this->dirResource = true;
+        $this->streamResource = false;
     }
 
     public function isStreamResource(): bool
     {
         return $this->streamResource && self::TYPE_INTEGER === $this->type;
+    }
+
+    public function isDirResource(): bool
+    {
+        return $this->dirResource && self::TYPE_INTEGER === $this->type;
     }
 
     public function is(int $type): bool {
@@ -504,6 +521,7 @@ final class Variable {
         $this->resetScalars();
         $this->type = self::TYPE_NULL;
         $this->streamResource = false;
+        $this->dirResource = false;
     }
 
     private function releaseArrayRef(): void
@@ -638,6 +656,7 @@ final class Variable {
             case self::TYPE_INTEGER:
                 $this->int($var->integer);
                 $this->streamResource = $var->streamResource;
+                $this->dirResource = $var->dirResource;
                 break;
             case self::TYPE_FLOAT:
                 $this->float($var->float);
@@ -670,6 +689,7 @@ final class Variable {
                 $var->array->addRef();
                 $this->type = self::TYPE_ARRAY;
                 $this->streamResource = false;
+                $this->dirResource = false;
                 $this->array = $var->array;
                 break;
             case self::TYPE_ENUM_CASE:
