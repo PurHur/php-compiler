@@ -169,6 +169,7 @@ static const char *phpc_builtin_functions[] = {
     "get_loaded_extensions",
     "get_object_vars",
     "get_parent_class",
+    "get_resource_id",
     "get_resources",
     "getallheaders",
     "getcwd",

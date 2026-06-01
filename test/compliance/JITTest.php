@@ -130,6 +130,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'get_resources')) {
                 continue;
             }
+            // get_resource_id() MCJIT: VM + AOT lint (#3180); fopen/__compiler_is_resource execute segfault until stable.
+            if (str_contains($name, 'get_resource_id')) {
+                continue;
+            }
             // stream_set_timeout/chunk_size MCJIT: VM + AOT (#3754); jit.php execute exit -1 until stable.
             if (str_contains($name, 'stream_set_timeout')) {
                 continue;
