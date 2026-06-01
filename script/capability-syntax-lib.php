@@ -282,10 +282,11 @@ function syntaxRowDefinitions(): array
             'construct' => 'Class constants with `new` object expressions (PHP 8.3)',
             'opcodes' => ['TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH', 'TYPE_NEW'],
             'issue' => 3196,
-            'jit' => false,
+            'jit' => true,
+            'aot' => true,
             'notes' => [
                 'Zend zend_compile_const_expr / zend_constants.c — materialize at class definition; shared identity on fetch',
-                'VM: ClassConstMaterializer + defineClass const-init opcodes; JIT compile lowers metadata (execute follow-up)',
+                'VM: ClassConstMaterializer; JIT/AOT: immortal module-global object in __init__ (#4021); MCJIT execute: ClassConstObjectJitCompileTest',
             ],
             'probe' => 'class C { public const X = new stdClass(); } echo (C::X instanceof stdClass && C::X === C::X) ? "1" : "0";',
         ],

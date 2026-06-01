@@ -366,6 +366,58 @@ class Object_ extends Type {
         return $obj;
     }
 
+    /**
+     * Immortal object for class constants (`public const X = new …`, #3196, #4021).
+     *
+     * Module-global singleton: no GC registration, non-refcounted header (php-src persistent zval).
+     */
+    public function allocateClassConstantObject(int $classId): PHPLLVM\Value
+    {
+        $objType = $this->context->getTypeFromString('__object__');
+        $propCount = count($this->properties[$classId] ?? []);
+        if (0 === $propCount) {
+            $obj = $this->context->memory->malloc($objType);
+        } else {
+            $obj = $this->context->memory->mallocWithExtra(
+                $objType,
+                $this->context->constantFromInteger(8 * $propCount, 'size_t')
+            );
+        }
+
+        $map = $this->context->structFieldMap['__object__'];
+        $this->context->builder->store(
+            $this->context->constantFromInteger($classId, 'int64'),
+            $this->context->builder->structGep($obj, $map['class_id'])
+        );
+        $this->context->builder->store(
+            $this->context->getTypeFromString('int8')->constInt(1, false),
+            $this->context->builder->structGep($obj, $map['constructed'])
+        );
+
+        $typeinfo = $this->context->getTypeFromString('int32')->constInt(
+            Refcount::TYPE_INFO_TYPE_OBJECT | Refcount::TYPE_INFO_NONREFCOUNTED,
+            false
+        );
+        $ref = $this->context->builder->pointerCast(
+            $obj,
+            $this->context->getTypeFromString('__ref__virtual*')
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__ref__init'),
+            $typeinfo,
+            $ref
+        );
+
+        if ($propCount > 0) {
+            $this->initPropertySlots($obj, $propCount);
+            $this->initPropertyDefaults($obj, $classId);
+            $this->initRuntimePropertyNewDefaults($obj, $classId);
+            $this->initEmptyHashtableProperties($obj, $classId);
+        }
+
+        return $obj;
+    }
+
     public function splObjectStorageClassId(): ?int
     {
         return $this->splObjectStorageClassId;
@@ -1850,14 +1902,10 @@ class Object_ extends Type {
             $global = $this->context->module->addGlobal($objPtrType, $globalName);
             $global->setInitializer($objPtrType->constNull());
             $this->classConstObjectGlobals[$globalName] = $global;
-            $restore = $this->context->builder->getInsertBlock();
-            $this->context->builder->positionAtEnd($this->context->initBlock);
-            $alloc = $this->allocate($jitClassId);
-            if (!$this->hasConstructor($jitClassId)) {
-                $this->markObjectConstructed($alloc);
-            }
-            $this->context->builder->store($alloc, $global);
-            $this->context->builder->positionAtEnd($restore);
+            $this->context->emitInInit(function (Context $ctx) use ($jitClassId, $global): void {
+                $alloc = $this->allocateClassConstantObject($jitClassId);
+                $ctx->builder->store($alloc, $global);
+            });
             $this->classConstants[$classId][$key] = [
                 'type' => Variable::TYPE_OBJECT,
                 'global' => $globalName,
