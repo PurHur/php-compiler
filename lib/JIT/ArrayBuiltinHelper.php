@@ -4428,6 +4428,37 @@ final class ArrayBuiltinHelper
     }
 
     /**
+     * array_merge_recursive() — deep merge with scalar→array promotion (#3297).
+     */
+    public static function mergeRecursive(Context $context, Variable ...$arrays): Value
+    {
+        if (\count($arrays) < 2) {
+            throw new \LogicException('array_merge_recursive() requires at least two arguments');
+        }
+
+        $allReindexable = true;
+        $hts = [];
+        foreach ($arrays as $array) {
+            $ht = self::loadHashTable($context, $array);
+            $hts[] = $ht;
+            if (!\PHPCompiler\ext\standard\JitArrayIsList::hashTableIsReindexableList($context, $ht)) {
+                $allReindexable = false;
+            }
+        }
+        if ($allReindexable) {
+            return self::merge($context, ...$arrays);
+        }
+
+        $result = HashTableHelper::alloc($context);
+        self::overlayHashTable($context, $result, $hts[0]);
+        for ($i = 1, $n = \count($hts); $i < $n; ++$i) {
+            \PHPCompiler\ext\standard\JitArrayMergeRecursive::overlay($context, $result, $hts[$i]);
+        }
+
+        return $result;
+    }
+
+    /**
      * Copy string-key entries from {@param $src} into {@param $dest}, overwriting duplicates (#2287).
      */
     private static function mergeStringKeysInto(Context $context, Value $dest, Value $src): void

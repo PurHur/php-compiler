@@ -26,6 +26,7 @@ static const char *phpc_builtin_functions[] = {
     "array_keys",
     "array_map",
     "array_merge",
+    "array_merge_recursive",
     "array_multisort",
     "array_pad",
     "array_pop",
