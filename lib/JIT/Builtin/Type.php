@@ -812,6 +812,11 @@ class Type extends Builtin {
             $this->context->context->functionType($strPtr, false, $i64)
         );
         $this->context->registerFunction('__phpc_stream_path', $fnStreamPath);
+        $fnFstat = $this->context->module->addFunction(
+            '__phpc_fstat',
+            $this->context->context->functionType($htPtr, false, $i64)
+        );
+        $this->context->registerFunction('__phpc_fstat', $fnFstat);
         $fnFgetcsv = $this->context->module->addFunction(
             '__compiler_fgetcsv',
             $this->context->context->functionType($htPtr, false, $i64, $i64, $strPtr, $strPtr, $strPtr)

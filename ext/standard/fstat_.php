@@ -46,14 +46,9 @@ final class fstat_ extends Internal
             throw new \LogicException('fstat() requires exactly one argument in this compiler build');
         }
 
-        $path = $context->builder->call(
-            $context->lookupFunction('__phpc_stream_path'),
-            $context->builder->truncOrBitCast(
-                JitLongArg::lower($context, $args[0], 'fstat() handle'),
-                $context->getTypeFromString('int64')
-            )
+        return JitStatArray::invokeHandle(
+            $context,
+            JitLongArg::lower($context, $args[0], 'fstat() handle')
         );
-
-        return JitStatArray::invoke($context, $path, false);
     }
 }

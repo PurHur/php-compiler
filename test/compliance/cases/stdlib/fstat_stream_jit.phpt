@@ -1,5 +1,5 @@
 --TEST--
-JIT: fstat() on stream resource via __phpc_stream_path + stat (issue #3482)
+JIT: fstat() on stream resource via __phpc_fstat (issue #3482)
 --FILE--
 <?php
 $path = 'test/compliance/cases/stdlib/readfile_fixture/data.txt';
