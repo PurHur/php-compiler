@@ -654,6 +654,109 @@ __string__ *__compiler_hash_hmac(__string__ *algo, __string__ *data, __string__ 
     return hc_result_string(id, digest, raw);
 }
 
+static void hc_pbkdf2_f(
+    int algo,
+    const uint8_t *pass,
+    size_t pass_len,
+    const uint8_t *salt,
+    size_t salt_len,
+    uint32_t block_index,
+    long long iterations,
+    uint8_t *out
+) {
+    size_t dlen = hc_digest_len(algo);
+    uint8_t *salt_block = (uint8_t *) malloc(salt_len + 4);
+
+    if (NULL == salt_block) {
+        return;
+    }
+    memcpy(salt_block, salt, salt_len);
+    salt_block[salt_len] = (uint8_t) ((block_index >> 24) & 0xff);
+    salt_block[salt_len + 1] = (uint8_t) ((block_index >> 16) & 0xff);
+    salt_block[salt_len + 2] = (uint8_t) ((block_index >> 8) & 0xff);
+    salt_block[salt_len + 3] = (uint8_t) (block_index & 0xff);
+
+    hc_hmac(algo, salt_block, salt_len + 4, pass, pass_len, out);
+    free(salt_block);
+
+    uint8_t U[SHA256_DIGEST_SIZE];
+    memcpy(U, out, dlen);
+    for (long long i = 1; i < iterations; i++) {
+        hc_hmac(algo, U, dlen, pass, pass_len, U);
+        for (size_t j = 0; j < dlen; j++) {
+            out[j] ^= U[j];
+        }
+    }
+}
+
+/** hash_pbkdf2() — sha256, sha1, md5 (issue #3773). */
+__string__ *__compiler_hash_pbkdf2(
+    __string__ *algo,
+    __string__ *password,
+    __string__ *salt,
+    long long iterations,
+    long long length,
+    int raw
+) {
+    int id = hc_algo_id(algo);
+
+    if (0 == id || iterations < 1) {
+        return NULL;
+    }
+    size_t hlen = hc_digest_len(id);
+    size_t dklen = (size_t) length;
+
+    if (0 == dklen) {
+        dklen = hlen;
+    }
+
+    size_t blocks = (dklen + hlen - 1) / hlen;
+    uint8_t *derived = (uint8_t *) malloc(dklen);
+
+    if (NULL == derived) {
+        return NULL;
+    }
+
+    size_t written = 0;
+    for (uint32_t block = 1; block <= blocks; block++) {
+        uint8_t T[SHA256_DIGEST_SIZE];
+        hc_pbkdf2_f(
+            id,
+            (const uint8_t *) hc_strdata(password),
+            hc_strlen(password),
+            (const uint8_t *) hc_strdata(salt),
+            hc_strlen(salt),
+            block,
+            iterations,
+            T
+        );
+        size_t copy = hlen;
+        if (written + copy > dklen) {
+            copy = dklen - written;
+        }
+        memcpy(derived + written, T, copy);
+        written += copy;
+    }
+
+    __string__ *result;
+    if (raw) {
+        result = __string__init((long long) dklen, (const char *) derived);
+    } else {
+        char *hex = (char *) malloc(dklen * 2 + 1);
+        if (NULL == hex) {
+            free(derived);
+
+            return NULL;
+        }
+        hc_hex_encode(derived, dklen, hex);
+        result = __string__init((long long) (dklen * 2), hex);
+        free(hex);
+    }
+    free(derived);
+
+    return result;
+}
+
 /** Timing-safe string compare for hash_equals() (issue #2179). */
 int __compiler_hash_equals(__string__ *known, __string__ *user)
 {

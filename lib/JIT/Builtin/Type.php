@@ -432,6 +432,19 @@ class Type extends Builtin {
         $fntypeHashHmac = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr, $i32);
         $fnHashHmac = $this->context->module->addFunction('__compiler_hash_hmac', $fntypeHashHmac);
         $this->context->registerFunction('__compiler_hash_hmac', $fnHashHmac);
+        $i64 = $this->context->getTypeFromString('int64');
+        $fntypeHashPbkdf2 = $this->context->context->functionType(
+            $strPtr,
+            false,
+            $strPtr,
+            $strPtr,
+            $strPtr,
+            $i64,
+            $i64,
+            $i32
+        );
+        $fnHashPbkdf2 = $this->context->module->addFunction('__compiler_hash_pbkdf2', $fntypeHashPbkdf2);
+        $this->context->registerFunction('__compiler_hash_pbkdf2', $fnHashPbkdf2);
         $fntypeHashEquals = $this->context->context->functionType($i32, false, $strPtr, $strPtr);
         $fnHashEquals = $this->context->module->addFunction('__compiler_hash_equals', $fntypeHashEquals);
         $this->context->registerFunction('__compiler_hash_equals', $fnHashEquals);
