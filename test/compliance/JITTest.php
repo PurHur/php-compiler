@@ -410,10 +410,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'asymmetric_visibility') && !str_contains($name, 'jit')) {
                 continue;
             }
-            // DNF typed properties: MCJIT segfault on assign (pre-#4008); params/returns JIT OK.
-            if (str_contains($name, 'dnf_property')) {
-                continue;
-            }
             // BackedEnum::from/tryFrom VM-only until JIT lowering (#3114, #3076).
             if (str_contains($name, 'enum_from') || str_contains($name, 'enum_try_from')) {
                 continue;

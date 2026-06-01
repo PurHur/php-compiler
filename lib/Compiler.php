@@ -79,6 +79,9 @@ class Compiler {
     /** Class being compiled while lowering static property declarations (#3814). */
     private ?string $currentClassStaticPropertyCompile = null;
 
+    /** Script declares DNF-typed instance properties — MCJIT needs a try region (#4111). */
+    private bool $scriptHasDnfTypedProperties = false;
+
     private ClassCompileRegistry $classCompileRegistry;
 
     public function setBareRethrowLines(array $lines): void
@@ -281,6 +284,7 @@ class Compiler {
         $this->haltCompilerRemaining = null;
         $this->compiledClassStaticProperties = [];
         $this->currentClassStaticPropertyCompile = null;
+        $this->scriptHasDnfTypedProperties = false;
         $this->classCompileRegistry = new ClassCompileRegistry();
         $this->seen = new SplObjectStorage;
         $this->ternaryMergeVarSlots = new SplObjectStorage;
@@ -306,6 +310,10 @@ class Compiler {
         }
 
         $this->seen = null;
+
+        if ($this->scriptHasDnfTypedProperties) {
+            $this->appendMcjitDnfPropertyTryEpilogue($main);
+        }
 
         InterfaceImplementationCheck::validate($script);
         TraitCollisionCheck::validate($script);
@@ -1774,6 +1782,43 @@ class Compiler {
      * True when declared type uses union/intersection/nullable DNF shape (#3094).
      * Plain scalars like `int` stay on paramTypeConstraints / typeConstraint paths.
      */
+    /**
+     * MCJIT execute for DNF typed property scripts needs at least one try/catch region
+     * (empty body is enough — see compliance dnf_property* vs dnf_new_empty_try).
+     */
+    private function appendMcjitDnfPropertyTryEpilogue(Block $main): void
+    {
+        $merge = new Block($main->orig);
+        $merge->func = $main->func;
+        $merge->inheritUndefinedLocals = true;
+        $merge->addOpCode(new OpCode(OpCode::TYPE_RETURN_VOID));
+
+        $tryBody = new Block($main->orig);
+        $tryBody->func = $main->func;
+        $tryBody->inheritUndefinedLocals = true;
+        $tryJump = new OpCode(OpCode::TYPE_JUMP);
+        $tryJump->block1 = $merge;
+        $tryBody->addOpCode($tryJump);
+
+        $catchBody = new Block($main->orig);
+        $catchBody->func = $main->func;
+        $catchBody->inheritUndefinedLocals = true;
+        $catchJump = new OpCode(OpCode::TYPE_JUMP);
+        $catchJump->block1 = $merge;
+        $catchBody->addOpCode($catchJump);
+
+        $tryOp = new OpCode(OpCode::TYPE_TRY);
+        $tryOp->block1 = $tryBody;
+        $tryOp->block2 = $merge;
+        $main->addOpCode($tryOp);
+
+        $catchOp = new OpCode(OpCode::TYPE_CATCH);
+        $catchOp->block1 = $catchBody;
+        $catchOp->block2 = $merge;
+        $catchOp->catchTypes = 'throwable';
+        $main->addOpCode($catchOp);
+    }
+
     protected function cfgTypeUsesDnfShape(?Op\Type $declared): bool
     {
         if (null === $declared) {
@@ -1955,15 +2000,23 @@ class Compiler {
                             }
                         }
                     }
+                    $typeSlot = $this->compileTypeConstrainedVariable(
+                        $result,
+                        $declared,
+                        null !== $propertyDeclName ? $propertyDeclName : $child->declaredType
+                    );
+                    if (
+                        !$child->static
+                        && isset($result->constants[$typeSlot])
+                        && null !== $result->constants[$typeSlot]->dnfArms
+                    ) {
+                        $this->scriptHasDnfTypedProperties = true;
+                    }
                     $declare = new OpCode(
                         $declareType,
                         $this->compileOperand($child->name, $result, true),
                         $defaultSlot,
-                        $this->compileTypeConstrainedVariable(
-                            $result,
-                            $declared,
-                            null !== $propertyDeclName ? $propertyDeclName : $child->declaredType
-                        )
+                        $typeSlot
                     );
                     if (!$child->static) {
                         $declare->propertyReadonly = (property_exists($child, 'readonly') && $child->readonly)
@@ -2158,11 +2211,15 @@ class Compiler {
         $declared = $this->typeFromParamDecl($param);
         $propName = new Operand\Literal($param->name->value);
         $propName->type = Type::string();
+        $typeSlot = $this->compileTypeConstrainedVariable($result, $declared, $param->declaredType);
+        if (isset($result->constants[$typeSlot]) && null !== $result->constants[$typeSlot]->dnfArms) {
+            $this->scriptHasDnfTypedProperties = true;
+        }
         $declare = new OpCode(
             OpCode::TYPE_DECLARE_PROPERTY,
             $this->compileOperand($propName, $result, true),
             $defaultSlot,
-            $this->compileTypeConstrainedVariable($result, $declared, $param->declaredType)
+            $typeSlot
         );
         $declare->propertyReadonly = $this->isPromotedParamReadonly($param);
         $declare->propertyVisibility = MethodVisibility::mask($param->promotionFlags);

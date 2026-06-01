@@ -19,6 +19,14 @@ final class DnfParamCheck
     /**
      * @param list<DnfArm> $arms
      */
+    public static function enforcePropertyWrite(Context $context, Variable $value, array $arms): void
+    {
+        self::enforce($context, $value, $arms, 'Property');
+    }
+
+    /**
+     * @param list<DnfArm> $arms
+     */
     public static function enforce(
         Context $context,
         Variable $arg,

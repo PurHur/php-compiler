@@ -7177,6 +7177,16 @@ class JIT {
                         );
                     }
                     $this->context->type->object->defineProperty($classId, $name->value, $jitType);
+                    if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
+                        $proto = $block->constants[$op->arg3];
+                        if (null !== $proto->dnfArms) {
+                            $this->context->type->object->definePropertyDnfArms(
+                                $classId,
+                                $name->value,
+                                $proto->dnfArms
+                            );
+                        }
+                    }
                     $this->context->type->object->definePropertyVisibility(
                         $classId,
                         $name->value,
@@ -7705,7 +7715,13 @@ class JIT {
             )) {
                 return;
             }
-            // Property DNF checks: defer to VM path until LLVM lowering is stable (#4008).
+            if (null !== $result->objectPropertyDnfArms) {
+                JIT\DnfParamCheck::enforcePropertyWrite(
+                    $this->context,
+                    $value,
+                    $result->objectPropertyDnfArms
+                );
+            }
             $this->context->type->object->propertyStore(
                 $result->objectPropertySlot,
                 $value,
@@ -8420,6 +8436,7 @@ class JIT {
             $dest->objectPropertyReceiver = null;
             $dest->objectPropertyName = null;
             $dest->objectPropertyClassName = null;
+            $dest->objectPropertyDnfArms = null;
         } else {
             $this->copyObjectPropertyBacking($dest, $src);
         }
@@ -8444,6 +8461,7 @@ class JIT {
         $dest->objectPropertyReceiver = $src->objectPropertyReceiver;
         $dest->objectPropertyName = $src->objectPropertyName;
         $dest->objectPropertyClassName = $src->objectPropertyClassName;
+        $dest->objectPropertyDnfArms = $src->objectPropertyDnfArms;
         $dest->closureCall = $src->closureCall;
         $dest->generatorStatePtr = $src->generatorStatePtr;
         $dest->generatorResumeName = $src->generatorResumeName;
@@ -8733,6 +8751,13 @@ class JIT {
             $this->context->jitEnclosingBlock
         )) {
             return;
+        }
+        if (null !== $dest->objectPropertyDnfArms) {
+            JIT\DnfParamCheck::enforcePropertyWrite(
+                $this->context,
+                $newVal,
+                $dest->objectPropertyDnfArms
+            );
         }
         $this->context->type->object->propertyStore(
             $dest->objectPropertySlot,
