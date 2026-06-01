@@ -1854,7 +1854,7 @@ class InternalArgInfo
         'get_loaded_extensions' => ['array', 'zend_extensions=' => 'bool'],
         'get_magic_quotes_gpc' => ['int'],
         'get_magic_quotes_runtime' => ['int'],
-        'get_meta_tags' => ['array', 'filename' => 'string', 'use_include_path=' => 'bool'],
+        'get_meta_tags' => ['array|false', 'filename' => 'string', 'use_include_path=' => 'bool'],
         'getmxrr' => ['bool', 'hostname' => 'string', 'mxhosts' => 'array', 'weight=' => 'array'],
         'getmygid' => ['int'],
         'getmyinode' => ['int'],
