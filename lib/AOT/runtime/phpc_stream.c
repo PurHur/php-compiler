@@ -705,3 +705,36 @@ __hashtable__ *__compiler_fgetcsv(
         return result;
     }
 }
+
+extern void __hashtable__setLongAt(__hashtable__ *ht, size_t index, long long val);
+
+/*
+ * get_resources() — active fopen/tmpfile handles (php-src basic_functions.c, #3646).
+ * type_filter NULL: all streams; "stream": same; any other string is invalid (caller validates).
+ */
+__hashtable__ *__compiler_get_resources(__string__ *type_filter)
+{
+    __hashtable__ *ht;
+    size_t index = 1;
+    int64_t id;
+
+    if (NULL != type_filter) {
+        size_t len = phpc_string_len(type_filter);
+        const char *data = phpc_string_data(type_filter);
+        if (len != 6 || 0 != memcmp(data, "stream", 6)) {
+            return NULL;
+        }
+    }
+
+    ht = __hashtable__alloc();
+    if (NULL == ht) {
+        return NULL;
+    }
+    for (id = 3; id < PHPC_MAX_STREAM_HANDLES; id++) {
+        if (NULL != phpc_stream_handles[id]) {
+            __hashtable__setLongAt(ht, index++, (long long) id);
+        }
+    }
+
+    return ht;
+}

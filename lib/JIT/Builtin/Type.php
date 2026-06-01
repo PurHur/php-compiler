@@ -304,6 +304,10 @@ class Type extends Builtin {
         $fntypeIsResource = $this->context->context->functionType($i32, false, $i64);
         $fnIsResource = $this->context->module->addFunction('__compiler_is_resource', $fntypeIsResource);
         $this->context->registerFunction('__compiler_is_resource', $fnIsResource);
+        $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $fntypeGetResources = $this->context->context->functionType($htPtr, false, $strPtr);
+        $fnGetResources = $this->context->module->addFunction('__compiler_get_resources', $fntypeGetResources);
+        $this->context->registerFunction('__compiler_get_resources', $fnGetResources);
         $fntypeGettype = $this->context->context->functionType($strPtr, false, $valuePtr);
         $fnGettype = $this->context->module->addFunction('__compiler_gettype', $fntypeGettype);
         $this->context->registerFunction('__compiler_gettype', $fnGettype);

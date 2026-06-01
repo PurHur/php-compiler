@@ -118,6 +118,7 @@ class Module extends ModuleAbstract
             new is_countable(),
             new is_iterable(),
             new is_resource_(),
+            new get_resources_(),
             new lcfirst(),
             new ucfirst(),
             new ucwords(),
