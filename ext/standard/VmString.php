@@ -1492,7 +1492,7 @@ final class VmString
             return $input;
         }
         if ('' === $padString) {
-            throw new \LogicException('str_pad(): Argument #3 ($pad_string) cannot be empty');
+            throw new \ValueError('str_pad(): Argument #3 ($pad_string) must be a non-empty string');
         }
         $need = $padLength - $inputLen;
         if (2 === $padType) {
