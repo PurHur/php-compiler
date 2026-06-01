@@ -6945,6 +6945,16 @@ class JIT {
         if ($toCall instanceof JIT\Call\Native || $toCall instanceof JIT\Call\Vararg) {
             return isset($this->context->functionReturnsRef[strtolower($toCall->name)]);
         }
+        if ($toCall instanceof JIT\Call\RuntimeIndirectInstanceMethodCall) {
+            foreach ($toCall->candidatesByClassId as $candidate) {
+                if (
+                    $candidate instanceof JIT\Call\Native
+                    && isset($this->context->functionReturnsRef[strtolower($candidate->name)])
+                ) {
+                    return true;
+                }
+            }
+        }
 
         return false;
     }
@@ -6965,6 +6975,9 @@ class JIT {
             Variable::KIND_VALUE,
             $llvmResult
         );
+        if ('__value__*' === $this->context->getStringFromType($llvmResult->typeOf())) {
+            $refVar->valueBoxAliasPtr = JIT\JitValueBox::normalizeValuePtr($this->context, $llvmResult);
+        }
         $refVar->addref();
         if (!$this->context->hasVariableOp($result)) {
             $this->context->setVariableOp($result, $refVar);

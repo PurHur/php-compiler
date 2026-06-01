@@ -397,10 +397,10 @@ function syntaxRowDefinitions(): array
             'id' => 'return_by_ref',
             'construct' => 'Return-by-reference (`function &f()` / `$x = &f()`)',
             'opcodes' => ['TYPE_RETURN', 'TYPE_FUNCCALL_EXEC_RETURN', 'TYPE_ASSIGN_REF'],
-            'issue' => 3778,
+            'issue' => 4054,
             'jit' => true,
-            'aot' => false,
-            'notes' => ['VM + JIT propagate reference cells via FLAG_RETURNS_REF (#3414, #3778); AOT deferred'],
+            'aot' => true,
+            'notes' => ['VM + JIT propagate reference cells via FLAG_RETURNS_REF (#3414, #3778); AOT aliases __value__* return slots (#4054)'],
             'probe' => 'function &c() { static $n = 0; return $n; } $r = &c(); $r = 5; echo c();',
         ],
         [
