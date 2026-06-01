@@ -13,23 +13,41 @@ use PHPCompiler\VM\Variable;
  */
 final class VmConstants
 {
-    /** Names resolved by VM\Context::constantFetch() (Core category). */
-    private const CORE_FETCH_NAMES = [
-        'true',
-        'false',
-        'password_bcrypt',
-        'password_default',
-        'crypt_std_des',
-        'crypt_ext_des',
-        'crypt_md5',
-        'crypt_blowfish',
-        'filter_validate_int',
-        'filter_validate_email',
-        'input_get',
-        'input_post',
-        ...Context::errorReportingConstantFetchNames(),
-        ...StdlibConstants::CORE_FETCH_NAMES,
-    ];
+    /** @var list<string>|null */
+    private static ?array $coreFetchNames = null;
+
+    /**
+     * Names resolved by VM\Context::constantFetch() (Core category).
+     *
+     * @return list<string>
+     */
+    private static function coreFetchNames(): array
+    {
+        if (null !== self::$coreFetchNames) {
+            return self::$coreFetchNames;
+        }
+
+        self::$coreFetchNames = \array_merge(
+            [
+                'true',
+                'false',
+                'password_bcrypt',
+                'password_default',
+                'crypt_std_des',
+                'crypt_ext_des',
+                'crypt_md5',
+                'crypt_blowfish',
+                'filter_validate_int',
+                'filter_validate_email',
+                'input_get',
+                'input_post',
+            ],
+            Context::errorReportingConstantFetchNames(),
+            StdlibConstants::CORE_FETCH_NAMES,
+        );
+
+        return self::$coreFetchNames;
+    }
 
     public static function getDefinedConstants(Context $ctx, bool $categorize = false): HashTable
     {
@@ -87,7 +105,7 @@ final class VmConstants
     private static function coreConstantEntries(Context $ctx, bool $categorized = false): array
     {
         $entries = [];
-        foreach (self::CORE_FETCH_NAMES as $fetchName) {
+        foreach (self::coreFetchNames() as $fetchName) {
             $value = $ctx->constantFetch($fetchName);
             if (null === $value) {
                 continue;

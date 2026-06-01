@@ -152,7 +152,7 @@ class Context {
             case 'password_bcrypt':
             case 'password_default':
                 $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmPassword::PASSWORD_DEFAULT);
+                $var->int(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_DEFAULT);
                 return $var;
             case 'crypt_std_des':
                 $var = new Variable(Variable::TYPE_INTEGER);
