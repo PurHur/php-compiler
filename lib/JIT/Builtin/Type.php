@@ -561,6 +561,11 @@ class Type extends Builtin {
             $fntypeMergeRecursiveOverlay
         );
         $this->context->registerFunction('__compiler_array_merge_recursive_overlay', $fnMergeRecursiveOverlay);
+        $fnReplaceRecursiveOverlay = $this->context->module->addFunction(
+            '__compiler_array_replace_recursive_overlay',
+            $fntypeMergeRecursiveOverlay
+        );
+        $this->context->registerFunction('__compiler_array_replace_recursive_overlay', $fnReplaceRecursiveOverlay);
         $fntypeUuencode = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnUuencode = $this->context->module->addFunction('__compiler_convert_uuencode', $fntypeUuencode);
         $this->context->registerFunction('__compiler_convert_uuencode', $fnUuencode);

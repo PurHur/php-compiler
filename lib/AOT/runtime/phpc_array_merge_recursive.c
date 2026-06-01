@@ -11,7 +11,6 @@ typedef struct __hashtable__ __hashtable__;
 typedef struct __value__ __value__;
 
 typedef struct __ref__ {
-    void *vtable;
     int32_t refcount;
     int32_t typeinfo;
 } __ref__;
@@ -21,10 +20,16 @@ typedef struct __value__ {
     int8_t value[8];
 } __value__;
 
+typedef struct __strkey_value__ {
+    int8_t type;
+    int8_t value[8];
+    int8_t pad[7];
+} __strkey_value__;
+
 typedef struct __strkey_node__ {
     __ref__ ref;
     __string__ *key;
-    __value__ value;
+    __strkey_value__ value;
     struct __strkey_node__ *next;
 } __strkey_node__;
 
@@ -185,7 +190,7 @@ static __hashtable__ *amr_ht_combine_values(__value__ *existing, __value__ *over
             NULL != node;
             node = node->next
         ) {
-            amr_ht_set_string_key_value(combined, node->key, &node->value);
+            amr_ht_set_string_key_value(combined, node->key, (__value__ *) &node->value);
         }
 
         return combined;
@@ -264,6 +269,6 @@ void __compiler_array_merge_recursive_overlay(__hashtable__ *dest, __hashtable__
     }
 
     for (__strkey_node__ *node = src->strKeys; NULL != node; node = node->next) {
-        amr_merge_string_key(dest, node->key, &node->value);
+        amr_merge_string_key(dest, node->key, (__value__ *) &node->value);
     }
 }

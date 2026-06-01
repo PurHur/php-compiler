@@ -1211,7 +1211,14 @@ final class ArrayBuiltinHelper
             $typeByte,
             $i8->constInt(Variable::TYPE_STRING & 0xff, false)
         );
-        $context->builder->branchIf($isString, $stringBlock, $longBlock);
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $afterString = BasicBlockHelper::append($context, 'ht_copy_packed_after_str_'.$tag);
+        $htBlock = BasicBlockHelper::append($context, 'ht_copy_packed_ht_'.$tag);
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
 
         $context->builder->positionAtEnd($stringBlock);
         $context->builder->call(
@@ -1219,6 +1226,18 @@ final class ArrayBuiltinHelper
             $dest,
             $destIndex,
             $context->builder->call($context->lookupFunction('__value__readString'), $srcEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $context->builder->branchIf($isHt, $htBlock, $longBlock);
+
+        $context->builder->positionAtEnd($htBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setHashtableAt'),
+            $dest,
+            $destIndex,
+            $context->builder->call($context->lookupFunction('__value__readHashtable'), $srcEntry)
         );
         $context->builder->branch($done);
 
@@ -5474,7 +5493,9 @@ final class ArrayBuiltinHelper
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($afterLong);
-        $context->builder->branchIf($isBool, $boolBlock, $done);
+        $afterBool = BasicBlockHelper::append($context, 'array_combine_sval_after_bool');
+        $htBlock = BasicBlockHelper::append($context, 'array_combine_sval_ht');
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
 
         $context->builder->positionAtEnd($boolBlock);
         $context->builder->call(
@@ -5485,6 +5506,23 @@ final class ArrayBuiltinHelper
                 $context->builder->call($context->lookupFunction('__value__readLong'), $valEntry),
                 $context->getTypeFromString('int1')
             )
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterBool);
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isHt, $htBlock, $done);
+
+        $context->builder->positionAtEnd($htBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyHashtable'),
+            $dest,
+            $keyStr,
+            $context->builder->call($context->lookupFunction('__value__readHashtable'), $valEntry)
         );
         $context->builder->branch($done);
 
@@ -8219,6 +8257,186 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($done);
 
         return $context->builder->load($foundSlot);
+    }
+
+    /**
+     * array_replace_recursive() — nested key merge (ext/standard/array.c parity; #3166).
+     */
+    public static function arrayReplaceRecursive(Context $context, Variable $first, Variable ...$others): Value
+    {
+        if (\count($others) < 1) {
+            throw new \LogicException('array_replace_recursive() requires at least two arguments');
+        }
+
+        $result = HashTableHelper::alloc($context);
+        self::overlayHashTable($context, $result, self::loadHashTable($context, $first));
+        $overlayFn = $context->lookupFunction('__compiler_array_replace_recursive_overlay');
+        foreach ($others as $other) {
+            $otherHt = self::loadHashTable($context, $other);
+            $context->builder->call($overlayFn, $result, $otherHt);
+            self::replaceRecursiveAddMissingStringKeys($context, $result, $otherHt);
+            self::replaceRecursiveOverlayPackedIndices($context, $result, $otherHt);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Packed-index overlay for array_replace_recursive() (string keys use C runtime; #3166).
+     */
+    private static function replaceRecursiveOverlayPackedIndices(
+        Context $context,
+        Value $dest,
+        Value $src
+    ): void {
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $valueMap = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $htType = Variable::TYPE_HASHTABLE;
+        $valuePtrType = $context->getTypeFromString('__value__*');
+
+        $nextFree = $context->builder->load($context->builder->structGep($src, $map['nextFreeElement']));
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_replace_rec_packed_idx');
+        $context->builder->store($zero, $idxSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_replace_rec_packed_head');
+        $body = BasicBlockHelper::append($context, 'array_replace_rec_packed_body');
+        $set = BasicBlockHelper::append($context, 'array_replace_rec_packed_set');
+        $next = BasicBlockHelper::append($context, 'array_replace_rec_packed_next');
+        $done = BasicBlockHelper::append($context, 'array_replace_rec_packed_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $idx
+        );
+        $context->builder->branchIf($isSet, $set, $next);
+
+        $context->builder->positionAtEnd($set);
+        $destHas = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $dest,
+            $idx
+        );
+        $srcVal = self::listEntryAt($context, $src, $idx);
+        $srcIsHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($context->builder->structGep($srcVal, $valueMap['type'])),
+            $i8->constInt($htType, false)
+        );
+        $destVal = self::listEntryAt($context, $dest, $idx);
+        $destIsHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($context->builder->structGep($destVal, $valueMap['type'])),
+            $i8->constInt($htType, false)
+        );
+        $bothHt = $context->builder->and(
+            $destHas,
+            $context->builder->and($srcIsHt, $destIsHt)
+        );
+        $copy = BasicBlockHelper::append($context, 'array_replace_rec_packed_copy');
+        $merge = BasicBlockHelper::append($context, 'array_replace_rec_packed_merge');
+        $context->builder->branchIf($bothHt, $merge, $copy);
+
+        $context->builder->positionAtEnd($copy);
+        self::copyPackedListEntry($context, $src, $idx, $dest, $idx);
+        $context->builder->branch($next);
+
+        $context->builder->positionAtEnd($merge);
+        $overlayFn = $context->lookupFunction('__compiler_array_replace_recursive_overlay');
+        $existingHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $destVal
+        );
+        $overlayHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $srcVal
+        );
+        $merged = HashTableHelper::alloc($context);
+        $context->builder->call($overlayFn, $merged, $existingHt);
+        $context->builder->call($overlayFn, $merged, $overlayHt);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setHashtableAt'),
+            $dest,
+            $idx,
+            $merged
+        );
+        $context->builder->branch($next);
+
+        $context->builder->positionAtEnd($next);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    /**
+     * Add string keys from {@param $src} missing in {@param $dest} after C overlay (#3166).
+     */
+    private static function replaceRecursiveAddMissingStringKeys(
+        Context $context,
+        Value $dest,
+        Value $src
+    ): void {
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+        $valuePtrType = $context->getTypeFromString('__value__*');
+
+        $strInit = BasicBlockHelper::append($context, 'array_replace_rec_add_str_init');
+        $strHead = BasicBlockHelper::append($context, 'array_replace_rec_add_str_head');
+        $context->builder->branch($strInit);
+
+        $context->builder->positionAtEnd($strInit);
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_replace_rec_add_str_walk');
+        $head = $context->builder->load($context->builder->structGep($src, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+        $strBody = BasicBlockHelper::append($context, 'array_replace_rec_add_str_body');
+        $strSet = BasicBlockHelper::append($context, 'array_replace_rec_add_str_set');
+        $strNext = BasicBlockHelper::append($context, 'array_replace_rec_add_str_next');
+        $strDone = BasicBlockHelper::append($context, 'array_replace_rec_add_str_done');
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $strDone, $strBody);
+
+        $context->builder->positionAtEnd($strBody);
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $context->builder->branch($strSet);
+
+        $context->builder->positionAtEnd($strSet);
+        $existingPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__peekStringKeyValue'),
+            $dest,
+            $keyStr
+        );
+        $existingNull = $context->builder->icmp(Builder::INT_EQ, $existingPtr, $valuePtrType->constNull());
+        $doSet = BasicBlockHelper::append($context, 'array_replace_rec_add_str_do_set');
+        $context->builder->branchIf($existingNull, $doSet, $strNext);
+
+        $context->builder->positionAtEnd($doSet);
+        self::storeValueEntryAtStringKey($context, $dest, $keyStr, $valEntry);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strNext);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strDone);
     }
 
     /**
