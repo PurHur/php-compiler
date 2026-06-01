@@ -9235,9 +9235,6 @@ class JIT {
     private function adaptByRefCallArgsForInternal(string $name, array $args, array $operands): array
     {
         $byRef = BuiltinByRefParams::forFunction($name);
-        if ([] === $byRef) {
-            return $args;
-        }
         foreach ($byRef as $idx) {
             if (!isset($args[$idx])) {
                 continue;
@@ -9247,6 +9244,20 @@ class JIT {
                 continue;
             }
             $args[$idx] = $this->ensureValueBoxLvalueForByRefPass($operand, $args[$idx]);
+        }
+        $variadicFrom = BuiltinByRefParams::variadicByRefFromIndex($name);
+        if (null !== $variadicFrom) {
+            $n = \count($args);
+            for ($idx = $variadicFrom; $idx < $n; ++$idx) {
+                if (!isset($args[$idx])) {
+                    continue;
+                }
+                $operand = $operands[$idx] ?? null;
+                if (null === $operand) {
+                    continue;
+                }
+                $args[$idx] = $this->ensureValueBoxLvalueForByRefPass($operand, $args[$idx]);
+            }
         }
 
         return $args;
