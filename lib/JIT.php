@@ -6875,7 +6875,28 @@ class JIT {
         $traitMethodSources = [];
         /** @var list<string> */
         $pendingTraitNames = [];
+        /** @var list<OpCode> */
+        $pendingPropertyNewDefaultOps = [];
+        $pendingPropertyNewClassName = null;
         foreach ($block->opCodes as $op) {
+            if ([] !== $pendingPropertyNewDefaultOps) {
+                if (OpCode::TYPE_DECLARE_PROPERTY === $op->type) {
+                    $pendingPropertyNewClassName = $this->jitPropertyNewClassNameFromOps($block, $pendingPropertyNewDefaultOps);
+                    $pendingPropertyNewDefaultOps = [];
+                } elseif (OpCode::TYPE_DECLARE_STATIC_PROPERTY === $op->type
+                    || OpCode::TYPE_DECLARE_CLASS_CONST === $op->type) {
+                    $pendingPropertyNewDefaultOps = [];
+                    $pendingPropertyNewClassName = null;
+                } else {
+                    $pendingPropertyNewDefaultOps[] = $op;
+
+                    continue;
+                }
+            } elseif (OpCode::TYPE_NEW === $op->type) {
+                $pendingPropertyNewDefaultOps[] = $op;
+
+                continue;
+            }
             if (OpCode::TYPE_TRAIT_USE_ADAPTATION === $op->type) {
                 if ($this->shouldSkipExternalClassBodyLowering($classId)) {
                     $pendingTraitNames = [];
@@ -6968,11 +6989,18 @@ class JIT {
                             $block->constants[$op->arg2]
                         );
                     }
+                    if (null !== $pendingPropertyNewClassName) {
+                        $this->context->type->object->definePropertyRuntimeNewDefault(
+                            $classId,
+                            $name->value,
+                            $pendingPropertyNewClassName
+                        );
+                        $pendingPropertyNewClassName = null;
+                    }
                     break;
                 case OpCode::TYPE_CONST_FETCH:
                 case OpCode::TYPE_CLASS_CONST_FETCH:
                 case OpCode::TYPE_INIT_ARRAY:
-                case OpCode::TYPE_NEW:
                 case OpCode::TYPE_ARG_SEND:
                 case OpCode::TYPE_FUNCCALL_EXEC_NORETURN:
                 case OpCode::TYPE_FUNCCALL_EXEC_RETURN:
@@ -7089,6 +7117,26 @@ class JIT {
             $ownMethods,
             $traitMethodSources
         );
+    }
+
+    /**
+     * @param list<OpCode> $pendingOps
+     */
+    private function jitPropertyNewClassNameFromOps(Block $block, array $pendingOps): ?string
+    {
+        foreach (array_reverse($pendingOps) as $newOp) {
+            if (OpCode::TYPE_NEW !== $newOp->type) {
+                continue;
+            }
+            $classOp = $block->getOperand($newOp->arg2);
+            if (!$classOp instanceof Operand\Literal) {
+                return null;
+            }
+
+            return $classOp->value;
+        }
+
+        return null;
     }
 
     /**

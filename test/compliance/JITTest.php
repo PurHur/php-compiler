@@ -374,12 +374,12 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'substr_jit')) {
                 continue;
             }
-            // property default `new` expressions — VM-only until JIT runtime init (#3391).
-            if (str_contains($name, 'property_default_new')) {
-                continue;
-            }
             // HashTable COW is VM-only until JIT mirrors refcount separation (#3760).
             if (str_contains($name, 'array_cow')) {
+                continue;
+            }
+            // property default `new` — LLVM verify in PropertyDefaultNewJitCompileTest (#3391); MCJIT execute segfaults (#98).
+            if (str_contains($name, 'property_default_new')) {
                 continue;
             }
             // Variable variables MCJIT execute segfaults; VM + compile probe in JitVariableVariablesTest (#3801, #1226).
