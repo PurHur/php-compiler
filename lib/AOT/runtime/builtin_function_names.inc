@@ -23,6 +23,8 @@ static const char *phpc_builtin_functions[] = {
     "array_key_exists",
     "array_key_first",
     "array_key_last",
+    "array_first",
+    "array_last",
     "array_keys",
     "array_map",
     "array_merge",
