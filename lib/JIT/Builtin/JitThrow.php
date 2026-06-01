@@ -23,18 +23,11 @@ final class JitThrow
 
     public static function ensureLinked(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
         self::implement($context);
     }
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         self::registerPendingGlobals($context);
         self::implementPendingHelpers($context);
     }

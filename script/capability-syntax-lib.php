@@ -674,10 +674,12 @@ function syntaxRowDefinitions(): array
             'construct' => 'throw expressions (PHP 8.0) — `throw` in expression context',
             'opcodes' => ['TYPE_THROW', 'TYPE_NEW', 'TYPE_JUMPIF'],
             'issue' => 3802,
+            'aot' => true,
             'notes' => [
                 'php-cfg Op\\Expr\\Throw_ overlay (#3802); php-types Expr_Throw type reconstructor patch',
                 'Compiler: skip duplicate New before Throw; fresh slot for ?: merge; ?? RHS via compileThrowExpression',
                 'VM/JIT reuse TYPE_THROW; compliance throw_expression.phpt (?:, ??, &&)',
+                'AOT: splitMergeBeforeNestedTry for sequential try merge (#4041); JitThrow LLVM pending globals in standalone',
             ],
             'probe' => 'try { echo (false ? 1 : throw new LogicException("x")); } catch (LogicException $e) { echo $e->getMessage(); }',
         ],

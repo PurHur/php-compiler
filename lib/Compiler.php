@@ -2751,6 +2751,7 @@ class Compiler {
             $block->addOpCode($op);
         } elseif ($stmt instanceof Op\Stmt\TryCatch) {
             $merge = $this->compileCfgBranch($stmt->end, $block);
+            $merge = $this->splitMergeBeforeNestedTry($merge);
             // Merge block is entered via TYPE_CATCH before catch locals exist (#195, #2084).
             $merge->inheritUndefinedLocals = true;
             $try = $this->compileCfgBranch($stmt->try, $block);
@@ -4585,6 +4586,41 @@ class Compiler {
                 $op->block1 = $finally;
             }
         }
+    }
+
+    /**
+     * Try/catch merge blocks from php-cfg may include later sibling try/catch in the same end
+     * block. JIT pre-lowers merge at beginTry via compileIncludedAtEntry; nested TYPE_TRY in
+     * that merge corrupts LLVM EH basic blocks (#4041). Split so merge is prefix-only + JUMP.
+     */
+    private function splitMergeBeforeNestedTry(Block $merge): Block
+    {
+        $splitAt = null;
+        for ($i = 0; $i < $merge->nOpCodes; ++$i) {
+            $type = $merge->opCodes[$i]->type;
+            if (
+                OpCode::TYPE_TRY === $type
+                || OpCode::TYPE_CATCH === $type
+                || OpCode::TYPE_FINALLY === $type
+            ) {
+                $splitAt = $i;
+                break;
+            }
+        }
+        if (null === $splitAt || 0 === $splitAt) {
+            return $merge;
+        }
+        $tailOps = \array_slice($merge->opCodes, $splitAt);
+        $merge->opCodes = \array_slice($merge->opCodes, 0, $splitAt);
+        $merge->nOpCodes = \count($merge->opCodes);
+        $tail = $merge->fragmentForOpcodes($tailOps);
+        $tail->orig = $merge->orig;
+        $tail->inheritUndefinedLocals = $merge->inheritUndefinedLocals;
+        $jump = new OpCode(OpCode::TYPE_JUMP);
+        $jump->block1 = $tail;
+        $merge->addOpCode($jump);
+
+        return $merge;
     }
 
     /**
