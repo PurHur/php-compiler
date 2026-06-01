@@ -121,7 +121,10 @@ final class TryCatchHelper
             return;
         }
         $handler->mergeEntryEmitted = true;
-        $dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, $args);
+        $dispatchBb = $handler->dispatchBb;
+        if (null === $dispatchBb) {
+            $dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, $args);
+        }
 
         $builder = $context->builder;
         $saved = $builder->getInsertBlock();
@@ -218,8 +221,17 @@ final class TryCatchHelper
         TryCatchHandler $handler,
         array $args
     ): BasicBlock {
+        if (null !== $handler->dispatchBb) {
+            $existing = $handler->dispatchBb->getParent();
+            if ($existing instanceof Function_ && $existing === $func) {
+                return $handler->dispatchBb;
+            }
+        }
+
         $suffix = self::blockSuffix($handler);
         $dispatch = self::appendBlock($func, 'try_catch_dispatch_'.$suffix);
+        // Pin before catch lowering: emitMergeEntryCheck re-enters dispatchBbFor mid-build (#4041).
+        $handler->dispatchBb = $dispatch;
         $builder = $context->builder;
         $saved = $builder->getInsertBlock();
         $builder->positionAtEnd($dispatch);
@@ -267,7 +279,7 @@ final class TryCatchHelper
                 $caughtVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
                 $jit->assignOperandForced($operand, $caughtVar);
             }
-            $jit->compileIncludedAtEntry($func, $catchOp->block1, $matchBb);
+            $jit->compileCatchArmAtEntry($func, $catchOp->block1, $matchBb, ...$args);
             $catchTail = $context->builder->getInsertBlock();
             $builder->positionAtEnd($catchTail);
             if (null !== $mergeBody && null === $catchTail->getTerminator()) {

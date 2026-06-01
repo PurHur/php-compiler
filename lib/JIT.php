@@ -4418,6 +4418,35 @@ class JIT {
     }
 
     /**
+     * Lower a catch arm at {@see TryCatchHelper::buildDispatch} match entry (#4041).
+     *
+     * Catch CFG blocks may already sit in blockStorage from an earlier partial compile;
+     * force re-lowering at the dispatch match BB and skip the trailing merge JUMP
+     * (TryCatchHelper branches to merge after the arm body).
+     *
+     * @param list<Variable> $args
+     */
+    public function compileCatchArmAtEntry(
+        PHPLLVM\Value $func,
+        Block $block,
+        PHPLLVM\BasicBlock $entryBlock,
+        Variable ...$args
+    ): PHPLLVM\BasicBlock {
+        $limit = $block->nOpCodes;
+        if ($limit > 0 && OpCode::TYPE_JUMP === $block->opCodes[$limit - 1]->type) {
+            --$limit;
+        }
+
+        $this->context->inlineIncludeExitBlock = null;
+        $exit = $this->compileBlockInternal($func, $block, $limit, $entryBlock, 0, false, ...$args);
+        if (null !== $this->context->inlineIncludeExitBlock) {
+            $exit = $this->context->inlineIncludeExitBlock;
+        }
+
+        return $exit;
+    }
+
+    /**
      * Opcode limit for compileIncludedAtEntry: skip redundant try-entry JUMP only (#2084).
      */
     private function includedAtEntryOpcodeLimit(Block $block): int
