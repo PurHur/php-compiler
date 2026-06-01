@@ -37,6 +37,9 @@ class ObjectEntry {
     /** Anonymous function / closure body (issue #72). */
     public ?ClosureState $closureState = null;
 
+    /** Closure target for ReflectionFunction instances (#4123). */
+    public ?ClosureState $reflectionClosureState = null;
+
     /** Initializer for lazy proxy objects (#3317). */
     public ?ClosureState $lazyInitializer = null;
 

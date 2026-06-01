@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
+use PHPCompiler\ext\standard\VmClosureCall;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
@@ -22,10 +23,18 @@ final class ReflectionFunctionConstruct extends VmClassMethod
             throw new \LogicException('ReflectionFunction::__construct() expects a function name');
         }
         $ctx = VmReflection::requireContext($frame);
-        $name = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionFunction::__construct() name');
-        ReflectionSupport::resolveUserFunction($ctx, $name);
         $receiver = ReflectionSupport::requireReflectionFunction($frame, $frame->calledArgs[0]);
-        $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string($name);
+        $target = $frame->calledArgs[1];
+        if (VmClosureCall::isClosure($target)) {
+            $state = VmClosureCall::resolve($target);
+            $receiver->reflectionClosureState = $state;
+            $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string($state->func->name);
+        } else {
+            $name = VmReflection::stringArg($target, 'ReflectionFunction::__construct() name');
+            ReflectionSupport::resolveUserFunction($ctx, $name);
+            $receiver->reflectionClosureState = null;
+            $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string($name);
+        }
         $receiver->constructed = true;
         if (null !== $frame->returnVar) {
             $frame->returnVar->null();
