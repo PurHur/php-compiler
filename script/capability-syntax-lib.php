@@ -358,12 +358,15 @@ function syntaxRowDefinitions(): array
             'id' => 'foreach_iterator',
             'construct' => 'foreach over Iterator / IteratorAggregate objects',
             'opcodes' => ['TYPE_ITER_RESET', 'TYPE_ITER_VALID', 'TYPE_ITER_KEY', 'TYPE_ITER_VALUE'],
-            'issue' => 4011,
+            'issue' => 4067,
+            'jit' => true,
+            'aot' => true,
             'notes' => [
                 'VM + JIT/AOT call rewind/valid/current/key/next (Zend zend_iterators.c parity)',
-                'IteratorAggregate::getIterator(); TypeError for non-iterable objects',
+                'IteratorProtocolHelper + IteratorHelper (#4011); IteratorAggregate::getIterator()',
+                'TypeError for non-iterable objects; compliance foreach_iterator_jit.phpt',
             ],
-            'probe' => null,
+            'probe' => 'class T implements Iterator { private int $i = 0; public function current() { return $this->i; } public function key() { return $this->i; } public function next(): void { $this->i++; } public function rewind(): void { $this->i = 0; } public function valid(): bool { return $this->i < 2; } } $s = 0; foreach (new T() as $v) { $s += $v; } echo $s;',
         ],
         [
             'id' => 'array_access_interface',
