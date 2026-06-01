@@ -32,6 +32,12 @@ final class IteratorHelper
             && 'splobjectstorage' === strtolower($containerUserType);
     }
 
+    private static function usesWeakMapHashtable(?string $containerUserType): bool
+    {
+        return null !== $containerUserType
+            && 'weakmap' === strtolower($containerUserType);
+    }
+
     /**
      * Borrowed {@see Variable::$objectPropertySlot} for external CFG / compiler array fields (#848).
      */
@@ -119,6 +125,9 @@ final class IteratorHelper
         if (Variable::TYPE_OBJECT === $array->type) {
             if (self::usesObjectKeys($containerUserType)) {
                 return $context->type->object->splBackingHashtable($array);
+            }
+            if (self::usesWeakMapHashtable($containerUserType)) {
+                return $context->type->object->weakMapBackingHashtable($array);
             }
 
             if (Variable::KIND_VALUE === $array->kind || Variable::KIND_VARIABLE === $array->kind) {

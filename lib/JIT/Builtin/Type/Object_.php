@@ -1768,6 +1768,7 @@ class Object_ extends Type {
         if ('weakmap' === $lcname) {
             $this->weakMapClassId = $id;
             $this->defineProperty($id, '__weak_map', Variable::TYPE_HASHTABLE);
+            $this->setClassInterfaces($displayName, ['arrayaccess', 'countable']);
         }
         if ('phpcompiler\\vm\\variable' === $lcname) {
             foreach ([
