@@ -64,6 +64,26 @@ PHP
             '123');
     }
 
+    public function testYieldFromGeneratorForeachExecutesViaMcjit(): void
+    {
+        $this->assertMcjitOutput(<<<'PHP'
+<?php
+function inner() {
+    yield 1;
+    yield 2;
+}
+function outer() {
+    yield from inner();
+    yield 3;
+}
+foreach (outer() as $v) {
+    echo $v;
+}
+PHP
+            ,
+            '123');
+    }
+
     public function testRequiresVmLoweringSkipsNestedGeneratorBodies(): void
     {
         $runtime = new Runtime();
