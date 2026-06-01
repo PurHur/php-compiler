@@ -455,7 +455,10 @@ function syntaxRowDefinitions(): array
             'construct' => '`goto` / labels (function scope)',
             'opcodes' => ['TYPE_JUMP'],
             'issue' => 1228,
-            'notes' => ['php-cfg lowers labels to CFG Jump; VM avoids frame nesting on same-block back-edges'],
+            'notes' => [
+                'php-cfg lowers labels to CFG Jump; VM avoids frame nesting on same-block back-edges',
+                'AOT native execute via TYPE_JUMP lowering (issue #4042)',
+            ],
             'probe' => '$i = 0; start: $i++; if ($i < 2) { goto start; } echo $i;',
         ],
         [
