@@ -59,13 +59,13 @@
       <div class="cap-summary">
         <article>
           <div>Language constructs</div>
-          <strong>77</strong> / 83 full (VM+JIT+AOT)
-          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">2 partial · 4 gaps</p>
+          <strong>75</strong> / 83 full (VM+JIT+AOT)
+          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">4 partial · 4 gaps</p>
         </article>
         <article>
           <div>Stdlib builtins</div>
-          <strong>461</strong> / 481 full (VM+JIT+AOT)
-          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">20 partial · 0 gaps</p>
+          <strong>452</strong> / 466 full (VM+JIT+AOT)
+          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">14 partial · 0 gaps</p>
         </article>
         <article>
           <div>Legend</div>
@@ -153,11 +153,11 @@
 <tr data-support="full"><td><code>`__serialize` / `__unserialize` magic methods</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/1365">#1365</a></td></tr>
 <tr data-support="gap"><td><code>Multi-type catch `catch (A</code></td><td class="status-yes">yes</td><td class="">B $e)`</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>yes</td></tr>
 <tr data-support="full"><td><code>`try` / `catch` / `throw`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/57">#57</a></td></tr>
-<tr data-support="full"><td><code>throw expressions (PHP 8.0) — `throw` in expression context</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3802">#3802</a></td></tr>
+<tr data-support="partial"><td><code>throw expressions (PHP 8.0) — `throw` in expression context</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td><a href="https://github.com/PurHur/php-compiler/issues/3802">#3802</a></td></tr>
 <tr data-support="full"><td><code>readonly classes</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/1360">#1360</a></td></tr>
 <tr data-support="full"><td><code>readonly properties (per-property)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3149">#3149</a></td></tr>
 <tr data-support="full"><td><code>Property hooks (`get` / `set` on properties)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3145">#3145</a></td></tr>
-<tr data-support="full"><td><code>PHP 8.4 asymmetric property visibility (public private(set), etc.)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3165">#3165</a></td></tr>
+<tr data-support="partial"><td><code>PHP 8.4 asymmetric property visibility (public private(set), etc.)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3165">#3165</a></td></tr>
 <tr data-support="partial"><td><code>User __destruct()</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td><a href="https://github.com/PurHur/php-compiler/issues/3144">#3144</a></td></tr>
 <tr data-support="full"><td><code>PHP 8 attributes — `ReflectionClass` / `ReflectionMethod` metadata</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/1936">#1936</a></td></tr>
 <tr data-support="full"><td><code>WeakReference / WeakMap</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3667">#3667</a></td></tr>
@@ -183,8 +183,8 @@
 <tr data-support="full"><td><code>`__halt_compiler`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`abs`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`acos`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`addcslashes`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`addslashes`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`addcslashes`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="partial"><td><code>`array_all`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="partial"><td><code>`array_any`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`array_change_key_case`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -245,8 +245,8 @@
 <tr data-support="full"><td><code>`boolval`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`ceil`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`chdir`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`chgrp`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`chmod`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`chgrp`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`chown`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`chr`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`chunk_split`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -256,7 +256,6 @@
 <tr data-support="full"><td><code>`class_parents`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`class_uses`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`clearstatcache`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`closedir`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`compact`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`constant`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`convert_uudecode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -364,7 +363,6 @@
 <tr data-support="full"><td><code>`getcwd`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`getdate`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`getenv`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`gethostbynamel`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`gethostname`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`getmygrgid`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`getmyinode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -378,12 +376,6 @@
 <tr data-support="full"><td><code>`gettype`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`glob`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`gmdate`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`gzcompress`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`gzdecode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`gzdeflate`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`gzencode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`gzinflate`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
-<tr data-support="partial"><td><code>`gzuncompress`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`hash`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`hash_equals`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`hash_hmac`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -489,14 +481,12 @@
 <tr data-support="full"><td><code>`ob_implicit_flush`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`ob_start`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`octdec`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`opendir`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`ord`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`pack`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`parse_str`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`parse_url`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`password_get_info`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`password_hash`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`password_needs_rehash`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`password_verify`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`pathinfo`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`php_sapi_name`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -506,7 +496,6 @@
 <tr data-support="full"><td><code>`phpversion`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`pi`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`pow`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`preg_filter`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`preg_grep`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`preg_last_error`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`preg_last_error_msg`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -520,8 +509,6 @@
 <tr data-support="full"><td><code>`printf`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`property_exists`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`putenv`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`quoted_printable_decode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`quoted_printable_encode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`quotemeta`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`rad2deg`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`random_bytes`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -529,7 +516,6 @@
 <tr data-support="full"><td><code>`range`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`rawurldecode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`rawurlencode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`readdir`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`readfile`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`readline`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`readlink`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -539,7 +525,6 @@
 <tr data-support="full"><td><code>`restore_error_handler`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`restore_exception_handler`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`rewind`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`rewinddir`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`rmdir`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`round`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`rsort`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -598,9 +583,9 @@
 <tr data-support="full"><td><code>`stream_set_timeout`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`stream_set_write_buffer`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`strip_tags`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`stripcslashes`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`stripos`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`stripslashes`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`stripcslashes`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`stristr`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`strlen`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`strnatcasecmp`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -620,9 +605,9 @@
 <tr data-support="full"><td><code>`strtr`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`strval`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`substr`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`substr_replace`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`substr_compare`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`substr_count`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
-<tr data-support="full"><td><code>`substr_replace`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`symlink`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sys_get_temp_dir`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sys_getloadavg`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>

@@ -55,9 +55,6 @@ foreach ($inventoryFiles as $rel) {
     if (in_array($rel, $spineCoverageDeferred, true)) {
         continue;
     }
-    if (bootstrap_spine_is_inventory_ahead_deferred($rel)) {
-        continue;
-    }
     if (isset($spineSubstitutes[$rel])) {
         if (isset($spinePaths[$rel]) || isset($spinePaths[$spineSubstitutes[$rel]])) {
             continue;
