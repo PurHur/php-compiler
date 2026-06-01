@@ -326,6 +326,7 @@ class Module extends ModuleAbstract
             new disk_total_space(),
             new diskfreespace(),
             new disktotalspace(),
+            new dl(),
             new clearstatcache_(),
             new stat_(),
             new lstat_(),
