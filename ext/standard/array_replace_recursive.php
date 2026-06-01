@@ -57,12 +57,6 @@ final class array_replace_recursive extends Internal
             throw new \LogicException('array_replace_recursive() requires at least two arguments');
         }
 
-        foreach ($args as $i => $arg) {
-            if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
-                $this->jitString($context, $arg, 'array_replace_recursive() argument #'.((int) $i + 1));
-            }
-        }
-
         return ArrayBuiltinHelper::arrayReplaceRecursive($context, $args[0], ...\array_slice($args, 1));
     }
 }

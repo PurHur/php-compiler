@@ -34,10 +34,6 @@ class JITTest extends BaseTest {
                 continue;
             }
             // preserve_keys=true: VM + JIT/AOT via ArrayBuiltinHelper (#3524).
-            // array_replace_recursive(): VM + AOT (#3166); MCJIT execute unstable (same as array_merge_recursive).
-            if (str_contains(strtolower($case[0]), 'array_replace_recursive')) {
-                continue;
-            }
             // array_merge_recursive(): VM + AOT via C overlay (#3297); MCJIT execute unstable.
             if (str_contains(strtolower($case[0]), 'array_merge_recursive')) {
                 continue;
@@ -146,10 +142,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gethostname')) {
                 continue;
             }
-            // gethostbynamel() MCJIT: dedicated GethostbynamelJITTest (#3707).
-            if (str_contains($name, 'gethostbynamel')) {
-                continue;
-            }
             // getprotobynumber()/getservbyport() MCJIT: NetworkServicesJITTest (#3650).
             if (str_contains($name, 'getprotobynumber')) {
                 continue;
@@ -172,10 +164,6 @@ class JITTest extends BaseTest {
             }
             // password_get_info() MCJIT: VM + AOT (#3649); jit.php execute exit -1 until stable.
             if (str_contains($name, 'password_get_info')) {
-                continue;
-            }
-            // password_needs_rehash() MCJIT: VM + AOT (#3279); MCJIT execute segfault until stable.
-            if (str_contains($name, 'password_needs_rehash')) {
                 continue;
             }
             // error_reporting() MCJIT: VM + AOT (#3220); phpc_ini_set.c __value__* mismatch until stable.

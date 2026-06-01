@@ -8270,19 +8270,18 @@ final class ArrayBuiltinHelper
 
         $result = HashTableHelper::alloc($context);
         self::overlayHashTable($context, $result, self::loadHashTable($context, $first));
-        $overlayFn = $context->lookupFunction('__compiler_array_replace_recursive_overlay');
         foreach ($others as $other) {
             $otherHt = self::loadHashTable($context, $other);
-            $context->builder->call($overlayFn, $result, $otherHt);
-            self::replaceRecursiveAddMissingStringKeys($context, $result, $otherHt);
             self::replaceRecursiveOverlayPackedIndices($context, $result, $otherHt);
+            self::replaceRecursiveMergeStringKeys($context, $result, $otherHt);
+            self::replaceRecursiveAddMissingStringKeys($context, $result, $otherHt);
         }
 
         return $result;
     }
 
     /**
-     * Packed-index overlay for array_replace_recursive() (string keys use C runtime; #3166).
+     * Packed-index overlay for array_replace_recursive() (#3166).
      */
     private static function replaceRecursiveOverlayPackedIndices(
         Context $context,
@@ -8296,7 +8295,6 @@ final class ArrayBuiltinHelper
         $valueMap = $context->structFieldMap['__value__'];
         $i8 = $context->getTypeFromString('int8');
         $htType = Variable::TYPE_HASHTABLE;
-        $valuePtrType = $context->getTypeFromString('__value__*');
 
         $nextFree = $context->builder->load($context->builder->structGep($src, $map['nextFreeElement']));
         $idxSlot = $context->builder->alloca($sizeT, 1, 'array_replace_rec_packed_idx');
@@ -8353,7 +8351,6 @@ final class ArrayBuiltinHelper
         $context->builder->branch($next);
 
         $context->builder->positionAtEnd($merge);
-        $overlayFn = $context->lookupFunction('__compiler_array_replace_recursive_overlay');
         $existingHt = $context->builder->call(
             $context->lookupFunction('__value__readHashtable'),
             $destVal
@@ -8363,8 +8360,8 @@ final class ArrayBuiltinHelper
             $srcVal
         );
         $merged = HashTableHelper::alloc($context);
-        $context->builder->call($overlayFn, $merged, $existingHt);
-        $context->builder->call($overlayFn, $merged, $overlayHt);
+        self::overlayHashTable($context, $merged, $existingHt);
+        self::replaceRecursiveAddMissingStringKeys($context, $merged, $overlayHt);
         $context->builder->call(
             $context->lookupFunction('__hashtable__setHashtableAt'),
             $dest,
@@ -8381,7 +8378,101 @@ final class ArrayBuiltinHelper
     }
 
     /**
-     * Add string keys from {@param $src} missing in {@param $dest} after C overlay (#3166).
+     * Merge existing string keys when both values are hashtables (VM in-place parity; #3166).
+     */
+    private static function replaceRecursiveMergeStringKeys(
+        Context $context,
+        Value $dest,
+        Value $src
+    ): void {
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $valueMap = $context->structFieldMap['__value__'];
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+        $valuePtrType = $context->getTypeFromString('__value__*');
+        $i8 = $context->getTypeFromString('int8');
+        $htType = Variable::TYPE_HASHTABLE;
+
+        $strInit = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_init');
+        $strHead = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_head');
+        $context->builder->branch($strInit);
+
+        $context->builder->positionAtEnd($strInit);
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_replace_rec_merge_str_walk');
+        $head = $context->builder->load($context->builder->structGep($src, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+        $strBody = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_body');
+        $strSet = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_set');
+        $strNext = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_next');
+        $strDone = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_done');
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $strDone, $strBody);
+
+        $context->builder->positionAtEnd($strBody);
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $context->builder->branch($strSet);
+
+        $context->builder->positionAtEnd($strSet);
+        $existingPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__peekStringKeyValue'),
+            $dest,
+            $keyStr
+        );
+        $existingNull = $context->builder->icmp(Builder::INT_EQ, $existingPtr, $valuePtrType->constNull());
+        $skip = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_skip');
+        $replace = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_replace');
+        $context->builder->branchIf($existingNull, $skip, $replace);
+
+        $context->builder->positionAtEnd($replace);
+        $srcIsHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($context->builder->structGep($valEntry, $valueMap['type'])),
+            $i8->constInt($htType, false)
+        );
+        $existingIsHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($context->builder->structGep($existingPtr, $valueMap['type'])),
+            $i8->constInt($htType, false)
+        );
+        $bothHt = $context->builder->and($srcIsHt, $existingIsHt);
+        $scalarReplace = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_scalar');
+        $deepMerge = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_deep');
+        $context->builder->branchIf($bothHt, $deepMerge, $scalarReplace);
+
+        $context->builder->positionAtEnd($scalarReplace);
+        self::storeValueEntryAtStringKey($context, $dest, $keyStr, $valEntry);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($deepMerge);
+        $existingHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $existingPtr
+        );
+        $overlayHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valEntry
+        );
+        self::replaceRecursiveAddMissingStringKeys($context, $existingHt, $overlayHt);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strNext);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strDone);
+    }
+
+    /**
+     * Add string keys from {@param $src} missing in {@param $dest} (#3166).
      */
     private static function replaceRecursiveAddMissingStringKeys(
         Context $context,
