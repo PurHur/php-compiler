@@ -802,15 +802,12 @@ final class VmString
 
     public static function strspn(string $str, string $mask, int $offset = 0, ?int $length = null): int
     {
-        if ('' === $mask) {
-            throw new \ValueError('strspn(): Argument #2 ($characters) must not be empty');
-        }
         $slen = self::byteLength($str);
-        $mlen = self::byteLength($mask);
         [$start, $len] = self::normalizeSpnBounds($slen, $offset, $length);
-        if (0 === $len) {
+        if ('' === $mask || 0 === $len) {
             return 0;
         }
+        $mlen = self::byteLength($mask);
         $count = 0;
         for ($i = $start; $i < $start + $len; ++$i) {
             if (!self::byteInSet($str[$i], $mask, $mlen)) {
@@ -824,15 +821,15 @@ final class VmString
 
     public static function strcspn(string $str, string $mask, int $offset = 0, ?int $length = null): int
     {
-        if ('' === $mask) {
-            throw new \ValueError('strcspn(): Argument #2 ($characters) must not be empty');
-        }
         $slen = self::byteLength($str);
-        $mlen = self::byteLength($mask);
         [$start, $len] = self::normalizeSpnBounds($slen, $offset, $length);
         if (0 === $len) {
             return 0;
         }
+        if ('' === $mask) {
+            return $len;
+        }
+        $mlen = self::byteLength($mask);
         $count = 0;
         for ($i = $start; $i < $start + $len; ++$i) {
             if (self::byteInSet($str[$i], $mask, $mlen)) {
