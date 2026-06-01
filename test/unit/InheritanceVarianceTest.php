@@ -72,4 +72,61 @@ PHP;
         $this->expectExceptionMessage('Declaration of Sub::create(): Base must be compatible with Base::create(): Child');
         $runtime->parseAndCompile($code, 'wide_return.php');
     }
+
+    /** Zend/php-src: concrete parent __construct signatures are not enforced on children (#1492 M5 vendor). */
+    public function testConcreteConstructorSignatureMismatchAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Factory {}
+class CoreLLVM {
+    public function __construct(Factory $factory, ?string $path = null) {}
+}
+class LLVM4 extends CoreLLVM {
+    public function __construct(?string $path = null) {
+        parent::__construct(new Factory(), $path);
+    }
+}
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'ctor_mismatch_ok.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    public function testInterfaceReturnCovariantImplementationAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface IModule {}
+class CModule implements IModule {}
+interface IBuffer { public function parse(): IModule; }
+class CBuffer implements IBuffer {
+    public function parse(): CModule { return new CModule(); }
+}
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'iface_return.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    public function testAbstractConstructorSignatureMismatchFails(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+abstract class Base { abstract public function __construct(); }
+class Child extends Base { public function __construct($x) {} }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Declaration of Child::__construct($x) must be compatible with Base::__construct()');
+        $runtime->parseAndCompile($code, 'abstract_ctor.php');
+    }
 }
