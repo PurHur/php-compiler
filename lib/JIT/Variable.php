@@ -126,6 +126,13 @@ final class Variable {
     /** Declaring class name for readonly diagnostics (#1360). */
     public ?string $objectPropertyClassName = null;
 
+    /**
+     * DNF declared-type arms for property writes (#4111).
+     *
+     * @var list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>|null
+     */
+    public ?array $objectPropertyDnfArms = null;
+
     /** __set dispatch when the property slot does not exist (#146, #4022). */
     public ?\PHPLLVM\Value $magicSetReceiver = null;
 

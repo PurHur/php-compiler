@@ -61,6 +61,9 @@ class Object_ extends Type {
 
     /** @var array<int, array<string, int>> class id => property lc => asymmetric set visibility (#3165) */
     private array $propertySetVisibility = [];
+
+    /** @var array<int, array<string, list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>>> */
+    private array $propertyDnfArms = [];
     /** @var array<int, array<string, string>> class id => method lc => declared casing (#3118) */
     private array $methodDisplayNames = [];
     /** @var array<int, Block> class id => __destruct CFG block (#4013) */
@@ -465,6 +468,7 @@ class Object_ extends Type {
             $this->initPropertyDefaults($obj, $classId);
             $this->initRuntimePropertyNewDefaults($obj, $classId);
             $this->initEmptyHashtableProperties($obj, $classId);
+            $this->initEmptyValueProperties($obj, $classId);
         }
 
         if ($this->isSplObjectStorageClass($classId)) {
@@ -533,6 +537,7 @@ class Object_ extends Type {
             $this->initPropertyDefaults($obj, $classId);
             $this->initRuntimePropertyNewDefaults($obj, $classId);
             $this->initEmptyHashtableProperties($obj, $classId);
+            $this->initEmptyValueProperties($obj, $classId);
         }
 
         return $obj;
@@ -590,6 +595,7 @@ class Object_ extends Type {
             $this->initPropertyDefaults($obj, $classId);
             $this->initRuntimePropertyNewDefaults($obj, $classId);
             $this->initEmptyHashtableProperties($obj, $classId);
+            $this->initEmptyValueProperties($obj, $classId);
         }
 
         return $obj;
@@ -729,6 +735,55 @@ class Object_ extends Type {
             $voidPtr = $this->context->getTypeFromString('void*');
             $this->context->builder->store(
                 $this->context->builder->pointerCast($ht, $voidPtr),
+                $slot
+            );
+            $this->context->builder->branch($doneBlock);
+            $this->context->builder->positionAtEnd($doneBlock);
+        }
+    }
+
+    /** Uninitialized {@see __value__} property slots start as boxed null (#4111, Zend typed properties). */
+    private function initEmptyValueProperties(PHPLLVM\Value $obj, int $classId): void
+    {
+        if (!isset($this->properties[$classId])) {
+            return;
+        }
+        $initialized = $this->propertyDefaults[$classId] ?? [];
+        $valueType = $this->context->getTypeFromString('__value__');
+        $voidPtr = $this->context->getTypeFromString('void*');
+        $valueMap = $this->context->structFieldMap['__value__'];
+        foreach ($this->properties[$classId] as $propset) {
+            if (Variable::TYPE_VALUE !== $propset[2]) {
+                continue;
+            }
+            if (isset($initialized[$propset[3]])) {
+                continue;
+            }
+            $slot = $this->propertySlotPtr($obj, $propset[3]);
+            $loaded = $this->context->builder->load($slot);
+            $nullPtr = $loaded->typeOf()->getElementType()->constNull();
+            $isEmpty = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $loaded,
+                $nullPtr
+            );
+            $fn = $this->context->builder->getInsertBlock()->getParent();
+            assert($fn instanceof PHPLLVM\Value\Function_);
+            $initBlock = $fn->appendBasicBlock('prop_value_init_'.$classId.'_'.$propset[3]);
+            $doneBlock = $fn->appendBasicBlock('prop_value_done_'.$classId.'_'.$propset[3]);
+            $this->context->builder->branchIf($isEmpty, $initBlock, $doneBlock);
+            $this->context->builder->positionAtEnd($initBlock);
+            $heapVal = $this->context->memory->malloc($valueType);
+            $heapPtr = $this->context->builder->pointerCast(
+                $heapVal,
+                $this->context->getTypeFromString('__value__*')
+            );
+            $this->context->builder->store(
+                $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+                $this->context->builder->structGep($heapVal, $valueMap['type'])
+            );
+            $this->context->builder->store(
+                $this->context->builder->pointerCast($heapPtr, $voidPtr),
                 $slot
             );
             $this->context->builder->branch($doneBlock);
@@ -2038,6 +2093,25 @@ class Object_ extends Type {
         ];
     }
 
+    /**
+     * @param list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}> $arms
+     */
+    public function definePropertyDnfArms(int $classId, string $name, array $arms): void
+    {
+        if ([] === $arms) {
+            return;
+        }
+        $this->propertyDnfArms[$classId][strtolower($name)] = $arms;
+    }
+
+    /**
+     * @return list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>|null
+     */
+    public function dnfArmsForProperty(int $classId, string $name): ?array
+    {
+        return $this->propertyDnfArms[$classId][strtolower($name)] ?? null;
+    }
+
     public function definePropertyRuntimeNewDefault(int $classId, string $name, string $newClassName): void
     {
         $newClassId = $this->lookup($newClassName);
@@ -2842,6 +2916,7 @@ class Object_ extends Type {
                     $var->objectPropertyReceiver = $obj;
                     $var->objectPropertyName = $propset[1];
                     $var->objectPropertyClassName = $className;
+                    $var->objectPropertyDnfArms = $this->dnfArmsForProperty($classId, $propset[1]);
                     $this->slotReceivers[spl_object_id($slot)] = $obj;
 
                     return $var;
@@ -2862,6 +2937,7 @@ class Object_ extends Type {
                     $var->objectPropertyReceiver = $obj;
                     $var->objectPropertyName = $propset[1];
                     $var->objectPropertyClassName = $className;
+                    $var->objectPropertyDnfArms = $this->dnfArmsForProperty($classId, $propset[1]);
                     $this->slotReceivers[spl_object_id($slot)] = $obj;
 
                     return $var;
@@ -2882,6 +2958,7 @@ class Object_ extends Type {
                 $var->objectPropertyReceiver = $obj;
                 $var->objectPropertyName = $propset[1];
                 $var->objectPropertyClassName = $className;
+                $var->objectPropertyDnfArms = $this->dnfArmsForProperty($classId, $propset[1]);
                 $this->slotReceivers[spl_object_id($slot)] = $obj;
 
                 return $var;

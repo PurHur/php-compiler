@@ -587,7 +587,7 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'php-cfg Union + Intersection; Type::fromTypeDecl + TypeReconstructor resolveOpType for Union_/Intersection (#4106)',
                 'TYPE_DECLARE_PROPERTY / promotion: compileTypeConstrainedVariable sets dnfArms; VM DnfCheck on property writes',
-                'JIT/AOT DnfParamCheck at call sites + returns; __value__* param ABI (#4008); typed property assign MCJIT still VM-only (#4111)',
+                'JIT/AOT DnfParamCheck at call sites, returns, and property writes (#4111); __value__* param ABI (#4008)',
                 'Parenthesized DNF only (php-parser 4.x); ref Zend/zend_compile.c zend_compile_type',
             ],
             'probe' => 'interface A {} interface B {} class C implements A, B {} class H { public (A&B)|null $x; } $h = new H(); $h->x = new C(); echo $h->x === null ? 0 : 1;',
