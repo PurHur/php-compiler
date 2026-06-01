@@ -82,6 +82,7 @@ class Native implements Call {
     public function call(Context $context, Variable ... $args): Value {
         $sentArgs = $args;
         if (null !== $this->variadicArgIndex) {
+            $this->enforceVariadicTrailingArgs($context, $args);
             $args = $this->packVariadicCallArgs($context, $args);
         }
         // Store call-site argv for func_get_args/func_num_args (issue #197).
@@ -96,7 +97,10 @@ class Native implements Call {
             } else {
                 $arg = $this->missingCallArg($context, $this->argTypes[$index]);
             }
-            if (isset($this->paramTypeConstraintsByArg[$index])) {
+            $skipVariadicPackedTypeCheck = null !== $this->variadicArgIndex
+                && $index === $this->variadicArgIndex
+                && $this->variadicSlotUsesElementTypeChecks($index);
+            if (!$skipVariadicPackedTypeCheck && isset($this->paramTypeConstraintsByArg[$index])) {
                 \PHPCompiler\JIT\TypeCheck::enforceParameter(
                     $context,
                     $arg,
@@ -104,14 +108,14 @@ class Native implements Call {
                     $context->callerStrictTypes
                 );
             }
-            if (isset($this->paramIntersectionConstraintsByArg[$index])) {
+            if (!$skipVariadicPackedTypeCheck && isset($this->paramIntersectionConstraintsByArg[$index])) {
                 \PHPCompiler\JIT\IntersectionParamCheck::enforce(
                     $context,
                     $arg,
                     $this->paramIntersectionConstraintsByArg[$index]
                 );
             }
-            if (isset($this->paramDnfConstraintsByArg[$index])) {
+            if (!$skipVariadicPackedTypeCheck && isset($this->paramDnfConstraintsByArg[$index])) {
                 \PHPCompiler\JIT\DnfParamCheck::enforce(
                     $context,
                     $arg,
@@ -414,6 +418,51 @@ class Native implements Call {
                 break;
         }
         throw new \LogicException("Unsupported cast for arg type $typeName from " . Variable::getStringType($arg->type));
+    }
+
+    /**
+     * @param list<Variable> $args
+     */
+    private function enforceVariadicTrailingArgs(Context $context, array $args): void
+    {
+        $idx = $this->variadicArgIndex;
+        assert(null !== $idx);
+        if (!$this->variadicSlotUsesElementTypeChecks($idx)) {
+            return;
+        }
+        $extra = array_slice($args, $idx);
+        $strict = $context->callerStrictTypes;
+        foreach ($extra as $arg) {
+            if (isset($this->paramTypeConstraintsByArg[$idx])) {
+                \PHPCompiler\JIT\TypeCheck::enforceParameter(
+                    $context,
+                    $arg,
+                    $this->paramTypeConstraintsByArg[$idx],
+                    $strict
+                );
+            }
+            if (isset($this->paramIntersectionConstraintsByArg[$idx])) {
+                \PHPCompiler\JIT\IntersectionParamCheck::enforce(
+                    $context,
+                    $arg,
+                    $this->paramIntersectionConstraintsByArg[$idx]
+                );
+            }
+            if (isset($this->paramDnfConstraintsByArg[$idx])) {
+                \PHPCompiler\JIT\DnfParamCheck::enforce(
+                    $context,
+                    $arg,
+                    $this->paramDnfConstraintsByArg[$idx]
+                );
+            }
+        }
+    }
+
+    private function variadicSlotUsesElementTypeChecks(int $llvmArgIndex): bool
+    {
+        return isset($this->paramTypeConstraintsByArg[$llvmArgIndex])
+            || isset($this->paramIntersectionConstraintsByArg[$llvmArgIndex])
+            || isset($this->paramDnfConstraintsByArg[$llvmArgIndex]);
     }
 
     /**

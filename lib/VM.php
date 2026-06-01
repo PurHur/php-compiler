@@ -1783,15 +1783,44 @@ restart:
                     $isVariadicSlot = null !== $frame->block->variadicParamIndex
                         && $frame->block->variadicParamIndex === (int) $op->arg2;
                     if ($isVariadicSlot) {
-                        $arg1->newArray();
-                        $packed = $arg1->toArray();
+                        $variadicSlot = (int) $op->arg1;
+                        $strict = null !== $frame->parent
+                            ? $frame->parent->block->strictTypes
+                            : $frame->block->strictTypes;
                         $n = count($frame->calledArgs);
-                        for ($i = $recvIdx; $i < $n; ++$i) {
-                            $copy = new Variable();
-                            $copy->copyFrom($frame->calledArgs[$i]);
-                            $packed->append($copy);
+                        try {
+                            if (TypeCheck::variadicSlotNeedsElementChecks($frame->block, $variadicSlot)) {
+                                $trailing = [];
+                                for ($i = $recvIdx; $i < $n; ++$i) {
+                                    $trailing[] = $frame->calledArgs[$i];
+                                }
+                                TypeCheck::verifyVariadicElements(
+                                    $trailing,
+                                    $strict,
+                                    $frame->block->paramVariadicElementTypeConstraints[$variadicSlot] ?? null,
+                                    $frame->block->paramVariadicElementGenericArrayTypeSpecs[$variadicSlot] ?? null,
+                                    $frame->block->paramVariadicElementIntersectionConstraints[$variadicSlot] ?? null,
+                                    $frame->block->paramVariadicElementDnfConstraints[$variadicSlot] ?? null,
+                                    $this->context
+                                );
+                            }
+                            $arg1->newArray();
+                            $packed = $arg1->toArray();
+                            for ($i = $recvIdx; $i < $n; ++$i) {
+                                $copy = new Variable();
+                                $copy->copyFrom($frame->calledArgs[$i]);
+                                $packed->append($copy);
+                            }
+                        } catch (\TypeError $e) {
+                            $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
                         }
-                    } elseif (array_key_exists($recvIdx, $frame->calledArgs)) {
+                        break;
+                    }
+                    if (array_key_exists($recvIdx, $frame->calledArgs)) {
                         if (isset($frame->block->paramByRef[(int) $op->arg2])) {
                             $arg1->indirect($frame->calledArgs[$recvIdx]);
                         } else {

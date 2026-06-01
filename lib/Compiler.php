@@ -1882,7 +1882,7 @@ class Compiler {
         return null;
     }
 
-    protected function applyParamDeclaredType(Op\Expr\Param $param, Block $block, int $slot): void
+    protected function applyParamDeclaredType(Op\Expr\Param $param, Block $block, int $slot, bool $variadicElement = false): void
     {
         $declared = $param->declaredType;
         if ($declared instanceof Op\Type\Never_) {
@@ -1895,15 +1895,25 @@ class Compiler {
             $block->paramDeclaredTypes[$slot] = $declared;
         }
         if ($declared instanceof Op\Type\Intersection) {
-            $block->paramTypeConstraints[$slot] = Variable::TYPE_OBJECT;
-            $block->paramIntersectionConstraints[$slot] = $this->intersectionNamesFromCfgType($declared);
+            if ($variadicElement) {
+                $block->paramVariadicElementTypeConstraints[$slot] = Variable::TYPE_OBJECT;
+                $block->paramVariadicElementIntersectionConstraints[$slot] = $this->intersectionNamesFromCfgType($declared);
+            } else {
+                $block->paramTypeConstraints[$slot] = Variable::TYPE_OBJECT;
+                $block->paramIntersectionConstraints[$slot] = $this->intersectionNamesFromCfgType($declared);
+            }
 
             return;
         }
         $arraySpec = $this->genericArraySpecFromCfgType($declared);
         if (null !== $arraySpec) {
-            $block->paramTypeConstraints[$slot] = Variable::TYPE_ARRAY;
-            $block->paramGenericArrayTypeSpecs[$slot] = $arraySpec;
+            if ($variadicElement) {
+                $block->paramVariadicElementTypeConstraints[$slot] = Variable::TYPE_ARRAY;
+                $block->paramVariadicElementGenericArrayTypeSpecs[$slot] = $arraySpec;
+            } else {
+                $block->paramTypeConstraints[$slot] = Variable::TYPE_ARRAY;
+                $block->paramGenericArrayTypeSpecs[$slot] = $arraySpec;
+            }
 
             return;
         }
@@ -1914,7 +1924,11 @@ class Compiler {
                 fn (Op\Type\Intersection $t) => $this->intersectionDisplayFromCfgType($t)
             );
             if (DnfType::hasConstraints($dnfArms)) {
-                $block->paramDnfConstraints[$slot] = $dnfArms;
+                if ($variadicElement) {
+                    $block->paramVariadicElementDnfConstraints[$slot] = $dnfArms;
+                } else {
+                    $block->paramDnfConstraints[$slot] = $dnfArms;
+                }
 
                 return;
             }
@@ -1925,7 +1939,11 @@ class Compiler {
                 $rawType = Type::fromDecl($declared->name);
                 $mapped = Variable::mapFromType($rawType);
                 if ($mapped !== Variable::TYPE_UNDEFINED) {
-                    $block->paramTypeConstraints[$slot] = $mapped;
+                    if ($variadicElement) {
+                        $block->paramVariadicElementTypeConstraints[$slot] = $mapped;
+                    } else {
+                        $block->paramTypeConstraints[$slot] = $mapped;
+                    }
                 }
             }
         }
@@ -2714,7 +2732,7 @@ class Compiler {
         if (AttributeNames::isSensitiveParameter(AttributeNames::fromOp($param))) {
             $block->paramSensitive[$paramIdx] = true;
         }
-        $this->applyParamDeclaredType($param, $block, $slot);
+        $this->applyParamDeclaredType($param, $block, $slot, $param->variadic);
 
         return new OpCode(
             OpCode::TYPE_ARG_RECV,

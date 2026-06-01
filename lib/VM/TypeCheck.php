@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Block;
 use PHPCompiler\GenericArrayTypeSpec;
 
 /**
@@ -11,6 +12,47 @@ use PHPCompiler\GenericArrayTypeSpec;
  */
 final class TypeCheck
 {
+    public static function variadicSlotNeedsElementChecks(Block $block, int $slot): bool
+    {
+        return isset($block->paramVariadicElementTypeConstraints[$slot])
+            || isset($block->paramVariadicElementGenericArrayTypeSpecs[$slot])
+            || isset($block->paramVariadicElementIntersectionConstraints[$slot])
+            || isset($block->paramVariadicElementDnfConstraints[$slot]);
+    }
+
+    /**
+     * Zend zend_verify_variadic_arg_type(): declared type applies to each trailing arg (#4185).
+     *
+     * @param list<Variable> $elements
+     * @param list<string>|null $intersection
+     * @param list<list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>>|null $dnfArms
+     */
+    public static function verifyVariadicElements(
+        array $elements,
+        bool $strict,
+        ?int $typeConstraint,
+        ?GenericArrayTypeSpec $arraySpec,
+        ?array $intersection,
+        ?array $dnfArms,
+        Context $context
+    ): void {
+        foreach ($elements as $element) {
+            $probe = new Variable();
+            $probe->copyFrom($element);
+            $resolved = $probe->resolveIndirect();
+            if (null !== $typeConstraint) {
+                $resolved->typeConstraint = $typeConstraint;
+            }
+            self::coerceParameter($probe, $strict, $arraySpec);
+            if (null !== $intersection) {
+                self::assertParamIntersection($probe, $intersection, $context);
+            }
+            if (null !== $dnfArms) {
+                DnfCheck::assertMatches($probe, $dnfArms, $context);
+            }
+        }
+    }
+
     public static function coerceParameter(Variable $dest, bool $strict, ?GenericArrayTypeSpec $arraySpec = null): void
     {
         self::coerceTypedSlot($dest, $strict, 'Argument');

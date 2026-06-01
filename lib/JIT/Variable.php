@@ -11,6 +11,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\Block;
+use PHPCompiler\OpCode;
 use PHPCfg\Operand;
 use PHPTypes\Type;
 use PHPCompiler\VM\Variable as VMVariable;
@@ -314,6 +315,14 @@ final class Variable {
         Block $block,
         Operand $op
     ): Variable {
+        if (self::isVariadicParamOperand($block, $op)) {
+            return new Variable(
+                $context,
+                self::TYPE_HASHTABLE,
+                self::KIND_VARIABLE,
+                BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__hashtable__*'))
+            );
+        }
         $type = self::getTypeFromType($op->type);
         if ($type === self::TYPE_NULL) {
             $slot = JitValueBox::alloc($context);
@@ -346,6 +355,27 @@ final class Variable {
             self::KIND_VARIABLE,
             BasicBlockHelper::entryAlloca($context, $context->getTypeFromString($stringType))
         );
+    }
+
+    private static function isVariadicParamOperand(Block $block, Operand $op): bool
+    {
+        if (null === $block->variadicParamIndex) {
+            return false;
+        }
+        $slot = $block->slotForOperand($op);
+        if (null === $slot) {
+            return false;
+        }
+        foreach ($block->opCodes as $recv) {
+            if (OpCode::TYPE_ARG_RECV !== $recv->type) {
+                continue;
+            }
+            if ((int) $recv->arg1 === $slot && (int) $recv->arg2 === $block->variadicParamIndex) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
