@@ -1,11 +1,15 @@
 --TEST--
-stdlib parse_str() one-arg JIT/AOT local scope (issue #3708)
+stdlib parse_str() one-arg inside function throws on JIT/AOT (#4034)
 --FILE--
 <?php
 function t(): void {
-    parse_str('x=9&y=hello');
-    echo $x, ' ', $y, "\n";
+    try {
+        parse_str('x=9&y=hello');
+        echo "no throw\n";
+    } catch (ArgumentCountError $e) {
+        echo $e->getMessage(), "\n";
+    }
 }
 t();
 --EXPECT--
-9 hello
+parse_str() expects exactly 2 arguments, 1 given

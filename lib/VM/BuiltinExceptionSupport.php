@@ -13,6 +13,7 @@ final class BuiltinExceptionSupport
 {
     public const CLASS_ERROR = 'error';
     public const CLASS_TYPE_ERROR = 'typeerror';
+    public const CLASS_ARGUMENT_COUNT_ERROR = 'argumentcounterror';
     public const CLASS_VALUE_ERROR = 'valueerror';
     public const CLASS_DIVISION_BY_ZERO_ERROR = 'divisionbyzeroerror';
     public const CLASS_THROWABLE = 'throwable';
@@ -21,6 +22,11 @@ final class BuiltinExceptionSupport
     public static function materializeTypeError(Context $ctx, string $message): Variable
     {
         return self::materializeThrowable($ctx, self::CLASS_TYPE_ERROR, $message);
+    }
+
+    public static function materializeArgumentCountError(Context $ctx, string $message): Variable
+    {
+        return self::materializeThrowable($ctx, self::CLASS_ARGUMENT_COUNT_ERROR, $message);
     }
 
     public static function materializeValueError(Context $ctx, string $message): Variable

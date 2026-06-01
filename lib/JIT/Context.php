@@ -590,6 +590,7 @@ class Context {
                 Builtin\JitThrow::registerDeclarations($this);
                 $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending'));
                 Builtin\ReadonlyRaise::emitClearForStandaloneMain($this);
+                Builtin\TypeErrorRaise::emitClearForStandaloneMain($this);
             }
             $this->builder->call(
                 $this->lookupFunction('__phpc_progress_note'),
@@ -608,6 +609,7 @@ class Context {
             );
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
                 Builtin\ReadonlyRaise::emitAbortIfPendingForStandaloneMain($this);
+                Builtin\TypeErrorRaise::emitAbortIfPendingForStandaloneMain($this);
                 Builtin\PendingHeaders::emitFlushForStandalone($this);
                 Builtin\ObOutput::emitEndAllForStandalone($this);
             }

@@ -6,6 +6,8 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\Block;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -33,6 +35,7 @@ final class parse_str extends Internal
         }
         if (1 === $argc) {
             $caller = VmScope::requireCaller($frame);
+            VmScope::requireMainScriptForParseStrOneArg($caller);
             $params = [];
             \parse_str($encoded->toString(), $params);
             VmParseStr::importIntoCaller($caller, $params);
@@ -65,6 +68,17 @@ final class parse_str extends Internal
             throw new \LogicException('parse_str() requires one or two arguments in this compiler build');
         }
         if (1 === \count($args)) {
+            $block = $context->jitCurrentBlock ?? $context->jitEnclosingBlock;
+            if ($block instanceof Block && !$block->isMainScript()) {
+                TypeErrorRaise::registerDeclarations($context);
+                TypeErrorRaise::ensureLinked($context);
+                TypeErrorRaise::emitArgumentCountError(
+                    $context,
+                    'parse_str() expects exactly 2 arguments, 1 given'
+                );
+
+                return $context->getTypeFromString('int32')->constInt(0, false);
+            }
             JitParseStr::parseIntoScope($context, $args[0]);
 
             return $context->getTypeFromString('int32')->constInt(0, false);
