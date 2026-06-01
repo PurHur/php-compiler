@@ -1124,8 +1124,13 @@ class JIT {
             )
         );
 
+        $cfgParamCount = null !== $block->func ? count($block->func->params) : 0;
         foreach ($args as $idx => $arg) {
-            $argVars[] = new Variable($this->context, Variable::getTypeFromType($rawTypes[$idx]), Variable::KIND_VALUE, $func->getParam($idx));
+            $varType = Variable::getTypeFromType($rawTypes[$idx]);
+            if ($idx < $cfgParamCount && $block->func->params[$idx]->variadic) {
+                $varType = Variable::TYPE_HASHTABLE;
+            }
+            $argVars[] = new Variable($this->context, $varType, Variable::KIND_VALUE, $func->getParam($idx));
         }
 
         $lcname = strtolower($logicalName ?? $internalName);
@@ -9676,10 +9681,20 @@ class JIT {
             if (OpCode::TYPE_ARG_RECV !== $op->type) {
                 continue;
             }
-            if (!isset($block->paramTypeConstraints[$op->arg1])) {
+            $slot = (int) $op->arg1;
+            $paramIdx = (int) $op->arg2;
+            $isVariadic = null !== $block->variadicParamIndex && $paramIdx === $block->variadicParamIndex;
+            if ($isVariadic) {
+                if (!isset($block->paramVariadicElementTypeConstraints[$slot])) {
+                    continue;
+                }
+                $constraints[$paramIdx + $offset] = $block->paramVariadicElementTypeConstraints[$slot];
                 continue;
             }
-            $constraints[(int) $op->arg2 + $offset] = $block->paramTypeConstraints[$op->arg1];
+            if (!isset($block->paramTypeConstraints[$slot])) {
+                continue;
+            }
+            $constraints[$paramIdx + $offset] = $block->paramTypeConstraints[$slot];
         }
 
         return $constraints;
@@ -9696,10 +9711,20 @@ class JIT {
             if (OpCode::TYPE_ARG_RECV !== $op->type) {
                 continue;
             }
-            if (!isset($block->paramIntersectionConstraints[$op->arg1])) {
+            $slot = (int) $op->arg1;
+            $paramIdx = (int) $op->arg2;
+            $isVariadic = null !== $block->variadicParamIndex && $paramIdx === $block->variadicParamIndex;
+            if ($isVariadic) {
+                if (!isset($block->paramVariadicElementIntersectionConstraints[$slot])) {
+                    continue;
+                }
+                $constraints[$paramIdx + $offset] = $block->paramVariadicElementIntersectionConstraints[$slot];
                 continue;
             }
-            $constraints[(int) $op->arg2 + $offset] = $block->paramIntersectionConstraints[$op->arg1];
+            if (!isset($block->paramIntersectionConstraints[$slot])) {
+                continue;
+            }
+            $constraints[$paramIdx + $offset] = $block->paramIntersectionConstraints[$slot];
         }
 
         return $constraints;
@@ -9716,10 +9741,20 @@ class JIT {
             if (OpCode::TYPE_ARG_RECV !== $op->type) {
                 continue;
             }
-            if (!isset($block->paramDnfConstraints[$op->arg1])) {
+            $slot = (int) $op->arg1;
+            $paramIdx = (int) $op->arg2;
+            $isVariadic = null !== $block->variadicParamIndex && $paramIdx === $block->variadicParamIndex;
+            if ($isVariadic) {
+                if (!isset($block->paramVariadicElementDnfConstraints[$slot])) {
+                    continue;
+                }
+                $constraints[$paramIdx + $offset] = $block->paramVariadicElementDnfConstraints[$slot];
                 continue;
             }
-            $constraints[(int) $op->arg2 + $offset] = $block->paramDnfConstraints[$op->arg1];
+            if (!isset($block->paramDnfConstraints[$slot])) {
+                continue;
+            }
+            $constraints[$paramIdx + $offset] = $block->paramDnfConstraints[$slot];
         }
 
         return $constraints;
