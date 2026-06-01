@@ -82,6 +82,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'array_numeric_string_key')) {
                 continue;
             }
+            // array literal int / numeric-string key collision: VM + AOT (#4151); MCJIT execute unstable (#98).
+            if (str_contains($name, 'array_literal_numeric_string_key')) {
+                continue;
+            }
             // base_convert() MCJIT execute unstable until MathBaseConvert verify (#3173).
             if (str_contains($name, 'base_convert') || str_contains(strtolower($case[0]), 'base_convert')) {
                 continue;

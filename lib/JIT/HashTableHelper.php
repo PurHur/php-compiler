@@ -1315,7 +1315,7 @@ final class HashTableHelper
         }
         if (Variable::TYPE_STRING === $key->type) {
             $keyPtr = $context->helper->loadValue($key);
-            self::setAtStringKey($context, $ht, $keyPtr, $element);
+            self::setAtKeyCoercingNumericString($context, $ht, $keyPtr, $element);
 
             return;
         }
@@ -1779,6 +1779,61 @@ final class HashTableHelper
         );
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
+    }
+
+    /**
+     * Array element write: numeric strings use the int index slot (Zend zend_hash.c; #4151).
+     */
+    public static function setAtKeyCoercingNumericString(
+        Context $context,
+        Value $ht,
+        Value $keyPtr,
+        Variable $element
+    ): void {
+        $builder = $context->builder;
+        $map = $context->structFieldMap['__string__'];
+        $len = $builder->load($builder->structGep($keyPtr, $map['length']));
+        $charPtr = $builder->structGep($keyPtr, $map['value']);
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $zeroLen = $len->typeOf()->constInt(0, false);
+
+        $useStr = BasicBlockHelper::append($context, 'arr_key_str_'.self::nextSeq());
+        $tryInt = BasicBlockHelper::append($context, 'arr_key_try_int_'.self::nextSeq());
+        $useInt = BasicBlockHelper::append($context, 'arr_key_int_'.self::nextSeq());
+        $done = BasicBlockHelper::append($context, 'arr_key_done_'.self::nextSeq());
+
+        $isEmpty = $builder->icmp(Builder::INT_EQ, $len, $zeroLen);
+        $builder->branchIf($isEmpty, $useStr, $tryInt);
+
+        $builder->positionAtEnd($tryInt);
+        $endPtrSlot = $builder->alloca($i8p, 1, 'arr_key_strtol_end');
+        $builder->store($i8p->constNull(), $endPtrSlot);
+        $parsed = $builder->call(
+            $context->lookupFunction('strtol'),
+            $charPtr,
+            $endPtrSlot,
+            $context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $endPtr = $builder->load($endPtrSlot);
+        $endOffset = $builder->sub(
+            $builder->ptrToInt($endPtr, $i64),
+            $builder->ptrToInt($charPtr, $i64)
+        );
+        $consumedAll = $builder->icmp(Builder::INT_EQ, $endOffset, $len);
+        $builder->branchIf($consumedAll, $useInt, $useStr);
+
+        $builder->positionAtEnd($useInt);
+        $index = $builder->truncOrBitCast($parsed, $sizeT);
+        self::setAtIndex($context, $ht, $index, $element);
+        $builder->branch($done);
+
+        $builder->positionAtEnd($useStr);
+        self::setAtStringKey($context, $ht, $keyPtr, $element);
+        $builder->branch($done);
+
+        $builder->positionAtEnd($done);
     }
 
     public static function setAtStringKey(
