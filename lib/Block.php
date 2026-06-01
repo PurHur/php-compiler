@@ -1228,6 +1228,44 @@ class Block {
      * CFG regions that MCJIT must not execute yet; `bin/jit.php` runs the VM instead (#2114, #167).
      * Simple try/catch without `finally` may pass MCJIT when {@see TryCatchJitExecuteTest} is green.
      */
+    /** Script or nested closure uses Fiber::suspend() (#4019). */
+    public static function containsFiberSuspendOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_STATICCALL_INIT === $op->type) {
+                    $classOp = $block->getOperand($op->arg1);
+                    $nameOp = $block->getOperand($op->arg2);
+                    if (
+                        $classOp instanceof Literal
+                        && $nameOp instanceof Literal
+                        && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'Fiber')
+                        && 0 === strcasecmp($nameOp->value, 'suspend')
+                    ) {
+                        return true;
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     public static function requiresVmLowering(?self $root): bool
     {
         return self::containsGeneratorOpcodesInScriptScope($root)
@@ -1236,6 +1274,7 @@ class Block {
             || self::containsDynamicStaticPropertyOpcodes($root)
             || self::containsTypedNonVoidReturnOpcodes($root)
             || self::containsClosureByRefCaptureOpcodes($root)
-            || self::containsReadonlyPropertyOpcodes($root);
+            || self::containsReadonlyPropertyOpcodes($root)
+            || self::containsFiberSuspendOpcodes($root);
     }
 }

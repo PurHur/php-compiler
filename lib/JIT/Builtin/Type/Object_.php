@@ -15,6 +15,7 @@ use PHPCompiler\Block;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\ClassConstFetchHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\FiberHelper;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\Builtin\Refcount;
 use PHPCompiler\JIT\Builtin\Type;
@@ -1676,6 +1677,11 @@ class Object_ extends Type {
         if ('closure' === $lcname) {
             // Invoke metadata for indirect holders (array elements, properties; issue #72).
             $this->defineProperty($id, '__closure_target', Variable::TYPE_STRING);
+            $this->defineProperty($id, FiberHelper::TARGET_PROPERTY, Variable::TYPE_STRING);
+        }
+        if ('fiber' === $lcname) {
+            $this->defineProperty($id, FiberHelper::TARGET_PROPERTY, Variable::TYPE_STRING);
+            $this->defineProperty($id, FiberHelper::STATE_PROPERTY, Variable::TYPE_NATIVE_LONG);
         }
         if ('generator' === $lcname) {
             $this->defineProperty($id, GeneratorHelper::TARGET_PROPERTY, Variable::TYPE_STRING);

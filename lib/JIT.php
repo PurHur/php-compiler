@@ -5811,6 +5811,23 @@ class JIT {
                         $this->assignOperandValue($block->getOperand($op->arg1), $nullVar->value);
                         break;
                     }
+                    if (JIT\FiberHelper::blockContainsFiberSuspend($op->block1)) {
+                        $internalName = JIT\ClosureHelper::nextInternalName();
+                        $resumeName = strtolower($internalName.'__fiber_resume');
+                        JIT\FiberHelper::compileResumeFunction(
+                            $this,
+                            $resumeName,
+                            $op->block1,
+                            $internalName
+                        );
+                        $this->context->scriptFiberResumeName = $resumeName;
+                        $closureObj = JIT\FiberHelper::allocateFiberCallbackObject(
+                            $this->context,
+                            $resumeName
+                        );
+                        $this->assignOperand($block->getOperand($op->arg1), $closureObj, true);
+                        break;
+                    }
                     $internalName = JIT\ClosureHelper::nextInternalName();
                     $this->compileBlock($op->block1, $internalName);
                     $lcname = strtolower($internalName);
@@ -8382,6 +8399,10 @@ class JIT {
         if (null !== $src->closureCall) {
             $dest->closureCall = $src->closureCall;
         }
+        if (null !== $src->fiberResumeName) {
+            $dest->fiberResumeName = $src->fiberResumeName;
+            $dest->fiberStatePtr = $src->fiberStatePtr;
+        }
     }
 
     private function copyObjectPropertyBacking(Variable $dest, Variable $src): void
@@ -8395,6 +8416,16 @@ class JIT {
         $dest->generatorStatePtr = $src->generatorStatePtr;
         $dest->generatorResumeName = $src->generatorResumeName;
         $dest->isJitGenerator = $src->isJitGenerator;
+        $dest->fiberResumeName = $src->fiberResumeName;
+        $dest->fiberStatePtr = $src->fiberStatePtr;
+        if (Variable::TYPE_OBJECT === $src->type && Variable::TYPE_OBJECT === $dest->type) {
+            $srcKey = spl_object_id($this->context->helper->loadValue($src));
+            $destKey = spl_object_id($this->context->helper->loadValue($dest));
+            if (isset($this->context->fiberResumeByObjectValueId[$srcKey])) {
+                $this->context->fiberResumeByObjectValueId[$destKey]
+                    = $this->context->fiberResumeByObjectValueId[$srcKey];
+            }
+        }
     }
 
     /**
@@ -9183,6 +9214,12 @@ class JIT {
         $className = $this->resolveJitStaticScopeClass($block, $classOp);
         $declaringClassLc = strtolower($className);
         $methodLc = strtolower($nameOp->value);
+        if ($this->context->compilingFiberResume && 'fiber' === $declaringClassLc && 'suspend' === $methodLc) {
+            $this->context->scope->toCall = null;
+            $this->context->scope->args = [];
+
+            return;
+        }
         $declaringClassId = $this->context->type->object->lookup($className);
         $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
         $callerClassLc = null;

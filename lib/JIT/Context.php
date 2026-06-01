@@ -64,6 +64,17 @@ class Context {
 
     public ?\PHPLLVM\Value $generatorStateParam = null;
 
+    /** While lowering fiber resume LLVM (issue #4019). */
+    public bool $compilingFiberResume = false;
+
+    public ?\PHPLLVM\Value $fiberStateParam = null;
+
+    /** @var array<int, string> spl_object_id(__object__*) => fiber resume LLVM symbol */
+    public array $fiberResumeByObjectValueId = [];
+
+    /** Last fiber callback resume symbol in script scope (phase 1 #4019). */
+    public ?string $scriptFiberResumeName = null;
+
     /** @var array<string, string> user func lc => resume LLVM symbol */
     public array $generatorCreators = [];
 
@@ -533,6 +544,8 @@ class Context {
         $this->functionProxies['reflectionclass::getmethod'] = new Call\ReflectionClassGetMethod();
         $this->functionProxies['reflectionmethod::getattributes'] = new Call\ReflectionMethodGetAttributes();
         $this->functionProxies['reflectionattribute::getname'] = new Call\ReflectionAttributeGetName();
+
+        FiberHelper::registerJitMethods($this);
     }
 
     public function compileToFile(string $file) {

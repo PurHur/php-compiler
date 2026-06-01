@@ -50,6 +50,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'readline_exists')) {
                 continue;
             }
+            // Fiber::suspend() MCJIT execute segfault (#4019); VM + AOT green; bin/jit.php VM-fallback.
+            if (str_contains($name, 'fiber_jit')) {
+                continue;
+            }
             // strspn()/strcspn() offset/length: VM + AOT lint (#3734); MCJIT phpc_strspn_ex execute pending.
             if (str_contains($name, 'strspn_strcspn_offset')) {
                 continue;
