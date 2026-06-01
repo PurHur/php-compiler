@@ -346,6 +346,7 @@ static const char *phpc_builtin_functions[] = {
     "sha1",
     "shell_exec",
     "shuffle",
+    "show_source",
     "similar_text",
     "sin",
     "sinh",
