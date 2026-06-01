@@ -1391,6 +1391,10 @@ return_bool:
             );
         }
         if ($variable->kind === Variable::KIND_VALUE) {
+            if ($variable->functionStaticGlobal) {
+                return $this->context->builder->load($variable->value);
+            }
+
             return $variable->value;
         }
         return $this->context->builder->load($variable->value);
