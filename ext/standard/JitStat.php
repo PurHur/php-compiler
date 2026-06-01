@@ -31,9 +31,6 @@ final class JitStat
     /** offsetof(struct stat, st_size) on Linux x86_64 glibc */
     private const STAT_SIZE_OFFSET = 48;
 
-    /** offsetof(struct stat, st_ino) on Linux x86_64 glibc */
-    private const STAT_INO_OFFSET = 8;
-
     /** offsetof(struct stat, st_atim) on Linux x86_64 glibc */
     private const STAT_ATIME_OFFSET = 72;
 
@@ -191,51 +188,6 @@ final class JitStat
         $sizePtr = $context->builder->pointerCast($bytePtr, $i64->pointerType(0));
         $size64 = $context->builder->load($sizePtr);
         JitValueBox::writeLong($context, $slot, $size64);
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($doneBlock);
-
-        return $ptr;
-    }
-
-    /** @return Value */
-    public static function pathFileInodeBoxed(Context $context, Value $str): Value
-    {
-        $map = $context->structFieldMap['__string__'];
-        $pathPtr = $context->builder->structGep($str, $map['value']);
-        $i8 = $context->getTypeFromString('int8');
-        $bufType = $i8->arrayType(self::STAT_BUF_SIZE);
-        $buf = $context->builder->alloca($bufType, 1, 'fileinode_stat_buf');
-        $i8p = $context->getTypeFromString('int8*');
-        $bufPtr = $context->builder->pointerCast($buf, $i8p);
-        $ret = $context->builder->call(
-            $context->lookupFunction('stat'),
-            $pathPtr,
-            $bufPtr
-        );
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $zero = $i32->constInt(0, false);
-        $failed = $context->builder->icmp(Builder::INT_NE, $ret, $zero);
-
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $id = (string) (++self::$blockSerial);
-        $failBlock = BasicBlockHelper::append($context, 'fileinode_fail_'.$id);
-        $okBlock = BasicBlockHelper::append($context, 'fileinode_ok_'.$id);
-        $doneBlock = BasicBlockHelper::append($context, 'fileinode_done_'.$id);
-        $context->builder->branchIf($failed, $failBlock, $okBlock);
-
-        $context->builder->positionAtEnd($failBlock);
-        $i1 = $context->getTypeFromString('int1');
-        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($okBlock);
-        $bytePtr = $context->builder->gep($bufPtr, $i64->constInt(self::STAT_INO_OFFSET, false));
-        $inoPtr = $context->builder->pointerCast($bytePtr, $i64->pointerType(0));
-        $ino64 = $context->builder->load($inoPtr);
-        JitValueBox::writeLong($context, $slot, $ino64);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
