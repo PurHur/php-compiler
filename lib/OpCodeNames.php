@@ -230,6 +230,10 @@ function opcode_type_name(int $type): string
             return 'TYPE_TRAIT_USE_ADAPTATION';
         case 120:
             return 'TYPE_LIST_UNPACK_CHECK';
+        case 121:
+            return 'TYPE_JUMPIF_FUNCTION_STATIC_INITIALIZED';
+        case 122:
+            return 'TYPE_FUNCTION_STATIC_INIT_STORE';
         default:
             return 'unknown opcode';
     }

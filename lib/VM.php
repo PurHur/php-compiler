@@ -1030,10 +1030,32 @@ restart:
                     if (!$this->context->isFunctionStaticInitialized($storageKey)) {
                         if (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
                             $storage->copyFrom($frame->block->constants[$op->arg3]);
+                            $this->context->markFunctionStaticInitialized($storageKey);
                         }
-                        $this->context->markFunctionStaticInitialized($storageKey);
                     }
                     $frame->scope[$op->arg1]->indirect($storage);
+                    break;
+                case OpCode::TYPE_JUMPIF_FUNCTION_STATIC_INITIALIZED:
+                    if (!isset($frame->block->constants[$op->arg2])) {
+                        throw new \LogicException('Function static key must be a compile-time constant');
+                    }
+                    $jumpKey = $frame->block->constants[$op->arg2]->toString();
+                    if ($this->context->isFunctionStaticInitialized($jumpKey)) {
+                        $frame = $this->frameForBranch($frame, $op->block1);
+                        goto restart;
+                    }
+                    break;
+                case OpCode::TYPE_FUNCTION_STATIC_INIT_STORE:
+                    if (!isset($frame->block->constants[$op->arg2])) {
+                        throw new \LogicException('Function static key must be a compile-time constant');
+                    }
+                    if (null === $op->arg3) {
+                        throw new \LogicException('Function static init store requires a value slot');
+                    }
+                    $storeKey = $frame->block->constants[$op->arg2]->toString();
+                    $store = $this->context->ensureFunctionStatic($storeKey);
+                    $store->copyFrom($frame->scope[$op->arg3]->resolveIndirect());
+                    $this->context->markFunctionStaticInitialized($storeKey);
                     break;
                 case OpCode::TYPE_LIST_UNPACK_CHECK:
                     $unpack = $frame->scope[$op->arg2]->resolveIndirect();
