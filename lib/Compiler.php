@@ -3138,6 +3138,25 @@ class Compiler {
         return strtolower(ltrim($className, '\\'));
     }
 
+    /**
+     * Non-nullable declared type with `= null` default (php-src implicit nullable, #4449).
+     */
+    protected function paramIsImplicitNullable(Op\Expr\Param $param, ?int $defaultSlot, Block $block): bool
+    {
+        if (null === $defaultSlot || null === $param->declaredType) {
+            return false;
+        }
+        if ($param->declaredType instanceof Op\Type\Nullable) {
+            return false;
+        }
+        if ($this->cfgTypeUsesDnfShape($param->declaredType)) {
+            return false;
+        }
+        $default = $block->constants[$defaultSlot] ?? null;
+
+        return null !== $default && Variable::TYPE_NULL === $default->type;
+    }
+
     protected function compileParam(Op\Expr\Param $param, Block $block, int $paramIdx): OpCode {
         if ($param->byRef) {
             $block->paramByRef[$paramIdx] = true;
@@ -3158,6 +3177,9 @@ class Compiler {
             $block->paramSensitive[$paramIdx] = true;
         }
         $this->applyParamDeclaredType($param, $block, $slot, $param->variadic);
+        if ($this->paramIsImplicitNullable($param, $defaultConst, $block)) {
+            $block->paramImplicitNullable[$slot] = true;
+        }
 
         return new OpCode(
             OpCode::TYPE_ARG_RECV,
@@ -6249,6 +6271,9 @@ class Compiler {
         $sends = [];
         foreach ($args as $arg) {
             $valueSlot = $this->compileOperand($arg, $block, true);
+            if (null === $valueSlot && $arg instanceof Operand\NullOperand) {
+                $valueSlot = $this->registerNullConstantSlot($block, $arg);
+            }
             $nameSlot = null;
             $argName = $this->callArgName($arg);
             if (null !== $argName) {

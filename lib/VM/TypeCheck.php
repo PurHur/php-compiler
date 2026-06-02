@@ -214,6 +214,18 @@ final class TypeCheck
         return self::isExactType($value->resolveIndirect(), $constraint);
     }
 
+    /**
+     * Zend 8.2: `int $x = null` accepts null at call sites (implicit nullable, #4449).
+     */
+    public static function skipParameterTypeCheckForImplicitNullable(
+        Block $block,
+        int $slot,
+        Variable $argument
+    ): bool {
+        return isset($block->paramImplicitNullable[$slot])
+            && Variable::TYPE_NULL === $argument->resolveIndirect()->type;
+    }
+
     public static function typeNameForConstraint(int $type): string
     {
         return self::typeName($type);

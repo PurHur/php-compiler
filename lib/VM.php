@@ -2121,6 +2121,15 @@ restart:
                                     continue;
                                 }
                                 $arg = $calledArgs[$paramIdx];
+                                if (
+                                    TypeCheck::skipParameterTypeCheckForImplicitNullable(
+                                        $calleeBlock,
+                                        $slot,
+                                        $arg
+                                    )
+                                ) {
+                                    continue;
+                                }
                                 if (!TypeCheck::parameterMatchesType($arg, $constraint)) {
                                     $paramName = $calleeBlock->paramNames[$paramIdx] ?? 'param'.$paramIdx;
                                     throw VM\ParamTypeError::forUserCall(
@@ -2269,7 +2278,15 @@ restart:
                         : $frame->block->strictTypes;
                     $arraySpec = $frame->block->paramGenericArrayTypeSpecs[$op->arg1] ?? null;
                     try {
-                        TypeCheck::coerceParameter($arg1, $strict, $arraySpec);
+                        if (
+                            !TypeCheck::skipParameterTypeCheckForImplicitNullable(
+                                $frame->block,
+                                (int) $op->arg1,
+                                $arg1
+                            )
+                        ) {
+                            TypeCheck::coerceParameter($arg1, $strict, $arraySpec);
+                        }
                         if (isset($frame->block->paramIntersectionConstraints[$op->arg1])) {
                             TypeCheck::assertParamIntersection(
                                 $arg1,
