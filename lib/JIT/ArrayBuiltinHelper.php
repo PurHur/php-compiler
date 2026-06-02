@@ -4534,15 +4534,66 @@ final class ArrayBuiltinHelper
      */
     public static function combine(Context $context, Variable $keys, Variable $values): Value
     {
-        if (self::isNativeArray($keys->type) && self::isNativeArray($values->type)) {
-            return self::combineNativeArrays($context, $keys, $values);
-        }
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $resultSlot = JitValueBox::alloc($context);
+        $resultPtr = JitValueBox::pointer($context, $resultSlot);
+        JitValueBox::writeBool($context, $resultSlot, $context->constantFromBool(false));
 
-        return self::combineHashTables(
+        // Count operands before materializeNativeArrayForCall (same as array_count(); #4353).
+        $keysNum = self::packedListElementCount($context, $keys);
+        $valsNum = self::packedListElementCount($context, $values);
+        $keysEmpty = $context->builder->icmp(Builder::INT_EQ, $keysNum, $zero);
+        $valsEmpty = $context->builder->icmp(Builder::INT_EQ, $valsNum, $zero);
+        $eitherEmpty = $context->builder->or($keysEmpty, $valsEmpty);
+        $lengthMismatch = $context->builder->icmp(Builder::INT_NE, $keysNum, $valsNum);
+        $returnFalse = $context->builder->or($eitherEmpty, $lengthMismatch);
+
+        $exitBlock = BasicBlockHelper::append($context, 'array_combine_exit');
+        $falseBlock = BasicBlockHelper::append($context, 'array_combine_false');
+        $workBlock = BasicBlockHelper::append($context, 'array_combine_work');
+        $context->builder->branchIf($returnFalse, $falseBlock, $workBlock);
+
+        $context->builder->positionAtEnd($falseBlock);
+        $context->builder->branch($exitBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+
+        self::combineHashTablesInto(
             $context,
             self::loadHashTable($context, $keys),
-            self::loadHashTable($context, $values)
+            self::loadHashTable($context, $values),
+            $resultPtr,
+            $exitBlock
         );
+
+        $context->builder->positionAtEnd($exitBlock);
+
+        return $resultPtr;
+    }
+
+    /**
+     * Packed list length for array_combine() guards (mirrors ext/standard/array_count.php).
+     */
+    private static function packedListElementCount(Context $context, Variable $array): Value
+    {
+        if (0 !== ($array->type & Variable::IS_NATIVE_ARRAY)) {
+            return $context->constantFromInteger($array->nextFreeElement, 'size_t');
+        }
+        if (Variable::TYPE_HASHTABLE === $array->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__getNumElements'),
+                self::loadHashTable($context, $array)
+            );
+        }
+        if (Variable::TYPE_VALUE === $array->type || JitValueBox::isValueOperand($array)) {
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__getNumElements'),
+                self::loadHashTable($context, $array)
+            );
+        }
+
+        throw new \LogicException('array_combine() packedListElementCount: unsupported array operand type');
     }
 
     /**
@@ -4852,36 +4903,20 @@ final class ArrayBuiltinHelper
         return $ptr;
     }
 
-    private static function combineHashTables(Context $context, Value $keysHt, Value $valsHt): Value
-    {
+    private static function combineHashTablesInto(
+        Context $context,
+        Value $keysHt,
+        Value $valsHt,
+        Value $resultPtr,
+        \PHPLLVM\BasicBlock $doneBlock
+    ): void {
         $sizeT = $context->getTypeFromString('size_t');
-        $i1 = $context->getTypeFromString('int1');
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
         $keysNum = $context->builder->call(
             $context->lookupFunction('__hashtable__getNumElements'),
             $keysHt
         );
-        $valsNum = $context->builder->call(
-            $context->lookupFunction('__hashtable__getNumElements'),
-            $valsHt
-        );
-        $lengthMismatch = $context->builder->icmp(Builder::INT_NE, $keysNum, $valsNum);
-
-        $failSlot = JitValueBox::alloc($context);
-        $failPtr = JitValueBox::pointer($context, $failSlot);
-        $okSlot = JitValueBox::alloc($context);
-        $okPtr = JitValueBox::pointer($context, $okSlot);
-        $failBlock = BasicBlockHelper::append($context, 'array_combine_fail');
-        $workBlock = BasicBlockHelper::append($context, 'array_combine_work');
-        $mergeBlock = BasicBlockHelper::append($context, 'array_combine_merge');
-        $context->builder->branchIf($lengthMismatch, $failBlock, $workBlock);
-
-        $context->builder->positionAtEnd($failBlock);
-        JitValueBox::writeBool($context, $failSlot, $i1->constInt(0, false));
-        $context->builder->branch($mergeBlock);
-
-        $context->builder->positionAtEnd($workBlock);
         $dest = HashTableHelper::alloc($context);
         $idxSlot = $context->builder->alloca($sizeT, 1, 'array_combine_idx');
         $context->builder->store($zero, $idxSlot);
@@ -4912,17 +4947,10 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($loopDone);
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
-            $okPtr,
+            $resultPtr,
             $dest
         );
-        $context->builder->branch($mergeBlock);
-
-        $context->builder->positionAtEnd($mergeBlock);
-        $phi = $context->builder->phi($failPtr->typeOf());
-        $phi->addIncoming($failPtr, $failBlock);
-        $phi->addIncoming($okPtr, $loopDone);
-
-        return $phi;
+        $context->builder->branch($doneBlock);
     }
 
     private static function combineNativeArrays(Context $context, Variable $keys, Variable $values): Value
@@ -4938,7 +4966,11 @@ final class ArrayBuiltinHelper
         $one = $sizeT->constInt(1, false);
         $keysCount = $context->constantFromInteger($keys->nextFreeElement, 'size_t');
         $valsCount = $context->constantFromInteger($values->nextFreeElement, 'size_t');
+        $keysEmpty = $context->builder->icmp(Builder::INT_EQ, $keysCount, $zero);
+        $valsEmpty = $context->builder->icmp(Builder::INT_EQ, $valsCount, $zero);
+        $eitherEmpty = $context->builder->or($keysEmpty, $valsEmpty);
         $lengthMismatch = $context->builder->icmp(Builder::INT_NE, $keysCount, $valsCount);
+        $returnFalse = $context->builder->or($eitherEmpty, $lengthMismatch);
 
         $failSlot = JitValueBox::alloc($context);
         $failPtr = JitValueBox::pointer($context, $failSlot);
@@ -4947,10 +4979,10 @@ final class ArrayBuiltinHelper
         $failBlock = BasicBlockHelper::append($context, 'array_combine_native_fail');
         $workBlock = BasicBlockHelper::append($context, 'array_combine_native_work');
         $mergeBlock = BasicBlockHelper::append($context, 'array_combine_native_merge');
-        $context->builder->branchIf($lengthMismatch, $failBlock, $workBlock);
+        $context->builder->branchIf($returnFalse, $failBlock, $workBlock);
 
         $context->builder->positionAtEnd($failBlock);
-        JitValueBox::writeBool($context, $failSlot, $i1->constInt(0, false));
+        JitValueBox::writeBool($context, $failSlot, $context->constantFromBool(false));
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($workBlock);

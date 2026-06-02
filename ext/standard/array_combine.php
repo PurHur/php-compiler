@@ -46,6 +46,14 @@ final class array_combine extends Internal
         foreach ($valuesArg->toArray()->iterateKeyed(true) as [, $value]) {
             $values[] = $value;
         }
+        if (0 === \count($keys) || 0 === \count($values)) {
+            if (null === $frame->returnVar) {
+                return;
+            }
+            $frame->returnVar->bool(false);
+
+            return;
+        }
         if (\count($keys) !== \count($values)) {
             throw new \ValueError(self::LENGTH_MISMATCH_ERROR);
         }
@@ -90,6 +98,7 @@ final class array_combine extends Internal
                 $this->jitString($context, $arg, 'array_combine() argument #'.((int) $i + 1));
             }
         }
+
         return ArrayBuiltinHelper::combine($context, $args[0], $args[1]);
     }
 }
