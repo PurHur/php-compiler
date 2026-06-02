@@ -7796,10 +7796,12 @@ class JIT {
 
         /** @var array<string, array<string, array{traitId: int, traitName: string, traitLc: string, methodLc: string}>> */
         $perTraitMethods = [];
+        /** @var array<string, string> */
+        $usedTraitNameByLc = [];
         foreach ($traitNames as $traitName) {
             $traitLc = strtolower(ltrim($traitName, '\\'));
             if (!$object->hasDeclaredClass($traitName)) {
-                throw new \LogicException("Trait {$traitName} not found");
+                throw new \LogicException("Could not find trait {$traitName}");
             }
             if (!$object->isTraitClass($traitLc)) {
                 throw new \LogicException("{$traitName} is not a trait");
@@ -7810,6 +7812,7 @@ class JIT {
             if (!isset($perTraitMethods[$traitLc])) {
                 $perTraitMethods[$traitLc] = [];
             }
+            $usedTraitNameByLc[$traitLc] = $traitName;
             foreach ($object->declaredMethodNames($traitId) as $methodLc) {
                 $perTraitMethods[$traitLc][$methodLc] = [
                     'traitId' => $traitId,
@@ -7827,9 +7830,36 @@ class JIT {
             if ('precedence' !== ($adaptation['kind'] ?? '')) {
                 continue;
             }
+            $winnerTraitLc = strtolower(ltrim((string) ($adaptation['trait'] ?? ''), '\\'));
+            if ('' === $winnerTraitLc) {
+                throw new \LogicException('Trait precedence adaptation must specify a trait');
+            }
+            if (!isset($usedTraitNameByLc[$winnerTraitLc])) {
+                throw new \LogicException('Could not find trait ' . (string) ($adaptation['trait'] ?? ''));
+            }
             $methodLc = strtolower((string) $adaptation['method']);
+            if (!isset($perTraitMethods[$winnerTraitLc][$methodLc])) {
+                throw new \LogicException(
+                    'A precedence rule was defined for '
+                    . $usedTraitNameByLc[$winnerTraitLc]
+                    . '::' . (string) ($adaptation['method'] ?? '')
+                    . ' but this method does not exist'
+                );
+            }
             foreach ($adaptation['insteadof'] as $loserTrait) {
                 $loserLc = strtolower(ltrim((string) $loserTrait, '\\'));
+                if (!isset($usedTraitNameByLc[$loserLc])) {
+                    throw new \LogicException('Could not find trait ' . (string) $loserTrait);
+                }
+                if (!isset($perTraitMethods[$loserLc][$methodLc])) {
+                    throw new \LogicException(
+                        'A precedence rule was defined for '
+                        . $usedTraitNameByLc[$winnerTraitLc]
+                        . '::' . (string) ($adaptation['method'] ?? '')
+                        . ' but this method does not exist in '
+                        . $usedTraitNameByLc[$loserLc]
+                    );
+                }
                 $excludedByPrecedence["{$loserLc}\0{$methodLc}"] = true;
             }
         }
@@ -7861,11 +7891,18 @@ class JIT {
                 ? strtolower(ltrim((string) $adaptation['trait'], '\\'))
                 : null;
             if (!isset($merged[$methodLc])) {
-                throw new \LogicException('Could not find trait method ' . $adaptation['method']);
+                $traitPrefix = null !== ($adaptation['trait'] ?? null)
+                    ? (string) $adaptation['trait'] . '::'
+                    : '';
+                throw new \LogicException(
+                    'An alias was defined for ' . $traitPrefix . (string) ($adaptation['method'] ?? '')
+                    . ' but this method does not exist'
+                );
             }
             if (null !== $traitLcFilter && $merged[$methodLc]['traitLc'] !== $traitLcFilter) {
                 throw new \LogicException(
-                    'Could not find trait method ' . $adaptation['method'] . ' in trait ' . $adaptation['trait']
+                    'An alias was defined for ' . (string) ($adaptation['trait'] ?? '') . '::' . (string) ($adaptation['method'] ?? '')
+                    . ' but this method does not exist'
                 );
             }
             $newName = $adaptation['newName'] ?? null;
