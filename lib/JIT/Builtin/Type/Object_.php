@@ -2590,14 +2590,43 @@ class Object_ extends Type {
         }
     }
 
-    public function inheritTraitStaticProperties(int $classId, int $traitId): void
+    public function inheritTraitStaticProperties(int $classId, int $traitId, string $traitName): void
     {
         if (!isset($this->staticPropertyGlobals[$traitId])) {
             return;
         }
         foreach ($this->staticPropertyGlobals[$traitId] as $name => $entry) {
-            if (!isset($this->staticPropertyGlobals[$classId][$name])) {
-                $this->staticPropertyGlobals[$classId][$name] = $entry;
+            if (isset($this->staticPropertyGlobals[$classId][$name])) {
+                throw new \LogicException(
+                    "Trait property {$traitName}::\${$name} conflicts with a property declared in another trait"
+                );
+            }
+            $this->defineStaticProperty(
+                $classId,
+                $name,
+                $entry['type'],
+                $entry['default'] ?? null
+            );
+        }
+    }
+
+    public function inheritParentStaticProperties(int $childId, string $parentLc): void
+    {
+        if (!$this->hasDeclaredClass($parentLc)) {
+            return;
+        }
+        $parentId = $this->lookup($parentLc);
+        if (!isset($this->staticPropertyGlobals[$parentId])) {
+            return;
+        }
+        foreach ($this->staticPropertyGlobals[$parentId] as $name => $entry) {
+            if (!isset($this->staticPropertyGlobals[$childId][$name])) {
+                $this->defineStaticProperty(
+                    $childId,
+                    $name,
+                    $entry['type'],
+                    $entry['default'] ?? null
+                );
             }
         }
     }
@@ -2712,6 +2741,7 @@ class Object_ extends Type {
         $this->staticPropertyGlobals[$classId][$key] = [
             'type' => $jitType,
             'global' => $global,
+            'default' => $default,
         ];
         if (Variable::TYPE_STRING === $jitType && null !== $default) {
             $this->initStaticStringPropertyDefault($global, $default);

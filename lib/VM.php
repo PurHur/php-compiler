@@ -5116,9 +5116,12 @@ restart:
                 }
             }
             foreach ($trait->staticProperties as $name => $storage) {
-                if (!isset($entry->staticProperties[$name])) {
-                    $entry->staticProperties[$name] = $storage;
+                if (isset($entry->staticProperties[$name])) {
+                    throw new \LogicException(
+                        "Trait property {$trait->name}::\${$name} conflicts with a property declared in another trait"
+                    );
                 }
+                $entry->staticProperties[$name] = $this->cloneStaticPropertyStorage($storage);
             }
             foreach ($trait->constants as $name => $value) {
                 if (isset($entry->constants[$name])) {
@@ -5390,6 +5393,14 @@ restart:
         }
     }
 
+    private function cloneStaticPropertyStorage(Variable $source): Variable
+    {
+        $clone = new Variable();
+        $clone->copyFrom($source->resolveIndirect());
+
+        return $clone;
+    }
+
     protected function inheritFromParent(ClassEntry $entry): void
     {
         if (null === $entry->parentLc || !isset($this->context->classes[$entry->parentLc])) {
@@ -5413,7 +5424,7 @@ restart:
         }
         foreach ($parent->staticProperties as $name => $storage) {
             if (!isset($entry->staticProperties[$name])) {
-                $entry->staticProperties[$name] = $storage;
+                $entry->staticProperties[$name] = $this->cloneStaticPropertyStorage($storage);
             }
         }
         foreach ($parent->constants as $name => $value) {
