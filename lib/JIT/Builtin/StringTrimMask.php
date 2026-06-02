@@ -25,9 +25,10 @@ final class StringTrimMask
     {
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
             $fn = $context->module->getNamedFunction('__phpc_char_in_mask');
-            if (null !== $fn) {
-                $context->registerFunction('__phpc_char_in_mask', $fn);
+            if (null === $fn) {
+                $fn = self::declareStandalone($context);
             }
+            $context->registerFunction('__phpc_char_in_mask', $fn);
 
             return;
         }
@@ -50,6 +51,15 @@ final class StringTrimMask
             throw new \LogicException('Failed to link trim mask JIT runtime bitcode');
         }
         self::registerLinkedRuntime($context);
+    }
+
+    private static function declareStandalone(Context $context)
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $ft = $context->context->functionType($i32, false, $i32, $strPtr);
+
+        return $context->module->addFunction('__phpc_char_in_mask', $ft);
     }
 
     private static function registerLinkedRuntime(Context $context): void
