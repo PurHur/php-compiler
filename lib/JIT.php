@@ -4854,6 +4854,41 @@ class JIT {
                         }
                     }
                     break;
+                case OpCode::TYPE_JUMPIF_FUNCTION_STATIC_INITIALIZED:
+                    if (!isset($block->constants[$op->arg2])) {
+                        throw new \LogicException('Function static key must be a compile-time constant');
+                    }
+                    $branchBlock = $builder->getInsertBlock();
+                    $builder->positionAtEnd($branchBlock);
+                    $jumpKey = $block->constants[$op->arg2]->toString();
+                    $this->compileBlockInternal($func, $op->block1, null, null, 0, false, ...$args);
+                    $skipEntry = $this->context->scope->blockStorage[$op->block1];
+                    $initPathBb = JIT\BasicBlockHelper::append($this->context, 'fn_static_init_path');
+                    $builder->positionAtEnd($branchBlock);
+                    $builder->branchIf(
+                        JIT\FunctionStaticHelper::isInitializedCondition($this->context, $jumpKey),
+                        $skipEntry,
+                        $initPathBb
+                    );
+                    $builder->positionAtEnd($initPathBb);
+                    break;
+                case OpCode::TYPE_FUNCTION_STATIC_INIT_STORE:
+                    if (!isset($block->constants[$op->arg2])) {
+                        throw new \LogicException('Function static key must be a compile-time constant');
+                    }
+                    if (null === $op->arg3) {
+                        throw new \LogicException('Function static init store requires a value slot');
+                    }
+                    $storeKey = $block->constants[$op->arg2]->toString();
+                    $storeVar = $this->ensureJitFunctionStatic($storeKey);
+                    $initValue = $this->variableFromBlockSlot($block, (int) $op->arg3);
+                    JIT\FunctionStaticHelper::emitRuntimeInitStore(
+                        $this->context,
+                        $storeKey,
+                        $storeVar,
+                        $initValue
+                    );
+                    break;
                 case OpCode::TYPE_VAR_FETCH:
                     $destOp = $block->getOperand($op->arg1);
                     if (!$this->context->hasVariableOp($destOp)) {

@@ -959,6 +959,12 @@ class Compiler {
                     ) {
                         // Lowered by compileIsset via TYPE_ISSET(container, name) (#3298).
                         break;
+                    } elseif ($child instanceof Op\Terminal\StaticVar) {
+                        [$staticOps, $nextBlock] = $this->compileFunctionStaticVar($child, $block);
+                        foreach ($staticOps as $staticOp) {
+                            $block->addOpCode($staticOp);
+                        }
+                        $block = $nextBlock;
                     } elseif (
                         $child instanceof Op\Expr\PropertyFetch
                         && $i + 1 < $opCount
@@ -4640,8 +4646,10 @@ class Compiler {
 
     /**
      * @param Op\Terminal\StaticVar $terminal
+     *
+     * @return array{0: list<OpCode>, 1: Block}
      */
-    protected function compileFunctionStaticVar(Op\Terminal $terminal, Block $block): OpCode
+    protected function compileFunctionStaticVar(Op\Terminal $terminal, Block $block): array
     {
         if (null === $block->func) {
             $this->throwCompileLogic('Function-local static requires a function context');
@@ -4653,34 +4661,155 @@ class Compiler {
         $keyOperand = new Operand\Literal($storageKey);
         $keyOperand->type = Type::string();
         $keySlot = $block->registerConstant($keyOperand, $keyVar);
-        $defaultSlot = null;
-        if (null !== $terminal->defaultVar) {
-            $defaultSlot = $this->tryFoldFunctionStaticDefaultSlot($terminal, $block);
-            if (null === $defaultSlot) {
-                if (null !== $terminal->defaultBlock) {
-                    $this->compileOps($terminal->defaultBlock->children, $block);
-                }
-                $defaultSlot = $this->compileOperand($terminal->defaultVar, $block, true);
-                if (!isset($block->constants[$defaultSlot])) {
-                    $this->throwCompileLogic(
-                        'Function-local static initializer must be a compile-time literal in v1 (#2286)'
-                    );
-                }
-            }
+        $localSlot = $this->compileOperand($terminal->var, $block, false);
+
+        if (null === $terminal->defaultVar) {
+            return [[new OpCode(
+                OpCode::TYPE_DECLARE_FUNCTION_STATIC,
+                $localSlot,
+                $keySlot,
+                null
+            )], $block];
+        }
+
+        $defaultSlot = $this->tryFoldFunctionStaticDefaultSlot($terminal, $block);
+        if (null !== $defaultSlot) {
             $defaultVm = $block->constants[$defaultSlot];
             if (!$this->isAllowedFunctionStaticDefaultType($defaultVm->type)) {
                 $this->throwCompileLogic(
                     'Function-local static initializer must be a compile-time literal in v1 (#2286)'
                 );
             }
+
+            return [[new OpCode(
+                OpCode::TYPE_DECLARE_FUNCTION_STATIC,
+                $localSlot,
+                $keySlot,
+                $defaultSlot
+            )], $block];
         }
 
-        return new OpCode(
-            OpCode::TYPE_DECLARE_FUNCTION_STATIC,
-            $this->compileOperand($terminal->var, $block, false),
-            $keySlot,
-            $defaultSlot
+        $this->assertFunctionStaticRuntimeInitAllowed($terminal);
+
+        $continueBlock = new Block($block->orig);
+        $continueBlock->func = $block->func;
+        $continueBlock->inheritScopeFrom($block);
+
+        $skipOp = new OpCode(
+            OpCode::TYPE_JUMPIF_FUNCTION_STATIC_INITIALIZED,
+            null,
+            $keySlot
         );
+        $skipOp->block1 = $continueBlock;
+
+        if (null !== $terminal->defaultBlock) {
+            $this->compileOps($terminal->defaultBlock->children, $block);
+        }
+        $initSlot = $this->compileOperand($terminal->defaultVar, $block, true);
+
+        $storeOp = new OpCode(
+            OpCode::TYPE_FUNCTION_STATIC_INIT_STORE,
+            null,
+            $keySlot,
+            $initSlot
+        );
+        $jumpOp = new OpCode(OpCode::TYPE_JUMP);
+        $jumpOp->block1 = $continueBlock;
+
+        $continueBlock->addOpCode(new OpCode(
+            OpCode::TYPE_DECLARE_FUNCTION_STATIC,
+            $localSlot,
+            $keySlot,
+            null
+        ));
+        $continueBlock->parents[] = $block;
+
+        return [[$skipOp, $storeOp, $jumpOp], $continueBlock];
+    }
+
+    /**
+     * @param Op\Terminal\StaticVar $terminal
+     */
+    protected function assertFunctionStaticRuntimeInitAllowed(Op\Terminal $terminal): void
+    {
+        if (null === $terminal->defaultBlock) {
+            return;
+        }
+        foreach ($terminal->defaultBlock->children as $child) {
+            if ($this->functionStaticInitReferencesLocal($child)) {
+                $this->throwCompileLogic(
+                    'Constant expression contains invalid operations'
+                );
+            }
+        }
+    }
+
+    protected function functionStaticInitReferencesLocal(Op $op): bool
+    {
+        if ($op instanceof Op\Expr\FuncCall || $op instanceof Op\Expr\MethodCall) {
+            return true;
+        }
+        if ($op instanceof Op\Expr\Variable) {
+            return true;
+        }
+        if ($op instanceof Op\Expr\ArrayDimFetch) {
+            return $this->functionStaticInitReferencesLocal($op->var)
+                || (null !== $op->dim && $this->functionStaticInitOperandReferencesLocal($op->dim));
+        }
+        if ($op instanceof Op\Expr\PropertyFetch) {
+            return $this->functionStaticInitReferencesLocal($op->var)
+                || $this->functionStaticInitOperandReferencesLocal($op->name);
+        }
+        if ($op instanceof Op\Expr\BinaryOp) {
+            return $this->functionStaticInitOperandReferencesLocal($op->left)
+                || $this->functionStaticInitOperandReferencesLocal($op->right);
+        }
+        if ($op instanceof Op\Expr\UnaryMinus || $op instanceof Op\Expr\UnaryPlus || $op instanceof Op\Expr\UnaryOp\BitwiseNot) {
+            return $this->functionStaticInitOperandReferencesLocal($op->expr);
+        }
+        if ($op instanceof Op\Expr\New_) {
+            foreach ($op->args as $arg) {
+                if ($this->functionStaticInitOperandReferencesLocal($arg->value)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        if ($op instanceof Op\Expr\Array_) {
+            $n = \count($op->values);
+            for ($i = 0; $i < $n; ++$i) {
+                if ($this->functionStaticInitOperandReferencesLocal($op->values[$i])) {
+                    return true;
+                }
+                $key = $op->keys[$i] ?? null;
+                if (null !== $key && $this->functionStaticInitOperandReferencesLocal($key)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        if ($op instanceof Op\Expr\ConstFetch || $op instanceof Op\Expr\ClassConstFetch) {
+            return false;
+        }
+
+        return false;
+    }
+
+    protected function functionStaticInitOperandReferencesLocal(Operand $operand): bool
+    {
+        if ($operand instanceof Operand\Variable) {
+            return true;
+        }
+        if ($operand instanceof Operand\Literal || $operand instanceof Operand\NullOperand) {
+            return false;
+        }
+        if ($operand instanceof Operand\Temporary) {
+            return false;
+        }
+
+        return false;
     }
 
     private function isAllowedFunctionStaticDefaultType(int $type): bool
@@ -5645,7 +5774,7 @@ class Compiler {
                     $nameSlot
                 )];
             case 'Terminal_StaticVar':
-                return [$this->compileFunctionStaticVar($terminal, $block)];
+                throw new \LogicException('StaticVar must be compiled via compileOps (#4352)');
             default:
                 $this->throwCompileLogic("Unknown Terminal Type: " . $terminal->getType());
         }

@@ -125,7 +125,8 @@ class OpCode {
     /** unset(Class::$prop) — arg2 class, arg3 property name (#2256). */
     const TYPE_STATIC_PROPERTY_UNSET = 104;
     /**
-     * Function-local static: arg1 local slot, arg2 storage key constant slot, arg3 default constant slot (#2286).
+     * Function-local static: arg1 local slot, arg2 storage key constant slot, arg3 compile-time default slot (#2286).
+     * When arg3 is null, bind only — runtime init via TYPE_FUNCTION_STATIC_INIT_STORE (#4352).
      */
     const TYPE_DECLARE_FUNCTION_STATIC = 105;
     /** User trait declaration with method bodies (#2312). */
@@ -171,6 +172,10 @@ class OpCode {
     const TYPE_LOGICAL_XOR = 118;
     /** `list()` / `[]` unpack: arg2 = array slot; TypeError when not a list (#4298). */
     const TYPE_LIST_UNPACK_CHECK = 120;
+    /** Skip runtime static init when storage key (arg2) is already initialized; jump to block1 (#4352). */
+    const TYPE_JUMPIF_FUNCTION_STATIC_INITIALIZED = 121;
+    /** Store runtime static default: arg2 = key constant slot, arg3 = value slot (#4352). */
+    const TYPE_FUNCTION_STATIC_INIT_STORE = 122;
 
     public int $type;
     public ?int $arg1;
