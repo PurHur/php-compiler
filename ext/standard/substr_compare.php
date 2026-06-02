@@ -39,10 +39,13 @@ final class substr_compare extends Internal
         $length = null;
         if ($argc >= 4) {
             $lengthArg = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $lengthArg->type) {
+            if (Variable::TYPE_NULL === $lengthArg->type) {
+                $length = null;
+            } elseif (Variable::TYPE_INTEGER !== $lengthArg->type) {
                 throw new \LogicException('substr_compare() argument #4 must be an integer in this compiler build');
+            } else {
+                $length = $lengthArg->toInt();
             }
-            $length = $lengthArg->toInt();
         }
         $caseInsensitive = false;
         if (5 === $argc) {
@@ -78,10 +81,16 @@ final class substr_compare extends Internal
         $i32 = $context->getTypeFromString('int32');
         $lengthVal = $i64->constInt(-1, false);
         if ($argc >= 4) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[3]->type) {
-                throw new \LogicException('substr_compare() length must be an integer in this compiler build');
+            if (JITVariable::TYPE_NATIVE_LONG === $args[3]->type) {
+                $lengthVal = $this->jitLong($context, $args[3], 'substr_compare() length');
+            } elseif (JITVariable::TYPE_VALUE === $args[3]->type) {
+                if (!$args[3]->isNullConstant) {
+                    throw new \LogicException('substr_compare() length must be an integer or literal null in this compiler build');
+                }
+                $lengthVal = $i64->constInt(-1, false);
+            } else {
+                throw new \LogicException('substr_compare() length must be an integer or null in this compiler build');
             }
-            $lengthVal = $this->jitLong($context, $args[3], 'substr_compare() length');
         }
         $ci = $i32->constInt(0, false);
         if (5 === $argc) {
