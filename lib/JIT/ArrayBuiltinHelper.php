@@ -4538,23 +4538,40 @@ final class ArrayBuiltinHelper
         $zero = $sizeT->constInt(0, false);
         $resultSlot = JitValueBox::alloc($context);
         $resultPtr = JitValueBox::pointer($context, $resultSlot);
-        JitValueBox::writeBool($context, $resultSlot, $context->constantFromBool(false));
 
-        // Count operands before materializeNativeArrayForCall (same as array_count(); #4353).
+        // Count operands before materializeNativeArrayForCall (same as array_count(); #4523).
         $keysNum = self::packedListElementCount($context, $keys);
         $valsNum = self::packedListElementCount($context, $values);
         $keysEmpty = $context->builder->icmp(Builder::INT_EQ, $keysNum, $zero);
         $valsEmpty = $context->builder->icmp(Builder::INT_EQ, $valsNum, $zero);
+        $bothEmpty = $context->builder->and($keysEmpty, $valsEmpty);
         $eitherEmpty = $context->builder->or($keysEmpty, $valsEmpty);
         $lengthMismatch = $context->builder->icmp(Builder::INT_NE, $keysNum, $valsNum);
-        $returnFalse = $context->builder->or($eitherEmpty, $lengthMismatch);
+        $returnFalse = $context->builder->or(
+            $context->builder->and($eitherEmpty, $context->builder->not($bothEmpty)),
+            $lengthMismatch
+        );
 
         $exitBlock = BasicBlockHelper::append($context, 'array_combine_exit');
+        $bothEmptyBlock = BasicBlockHelper::append($context, 'array_combine_both_empty');
         $falseBlock = BasicBlockHelper::append($context, 'array_combine_false');
         $workBlock = BasicBlockHelper::append($context, 'array_combine_work');
+        $checkFalseBlock = BasicBlockHelper::append($context, 'array_combine_check_false');
+        $context->builder->branchIf($bothEmpty, $bothEmptyBlock, $checkFalseBlock);
+
+        $context->builder->positionAtEnd($bothEmptyBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $resultPtr,
+            HashTableHelper::alloc($context)
+        );
+        $context->builder->branch($exitBlock);
+
+        $context->builder->positionAtEnd($checkFalseBlock);
         $context->builder->branchIf($returnFalse, $falseBlock, $workBlock);
 
         $context->builder->positionAtEnd($falseBlock);
+        JitValueBox::writeBool($context, $resultSlot, $context->constantFromBool(false));
         $context->builder->branch($exitBlock);
 
         $context->builder->positionAtEnd($workBlock);
@@ -4968,17 +4985,34 @@ final class ArrayBuiltinHelper
         $valsCount = $context->constantFromInteger($values->nextFreeElement, 'size_t');
         $keysEmpty = $context->builder->icmp(Builder::INT_EQ, $keysCount, $zero);
         $valsEmpty = $context->builder->icmp(Builder::INT_EQ, $valsCount, $zero);
+        $bothEmpty = $context->builder->and($keysEmpty, $valsEmpty);
         $eitherEmpty = $context->builder->or($keysEmpty, $valsEmpty);
         $lengthMismatch = $context->builder->icmp(Builder::INT_NE, $keysCount, $valsCount);
-        $returnFalse = $context->builder->or($eitherEmpty, $lengthMismatch);
+        $returnFalse = $context->builder->or(
+            $context->builder->and($eitherEmpty, $context->builder->not($bothEmpty)),
+            $lengthMismatch
+        );
 
         $failSlot = JitValueBox::alloc($context);
         $failPtr = JitValueBox::pointer($context, $failSlot);
         $okSlot = JitValueBox::alloc($context);
         $okPtr = JitValueBox::pointer($context, $okSlot);
+        $bothEmptyBlock = BasicBlockHelper::append($context, 'array_combine_native_both_empty');
         $failBlock = BasicBlockHelper::append($context, 'array_combine_native_fail');
         $workBlock = BasicBlockHelper::append($context, 'array_combine_native_work');
         $mergeBlock = BasicBlockHelper::append($context, 'array_combine_native_merge');
+        $checkFalseBlock = BasicBlockHelper::append($context, 'array_combine_native_check_false');
+        $context->builder->branchIf($bothEmpty, $bothEmptyBlock, $checkFalseBlock);
+
+        $context->builder->positionAtEnd($bothEmptyBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $okPtr,
+            HashTableHelper::alloc($context)
+        );
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($checkFalseBlock);
         $context->builder->branchIf($returnFalse, $failBlock, $workBlock);
 
         $context->builder->positionAtEnd($failBlock);
@@ -5047,6 +5081,7 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($mergeBlock);
         $phi = $context->builder->phi($failPtr->typeOf());
         $phi->addIncoming($failPtr, $failBlock);
+        $phi->addIncoming($okPtr, $bothEmptyBlock);
         $phi->addIncoming($okPtr, $loopDone);
 
         return $phi;
