@@ -49,6 +49,46 @@ final class ApplyPatchesTest extends TestCase
         );
     }
 
+    public function testPhpTypesUnionTypeReconstructorOverlayReappliesAfterPartialVendor(): void
+    {
+        $recon = self::$root.'/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php';
+        if (!is_readable($recon)) {
+            self::markTestSkipped('vendor/ircmaxell/php-types not installed');
+        }
+
+        $original = (string) file_get_contents($recon);
+        $block = <<<'PHP'
+        } elseif ($type instanceof Op\Type\Union_) {
+            $subs = [];
+            foreach ($type->types as $sub) {
+                $subs[] = $this->resolveOpType($sub);
+            }
+
+            return (new Type(Type::TYPE_UNION, $subs))->simplify();
+PHP;
+        self::assertStringContainsString($block, $original, 'fixture must include Union_ handler');
+
+        $stripped = str_replace($block, '', $original);
+        file_put_contents($recon, $stripped);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertSame(0, $exitCode, "apply-patches failed after stripping Union_:\n".$joined);
+
+            $restored = (string) file_get_contents($recon);
+            self::assertStringContainsString(
+                'instanceof Op\\Type\\Union_',
+                $restored,
+                'overlay must re-insert Union_ when Intersection handler is present (#4229)'
+            );
+        } finally {
+            file_put_contents($recon, $original);
+        }
+    }
+
     public function testPhpCfgEnumParserPassesImplementsArrayNotBlock(): void
     {
         $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';

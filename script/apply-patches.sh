@@ -1096,27 +1096,44 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 text = path.read_text()
-anchor = """        } elseif ($type instanceof Op\\Type\\Never_) {
-            return Type::never();
-        }
-
-        throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
-insert = """        } elseif ($type instanceof Op\\Type\\Never_) {
-            return Type::never();
-        } elseif ($type instanceof Op\\Type\\Union_) {
+union_block = """        } elseif ($type instanceof Op\\Type\\Union_) {
             $subs = [];
             foreach ($type->types as $sub) {
                 $subs[] = $this->resolveOpType($sub);
             }
 
             return (new Type(Type::TYPE_UNION, $subs))->simplify();
+"""
+if union_block.strip() in text:
+    raise SystemExit(0)
+
+intersection_anchor = """        } elseif ($type instanceof Op\\Type\\Intersection) {"""
+never_throw_anchor = """        } elseif ($type instanceof Op\\Type\\Never_) {
+            return Type::never();
         }
 
         throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
-if anchor not in text:
-    sys.stderr.write("php-types-union-type: TypeReconstructor Never_ anchor not found\n")
+
+if intersection_anchor in text:
+    text = text.replace(intersection_anchor, union_block + intersection_anchor, 1)
+elif never_throw_anchor in text:
+    text = text.replace(
+        never_throw_anchor,
+        """        } elseif ($type instanceof Op\\Type\\Never_) {
+            return Type::never();
+        }"""
+        + union_block
+        + """
+        throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));""",
+        1,
+    )
+else:
+    sys.stderr.write(
+        "php-types-union-type: TypeReconstructor anchor not found "
+        "(expected Intersection handler or Never_/throw tail)\n"
+    )
     raise SystemExit(1)
-path.write_text(text.replace(anchor, insert, 1))
+path.write_text(text)
 PY
   echo "Applied php-types-union-type.patch (TypeReconstructor overlay)"
 }
