@@ -4726,6 +4726,40 @@ class JIT {
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg3));
                     $destOp = $block->getOperand($op->arg1);
                     $forceCoalesce = $this->context->coalesceAssignTargets->contains($destOp);
+                    $srcOp = $block->getOperand($op->arg3);
+                    $isNullSource = $value->isNullConstant
+                        || Variable::TYPE_NULL === $value->type
+                        || ($srcOp instanceof Operand\Literal && null === $srcOp->value);
+                    if ($forceCoalesce && $isNullSource) {
+                        if (!$this->context->hasVariableOp($destOp)) {
+                            $this->context->makeVariableFromOp($func, $basicBlock, $block, $destOp);
+                        }
+                        $mergeDest = $this->context->getVariableFromOp($destOp);
+                        if (Variable::KIND_VALUE === $mergeDest->kind) {
+                            $slot = JIT\JitValueBox::alloc($this->context);
+                            $this->context->setVariableOp(
+                                $destOp,
+                                new Variable(
+                                    $this->context,
+                                    Variable::TYPE_VALUE,
+                                    Variable::KIND_VARIABLE,
+                                    $slot
+                                )
+                            );
+                            $mergeDest = $this->context->getVariableFromOp($destOp);
+                        }
+                        if (
+                            Variable::TYPE_VALUE === $mergeDest->type
+                            && Variable::KIND_VARIABLE === $mergeDest->kind
+                        ) {
+                            $this->context->builder->call(
+                                $this->context->lookupFunction('__value__writeNull'),
+                                JIT\JitValueBox::pointer($this->context, $mergeDest->value)
+                            );
+                            $mergeDest->isNullConstant = true;
+                            break;
+                        }
+                    }
                     $forceAssign = $forceCoalesce
                         || $this->assignOperandsUsedByLiteralInclude($block, $op);
                     $aliasOp = $block->getOperand($op->arg2);
@@ -5882,6 +5916,11 @@ class JIT {
                     // Mirror ?? lowering: branchIf targets entry blocks; merge from branch tails (#3219).
                     $nullTail = JIT\NullsafeHelper::compileBranch($this, $func, $op->block1);
                     $fetchTail = JIT\NullsafeHelper::compileBranch($this, $func, $op->block2);
+                    if ($this->context->hasVariableOp($nullsafeResult)) {
+                        $nullsafeVar = $this->context->getVariableFromOp($nullsafeResult);
+                        $nullsafeVar->compileTimeString = null;
+                        $nullsafeVar->compileTimeConstantName = null;
+                    }
                     $nullEntry = $this->context->scope->blockStorage[$op->block1];
                     $fetchEntry = $this->context->scope->blockStorage[$op->block2];
                     $builder->positionAtEnd($branchBlock);
@@ -6607,6 +6646,24 @@ class JIT {
                     $declaringClass = $this->resolvePropertyDeclaringClass($obj, $block, $propName);
                     $receiver = $this->loadPropertyFetchReceiver($obj);
                     $forceBranchMerge = $this->context->coalesceAssignTargets->contains($result);
+                    if ($forceBranchMerge) {
+                        if (!$this->context->hasVariableOp($result)) {
+                            $this->context->makeVariableFromOp($func, $basicBlock, $block, $result);
+                        }
+                        $mergeVar = $this->context->getVariableFromOp($result);
+                        if (Variable::KIND_VALUE === $mergeVar->kind) {
+                            $slot = JIT\JitValueBox::alloc($this->context);
+                            $this->context->setVariableOp(
+                                $result,
+                                new Variable(
+                                    $this->context,
+                                    Variable::TYPE_VALUE,
+                                    Variable::KIND_VARIABLE,
+                                    $slot
+                                )
+                            );
+                        }
+                    }
                     $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
                     if ($name instanceof Operand\Literal) {
                         $classId = $this->context->type->object->lookup($declaringClass);
@@ -8041,6 +8098,7 @@ class JIT {
     }
 
     private function assignOperand(Operand $resultOp, Variable $value, bool $force = false): void {
+        $branchMergeTarget = $force && $this->context->coalesceAssignTargets->contains($resultOp);
         $resolvedName = JIT\OperandName::resolve($resultOp);
         if (
             !$force
@@ -8239,7 +8297,10 @@ class JIT {
         if ($result->kind !== Variable::KIND_VARIABLE) {
             throw new \LogicException("Cannot assign to a value");
         }
-        if ($value->type === $result->type) {
+        if (
+            $value->type === $result->type
+            && !($branchMergeTarget && Variable::TYPE_VALUE === $result->type)
+        ) {
             if (!$result->includeBinding) {
                 $result->free();
             }
