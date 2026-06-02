@@ -2556,19 +2556,16 @@ restart:
                     break;
                 case OpCode::TYPE_ARRAY_SPREAD:
                     $result = $frame->scope[$op->arg1];
-                    $source = $frame->scope[$op->arg2]->resolveIndirect();
-                    if (Variable::TYPE_ARRAY !== $source->type) {
-                        $catchFrame = $this->dispatchVmTypeError(
-                            new \TypeError('Only arrays and Traversables can be unpacked'),
-                            $frame
-                        );
+                    $source = $frame->scope[$op->arg2];
+                    try {
+                        VM\ArraySpread::spreadInto($this, $frame, $result->toArray(), $source);
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
                         }
-                        break;
                     }
-                    $result->toArray()->spreadFrom($source->toArray());
                     break;
                 case OpCode::TYPE_CLONE:
                     $result = $frame->scope[$op->arg1];
@@ -5896,15 +5893,8 @@ restart:
                 break;
             case OpCode::TYPE_ARRAY_SPREAD:
                 $result = $frame->scope[$op->arg1];
-                $source = $frame->scope[$op->arg2]->resolveIndirect();
-                if (Variable::TYPE_ARRAY !== $source->type) {
-                    throw new \LogicException(
-                        Variable::TYPE_NULL === $source->type
-                            ? 'Cannot spread null'
-                            : 'Only arrays can be spread'
-                    );
-                }
-                $result->toArray()->spreadFrom($source->toArray());
+                $source = $frame->scope[$op->arg2];
+                VM\ArraySpread::spreadInto($this, $frame, $result->toArray(), $source);
                 break;
             default:
                 throw new \LogicException(

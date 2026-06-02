@@ -2106,14 +2106,41 @@ final class HashTableHelper
     }
 
     /**
-     * Array-literal spread: append packed list then string keys (issue #141, #1361).
+     * Array-literal spread: append packed list then string keys (issue #141, #1361, #4453).
      */
     public static function spreadInto(Context $context, Variable $dest, Variable $source): void
     {
+        if (self::needsTraversableMaterialization($context, $source)) {
+            $srcPtr = \PHPCompiler\ext\standard\JitIteratorToArray::materializeHashtable(
+                $context,
+                $source,
+                true,
+                $source->userType ?? null
+            );
+            self::spreadPackedInto($context, $dest, $srcPtr);
+            self::spreadStringKeysInto($context, $dest, $srcPtr);
+
+            return;
+        }
         $srcHt = self::coerceToPackedHashtable($context, $source);
         $srcPtr = $context->helper->loadValue($srcHt);
         self::spreadPackedInto($context, $dest, $srcPtr);
         self::spreadStringKeysInto($context, $dest, $srcPtr);
+    }
+
+    private static function needsTraversableMaterialization(Context $context, Variable $source): bool
+    {
+        if (ListUnpackHelper::isDefinitelyArrayAtCompileTime($source)) {
+            return false;
+        }
+        if (GeneratorHelper::isGeneratorVariable($source)) {
+            return true;
+        }
+        if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $source, $source->userType ?? null)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
