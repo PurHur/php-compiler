@@ -26,6 +26,7 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\MagicMethodDispatch;
+use PHPCompiler\JIT\PropertyHookDispatch;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable as VMVariable;
@@ -3310,12 +3311,22 @@ class Object_ extends Type {
     }
 
     /**
-     * isset($obj->prop) for a literal property name (issue #3603).
+     * isset($obj->prop) for a literal property name (issue #3603, #4586).
      */
     public function propertyIsSet(PHPLLVM\Value $obj, string $class, string $name): PHPLLVM\Value
     {
         $classId = $this->lookup('' !== $class ? $class : 'stdclass');
         $i1 = $this->context->getTypeFromString('int1');
+        $hookIsset = PropertyHookDispatch::tryEmitPropertyIsSet(
+            $this->context,
+            $obj,
+            $class,
+            $name,
+            $this->context->jitCurrentBlock
+        );
+        if (null !== $hookIsset) {
+            return $hookIsset;
+        }
         if (!$this->hasProperty($classId, $name)) {
             return $i1->constInt(0, false);
         }
