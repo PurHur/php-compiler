@@ -46,11 +46,11 @@ final class array_combine extends Internal
         foreach ($valuesArg->toArray()->iterateKeyed(true) as [, $value]) {
             $values[] = $value;
         }
-        if (0 === \count($keys) || 0 === \count($values)) {
+        if (0 === \count($keys) && 0 === \count($values)) {
             if (null === $frame->returnVar) {
                 return;
             }
-            $frame->returnVar->bool(false);
+            $frame->returnVar->array(new HashTable());
 
             return;
         }

@@ -1,11 +1,10 @@
 --TEST--
-AOT: array_combine() empty keys or values return false (#4353)
+AOT: array_combine() empty keys and values return [] (#4523)
 --FILE--
 <?php
-echo array_combine([], []) === false ? "false\n" : "not-false\n";
-echo array_combine(['a'], []) === false ? "false\n" : "not-false\n";
-echo array_combine([], ['x']) === false ? "false\n" : "not-false\n";
+$result = array_combine([], []);
+echo gettype($result), "\n";
+echo count($result), "\n";
 --EXPECT--
-false
-false
-false
+array
+0
