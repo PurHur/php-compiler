@@ -12,8 +12,7 @@ require_once __DIR__.'/../LlvmToolchain.php';
  * LLVM compile-only verify for try/catch JIT lowering (#1056, #2084, #2114).
  *
  * IR verify via {@see JIT\Context::compileCommon()} — no MCJIT link/execute.
- * MCJIT execution for EH still segfaults (#2114); {@see Block::requiresVmLowering}
- * keeps {@see bin/jit.php} on the VM path.
+ * MCJIT execution for try/catch/finally: {@see TryCatchJitExecuteTest} (#4246).
  *
  * @group llvm
  */
@@ -34,14 +33,6 @@ final class TryCatchJitCompileTest extends TestCase
     {
         $runtime = new Runtime();
         $cases = [
-            'try_catch_get_message.php' => <<<'PHP'
-<?php
-try {
-    throw new Exception('msg');
-} catch (Exception $e) {
-    echo $e->getMessage();
-}
-PHP,
             'try_catch_jit_smoke.php' => <<<'PHP'
 <?php
 class Ex {}
@@ -80,7 +71,7 @@ PHP,
         $this->addToAssertionCount(1);
     }
 
-    public function testRequiresVmLoweringForTryCatchWithoutYield(): void
+    public function testRequiresVmLoweringForScriptScopeTryCatch(): void
     {
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(<<<'PHP'
@@ -100,4 +91,5 @@ PHP
         $this->assertFalse(Block::containsFinallyOpcodes($block));
         $this->assertTrue(Block::requiresVmLowering($block));
     }
+
 }

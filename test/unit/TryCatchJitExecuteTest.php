@@ -11,7 +11,7 @@ require_once __DIR__.'/../LlvmToolchain.php';
 /**
  * MCJIT execute for simple try/catch (no finally) after #2114 catch double-compile fix.
  *
- * Uses Runtime::jit() directly (bin/jit.php still VM-fallbacks all EH via requiresVmLowering).
+ * Uses Runtime::jit() directly (bin/jit.php JIT-lowers try/catch/finally in functions, #4246).
  * Skipped when script/jit-runtime-probe.php fails.
  *
  * @group llvm
@@ -83,6 +83,7 @@ PHP
         $block = $runtime->parseAndCompile($code, 'test.php');
         $this->assertNotNull($block);
         $this->assertFalse(Block::containsFinallyOpcodes($block));
+        $this->assertFalse(Block::requiresVmLowering($block));
         $runtime->jit($block);
         ob_start();
         $runtime->run($block);

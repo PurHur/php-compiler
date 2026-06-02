@@ -97,6 +97,7 @@ final class Linker
         __DIR__.'/runtime/phpc_type_error_raise.c',
         __DIR__.'/runtime/phpc_error_raise.c',
         __DIR__.'/runtime/phpc_jit_throw.c',
+        __DIR__.'/runtime/phpc_jit_return.c',
         __DIR__.'/runtime/phpc_attr_registry.c',
         __DIR__.'/runtime/phpc_class_methods.c',
         __DIR__.'/runtime/phpc_reflection_attr.c',

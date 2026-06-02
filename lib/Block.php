@@ -969,7 +969,7 @@ class Block {
         return false;
     }
 
-    /** Script contains try/catch/finally/throw opcodes (#2114). IR may verify; MCJIT execute is not yet safe. */
+    /** Script contains try/catch/finally/throw opcodes (#2114). JIT lowers via TryCatchHelper (#4246). */
     public static function containsExceptionHandlingOpcodes(?self $root): bool
     {
         return self::containsOpcodeTypes(

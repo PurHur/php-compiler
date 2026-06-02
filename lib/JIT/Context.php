@@ -623,6 +623,8 @@ class Context {
                 $this->builder->call($this->lookupFunction('__superglobals__refresh'));
                 Builtin\JitThrow::registerDeclarations($this);
                 $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending'));
+                Builtin\JitReturnPending::registerDeclarations($this);
+                $this->builder->call($this->lookupFunction('phpc_jit_clear_return_pending'));
                 Builtin\ReadonlyRaise::emitClearForStandaloneMain($this);
                 Builtin\TypeErrorRaise::emitClearForStandaloneMain($this);
                 Builtin\ErrorRaise::emitClearForStandaloneMain($this);

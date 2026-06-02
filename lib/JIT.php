@@ -4452,6 +4452,84 @@ class JIT {
     }
 
     /**
+     * Lower a finally CFG arm at entry (#4246).
+     *
+     * @param list<Variable> $args
+     */
+    public function compileFinallyAtEntry(
+        PHPLLVM\Value $func,
+        Block $block,
+        PHPLLVM\BasicBlock $entryBlock,
+        Variable ...$args
+    ): PHPLLVM\BasicBlock {
+        $limit = $block->nOpCodes;
+        if ($limit > 0 && OpCode::TYPE_JUMP === $block->opCodes[$limit - 1]->type) {
+            --$limit;
+        }
+
+        $this->context->inlineIncludeExitBlock = null;
+        $exit = $this->compileBlockInternal($func, $block, $limit, $entryBlock, 0, false, ...$args);
+        if (null !== $this->context->inlineIncludeExitBlock) {
+            $exit = $this->context->inlineIncludeExitBlock;
+        }
+
+        return $exit;
+    }
+
+    /** Resume LLVM return after return-through-finally (#4246). */
+    public function emitPendingReturnResume(PHPLLVM\Value $func): void
+    {
+        JIT\Builtin\JitReturnPending::registerDeclarations($this->context);
+        JIT\Builtin\JitReturnPending::ensureLinked($this->context);
+        $builder = $this->context->builder;
+        $i32 = $this->context->getTypeFromString('int32');
+        $isVoid = $builder->call($this->context->lookupFunction('phpc_jit_return_pending_is_void'));
+        $isVoidBool = $builder->icmp(PHPLLVM\Builder::INT_NE, $isVoid, $i32->constInt(0, false));
+        $voidBb = $func->appendBasicBlock('pending_return_void');
+        $valueBb = $func->appendBasicBlock('pending_return_value');
+        $builder->branchIf($isVoidBool, $voidBb, $valueBb);
+        $builder->positionAtEnd($voidBb);
+        if ($this->isVoidLlvmFunction($func)) {
+            $builder->returnVoid();
+        } else {
+            $builder->returnValue($this->defaultLlvmReturnValue($func));
+        }
+        $builder->positionAtEnd($valueBb);
+        $valuePtr = $builder->call($this->context->lookupFunction('phpc_jit_take_return_pending'));
+        if ($this->isVoidLlvmFunction($func)) {
+            $builder->returnVoid();
+        } else {
+            $expected = null;
+            if (null !== $this->context->activeFunction) {
+                $expected = $this->context->functionReturnType[$this->context->activeFunction] ?? null;
+            }
+            $retval = $this->loadPendingReturnValue($valuePtr, $expected);
+            $builder->returnValue($retval);
+        }
+    }
+
+    private function loadPendingReturnValue(PHPLLVM\Value $valuePtr, ?string $expectedReturn): PHPLLVM\Value
+    {
+        $read = match ($expectedReturn) {
+            'string', '__string__*' => '__value__readString',
+            'double' => '__value__readDouble',
+            'bool', 'int1' => '__value__readLong',
+            '__object__*' => '__value__readObject',
+            '__hashtable__*' => '__value__readHashtable',
+            default => '__value__readLong',
+        };
+        $loaded = $this->context->builder->call($this->context->lookupFunction($read), $valuePtr);
+        if ('bool' === $expectedReturn || 'int1' === $expectedReturn) {
+            return $this->context->builder->truncOrBitCast(
+                $loaded,
+                $this->context->getTypeFromString('int1')
+            );
+        }
+
+        return $loaded;
+    }
+
+    /**
      * Opcode limit for compileIncludedAtEntry: skip redundant try-entry JUMP only (#2084).
      */
     private function includedAtEntryOpcodeLimit(Block $block): int
@@ -5846,6 +5924,12 @@ class JIT {
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                         $this->context->freeDeadVariables($func, $returnBlock, $block);
                     }
+                    if (
+                        0 === $this->context->inlineIncludeDepth
+                        && JIT\TryCatchHelper::deferReturnIfNeeded($this, $this->context, $func, $block, true, null)
+                    ) {
+                        return $origBasicBlock;
+                    }
                     if (0 === $this->context->inlineIncludeDepth) {
                         if (
                             !$this->isVoidLlvmFunction($func)
@@ -5870,6 +5954,12 @@ class JIT {
                     $returnBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($returnBlock);
                     $this->markJitThisConstructedIfLeavingConstruct($block);
+                    if (
+                        0 === $this->context->inlineIncludeDepth
+                        && JIT\TryCatchHelper::deferReturnIfNeeded($this, $this->context, $func, $block, false, $return)
+                    ) {
+                        return $origBasicBlock;
+                    }
                     if ($this->context->inlineIncludeDepth > 0) {
                         if ([] !== $this->context->inlineIncludeReturnOperands) {
                             $holderOp = $this->context->inlineIncludeReturnOperands[
