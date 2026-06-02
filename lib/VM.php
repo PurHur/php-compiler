@@ -1995,7 +1995,7 @@ restart:
                     );
                     $this->applyClosureBinding($new, $frame->closureCall);
                     $frame->closureCall = null;
-                    if (null !== $new->block->func && (int) ($new->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) {
+                    if (null !== $new->block && null !== $new->block->func && (int) ($new->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) {
                         $thisIdx = $new->block->slotIndexForVariableName('this');
                         if (null !== $thisIdx) {
                             $catchFrame = $this->dispatchVmError(
