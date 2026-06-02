@@ -6067,6 +6067,23 @@ class Compiler {
 
     protected function operandIsInvokableReceiver(Operand $operand, Block $block): bool
     {
+        // First-class callables are represented as string/array callables (not Closure objects) in the VM;
+        // don't lower `$x(...)` to `$x->__invoke(...)` when `$x` originates from `foo(...)` / `C::m(...)`.
+        if (null !== $block->orig) {
+            $root = $this->unwrapOperandChain($operand);
+            foreach ($block->orig->children as $child) {
+                if (!$child instanceof Op\Expr\Assign) {
+                    continue;
+                }
+                if (!$this->operandsReferToSameVariable($child->var, $root)) {
+                    continue;
+                }
+                if ($child->expr instanceof Op\Expr\FirstClassCallable) {
+                    return false;
+                }
+            }
+        }
+
         if ($this->operandHasObjectType($operand)) {
             return true;
         }
