@@ -308,6 +308,7 @@ static const char *phpc_builtin_functions[] = {
     "ob_end_flush",
     "ob_get_clean",
     "ob_get_contents",
+    "ob_get_flush",
     "ob_get_length",
     "ob_get_level",
     "ob_get_status",

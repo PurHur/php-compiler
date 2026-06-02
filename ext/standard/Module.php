@@ -309,6 +309,7 @@ class Module extends ModuleAbstract
             new ob_start(),
             new ob_get_clean(),
             new ob_get_contents(),
+            new ob_get_flush(),
             new ob_end_clean(),
             new ob_get_length(),
             new ob_end_flush(),
