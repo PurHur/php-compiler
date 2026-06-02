@@ -103,6 +103,9 @@ final class Variable {
     /** Hashtable pointer from {@see __value__readHashtable}; do not addref/delref (issue #107). */
     public bool $borrowedHashtable = false;
 
+    /** Borrowed {@see __value__} entry from foreach by-ref; skip valueDelref (#4364). */
+    public bool $borrowedValueEntry = false;
+
     /** void** property slot on {@see __object__} when this variable is a property lvalue (#58). */
     public ?\PHPLLVM\Value $objectPropertySlot = null;
 
@@ -634,6 +637,7 @@ final class Variable {
             if (
                 self::KIND_VARIABLE === $this->kind
                 && null === $this->objectPropertySlot
+                && !$this->borrowedValueEntry
             ) {
                 $this->context->builder->call(
                     $this->context->lookupFunction('__value__valueDelref'),

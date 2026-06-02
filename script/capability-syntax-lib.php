@@ -357,7 +357,13 @@ function syntaxRowDefinitions(): array
             'construct' => 'foreach by-reference (`&$v`)',
             'opcodes' => ['TYPE_ITER_VALUE', 'TYPE_ASSIGN_REF'],
             'issue' => 1222,
-            'notes' => ['Packed and string-keyed arrays; VM + JIT lowering'],
+            'jit' => true,
+            'aot' => true,
+            'notes' => [
+                'Packed and string-keyed arrays; VM + JIT/AOT lowering (#1222, #4364)',
+                'AOT: borrowed hashtable entry refs skip valueDelref (IteratorHelper)',
+                'AOT PHPT: foreach_by_ref.phpt, foreach_by_ref_assoc.phpt',
+            ],
             'probe' => '$a = [1, 2, 3]; foreach ($a as &$v) { $v *= 2; } echo $a[0], $a[1], $a[2];',
         ],
         [
