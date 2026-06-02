@@ -2171,7 +2171,15 @@ restart:
                         }
                     }
                     if (!isset($this->context->classes[$lcname])) {
-                        throw new \LogicException("Attempting to instantiate non-existing class {$rawName}");
+                        $catchFrame = $this->dispatchVmError(
+                            $this->classNotFoundMessage($rawName),
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
                     }
                     $class = $this->context->classes[$lcname];
                     if ($class->isAbstract) {
@@ -3034,6 +3042,12 @@ restart:
     /**
      * Bridge VM Error throws (enum clone guard, echo __toString, etc.) into user catch handlers (#3554, #3564).
      */
+    /** Zend object_and_properties_init unknown class message (zend_execute.c). */
+    private function classNotFoundMessage(string $className): string
+    {
+        return sprintf('Class "%s" not found', $className);
+    }
+
     private function dispatchVmError(string $message, Frame $frame): ?Frame
     {
         $thrown = VM\BuiltinExceptionSupport::materializeError($this->context, $message);
@@ -5215,7 +5229,7 @@ restart:
                     $this->context->autoloadClass($name);
                 }
                 if (!isset($this->context->classes[$lcname])) {
-                    throw new \LogicException("Attempting to instantiate non-existing class $name");
+                    throw new \Error($this->classNotFoundMessage($name));
                 }
                 $class = $this->context->classes[$lcname];
                 $object = new VM\ObjectEntry($class);
