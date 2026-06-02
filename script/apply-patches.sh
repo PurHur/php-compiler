@@ -2472,6 +2472,12 @@ apply_patch() {
     echo "Applied ${patch_name}"
     return 0
   fi
+  # Some patches are stored with `a/` + `b/` prefixes (git diff default).
+  if git -C "$ROOT" apply --check -p1 "$patch" >/dev/null 2>&1; then
+    git -C "$ROOT" apply -p1 "$patch"
+    echo "Applied ${patch_name} (-p1)"
+    return 0
+  fi
   if command -v patch >/dev/null 2>&1; then
     if patch -p0 --dry-run -s -f < "$patch" >/dev/null 2>&1; then
       patch -p0 -s -f < "$patch" >/dev/null 2>&1
