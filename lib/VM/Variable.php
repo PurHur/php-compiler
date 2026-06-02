@@ -655,6 +655,33 @@ final class Variable {
         }
     }
 
+    /**
+     * Shallow property copy for {@see ObjectEntry::cloneShallow()} — skips typed-property
+     * read guards so uninitialized slots clone like Zend zend_objects_clone_obj (#4245).
+     */
+    public function copyFromForClone(self $var): void
+    {
+        if (self::TYPE_INDIRECT === $this->type) {
+            $this->indirect->copyFromForClone($var);
+
+            return;
+        }
+        while (self::TYPE_INDIRECT === $var->type) {
+            $var = $var->indirect;
+        }
+        if (TypedPropertyCheck::isUninitialized($var)) {
+            $owner = $this->objectPropertyOwner;
+            $name = $this->objectPropertyName;
+            $this->reset();
+            $this->type = self::TYPE_UNDEFINED;
+            $this->objectPropertyOwner = $owner;
+            $this->objectPropertyName = $name;
+
+            return;
+        }
+        $this->copyFrom($var);
+    }
+
     public function copyFrom(self $var): void {
         if ($this->type === self::TYPE_INDIRECT) {
             // always assign to the indirection
