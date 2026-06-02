@@ -11,7 +11,11 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** getservbyname() — service entry array (VM host; JIT/AOT deferred, issue #3593). */
+/**
+ * getservbyname() — service port by name+protocol (JIT/AOT via libc, issue #4024).
+ *
+ * @see https://github.com/php/php-src/blob/master/ext/standard/network.c PHP_FUNCTION(getservbyname)
+ */
 final class getservbyname extends Internal
 {
     public function __construct()
@@ -32,17 +36,21 @@ final class getservbyname extends Internal
         if (Variable::TYPE_STRING !== $serviceVar->type || Variable::TYPE_STRING !== $protocolVar->type) {
             throw new \LogicException('getservbyname() requires string service and protocol in this compiler build');
         }
-        $result = VmNetwork::getservbyname($serviceVar->toString(), $protocolVar->toString());
-        if (false === $result) {
+        $port = VmNetwork::getservbyname($serviceVar->toString(), $protocolVar->toString());
+        if (false === $port) {
             $frame->returnVar->bool(false);
 
             return;
         }
-        $frame->returnVar->copyFrom(VmJson::import($result));
+        $frame->returnVar->int($port);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('getservbyname() is not implemented for JIT in this compiler build (issue #3593)');
+        if (2 !== \count($args)) {
+            throw new \LogicException('getservbyname() requires exactly two arguments in this compiler build');
+        }
+
+        return JitNetworkServices::getservbyname($context, $args[0], $args[1]);
     }
 }

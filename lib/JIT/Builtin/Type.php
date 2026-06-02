@@ -1043,6 +1043,13 @@ class Type extends Builtin {
             $fntypeGetservbyport
         );
         $this->context->registerFunction('__compiler_getservbyport', $fnGetservbyport);
+        $valuePtr = $this->context->getTypeFromString('__value__*');
+        $fntypeGetprotobyname = $this->context->context->functionType($void, false, $strPtr, $valuePtr);
+        $fnGetprotobyname = $this->context->module->addFunction('__phpc_getprotobyname', $fntypeGetprotobyname);
+        $this->context->registerFunction('__phpc_getprotobyname', $fnGetprotobyname);
+        $fntypeGetservbyname = $this->context->context->functionType($void, false, $strPtr, $strPtr, $valuePtr);
+        $fnGetservbyname = $this->context->module->addFunction('__phpc_getservbyname', $fntypeGetservbyname);
+        $this->context->registerFunction('__phpc_getservbyname', $fnGetservbyname);
         $fntypeTempnam = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr);
         $fnTempnam = $this->context->module->addFunction('__compiler_tempnam', $fntypeTempnam);
         $this->context->registerFunction('__compiler_tempnam', $fnTempnam);

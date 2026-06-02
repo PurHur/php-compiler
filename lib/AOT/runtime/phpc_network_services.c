@@ -11,11 +11,17 @@
 #include <string.h>
 
 typedef struct __string__ __string__;
+typedef struct __value__ __value__;
 
 extern __string__ *__string__init(long long size, const char *value);
+extern void __value__writeBool(__value__ *out, int value);
+extern void __value__writeLong(__value__ *out, long long v);
+extern void __compiler_trigger_error(const char *message, size_t len, int level);
 
 static const char *NS_FALLBACK_PROTOCOLS = "/compiler/ext/standard/data/protocols";
 static const char *NS_FALLBACK_SERVICES = "/compiler/ext/standard/data/services";
+
+#define NS_ERR_LEVEL_WARNING 2
 
 static int ns_is_space(int c)
 {
@@ -126,6 +132,122 @@ static __string__ *ns_lookup_protocol(int number)
     return NULL;
 }
 
+static int ns_is_token_equal_ci(const char *token, const char *want)
+{
+    return 0 == strcasecmp(token, want);
+}
+
+static long long ns_lookup_protocol_by_name(const char *want)
+{
+    const char *paths[] = {"/etc/protocols", NS_FALLBACK_PROTOCOLS, NULL};
+    size_t i;
+
+    for (i = 0; paths[i] != NULL; i++) {
+        FILE *fp = fopen(paths[i], "r");
+
+        if (NULL == fp) {
+            continue;
+        }
+        char line[512];
+        while (fgets(line, sizeof(line), fp) != NULL) {
+            char *hash = strchr(line, '#');
+
+            if (NULL != hash) {
+                *hash = '\0';
+            }
+            ns_trim_line(line);
+            if ('\0' == line[0]) {
+                continue;
+            }
+            char *name = strtok(line, " \t");
+            char *numToken = strtok(NULL, " \t");
+
+            if (NULL == name || NULL == numToken) {
+                continue;
+            }
+            if (ns_is_token_equal_ci(name, want)) {
+                fclose(fp);
+
+                return strtoll(numToken, NULL, 10);
+            }
+            char *alias;
+            while ((alias = strtok(NULL, " \t")) != NULL) {
+                if (ns_is_token_equal_ci(alias, want)) {
+                    fclose(fp);
+
+                    return strtoll(numToken, NULL, 10);
+                }
+            }
+        }
+        fclose(fp);
+    }
+
+    return -1;
+}
+
+static long long ns_lookup_service_by_name(const char *service, const char *proto)
+{
+    const char *paths[] = {"/etc/services", NS_FALLBACK_SERVICES, NULL};
+    size_t i;
+
+    for (i = 0; paths[i] != NULL; i++) {
+        FILE *fp = fopen(paths[i], "r");
+
+        if (NULL == fp) {
+            continue;
+        }
+        char line[512];
+        while (fgets(line, sizeof(line), fp) != NULL) {
+            char *hash = strchr(line, '#');
+
+            if (NULL != hash) {
+                *hash = '\0';
+            }
+            ns_trim_line(line);
+            if ('\0' == line[0]) {
+                continue;
+            }
+            char *name = strtok(line, " \t");
+            char *portProto = strtok(NULL, " \t");
+
+            if (NULL == name || NULL == portProto) {
+                continue;
+            }
+            char *slash = strchr(portProto, '/');
+            if (NULL == slash) {
+                continue;
+            }
+            *slash = '\0';
+            const char *filePortStr = portProto;
+            const char *fileProto = slash + 1;
+
+            if (0 != strcasecmp(fileProto, proto)) {
+                *slash = '/';
+                continue;
+            }
+            long long port = strtoll(filePortStr, NULL, 10);
+            *slash = '/';
+
+            if (ns_is_token_equal_ci(name, service)) {
+                fclose(fp);
+
+                return port;
+            }
+            char *alias;
+            while ((alias = strtok(NULL, " \t")) != NULL) {
+                if (ns_is_token_equal_ci(alias, service)) {
+                    fclose(fp);
+
+                    return port;
+                }
+            }
+        }
+        fclose(fp);
+    }
+
+    return -1;
+}
+
 static __string__ *ns_lookup_service(int port, const char *proto)
 {
     struct {
@@ -157,6 +279,43 @@ __string__ *__compiler_getprotobynumber(long long number)
     return ns_lookup_protocol((int) number);
 }
 
+long long __compiler_getprotobyname(__string__ *name)
+{
+    const char *p;
+    size_t len;
+    char buf[128];
+    struct protoent *ent;
+
+    if (NULL == name) {
+        __compiler_trigger_error("getprotobyname(): Protocol name not found", 41, NS_ERR_LEVEL_WARNING);
+
+        return -1;
+    }
+    len = (size_t) *((long long *) ((char *) name + sizeof(void *)));
+    p = (const char *) name + sizeof(void *) + sizeof(long long);
+    if (0 == len || len >= sizeof(buf)) {
+        __compiler_trigger_error("getprotobyname(): Protocol name not found", 41, NS_ERR_LEVEL_WARNING);
+
+        return -1;
+    }
+    memcpy(buf, p, len);
+    buf[len] = '\0';
+
+    ent = getprotobyname(buf);
+    if (NULL != ent) {
+        return (long long) ent->p_proto;
+    }
+
+    long long fallback = ns_lookup_protocol_by_name(buf);
+    if (fallback >= 0) {
+        return fallback;
+    }
+
+    __compiler_trigger_error("getprotobyname(): Protocol name not found", 41, NS_ERR_LEVEL_WARNING);
+
+    return -1;
+}
+
 __string__ *__compiler_getservbyport(long long port, __string__ *protocol)
 {
     const char *proto;
@@ -181,4 +340,76 @@ __string__ *__compiler_getservbyport(long long port, __string__ *protocol)
     }
 
     return ns_lookup_service((int) port, proto_buf);
+}
+
+long long __compiler_getservbyname(__string__ *service, __string__ *protocol)
+{
+    const char *s;
+    size_t slen;
+    char svc_buf[128];
+    const char *p;
+    size_t plen;
+    char proto_buf[64];
+    struct servent *ent;
+
+    if (NULL == service || NULL == protocol) {
+        __compiler_trigger_error("getservbyname(): Service name not found", 39, NS_ERR_LEVEL_WARNING);
+
+        return -1;
+    }
+    slen = (size_t) *((long long *) ((char *) service + sizeof(void *)));
+    s = (const char *) service + sizeof(void *) + sizeof(long long);
+    if (0 == slen || slen >= sizeof(svc_buf)) {
+        __compiler_trigger_error("getservbyname(): Service name not found", 39, NS_ERR_LEVEL_WARNING);
+
+        return -1;
+    }
+    memcpy(svc_buf, s, slen);
+    svc_buf[slen] = '\0';
+
+    plen = (size_t) *((long long *) ((char *) protocol + sizeof(void *)));
+    p = (const char *) protocol + sizeof(void *) + sizeof(long long);
+    if (0 == plen || plen >= sizeof(proto_buf)) {
+        __compiler_trigger_error("getservbyname(): Service name not found", 39, NS_ERR_LEVEL_WARNING);
+
+        return -1;
+    }
+    memcpy(proto_buf, p, plen);
+    proto_buf[plen] = '\0';
+
+    ent = getservbyname(svc_buf, proto_buf);
+    if (NULL != ent) {
+        return (long long) ntohs((unsigned short) ent->s_port);
+    }
+
+    long long fallback = ns_lookup_service_by_name(svc_buf, proto_buf);
+    if (fallback >= 0) {
+        return fallback;
+    }
+
+    __compiler_trigger_error("getservbyname(): Service name not found", 39, NS_ERR_LEVEL_WARNING);
+
+    return -1;
+}
+
+void __phpc_getprotobyname(__string__ *name, __value__ *out)
+{
+    long long result = __compiler_getprotobyname(name);
+
+    if (result < 0) {
+        __value__writeBool(out, 0);
+    } else {
+        __value__writeLong(out, result);
+    }
+}
+
+void __phpc_getservbyname(__string__ *service, __string__ *protocol, __value__ *out)
+{
+    long long result = __compiler_getservbyname(service, protocol);
+
+    if (result < 0) {
+        __value__writeBool(out, 0);
+    } else {
+        __value__writeLong(out, result);
+    }
 }
