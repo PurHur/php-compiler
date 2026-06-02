@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM;
 use PHPCompiler\VM\Variable;
 
 final class VmString
@@ -15,10 +16,17 @@ final class VmString
     public const TRIM_DEFAULT = " \t\n\r\0\x0B";
 
     /**
-     * Coerce a string-search builtin operand to string (php-src _convert_to_string parity, #3549).
+     * Coerce a string builtin operand to string (php-src _convert_to_string parity, #3549, #4284).
+     *
+     * Objects with __toString invoke the magic method so exceptions reach enclosing try/catch.
      */
     public static function coerceOperand(Variable $var): string
     {
+        $vm = VM::running();
+        if (null !== $vm) {
+            return $vm->coerceVariableToString($var);
+        }
+
         return $var->resolveIndirect()->toString();
     }
 

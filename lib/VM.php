@@ -91,6 +91,18 @@ class VM {
      */
     public function invokePhpFunction(Func\PHP $func, Variable ...$args): Variable
     {
+        if ($this->context->coercingObjectToString) {
+            return $this->invokePhpFunctionForCoercion($func, ...$args);
+        }
+
+        return $this->invokePhpFunctionOnStack($func, ...$args);
+    }
+
+    /**
+     * @param Variable ...$args
+     */
+    private function invokePhpFunctionOnStack(Func\PHP $func, ...$args): Variable
+    {
         $child = $func->getFrame($this->context, null);
         $child->calledArgs = $args;
         if (
@@ -110,8 +122,59 @@ class VM {
         if (self::SUCCESS !== $result) {
             throw new \LogicException('User function invocation failed in this compiler build');
         }
+        if ($this->context->magicMethodThrowHandled) {
+            $this->context->magicMethodThrowHandled = false;
+            throw new VM\MagicMethodInvocationAborted();
+        }
 
         return $out->resolveIndirect();
+    }
+
+    /**
+     * Isolated __toString / coercion invoke — must not run the caller script in nested runFrames (#4284).
+     *
+     * @param Variable ...$args
+     */
+    private function invokePhpFunctionForCoercion(Func\PHP $func, ...$args): Variable
+    {
+        $savedStack = $this->context->swapRunStack(null);
+        try {
+            $result = $this->invokePhpFunctionOnStack($func, ...$args);
+            $this->context->swapRunStack($savedStack);
+
+            return $result;
+        } catch (\Throwable $native) {
+            $this->context->swapRunStack($savedStack);
+            if (null !== $savedStack) {
+                $thrown = $native instanceof \Error
+                    ? VM\BuiltinExceptionSupport::materializeError($this->context, $native->getMessage())
+                    : $this->makeEngineError($native->getMessage(), 'Exception');
+                $catchFrame = $this->findCatchFrameForThrow($savedStack->frame, $thrown);
+                if (null !== $catchFrame) {
+                    $this->context->swapRunStack($savedStack);
+                    $catchStack = $this->context->swapRunStack(null);
+                    $this->context->push($catchFrame);
+                    $catchResult = $this->runFrames();
+                    $this->context->swapRunStack($catchStack);
+                    $this->clearTryCatchUnwindState();
+                    if (self::SUCCESS !== $catchResult) {
+                        throw new \LogicException('Coercion catch handler failed in this compiler build');
+                    }
+                    throw new VM\MagicMethodInvocationAborted();
+                }
+            }
+            throw $native;
+        } catch (VM\MagicMethodInvocationAborted $aborted) {
+            if (!$this->context->hasRunStack()) {
+                $this->context->swapRunStack($savedStack);
+            }
+            throw $aborted;
+        } catch (\Throwable $e) {
+            if (!$this->context->hasRunStack()) {
+                $this->context->swapRunStack($savedStack);
+            }
+            throw $e;
+        }
     }
 
     /**
@@ -189,7 +252,12 @@ class VM {
         if (!$this->hasInstanceMethod($object->class, '__tostring')) {
             return 'Object';
         }
-        $result = $this->invokeInstanceMethod($object, '__toString')->resolveIndirect();
+        $this->context->coercingObjectToString = true;
+        try {
+            $result = $this->invokeInstanceMethod($object, '__toString')->resolveIndirect();
+        } finally {
+            $this->context->coercingObjectToString = false;
+        }
         if (Variable::TYPE_STRING !== $result->type) {
             throw new \LogicException(
                 "{$object->class->name}::__toString() must return a string in this compiler build"
@@ -317,7 +385,12 @@ class VM {
                 'Object of class '.$object->class->name.' could not be converted to string'
             );
         }
-        $result = $this->invokeInstanceMethod($object, '__toString')->resolveIndirect();
+        $this->context->coercingObjectToString = true;
+        try {
+            $result = $this->invokeInstanceMethod($object, '__toString')->resolveIndirect();
+        } finally {
+            $this->context->coercingObjectToString = false;
+        }
         if (Variable::TYPE_STRING !== $result->type) {
             throw new \LogicException(
                 $object->class->name.'::__toString() must return a string'
@@ -345,7 +418,12 @@ class VM {
         if (!$this->hasInstanceMethod($object->class, '__tostring')) {
             throw new \Error("Object of class {$object->class->name} could not be converted to string");
         }
-        $result = $this->invokeInstanceMethod($object, '__toString')->resolveIndirect();
+        $this->context->coercingObjectToString = true;
+        try {
+            $result = $this->invokeInstanceMethod($object, '__toString')->resolveIndirect();
+        } finally {
+            $this->context->coercingObjectToString = false;
+        }
         if (Variable::TYPE_STRING !== $result->type) {
             $returned = match ($result->type) {
                 Variable::TYPE_INTEGER => 'int',
@@ -1104,7 +1182,13 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_CAST_STRING:
-                    $frame->scope[$op->arg1]->castFrom(Variable::TYPE_STRING, $frame->scope[$op->arg2], $this);
+                    try {
+                        $frame->scope[$op->arg1]->castFrom(Variable::TYPE_STRING, $frame->scope[$op->arg2], $this);
+                    } catch (VM\MagicMethodInvocationAborted) {
+                        $this->clearTryCatchUnwindState();
+                        ++$frame->pos;
+                        break;
+                    }
                     break;
                 case OpCode::TYPE_CAST_ARRAY:
                     $frame->scope[$op->arg1]->copyFrom(
@@ -1300,11 +1384,22 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
-                    $arg2 = $this->coerceVariableToString($frame->scope[$op->arg2]);
-                    $arg3 = $this->coerceVariableToString($frame->scope[$op->arg3]);
-                    $arg1->string($arg2 . $arg3);
+                    try {
+                        $arg2 = $this->coerceVariableToString($frame->scope[$op->arg2]);
+                        $arg3 = $this->coerceVariableToString($frame->scope[$op->arg3]);
+                        $arg1->string($arg2 . $arg3);
+                    } catch (VM\MagicMethodInvocationAborted) {
+                        $this->clearTryCatchUnwindState();
+                        ++$frame->pos;
+                        $frame->suppressNextEcho = true;
+                        break;
+                    }
                     break;
                 case OpCode::TYPE_ECHO:
+                    if ($frame->suppressNextEcho) {
+                        $frame->suppressNextEcho = false;
+                        break;
+                    }
                     try {
                         if (!VM\SapiOutput::headersSent()) {
                             VM\HeaderCallbackQueue::runBeforeOutput($this->context);
@@ -1323,6 +1418,8 @@ restart:
                             $frame = $catchFrame;
                             goto restart;
                         }
+                        break;
+                    } catch (VM\MagicMethodInvocationAborted) {
                         break;
                     }
                     break;
@@ -1346,6 +1443,8 @@ restart:
                             $frame = $catchFrame;
                             goto restart;
                         }
+                        break;
+                    } catch (VM\MagicMethodInvocationAborted) {
                         break;
                     }
                     break;
@@ -2813,6 +2912,15 @@ restart:
             return $this->dispatchVmError($e->getMessage(), $callerFrame);
         } catch (VM\GeneratorUncaughtThrow $e) {
             return $this->dispatchUncaughtGeneratorThrow($e->thrown, $callerFrame);
+        } catch (VM\MagicMethodInvocationAborted) {
+            $this->clearTryCatchUnwindState();
+            $callerFrame->call = null;
+            $callerFrame->callArgs = [];
+            $callerFrame->callArgEntries = [];
+            $callerFrame->suppressNextEcho = true;
+            ++$callerFrame->pos;
+
+            return null;
         }
     }
 
@@ -2911,6 +3019,9 @@ restart:
             $catchFrame = $this->dispatchCatchForHandlerFrame($handler);
             if (null !== $catchFrame) {
                 \array_splice($this->context->activeTryHandlerFrames, $i);
+                if ($this->context->coercingObjectToString) {
+                    $this->context->magicMethodThrowHandled = true;
+                }
 
                 return $catchFrame;
             }
@@ -2918,6 +3029,10 @@ restart:
         for ($handler = $frame->parent ?? $frame; null !== $handler; $handler = $handler->parent) {
             $catchFrame = $this->dispatchCatchForHandlerFrame($handler);
             if (null !== $catchFrame) {
+                if ($this->context->coercingObjectToString) {
+                    $this->context->magicMethodThrowHandled = true;
+                }
+
                 return $catchFrame;
             }
         }

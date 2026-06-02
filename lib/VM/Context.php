@@ -58,6 +58,12 @@ class Context {
     /** Set when a property set hook throws (even if caught); suppresses outer assign (#3145). */
     public bool $propertyHookSetAborted = false;
 
+    /** Active object-to-string coercion via __toString (issue #4284). */
+    public bool $coercingObjectToString = false;
+
+    /** User catch ran during coercion; caller must not use a coerced result (#4284). */
+    public bool $magicMethodThrowHandled = false;
+
     /** Handler frame whose catch chain resumes after a throw-path finally (issue #2114). */
     public ?Frame $pendingCatchResumeHandler = null;
 
@@ -538,6 +544,11 @@ class Context {
         $this->runStack = $stack;
 
         return $prev;
+    }
+
+    public function hasRunStack(): bool
+    {
+        return null !== $this->runStack;
     }
 
     /**
