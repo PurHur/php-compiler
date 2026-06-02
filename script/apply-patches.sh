@@ -110,6 +110,9 @@ patch_already_applied() {
     php-types-get-meta-tags-array-false.patch)
       grep -q "'get_meta_tags' => \['array|false'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
+    php-types-array-combine-array-false.patch)
+      grep -qF "'array_combine' => ['array|false'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
+      ;;
     php-types-stream-context-array-return.patch)
       grep -q "'stream_context_create' => \['array'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
@@ -225,7 +228,10 @@ patch_already_applied() {
       ;;
     php-cfg-asymmetric-visibility.patch)
       grep -q 'public int \$setVisibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null \
-        && grep -q 'promotionSetVisibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null
+        && (
+          grep -q 'promotionSetVisibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null \
+          || grep -q 'promotionFlags' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null
+        )
       ;;
     php-cfg-assertion-expr-property.patch)
       grep -q 'public \\$expr;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assertion.php" 2>/dev/null
@@ -458,7 +464,7 @@ apply_php_cfg_asymmetric_visibility_overlay() {
   if grep -q 'public int \$setVisibility' "$prop" 2>/dev/null; then
     has_prop=1
   fi
-  if grep -q 'promotionSetVisibility' "$param" 2>/dev/null; then
+  if grep -q 'promotionSetVisibility' "$param" 2>/dev/null || grep -q 'promotionFlags' "$param" 2>/dev/null; then
     has_param=1
   fi
   if [[ $has_prop -eq 1 && $has_param -eq 1 ]]; then
@@ -496,6 +502,9 @@ from pathlib import Path
 path = Path(sys.argv[1])
 text = path.read_text()
 if 'promotionSetVisibility' in text:
+    raise SystemExit(0)
+if 'promotionFlags' in text:
+    # Newer php-cfg uses a single promotionFlags int instead of promotionReadonly/promotionSetVisibility.
     raise SystemExit(0)
 insert_block = (
     "\n"
@@ -2575,6 +2584,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-str-split-string-array.patch"
   apply_patch "$PATCH_DIR/php-types-readfile-int-false.patch"
   apply_patch "$PATCH_DIR/php-types-get-meta-tags-array-false.patch"
+  apply_patch "$PATCH_DIR/php-types-array-combine-array-false.patch"
   apply_patch "$PATCH_DIR/php-types-stream-context-array-return.patch"
   apply_patch "$PATCH_DIR/php-types-strpbrk-string-false.patch"
   apply_patch "$PATCH_DIR/php-types-error-get-last-null.patch"
