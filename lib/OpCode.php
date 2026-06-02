@@ -169,6 +169,8 @@ class OpCode {
     const TYPE_PRE_DEC = 117;
     /** Logical xor (`$a xor $b`): both operands evaluated, truthiness exclusive-or (#2313). */
     const TYPE_LOGICAL_XOR = 118;
+    /** `list()` / `[]` unpack: arg2 = array slot; TypeError when not a list (#4298). */
+    const TYPE_LIST_UNPACK_CHECK = 120;
 
     public int $type;
     public ?int $arg1;

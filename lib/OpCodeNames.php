@@ -228,6 +228,8 @@ function opcode_type_name(int $type): string
             return 'TYPE_LOGICAL_XOR';
         case 119:
             return 'TYPE_TRAIT_USE_ADAPTATION';
+        case 120:
+            return 'TYPE_LIST_UNPACK_CHECK';
         default:
             return 'unknown opcode';
     }

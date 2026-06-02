@@ -5010,6 +5010,12 @@ class JIT {
                         $this->context->getVariableFromOp($block->getOperand($op->arg2))
                     );
                     break;
+                case OpCode::TYPE_LIST_UNPACK_CHECK:
+                    JIT\ListUnpackHelper::emitCheck(
+                        $this->context,
+                        $this->context->getVariableFromOp($block->getOperand($op->arg2))
+                    );
+                    break;
                 case OpCode::TYPE_TYPE_ASSERT:
                     $this->assignOperand(
                         $block->getOperand($op->arg1),

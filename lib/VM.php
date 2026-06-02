@@ -957,6 +957,21 @@ restart:
                     }
                     $frame->scope[$op->arg1]->indirect($storage);
                     break;
+                case OpCode::TYPE_LIST_UNPACK_CHECK:
+                    $unpack = $frame->scope[$op->arg2]->resolveIndirect();
+                    if (Variable::TYPE_ARRAY === $unpack->type
+                        && !\PHPCompiler\ext\standard\VmArray::isList($unpack->toArray())
+                    ) {
+                        $catchFrame = $this->dispatchVmTypeError(
+                            new \TypeError('Cannot unpack array with string keys'),
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                    }
+                    break;
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
                 case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:
                     $arg1 = $frame->scope[$op->arg1];
