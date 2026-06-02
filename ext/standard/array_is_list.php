@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** array_is_list() — true when keys are consecutive integers 0..count-1 (issue #2211). */
@@ -21,24 +20,25 @@ final class array_is_list extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('array_is_list() requires exactly one argument');
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError('array_is_list() expects exactly 1 argument, '.$argc.' given');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
+        $ht = VmArray::requireArray($frame->calledArgs[0], 'array_is_list');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_ARRAY !== $v->type) {
-            throw new \LogicException('array_is_list() requires an array in this compiler build');
-        }
-        $frame->returnVar->bool(VmArray::isList($v->toArray()));
+        $frame->returnVar->bool(VmArray::isList($ht));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('array_is_list() requires exactly one argument');
+        $argc = \count($args);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError('array_is_list() expects exactly 1 argument, '.$argc.' given');
         }
+
+        JitArrayKey::requireArrayArg($context, $args[0], 'array_is_list');
 
         return JitArrayIsList::invoke($context, $args[0]);
     }
