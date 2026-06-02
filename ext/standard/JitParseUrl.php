@@ -115,7 +115,7 @@ final class JitParseUrl
     }
 
     /**
-     * @param string|int|null $result
+     * @param string|int|false $result
      */
     private static function materializeVmResult(Context $context, $result): Value
     {
@@ -124,8 +124,8 @@ final class JitParseUrl
         }
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
-        if (null === $result) {
-            $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
+        if (false === $result) {
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
         } elseif (\is_int($result)) {
             $i64 = $context->getTypeFromString('int64');
             JitValueBox::writeLong($context, $slot, $i64->constInt($result, false));
