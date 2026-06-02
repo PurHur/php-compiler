@@ -420,6 +420,7 @@ static const char *phpc_builtin_functions[] = {
     "strcspn",
     "stream_context_create",
     "stream_get_contents",
+    "stream_get_line",
     "stream_set_chunk_size",
     "stream_set_read_buffer",
     "stream_set_timeout",

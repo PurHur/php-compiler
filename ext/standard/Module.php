@@ -399,6 +399,7 @@ class Module extends ModuleAbstract
             new stream_get_contents(),
             new fgetc(),
             new fgets(),
+            new stream_get_line(),
             new fgetcsv(),
             new fputcsv(),
             new str_getcsv(),

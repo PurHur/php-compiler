@@ -129,7 +129,7 @@ final class SelfHostBuiltinPolicy
         'chmod' => 'filesystem', 'chown' => 'filesystem', 'lchown' => 'filesystem', 'chgrp' => 'filesystem', 'lchgrp' => 'filesystem', 'umask' => 'filesystem',
         'glob' => 'filesystem', 'scandir' => 'filesystem', 'fnmatch' => 'filesystem',
         'opendir' => 'filesystem', 'readdir' => 'filesystem', 'closedir' => 'filesystem', 'rewinddir' => 'filesystem',
-        'fopen' => 'filesystem', 'fread' => 'filesystem', 'fwrite' => 'filesystem', 'fgetc' => 'filesystem', 'fgets' => 'filesystem',
+        'fopen' => 'filesystem', 'fread' => 'filesystem', 'fwrite' => 'filesystem', 'fgetc' => 'filesystem', 'fgets' => 'filesystem', 'stream_get_line' => 'filesystem',
         'fgetcsv' => 'filesystem',
         'fputcsv' => 'filesystem',
         'ftell' => 'filesystem', 'fseek' => 'filesystem', 'fclose' => 'filesystem', 'flock' => 'filesystem',
