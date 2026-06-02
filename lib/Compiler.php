@@ -1935,11 +1935,16 @@ class Compiler {
             $this->compileOperand($trait->name, $block, true)
         );
         $this->assignAttributeMetadata($return, $trait);
+        $traitLc = strtolower(ltrim($name, '\\'));
+        $this->compiledClassStaticProperties[$traitLc] = $this->compiledClassStaticProperties[$traitLc] ?? [];
+        $prevClassStaticCompile = $this->currentClassStaticPropertyCompile;
+        $this->currentClassStaticPropertyCompile = $traitLc;
         $return->block1 = $this->compileClassBody(
             $trait->stmts,
             OpCode::TYPE_DECLARE_TRAIT,
             $this->staticNameFromOperand($trait->name)
         );
+        $this->currentClassStaticPropertyCompile = $prevClassStaticCompile;
 
         return $return;
     }
@@ -2115,6 +2120,7 @@ class Compiler {
             $className
         );
         $this->currentClassStaticPropertyCompile = $prevClassStaticCompile;
+        $this->mergeTraitStaticPropertiesIntoClass($class->stmts, $classLc);
         if ($class instanceof Op\Stmt\Class_ && null !== $class->extends && null !== $parentLc) {
             foreach ($this->compiledClassStaticProperties[$parentLc] ?? [] as $prop => $_) {
                 $this->compiledClassStaticProperties[$classLc][$prop] = true;
@@ -2123,6 +2129,25 @@ class Compiler {
         $this->classCompileRegistry->registerClass($className, $parentLc, $interfaceLcs, $class->stmts);
 
         return $return;
+    }
+
+    protected function mergeTraitStaticPropertiesIntoClass(CfgBlock $stmts, string $classLc): void
+    {
+        foreach ($stmts->children as $child) {
+            if (!$child instanceof Op\Stmt\TraitUse) {
+                continue;
+            }
+            foreach ($child->traits as $traitOperand) {
+                $traitName = $this->staticNameFromOperand($traitOperand);
+                if (null === $traitName) {
+                    continue;
+                }
+                $traitLc = strtolower(ltrim($traitName, '\\'));
+                foreach ($this->compiledClassStaticProperties[$traitLc] ?? [] as $prop => $_) {
+                    $this->compiledClassStaticProperties[$classLc][$prop] = true;
+                }
+            }
+        }
     }
 
     protected function applySealedMetadataFromOp(Op $op, OpCode $opcode): void
@@ -2406,7 +2431,13 @@ class Compiler {
             switch (get_class($child)) {
                 case Op\Stmt\Property::class:
                     if (OpCode::TYPE_DECLARE_CLASS !== $type) {
-                        $this->throwCompileLogic('Properties are only supported on classes for now');
+                        if (OpCode::TYPE_DECLARE_TRAIT === $type) {
+                            if (!$child->static) {
+                                $this->throwCompileLogic('Traits cannot declare non-static properties');
+                            }
+                        } else {
+                            $this->throwCompileLogic('Properties are only supported on classes for now');
+                        }
                     }
                     if (
                         !$child->static
@@ -5731,13 +5762,19 @@ class Compiler {
     {
         $literalName = $this->staticNameFromOperand($name);
         if (null !== $literalName) {
+            $lcProp = strtolower($literalName);
             $className = $this->literalScopeClassName($class);
             if (null !== $className) {
                 $lcClass = strtolower(ltrim($className, '\\'));
-                $lcProp = strtolower($literalName);
                 if (isset($this->compiledClassStaticProperties[$lcClass][$lcProp])) {
                     return $this->compileOperand($name, $block, true);
                 }
+            }
+            if (
+                null !== $this->compilingClassLc
+                && isset($this->compiledClassStaticProperties[$this->compilingClassLc][$lcProp])
+            ) {
+                return $this->compileOperand($name, $block, true);
             }
             $varOperand = new CfgVariable(new Literal($literalName));
 

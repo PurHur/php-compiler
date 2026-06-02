@@ -6587,6 +6587,10 @@ class JIT {
                             $this->context->scope->classId,
                             $this->context->scope->className
                         );
+                        $this->context->type->object->inheritParentStaticProperties(
+                            $this->context->scope->classId,
+                            strtolower(ltrim($parentOp->value, '\\'))
+                        );
                     }
                     if ([] !== $op->classImplements) {
                         $this->context->type->object->setClassInterfaces(
@@ -7913,7 +7917,7 @@ class JIT {
             }
             $traitId = $object->lookup($traitName);
             $object->inheritTraitConstants($classId, $traitId, $traitName);
-            $object->inheritTraitStaticProperties($classId, $traitId);
+            $object->inheritTraitStaticProperties($classId, $traitId, $traitName);
             if (!isset($perTraitMethods[$traitLc])) {
                 $perTraitMethods[$traitLc] = [];
             }
