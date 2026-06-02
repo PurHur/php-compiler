@@ -4411,10 +4411,7 @@ class JIT {
         Block $block,
         PHPLLVM\BasicBlock $entryBlock
     ): PHPLLVM\BasicBlock {
-        $limit = $block->nOpCodes;
-        if ($limit > 0 && OpCode::TYPE_JUMP === $block->opCodes[$limit - 1]->type) {
-            --$limit;
-        }
+        $limit = $this->includedAtEntryOpcodeLimit($block);
 
         $this->context->inlineIncludeExitBlock = null;
         $exit = $this->compileBlockInternal($func, $block, $limit, $entryBlock);
@@ -4423,6 +4420,71 @@ class JIT {
         }
 
         return $exit;
+    }
+
+    /**
+     * Lower a catch arm at {@see TryCatchHelper::buildDispatch} match entry (#4041).
+     *
+     * Catch CFG blocks may already sit in blockStorage from an earlier partial compile;
+     * force re-lowering at the dispatch match BB and skip the trailing merge JUMP
+     * (TryCatchHelper branches to merge after the arm body).
+     *
+     * @param list<Variable> $args
+     */
+    public function compileCatchArmAtEntry(
+        PHPLLVM\Value $func,
+        Block $block,
+        PHPLLVM\BasicBlock $entryBlock,
+        Variable ...$args
+    ): PHPLLVM\BasicBlock {
+        $limit = $block->nOpCodes;
+        if ($limit > 0 && OpCode::TYPE_JUMP === $block->opCodes[$limit - 1]->type) {
+            --$limit;
+        }
+
+        $this->context->inlineIncludeExitBlock = null;
+        $exit = $this->compileBlockInternal($func, $block, $limit, $entryBlock, 0, false, ...$args);
+        if (null !== $this->context->inlineIncludeExitBlock) {
+            $exit = $this->context->inlineIncludeExitBlock;
+        }
+
+        return $exit;
+    }
+
+    /**
+     * Opcode limit for compileIncludedAtEntry: skip redundant try-entry JUMP only (#2084).
+     */
+    private function includedAtEntryOpcodeLimit(Block $block): int
+    {
+        $limit = $block->nOpCodes;
+        if ($limit > 0 && OpCode::TYPE_JUMP === $block->opCodes[$limit - 1]->type) {
+            $jump = $block->opCodes[$limit - 1];
+            if (null !== $jump->block1 && $this->isRedundantTryEntryJump($block, $jump->block1)) {
+                --$limit;
+            }
+        }
+
+        return $limit;
+    }
+
+    /**
+     * php-cfg TryCatch emits a Stmt_Jump into the try body; TYPE_TRY already enters it (#2084).
+     */
+    private function isRedundantTryEntryJump(Block $block, Block $target): bool
+    {
+        for ($i = $block->nOpCodes - 1; $i >= 0; --$i) {
+            $op = $block->opCodes[$i];
+            if (OpCode::TYPE_CATCH === $op->type || OpCode::TYPE_FINALLY === $op->type) {
+                continue;
+            }
+            if (OpCode::TYPE_TRY === $op->type) {
+                return $op->block1 === $target;
+            }
+
+            break;
+        }
+
+        return false;
     }
 
     /**

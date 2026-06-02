@@ -173,7 +173,10 @@ final class TryCatchHelper
             return;
         }
         $handler->mergeEntryEmitted = true;
-        $dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, $args);
+        $dispatchBb = $handler->dispatchBb;
+        if (null === $dispatchBb) {
+            $dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, $args);
+        }
 
         $builder = $context->builder;
         $saved = $builder->getInsertBlock();
@@ -243,7 +246,12 @@ final class TryCatchHelper
         if (null === $handler) {
             $builder = $context->builder;
             $throwBlock = $builder->getInsertBlock();
-            $builder->positionAtEnd($throwBlock);
+            if (null === $throwBlock || null !== $throwBlock->getTerminator()) {
+                $throwBlock = self::appendBlock($func, 'throw_uncaught');
+                $builder->positionAtEnd($throwBlock);
+            } else {
+                $builder->positionAtEnd($throwBlock);
+            }
             $context->freeDeadVariables($func, $throwBlock, $block);
             $context->builder->call($context->lookupFunction('abort'));
             $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
@@ -261,7 +269,12 @@ final class TryCatchHelper
 
         $builder = $context->builder;
         $throwBlock = $builder->getInsertBlock();
-        $builder->positionAtEnd($throwBlock);
+        if (null === $throwBlock || null !== $throwBlock->getTerminator()) {
+            $throwBlock = self::appendBlock($func, 'throw_pending_'.self::blockSuffix($handler));
+            $builder->positionAtEnd($throwBlock);
+        } else {
+            $builder->positionAtEnd($throwBlock);
+        }
         $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
         $builder->branch($dispatchBb);
     }
@@ -297,8 +310,17 @@ final class TryCatchHelper
         TryCatchHandler $handler,
         array $args
     ): BasicBlock {
+        if (null !== $handler->dispatchBb) {
+            $existing = $handler->dispatchBb->getParent();
+            if ($existing instanceof Function_ && $existing === $func) {
+                return $handler->dispatchBb;
+            }
+        }
+
         $suffix = self::blockSuffix($handler);
         $dispatch = self::appendBlock($func, 'try_catch_dispatch_'.$suffix);
+        // Pin before catch lowering: emitMergeEntryCheck re-enters dispatchBbFor mid-build (#4041).
+        $handler->dispatchBb = $dispatch;
         $builder = $context->builder;
         $saved = $builder->getInsertBlock();
         $builder->positionAtEnd($dispatch);
@@ -313,12 +335,20 @@ final class TryCatchHelper
         foreach ($handler->catchArms as $arm) {
             $catchOp = $arm['op'];
             $types = $arm['catchTypes'];
-            $matchBb = self::appendBlock($func, 'try_catch_match_'.$suffix);
+            $catchCfg = $catchOp->block1;
+            $cachedCatchBb = null !== $catchCfg
+                ? ($context->scope->blockStorage[$catchCfg] ?? null)
+                : null;
+            $catchBodyBb = $cachedCatchBb ?? self::appendBlock($func, 'try_catch_match_'.$suffix);
+            $catchEntryBb = $catchBodyBb;
+            if (null !== $cachedCatchBb && null !== $catchOp->arg3) {
+                $catchEntryBb = self::appendBlock($func, 'try_catch_assign_'.$suffix);
+            }
             $noMatchBb = self::appendBlock($func, 'try_catch_nomatch_'.$suffix);
 
             $builder->positionAtEnd($nextCatch);
             if ([] === $types || $singleArm) {
-                $builder->branch($matchBb);
+                $builder->branch($catchEntryBb);
             } else {
                 $checkBb = $nextCatch;
                 $typeCount = count($types);
@@ -330,37 +360,45 @@ final class TryCatchHelper
                         : $context->helper->loadValue($isInstance);
                     $isLast = $idx === $typeCount - 1;
                     if ($isLast) {
-                        $builder->branchIf($isBool, $matchBb, $noMatchBb);
+                        $builder->branchIf($isBool, $catchEntryBb, $noMatchBb);
                     } else {
                         $nextCheck = self::appendBlock($func, 'try_catch_type_next_'.$suffix);
-                        $builder->branchIf($isBool, $matchBb, $nextCheck);
+                        $builder->branchIf($isBool, $catchEntryBb, $nextCheck);
                         $checkBb = $nextCheck;
                         $builder->positionAtEnd($checkBb);
                     }
                 }
             }
 
-            $builder->positionAtEnd($matchBb);
-            if (null !== $catchOp->arg3) {
+            if (null === $cachedCatchBb) {
+                $builder->positionAtEnd($catchBodyBb);
+                if (null !== $catchOp->arg3) {
+                    $operand = $catchOp->block1->getOperand((int) $catchOp->arg3);
+                    $caughtVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
+                    $jit->assignOperandForced($operand, $caughtVar);
+                }
+                if ($context->compilingGeneratorResume && null !== $catchOp->block1) {
+                    $catchResume = $context->generatorCatchDispatchEntry[spl_object_id($catchOp->block1)] ?? null;
+                    if (null !== $catchResume) {
+                        $builder->branch($catchResume);
+                        $nextCatch = $noMatchBb;
+                        $builder->positionAtEnd($nextCatch);
+
+                        continue;
+                    }
+                }
+                $jit->compileCatchArmAtEntry($func, $catchOp->block1, $catchBodyBb, ...$args);
+                $catchTail = $context->builder->getInsertBlock();
+                $builder->positionAtEnd($catchTail);
+                if (null !== $mergeBody && null === $catchTail->getTerminator()) {
+                    $builder->branch($mergeBody);
+                }
+            } elseif (null !== $catchOp->arg3) {
+                $builder->positionAtEnd($catchEntryBb);
                 $operand = $catchOp->block1->getOperand((int) $catchOp->arg3);
                 $caughtVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
                 $jit->assignOperandForced($operand, $caughtVar);
-            }
-            if ($context->compilingGeneratorResume && null !== $catchOp->block1) {
-                $catchResume = $context->generatorCatchDispatchEntry[spl_object_id($catchOp->block1)] ?? null;
-                if (null !== $catchResume) {
-                    $builder->branch($catchResume);
-                    $nextCatch = $noMatchBb;
-                    $builder->positionAtEnd($nextCatch);
-
-                    continue;
-                }
-            }
-            $jit->compileIncludedAtEntry($func, $catchOp->block1, $matchBb);
-            $catchTail = $context->builder->getInsertBlock();
-            $builder->positionAtEnd($catchTail);
-            if (null !== $mergeBody && null === $catchTail->getTerminator()) {
-                $builder->branch($mergeBody);
+                $builder->branch($catchBodyBb);
             }
 
             $nextCatch = $noMatchBb;
