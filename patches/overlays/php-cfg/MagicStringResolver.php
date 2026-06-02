@@ -31,6 +31,18 @@ class MagicStringResolver extends NodeVisitorAbstract
     /** @var list<string> */
     protected $traitStack = [];
 
+    /** @var string */
+    protected $compilationUnitFile = '';
+
+    /** @var int */
+    protected $anonymousClassCounter = 0;
+
+    public function beginCompilationUnit(string $fileName): void
+    {
+        $this->compilationUnitFile = $fileName;
+        $this->anonymousClassCounter = 0;
+    }
+
     public function enterNode(Node $node)
     {
         $this->repairComments($node);
@@ -155,12 +167,33 @@ class MagicStringResolver extends NodeVisitorAbstract
 
     private function anonymousClassName(Node\Stmt\ClassLike $node): string
     {
-        $start = $node->getStartLine();
-        if (null === $start) {
-            $start = 0;
+        $line = $node->getStartLine();
+        if (null === $line) {
+            $line = 0;
         }
 
-        return 'AnonymousClass@' . $start;
+        $prefix = 'class';
+        if (!empty($node->extends) && !is_array($node->extends)) {
+            $prefix = $node->extends->getLast();
+        }
+
+        $file = $this->compilationUnitFile;
+        if ('' === $file) {
+            $attrs = $node->getAttributes();
+            if (isset($attrs['fileName']) && is_string($attrs['fileName'])) {
+                $file = $attrs['fileName'];
+            }
+        }
+        if ('' !== $file && is_file($file)) {
+            $real = realpath($file);
+            if (false !== $real) {
+                $file = $real;
+            }
+        }
+
+        $id = $this->anonymousClassCounter++;
+
+        return $prefix.'@anonymous'."\0".$file.':'.$line.'$'.$id;
     }
 
     private function repairCommentsCallback($match)

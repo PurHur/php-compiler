@@ -1703,8 +1703,25 @@ PY
 
 apply_php_types_anonymous_class_type_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
-  if grep -q 'AnonymousClass@' "$target" 2>/dev/null; then
+  if grep -q "@anonymous\\\\x00" "$target" 2>/dev/null; then
     echo "Skip php-types-anonymous-class-type.patch (already applied)"
+    return 0
+  fi
+  if grep -q 'AnonymousClass@' "$target" 2>/dev/null; then
+    python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+old = "        if (preg_match('/^AnonymousClass@\\d+$/', trim($decl))) {\n            return new self(self::TYPE_OBJECT, [], $decl);\n        }\n"
+new = "        if (preg_match('/@anonymous\\x00/', $decl)) {\n            return new self(self::TYPE_OBJECT, [], $decl);\n        }\n" + old
+if old not in text:
+    sys.stderr.write("php-types-anonymous-class-type: upgrade anchor not found\n")
+    raise SystemExit(1)
+path.write_text(text.replace(old, new, 1))
+PY
+    echo "Applied php-types-anonymous-class-type.patch (overlay upgrade)"
     return 0
   fi
   python3 - "$target" <<'PY'
@@ -1714,7 +1731,10 @@ from pathlib import Path
 path = Path(sys.argv[1])
 text = path.read_text()
 needle = "        $regex = '(^([a-zA-Z_"
-block = """        if (preg_match('/^AnonymousClass@\\d+$/', trim($decl))) {
+block = """        if (preg_match('/@anonymous\\x00/', $decl)) {
+            return new self(self::TYPE_OBJECT, [], $decl);
+        }
+        if (preg_match('/^AnonymousClass@\\d+$/', trim($decl))) {
             return new self(self::TYPE_OBJECT, [], $decl);
         }
 """
@@ -1836,12 +1856,23 @@ apply_php_cfg_magic_constants_overlay() {
     && grep -q 'traitStack' "$target" 2>/dev/null \
     && grep -q 'functionStack' "$target" 2>/dev/null \
     && grep -q 'MagicConst\\Method' "$target" 2>/dev/null \
-    && grep -A3 'MagicConst\\Method' "$target" | grep -q 'functionStack'; then
+    && grep -A3 'MagicConst\\Method' "$target" | grep -q 'functionStack' \
+    && grep -q 'beginCompilationUnit' "$target" 2>/dev/null \
+    && ! grep -q "return 'AnonymousClass@'" "$target" 2>/dev/null; then
     echo "Skip php-cfg-magic-constants.patch (already applied)"
     return 0
   fi
   cp "$overlay" "$target"
   echo "Applied php-cfg-magic-constants.patch (overlay)"
+}
+
+apply_php_cfg_anonymous_class_name_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if grep -q 'magicStringResolver->beginCompilationUnit' "$target" 2>/dev/null; then
+    echo "Skip php-cfg-anonymous-class-name.patch (already applied)"
+    return 0
+  fi
+  apply_patch "$PATCH_DIR/php-cfg-anonymous-class-name.patch"
 }
 
 apply_php_cfg_halt_compiler_overlay() {
@@ -2483,6 +2514,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-first-class-callable.patch"
   apply_patch "$PATCH_DIR/php-cfg-arrow-function.patch"
   apply_patch "$PATCH_DIR/php-cfg-anonymous-class.patch"
+  apply_php_cfg_anonymous_class_name_overlay || true
   apply_patch "$PATCH_DIR/php-cfg-enum.patch"
   apply_patch "$PATCH_DIR/php-cfg-enum-implements.patch"
   apply_patch "$PATCH_DIR/php-cfg-enum-class-method.patch"
