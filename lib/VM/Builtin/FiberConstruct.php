@@ -31,8 +31,5 @@ final class FiberConstruct extends VmClassMethod
             throw new \LogicException('Fiber::__construct() called on invalid object');
         }
         FiberSupport::attachCallback($object, $frame->calledArgs[1]);
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->null();
-        }
     }
 }

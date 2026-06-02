@@ -85,6 +85,9 @@ class Context {
      */
     public array $generatorCatchDispatchEntry = [];
 
+    /** @var array<int, \PHPLLVM\BasicBlock> catch CFG block id => resume entry BB (#4624) */
+    public array $fiberCatchDispatchEntry = [];
+
     /** CFG block currently being lowered (get_defined_vars snapshot, #3135). */
     public ?Block $jitCurrentBlock = null;
 

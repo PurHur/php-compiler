@@ -204,6 +204,15 @@ final class TryCatchHelper
         \PHPCompiler\JIT $jit,
         string $message
     ): void {
+        self::emitCatchableClassError($context, 'Error', $message, $jit);
+    }
+
+    public static function emitCatchableClassError(
+        Context $context,
+        string $className,
+        string $message,
+        ?\PHPCompiler\JIT $jit = null
+    ): void {
         JitThrow::registerDeclarations($context);
         JitThrow::ensureLinked($context);
         $handler = $context->tryCatch->handlerStack[array_key_last($context->tryCatch->handlerStack)] ?? null;
@@ -214,10 +223,17 @@ final class TryCatchHelper
         }
         $func = $context->builder->getInsertBlock()->getParent();
         assert($func instanceof Function_);
-        $dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, []);
+        $dispatchBb = null !== $jit
+            ? self::dispatchBbFor($jit, $func, $context, $handler, [])
+            : $handler->dispatchBb;
+        if (null === $dispatchBb) {
+            ErrorRaise::emitRaise($context, $message);
+
+            return;
+        }
 
         $object = $context->type->object;
-        $classId = $object->lookup('Error');
+        $classId = $object->lookup($className);
         $obj = $object->allocate($classId);
         $object->markObjectConstructed($obj);
         $msgStr = $context->builder->load($context->constantStringFromString($message));
@@ -227,7 +243,7 @@ final class TryCatchHelper
             Variable::KIND_VALUE,
             $msgStr
         );
-        $object->storeInstanceProperty($obj, 'Error', 'message', $msgVar);
+        $object->storeInstanceProperty($obj, $className, 'message', $msgVar);
 
         $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
         $context->builder->branch($dispatchBb);
@@ -379,6 +395,16 @@ final class TryCatchHelper
                 }
                 if ($context->compilingGeneratorResume && null !== $catchOp->block1) {
                     $catchResume = $context->generatorCatchDispatchEntry[spl_object_id($catchOp->block1)] ?? null;
+                    if (null !== $catchResume) {
+                        $builder->branch($catchResume);
+                        $nextCatch = $noMatchBb;
+                        $builder->positionAtEnd($nextCatch);
+
+                        continue;
+                    }
+                }
+                if ($context->compilingFiberResume && null !== $catchOp->block1) {
+                    $catchResume = $context->fiberCatchDispatchEntry[spl_object_id($catchOp->block1)] ?? null;
                     if (null !== $catchResume) {
                         $builder->branch($catchResume);
                         $nextCatch = $noMatchBb;
