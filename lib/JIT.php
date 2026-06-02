@@ -7663,6 +7663,16 @@ class JIT {
                             $this->context->type->object->defineEnumCaseConst($classId, $name->value, $vmVar);
                             break;
                         }
+                        $enumCaseRef = $this->tryResolveEnumCaseClassConstInit($block, $op->arg2);
+                        if (null !== $enumCaseRef) {
+                            $this->context->type->object->defineClassConstEnumCaseRef(
+                                $classId,
+                                $name->value,
+                                $enumCaseRef[0],
+                                $enumCaseRef[1]
+                            );
+                            break;
+                        }
                         $this->context->type->object->defineClassConst(
                             $classId,
                             $name->value,
@@ -10701,6 +10711,38 @@ class JIT {
         }
 
         return $this->context->jitGlobalVariables[$name];
+    }
+
+    /**
+     * Resolve `public const X = SomeEnum::Case` when VM materialization lacks the enum (#4445).
+     *
+     * @return array{0: int, 1: string}|null enum class id + case key (lowercase)
+     */
+    private function tryResolveEnumCaseClassConstInit(Block $block, int $valueSlot): ?array
+    {
+        $fetchOp = null;
+        foreach ($block->opCodes as $initOp) {
+            if (OpCode::TYPE_DECLARE_CLASS_CONST === $initOp->type && $valueSlot === $initOp->arg2) {
+                break;
+            }
+            if (OpCode::TYPE_CLASS_CONST_FETCH === $initOp->type) {
+                $fetchOp = $initOp;
+            }
+        }
+        if (null === $fetchOp) {
+            return null;
+        }
+        $enumClassOp = $block->getOperand($fetchOp->arg2);
+        $caseOp = $block->getOperand($fetchOp->arg3);
+        if (!$enumClassOp instanceof Operand\Literal || !$caseOp instanceof Operand\Literal) {
+            return null;
+        }
+        $enumClassId = $this->context->type->object->lookup(strtolower($enumClassOp->value));
+        if (!$this->context->type->object->isEnumClassId($enumClassId)) {
+            return null;
+        }
+
+        return [$enumClassId, strtolower($caseOp->value)];
     }
 
     private function ensureJitFunctionStatic(string $storageKey): Variable

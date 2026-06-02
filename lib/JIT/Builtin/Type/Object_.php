@@ -27,6 +27,7 @@ use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\MagicMethodDispatch;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM;
 
@@ -623,6 +624,64 @@ class Object_ extends Type {
             $this->initEmptyHashtableProperties($obj, $classId);
             $this->initEmptyValueProperties($obj, $classId);
         }
+
+        return $obj;
+    }
+
+    /**
+     * Immortal enum case singleton for class constants (`public const X = E::A`, #4445).
+     *
+     * Reuses the canonical enum case object shape without GC registration (php-src persistent zval).
+     */
+    public function allocateClassConstantEnumCase(
+        int $enumClassId,
+        string $caseName,
+        Variable $backingJit
+    ): PHPLLVM\Value {
+        $objType = $this->context->getTypeFromString('__object__');
+        $obj = $this->context->memory->mallocWithExtra(
+            $objType,
+            $this->context->constantFromInteger(16, 'size_t')
+        );
+        $map = $this->context->structFieldMap['__object__'];
+        $this->context->builder->store(
+            $this->context->constantFromInteger($enumClassId, 'int64'),
+            $this->context->builder->structGep($obj, $map['class_id'])
+        );
+        $this->context->builder->store(
+            $this->context->getTypeFromString('int8')->constInt(1, false),
+            $this->context->builder->structGep($obj, $map['constructed'])
+        );
+        $typeinfo = $this->context->getTypeFromString('int32')->constInt(
+            Refcount::TYPE_INFO_TYPE_OBJECT | Refcount::TYPE_INFO_REFCOUNTED,
+            false
+        );
+        $ref = $this->context->builder->pointerCast(
+            $obj,
+            $this->context->getTypeFromString('__ref__virtual*')
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__ref__init'),
+            $typeinfo,
+            $ref
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__ref__addref'),
+            $ref
+        );
+        $voidPtr = $this->context->getTypeFromString('void*');
+        $nameStr = $this->context->builder->load(
+            $this->context->constantStringFromString($caseName)
+        );
+        $this->context->builder->store(
+            $this->context->builder->pointerCast($nameStr, $voidPtr),
+            $this->propertySlotPtr($obj, self::ENUM_CASE_SLOT_NAME)
+        );
+        $this->propertyStore(
+            $this->propertySlotPtr($obj, self::ENUM_CASE_SLOT_VALUE),
+            $backingJit,
+            Variable::TYPE_VALUE
+        );
 
         return $obj;
     }
@@ -2329,7 +2388,15 @@ class Object_ extends Type {
             return;
         }
         if (VMVariable::TYPE_OBJECT === $value->type) {
-            $objClass = strtolower($value->toObject()->class->name);
+            $object = $value->toObject();
+            if (EnumCaseSupport::isEnumCase($object)) {
+                $enumClassLc = strtolower($object->class->name);
+                $caseKey = strtolower((string) ($object->enumCaseName ?? ''));
+                $this->defineClassConstEnumCaseRef($classId, $key, $this->lookup($enumClassLc), $caseKey);
+
+                return;
+            }
+            $objClass = strtolower($object->class->name);
             $jitClassId = $this->lookup($objClass);
             $globalName = 'php_compiler_class_const_obj_'.$classId.'_'.$key;
             $objPtrType = $this->context->getTypeFromString('__object__*');
@@ -2350,6 +2417,49 @@ class Object_ extends Type {
         $this->classConstants[$classId][$key] = [
             'type' => Variable::fromVMVariable($value->type),
             'value' => $this->compileTimeValueFromVm($value),
+        ];
+    }
+
+    public function defineClassConstEnumCaseRef(
+        int $holdingClassId,
+        string $constName,
+        int $enumClassId,
+        string $caseKey
+    ): void {
+        $constKey = strtolower($constName);
+        $caseKey = strtolower($caseKey);
+        if (!$this->isEnumClassId($enumClassId)) {
+            throw new \LogicException('Class constant enum case reference requires an enum class id');
+        }
+        if ('' === $caseKey || !isset($this->classConstants[$enumClassId][$caseKey])) {
+            $enumLc = $this->classNameForId($enumClassId);
+            throw new \LogicException("Unknown enum case for class constant: {$enumLc}::{$caseKey}");
+        }
+        $globalName = 'php_compiler_enum_case_singleton_'.$enumClassId.'_'.$caseKey;
+        if (!isset($this->classConstObjectGlobals[$globalName])) {
+            $objPtrType = $this->context->getTypeFromString('__object__*');
+            $global = $this->context->module->addGlobal($objPtrType, $globalName);
+            $global->setInitializer($objPtrType->constNull());
+            $this->classConstObjectGlobals[$globalName] = $global;
+            $canonicalName = $this->enumCaseCanonicalName($enumClassId, $caseKey);
+            $backingEntry = $this->classConstants[$enumClassId][$caseKey];
+            $this->context->emitInInit(function (Context $ctx) use (
+                $enumClassId,
+                $canonicalName,
+                $backingEntry,
+                $global
+            ): void {
+                $alloc = $this->allocateClassConstantEnumCase(
+                    $enumClassId,
+                    $canonicalName,
+                    $this->jitConstantFromEntry($backingEntry)
+                );
+                $ctx->builder->store($alloc, $global);
+            });
+        }
+        $this->classConstants[$holdingClassId][$constKey] = [
+            'type' => Variable::TYPE_OBJECT,
+            'global' => $globalName,
         ];
     }
 
