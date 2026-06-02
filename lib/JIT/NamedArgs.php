@@ -128,7 +128,7 @@ final class NamedArgs
             $value = $entry['value'];
             $idx = array_search($name, $lowerNames, true);
             if (false === $idx) {
-                throw new \LogicException("Unknown named parameter \${$entry['name']}");
+                throw new \Error("Unknown named parameter \${$entry['name']}");
             }
             if (isset($filled[$idx])) {
                 throw new \LogicException(
