@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -65,6 +66,7 @@ final class print_r extends Internal
 
     private static function formatVariable(VM $vm, Variable $var, int $level): string
     {
+        TypedPropertyCheck::assertReadable($var);
         if (Variable::TYPE_INTEGER === $var->type) {
             return (string) $var->toInt();
         }
