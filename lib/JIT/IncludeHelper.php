@@ -93,6 +93,23 @@ final class IncludeHelper
             throw new \LogicException('failed to compile include: '.$path.$suffix);
         }
 
+        self::compileInlinedBlock($jit, $func, $callerBlock, $included, $resultOperand, false, 'c:include:'.$path);
+    }
+
+    /**
+     * Inline a compiled block in caller scope (include/require or eval, issue #4652).
+     */
+    public static function compileInlinedBlock(
+        JIT $jit,
+        Function_ $func,
+        Block $callerBlock,
+        Block $included,
+        ?Operand $resultOperand,
+        bool $captureEvalReturn,
+        string $progressNote = 'c:inline'
+    ): void {
+        $context = $jit->context;
+
         $included->inheritScopeFrom($callerBlock);
         $included->inheritUndefinedLocals = true;
 
@@ -118,7 +135,14 @@ final class IncludeHelper
             Variable::KIND_VARIABLE,
             JitValueBox::alloc($context)
         );
-        JitValueBox::writeLong($context, $returnHolder->value, $context->constantFromInteger(1));
+        if ($captureEvalReturn) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $returnHolder->value)
+            );
+        } else {
+            JitValueBox::writeLong($context, $returnHolder->value, $context->constantFromInteger(1));
+        }
         $context->setVariableOp($returnHolderOp, $returnHolder);
         $context->inlineIncludeReturnOperands[] = $returnHolderOp;
         $entryBb = $func->appendBasicBlock('include_entry_'.(++self::$includeEntrySerial));
@@ -132,7 +156,7 @@ final class IncludeHelper
         $context->builder->call(
             $context->lookupFunction('__phpc_progress_note'),
             $context->builder->pointerCast(
-                $context->constantFromString('c:include:'.$path),
+                $context->constantFromString($progressNote),
                 $context->getTypeFromString('int8*')
             )
         );
