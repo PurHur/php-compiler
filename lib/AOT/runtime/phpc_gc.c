@@ -268,6 +268,8 @@ static void phpc_gc_clear_slots_pointing_to(void *target)
 
 static void phpc_gc_free_object(void *obj)
 {
+    /* Zend zend_gc_remove_from_buffer: user __destruct before cycle teardown (#4096, #4023). */
+    phpc_destruct_try_invoke(obj);
     phpc_weakref_clear_object(obj);
     phpc_gc_clear_slots_pointing_to(obj);
     phpc_gc_unregister(obj);
