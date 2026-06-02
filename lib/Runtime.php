@@ -299,11 +299,21 @@ class Runtime {
         return SourceBareThrowRewriter::rewrite($code);
     }
 
+    /**
+     * Source rewrites applied immediately before php-parser / PHPCfg (issue #3243, #4456).
+     *
+     * Must run on any path that calls Parser::parse() directly (AOT include discovery, etc.).
+     */
+    public function rewriteSourceBeforeParser(string $code): string
+    {
+        $code = AsymmetricVisibilityRewriter::rewrite($code);
+        return PipeOperatorDesugar::desugar($code);
+    }
+
     public function parse(string $code, string $filename): Script {
         [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code);
         $this->compiler->setBareRethrowLines($bareRethrowLines);
-        $code = AsymmetricVisibilityRewriter::rewrite($code);
-        $code = PipeOperatorDesugar::desugar($code);
+        $code = $this->rewriteSourceBeforeParser($code);
         $fileStrictTypes = $this->detectFileStrictTypes($code);
         try {
             $script = $this->parser->parse($code, $filename);
