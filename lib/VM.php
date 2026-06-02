@@ -1652,7 +1652,17 @@ restart:
                         $frame = $mergeFrame;
                         goto restart;
                     }
+                    $gotoFrame = $this->resumeGotoAfterFinally($frame);
+                    if (null !== $gotoFrame) {
+                        $frame = $gotoFrame;
+                        goto restart;
+                    }
                     $finallyFrame = $this->beginCatchExitFinallyUnwind($frame, $op->block1);
+                    if (null !== $finallyFrame) {
+                        $frame = $finallyFrame;
+                        goto restart;
+                    }
+                    $finallyFrame = $this->beginGotoFinallyUnwind($frame, $op->block1);
                     if (null !== $finallyFrame) {
                         $frame = $finallyFrame;
                         goto restart;
@@ -2978,6 +2988,19 @@ restart:
                     if (null !== $op->block2) {
                         $this->context->tryMergeBlockIds[spl_object_id($op->block2)] = true;
                     }
+                    // php-cfg may fuse try body with merge when try is only `goto` to a later label (#4491).
+                    if (
+                        null !== $op->block2
+                        && $op->block1 === $op->block2
+                        && $this->hasPendingFinally($frame)
+                    ) {
+                        $this->context->pendingGotoAfterFinally = $op->block1;
+                        $finallyFrame = $this->enterFinallyHandlerForUnwind($frame, false);
+                        if (null !== $finallyFrame) {
+                            $frame = $finallyFrame;
+                            goto restart;
+                        }
+                    }
                     $frame = $op->block1->getFrame($this->context, $frame);
                     goto restart;
                 case OpCode::TYPE_CATCH:
@@ -3664,6 +3687,64 @@ restart:
         return $merge->getFrame($this->context, $frame);
     }
 
+    private function resumeGotoAfterFinally(Frame $frame): ?Frame
+    {
+        $target = $this->context->pendingGotoAfterFinally;
+        if (null === $target) {
+            return null;
+        }
+        $this->context->pendingGotoAfterFinally = null;
+
+        return $this->frameForBranch($frame, $target);
+    }
+
+    /**
+     * Leaving a try body via goto must run finally before the jump target (Zend order, #4491).
+     */
+    private function beginGotoFinallyUnwind(Frame $frame, Block $target): ?Frame
+    {
+        $handlers = $this->context->activeTryHandlerFrames;
+        for ($i = \count($handlers) - 1; $i >= 0; --$i) {
+            $handler = $handlers[$i];
+            if (!$this->hasPendingFinally($handler)) {
+                continue;
+            }
+            $finallyOp = $this->findFinallyOpForHandler($handler);
+            if (null === $finallyOp || null === $finallyOp->block1) {
+                continue;
+            }
+            if ($target === $finallyOp->block1) {
+                continue;
+            }
+            if ($finallyOp->block1 === $frame->block) {
+                continue;
+            }
+            if (!$this->frameIsDescendantOf($frame, $handler)) {
+                continue;
+            }
+            // Normal try/catch completion uses the merge block (registered at TYPE_TRY).
+            if (isset($this->context->tryMergeBlockIds[spl_object_id($target)])) {
+                continue;
+            }
+            $this->context->pendingGotoAfterFinally = $target;
+
+            return $this->enterFinallyHandlerForUnwind($handler, false);
+        }
+
+        return null;
+    }
+
+    private function frameIsDescendantOf(Frame $frame, Frame $ancestor): bool
+    {
+        for ($f = $frame; null !== $f; $f = $f->parent) {
+            if ($f === $ancestor) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function findFinallyOpForHandler(Frame $handler): ?OpCode
     {
         foreach ($handler->block->opCodes as $op) {
@@ -3710,6 +3791,7 @@ restart:
         $this->clearThrowDispatchState();
         $this->context->activeCatchHandlerFrame = null;
         $this->context->pendingMergeAfterFinally = null;
+        $this->context->pendingGotoAfterFinally = null;
         $this->clearPendingReturnState();
     }
 
