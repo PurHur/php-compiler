@@ -26,19 +26,20 @@ final class JitSscanf
         $outCount = $argc - 2;
         $i64 = $context->getTypeFromString('int64');
         if (0 === $outCount) {
-            return $context->builder->intCast(
-                $context->builder->call(
-                    $context->lookupFunction('__compiler_sscanf'),
-                    $str,
-                    $fmt,
-                    $i64->constInt(0, false),
-                    $context->builder->pointerCast(
-                        $i64->constInt(0, false),
-                        $context->getTypeFromString('__value__**')
-                    )
-                ),
-                $i64
+            $raw = $context->builder->call(
+                $context->lookupFunction('__compiler_sscanf_array'),
+                $str,
+                $fmt
             );
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                $ptr,
+                $raw
+            );
+
+            return $ptr;
         }
         $ptrTy = $context->getTypeFromString('__value__*');
         $i32 = $context->getTypeFromString('int32');

@@ -24,6 +24,8 @@ extern __hashtable__ *__hashtable__alloc(void);
 extern void __hashtable__setStringKeyString(__hashtable__ *ht, __string__ *key, __string__ *val);
 extern void __hashtable__setStringKeyHashtable(__hashtable__ *ht, __string__ *key, __hashtable__ *child);
 extern void __hashtable__setStringAt(__hashtable__ *ht, size_t index, __string__ *val);
+extern void __hashtable__setLongAt(__hashtable__ *ht, size_t index, long long val);
+extern void __hashtable__setDoubleAt(__hashtable__ *ht, size_t index, double val);
 extern size_t __hashtable__getNumElements(__hashtable__ *ht);
 extern __hashtable__ *__hashtable__readStringKeyHashtable(__hashtable__ *ht, __string__ *key);
 extern __string__ *__string__init(long long size, const char *value);
@@ -2085,6 +2087,92 @@ long long __compiler_sscanf(
     }
 
     return assigned;
+}
+
+/**
+ * Two-arg sscanf(): return parsed values as a list array (issue #4201, php-src ext/standard/sscanf.c).
+ */
+__hashtable__ *__compiler_sscanf_array(__string__ *str, __string__ *fmt)
+{
+    const char *input;
+    size_t in_len;
+    const char *format;
+    size_t fmt_len;
+    size_t in_pos = 0;
+    size_t out_idx = 0;
+    size_t fpos;
+    __hashtable__ *ht;
+
+    if (NULL == str || NULL == fmt) {
+        return __hashtable__alloc();
+    }
+    input = nf_strdata(str);
+    in_len = nf_strlen(str);
+    format = nf_strdata(fmt);
+    fmt_len = nf_strlen(fmt);
+    ht = __hashtable__alloc();
+    for (fpos = 0; fpos < fmt_len; fpos++) {
+        char ch = format[fpos];
+
+        if ('%' != ch) {
+            if (in_pos >= in_len || input[in_pos] != ch) {
+                return ht;
+            }
+            in_pos++;
+            continue;
+        }
+        if (fpos + 1 >= fmt_len) {
+            return ht;
+        }
+        ch = format[++fpos];
+        if ('%' == ch) {
+            if (in_pos >= in_len || input[in_pos] != '%') {
+                return ht;
+            }
+            in_pos++;
+            continue;
+        }
+        switch (ch) {
+            case 'd': {
+                long long val;
+
+                if (!ss_scan_int(input, in_len, &in_pos, &val)) {
+                    return ht;
+                }
+                __hashtable__setLongAt(ht, out_idx, val);
+                out_idx++;
+                break;
+            }
+            case 's': {
+                char buf[4096];
+
+                if (!ss_scan_string(input, in_len, &in_pos, buf, sizeof(buf))) {
+                    return ht;
+                }
+                __hashtable__setStringAt(
+                    ht,
+                    out_idx,
+                    __string__init((long long) strlen(buf), buf)
+                );
+                out_idx++;
+                break;
+            }
+            case 'f': {
+                double val;
+
+                if (!ss_scan_float(input, in_len, &in_pos, &val)) {
+                    return ht;
+                }
+                __hashtable__setDoubleAt(ht, out_idx, val);
+                out_idx++;
+                break;
+            }
+            default:
+                return ht;
+        }
+    }
+
+    return ht;
 }
 
 /**
