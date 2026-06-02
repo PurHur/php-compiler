@@ -107,6 +107,22 @@ final class FunctionStaticHelper
                     $default->value
                 );
                 break;
+            case Variable::TYPE_OBJECT:
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeObject'),
+                    $destPtr,
+                    $context->helper->loadValue($default)
+                );
+                break;
+            case Variable::TYPE_HASHTABLE:
+                $ht = $context->helper->loadValue($default);
+                $context->refcount->addref($ht);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeHashtable'),
+                    $destPtr,
+                    $ht
+                );
+                break;
             case Variable::TYPE_VALUE:
                 $srcPtr = $context->helper->loadValue($default);
                 if ($storage->functionStaticGlobal) {
@@ -120,6 +136,16 @@ final class FunctionStaticHelper
                 JitValueBox::copyFromPointer($context, $storage->value, $srcPtr);
                 break;
             default:
+                if (($default->type & Variable::IS_NATIVE_ARRAY) !== 0) {
+                    $ht = $context->helper->loadValue($default);
+                    $context->refcount->addref($ht);
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeHashtable'),
+                        $destPtr,
+                        $ht
+                    );
+                    break;
+                }
                 throw new \LogicException(
                     'Unsupported function static default JIT type '.$default->type.' (#2286)'
                 );

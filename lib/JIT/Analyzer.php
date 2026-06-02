@@ -72,7 +72,8 @@ class Analyzer
                 || $usage instanceof Op\Terminal\Echo_
                 || $usage instanceof Op\Expr\Array_
                 || $usage instanceof Op\Expr\Yield_
-                || $usage instanceof Op\Expr\YieldFrom) {
+                || $usage instanceof Op\Expr\YieldFrom
+                || $usage instanceof Op\Terminal\StaticVar) {
                 continue;
             } else {
                 throw new \LogicException('Not implemented escape operand '.get_class($usage));
@@ -134,7 +135,8 @@ class Analyzer
                 || $usage instanceof Op\Iterator\Next
                 || $usage instanceof Op\Terminal\Return_
                 || $usage instanceof Op\Expr\Yield_
-                || $usage instanceof Op\Expr\YieldFrom) {
+                || $usage instanceof Op\Expr\YieldFrom
+                || $usage instanceof Op\Terminal\StaticVar) {
                 // not a dynamic packed-array append
             } else {
                 throw new \LogicException('Not implemented dynamic append operand '.get_class($usage));

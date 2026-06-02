@@ -13,6 +13,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCfg\Op\Expr\Array_;
 use PHPCfg\Op\Expr\StaticCall;
+use PHPCfg\Op\Terminal\StaticVar;
 use PHPCfg\Operand;
 use PHPTypes\Type;
 use PHPUnit\Framework\TestCase;
@@ -66,6 +67,18 @@ class AnalyzerTest extends TestCase
         $staticCall = new StaticCall($class, $name, []);
 
         $this->assertNull($analyzer->computeStaticArraySize($staticCall->result));
+    }
+
+    public function testCanEscapeFunctionStaticArrayInitOperand(): void
+    {
+        $analyzer = new Analyzer();
+        $init = $this->makeOperand([null, null]);
+        $name = new Operand\Literal('a');
+        $name->type = Type::string();
+        $var = new Operand\Variable($name);
+        new StaticVar($var, null, $init);
+
+        $this->assertFalse($analyzer->canEscape($init));
     }
 
     private function makeOperand(array $keys): Operand
