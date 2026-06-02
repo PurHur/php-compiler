@@ -7207,6 +7207,16 @@ class JIT {
         if (null === $declaringClass && null !== $block->func && null !== $block->func->class) {
             $declaringClass = $block->func->class->value;
         }
+        if (null !== $declaringClass && '' !== $declaringClass && '' !== $this->context->scope->className) {
+            $funcClassLc = strtolower(ltrim($declaringClass, '\\'));
+            $scopeClassLc = strtolower(ltrim($this->context->scope->className, '\\'));
+            if (
+                $this->context->type->object->isTraitClass($funcClassLc)
+                && !$this->context->type->object->isTraitClass($scopeClassLc)
+            ) {
+                $declaringClass = $this->context->scope->className;
+            }
+        }
         if (null === $declaringClass || '' === $declaringClass) {
             $declaringClass = $this->context->scope->className !== ''
                 ? $this->context->scope->className
@@ -7763,6 +7773,7 @@ class JIT {
                                 $methodLc,
                                 $methodBlock
                             );
+                            break;
                         }
                         $this->compileBlock($methodBlock, $funcName);
                     }
@@ -7954,6 +7965,7 @@ class JIT {
             $traitId = $object->lookup($traitName);
             $object->inheritTraitConstants($classId, $traitId, $traitName);
             $object->inheritTraitStaticProperties($classId, $traitId, $traitName);
+            $object->inheritTraitInstanceProperties($classId, $traitId, $traitName);
             if (!isset($perTraitMethods[$traitLc])) {
                 $perTraitMethods[$traitLc] = [];
             }
@@ -8125,6 +8137,9 @@ class JIT {
             $sourceMethodLc = $data['sourceMethodLc'] ?? $data['methodLc'];
             $methodBlock = $object->traitMethodBlock($traitId, $sourceMethodLc);
             if (null !== $methodBlock) {
+                if ($this->context->scope->blockStorage->contains($methodBlock)) {
+                    $this->context->scope->blockStorage->detach($methodBlock);
+                }
                 $this->compileBlock($methodBlock, $classLc.'::'.$methodLc);
             }
         }

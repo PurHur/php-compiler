@@ -5258,6 +5258,7 @@ restart:
                 $entry->staticProperties[$name] = $this->cloneStaticPropertyStorage($storage);
                 $entry->traitStaticPropertyNames[$name] = true;
             }
+            $this->inheritTraitInstanceProperties($entry, $trait, $trait->name);
             foreach ($trait->constants as $name => $value) {
                 if (isset($entry->constants[$name])) {
                     if ($this->classConstValuesIdentical($entry->constants[$name], $value)) {
@@ -5455,7 +5456,52 @@ restart:
             if (null !== $data['parameterMetadata']) {
                 $entry->methodParameterMetadata[$methodLc] = $data['parameterMetadata'];
             }
+            if ('__construct' === $methodLc && null === $entry->constructor) {
+                $entry->constructor = $data['method'];
+            }
         }
+    }
+
+    protected function inheritTraitInstanceProperties(ClassEntry $entry, ClassEntry $trait, string $traitName): void
+    {
+        foreach ($trait->properties as $property) {
+            $propLc = strtolower($property->name);
+            foreach ($entry->properties as $existing) {
+                if (strtolower($existing->name) === $propLc) {
+                    throw new \LogicException(
+                        "Trait property {$traitName}::\${$property->name} conflicts with a property declared in another trait"
+                    );
+                }
+            }
+            $entry->properties[] = $this->cloneClassPropertyForEntry($property, $entry);
+            if (isset($trait->propertyAttributeNames[$propLc])) {
+                $entry->propertyAttributeNames[$propLc] = $trait->propertyAttributeNames[$propLc];
+            }
+            if (isset($trait->propertyAttributeEntries[$propLc])) {
+                $entry->propertyAttributeEntries[$propLc] = $trait->propertyAttributeEntries[$propLc];
+            }
+        }
+    }
+
+    private function cloneClassPropertyForEntry(VM\ClassProperty $property, ClassEntry $entry): VM\ClassProperty
+    {
+        $prototype = clone $property->prototype;
+        $default = null !== $property->default ? clone $property->default : null;
+        $cloned = new VM\ClassProperty(
+            $property->name,
+            $default,
+            $prototype,
+            $property->readonly,
+            $property->visibility,
+            strtolower($entry->name),
+            $property->setVisibility
+        );
+        $cloned->getHookMethodLc = $property->getHookMethodLc;
+        $cloned->setHookMethodLc = $property->setHookMethodLc;
+        $cloned->defaultInitBlock = $property->defaultInitBlock;
+        $cloned->defaultInitResultSlot = $property->defaultInitResultSlot;
+
+        return $cloned;
     }
 
     /**
