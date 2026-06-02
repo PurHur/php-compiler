@@ -188,6 +188,7 @@ class JIT {
             $this->context->scopeStack = [];
             $this->context->inlineIncludeReturnOperands = [];
             $this->context->coalesceAssignTargets = new \SplObjectStorage();
+            $this->context->listUnpackSkipAssignPath = false;
             $this->context->jitPropertyHookRawProperty = null;
             // Each queued CFG function gets a fresh try/catch stack — dispatch BBs are per-LLVM-function (#3012).
             $this->context->tryCatch->reset();
@@ -4955,7 +4956,10 @@ class JIT {
                         }
                         break;
                     }
-                    if ($value->type === Variable::TYPE_STRING) {
+                    if (
+                        $value->type === Variable::TYPE_STRING
+                        && !$this->context->listUnpackSkipAssignPath
+                    ) {
                         $charPtr = JIT\StringOffsetHelper::dimFetch(
                             $this->context,
                             $value->value,
@@ -4992,12 +4996,14 @@ class JIT {
                         break;
                     }
                     if (
-                        Variable::TYPE_NULL === $value->type
+                        $this->context->listUnpackSkipAssignPath
+                        || Variable::TYPE_NULL === $value->type
                         || Variable::TYPE_NATIVE_BOOL === $value->type
                         || Variable::TYPE_NATIVE_LONG === $value->type
                         || Variable::TYPE_NATIVE_DOUBLE === $value->type
+                        || Variable::TYPE_STRING === $value->type
                     ) {
-                        // Guarded list destruct compiles dim fetches on non-array RHS (#4325); unreachable at run time.
+                        // Guarded list destruct compiles dim fetches on non-array RHS (#4325, #4308); unreachable at run time.
                         $boxed = new Variable(
                             $this->context,
                             Variable::TYPE_VALUE,
@@ -5091,14 +5097,11 @@ class JIT {
                         } else {
                             $mergeEntry = $this->context->scope->blockStorage[$op->block1];
                         }
-                        $isArray = JIT\ListUnpackHelper::isArrayValue($this->context, $array);
-                        $arrayCheckBb = JIT\BasicBlockHelper::append($this->context, 'list_unpack_array_check');
-                        $builder->positionAtEnd($branchBlock);
-                        $builder->branchIf($isArray, $arrayCheckBb, $mergeEntry);
-                        $builder->positionAtEnd($arrayCheckBb);
-                        JIT\ListUnpackHelper::emitIsListBranchOrFail(
+                        $this->context->listUnpackSkipAssignPath = JIT\ListUnpackHelper::emitGuardedListUnpackCheck(
                             $this->context,
-                            $array
+                            $array,
+                            $branchBlock,
+                            $mergeEntry
                         );
                         break;
                     }
@@ -5799,6 +5802,7 @@ class JIT {
                     $builder->positionAtEnd($nextBb);
                     break;
                 case OpCode::TYPE_JUMP:
+                    $this->context->listUnpackSkipAssignPath = false;
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
                     $this->compileBlockInternal($func, $op->block1, null, null, 0, false, ...$args);
