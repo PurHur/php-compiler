@@ -2442,7 +2442,7 @@ restart:
                         break;
                     }
                     $class = $this->context->classes[$lcname];
-                    if ($class->isAbstract) {
+                    if ($class->isEnum || $class->isAbstract) {
                         $msg = $class->isEnum
                             ? "Cannot instantiate enum {$class->name}"
                             : "Cannot instantiate abstract class {$class->name}";
@@ -5848,6 +5848,9 @@ restart:
                     throw new \Error($this->classNotFoundMessage($name));
                 }
                 $class = $this->context->classes[$lcname];
+                if ($class->isEnum) {
+                    throw new \Error("Cannot instantiate enum {$class->name}");
+                }
                 $object = new VM\ObjectEntry($class);
                 $result->object($object);
                 $frame->call = $object->constructor;
