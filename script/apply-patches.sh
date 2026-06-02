@@ -302,7 +302,7 @@ patch_already_applied() {
       grep -q 'promotionReadonly' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null
       ;;
     php-cfg-property-readonly.patch)
-      grep -qE 'propertyFlags = \$node->flags|\$cfgProp->readonly =|\$prop->readonly =' \
+      grep -qE 'propertyFlags = \$node->flags|\$cfgProp->readonly =|\$prop->readonly =|\$property->readonly =|->readonly = 0 !== \\(\\$node->flags & .*MODIFIER_READONLY\\)' \
         "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-attribute-groups.patch)
@@ -1878,7 +1878,7 @@ apply_php_cfg_property_readonly_overlay() {
   if [[ ! -f "$prop" || ! -f "$parser" ]]; then
     return 0
   fi
-  if grep -qE 'propertyFlags = \$node->flags|\$cfgProp->readonly =|\$prop->readonly =' "$parser" 2>/dev/null; then
+  if grep -qE 'propertyFlags = \$node->flags|\$cfgProp->readonly =|\$prop->readonly =|\$property->readonly =|->readonly = 0 !== \\(\\$node->flags & .*MODIFIER_READONLY\\)' "$parser" 2>/dev/null; then
     echo "Skip php-cfg-property-readonly.patch (already applied)"
     return 0
   fi
@@ -2378,8 +2378,18 @@ apply_patch() {
       echo "Applied ${patch_name} (patch(1))"
       return 0
     fi
+    # Some patches are stored with `a/` + `b/` prefixes (git diff default).
+    if patch -p1 --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+      patch -p1 -s -f < "$patch" >/dev/null 2>&1
+      echo "Applied ${patch_name} (patch(1), -p1)"
+      return 0
+    fi
     if patch -p0 --reverse --dry-run -s -f < "$patch" >/dev/null 2>&1; then
       echo "Skip ${patch_name} (already applied)"
+      return 0
+    fi
+    if patch -p1 --reverse --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+      echo "Skip ${patch_name} (already applied, -p1)"
       return 0
     fi
   fi
@@ -2559,7 +2569,7 @@ verify_critical_language_patches() {
   if ! grep -qE 'public \$readonly|propertyFlags' "$prop" 2>/dev/null; then
     missing+=("php-cfg-property-readonly-Property")
   fi
-  if ! grep -qE 'propertyFlags = \$node->flags|\$cfgProp->readonly =|\$prop->readonly =' "$parser" 2>/dev/null; then
+  if ! grep -qE 'propertyFlags = \$node->flags|\$cfgProp->readonly =|\$prop->readonly =|\$property->readonly =|->readonly = 0 !== \\(\\$node->flags & .*MODIFIER_READONLY\\)' "$parser" 2>/dev/null; then
     missing+=("php-cfg-property-readonly-Parser")
   fi
   if ((${#missing[@]} > 0)); then

@@ -4054,6 +4054,14 @@ class Compiler {
         }
 
         $sourceFile = $expr->getFile() ?? '';
+        $includeKind = match ($expr->type) {
+            Op\Expr\Include_::TYPE_INCLUDE => OpCode::INCLUDE_KIND_INCLUDE,
+            Op\Expr\Include_::TYPE_INCLUDE_ONCE => OpCode::INCLUDE_KIND_INCLUDE_ONCE,
+            Op\Expr\Include_::TYPE_REQUIRE => OpCode::INCLUDE_KIND_REQUIRE,
+            Op\Expr\Include_::TYPE_REQUIRE_ONCE => OpCode::INCLUDE_KIND_REQUIRE_ONCE,
+            default => OpCode::INCLUDE_KIND_INCLUDE_ONCE,
+        };
+
         $deploySpec = ConstStringFolder::tryParseDeployInclude($block->orig, $expr->expr, $sourceFile);
         if (null !== $deploySpec) {
             $pathIndex = count($block->deployIncludePaths);
@@ -4062,12 +4070,15 @@ class Compiler {
             $pathOperand = new Operand\Literal('' !== $compilePath ? $compilePath : ' ');
             $pathOperand->type = Type::string();
 
-            return new OpCode(
+            $op = new OpCode(
                 OpCode::TYPE_INCLUDE,
                 $this->compileOperand($pathOperand, $block, true),
                 $resultSlot,
                 $pathIndex,
             );
+            $op->includeKind = $includeKind;
+
+            return $op;
         }
 
         $includePath = ConstStringFolder::foldForInclude($block->orig, $expr->expr, $sourceFile);
@@ -4080,20 +4091,26 @@ class Compiler {
                 $pathIndex = count($block->literalIncludePaths);
                 $block->literalIncludePaths[$pathIndex] = $resolved;
 
-                return new OpCode(
+                $op = new OpCode(
                     OpCode::TYPE_INCLUDE,
                     $this->compileOperand($literal, $block, true),
                     $resultSlot,
                     $pathIndex,
                 );
+                $op->includeKind = $includeKind;
+
+                return $op;
             }
         }
 
-        return new OpCode(
+        $op = new OpCode(
             OpCode::TYPE_INCLUDE,
             $this->compileOperand($expr->expr, $block, true),
             $resultSlot,
         );
+        $op->includeKind = $includeKind;
+
+        return $op;
     }
 
     /**
