@@ -39,9 +39,36 @@ typedef struct __hashtable__ {
     void *objKeys;
 } __hashtable__;
 
+#define PHPC_TYPE_NULL 0
+#define PHPC_TYPE_NATIVE_LONG 1
+#define PHPC_TYPE_NATIVE_BOOL 2
+#define PHPC_TYPE_NATIVE_DOUBLE 3
+#define PHPC_TYPE_STRING 4
+#define PHPC_TYPE_OBJECT 5
+#define PHPC_TYPE_HASHTABLE 7
+
+#define PHPC_TYPEINFO_TYPEMASK 0xFFFFFFFC
+#define PHPC_TYPEINFO_TYPE_OBJECT 8
+
+typedef void __object__;
+
+typedef struct {
+    int32_t refcount;
+    int32_t typeinfo;
+} phpc_ref_head;
+
+typedef struct {
+    phpc_ref_head ref;
+    int64_t class_id;
+    int8_t constructed;
+} phpc_object_header;
+
 extern long long __value__readLong(__value__ *v);
 extern __string__ *__value__readString(__value__ *v);
 extern __hashtable__ *__value__readHashtable(__value__ *v);
+extern void __value__writeNull(__value__ *out);
+extern __object__ *__value__readObject(__value__ *v);
+extern int phpc_object_prop_count(void *obj);
 
 long long __value__spaceship(__value__ *left, __value__ *right);
 long long __hashtable__compareSpaceship(__hashtable__ *left, __hashtable__ *right);
@@ -85,34 +112,6 @@ static size_t phpc_object_header_bytes(void)
 {
     return sizeof(phpc_object_header);
 }
-
-#define PHPC_TYPE_NULL 0
-#define PHPC_TYPE_NATIVE_LONG 1
-#define PHPC_TYPE_NATIVE_BOOL 2
-#define PHPC_TYPE_NATIVE_DOUBLE 3
-#define PHPC_TYPE_STRING 4
-#define PHPC_TYPE_OBJECT 5
-#define PHPC_TYPE_HASHTABLE 7
-
-#define PHPC_TYPEINFO_TYPEMASK 0xFFFFFFFC
-#define PHPC_TYPEINFO_TYPE_OBJECT 8
-
-typedef void __object__;
-
-typedef struct {
-    int32_t refcount;
-    int32_t typeinfo;
-} phpc_ref_head;
-
-typedef struct {
-    phpc_ref_head ref;
-    int64_t class_id;
-    int8_t constructed;
-} phpc_object_header;
-
-extern void __value__writeNull(__value__ *out);
-extern __object__ *__value__readObject(__value__ *v);
-extern int phpc_object_prop_count(void *obj);
 
 static int phpc_value_kind(const __value__ *v)
 {

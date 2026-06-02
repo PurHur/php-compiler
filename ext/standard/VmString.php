@@ -355,7 +355,7 @@ final class VmString
             $ordA = self::byteOrd($a[$i]);
             $ordB = self::byteOrd($b[$i]);
             if ($ordA !== $ordB) {
-                return $ordA <=> $ordB;
+                return $ordA - $ordB;
             }
         }
 
@@ -512,7 +512,7 @@ final class VmString
             $ordA = self::byteOrd($a[$i]);
             $ordB = self::byteOrd($b[$i]);
             if ($ordA !== $ordB) {
-                return $ordA <=> $ordB;
+                return $ordA - $ordB;
             }
         }
 
@@ -528,7 +528,7 @@ final class VmString
             $ordA = self::byteOrd(self::asciiLowerByte($a[$i]));
             $ordB = self::byteOrd(self::asciiLowerByte($b[$i]));
             if ($ordA !== $ordB) {
-                return $ordA <=> $ordB;
+                return $ordA - $ordB;
             }
         }
 
@@ -553,7 +553,7 @@ final class VmString
             $ordA = self::byteOrd(self::asciiLowerByte($a[$i]));
             $ordB = self::byteOrd(self::asciiLowerByte($b[$i]));
             if ($ordA !== $ordB) {
-                return $ordA <=> $ordB;
+                return $ordA - $ordB;
             }
         }
 
@@ -810,7 +810,7 @@ final class VmString
             $ordA = self::byteOrd(self::asciiLowerByte($a[$i]));
             $ordB = self::byteOrd(self::asciiLowerByte($b[$i]));
             if ($ordA !== $ordB) {
-                return $ordA <=> $ordB;
+                return $ordA - $ordB;
             }
         }
 
