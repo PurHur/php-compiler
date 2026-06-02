@@ -73,6 +73,9 @@ class Context {
     /** Merge block to enter after catch-path finally completes (#195, Zend zend_exceptions.c). */
     public ?Block $pendingMergeAfterFinally = null;
 
+    /** Label/merge target after goto exits a try with pending finally (#4491). */
+    public ?Block $pendingGotoAfterFinally = null;
+
     /** @var array<int, true> handler frame object id => finally already ran for current unwind */
     public array $completedFinallyHandlers = [];
 

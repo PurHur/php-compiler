@@ -18,6 +18,7 @@ class GotoVMTest extends BaseTest
     {
         foreach ([
             'goto.phpt',
+            'goto_try_finally_before_label.phpt',
             'goto_invalid_into_loop.phpt',
             'goto_invalid_into_finally.phpt',
             'goto_invalid_out_of_finally.phpt',
