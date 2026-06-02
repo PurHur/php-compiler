@@ -28,6 +28,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethod;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethods;
+use PHPCompiler\VM\Builtin\ReflectionClassGetProperty;
 use PHPCompiler\VM\Builtin\ReflectionClassGetProperties;
 use PHPCompiler\VM\Builtin\ReflectionClassGetReflectionConstant;
 use PHPCompiler\VM\Builtin\ReflectionClassNewLazyGhost;
@@ -62,6 +63,9 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyConstruct;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetName;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetValue;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsPrivate;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsProtected;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsPublic;
 use PHPCompiler\VM\Builtin\ReflectionTypeAllowsNull;
 use PHPCompiler\VM\Builtin\ReflectionTypeToString;
 use PHPCompiler\VM\Builtin\WeakMapConstruct;
@@ -235,6 +239,8 @@ final class BuiltinClasses
         $rc->methodVisibility['getattributes'] = $pub;
         $rc->methods['getmethod'] = new ReflectionClassGetMethod();
         $rc->methodVisibility['getmethod'] = $pub;
+        $rc->methods['getproperty'] = new ReflectionClassGetProperty();
+        $rc->methodVisibility['getproperty'] = $pub;
         $rc->methods['getproperties'] = new ReflectionClassGetProperties();
         $rc->methodVisibility['getproperties'] = $pub;
         $rc->methods['getmethods'] = new ReflectionClassGetMethods();
@@ -258,6 +264,16 @@ final class BuiltinClasses
         $rp->methodVisibility['getvalue'] = $pub;
         $rp->methods['getattributes'] = new ReflectionPropertyGetAttributes();
         $rp->methodVisibility['getattributes'] = $pub;
+        foreach (
+            [
+                'ispublic' => new ReflectionPropertyIsPublic(),
+                'isprivate' => new ReflectionPropertyIsPrivate(),
+                'isprotected' => new ReflectionPropertyIsProtected(),
+            ] as $name => $method
+        ) {
+            $rp->methods[$name] = $method;
+            $rp->methodVisibility[$name] = $pub;
+        }
         $ctx->classes[ReflectionSupport::REFLECTION_PROPERTY] = $rp;
 
         $rf = new ClassEntry('ReflectionFunction');
