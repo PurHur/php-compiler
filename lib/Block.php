@@ -118,6 +118,9 @@ class Block {
     /** Parameter indices marked `#[\SensitiveParameter]` (issue #3351). */
     public array $paramSensitive = [];
 
+    /** Parameter scope slots with non-nullable type and `= null` default (Zend 8.2 implicit nullable, #4449). */
+    public array $paramImplicitNullable = [];
+
     /** Function body contains `yield` (issue #167). */
     public bool $isGenerator = false;
 
@@ -444,6 +447,7 @@ class Block {
             $this->paramIntersectionConstraints = $parent->paramIntersectionConstraints;
             $this->paramDnfConstraints = $parent->paramDnfConstraints;
             $this->paramNames = $parent->paramNames;
+            $this->paramImplicitNullable = $parent->paramImplicitNullable;
         }
     }
 

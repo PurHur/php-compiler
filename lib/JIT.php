@@ -1162,7 +1162,8 @@ class JIT {
                     $this->paramDnfConstraintsForNativeCall($block),
                     $this->paramByRefForNativeCall($block),
                     $block->paramNames,
-                    $block->variadicParamIndex
+                    $block->variadicParamIndex,
+                    $this->paramImplicitNullableForNativeCall($block)
                 );
             }
             if ($returnsByRef) {
@@ -10164,6 +10165,27 @@ class JIT {
         }
 
         return $constraints;
+    }
+
+    /**
+     * @return array<int, true>
+     */
+    private function paramImplicitNullableForNativeCall(Block $block): array
+    {
+        $implicit = [];
+        $offset = $this->instanceMethodUsesThis($block) ? 1 : 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARG_RECV !== $op->type) {
+                continue;
+            }
+            $slot = (int) $op->arg1;
+            if (!isset($block->paramImplicitNullable[$slot])) {
+                continue;
+            }
+            $implicit[(int) $op->arg2 + $offset] = true;
+        }
+
+        return $implicit;
     }
 
     /**
