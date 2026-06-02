@@ -3993,9 +3993,7 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($workBlock);
         $dest = HashTableHelper::alloc($context);
         $idxSlot = $context->builder->alloca($sizeT, 1, 'array_filter_native_idx');
-        $destIdxSlot = $context->builder->alloca($sizeT, 1, 'array_filter_native_dest');
         $context->builder->store($zero, $idxSlot);
-        $context->builder->store($zero, $destIdxSlot);
         $head = BasicBlockHelper::append($context, 'array_filter_native_head');
         $body = BasicBlockHelper::append($context, 'array_filter_native_body');
         $copyBlock = BasicBlockHelper::append($context, 'array_filter_native_copy');
@@ -4028,12 +4026,7 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($truthy, $copyBlock, $skipBlock);
 
         $context->builder->positionAtEnd($copyBlock);
-        $destIdx = $context->builder->load($destIdxSlot);
-        HashTableHelper::setAtIndex($context, $dest, $destIdx, $elem);
-        $context->builder->store(
-            $context->builder->addNoSignedWrap($destIdx, $one),
-            $destIdxSlot
-        );
+        HashTableHelper::setAtIndex($context, $dest, $idx, $elem);
         $context->builder->branch($advance);
 
         $context->builder->positionAtEnd($skipBlock);
