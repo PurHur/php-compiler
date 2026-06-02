@@ -47,6 +47,7 @@ final class Linker
         __DIR__.'/runtime/crc32.c',
         __DIR__.'/runtime/crc32c.c',
         __DIR__.'/runtime/strtr.c',
+        __DIR__.'/runtime/phpc_trim_mask.c',
         __DIR__.'/runtime/phpc_array_merge_recursive.c',
         __DIR__.'/runtime/phpc_array_replace_recursive.c',
         __DIR__.'/runtime/phpc_uuencode.c',
