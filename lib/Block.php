@@ -912,6 +912,55 @@ class Block {
         return false;
     }
 
+    /**
+     * php-cfg match lowering emits one TYPE_IDENTICAL per non-default arm (#143).
+     * MCJIT segfaults on successful arm merge; VM strict === is correct (#4516).
+     */
+    public static function containsMatchExpressionOpcodesInScriptScope(?self $root): bool
+    {
+        return self::countOpcodeTypesSkippingFuncDefs($root, OpCode::TYPE_IDENTICAL) >= 2
+            && self::containsOpcodeTypesSkippingFuncDefs($root, OpCode::TYPE_JUMPIF);
+    }
+
+    /**
+     * @param int ...$types OpCode::TYPE_* values to count
+     */
+    private static function countOpcodeTypesSkippingFuncDefs(?self $root, int ...$types): int
+    {
+        if (null === $root || [] === $types) {
+            return 0;
+        }
+        $want = array_fill_keys($types, true);
+        $count = 0;
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (isset($want[$op->type])) {
+                    ++$count;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        if (
+                            (OpCode::TYPE_FUNCDEF === $op->type || OpCode::TYPE_DECLARE_METHOD === $op->type)
+                            && $sub === $op->block1
+                        ) {
+                            continue;
+                        }
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return $count;
+    }
+
     /** Script or nested function body contains `yield` / `yield from` (issue #167). */
     public static function containsGeneratorOpcodes(?self $root): bool
     {
@@ -1347,6 +1396,7 @@ class Block {
         return self::containsGeneratorOpcodesInScriptScope($root)
             || self::containsFinallyOpcodesInScriptScope($root)
             || self::containsExceptionHandlingOpcodesInScriptScope($root)
+            || self::containsMatchExpressionOpcodesInScriptScope($root)
             || self::containsDynamicStaticPropertyOpcodes($root)
             || self::containsTypedNonVoidReturnOpcodes($root)
             || self::containsClosureByRefCaptureOpcodes($root)
