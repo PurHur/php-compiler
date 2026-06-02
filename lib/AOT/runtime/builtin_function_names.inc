@@ -183,6 +183,7 @@ static const char *phpc_builtin_functions[] = {
     "get_object_vars",
     "get_parent_class",
     "get_resource_id",
+    "get_resource_type",
     "get_resources",
     "getallheaders",
     "getcwd",
@@ -417,6 +418,7 @@ static const char *phpc_builtin_functions[] = {
     "strcmp",
     "strcspn",
     "stream_context_create",
+    "stream_get_contents",
     "stream_set_chunk_size",
     "stream_set_read_buffer",
     "stream_set_timeout",
@@ -485,4 +487,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 484;
+static const size_t phpc_builtin_functions_count = 486;
