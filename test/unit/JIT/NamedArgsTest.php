@@ -29,7 +29,7 @@ final class NamedArgsTest extends TestCase
     public function testUnknownNamedParameterRejects(): void
     {
         $v = new \stdClass();
-        $this->expectException(\LogicException::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Unknown named parameter $foo');
         NamedArgs::resolveOutgoing(
             [['named' => 'foo', 'value' => $v]],

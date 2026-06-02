@@ -1741,6 +1741,13 @@ restart:
                     if ($frame->call instanceof Func\PHP && $frame->call->block->isGenerator) {
                         try {
                             $calledArgs = $this->resolveOutgoingCallArgs($frame);
+                        } catch (\Error $e) {
+                            $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
                         } catch (\LogicException $e) {
                             return $this->raise($e->getMessage(), $frame);
                         }
@@ -1770,6 +1777,13 @@ restart:
                     }
                     try {
                         $new->calledArgs = $this->resolveOutgoingCallArgs($frame);
+                    } catch (\Error $e) {
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
                     } catch (\LogicException $e) {
                         return $this->raise($e->getMessage(), $frame);
                     }
@@ -5055,6 +5069,8 @@ restart:
                 $new->returnVar = null;
                 try {
                     $new->calledArgs = $this->resolveOutgoingCallArgs($frame);
+                } catch (\Error $e) {
+                    throw $e;
                 } catch (\LogicException $e) {
                     throw new \LogicException($e->getMessage(), 0, $e);
                 }
