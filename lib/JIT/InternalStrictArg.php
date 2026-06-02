@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 
 /**
@@ -34,6 +37,54 @@ final class InternalStrictArg
             $context,
             self::message($function, $argNumber, $paramName, 'int', $arg)
         );
+    }
+
+    /**
+     * Reject null for internal string parameters (Zend ZEND_VERIFY_NULL_NOT_ALLOWED; #4365).
+     */
+    public static function rejectNullString(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): void {
+        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            self::raiseTypeErrorAndAbort(
+                $context,
+                self::message($function, $argNumber, $paramName, 'string', $arg)
+            );
+
+            return;
+        }
+        if (Variable::TYPE_VALUE !== $arg->type) {
+            return;
+        }
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $okBlock = BasicBlockHelper::append($context, 'internal_reject_null_str_ok');
+        $failBlock = BasicBlockHelper::append($context, 'internal_reject_null_str_fail');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(VmVariable::TYPE_NULL, false)
+            ),
+            $failBlock,
+            $okBlock
+        );
+        $context->builder->positionAtEnd($failBlock);
+        self::raiseTypeErrorAndAbort(
+            $context,
+            self::message($function, $argNumber, $paramName, 'string', $arg)
+        );
+        $context->builder->positionAtEnd($okBlock);
     }
 
     public static function requireString(

@@ -17,9 +17,11 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\Frame;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable;
 
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 
@@ -30,6 +32,7 @@ class strlen extends Internal {
             throw new \LogicException("Expecting exactly a single argument to strlen()");
         }
         $var = $frame->calledArgs[0];
+        InternalStrictArg::rejectNullString($var, 'strlen', 'string');
         if (!is_null($frame->returnVar)) {
             $frame->returnVar->int(VmString::byteLength(VmString::coerceOperand($var)));
         }
@@ -39,6 +42,7 @@ class strlen extends Internal {
         if (count($args) !== 1) {
             throw new \LogicException('Too few args passed to strlen()');
         }
+        JitInternalStrictArg::rejectNullString($context, $args[0], 'strlen', 'string', 1);
         $argValue = JitStringArg::lower($context, $args[0], 'strlen() string');
         $offset = $context->structFieldIndex($argValue, 'length');
 
