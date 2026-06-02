@@ -23,8 +23,8 @@ final class TypedPropertyCheck
             if ($property->name !== $name) {
                 continue;
             }
-
-            return null === $property->default;
+            // Typed slots use TYPE_UNDEFINED prototype; untyped use TYPE_NULL (#4240).
+            return $property->prototype->isUndefined();
         }
 
         return false;

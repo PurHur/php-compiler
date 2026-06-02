@@ -146,7 +146,22 @@ class ObjectEntry {
         if (!isset($this->properties[$name])) {
             return;
         }
-        $this->properties[$name]->null();
+        $slot = $this->properties[$name];
+        foreach ($this->class->properties as $property) {
+            if ($property->name !== $name) {
+                continue;
+            }
+            if ($property->prototype->isUndefined()) {
+                $slot->reset();
+                $slot->type = Variable::TYPE_UNDEFINED;
+                $slot->objectPropertyOwner = $this;
+                $slot->objectPropertyName = $name;
+
+                return;
+            }
+            break;
+        }
+        $slot->null();
     }
 
     /** @return array<string, Variable> */
