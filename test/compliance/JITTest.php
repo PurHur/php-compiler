@@ -489,6 +489,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'list_destructure_string')) {
                 continue;
             }
+            // PHP 8.3 typed class constants: VM + AOT; MCJIT execute unstable (#4511, #3592).
+            if (str_contains($name, 'typed_class_const')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
