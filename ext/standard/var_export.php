@@ -83,6 +83,9 @@ final class var_export extends Internal
         if (Variable::TYPE_NULL === $v->type || Variable::TYPE_UNDEFINED === $v->type) {
             return 'NULL';
         }
+        if (Variable::TYPE_INTEGER === $v->type) {
+            return (string) $v->toInt();
+        }
 
         throw new \LogicException('var_export() does not support this value type in this compiler build');
     }
