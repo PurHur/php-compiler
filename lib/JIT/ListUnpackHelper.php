@@ -12,6 +12,23 @@ final class ListUnpackHelper
 {
     public const TYPE_ERROR_MESSAGE = 'Cannot unpack array with string keys';
 
+    public const CALL_UNPACK_NON_ARRAY_MESSAGE = 'Only arrays and Traversables can be unpacked';
+
+    public static function emitCallUnpackOperandCheck(Context $context, Variable $operand): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $isArray = self::isArrayValue($context, $operand);
+        $failBb = BasicBlockHelper::append($context, 'call_unpack_non_array_fail');
+        $okBb = BasicBlockHelper::append($context, 'call_unpack_non_array_ok');
+        $context->builder->branchIf($isArray, $okBb, $failBb);
+        $context->builder->positionAtEnd($failBb);
+        TypeErrorRaise::emitRaise($context, self::CALL_UNPACK_NON_ARRAY_MESSAGE);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        $context->builder->positionAtEnd($okBb);
+    }
+
     public static function emitCheck(Context $context, Variable $array): void
     {
         TypeErrorRaise::registerDeclarations($context);
