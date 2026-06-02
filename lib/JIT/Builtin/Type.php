@@ -776,7 +776,7 @@ class Type extends Builtin {
             $fntypeUndefKeyLong
         );
         $this->context->registerFunction('__compiler_undefined_array_key_warning_long', $fnUndefKeyLong);
-        $fntypeTriggerError = $this->context->context->functionType($void, false, $i8p, $sizeT, $i32);
+        $fntypeTriggerError = $this->context->context->functionType($void, false, $i8p, $sizeT, $i32, $i8p, $i32);
         $fnTriggerError = $this->context->module->addFunction('__compiler_trigger_error', $fntypeTriggerError);
         $this->context->registerFunction('__compiler_trigger_error', $fnTriggerError);
         $fntypeAssertFail = $this->context->context->functionType($void, false, $i8p, $sizeT);

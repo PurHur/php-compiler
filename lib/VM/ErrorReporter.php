@@ -214,9 +214,6 @@ final class ErrorReporter
         ?Frame $frame = null,
         ?string $file = null
     ): void {
-        if (0 === ($this->errorReporting & self::E_WARNING)) {
-            return;
-        }
         $this->emitWarning("Undefined variable \${$name}", $context, $frame, $file);
     }
 
@@ -226,9 +223,6 @@ final class ErrorReporter
         ?Frame $frame = null,
         ?string $file = null
     ): void {
-        if (0 === ($this->errorReporting & self::E_WARNING)) {
-            return;
-        }
         $key = $this->formatArrayKey($index);
         $message = "Undefined array key {$key}";
         $this->emitWarning($message, $context, $frame, $file);
@@ -254,10 +248,10 @@ final class ErrorReporter
         ?string $file = null,
         int $line = 0
     ): void {
+        $this->recordLastError(self::E_WARNING, $message, $file, $line);
         if (0 === ($this->errorReporting & self::E_WARNING)) {
             return;
         }
-        $this->recordLastError(self::E_WARNING, $message, $file, $line);
         if ($this->dispatchUserHandler($context, $frame, self::E_WARNING, $message, $file, $line)) {
             return;
         }
@@ -286,10 +280,10 @@ final class ErrorReporter
             $className,
             $propertyName
         );
+        $this->recordLastError(self::E_DEPRECATED, $message, $file, 0);
         if (0 === ($this->errorReporting & self::E_DEPRECATED)) {
             return;
         }
-        $this->recordLastError(self::E_DEPRECATED, $message, $file, 0);
         if ($this->dispatchUserHandler($context, $frame, self::E_DEPRECATED, $message, $file, 0)) {
             return;
         }
@@ -308,13 +302,14 @@ final class ErrorReporter
         int $level,
         ?string $file = null,
         ?Context $context = null,
-        ?Frame $frame = null
+        ?Frame $frame = null,
+        int $line = 0
     ): void {
+        $this->recordLastError($level, $message, $file, $line);
         if (0 === ($this->errorReporting & $level)) {
             return;
         }
-        $this->recordLastError($level, $message, $file, 0);
-        if ($this->dispatchUserHandler($context, $frame, $level, $message, $file, 0)) {
+        if ($this->dispatchUserHandler($context, $frame, $level, $message, $file, $line)) {
             if (self::E_USER_ERROR === $level) {
                 throw new \LogicException("Fatal error: {$message}");
             }
@@ -329,16 +324,19 @@ final class ErrorReporter
             self::E_USER_DEPRECATED => 'Deprecated',
             default => 'Unknown error',
         };
-        $line = "{$prefix}: {$message}";
+        $formatted = "{$prefix}: {$message}";
         if (null !== $file && '' !== $file) {
-            $line .= " in {$file}";
+            $formatted .= " in {$file}";
+            if ($line > 0) {
+                $formatted .= " on line {$line}";
+            }
         }
-        $line .= "\n";
+        $formatted .= "\n";
         if ($this->displayErrors) {
-            fwrite(STDERR, $line);
+            fwrite(STDERR, $formatted);
         }
         if (self::E_USER_ERROR === $level) {
-            throw new \LogicException(rtrim($line));
+            throw new \LogicException(rtrim($formatted));
         }
     }
 

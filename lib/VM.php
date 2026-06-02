@@ -2055,6 +2055,9 @@ restart:
                         $this->markPendingNewObjectConstructed($frame);
                         break;
                     }
+                    $frame->callSiteLine = OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
+                        ? (int) ($op->arg2 ?? 0)
+                        : (int) ($op->arg1 ?? 0);
                     $this->emitCallDeprecationNotice($frame);
                     if ($frame->call instanceof Func\PHP && $frame->call->block->isGenerator) {
                         try {

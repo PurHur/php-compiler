@@ -51,7 +51,7 @@ extern void __hashtable__setStringKeyBool(__hashtable__ *ht, __string__ *key, in
 extern void __hashtable__setStringKeyHashtable(__hashtable__ *ht, __string__ *key, __hashtable__ *child);
 extern __string__ *__string__init(long long size, const char *value);
 extern __string__ *__string__separate(__string__ *s);
-extern void __compiler_trigger_error(const char *message, size_t len, int level);
+extern void __compiler_trigger_error(const char *message, size_t len, int level, const char *file, int line);
 
 #define PHPC_COMPACT_ERR_LEVEL 2
 
@@ -139,7 +139,7 @@ static void phpc_compact_apply_name(
         int n = snprintf(msg, sizeof(msg), "compact(): Undefined variable $%s", name);
 
         if (n > 0) {
-            __compiler_trigger_error(msg, (size_t) n, PHPC_COMPACT_ERR_LEVEL);
+            __compiler_trigger_error(msg, (size_t) n, PHPC_COMPACT_ERR_LEVEL, "", 0);
         }
     }
 }
@@ -174,7 +174,7 @@ static void phpc_compact_invalid_argument_warning(long long arg_num, int kind)
     );
 
     if (n > 0) {
-        __compiler_trigger_error(msg, (size_t) n, PHPC_COMPACT_ERR_LEVEL);
+        __compiler_trigger_error(msg, (size_t) n, PHPC_COMPACT_ERR_LEVEL, "", 0);
     }
 }
 

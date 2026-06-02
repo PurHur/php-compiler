@@ -19,7 +19,7 @@ extern __string__ *__string__init(long long size, const char *value);
 extern long long __value__readLong(__value__ *);
 extern double __value__readDouble(__value__ *);
 extern __string__ *__value__readString(__value__ *);
-extern void __compiler_trigger_error(const char *message, size_t len, int level);
+extern void __compiler_trigger_error(const char *message, size_t len, int level, const char *file, int line);
 
 #define PACK_ERR_LEVEL 256
 
@@ -56,7 +56,7 @@ static __string__ *pack_fail(const char *msg)
 {
     size_t len = strlen(msg);
 
-    __compiler_trigger_error(msg, len, PACK_ERR_LEVEL);
+    __compiler_trigger_error(msg, len, PACK_ERR_LEVEL, "", 0);
 
     return pack_result("", 0);
 }

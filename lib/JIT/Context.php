@@ -94,6 +94,9 @@ class Context {
     /** Call-site file strict_types while lowering FUNCCALL (issues #156, #1229). */
     public bool $callerStrictTypes = false;
 
+    /** Call-site line for the pending FUNCCALL_EXEC (issue #4381). */
+    public int $callSiteLine = 0;
+
     /** When true, pow() lowering returns a boxed {@see __value__*} (power operator **). */
     public bool $powReturnValueBox = false;
 

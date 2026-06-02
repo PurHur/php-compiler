@@ -7,7 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ScriptMagic;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\OpCode;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -44,12 +46,24 @@ final class trigger_error_ extends Internal
                 throw new \ValueError('trigger_error(): Argument #2 ($error_level) must be one of E_USER_ERROR, E_USER_WARNING, E_USER_NOTICE, or E_USER_DEPRECATED');
             }
         }
+        $file = null;
+        $line = 0;
+        $caller = $frame->parent;
+        if (null !== $caller) {
+            if ('' !== $caller->scriptPath) {
+                $file = $caller->scriptPath;
+            }
+            $line = $caller->callSiteLine;
+        } elseif ('' !== $frame->scriptPath) {
+            $file = $frame->scriptPath;
+        }
         $frame->vmContext->errors->triggerError(
             $messageVar->toString(),
             $level,
-            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $file,
             $frame->vmContext,
-            $frame
+            $frame,
+            $line
         );
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
@@ -78,11 +92,18 @@ final class trigger_error_ extends Internal
         $i32 = $context->getTypeFromString('int32');
         $msgPtr = $context->builder->pointerCast($context->constantFromString($literal), $i8p);
         $msgLen = $sizeT->constInt(\strlen($literal), false);
+        $filePath = '';
+        if (null !== $context->jitEnclosingBlock) {
+            $filePath = ScriptMagic::stringForBlock($context->jitEnclosingBlock, OpCode::SCRIPT_MAGIC_FILE);
+        }
+        $filePtr = $context->builder->pointerCast($context->constantFromString($filePath), $i8p);
         $context->builder->call(
             $context->lookupFunction('__compiler_trigger_error'),
             $msgPtr,
             $msgLen,
-            $i32->constInt($level, false)
+            $i32->constInt($level, false),
+            $filePtr,
+            $i32->constInt($context->callSiteLine, false)
         );
         $i1 = $context->getTypeFromString('int1');
 

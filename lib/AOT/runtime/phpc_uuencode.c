@@ -14,7 +14,7 @@ typedef struct __value__ __value__;
 extern __string__ *__string__init(long long size, const char *value);
 extern void __value__writeString(__value__ *out, __string__ *s);
 extern void __value__writeBool(__value__ *out, int value);
-extern void __compiler_trigger_error(const char *message, size_t len, int level);
+extern void __compiler_trigger_error(const char *message, size_t len, int level, const char *file, int line);
 
 #define UU_ENC(c) ((c) ? (char) ((((c) & 077) + ' ')) : '`')
 #define UU_ENC_C2(c) UU_ENC(((*(c) << 4) & 060) | ((*((c) + 1) >> 4) & 017))
@@ -112,7 +112,7 @@ __string__ *__compiler_convert_uuencode(__string__ *src)
 
 static void uudecode_fail(__value__ *out)
 {
-    __compiler_trigger_error(UUDEC_ERR_MSG, sizeof(UUDEC_ERR_MSG) - 1, UUDEC_ERR_LEVEL);
+    __compiler_trigger_error(UUDEC_ERR_MSG, sizeof(UUDEC_ERR_MSG) - 1, UUDEC_ERR_LEVEL, "", 0);
     __value__writeBool(out, 0);
 }
 
