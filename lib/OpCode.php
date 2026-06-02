@@ -184,6 +184,8 @@ class OpCode {
     const TYPE_JUMPIF_FUNCTION_STATIC_INITIALIZED = 121;
     /** Store runtime static default: arg2 = key constant slot, arg3 = value slot (#4352). */
     const TYPE_FUNCTION_STATIC_INIT_STORE = 122;
+    /** PHP 8.3+ `$needle in $haystack` strict contains (#4682). arg2=needle, arg3=haystack. */
+    const TYPE_IN = 123;
 
     public int $type;
     public ?int $arg1;

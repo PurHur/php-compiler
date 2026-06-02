@@ -1780,6 +1780,18 @@ PY
   echo "Applied php-types-fromdecl-junk-fragments.patch (overlay)"
 }
 
+apply_php_cfg_in_operator_overlay() {
+  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/In_.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg/Op/Expr/In_.php"
+  if [[ ! -f "$overlay" ]]; then
+    echo "Skip php-cfg-in-operator overlay (missing $overlay)" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$op")"
+  cp "$overlay" "$op"
+  echo "Applied php-cfg-in-operator overlay (In_.php)"
+}
+
 apply_php_cfg_magic_script_const_overlay() {
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MagicScriptConst.php"
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
@@ -2519,6 +2531,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-enum-implements.patch"
   apply_patch "$PATCH_DIR/php-cfg-enum-class-method.patch"
   apply_patch "$PATCH_DIR/php-cfg-enum-abstract.patch"
+  apply_php_cfg_in_operator_overlay || true
   apply_patch "$PATCH_DIR/php-cfg-named-args.patch"
   apply_patch "$PATCH_DIR/php-cfg-spread.patch"
   apply_patch "$PATCH_DIR/php-cfg-never-type.patch"

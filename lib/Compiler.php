@@ -3895,6 +3895,8 @@ class Compiler {
                 )];
             case Op\Expr\InstanceOf_::class:
                 return $this->compileInstanceOf($expr, $block);
+            case Op\Expr\In_::class:
+                return $this->compileIn($expr, $block);
             case Op\Expr\AssignRef::class:
                 $bindRefFlags = 0;
                 $dimFetch = $this->unwrapArrayDimFetch($expr->expr)
@@ -6042,6 +6044,19 @@ class Compiler {
             $this->compileOperand($expr->result, $block, false),
             $this->compileOperand($expr->expr, $block, true),
             $this->compileOperand($expr->class, $block, true)
+        )];
+    }
+
+    /**
+     * @return OpCode[]
+     */
+    protected function compileIn(Op\Expr\In_ $expr, Block $block): array
+    {
+        return [new OpCode(
+            OpCode::TYPE_IN,
+            $this->compileOperand($expr->result, $block, false),
+            $this->compileOperand($expr->expr, $block, true),
+            $this->compileOperand($expr->haystack, $block, true),
         )];
     }
 

@@ -28,7 +28,9 @@ use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Ast\GroupUseStripper;
 use PHPCompiler\Ast\SealedClassAnnotator;
 use PHPCompiler\Ast\SealedClassPreprocessor;
+use PHPCompiler\Ast\InOperatorDesugar;
 use PHPCompiler\Ast\PipeOperatorDesugar;
+use PHPCompiler\Visitor\InOperatorResolver;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Lint\LintCompiler;
 use PHPCompiler\VM\OutputBuffer;
@@ -109,6 +111,7 @@ class Runtime {
         );
 
         $this->preprocessor = new Traverser;
+        $this->preprocessor->addVisitor(new InOperatorResolver);
         $this->preprocessor->addVisitor(new Visitor\Simplifier);
         $this->preprocessor->addVisitor(new Visitor\DeadBlockEliminator);
         $this->postprocessor = new Traverser;
@@ -307,6 +310,7 @@ class Runtime {
     public function rewriteSourceBeforeParser(string $code): string
     {
         $code = AsymmetricVisibilityRewriter::rewrite($code);
+        $code = InOperatorDesugar::desugar($code);
         return PipeOperatorDesugar::desugar($code);
     }
 
