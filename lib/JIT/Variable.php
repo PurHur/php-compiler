@@ -406,6 +406,12 @@ final class Variable {
             $type = self::TYPE_STRING;
         } elseif ('__object__*' === $llvmType) {
             $type = self::TYPE_OBJECT;
+        } elseif ('double' === $llvmType) {
+            $type = self::TYPE_NATIVE_DOUBLE;
+        } elseif ('int64' === $llvmType) {
+            $type = self::TYPE_NATIVE_LONG;
+        } elseif ('int1' === $llvmType) {
+            $type = self::TYPE_NATIVE_BOOL;
         } else {
             $type = self::getTypeFromType($op->type);
         }
