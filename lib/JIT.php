@@ -5244,7 +5244,12 @@ class JIT {
                             break;
                         }
                         $classVar = $this->context->getVariableFromOp($classOp);
-                        if (JIT\Variable::TYPE_OBJECT === $classVar->type) {
+                        if ($op->classConstFetchOnObject) {
+                            $classNameVal = JIT\ClassConstFetchHelper::emitExprClassPseudoConst(
+                                $this->context->type->object,
+                                $classVar
+                            );
+                        } elseif (JIT\Variable::TYPE_OBJECT === $classVar->type) {
                             $classNameVal = JIT\ReflectionBuiltinHelper::getClassName($this->context, $classVar);
                         } else {
                             $classNameVal = JIT\ClassConstFetchHelper::emitClassPseudoConstStringValue(
