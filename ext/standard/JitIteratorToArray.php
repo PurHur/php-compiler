@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\IteratorHelper;
+use PHPCompiler\JIT\IteratorProtocolHelper;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
@@ -22,13 +23,28 @@ final class JitIteratorToArray
 {
     public static function invoke(Context $context, Variable $iterator, bool $preserveKeys): Value
     {
+        return self::wrapHashTable($context, self::materializeHashtable($context, $iterator, $preserveKeys));
+    }
+
+    /**
+     * Materialize Traversable/array operand into __hashtable__* (array spread / iterator_to_array, #4453).
+     */
+    public static function materializeHashtable(
+        Context $context,
+        Variable $iterator,
+        bool $preserveKeys,
+        ?string $containerUserType = null
+    ): Value {
         GeneratorHelper::ensureTypes($context);
         $gen = self::resolveGenerator($context, $iterator);
         if (null !== $gen) {
-            return self::wrapHashTable($context, self::materializeFromGenerator($context, $gen, $preserveKeys));
+            return self::materializeFromGenerator($context, $gen, $preserveKeys);
+        }
+        if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $iterator, $containerUserType)) {
+            return self::materializeFromIteratorProtocol($context, $iterator, $containerUserType);
         }
 
-        return self::wrapHashTable($context, self::materializeFromArray($context, $iterator, $preserveKeys));
+        return self::materializeFromArray($context, $iterator, $preserveKeys);
     }
 
     private static function wrapHashTable(Context $context, Value $ht): Value
@@ -52,6 +68,50 @@ final class JitIteratorToArray
         }
 
         return null;
+    }
+
+    private static function materializeFromIteratorProtocol(
+        Context $context,
+        Variable $iterator,
+        ?string $containerUserType
+    ): Value {
+        $receiver = IteratorProtocolHelper::resolveForeachReceiver($context, $iterator, $containerUserType);
+        IteratorProtocolHelper::invokeIteratorMethod($context, $receiver, 'rewind', $containerUserType);
+        $out = new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            HashTableHelper::alloc($context)
+        );
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $head = $fn->appendBasicBlock('ita_iter_proto_head');
+        $body = $fn->appendBasicBlock('ita_iter_proto_body');
+        $advance = $fn->appendBasicBlock('ita_iter_proto_advance');
+        $done = $fn->appendBasicBlock('ita_iter_proto_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $valid = IteratorProtocolHelper::invokeIteratorMethodBool(
+            $context,
+            $receiver,
+            'valid',
+            $containerUserType
+        );
+        $context->builder->branchIf($valid, $body, $done);
+
+        $context->builder->positionAtEnd($body);
+        $key = IteratorProtocolHelper::invokeIteratorMethodValue($context, $receiver, 'key', $containerUserType);
+        $value = IteratorProtocolHelper::invokeIteratorMethodValue($context, $receiver, 'current', $containerUserType);
+        HashTableHelper::addElement($context, $out, $value, $key);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        IteratorProtocolHelper::invokeIteratorMethod($context, $receiver, 'next', $containerUserType);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+
+        return $context->helper->loadValue($out);
     }
 
     private static function materializeFromGenerator(
