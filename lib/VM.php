@@ -2118,19 +2118,7 @@ restart:
                 case OpCode::TYPE_ARG_SEND:
                     $value = $frame->scope[$op->arg1];
                     if (null !== $op->arg3) {
-                        try {
-                            $elements = VM\CallUnpack::materialize($this, $frame, $value);
-                        } catch (\TypeError $e) {
-                            $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            break;
-                        }
-                        foreach ($elements as $element) {
-                            $frame->callArgEntries[] = ['p', $element];
-                        }
+                        $frame->callArgEntries[] = ['u', $value];
                         break;
                     }
                     if (null !== $op->arg2 && isset($frame->block->constants[$op->arg2])) {
@@ -2157,6 +2145,13 @@ restart:
                     if ($frame->call instanceof Func\PHP && $frame->call->block->isGenerator) {
                         try {
                             $calledArgs = $this->resolveOutgoingCallArgs($frame);
+                        } catch (\TypeError $e) {
+                            $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
                         } catch (\Error $e) {
                             $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                             if (null !== $catchFrame) {
@@ -2852,13 +2847,25 @@ restart:
                     if (null === $gen) {
                         throw new \LogicException('yield outside generator function');
                     }
-                    if (null !== $op->arg2 && isset($frame->scope[$op->arg2])) {
-                        $gen->currentValue->copyFrom($frame->scope[$op->arg2]->resolveIndirect());
+                    if (null !== $op->arg2) {
+                        if (isset($frame->scope[$op->arg2])) {
+                            $gen->currentValue->copyFrom($frame->scope[$op->arg2]->resolveIndirect());
+                        } elseif (isset($frame->block->constants[$op->arg2])) {
+                            $gen->currentValue->copyFrom($frame->block->constants[$op->arg2]);
+                        } else {
+                            $gen->currentValue->null();
+                        }
                     } else {
                         $gen->currentValue->null();
                     }
-                    if (null !== $op->arg3 && isset($frame->scope[$op->arg3])) {
-                        $gen->currentKey->copyFrom($frame->scope[$op->arg3]->resolveIndirect());
+                    if (null !== $op->arg3) {
+                        if (isset($frame->scope[$op->arg3])) {
+                            $gen->currentKey->copyFrom($frame->scope[$op->arg3]->resolveIndirect());
+                        } elseif (isset($frame->block->constants[$op->arg3])) {
+                            $gen->currentKey->copyFrom($frame->block->constants[$op->arg3]);
+                        } else {
+                            $gen->currentKey->int($gen->autoKey++);
+                        }
                     } else {
                         $gen->currentKey->int($gen->autoKey++);
                     }
@@ -4702,9 +4709,7 @@ restart:
             $methodName = $frame->magicCallMethodName;
             $frame->magicCallMethodName = null;
             [$paramNames, $variadicIndex] = $this->calleeParamMetadata($frame->call);
-            $userArgs = [] === $frame->callArgEntries
-                ? []
-                : NamedArgs::resolve($frame->callArgEntries, $paramNames, $variadicIndex);
+            $userArgs = $this->resolveUserCallArgs($frame, $paramNames, $variadicIndex);
             $nameVar = new Variable(Variable::TYPE_STRING);
             $nameVar->string($methodName);
             $argsVar = new Variable();
@@ -4720,15 +4725,46 @@ restart:
         }
 
         [$paramNames, $variadicIndex] = $this->calleeParamMetadata($frame->call);
-        $userArgs = [] === $frame->callArgEntries
-            ? []
-            : NamedArgs::resolve($frame->callArgEntries, $paramNames, $variadicIndex);
 
+        $userArgs = $this->resolveUserCallArgs($frame, $paramNames, $variadicIndex);
         if ([] === $frame->callArgs) {
             return $userArgs;
         }
 
-        return array_merge($frame->callArgs, $userArgs);
+        return $frame->callArgs + $userArgs;
+    }
+
+    /**
+     * @param list<string> $paramNames
+     *
+     * @return list<Variable>
+     */
+    private function resolveUserCallArgs(Frame $frame, array $paramNames, ?int $variadicIndex): array
+    {
+        if ([] === $frame->callArgEntries) {
+            return [];
+        }
+
+        $entries = [];
+        foreach ($frame->callArgEntries as $entry) {
+            if ('u' === $entry[0]) {
+                foreach (
+                    VM\CallUnpack::expandToEntries(
+                        $this,
+                        $frame,
+                        $entry[1],
+                        $paramNames,
+                        $variadicIndex
+                    ) as $expanded
+                ) {
+                    $entries[] = $expanded;
+                }
+                continue;
+            }
+            $entries[] = $entry;
+        }
+
+        return NamedArgs::resolve($entries, $paramNames, $variadicIndex);
     }
 
     /**

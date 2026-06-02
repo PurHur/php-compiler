@@ -140,6 +140,9 @@ final class NamedArgs
             $resultOperands[$idx] = $entry['operand'];
         }
 
+        ksort($result);
+        ksort($resultOperands);
+
         return [$result, $resultOperands];
     }
 }
