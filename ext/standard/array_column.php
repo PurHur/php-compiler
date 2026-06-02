@@ -35,7 +35,10 @@ final class array_column extends Internal
             throw new \LogicException('array_column() first argument must be an array in this compiler build');
         }
         $columnField = $this->resolveFieldSpec($column, 'column key');
-        $indexField = null !== $indexKeySpec ? $this->resolveFieldSpec($indexKeySpec, 'index_key') : null;
+        $indexField = null;
+        if (null !== $indexKeySpec && Variable::TYPE_NULL !== $indexKeySpec->type) {
+            $indexField = $this->resolveFieldSpec($indexKeySpec, 'index_key');
+        }
 
         $out = new HashTable();
         foreach ($array->toArray()->iterate(true) as $rowVar) {
@@ -82,6 +85,9 @@ final class array_column extends Internal
         }
         $columnKey = $this->jitString($context, $args[1], 'array_column() column key');
         if (2 === $argc) {
+            return ArrayBuiltinHelper::buildColumnArray($context, $args[0], $columnKey);
+        }
+        if (Variable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {
             return ArrayBuiltinHelper::buildColumnArray($context, $args[0], $columnKey);
         }
         if (null === JitStringArg::compileTimeLiteral($args[2])) {
