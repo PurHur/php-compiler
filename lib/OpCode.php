@@ -111,6 +111,12 @@ class OpCode {
 
     public const SCRIPT_MAGIC_LINE = 3;
 
+    /** include/require kind encoded for TYPE_INCLUDE (issue #4426). */
+    public const INCLUDE_KIND_INCLUDE = 1;
+    public const INCLUDE_KIND_INCLUDE_ONCE = 2;
+    public const INCLUDE_KIND_REQUIRE = 3;
+    public const INCLUDE_KIND_REQUIRE_ONCE = 4;
+
     const TYPE_ASSIGN_REF = 97;
     const TYPE_DECLARE_GLOBAL = 98;
     const TYPE_DECLARE_STATIC_PROPERTY = 99;
@@ -236,6 +242,9 @@ class OpCode {
     public int $propertySetVisibility = 0;
     /** TYPE_CLASS_CONST_FETCH: `::class` on a runtime expression operand (must be object, #4241). */
     public bool $classConstFetchOnObject = false;
+
+    /** TYPE_INCLUDE: include/require + once/non-once semantics (issue #4426). */
+    public int $includeKind = self::INCLUDE_KIND_INCLUDE_ONCE;
 
     public function __construct(int $type, ?int $arg1 = null, ?int $arg2 = null, ?int $arg3 = null) {
         $this->type = $type;

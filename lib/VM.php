@@ -2577,17 +2577,53 @@ restart:
                     if (null === $file) {
                         $file = $frame->scope[$op->arg1]->toString();
                     }
-                    $resolved = VM\ScriptStack::normalize($file);
-                    if ('' === $resolved || !is_file($resolved)) {
-                        return $this->raise('Failed opening required \''.$file.'\' for inclusion', $frame);
+
+                    $kind = $op->includeKind ?? OpCode::INCLUDE_KIND_INCLUDE_ONCE;
+                    $once = $kind === OpCode::INCLUDE_KIND_INCLUDE_ONCE || $kind === OpCode::INCLUDE_KIND_REQUIRE_ONCE;
+                    $isRequire = $kind === OpCode::INCLUDE_KIND_REQUIRE || $kind === OpCode::INCLUDE_KIND_REQUIRE_ONCE;
+
+                    $resolved = $this->resolveIncludeFilename($file, $frame);
+                    if (null === $resolved) {
+                        if ($isRequire) {
+                            $this->context->errors->triggerError(
+                                'Failed opening required \''.$file.'\' for inclusion',
+                                VM\ErrorReporter::E_WARNING,
+                                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                                $this->context,
+                                $frame
+                            );
+                            $catchFrame = $this->dispatchEngineThrow(
+                                $frame,
+                                $this->makeEngineError('Failed opening required \''.$file.'\' for inclusion', 'Error')
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
+                        $this->context->errors->triggerError(
+                            'Failed opening \''.$file.'\' for inclusion',
+                            VM\ErrorReporter::E_WARNING,
+                            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                            $this->context,
+                            $frame
+                        );
+                        if (null !== $op->arg2 && isset($frame->scope[$op->arg2])) {
+                            $frame->scope[$op->arg2]->bool(false);
+                        }
+                        break;
                     }
-                    if ($this->context->isCompileUnitLoaded($resolved)) {
+
+                    if ($once && $this->context->isCompileUnitLoaded($resolved)) {
                         if (null !== $op->arg2 && isset($frame->scope[$op->arg2])) {
                             $frame->scope[$op->arg2]->int(1);
                         }
                         break;
                     }
-                    $this->context->markCompileUnitLoaded($resolved);
+                    if ($once) {
+                        $this->context->markCompileUnitLoaded($resolved);
+                    }
                     $this->context->scriptStack->push($resolved);
                     $parsed = $this->context->runtime->parseAndCompileFile($resolved);
                     $new = $parsed->getFrame($this->context, $frame);
@@ -3106,6 +3142,53 @@ restart:
     {
         $where = '' !== $frame->scriptPath ? $frame->scriptPath : 'script';
         throw new \LogicException($message.' in '.$where);
+    }
+
+    private function resolveIncludeFilename(string $file, Frame $frame): ?string
+    {
+        if ('' === $file || str_contains($file, "\0")) {
+            return null;
+        }
+        // Absolute unix paths or windows drive letters.
+        if ($file[0] === '/' || (strlen($file) > 1 && $file[1] === ':')) {
+            $normalized = VM\ScriptStack::normalize($file);
+
+            return '' !== $normalized && is_file($normalized) ? $normalized : null;
+        }
+
+        // 1) As-is (cwd / relative execution context)
+        $candidate = VM\ScriptStack::normalize($file);
+        if ('' !== $candidate && is_file($candidate)) {
+            return $candidate;
+        }
+
+        // 2) Relative to the current script directory (Zend-like common path)
+        $current = '' !== $frame->scriptPath ? $frame->scriptPath : $this->context->scriptStack->current();
+        if ('' !== $current) {
+            $fromDir = dirname($current);
+            $cand = VM\ScriptStack::normalize($fromDir.'/'.$file);
+            if ('' !== $cand && is_file($cand)) {
+                return $cand;
+            }
+        }
+
+        // 3) include_path search (best-effort using host get_include_path when available)
+        if (\function_exists('get_include_path')) {
+            $includePath = (string) @get_include_path();
+            if ('' !== $includePath) {
+                foreach (explode(\PATH_SEPARATOR, $includePath) as $dir) {
+                    if ('' === $dir) {
+                        continue;
+                    }
+                    $cand = VM\ScriptStack::normalize(rtrim($dir, '/').'/'.$file);
+                    if ('' !== $cand && is_file($cand)) {
+                        return $cand;
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     /** Zend get_debug_type() labels for TypeError messages (#4241). */
