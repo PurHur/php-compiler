@@ -795,15 +795,13 @@ final class Variable {
     public function identicalTo(Variable $other): bool {
         $self = $this->resolveIndirect();
         $other = $other->resolveIndirect();
+        if (self::isEnumCaseOperand($self) && self::isEnumCaseOperand($other)) {
+            return EnumCaseSupport::enumCaseVariablesEqual($self, $other);
+        }
         if ($self->type !== $other->type) {
             return false;
         }
         if (self::TYPE_OBJECT === $self->type) {
-            if (EnumCaseSupport::isEnumCase($self->object) && EnumCaseSupport::isEnumCase($other->object)) {
-                return $self->object->class === $other->object->class
-                    && 0 === strcasecmp($self->object->enumCaseName ?? '', $other->object->enumCaseName ?? '');
-            }
-
             return $self->object === $other->object;
         }
         if (self::TYPE_STRING === $self->type) {
@@ -842,6 +840,8 @@ restart:
                 } elseif ($other->type === self::TYPE_INDIRECT) {
                     $other = $other->indirect;
                     goto restart;
+                } elseif (self::isEnumCaseOperand($self) && self::isEnumCaseOperand($other)) {
+                    return EnumCaseSupport::enumCaseVariablesEqual($self, $other);
                 }
                 return $this->looseEqual($self, $other);
         }
