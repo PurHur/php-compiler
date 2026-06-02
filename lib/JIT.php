@@ -6233,6 +6233,7 @@ class JIT {
                         // short circuit
                         break;
                     }
+                    $this->context->callSiteLine = (int) ($op->arg1 ?? 0);
                     [$callArgs, $callOperands] = $this->resolveJitOutgoingCall(
                         $this->context->scope->toCall,
                         $this->context->scope->args,
@@ -6278,6 +6279,7 @@ class JIT {
                 case OpCode::TYPE_FUNCCALL_EXEC_RETURN:
                     if (is_null($this->context->scope->toCall)) {
                         // Self-host stub/short-circuit (eg runtime variable function): represent as null.
+                        $this->context->callSiteLine = (int) ($op->arg2 ?? 0);
                         $nullVar = new Variable(
                             $this->context,
                             Variable::TYPE_NULL,
@@ -6288,6 +6290,7 @@ class JIT {
                         $this->assignOperandValue($block->getOperand($op->arg1), $nullVar->value);
                         break;
                     }
+                    $this->context->callSiteLine = (int) ($op->arg2 ?? 0);
                     [$callArgs, $callOperands] = $this->resolveJitOutgoingCall(
                         $this->context->scope->toCall,
                         $this->context->scope->args,

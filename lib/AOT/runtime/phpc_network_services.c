@@ -16,7 +16,7 @@ typedef struct __value__ __value__;
 extern __string__ *__string__init(long long size, const char *value);
 extern void __value__writeBool(__value__ *out, int value);
 extern void __value__writeLong(__value__ *out, long long v);
-extern void __compiler_trigger_error(const char *message, size_t len, int level);
+extern void __compiler_trigger_error(const char *message, size_t len, int level, const char *file, int line);
 
 static const char *NS_FALLBACK_PROTOCOLS = "/compiler/ext/standard/data/protocols";
 static const char *NS_FALLBACK_SERVICES = "/compiler/ext/standard/data/services";
@@ -287,14 +287,14 @@ long long __compiler_getprotobyname(__string__ *name)
     struct protoent *ent;
 
     if (NULL == name) {
-        __compiler_trigger_error("getprotobyname(): Protocol name not found", 41, NS_ERR_LEVEL_WARNING);
+        __compiler_trigger_error("getprotobyname(): Protocol name not found", 41, NS_ERR_LEVEL_WARNING, "", 0);
 
         return -1;
     }
     len = (size_t) *((long long *) ((char *) name + sizeof(void *)));
     p = (const char *) name + sizeof(void *) + sizeof(long long);
     if (0 == len || len >= sizeof(buf)) {
-        __compiler_trigger_error("getprotobyname(): Protocol name not found", 41, NS_ERR_LEVEL_WARNING);
+        __compiler_trigger_error("getprotobyname(): Protocol name not found", 41, NS_ERR_LEVEL_WARNING, "", 0);
 
         return -1;
     }
@@ -311,7 +311,7 @@ long long __compiler_getprotobyname(__string__ *name)
         return fallback;
     }
 
-    __compiler_trigger_error("getprotobyname(): Protocol name not found", 41, NS_ERR_LEVEL_WARNING);
+    __compiler_trigger_error("getprotobyname(): Protocol name not found", 41, NS_ERR_LEVEL_WARNING, "", 0);
 
     return -1;
 }
@@ -353,14 +353,14 @@ long long __compiler_getservbyname(__string__ *service, __string__ *protocol)
     struct servent *ent;
 
     if (NULL == service || NULL == protocol) {
-        __compiler_trigger_error("getservbyname(): Service name not found", 39, NS_ERR_LEVEL_WARNING);
+        __compiler_trigger_error("getservbyname(): Service name not found", 39, NS_ERR_LEVEL_WARNING, "", 0);
 
         return -1;
     }
     slen = (size_t) *((long long *) ((char *) service + sizeof(void *)));
     s = (const char *) service + sizeof(void *) + sizeof(long long);
     if (0 == slen || slen >= sizeof(svc_buf)) {
-        __compiler_trigger_error("getservbyname(): Service name not found", 39, NS_ERR_LEVEL_WARNING);
+        __compiler_trigger_error("getservbyname(): Service name not found", 39, NS_ERR_LEVEL_WARNING, "", 0);
 
         return -1;
     }
@@ -370,7 +370,7 @@ long long __compiler_getservbyname(__string__ *service, __string__ *protocol)
     plen = (size_t) *((long long *) ((char *) protocol + sizeof(void *)));
     p = (const char *) protocol + sizeof(void *) + sizeof(long long);
     if (0 == plen || plen >= sizeof(proto_buf)) {
-        __compiler_trigger_error("getservbyname(): Service name not found", 39, NS_ERR_LEVEL_WARNING);
+        __compiler_trigger_error("getservbyname(): Service name not found", 39, NS_ERR_LEVEL_WARNING, "", 0);
 
         return -1;
     }
@@ -387,7 +387,7 @@ long long __compiler_getservbyname(__string__ *service, __string__ *protocol)
         return fallback;
     }
 
-    __compiler_trigger_error("getservbyname(): Service name not found", 39, NS_ERR_LEVEL_WARNING);
+    __compiler_trigger_error("getservbyname(): Service name not found", 39, NS_ERR_LEVEL_WARNING, "", 0);
 
     return -1;
 }
