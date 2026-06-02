@@ -21,6 +21,7 @@ use PHPCompiler\ext\standard\strtoupper;
 use PHPCompiler\ext\standard\VmInternalCall;
 use PHPCompiler\ext\types\strlen;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Call\ClosureWithCaptures;
 use PHPCompiler\JIT\Call\ExternalMethod;
@@ -29,6 +30,9 @@ use PHPLLVM\Value;
 
 final class ArrayBuiltinHelper
 {
+    private const ARRAY_PRODUCT_ELEMENT_TYPE_ERROR =
+        'array_product(): Argument #1 ($array) must contain only int and float values';
+
     /** Monotonic id so copyListEntry basic blocks stay unique per LLVM function. */
     private static int $copyListEntrySeq = 0;
 
@@ -6525,6 +6529,51 @@ final class ArrayBuiltinHelper
         return $context->builder->icmp(Builder::INT_EQ, $endOffset, $len);
     }
 
+    /**
+     * True when __string__* is fully consumed by strtod (float numeric string; #4262).
+     */
+    private static function stringPtrIsDoubleNumeric(Context $context, Value $strPtr): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $len = $context->builder->load(
+            $context->builder->structGep($strPtr, $map['length'])
+        );
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $endPtrSlot = $context->builder->alloca($i8p, 1, 'array_product_str_double_end');
+        $context->builder->store($i8p->constNull(), $endPtrSlot);
+        $context->builder->call(
+            $context->lookupFunction('strtod'),
+            $charPtr,
+            $endPtrSlot
+        );
+        $endPtr = $context->builder->load($endPtrSlot);
+        $endOffset = $context->builder->sub(
+            $context->builder->ptrToInt($endPtr, $i64),
+            $context->builder->ptrToInt($charPtr, $i64)
+        );
+
+        return $context->builder->icmp(Builder::INT_EQ, $endOffset, $len);
+    }
+
+    /** True when __string__* is a Zend numeric string (int or float form; #4262). */
+    private static function stringPtrIsNumericString(Context $context, Value $strPtr): Value
+    {
+        $isIntNumeric = self::stringPtrIsIntegerNumeric($context, $strPtr);
+        $isDoubleNumeric = self::stringPtrIsDoubleNumeric($context, $strPtr);
+
+        return $context->builder->or($isIntNumeric, $isDoubleNumeric);
+    }
+
+    private static function arrayProductEmitInvalidElementType(Context $context): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, self::ARRAY_PRODUCT_ELEMENT_TYPE_ERROR);
+        $context->builder->call($context->lookupFunction('abort'));
+    }
+
     private static function stringPtrToDouble(Context $context, Value $strPtr): Value
     {
         $structName = $strPtr->typeOf()->getElementType()->getName();
@@ -6663,10 +6712,19 @@ final class ArrayBuiltinHelper
         $double = $context->getTypeFromString('double');
         $i1 = $context->getTypeFromString('int1');
 
+        $isNumeric = self::stringPtrIsNumericString($context, $strPtr);
+        $validBlock = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_valid');
+        $invalidBlock = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_invalid');
+        $strDone = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_done');
+        $context->builder->branchIf($isNumeric, $validBlock, $invalidBlock);
+
+        $context->builder->positionAtEnd($invalidBlock);
+        self::arrayProductEmitInvalidElementType($context);
+
+        $context->builder->positionAtEnd($validBlock);
         $isIntNumeric = self::stringPtrIsIntegerNumeric($context, $strPtr);
         $intBlock = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_int');
         $floatBlock = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_float');
-        $strDone = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_done');
         $context->builder->branchIf($isIntNumeric, $intBlock, $floatBlock);
 
         $context->builder->positionAtEnd($intBlock);
@@ -7288,9 +7346,7 @@ final class ArrayBuiltinHelper
         }
 
         if (Variable::TYPE_NATIVE_LONG !== $elemType) {
-            throw new \LogicException(
-                'array_product() only supports integer and float elements in this compiler build'
-            );
+            throw new \TypeError(self::ARRAY_PRODUCT_ELEMENT_TYPE_ERROR);
         }
 
         $prodSlot = $context->builder->alloca($i64, 1, 'array_product_native_i');
@@ -7423,6 +7479,7 @@ final class ArrayBuiltinHelper
         $doubleBlock = BasicBlockHelper::append($context, 'array_product_ht_double');
         $afterDouble = BasicBlockHelper::append($context, 'array_product_ht_after_double');
         $stringBlock = BasicBlockHelper::append($context, 'array_product_ht_string');
+        $invalidBlock = BasicBlockHelper::append($context, 'array_product_ht_invalid');
         $continueBlock = BasicBlockHelper::append($context, 'array_product_ht_continue');
         $doneBlock = BasicBlockHelper::append($context, 'array_product_ht_done');
 
@@ -7461,7 +7518,10 @@ final class ArrayBuiltinHelper
             $typeByte,
             $i8->constInt(Variable::TYPE_STRING & 0xff, false)
         );
-        $context->builder->branchIf($isString, $stringBlock, $continueBlock);
+        $context->builder->branchIf($isString, $stringBlock, $invalidBlock);
+
+        $context->builder->positionAtEnd($invalidBlock);
+        self::arrayProductEmitInvalidElementType($context);
 
         $context->builder->positionAtEnd($stringBlock);
         self::arrayProductAccumulateStringEntry(
@@ -7575,6 +7635,7 @@ final class ArrayBuiltinHelper
         $doubleBlock = BasicBlockHelper::append($context, 'array_product_nv_double');
         $afterDouble = BasicBlockHelper::append($context, 'array_product_nv_after_double');
         $stringBlock = BasicBlockHelper::append($context, 'array_product_nv_string');
+        $invalidBlock = BasicBlockHelper::append($context, 'array_product_nv_invalid');
         $continueBlock = BasicBlockHelper::append($context, 'array_product_nv_continue');
         $doneBlock = BasicBlockHelper::append($context, 'array_product_nv_done');
         $context->builder->branch($head);
@@ -7610,7 +7671,10 @@ final class ArrayBuiltinHelper
             $typeByte,
             $i8->constInt(Variable::TYPE_STRING & 0xff, false)
         );
-        $context->builder->branchIf($isString, $stringBlock, $continueBlock);
+        $context->builder->branchIf($isString, $stringBlock, $invalidBlock);
+
+        $context->builder->positionAtEnd($invalidBlock);
+        self::arrayProductEmitInvalidElementType($context);
 
         $context->builder->positionAtEnd($stringBlock);
         self::arrayProductAccumulateStringEntry(

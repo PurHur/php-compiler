@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -24,15 +25,15 @@ use PHPLLVM\Value;
  */
 final class array_product extends Internal
 {
+    private const ELEMENT_TYPE_ERROR =
+        'array_product(): Argument #1 ($array) must contain only int and float values';
+
     public function execute(Frame $frame): void
     {
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('array_product() requires exactly one argument');
         }
         $array = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('array_product() argument must be an array in this compiler build');
         }
@@ -61,7 +62,7 @@ final class array_product extends Internal
             if (Variable::TYPE_STRING === $v->type) {
                 $s = $v->toString();
                 if (!\is_numeric($s)) {
-                    throw new \TypeError('Unsupported operand types: string');
+                    throw new \TypeError(self::ELEMENT_TYPE_ERROR);
                 }
                 $num = $v->toNumeric();
                 if (\is_int($num)) {
@@ -80,7 +81,10 @@ final class array_product extends Internal
                 }
                 continue;
             }
-            throw new \LogicException('array_product() only supports integer, float, and numeric string elements in this compiler build');
+            throw new \TypeError(self::ELEMENT_TYPE_ERROR);
+        }
+        if (null === $frame->returnVar) {
+            return;
         }
         if ($useFloat) {
             $frame->returnVar->float($prodFloat);
@@ -101,6 +105,7 @@ final class array_product extends Internal
                 $this->jitString($context, $arg, 'array_product() argument #'.((int) $i + 1));
             }
         }
+        TypeErrorRaise::ensureLinked($context);
         if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY) {
             return ArrayBuiltinHelper::arrayProduct($context, $args[0]);
         }
