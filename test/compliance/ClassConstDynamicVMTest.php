@@ -19,6 +19,10 @@ final class ClassConstDynamicVMTest extends BaseTest
             __DIR__.'/cases/language/class_const_dynamic_jit.phpt',
             'class_const_dynamic_jit.phpt'
         );
+        yield 'class_const_variable_class_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/language/class_const_variable_class_jit.phpt',
+            'class_const_variable_class_jit.phpt'
+        );
     }
 
     public function setUp(): void
