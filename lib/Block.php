@@ -1335,6 +1335,45 @@ class Block {
      * CFG regions that MCJIT must not execute yet; `bin/jit.php` runs the VM instead (#2114, #167).
      * Simple try/catch without `finally` may pass MCJIT when {@see TryCatchJitExecuteTest} is green.
      */
+    /**
+     * ReflectionClass::newLazyProxy/Ghost — VM lazy init until MCJIT lowering (#4685).
+     *
+     * @see Zend/zend_lazy_objects.c
+     */
+    public static function containsLazyObjectOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_METHODCALL_INIT === $op->type) {
+                    $nameOp = $block->getOperand($op->arg2);
+                    if ($nameOp instanceof Literal) {
+                        $methodLc = strtolower($nameOp->value);
+                        if ('newlazyproxy' === $methodLc || 'newlazyghost' === $methodLc) {
+                            return true;
+                        }
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     /** Script or nested closure uses Fiber::suspend() (#4019). */
     public static function containsFiberSuspendOpcodes(?self $root): bool
     {
@@ -1533,7 +1572,7 @@ class Block {
                 }
                 $nameOp = $block->getOperand($op->arg3);
                 $objOp = $block->getOperand($op->arg2);
-                if (!$nameOp instanceof Literal || null === $objOp->type->userType) {
+                if (!$nameOp instanceof Literal || null === $objOp->type || null === $objOp->type->userType) {
                     foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
                         if ($sub instanceof self) {
                             $stack[] = $sub;
@@ -1657,6 +1696,7 @@ class Block {
             || self::containsReadonlyClassOpcodes($root)
             || self::containsDynamicPropertyDeprecationOpcodes($root)
             || self::containsFiberSuspendOpcodes($root)
-            || self::containsTraitConstructorOpcodes($root);
+            || self::containsTraitConstructorOpcodes($root)
+            || self::containsLazyObjectOpcodes($root);
     }
 }
