@@ -639,7 +639,7 @@ class VM {
     public function startFiber(FiberState $fiber, Variable ...$startArgs): Variable
     {
         if (FiberState::STATUS_INIT !== $fiber->status) {
-            throw new \LogicException('Fiber has already been started');
+            throw new VM\NativeFiberError('Cannot start a fiber that has already been started');
         }
         $fiber->resumeArgument->null();
         $child = $fiber->callback->func->getFrame($this->context, null);
@@ -662,15 +662,19 @@ class VM {
     public function resumeFiber(FiberState $fiber, Variable ...$resumeArgs): Variable
     {
         if (FiberState::STATUS_TERMINATED === $fiber->status) {
-            throw new \LogicException('Fiber has already been terminated');
+            throw new VM\NativeFiberError('Cannot resume a fiber that is terminated');
         }
         if (FiberState::STATUS_SUSPENDED !== $fiber->status) {
-            throw new \LogicException('Fiber must be suspended to resume');
+            throw new VM\NativeFiberError('Cannot resume a fiber that is not suspended');
         }
         if ([] !== $resumeArgs) {
             $fiber->resumeArgument->copyFrom($resumeArgs[0]->resolveIndirect());
         } else {
             $fiber->resumeArgument->null();
+        }
+        if (null !== $fiber->pendingSuspendReturnVar) {
+            $fiber->pendingSuspendReturnVar->copyFrom($fiber->resumeArgument);
+            $fiber->pendingSuspendReturnVar = null;
         }
         $child = $fiber->frame;
         if (null === $child) {
@@ -3121,6 +3125,8 @@ restart:
             return $this->dispatchVmTypeError($e, $callerFrame);
         } catch (\ValueError $e) {
             return $this->dispatchVmValueError($e, $callerFrame);
+        } catch (VM\NativeFiberError $e) {
+            return $this->dispatchVmFiberError($e, $callerFrame);
         } catch (\Error $e) {
             return $this->dispatchVmError($e->getMessage(), $callerFrame);
         } catch (VM\GeneratorUncaughtThrow $e) {
@@ -3220,6 +3226,21 @@ restart:
     private function dispatchVmError(string $message, Frame $frame): ?Frame
     {
         $thrown = VM\BuiltinExceptionSupport::materializeError($this->context, $message);
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /**
+     * Bridge native FiberError from fiber lifecycle operations into user catch handlers (#4372).
+     */
+    private function dispatchVmFiberError(VM\NativeFiberError $error, Frame $frame): ?Frame
+    {
+        $thrown = VM\BuiltinExceptionSupport::materializeFiberError($this->context, $error->getMessage());
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
             return $catchFrame;
