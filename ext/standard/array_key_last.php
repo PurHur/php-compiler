@@ -21,17 +21,15 @@ final class array_key_last extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('array_key_last() requires exactly one argument');
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError('array_key_last() expects exactly 1 argument, '.$argc.' given');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
+        $ht = VmArray::requireArray($frame->calledArgs[0], 'array_key_last');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_key_last() requires an array in this compiler build');
-        }
-        $key = VmArray::keyLast($array->toArray());
+        $key = VmArray::keyLast($ht);
         if (null === $key) {
             $frame->returnVar->null();
 
@@ -42,9 +40,12 @@ final class array_key_last extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('array_key_last() requires exactly one argument');
+        $argc = \count($args);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError('array_key_last() expects exactly 1 argument, '.$argc.' given');
         }
+
+        JitArrayKey::requireArrayArg($context, $args[0], 'array_key_last');
 
         return JitArrayKey::keyLast($context, $args[0]);
     }

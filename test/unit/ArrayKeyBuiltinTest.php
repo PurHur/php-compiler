@@ -44,6 +44,21 @@ final class ArrayKeyBuiltinTest extends TestCase
         $this->assertSame('y', $this->runKey($lastFn, $runtime, $assoc)->toString());
     }
 
+    public function testNonArrayThrowsTypeError(): void
+    {
+        $runtime = new Runtime();
+        $fn = new array_key_first();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $arg = new VMVariable();
+        $arg->null();
+        $frame->calledArgs = [$arg];
+        $frame->returnVar = new VMVariable();
+
+        $this->expectException(\TypeError::class);
+        $this->expectExceptionMessage('array_key_first(): Argument #1 ($array) must be of type array, null given');
+        $fn->execute($frame);
+    }
+
     private function runKey(Internal $fn, Runtime $runtime, HashTable $ht): ?VMVariable
     {
         $frame = $fn->getFrame($runtime->vmContext);

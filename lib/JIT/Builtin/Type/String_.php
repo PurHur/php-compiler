@@ -296,7 +296,6 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringUrldecode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringNl2br::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringUcwords::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringWordwrap::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringRandomBytes::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringJsonEncode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringSerialize::implement($this->context);
@@ -305,6 +304,7 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringGetenv::implement($this->context);
         \PHPCompiler\JIT\Builtin\IniSet::implement($this->context);
         \PHPCompiler\JIT\Builtin\IniGet::implement($this->context);
+        \PHPCompiler\JIT\Builtin\ErrorReporting::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringDeployPath::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringReadfile::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringFileGetContents::implement($this->context);

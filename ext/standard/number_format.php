@@ -34,10 +34,7 @@ final class number_format extends Internal
             return;
         }
         $numVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $numVar->type && Variable::TYPE_FLOAT !== $numVar->type) {
-            throw new \LogicException('number_format() number must be an integer or float in this compiler build');
-        }
-        $num = Variable::TYPE_INTEGER === $numVar->type ? (float) $numVar->toInt() : $numVar->toFloat();
+        $num = VmNumberFormat::coerceFloat($numVar);
         $decimals = 0;
         if ($argc >= 2) {
             $decVar = $frame->calledArgs[1]->resolveIndirect();

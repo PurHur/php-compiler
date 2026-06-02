@@ -1,5 +1,11 @@
 --TEST--
 Language: typed class constant type mismatch — compile-time TypeError (#3592)
+--SKIPIF--
+<?php
+if (PHP_VERSION_ID < 80300) {
+    die('skip typed class constants require PHP 8.3+');
+}
+?>
 --FILE--
 <?php
 class C {

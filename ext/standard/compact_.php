@@ -39,10 +39,14 @@ final class compact_ extends Internal
         }
 
         foreach ($args as $i => $arg) {
+            if (0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY) || JITVariable::TYPE_HASHTABLE === $arg->type) {
+                continue;
+            }
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
                 $this->jitString($context, $arg, 'compact() variable name #'.((int) $i + 1));
             }
         }
+
         return \call_user_func_array([ScopeBuiltinHelper::class, 'compact'], array_merge([$context], $args));
     }
 }

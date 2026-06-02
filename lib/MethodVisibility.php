@@ -42,18 +42,18 @@ final class MethodVisibility
             return;
         }
         if ($callerClassLc === null) {
-            self::deny($visibilityFlags, $declaringClassDisplay, $methodName);
+            self::deny($visibilityFlags, $declaringClassDisplay, $methodName, null);
         }
         if (($visibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0) {
             if ($callerClassLc !== $declaringClassLc) {
-                self::deny($visibilityFlags, $declaringClassDisplay, $methodName);
+                self::deny($visibilityFlags, $declaringClassDisplay, $methodName, $callerClassLc);
             }
 
             return;
         }
         if (($visibilityFlags & CfgFunc::FLAG_PROTECTED) !== 0) {
             if ($callerClassLc !== $declaringClassLc) {
-                self::deny($visibilityFlags, $declaringClassDisplay, $methodName);
+                self::deny($visibilityFlags, $declaringClassDisplay, $methodName, $callerClassLc);
             }
         }
     }
@@ -103,9 +103,12 @@ final class MethodVisibility
         return true;
     }
 
-    private static function deny(int $visibilityFlags, string $className, string $methodName): void
+    private static function deny(int $visibilityFlags, string $className, string $methodName, ?string $fromScopeLc): void
     {
         $kind = ($visibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0 ? 'private' : 'protected';
-        throw new \LogicException("Call to {$kind} method {$className}::{$methodName}()");
+        if (null === $fromScopeLc) {
+            throw new \LogicException("Call to {$kind} method {$className}::{$methodName}() from global scope");
+        }
+        throw new \LogicException("Call to {$kind} method {$className}::{$methodName}() from scope {$fromScopeLc}");
     }
 }

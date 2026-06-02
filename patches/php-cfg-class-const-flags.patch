@@ -1,0 +1,22 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php
+@@ -23,6 +23,9 @@ class Const_ extends Terminal
+     /** PHP 8.3+ typed class constant declaration; null when untyped. */
+     public ?Type $declaredType = null;
+ 
++    /** PhpParser Stmt\ClassConst flags (MODIFIER_FINAL, visibility, etc.). */
++    public int $flags = 0;
++
+     public function __construct(Operand $name, Operand $value, Block $valueBlock, array $attributes = [])
+     {
+         parent::__construct($attributes);
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -261,6 +261,7 @@ class Parser extends ParserAbstract
+                 $this->mapAttributes($node)
+             );
+             $constOp->declaredType = null !== $node->type ? $this->parseTypeNode($node->type) : null;
++            $constOp->flags = $node->flags;
+             $this->block->children[] = $constOp;
+         }
+     }

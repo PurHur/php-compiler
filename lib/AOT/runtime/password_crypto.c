@@ -1,5 +1,5 @@
 /*
- * password_hash() / password_verify() for AOT/JIT (issue #172 follow-up).
+ * password_hash() / password_verify() / password_get_info() / password_needs_rehash() for AOT/JIT.
  * PASSWORD_DEFAULT / PASSWORD_BCRYPT via libcrypt(3); no OpenSSL.
  */
 
@@ -14,8 +14,24 @@
 #include <crypt.h>
 
 typedef struct __string__ __string__;
+typedef struct __hashtable__ __hashtable__;
+
+typedef struct __value__ __value__;
+
+extern __hashtable__ *__hashtable__alloc(void);
+extern void __hashtable__setStringKeyString(__hashtable__ *ht, __string__ *key, __string__ *val);
+extern void __hashtable__setStringKeyLong(__hashtable__ *ht, __string__ *key, long long val);
+extern void __hashtable__setStringKeyHashtable(__hashtable__ *ht, __string__ *key, __hashtable__ *child);
+extern __value__ *__hashtable__readStringKeyValue(__hashtable__ *ht, __string__ *key);
+extern __hashtable__ *__value__readHashtable(__value__ *v);
+extern long long __value__readLong(__value__ *v);
 
 extern __string__ *__string__init(long long size, const char *value);
+
+static int pc_is_valid_salt_char(char c)
+{
+    return (c >= '.' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+}
 
 static const char BCRYPT_ITOA64[] =
     "./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -136,6 +152,41 @@ __string__ *__compiler_password_hash(__string__ *password, int64_t algo)
     return pc_string_from_cstr(result);
 }
 
+__string__ *__compiler_crypt(__string__ *password, __string__ *salt)
+{
+    const char *phrase = pc_strdata(password);
+    const char *setting = pc_strdata(salt);
+    size_t salt_len = pc_strlen(salt);
+    char *result;
+
+    if (salt_len >= 2 && setting[0] == '*' && (setting[1] == '0' || setting[1] == '1')) {
+        return pc_string_from_cstr("*0");
+    }
+
+    if (salt_len > 0 && setting[0] == '$') {
+        if (salt_len >= 4 && setting[1] == '2' && setting[3] == '$') {
+            /* blowfish — libcrypt */
+        } else if (salt_len >= 3 && setting[1] == '1' && setting[2] == '$') {
+            /* md5-crypt — libcrypt */
+        } else {
+            return pc_string_from_cstr("*0");
+        }
+    } else if (salt_len >= 2) {
+        if (!pc_is_valid_salt_char(setting[0]) || !pc_is_valid_salt_char(setting[1])) {
+            return pc_string_from_cstr("*0");
+        }
+    } else {
+        return pc_string_from_cstr("*0");
+    }
+
+    result = crypt(phrase, setting);
+    if (NULL == result || result[0] == '*' || 0 == strcmp(result, "*")) {
+        return pc_string_from_cstr("*0");
+    }
+
+    return pc_string_from_cstr(result);
+}
+
 int __compiler_password_verify(__string__ *password, __string__ *hash)
 {
     const char *phrase = pc_strdata(password);
@@ -152,4 +203,160 @@ int __compiler_password_verify(__string__ *password, __string__ *hash)
     }
 
     return strcmp(computed, stored) == 0;
+}
+
+static int pc_bcrypt_valid(const char *h, size_t len)
+{
+    return len == 60 && h[0] == '$' && h[1] == '2' && h[2] == 'y';
+}
+
+static int pc_extract_ident(const char *h, size_t len, char *ident, size_t cap)
+{
+    const char *start;
+    const char *end;
+    size_t idlen;
+
+    if (len < 3 || h[0] != '$') {
+        return 0;
+    }
+    start = h + 1;
+    end = strchr(start, '$');
+    if (NULL == end) {
+        return 0;
+    }
+    idlen = (size_t) (end - start);
+    if (idlen + 1 > cap) {
+        return 0;
+    }
+    memcpy(ident, start, idlen);
+    ident[idlen] = '\0';
+
+    return 1;
+}
+
+static __hashtable__ *pc_password_info_unknown(void)
+{
+    __hashtable__ *ht = __hashtable__alloc();
+    __hashtable__ *opts = __hashtable__alloc();
+
+    __hashtable__setStringKeyString(ht, pc_string_from_cstr("algoName"), pc_string_from_cstr("unknown"));
+    __hashtable__setStringKeyHashtable(ht, pc_string_from_cstr("options"), opts);
+
+    return ht;
+}
+
+static __hashtable__ *pc_password_info_bcrypt(const char *h)
+{
+    long long cost = 10;
+    __hashtable__ *ht;
+    __hashtable__ *opts;
+
+    sscanf(h, "$2y$%lld$", &cost);
+    ht = __hashtable__alloc();
+    opts = __hashtable__alloc();
+    __hashtable__setStringKeyString(ht, pc_string_from_cstr("algo"), pc_string_from_cstr("2y"));
+    __hashtable__setStringKeyString(ht, pc_string_from_cstr("algoName"), pc_string_from_cstr("bcrypt"));
+    __hashtable__setStringKeyLong(opts, pc_string_from_cstr("cost"), cost);
+    __hashtable__setStringKeyHashtable(ht, pc_string_from_cstr("options"), opts);
+
+    return ht;
+}
+
+static __hashtable__ *pc_password_info_argon2(const char *h, const char *name)
+{
+    long long v = 0;
+    long long memory_cost = 65536;
+    long long time_cost = 4;
+    long long threads = 1;
+    __hashtable__ *ht;
+    __hashtable__ *opts;
+
+    sscanf(h, "v=%lld$m=%lld,t=%lld,p=%lld", &v, &memory_cost, &time_cost, &threads);
+    ht = __hashtable__alloc();
+    opts = __hashtable__alloc();
+    __hashtable__setStringKeyString(ht, pc_string_from_cstr("algo"), pc_string_from_cstr(name));
+    __hashtable__setStringKeyString(ht, pc_string_from_cstr("algoName"), pc_string_from_cstr(name));
+    __hashtable__setStringKeyLong(opts, pc_string_from_cstr("memory_cost"), memory_cost);
+    __hashtable__setStringKeyLong(opts, pc_string_from_cstr("time_cost"), time_cost);
+    __hashtable__setStringKeyLong(opts, pc_string_from_cstr("threads"), threads);
+    __hashtable__setStringKeyHashtable(ht, pc_string_from_cstr("options"), opts);
+
+    return ht;
+}
+
+__hashtable__ *__compiler_password_get_info(__string__ *hash)
+{
+    const char *h = pc_strdata(hash);
+    size_t len = pc_strlen(hash);
+    char ident[32];
+
+    if (!pc_extract_ident(h, len, ident, sizeof(ident))) {
+        return pc_password_info_unknown();
+    }
+    if (strcmp(ident, "2y") == 0 && pc_bcrypt_valid(h, len)) {
+        return pc_password_info_bcrypt(h);
+    }
+    if (strcmp(ident, "argon2i") == 0 && len >= sizeof("$argon2i$") - 1
+        && !memcmp(h, "$argon2i$", sizeof("$argon2i$") - 1)) {
+        return pc_password_info_argon2(h + sizeof("$argon2i$") - 1, "argon2i");
+    }
+    if (strcmp(ident, "argon2id") == 0 && len >= sizeof("$argon2id$") - 1
+        && !memcmp(h, "$argon2id$", sizeof("$argon2id$") - 1)) {
+        return pc_password_info_argon2(h + sizeof("$argon2id$") - 1, "argon2id");
+    }
+
+    return pc_password_info_unknown();
+}
+
+static int pc_hash_ident_is_bcrypt(const char *h, size_t len)
+{
+    char ident[32];
+
+    if (!pc_extract_ident(h, len, ident, sizeof(ident))) {
+        return 0;
+    }
+
+    return strcmp(ident, "2y") == 0 && pc_bcrypt_valid(h, len);
+}
+
+static long long pc_bcrypt_cost_from_hash(const char *h, size_t len)
+{
+    long long cost = BCRYPT_DEFAULT_COST;
+
+    if (!pc_bcrypt_valid(h, len)) {
+        return cost;
+    }
+    if (len >= 7 && !memcmp(h, "$2y$", 4)) {
+        cost = (long long) atoi(h + 4);
+        if (cost < 4) {
+            cost = BCRYPT_DEFAULT_COST;
+        }
+    }
+
+    return cost;
+}
+
+int __compiler_password_needs_rehash(__string__ *hash, int64_t algo, int64_t new_cost)
+{
+    const char *h;
+    size_t len;
+    long long old_cost;
+
+    if (!pc_algo_supported(algo)) {
+        return 0;
+    }
+    if (NULL == hash) {
+        return 1;
+    }
+    h = pc_strdata(hash);
+    len = pc_strlen(hash);
+    if (!pc_hash_ident_is_bcrypt(h, len)) {
+        return 1;
+    }
+    if (new_cost <= 0) {
+        new_cost = BCRYPT_DEFAULT_COST;
+    }
+    old_cost = pc_bcrypt_cost_from_hash(h, len);
+
+    return old_cost != new_cost ? 1 : 0;
 }

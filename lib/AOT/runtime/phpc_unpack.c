@@ -21,7 +21,7 @@ extern void __hashtable__setLongAt(__hashtable__ *ht, size_t index, long long va
 extern void __hashtable__setStringAt(__hashtable__ *ht, size_t index, __string__ *val);
 extern void __value__writeHashtable(__value__ *out, __hashtable__ *ht);
 extern void __value__writeBool(__value__ *out, int value);
-extern void __compiler_trigger_error(const char *message, size_t len, int level);
+extern void __compiler_trigger_error(const char *message, size_t len, int level, const char *file, int line);
 
 #define UNPACK_ERR_LEVEL 2
 #define UNPACK_MAX_SPECS 256
@@ -181,7 +181,7 @@ static void unpack_fail_out(__value__ *out, const char *msg)
 {
     size_t len = strlen(msg);
 
-    __compiler_trigger_error(msg, len, UNPACK_ERR_LEVEL);
+    __compiler_trigger_error(msg, len, UNPACK_ERR_LEVEL, "", 0);
     __value__writeBool(out, 0);
 }
 

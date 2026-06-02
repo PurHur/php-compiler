@@ -41,7 +41,10 @@ class Native implements Call {
     /** @var array<int, list<string>> LLVM arg index => intersection interface lc names (#3077) */
     public array $paramIntersectionConstraintsByArg = [];
 
-    /** @var array<int, true> LLVM arg index => by-reference formal (issue #3161, #140) */
+    /** @var array<int, list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>> LLVM arg index => DNF arms (#4008) */
+    public array $paramDnfConstraintsByArg = [];
+
+    /** LLVM arg index => by-reference formal (issue #3161, #140). @var array<int, true> */
     public array $paramByRefByArg = [];
 
     /** Declared parameter names by index (issue #3777). */
@@ -49,6 +52,9 @@ class Native implements Call {
 
     /** PHP variadic parameter index for named-arg resolution (issue #3777). */
     public ?int $namedArgsVariadicIndex = null;
+
+    /** LLVM arg index => implicit nullable (`int $x = null`, #4449). */
+    public array $paramImplicitNullableByArg = [];
 
     public function __construct(
         Value $function,
@@ -58,9 +64,11 @@ class Native implements Call {
         ?int $variadicArgIndex = null,
         array $paramTypeConstraintsByArg = [],
         array $paramIntersectionConstraintsByArg = [],
+        array $paramDnfConstraintsByArg = [],
         array $paramByRefByArg = [],
         array $paramNames = [],
-        ?int $namedArgsVariadicIndex = null
+        ?int $namedArgsVariadicIndex = null,
+        array $paramImplicitNullableByArg = []
     ) {
         $this->function = $function;
         $this->name = $name;
@@ -69,14 +77,17 @@ class Native implements Call {
         $this->variadicArgIndex = $variadicArgIndex;
         $this->paramTypeConstraintsByArg = $paramTypeConstraintsByArg;
         $this->paramIntersectionConstraintsByArg = $paramIntersectionConstraintsByArg;
+        $this->paramDnfConstraintsByArg = $paramDnfConstraintsByArg;
         $this->paramByRefByArg = $paramByRefByArg;
         $this->paramNames = $paramNames;
         $this->namedArgsVariadicIndex = $namedArgsVariadicIndex;
+        $this->paramImplicitNullableByArg = $paramImplicitNullableByArg;
     }
 
     public function call(Context $context, Variable ... $args): Value {
         $sentArgs = $args;
         if (null !== $this->variadicArgIndex) {
+            $this->enforceVariadicTrailingArgs($context, $args);
             $args = $this->packVariadicCallArgs($context, $args);
         }
         // Store call-site argv for func_get_args/func_num_args (issue #197).
@@ -91,7 +102,14 @@ class Native implements Call {
             } else {
                 $arg = $this->missingCallArg($context, $this->argTypes[$index]);
             }
-            if (isset($this->paramTypeConstraintsByArg[$index])) {
+            $skipVariadicPackedTypeCheck = null !== $this->variadicArgIndex
+                && $index === $this->variadicArgIndex
+                && $this->variadicSlotUsesElementTypeChecks($index);
+            if (
+                !$skipVariadicPackedTypeCheck
+                && isset($this->paramTypeConstraintsByArg[$index])
+                && !$this->skipImplicitNullableTypeCheck($index, $arg)
+            ) {
                 \PHPCompiler\JIT\TypeCheck::enforceParameter(
                     $context,
                     $arg,
@@ -99,11 +117,18 @@ class Native implements Call {
                     $context->callerStrictTypes
                 );
             }
-            if (isset($this->paramIntersectionConstraintsByArg[$index])) {
+            if (!$skipVariadicPackedTypeCheck && isset($this->paramIntersectionConstraintsByArg[$index])) {
                 \PHPCompiler\JIT\IntersectionParamCheck::enforce(
                     $context,
                     $arg,
                     $this->paramIntersectionConstraintsByArg[$index]
+                );
+            }
+            if (!$skipVariadicPackedTypeCheck && isset($this->paramDnfConstraintsByArg[$index])) {
+                \PHPCompiler\JIT\DnfParamCheck::enforce(
+                    $context,
+                    $arg,
+                    $this->paramDnfConstraintsByArg[$index]
                 );
             }
             $argValues[] = $this->compileArg($context, $arg, $index);
@@ -402,6 +427,60 @@ class Native implements Call {
                 break;
         }
         throw new \LogicException("Unsupported cast for arg type $typeName from " . Variable::getStringType($arg->type));
+    }
+
+    /**
+     * @param list<Variable> $args
+     */
+    private function enforceVariadicTrailingArgs(Context $context, array $args): void
+    {
+        $idx = $this->variadicArgIndex;
+        assert(null !== $idx);
+        if (!$this->variadicSlotUsesElementTypeChecks($idx)) {
+            return;
+        }
+        $extra = array_slice($args, $idx);
+        $strict = $context->callerStrictTypes;
+        foreach ($extra as $arg) {
+            if (
+                isset($this->paramTypeConstraintsByArg[$idx])
+                && !$this->skipImplicitNullableTypeCheck($idx, $arg)
+            ) {
+                \PHPCompiler\JIT\TypeCheck::enforceParameter(
+                    $context,
+                    $arg,
+                    $this->paramTypeConstraintsByArg[$idx],
+                    $strict
+                );
+            }
+            if (isset($this->paramIntersectionConstraintsByArg[$idx])) {
+                \PHPCompiler\JIT\IntersectionParamCheck::enforce(
+                    $context,
+                    $arg,
+                    $this->paramIntersectionConstraintsByArg[$idx]
+                );
+            }
+            if (isset($this->paramDnfConstraintsByArg[$idx])) {
+                \PHPCompiler\JIT\DnfParamCheck::enforce(
+                    $context,
+                    $arg,
+                    $this->paramDnfConstraintsByArg[$idx]
+                );
+            }
+        }
+    }
+
+    private function variadicSlotUsesElementTypeChecks(int $llvmArgIndex): bool
+    {
+        return isset($this->paramTypeConstraintsByArg[$llvmArgIndex])
+            || isset($this->paramIntersectionConstraintsByArg[$llvmArgIndex])
+            || isset($this->paramDnfConstraintsByArg[$llvmArgIndex]);
+    }
+
+    private function skipImplicitNullableTypeCheck(int $index, Variable $arg): bool
+    {
+        return isset($this->paramImplicitNullableByArg[$index])
+            && (Variable::TYPE_NULL === $arg->type || !empty($arg->isNullConstant));
     }
 
     /**

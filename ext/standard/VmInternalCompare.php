@@ -35,6 +35,30 @@ final class VmInternalCompare
         return new $class();
     }
 
+    /** Resolve strcmp-family comparator from sort() flags (php-src php_array_sort). */
+    public static function stringCompareForSortFlags(int $flags): Internal
+    {
+        $caseFlag = $flags & StdlibConstants::SORT_FLAG_CASE;
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+
+        return match ($sortType) {
+            StdlibConstants::SORT_NATURAL => self::resolveStringCallback(
+                0 !== $caseFlag ? 'strnatcasecmp' : 'strnatcmp'
+            ),
+            StdlibConstants::SORT_STRING => self::resolveStringCallback(
+                0 !== $caseFlag ? 'strcasecmp' : 'strcmp'
+            ),
+            StdlibConstants::SORT_REGULAR,
+            StdlibConstants::SORT_NUMERIC,
+            StdlibConstants::SORT_LOCALE_STRING => self::resolveStringCallback(
+                0 !== $caseFlag ? 'strcasecmp' : 'strcmp'
+            ),
+            default => throw new \LogicException(
+                'sort() flags are not supported in this compiler build'
+            ),
+        };
+    }
+
     public static function invoke(Internal $fn, Variable $a, Variable $b): int
     {
         $frame = new Frame($fn, null, null);

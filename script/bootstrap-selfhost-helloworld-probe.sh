@@ -14,6 +14,9 @@ AOT_OUT="${ROOT}/build/helloworld-aot"
 EMIT_HELPER="${ROOT}/build/selfhost-helloworld-emit"
 COMPILE_DRIVER_BIN="${ROOT}/build/selfhost-helloworld-compile"
 INVENTORY_EMIT_DRIVER="${ROOT}/test/selfhost/compiler_helloworld_smoke/compile_driver.php"
+# shellcheck source=bootstrap-inventory-emit-default.sh
+source "$(dirname "$0")/bootstrap-inventory-emit-default.sh"
+bootstrap_resolve_inventory_emit_driver "${INVENTORY_EMIT_DRIVER}"
 M3_NATIVE_COMPILE=0
 M3_EMIT_PATH="none"
 M3_EMIT_HELPER_LINKED=0
@@ -61,6 +64,7 @@ if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT:-0}" == "1" ]]; then
   export BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1
   export BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1
   export BOOTSTRAP_M3_RUNTIME_COMPILE="${BOOTSTRAP_M3_RUNTIME_COMPILE:-1}"
+  bootstrap_resolve_inventory_emit_driver "${INVENTORY_EMIT_DRIVER}"
 fi
 
 m3_exit_label() {

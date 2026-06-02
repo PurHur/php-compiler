@@ -18,6 +18,7 @@ final class GeneratorKey extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $gen = GeneratorGetReturn::requireGeneratorState(self::receiver($frame));
+        GeneratorGetReturn::ensureStarted($gen);
         if (null === $frame->returnVar) {
             return;
         }

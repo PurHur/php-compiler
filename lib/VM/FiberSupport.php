@@ -54,19 +54,18 @@ final class FiberSupport
         }
         $fiber = $ctx->currentFiber;
         if (null === $fiber) {
-            throw new \LogicException('Fiber::suspend() must be called from a Fiber context');
+            throw new NativeFiberError('Cannot suspend outside of a fiber');
         }
         if (FiberState::STATUS_RUNNING !== $fiber->status) {
-            throw new \LogicException('Fiber::suspend() cannot be called in this fiber state');
+            throw new NativeFiberError('Cannot suspend a fiber that is not running');
         }
         if (\count($handlerFrame->calledArgs) >= 1) {
             $fiber->suspendReturn->copyFrom($handlerFrame->calledArgs[0]->resolveIndirect());
         } else {
             $fiber->suspendReturn->null();
         }
-        if (null !== $handlerFrame->returnVar) {
-            $handlerFrame->returnVar->copyFrom($fiber->resumeArgument);
-        }
+        // `Fiber::suspend()` returns when resumed; stash the return target now and fill it on resume.
+        $fiber->pendingSuspendReturnVar = $handlerFrame->returnVar;
         $parent = $handlerFrame->parent;
         if (null !== $parent) {
             $parent->fiberSuspend = true;

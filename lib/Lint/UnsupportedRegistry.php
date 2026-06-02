@@ -19,8 +19,6 @@ final class UnsupportedRegistry
         'Stmt_TryCatch' => 57,
         'Stmt_Catch' => 57,
         'Stmt_Finally' => 57,
-        'Expr_YieldFrom' => 167,
-        // Expr_ArrowFunction / Expr_Closure: VM without use() (#72, #142); JIT/AOT still deferred
     ];
 
     public static function trackingIssueForKind(string $kind): ?int

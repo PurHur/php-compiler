@@ -422,6 +422,68 @@ restart:
                 }
             }
         }
+        if (Variable::TYPE_STRING === $leftType && Variable::TYPE_NATIVE_LONG === $rightType) {
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                $result = $this->context->getTypeFromString('int1')->constInt(0, false);
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                $result = $this->context->getTypeFromString('int1')->constInt(1, false);
+                goto return_bool;
+            }
+            if (OpCode::TYPE_EQUAL === $opcode->type) {
+                $result = JitValueCompare::looseEqualStringToNativeLong(
+                    $this->context,
+                    $leftValue,
+                    $rightValue
+                );
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $same = JitValueCompare::looseEqualStringToNativeLong(
+                    $this->context,
+                    $leftValue,
+                    $rightValue
+                );
+                $result = $this->context->builder->icmp(
+                    Builder::INT_EQ,
+                    $same,
+                    $this->context->getTypeFromString('int1')->constInt(0, false)
+                );
+                goto return_bool;
+            }
+        }
+        if (Variable::TYPE_NATIVE_LONG === $leftType && Variable::TYPE_STRING === $rightType) {
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                $result = $this->context->getTypeFromString('int1')->constInt(0, false);
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                $result = $this->context->getTypeFromString('int1')->constInt(1, false);
+                goto return_bool;
+            }
+            if (OpCode::TYPE_EQUAL === $opcode->type) {
+                $result = JitValueCompare::looseEqualStringToNativeLong(
+                    $this->context,
+                    $rightValue,
+                    $leftValue
+                );
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $same = JitValueCompare::looseEqualStringToNativeLong(
+                    $this->context,
+                    $rightValue,
+                    $leftValue
+                );
+                $result = $this->context->builder->icmp(
+                    Builder::INT_EQ,
+                    $same,
+                    $this->context->getTypeFromString('int1')->constInt(0, false)
+                );
+                goto return_bool;
+            }
+        }
         $type = $opcode->getType();
         throw new \LogicException("Reached end of switch, can't handle binary operation yet: $type for type pair {$leftType} and {$rightType}");
 return_double:

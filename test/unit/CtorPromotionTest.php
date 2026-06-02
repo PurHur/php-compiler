@@ -48,4 +48,44 @@ PHP;
         $out = ob_get_clean();
         $this->assertSame('7', $out);
     }
+
+    public function testIssue4395ReproReflectionAndVisibility(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public function __construct(public int $x, private string $y = 'd') {}
+}
+$o = new C(3);
+echo $o->x, "\n";
+$r = new ReflectionClass(C::class);
+$p = $r->getProperty('x');
+echo ($p->isPublic() ? 'pub' : 'no'), "\n";
+try {
+    echo $o->y;
+} catch (Throwable $e) {
+    echo get_class($e), "\n";
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'repro_promotion.php'));
+        $out = ob_get_clean();
+        $this->assertSame("3\npub\nError\n", $out);
+    }
+
+    public function testPromotedPropertyCollidesWithDeclaredProperty(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public int $x = 0;
+    public function __construct(public int $x) {}
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot redeclare C::$x');
+        $runtime->parseAndCompile($code, 'promotion_collision.php');
+    }
 }

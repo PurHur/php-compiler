@@ -217,6 +217,6 @@ final class LiteralIncludeDiscovery
     {
         [$code] = $runtime->preprocessSourceForParse($code);
 
-        return $code;
+        return $runtime->rewriteSourceBeforeParser($code);
     }
 }

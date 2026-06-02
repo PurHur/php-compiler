@@ -18,6 +18,7 @@ final class GeneratorNext extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $gen = GeneratorGetReturn::requireGeneratorState(self::receiver($frame));
+        GeneratorGetReturn::ensureStarted($gen);
         if ($gen->done) {
             return;
         }

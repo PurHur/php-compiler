@@ -37,7 +37,7 @@ final class GeneratorJitExecuteTest extends TestCase
     {
         $this->assertMcjitOutput(<<<'PHP'
 <?php
-function gen(): Generator {
+function gen() {
     yield 1;
     yield 2;
 }
@@ -49,12 +49,96 @@ PHP
             '12');
     }
 
+    public function testYieldFromArrayForeachExecutesViaMcjit(): void
+    {
+        $this->assertMcjitOutput(<<<'PHP'
+<?php
+function gen() {
+    yield from [1, 2, 3];
+}
+foreach (gen() as $v) {
+    echo $v;
+}
+PHP
+            ,
+            '123');
+    }
+
+    public function testYieldFromGeneratorForeachExecutesViaMcjit(): void
+    {
+        $this->assertMcjitOutput(<<<'PHP'
+<?php
+function inner() {
+    yield 1;
+    yield 2;
+}
+function outer() {
+    yield from inner();
+    yield 3;
+}
+foreach (outer() as $v) {
+    echo $v;
+}
+PHP
+            ,
+            '123');
+    }
+
+    public function testYieldFromIteratorForeachExecutesViaMcjit(): void
+    {
+        $this->assertMcjitOutput(<<<'PHP'
+<?php
+class R implements IteratorAggregate {
+    public function getIterator() {
+        return new Inner();
+    }
+}
+class Inner implements Iterator {
+    private int $i = 0;
+    public function current() { return $this->i + 1; }
+    public function key() { return $this->i; }
+    public function next(): void { $this->i++; }
+    public function rewind(): void { $this->i = 0; }
+    public function valid(): bool { return $this->i < 3; }
+}
+function f(): Generator {
+    yield from new R();
+}
+foreach (f() as $v) {
+    echo $v;
+}
+PHP
+            ,
+            '123');
+    }
+
+    public function testGeneratorTryCatchExecutesViaMcjit(): void
+    {
+        $this->assertMcjitOutput(<<<'PHP'
+<?php
+function gen() {
+    try {
+        yield 1;
+        throw new Exception('boom');
+        yield 2;
+    } catch (Exception $e) {
+        yield 'caught:boom';
+    }
+}
+foreach (gen() as $v) {
+    echo $v, "\n";
+}
+PHP
+            ,
+            "1\ncaught:boom\n");
+    }
+
     public function testRequiresVmLoweringSkipsNestedGeneratorBodies(): void
     {
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
-function gen(): Generator {
+function gen() {
     yield 1;
 }
 foreach (gen() as $v) {

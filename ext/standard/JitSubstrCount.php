@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 /**
- * LLVM JIT helper for substr_count() — repeated strstr with non-overlapping advance.
+ * LLVM JIT helper for substr_count() — AOT uses phpc_substr_count; MCJIT uses inline strstr loop.
  */
 
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\Builtin\StringSubstrCount;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -24,6 +26,59 @@ final class JitSubstrCount
         ?Value $offset = null,
         ?Value $length = null
     ): Value {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            return self::countViaRuntime($context, $haystack, $needle, $offset, $length);
+        }
+
+        return self::countInline($context, $haystack, $needle, $offset, $length);
+    }
+
+    private static function countViaRuntime(
+        Context $context,
+        Value $haystack,
+        Value $needle,
+        ?Value $offset,
+        ?Value $length
+    ): Value {
+        StringSubstrCount::ensureLinked($context);
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $i64->constInt(0, false);
+
+        $hayLen = $context->builder->load(
+            $context->builder->structGep($haystack, $map['length'])
+        );
+        $needleLen = $context->builder->load(
+            $context->builder->structGep($needle, $map['length'])
+        );
+        $hayPtr = $context->builder->structGep($haystack, $map['value']);
+        $needlePtr = $context->builder->structGep($needle, $map['value']);
+        $offsetVal = null === $offset ? $zero : $offset;
+        $lengthVal = null === $length ? $zero : $length;
+        $lengthIsNull = $i32->constInt(null === $length ? 1 : 0, false);
+        $fn = $context->lookupFunction('phpc_substr_count');
+
+        return $context->builder->call(
+            $fn,
+            $hayPtr,
+            $context->builder->truncOrBitCast($hayLen, $sizeT),
+            $needlePtr,
+            $context->builder->truncOrBitCast($needleLen, $sizeT),
+            $offsetVal,
+            $lengthVal,
+            $lengthIsNull
+        );
+    }
+
+    private static function countInline(
+        Context $context,
+        Value $haystack,
+        Value $needle,
+        ?Value $offset,
+        ?Value $length
+    ): Value {
         $map = $context->structFieldMap['__string__'];
         $hayLen = $context->builder->load(
             $context->builder->structGep($haystack, $map['length'])
@@ -37,16 +92,7 @@ final class JitSubstrCount
         $hayPtr = $context->builder->structGep($haystack, $map['value']);
         $needlePtr = $context->builder->structGep($needle, $map['value']);
 
-        $startOffset = null === $offset ? $zero : self::clampIndex($context, $offset, $zero, $hayLen);
-        $end = $hayLen;
-        if (null !== $length) {
-            $end = self::clampIndex(
-                $context,
-                $context->builder->addNoSignedWrap($startOffset, $length),
-                $zero,
-                $hayLen
-            );
-        }
+        [$startOffset, $end] = self::normalizeWindow($context, $hayLen, $offset, $length);
 
         $limit = $context->builder->sub($end, $needleLen);
         $pastStart = $context->builder->icmp(Builder::INT_SLT, $limit, $startOffset);
@@ -128,18 +174,61 @@ final class JitSubstrCount
         return $donePhi;
     }
 
-    private static function clampIndex(Context $context, Value $index, Value $min, Value $max): Value
-    {
-        $cmpLo = $context->builder->icmp(Builder::INT_SLT, $index, $min);
+    /**
+     * @return array{0: Value, 1: Value} start offset and exclusive end (php-src php_substr_count window)
+     */
+    private static function normalizeWindow(
+        Context $context,
+        Value $hayLen,
+        ?Value $offset,
+        ?Value $length
+    ): array {
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
 
+        $startOffset = $zero;
+        $searchLen = $hayLen;
+
+        if (null !== $offset) {
+            $normOffset = $offset;
+            $isNegative = $context->builder->icmp(Builder::INT_SLT, $normOffset, $zero);
+            $normOffset = $context->builder->select(
+                $isNegative,
+                $context->builder->addNoSignedWrap($normOffset, $hayLen),
+                $normOffset
+            );
+            $startOffset = $normOffset;
+            $searchLen = $context->builder->sub($hayLen, $startOffset);
+        }
+
+        if (null !== $length) {
+            $normLen = $length;
+            $isNegative = $context->builder->icmp(Builder::INT_SLT, $normLen, $zero);
+            $normLen = $context->builder->select(
+                $isNegative,
+                $context->builder->addNoSignedWrap($normLen, $searchLen),
+                $normLen
+            );
+            $normLen = $context->builder->select(
+                $context->builder->icmp(Builder::INT_SLT, $normLen, $zero),
+                $zero,
+                $normLen
+            );
+            $normLen = self::clampMax($context, $normLen, $searchLen);
+            $searchLen = $normLen;
+        }
+
+        $end = $context->builder->addNoSignedWrap($startOffset, $searchLen);
+
+        return [$startOffset, $end];
+    }
+
+    private static function clampMax(Context $context, Value $index, Value $max): Value
+    {
         return $context->builder->select(
-            $cmpLo,
-            $min,
-            $context->builder->select(
-                $context->builder->icmp(Builder::INT_SGT, $index, $max),
-                $max,
-                $index
-            )
+            $context->builder->icmp(Builder::INT_SGT, $index, $max),
+            $max,
+            $index
         );
     }
 }

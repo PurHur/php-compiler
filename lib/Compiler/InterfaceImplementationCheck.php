@@ -18,7 +18,7 @@ final class InterfaceImplementationCheck
     /** @var array<string, array{display: string, extends: list<string>, methods: list<string>}> */
     private array $interfaces = [];
 
-    /** @var array<string, array{display: string, abstract: bool, extends: ?string, implements: list<string>, methods: array<string, true>}> */
+    /** @var array<string, array{display: string, abstract: bool, extends: ?string, implements: list<string>, methods: array<string, true>, abstractMethods: array<string, true>}> */
     private array $classes = [];
 
     /** @var array<string, array{display: string, methods: array<string, true>}> */
@@ -119,6 +119,7 @@ final class InterfaceImplementationCheck
             'extends' => $parentLc,
             'implements' => $implements,
             'methods' => $methods,
+            'abstractMethods' => $this->collectAbstractMethods($class->stmts->children),
         ];
     }
 
@@ -135,6 +136,26 @@ final class InterfaceImplementationCheck
                 continue;
             }
             if ($this->methodHasBody($member)) {
+                $methods[strtolower($member->func->name)] = true;
+            }
+        }
+
+        return $methods;
+    }
+
+    /**
+     * @param list<Op> $members
+     *
+     * @return array<string, true>
+     */
+    private function collectAbstractMethods(array $members): array
+    {
+        $methods = [];
+        foreach ($members as $member) {
+            if (!$member instanceof Op\Stmt\ClassMethod) {
+                continue;
+            }
+            if (!$this->methodHasBody($member)) {
                 $methods[strtolower($member->func->name)] = true;
             }
         }
@@ -159,7 +180,10 @@ final class InterfaceImplementationCheck
                 continue;
             }
             $provided = $this->classProvidedMethods($lc);
-            $missing = $this->missingInterfaceMethods($class['implements'], $provided);
+            $missing = array_merge(
+                $this->missingInterfaceMethods($class['implements'], $provided),
+                $this->missingParentAbstractMethods($class['extends'], $provided)
+            );
             if ([] === $missing) {
                 continue;
             }
@@ -236,6 +260,33 @@ final class InterfaceImplementationCheck
             if (!isset($provided[$methodLc])) {
                 $missing[] = [$ifaceDisplay, $methodLc];
             }
+        }
+
+        return $missing;
+    }
+
+    /**
+     * @param array<string, true> $provided
+     *
+     * @return list<array{0: string, 1: string}>
+     */
+    private function missingParentAbstractMethods(?string $parentLc, array $provided): array
+    {
+        $missing = [];
+        $visited = [];
+        $current = $parentLc;
+        while (null !== $current && !isset($visited[$current])) {
+            $visited[$current] = true;
+            if (!isset($this->classes[$current])) {
+                break;
+            }
+            $parent = $this->classes[$current];
+            foreach ($parent['abstractMethods'] as $methodLc => $_) {
+                if (!isset($provided[$methodLc])) {
+                    $missing[] = [$parent['display'], $methodLc];
+                }
+            }
+            $current = $parent['extends'];
         }
 
         return $missing;

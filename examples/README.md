@@ -184,7 +184,7 @@ curl -s http://127.0.0.1:8080/example.php
 curl -s http://127.0.0.1:8080/example.php/ping
 ```
 
-AOT: `phpc build --project examples/009-FastCGIWeb` when LLVM is ready. Init scaffold: `./phpc init --profile fastcgiweb my-app` ([#2342](https://github.com/PurHur/php-compiler/issues/2342)); template parity: `INIT_FASTCGIWEB_PARITY_GATE=1` in `ci-fast`. CI serve smoke: opt-in `FASTCGI_WEB_SMOKE_GATE=1` · `make examples-fastcgiweb-smoke` ([#2351](https://github.com/PurHur/php-compiler/issues/2351)).
+AOT: `phpc build --project examples/009-FastCGIWeb` when LLVM is ready. Init scaffold: `./phpc init --profile fastcgiweb my-app` ([#2342](https://github.com/PurHur/php-compiler/issues/2342)); template parity: `INIT_FASTCGIWEB_PARITY_GATE=1` in `ci-fast`. CI serve smoke: default-on `FASTCGI_WEB_SMOKE_GATE=1` · `make examples-fastcgiweb-smoke` ([#2351](https://github.com/PurHur/php-compiler/issues/2351), [#2369](https://github.com/PurHur/php-compiler/issues/2369)).
 
 ### 002-StaticWeb
 
@@ -278,14 +278,14 @@ For **009-FastCGIWeb**, the benchmark row is omitted until `phpc lint --all exam
 
 |         Example Name |      Native PHP |      bin/vm.php |     bin/jit.php | bin/compile.php |      ./compiled |
 |----------------------|-----------------|-----------------|-----------------|-----------------|-----------------|
-|       000-HelloWorld |         0.00890 |         0.04950 |         0.19440 |         1.64668 |         0.00106 |
-|        001-SimpleWeb |         0.00828 |         0.05050 |         0.20123 |         1.60901 |         0.00112 |
-|        002-StaticWeb |         0.00948 |         0.05241 |         0.19791 |         1.60500 |         0.00116 |
-|       003-MiniWebApp |         0.00832 |         0.09853 |         0.37581 |             n/a |             n/a |
-|          004-ApiJson |         0.00868 |         0.04865 |         0.19223 |         1.57579 |         0.00112 |
-|      005-SessionsWeb |         0.00962 |         0.05271 |         0.20867 |         1.66392 |         0.00340 |
-|    006-FileUploadWeb |         0.00886 |         0.05306 |         0.21228 |         1.64037 |         0.00111 |
-|        007-ThrowsWeb |         0.00807 |         0.05077 |         0.20271 |         1.65134 |         0.00097 |
-|    008-SelfHostProbe |         0.00839 |         0.04889 |         0.19755 |         1.61155 |         0.00117 |
-|       009-FastCGIWeb |         0.00880 |         0.04914 |         0.20435 |         1.65361 |         0.00104 |
+|       000-HelloWorld |         0.00790 |         0.06942 |         0.25238 |         3.43904 |         0.00111 |
+|        001-SimpleWeb |         0.00815 |         0.07362 |         0.24972 |         3.48373 |         0.00127 |
+|        002-StaticWeb |         0.00787 |         0.07071 |         0.25628 |         3.79083 |         0.00122 |
+|       003-MiniWebApp |         0.00815 |         0.09864 |         0.24346 |             n/a |             n/a |
+|          004-ApiJson |         0.00777 |         0.06538 |         0.25183 |         3.38246 |         0.00123 |
+|      005-SessionsWeb |         0.01000 |         0.07074 |         0.26034 |             n/a |             n/a |
+|    006-FileUploadWeb |         0.00808 |         0.04762 |         0.04799 |         5.30625 |         0.00100 |
+|        007-ThrowsWeb |         0.00810 |         0.07519 |         0.07293 |         5.23089 |         0.00105 |
+|    008-SelfHostProbe |         0.00835 |         0.07029 |         0.24949 |         3.35477 |         0.00120 |
+|       009-FastCGIWeb |         0.00812 |         0.07063 |         0.26357 |         5.24895 |         0.00081 |
 <!-- benchmark table end -->

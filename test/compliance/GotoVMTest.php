@@ -16,7 +16,13 @@ class GotoVMTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
-        foreach (['goto.phpt'] as $file) {
+        foreach ([
+            'goto.phpt',
+            'goto_try_finally_before_label.phpt',
+            'goto_invalid_into_loop.phpt',
+            'goto_invalid_into_finally.phpt',
+            'goto_invalid_out_of_finally.phpt',
+        ] as $file) {
             $path = __DIR__ . '/cases/language/' . $file;
             $name = preg_replace('/\.phpt$/', '', $file) ?: $file;
             yield $name => self::parsePHPT($path, $file);

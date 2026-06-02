@@ -34,10 +34,10 @@ final class str_starts_with extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $haystack->type || Variable::TYPE_STRING !== $needle->type) {
-            throw new \LogicException('str_starts_with() only supports strings in this compiler build');
-        }
-        $frame->returnVar->bool(VmString::startsWith($haystack->toString(), $needle->toString()));
+        $frame->returnVar->bool(VmString::startsWith(
+            VmString::coerceOperand($haystack),
+            VmString::coerceOperand($needle)
+        ));
     }
 
     public Context $context;

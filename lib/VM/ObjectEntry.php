@@ -25,17 +25,29 @@ class ObjectEntry {
     /** True after `__construct` returns (or immediately when none is defined). */
     public bool $constructed = false;
 
+    /** Live Variable references holding this object (#3144). */
+    public int $refCount = 0;
+
+    /** True after user `__destruct()` has run (or when class has none). */
+    public bool $destructorInvoked = false;
+
     /** User generator instance state (issue #167). */
     public ?GeneratorState $generatorState = null;
 
     /** Anonymous function / closure body (issue #72). */
     public ?ClosureState $closureState = null;
 
+    /** Closure target for ReflectionFunction instances (#4123). */
+    public ?ClosureState $reflectionClosureState = null;
+
     /** Initializer for lazy proxy objects (#3317). */
     public ?ClosureState $lazyInitializer = null;
 
     /** True until first property access or method call runs the lazy initializer. */
     public bool $lazyPending = false;
+
+    /** True for ghost lazy objects (in-place init); false for proxy strategy (#4026). */
+    public bool $lazyGhost = false;
 
     /** True for backed/unit enum case singleton objects (#3518). */
     public bool $isEnumCase = false;
@@ -78,6 +90,7 @@ class ObjectEntry {
     public function destroyForGc(): void
     {
         foreach ($this->properties as $prop) {
+            ObjectLifetime::releaseDirectObject($prop);
             if (Variable::TYPE_INDIRECT === $prop->type) {
                 $prop->resolveIndirect()->null();
             } else {
@@ -88,6 +101,7 @@ class ObjectEntry {
         $this->closureState = null;
         $this->lazyInitializer = null;
         $this->lazyPending = false;
+        $this->lazyGhost = false;
         $this->fiberState = null;
     }
 
@@ -132,7 +146,22 @@ class ObjectEntry {
         if (!isset($this->properties[$name])) {
             return;
         }
-        $this->properties[$name]->null();
+        $slot = $this->properties[$name];
+        foreach ($this->class->properties as $property) {
+            if ($property->name !== $name) {
+                continue;
+            }
+            if ($property->prototype->isUndefined()) {
+                $slot->reset();
+                $slot->type = Variable::TYPE_UNDEFINED;
+                $slot->objectPropertyOwner = $this;
+                $slot->objectPropertyName = $name;
+
+                return;
+            }
+            break;
+        }
+        $slot->null();
     }
 
     /** @return array<string, Variable> */
@@ -189,6 +218,9 @@ class ObjectEntry {
      */
     public function compareSpaceship(self $other): int
     {
+        if (EnumCaseSupport::isEnumCase($this) && EnumCaseSupport::isEnumCase($other)) {
+            return EnumCaseSupport::compareSpaceship($this, $other);
+        }
         if ($this === $other) {
             return 0;
         }
@@ -221,12 +253,13 @@ class ObjectEntry {
     public function cloneShallow(): self {
         $clone = new self($this->class);
         foreach ($this->properties as $name => $var) {
-            $clone->properties[$name]->copyFrom($var);
+            $clone->properties[$name]->copyFromForClone($var);
         }
         $clone->constructed = $this->constructed;
         $clone->closureState = $this->closureState;
         $clone->lazyInitializer = $this->lazyInitializer;
         $clone->lazyPending = $this->lazyPending;
+        $clone->lazyGhost = $this->lazyGhost;
 
         return $clone;
     }

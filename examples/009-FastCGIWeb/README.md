@@ -58,10 +58,10 @@ Production nginx + `PHPC_DEPLOY_ROOT`: [docs/deploy-web-aot.md](../../docs/deplo
 | VM `phpc run` | ✅ health `ok` |
 | VM `phpc serve` | ✅ health + `/ping` diagnostics |
 | AOT `phpc build --project` | ✅ when LLVM ready (`ExamplesCompileTest`) |
-| AOT CGI execute | ✅ opt-in `FASTCGI_WEB_AOT_SMOKE_GATE=1` ([#2352](https://github.com/PurHur/php-compiler/issues/2352)); `EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh` |
+| AOT CGI execute | ✅ default-on `FASTCGI_WEB_AOT_SMOKE_GATE=1` ([#2352](https://github.com/PurHur/php-compiler/issues/2352), [#2369](https://github.com/PurHur/php-compiler/issues/2369)); `EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh` |
 | Deploy CGI smoke | ✅ opt-in `FASTCGI_WEB_DEPLOY_SMOKE_GATE=1` ([#2359](https://github.com/PurHur/php-compiler/issues/2359)); `make examples-fastcgiweb-deploy-smoke` |
 | FastCGI adapter execute | ✅ `phpc fcgi --project .` ([#173](https://github.com/PurHur/php-compiler/issues/173), [#2427](https://github.com/PurHur/php-compiler/issues/2427)); `FASTCGI_SMOKE_GATE=1` for PHPUnit |
-| CI serve smoke | ✅ opt-in `FASTCGI_WEB_SMOKE_GATE=1` ([#2351](https://github.com/PurHur/php-compiler/issues/2351)); `make examples-fastcgiweb-smoke` |
+| CI serve smoke | ✅ default-on `FASTCGI_WEB_SMOKE_GATE=1` ([#2351](https://github.com/PurHur/php-compiler/issues/2351), [#2369](https://github.com/PurHur/php-compiler/issues/2369)); `make examples-fastcgiweb-smoke` |
 
 ## Related
 

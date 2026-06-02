@@ -70,8 +70,10 @@ final class GeneratorJITTest extends BaseTest
         yield 'yield from array' => ['generator_jit_yield_from.phpt'];
         yield 'yield + yield from' => ['generator_jit_yield_mixed.phpt'];
         yield 'yield from generator' => ['generator_jit_yield_from_generator.phpt'];
+        yield 'yield from iterator' => ['generator_jit_yield_from_iterator.phpt'];
         yield 'dynamic yield from variable' => ['generator_jit_dyn_yield_from.phpt'];
         yield 'computed yield prefix' => ['generator_jit_computed_yield.phpt'];
+        yield 'try/catch resume' => ['generator_try_catch_jit.phpt'];
     }
 }
 

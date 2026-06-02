@@ -17,8 +17,9 @@ final class dirname extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('dirname() requires exactly one argument');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('dirname() expects 1 or 2 arguments');
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
@@ -27,16 +28,25 @@ final class dirname extends Internal
         if (Variable::TYPE_STRING !== $v->type) {
             throw new \LogicException('dirname() only supports strings in this compiler build');
         }
-        $frame->returnVar->string(VmString::dirname($v->toString()));
+        $levels = 1;
+        if (2 === $argc) {
+            $levels = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        }
+        $frame->returnVar->string(VmString::dirname($v->toString(), $levels));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('dirname() requires exactly one argument');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('dirname() expects 1 or 2 arguments');
         }
         $path = JitStringArg::lower($context, $args[0], 'dirname() path');
+        if (1 === $argc) {
+            return JitPath::dirname($context, $path);
+        }
+        $levels = JitDirname::coerceLevels($context, $args[1]);
 
-        return JitPath::dirname($context, $path);
+        return JitPath::dirnameWithLevels($context, $path, $levels);
     }
 }

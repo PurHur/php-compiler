@@ -7,7 +7,7 @@ namespace PHPCompiler\Ast;
 /**
  * Rewrite PHP 8.4 asymmetric property visibility for nikic/php-parser 4.x (#3165).
  *
- * Transforms `public private(set) Type $prop` into a parseable form plus an internal marker
+ * Transforms asymmetric visibility property syntax into a parseable form plus an internal marker
  * comment consumed by PHPCfg (php-src: Zend/zend_compile.c ZEND_ACC_*_SET flags).
  */
 final class AsymmetricVisibilityRewriter

@@ -48,6 +48,51 @@ final class VmFs
         return (int) $stat['mtime'];
     }
 
+    public static function fileAtime(string $path) {
+        $stat = @stat($path);
+        if (false === $stat) {
+            return false;
+        }
+
+        return (int) $stat['atime'];
+    }
+
+    public static function fileCtime(string $path) {
+        $stat = @stat($path);
+        if (false === $stat) {
+            return false;
+        }
+
+        return (int) $stat['ctime'];
+    }
+
+    public static function fileInode(string $path) {
+        $stat = @stat($path);
+        if (false === $stat) {
+            return false;
+        }
+
+        return (int) $stat['ino'];
+    }
+
+    public static function fileOwner(string $path) {
+        $stat = @stat($path);
+        if (false === $stat) {
+            return false;
+        }
+
+        return (int) $stat['uid'];
+    }
+
+    public static function fileGroup(string $path) {
+        $stat = @stat($path);
+        if (false === $stat) {
+            return false;
+        }
+
+        return (int) $stat['gid'];
+    }
+
     public static function filePerms(string $path) {
         $stat = @stat($path);
         if (false === $stat) {
@@ -73,6 +118,24 @@ final class VmFs
    */
     public static function statInfo(string $path, bool $lstat = false) {
         $raw = $lstat ? @lstat($path) : @stat($path);
+        if (false === $raw) {
+            return false;
+        }
+
+        return self::phpStatArrayToHashTable($raw);
+    }
+
+    /**
+     * fstat() array for an open stream handle (issue #3482).
+     *
+     * @return HashTable|false
+     */
+    public static function fstat(int $handle) {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        $raw = @fstat($fp);
         if (false === $raw) {
             return false;
         }
@@ -129,9 +192,105 @@ final class VmFs
         return @chmod($path, $permissions);
     }
 
+    public static function resolveUserUid(Variable $user): ?int
+    {
+        if (Variable::TYPE_INTEGER === $user->type) {
+            return $user->toInt();
+        }
+        if (Variable::TYPE_STRING === $user->type) {
+            $name = $user->toString();
+            if ('' !== $name && ctype_digit($name)) {
+                return (int) $name;
+            }
+            if (\function_exists('posix_getpwnam')) {
+                $pw = @posix_getpwnam($name);
+                if (\is_array($pw) && isset($pw['uid'])) {
+                    return (int) $pw['uid'];
+                }
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    public static function resolveGroupGid(Variable $group): ?int
+    {
+        if (Variable::TYPE_INTEGER === $group->type) {
+            return $group->toInt();
+        }
+        if (Variable::TYPE_STRING === $group->type) {
+            $name = $group->toString();
+            if ('' !== $name && ctype_digit($name)) {
+                return (int) $name;
+            }
+            if (\function_exists('posix_getgrnam')) {
+                $gr = @posix_getgrnam($name);
+                if (\is_array($gr) && isset($gr['gid'])) {
+                    return (int) $gr['gid'];
+                }
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    public static function chown(string $path, Variable $user): bool
+    {
+        $uid = self::resolveUserUid($user);
+        if (null === $uid) {
+            return false;
+        }
+
+        return @chown($path, $uid);
+    }
+
+    public static function lchown(string $path, Variable $user): bool
+    {
+        $uid = self::resolveUserUid($user);
+        if (null === $uid) {
+            return false;
+        }
+
+        return @lchown($path, $uid);
+    }
+
+    public static function chgrp(string $path, Variable $group): bool
+    {
+        $gid = self::resolveGroupGid($group);
+        if (null === $gid) {
+            return false;
+        }
+
+        return @chgrp($path, $gid);
+    }
+
+    public static function lchgrp(string $path, Variable $group): bool
+    {
+        $gid = self::resolveGroupGid($group);
+        if (null === $gid) {
+            return false;
+        }
+
+        return @lchgrp($path, $gid);
+    }
+
     public static function rename(string $from, string $to): bool
     {
         return @rename($from, $to);
+    }
+
+    public static function hardLink(string $target, string $link): bool
+    {
+        return @link($target, $link);
+    }
+
+    public static function symlink(string $target, string $link): bool
+    {
+        return @symlink($target, $link);
     }
 
     /** Prefix for multipart upload temps (lib/Web/Superglobals.php, AOT sg_set_file_entry). */
@@ -234,6 +393,18 @@ final class VmFs
         return $data;
     }
 
+    /**
+     * @return list<string>|false
+     */
+    public static function file(string $path, int $flags = 0) {
+        $lines = @\file($path, $flags);
+        if (false === $lines) {
+            return false;
+        }
+
+        return $lines;
+    }
+
     public static function readfile(string $path) {
         $fp = @fopen($path, 'rb');
         if (false === $fp) {
@@ -280,6 +451,19 @@ final class VmFs
 
     public static function fopen(string $path, string $mode) {
         $fp = @fopen($path, $mode);
+        if (false === $fp) {
+            return false;
+        }
+        $id = ++self::$nextHandleId;
+        self::$handles[$id] = $fp;
+
+        return $id;
+    }
+
+    /** @return int|false */
+    public static function tmpfile()
+    {
+        $fp = @\tmpfile();
         if (false === $fp) {
             return false;
         }
@@ -381,6 +565,92 @@ final class VmFs
         }
 
         return @\fflush($fp);
+    }
+
+    /**
+     * stream_set_chunk_size() — php-src ext/standard/streams.c (issue #3754).
+     *
+     * @return int|false previous chunk size
+     */
+    public static function streamSetChunkSize(int $handle, int $chunkSize) {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        $previous = @\stream_set_chunk_size($fp, $chunkSize);
+        if (false === $previous) {
+            return false;
+        }
+
+        return (int) $previous;
+    }
+
+    /**
+     * stream_set_write_buffer() — php-src ext/standard/streams.c (issue #3755).
+     *
+     * @return int|false previous buffer size
+     */
+    public static function streamSetWriteBuffer(int $handle, int $buffer) {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        $previous = @\stream_set_write_buffer($fp, $buffer);
+        if (false === $previous) {
+            return false;
+        }
+
+        return (int) $previous;
+    }
+
+    /**
+     * stream_set_read_buffer() — php-src ext/standard/streams.c (issue #3755).
+     *
+     * @return int|false previous buffer size
+     */
+    public static function streamSetReadBuffer(int $handle, int $buffer) {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        $previous = @\stream_set_read_buffer($fp, $buffer);
+        if (false === $previous) {
+            return false;
+        }
+
+        return (int) $previous;
+    }
+
+    /**
+     * stream_set_timeout() — php-src ext/standard/streams.c (issue #3754).
+     */
+    public static function streamSetTimeout(int $handle, int $seconds, int $microseconds = 0): bool
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        if (@\stream_set_timeout($fp, $seconds, $microseconds)) {
+            return true;
+        }
+        $meta = @\stream_get_meta_data($fp);
+        if (!\is_array($meta)) {
+            return false;
+        }
+        $streamType = (string) ($meta['stream_type'] ?? '');
+
+        // php-src: read timeout applies to socket transports; memory/file are no-op success (#3754).
+        return !\in_array($streamType, ['tcp', 'udp', 'udg', 'unix', 'ssl', 'tls'], true);
+    }
+
+    public static function ftruncate(int $handle, int $size): bool
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+
+        return @\ftruncate($fp, $size);
     }
 
     public static function ftell(int $handle) {
@@ -558,9 +828,74 @@ final class VmFs
         return $path;
     }
 
+    /**
+     * stream_get_contents() — read remaining bytes (ext/standard/file.c, #3142).
+     *
+     * @return string|false
+     */
+    public static function streamGetContents(int $handle, int $maxlength = -1, int $offset = -1)
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        if ($offset < -1) {
+            return false;
+        }
+        if ($offset >= 0 && 0 !== @\fseek($fp, $offset, \SEEK_SET)) {
+            return false;
+        }
+        if ($maxlength < 0) {
+            $data = @\stream_get_contents($fp);
+        } elseif (0 === $maxlength) {
+            return '';
+        } else {
+            $data = @\stream_get_contents($fp, $maxlength);
+        }
+        if (false === $data) {
+            return false;
+        }
+
+        return $data;
+    }
+
+    /**
+     * get_resource_type() for fopen() stream handles (#3142).
+     */
+    public static function getResourceType(int $handle): ?string
+    {
+        if (!isset(self::$handles[$handle])) {
+            return null;
+        }
+
+        return 'stream';
+    }
+
     public static function isValidHandle(int $handle): bool
     {
         return isset(self::$handles[$handle]);
+    }
+
+    /**
+     * get_resources() — active stream handles (php-src basic_functions.c / zend_list.c, #3646).
+     *
+     * @throws \ValueError when $type is not a supported resource type filter
+     */
+    public static function getResourcesTable(?string $type = null): HashTable
+    {
+        if (null !== $type && 'stream' !== $type) {
+            throw new \ValueError('get_resources(): Argument #1 ($type) must be a valid resource type');
+        }
+        $ht = new HashTable();
+        $index = 1;
+        foreach (self::$handles as $id => $fp) {
+            $value = new Variable();
+            $value->streamHandle((int) $id);
+            $ht->addIndex($index, $value);
+            ++$index;
+        }
+
+        return $ht;
     }
 
     private static function lookup(int $handle): mixed
@@ -585,5 +920,37 @@ final class VmFs
     public static function chdir(string $path): bool
     {
         return @\chdir($path);
+    }
+
+    /**
+     * disk_free_space() / diskfreespace() — bytes available on filesystem (php-src filestat.c).
+     *
+     * @return float|false
+     */
+    public static function diskFreeSpace(?string $path)
+    {
+        $path = $path ?? '.';
+        $result = @\disk_free_space($path);
+        if (false === $result) {
+            return false;
+        }
+
+        return (float) $result;
+    }
+
+    /**
+     * disk_total_space() / disktotalspace() — total bytes on filesystem (php-src filestat.c).
+     *
+     * @return float|false
+     */
+    public static function diskTotalSpace(?string $path)
+    {
+        $path = $path ?? '.';
+        $result = @\disk_total_space($path);
+        if (false === $result) {
+            return false;
+        }
+
+        return (float) $result;
     }
 }

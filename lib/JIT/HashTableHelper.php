@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\string_trim;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -1313,17 +1314,38 @@ final class HashTableHelper
 
             return;
         }
-        if (Variable::TYPE_STRING === $key->type) {
-            $keyPtr = $context->helper->loadValue($key);
-            self::setAtStringKey($context, $ht, $keyPtr, $element);
+        if (Variable::TYPE_OBJECT === $key->type || Variable::TYPE_HASHTABLE === $key->type) {
+            self::emitIllegalOffsetType($context);
 
             return;
         }
-        $index = $context->builder->truncOrBitCast(
+        if (Variable::TYPE_STRING === $key->type) {
+            $keyPtr = $context->helper->loadValue($key);
+            self::setAtKeyCoercingNumericString($context, $ht, $keyPtr, $element);
+
+            return;
+        }
+        $index = self::arrayKeyToIndex($context, $key);
+        self::setAtIndex($context, $ht, $index, $element);
+    }
+
+    /**
+     * php-src: float array keys truncate toward zero (zend_dval_to_lval).
+     */
+    private static function arrayKeyToIndex(Context $context, Variable $key): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        if (Variable::TYPE_NATIVE_DOUBLE === $key->type) {
+            return $context->builder->fptosi(
+                $context->helper->loadValue($key),
+                $sizeT
+            );
+        }
+
+        return $context->builder->truncOrBitCast(
             $context->helper->loadValue($key),
             $sizeT
         );
-        self::setAtIndex($context, $ht, $index, $element);
     }
 
     private static function addNativeElement(
@@ -1333,10 +1355,7 @@ final class HashTableHelper
         ?Variable $key
     ): void {
         if (null !== $key) {
-            $index = $context->builder->truncOrBitCast(
-                $context->helper->loadValue($key),
-                $context->getTypeFromString('size_t')
-            );
+            $index = self::arrayKeyToIndex($context, $key);
         } else {
             $index = $context->constantFromInteger($array->nextFreeElement, 'size_t');
             ++$array->nextFreeElement;
@@ -1768,6 +1787,61 @@ final class HashTableHelper
         $context->builder->positionAtEnd($done);
     }
 
+    /**
+     * Array element write: numeric strings use the int index slot (Zend zend_hash.c; #4151).
+     */
+    public static function setAtKeyCoercingNumericString(
+        Context $context,
+        Value $ht,
+        Value $keyPtr,
+        Variable $element
+    ): void {
+        $builder = $context->builder;
+        $map = $context->structFieldMap['__string__'];
+        $len = $builder->load($builder->structGep($keyPtr, $map['length']));
+        $charPtr = $builder->structGep($keyPtr, $map['value']);
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $zeroLen = $len->typeOf()->constInt(0, false);
+
+        $useStr = BasicBlockHelper::append($context, 'arr_key_str_'.self::nextSeq());
+        $tryInt = BasicBlockHelper::append($context, 'arr_key_try_int_'.self::nextSeq());
+        $useInt = BasicBlockHelper::append($context, 'arr_key_int_'.self::nextSeq());
+        $done = BasicBlockHelper::append($context, 'arr_key_done_'.self::nextSeq());
+
+        $isEmpty = $builder->icmp(Builder::INT_EQ, $len, $zeroLen);
+        $builder->branchIf($isEmpty, $useStr, $tryInt);
+
+        $builder->positionAtEnd($tryInt);
+        $endPtrSlot = $builder->alloca($i8p, 1, 'arr_key_strtol_end');
+        $builder->store($i8p->constNull(), $endPtrSlot);
+        $parsed = $builder->call(
+            $context->lookupFunction('strtol'),
+            $charPtr,
+            $endPtrSlot,
+            $context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $endPtr = $builder->load($endPtrSlot);
+        $endOffset = $builder->sub(
+            $builder->ptrToInt($endPtr, $i64),
+            $builder->ptrToInt($charPtr, $i64)
+        );
+        $consumedAll = $builder->icmp(Builder::INT_EQ, $endOffset, $len);
+        $builder->branchIf($consumedAll, $useInt, $useStr);
+
+        $builder->positionAtEnd($useInt);
+        $index = $builder->truncOrBitCast($parsed, $sizeT);
+        self::setAtIndex($context, $ht, $index, $element);
+        $builder->branch($done);
+
+        $builder->positionAtEnd($useStr);
+        self::setAtStringKey($context, $ht, $keyPtr, $element);
+        $builder->branch($done);
+
+        $builder->positionAtEnd($done);
+    }
+
     public static function setAtStringKey(
         Context $context,
         Value $ht,
@@ -1794,6 +1868,14 @@ final class HashTableHelper
             case Variable::TYPE_NATIVE_BOOL:
                 $context->builder->call(
                     $context->lookupFunction('__hashtable__setStringKeyBool'),
+                    $ht,
+                    $keyPtr,
+                    $context->helper->loadValue($element)
+                );
+                break;
+            case Variable::TYPE_NATIVE_DOUBLE:
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringKeyDouble'),
                     $ht,
                     $keyPtr,
                     $context->helper->loadValue($element)
@@ -2024,14 +2106,41 @@ final class HashTableHelper
     }
 
     /**
-     * Array-literal spread: append packed list then string keys (issue #141, #1361).
+     * Array-literal spread: append packed list then string keys (issue #141, #1361, #4453).
      */
     public static function spreadInto(Context $context, Variable $dest, Variable $source): void
     {
+        if (self::needsTraversableMaterialization($context, $source)) {
+            $srcPtr = \PHPCompiler\ext\standard\JitIteratorToArray::materializeHashtable(
+                $context,
+                $source,
+                true,
+                $source->userType ?? null
+            );
+            self::spreadPackedInto($context, $dest, $srcPtr);
+            self::spreadStringKeysInto($context, $dest, $srcPtr);
+
+            return;
+        }
         $srcHt = self::coerceToPackedHashtable($context, $source);
         $srcPtr = $context->helper->loadValue($srcHt);
         self::spreadPackedInto($context, $dest, $srcPtr);
         self::spreadStringKeysInto($context, $dest, $srcPtr);
+    }
+
+    private static function needsTraversableMaterialization(Context $context, Variable $source): bool
+    {
+        if (ListUnpackHelper::isDefinitelyArrayAtCompileTime($source)) {
+            return false;
+        }
+        if (GeneratorHelper::isGeneratorVariable($source)) {
+            return true;
+        }
+        if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $source, $source->userType ?? null)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -2044,6 +2153,9 @@ final class HashTableHelper
         if (1 === \count($entries)) {
             $only = $entries[0];
             if (\is_array($only) && isset($only['unpack'])) {
+                ListUnpackHelper::emitCallUnpackOperandCheck($context, $only['unpack']);
+                ListUnpackHelper::emitCheck($context, $only['unpack']);
+
                 return self::coerceToPackedHashtable($context, $only['unpack']);
             }
         }
@@ -2057,6 +2169,8 @@ final class HashTableHelper
         );
         foreach ($entries as $entry) {
             if (\is_array($entry) && isset($entry['unpack'])) {
+                ListUnpackHelper::emitCallUnpackOperandCheck($context, $entry['unpack']);
+                ListUnpackHelper::emitCheck($context, $entry['unpack']);
                 self::spreadInto($context, $destVar, $entry['unpack']);
                 continue;
             }
@@ -2154,5 +2268,13 @@ final class HashTableHelper
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($done);
+    }
+
+    private static function emitIllegalOffsetType(Context $context): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, 'Illegal offset type');
+        $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
     }
 }

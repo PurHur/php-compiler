@@ -23,8 +23,8 @@ final class VmErrorHandler
     ): Variable {
         $reporter = $context->errors;
         $mask = self::parseMask($maskVar);
-        $callbackName = self::callbackName($callback);
-        $previous = $reporter->pushHandler($callbackName, $mask);
+        $storedCallback = self::normalizeCallbackForStorage($callback);
+        $previous = $reporter->pushHandler($storedCallback, $mask);
 
         return self::handlerReturnValue($previous);
     }
@@ -49,28 +49,54 @@ final class VmErrorHandler
         return $mask->toInt();
     }
 
-    private static function callbackName(Variable $callback): ?string
+    private static function normalizeCallbackForStorage(Variable $callback): Variable
     {
         $resolved = $callback->resolveIndirect();
         if (Variable::TYPE_NULL === $resolved->type) {
-            return null;
-        }
-        if (Variable::TYPE_STRING !== $resolved->type) {
-            throw new \LogicException(ErrorHandlerCallbackPolicy::vmRejectionMessage());
-        }
-
-        return $resolved->toString();
-    }
-
-    public static function handlerReturnValue(?string $name): Variable
-    {
-        $out = new Variable();
-        if (null === $name) {
+            $out = new Variable();
             $out->null();
 
             return $out;
         }
-        $out->string($name);
+        if (VmClosureCall::isClosure($resolved)) {
+            $out = new Variable();
+            $out->copyFrom($resolved);
+
+            return $out;
+        }
+        if (Variable::TYPE_STRING === $resolved->type) {
+            $out = new Variable();
+            $out->string($resolved->toString());
+
+            return $out;
+        }
+        if (Variable::TYPE_ARRAY === $resolved->type) {
+            $out = new Variable();
+            $out->copyFrom($resolved);
+
+            return $out;
+        }
+        if (Variable::TYPE_OBJECT === $resolved->type) {
+            $out = new Variable();
+            $out->copyFrom($resolved);
+
+            return $out;
+        }
+
+        throw new \LogicException(
+            'set_error_handler() callback must be null, a closure, a string function name, an array callable, or an invokable object in this compiler build'
+        );
+    }
+
+    public static function handlerReturnValue(?Variable $previous): Variable
+    {
+        $out = new Variable();
+        if (null === $previous) {
+            $out->null();
+
+            return $out;
+        }
+        $out->copyFrom($previous);
 
         return $out;
     }
@@ -78,32 +104,119 @@ final class VmErrorHandler
     public static function invokeHandler(
         Context $context,
         Frame $frame,
-        string $functionName,
+        Variable $callback,
         int $errno,
         string $errstr,
         ?string $errfile,
         int $errline
     ): bool {
-        $fn = VmUserCall::resolveStringCallback($context, $functionName);
+        $callback = $callback->resolveIndirect();
+        if (VmClosureCall::isClosure($callback)) {
+            $closure = VmClosureCall::resolve($callback);
+            $result = VmClosureCall::invoke(
+                $context,
+                $closure,
+                self::errnoVar($errno),
+                self::errstrVar($errstr),
+                self::fileVar($errfile),
+                self::lineVar($errline)
+            );
+
+            return self::truthyHandlerResult($result);
+        }
+        if (Variable::TYPE_STRING === $callback->type) {
+            $fn = VmUserCall::resolveStringCallback($context, $callback->toString());
+            $result = $context->runtime->vm->invokePhpFunction(
+                $fn,
+                self::errnoVar($errno),
+                self::errstrVar($errstr),
+                self::fileVar($errfile),
+                self::lineVar($errline)
+            );
+
+            return self::truthyHandlerResult($result);
+        }
+        if (Variable::TYPE_ARRAY === $callback->type) {
+            $table = $callback->toArray();
+            $idx0 = new Variable(Variable::TYPE_INTEGER);
+            $idx0->int(0);
+            $idx1 = new Variable(Variable::TYPE_INTEGER);
+            $idx1->int(1);
+            if (!$table->keyExists($idx0) || !$table->keyExists($idx1)) {
+                throw new \LogicException('Invalid array callable');
+            }
+            $receiver = $table->findVariable($idx0, false)->resolveIndirect();
+            $methodName = $table->findVariable($idx1, false)->resolveIndirect()->toString();
+            if (Variable::TYPE_OBJECT !== $receiver->type) {
+                throw new \LogicException('Invalid array callable');
+            }
+            $result = $context->runtime->vm->invokeInstanceMethod(
+                $receiver->toObject(),
+                $methodName,
+                self::errnoVar($errno),
+                self::errstrVar($errstr),
+                self::fileVar($errfile),
+                self::lineVar($errline)
+            );
+
+            return self::truthyHandlerResult($result);
+        }
+        if (Variable::TYPE_OBJECT === $callback->type) {
+            $result = $context->runtime->vm->invokeInstanceMethod(
+                $callback->toObject(),
+                '__invoke',
+                self::errnoVar($errno),
+                self::errstrVar($errstr),
+                self::fileVar($errfile),
+                self::lineVar($errline)
+            );
+
+            return self::truthyHandlerResult($result);
+        }
+
+        throw new \LogicException(
+            'set_error_handler() callback must be null, a closure, a string function name, an array callable, or an invokable object in this compiler build'
+        );
+    }
+
+    private static function errnoVar(int $errno): Variable
+    {
         $errnoVar = new Variable(Variable::TYPE_INTEGER);
         $errnoVar->int($errno);
+
+        return $errnoVar;
+    }
+
+    private static function errstrVar(string $errstr): Variable
+    {
         $errstrVar = new Variable(Variable::TYPE_STRING);
         $errstrVar->string($errstr);
+
+        return $errstrVar;
+    }
+
+    private static function fileVar(?string $errfile): Variable
+    {
         $fileVar = new Variable();
         if (null === $errfile) {
             $fileVar->null();
         } else {
             $fileVar->string($errfile);
         }
+
+        return $fileVar;
+    }
+
+    private static function lineVar(int $errline): Variable
+    {
         $lineVar = new Variable(Variable::TYPE_INTEGER);
         $lineVar->int($errline);
-        $result = $context->runtime->vm->invokePhpFunction(
-            $fn,
-            $errnoVar,
-            $errstrVar,
-            $fileVar,
-            $lineVar
-        );
+
+        return $lineVar;
+    }
+
+    private static function truthyHandlerResult(Variable $result): bool
+    {
         $resolved = $result->resolveIndirect();
         if (Variable::TYPE_BOOLEAN === $resolved->type) {
             return $resolved->toBool();

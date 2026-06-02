@@ -64,17 +64,35 @@ class Block {
     /** @var array<int, int> scope slot index => Variable::TYPE_* for typed parameters */
     public array $paramTypeConstraints = [];
 
+    /** @var array<int, int> typed variadic element constraints — not applied to the packed array local (#4185) */
+    public array $paramVariadicElementTypeConstraints = [];
+
     /** @var array<int, GenericArrayTypeSpec> generic list/array parameter types (#3705) */
     public array $paramGenericArrayTypeSpecs = [];
 
+    /** @var array<int, GenericArrayTypeSpec> typed variadic element array specs (#4185) */
+    public array $paramVariadicElementGenericArrayTypeSpecs = [];
+
     /** @var array<int, list<string>> */
     public array $paramIntersectionConstraints = [];
+
+    /** @var array<int, list<string>> typed variadic element intersection constraints (#4185) */
+    public array $paramVariadicElementIntersectionConstraints = [];
 
     /** @var array<int, Op\Type> declared parameter types for reflection (#3355). */
     public array $paramDeclaredTypes = [];
 
     /** Declared return type AST for reflection (#3355), or null when untyped. */
     public ?Op\Type $returnDeclaredType = null;
+
+    /** @var array<int, list<array{kind: string, interfaces?: list<string>, name?: string}>> */
+    public array $paramDnfConstraints = [];
+
+    /** @var array<int, list<array{kind: string, interfaces?: list<string>, name?: string}>> typed variadic element DNF (#4185) */
+    public array $paramVariadicElementDnfConstraints = [];
+
+    /** DNF return type arms (#3094), or null when untyped / non-DNF. */
+    public ?array $returnDnfConstraints = null;
 
     /** Declared scalar return type for this function (issue #205), or null when untyped. */
     public ?int $returnTypeConstraint = null;
@@ -99,6 +117,9 @@ class Block {
 
     /** Parameter indices marked `#[\SensitiveParameter]` (issue #3351). */
     public array $paramSensitive = [];
+
+    /** Parameter scope slots with non-nullable type and `= null` default (Zend 8.2 implicit nullable, #4449). */
+    public array $paramImplicitNullable = [];
 
     /** Function body contains `yield` (issue #167). */
     public bool $isGenerator = false;
@@ -416,6 +437,7 @@ class Block {
             $this->func = $parent->func;
             $this->strictTypes = $parent->strictTypes;
             $this->returnTypeConstraint = $parent->returnTypeConstraint;
+            $this->returnDnfConstraints = $parent->returnDnfConstraints;
             $this->returnTypeVoid = $parent->returnTypeVoid;
             $this->returnTypeNever = $parent->returnTypeNever;
             $this->returnTypeStatic = $parent->returnTypeStatic;
@@ -423,7 +445,9 @@ class Block {
             $this->paramDeclaredTypes = $parent->paramDeclaredTypes;
             $this->paramTypeConstraints = $parent->paramTypeConstraints;
             $this->paramIntersectionConstraints = $parent->paramIntersectionConstraints;
+            $this->paramDnfConstraints = $parent->paramDnfConstraints;
             $this->paramNames = $parent->paramNames;
+            $this->paramImplicitNullable = $parent->paramImplicitNullable;
         }
     }
 
@@ -617,11 +641,13 @@ class Block {
             }
             if (null !== $frame && 'this' === self::resolveVariableName($op)) {
                 if (!empty($frame->callArgs)) {
-                    $scope[$pos] = $frame->callArgs[0];
+                    $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    $scope[$pos]->copyFrom($frame->callArgs[0]);
                     continue;
                 }
                 if (!empty($frame->calledArgs)) {
-                    $scope[$pos] = $frame->calledArgs[0];
+                    $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    $scope[$pos]->copyFrom($frame->calledArgs[0]);
                     continue;
                 }
             }
@@ -667,6 +693,10 @@ class Block {
                         continue;
                     }
                     if ($this->inheritUndefinedLocals) {
+                        if (self::usesMainScriptGlobalSlot($op, $this)) {
+                            $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
+                            continue;
+                        }
                         $scope[$pos] = new Variable(Variable::TYPE_UNDEFINED);
                         continue;
                     }
@@ -886,6 +916,55 @@ class Block {
         return false;
     }
 
+    /**
+     * php-cfg match lowering emits one TYPE_IDENTICAL per non-default arm (#143).
+     * MCJIT segfaults on successful arm merge; VM strict === is correct (#4516).
+     */
+    public static function containsMatchExpressionOpcodesInScriptScope(?self $root): bool
+    {
+        return self::countOpcodeTypesSkippingFuncDefs($root, OpCode::TYPE_IDENTICAL) >= 2
+            && self::containsOpcodeTypesSkippingFuncDefs($root, OpCode::TYPE_JUMPIF);
+    }
+
+    /**
+     * @param int ...$types OpCode::TYPE_* values to count
+     */
+    private static function countOpcodeTypesSkippingFuncDefs(?self $root, int ...$types): int
+    {
+        if (null === $root || [] === $types) {
+            return 0;
+        }
+        $want = array_fill_keys($types, true);
+        $count = 0;
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (isset($want[$op->type])) {
+                    ++$count;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        if (
+                            (OpCode::TYPE_FUNCDEF === $op->type || OpCode::TYPE_DECLARE_METHOD === $op->type)
+                            && $sub === $op->block1
+                        ) {
+                            continue;
+                        }
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return $count;
+    }
+
     /** Script or nested function body contains `yield` / `yield from` (issue #167). */
     public static function containsGeneratorOpcodes(?self $root): bool
     {
@@ -1063,6 +1142,73 @@ class Block {
     }
 
     /**
+     * Closures with {@code use ($var)} / {@code use (&$var)} — MCJIT IR verify / execute unstable (#72, #2483).
+     */
+    public static function containsClosureUseCaptureOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_CLOSURE === $op->type && [] !== $op->closureCaptures) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Closures with {@code use (&$var)} — MCJIT execute segfaults after IR verify (#72, #2483).
+     * {@see JIT::compileIncDecOp} uses {@see Variable::$valueBoxAliasPtr}; execute ABI still unstable.
+     */
+    public static function containsClosureByRefCaptureOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_CLOSURE === $op->type) {
+                    foreach ($op->closureCaptures as $capture) {
+                        if (!empty($capture['byRef'])) {
+                            return true;
+                        }
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * User functions/methods with non-void declared return types — MCJIT execute segfaults (#55, #2055).
      * LLVM IR verify passes ({@see FunctionReturnTypeJitCompileTest}); AOT execute is OK.
      */
@@ -1116,16 +1262,149 @@ class Block {
     }
 
     /**
+     * `readonly class` declarations — MCJIT execute for promoted/instance stores segfaults (#4082).
+     * Per-property `readonly` uses {@see containsReadonlyPropertyOpcodes}.
+     */
+    public static function containsReadonlyClassOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (
+                    OpCode::TYPE_DECLARE_CLASS === $op->type
+                    && null !== $op->arg3
+                    && isset($block->constants[$op->arg3])
+                    && VM\ClassFlags::isReadonly($block->constants[$op->arg3]->toInt())
+                ) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Per-property readonly declarations — MCJIT uncaught violation exits
+     * with segfault instead of surfacing pending exception (#3149, #1360).
+     */
+    public static function containsReadonlyPropertyOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_PROPERTY === $op->type && $op->propertyReadonly) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * CFG regions that MCJIT must not execute yet; `bin/jit.php` runs the VM instead (#2114, #167).
      * Simple try/catch without `finally` may pass MCJIT when {@see TryCatchJitExecuteTest} is green.
      */
+    /** Script or nested closure uses Fiber::suspend() (#4019). */
+    public static function containsFiberSuspendOpcodes(?self $root): bool
+    {
+        return self::walkFiberSuspendOpcodes($root, false);
+    }
+
+    /**
+     * Top-level script scope only (skips nested TYPE_FUNCDEF bodies; issue #4097).
+     * Fiber callbacks compile to MCJIT resume functions like generator bodies (#3074).
+     */
+    public static function containsFiberSuspendOpcodesInScriptScope(?self $root): bool
+    {
+        return self::walkFiberSuspendOpcodes($root, true);
+    }
+
+    private static function walkFiberSuspendOpcodes(?self $root, bool $skipFuncDefs): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_STATICCALL_INIT === $op->type) {
+                    $classOp = $block->getOperand($op->arg1);
+                    $nameOp = $block->getOperand($op->arg2);
+                    if (
+                        $classOp instanceof Literal
+                        && $nameOp instanceof Literal
+                        && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'Fiber')
+                        && 0 === strcasecmp($nameOp->value, 'suspend')
+                    ) {
+                        return true;
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        if ($skipFuncDefs && $sub === $op->block1) {
+                            if (
+                                OpCode::TYPE_FUNCDEF === $op->type
+                                || OpCode::TYPE_DECLARE_METHOD === $op->type
+                                || OpCode::TYPE_CLOSURE === $op->type
+                            ) {
+                                continue;
+                            }
+                        }
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     public static function requiresVmLowering(?self $root): bool
     {
         return self::containsGeneratorOpcodesInScriptScope($root)
             || self::containsFinallyOpcodesInScriptScope($root)
             || self::containsExceptionHandlingOpcodesInScriptScope($root)
-            || self::containsArrayAccessObjectOpcodes($root)
-            || self::containsDynamicStaticPropertyOpcodes($root)
-            || self::containsTypedNonVoidReturnOpcodes($root);
+            || self::containsMatchExpressionOpcodesInScriptScope($root)
+            || self::containsTypedNonVoidReturnOpcodes($root)
+            || self::containsClosureByRefCaptureOpcodes($root)
+            || self::containsReadonlyPropertyOpcodes($root)
+            || self::containsReadonlyClassOpcodes($root)
+            || self::containsFiberSuspendOpcodes($root);
     }
 }

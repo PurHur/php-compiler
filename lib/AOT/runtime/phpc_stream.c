@@ -21,6 +21,17 @@ extern __string__ *__string__init(long long size, const char *value);
 #define PHPC_MAX_STREAM_HANDLES 256
 
 static FILE *phpc_stream_handles[PHPC_MAX_STREAM_HANDLES];
+static int phpc_stream_chunk_size[PHPC_MAX_STREAM_HANDLES];
+static int phpc_stream_write_buffer[PHPC_MAX_STREAM_HANDLES];
+static int phpc_stream_read_buffer[PHPC_MAX_STREAM_HANDLES];
+static char phpc_stream_write_buffer_storage[PHPC_MAX_STREAM_HANDLES][8192];
+static char *phpc_stream_paths[PHPC_MAX_STREAM_HANDLES];
+
+#define PHPC_STREAM_DEFAULT_CHUNK_SIZE 8192
+#define PHPC_STREAM_DEFAULT_BUFFER_SIZE 8192
+
+typedef struct __hashtable__ __hashtable__;
+extern __hashtable__ *__phpc_stat(__string__ *path, int use_lstat);
 
 static size_t phpc_string_len(__string__ *s)
 {
@@ -97,6 +108,41 @@ int64_t __compiler_fopen(__string__ *path, __string__ *mode)
     for (id = 3; id < PHPC_MAX_STREAM_HANDLES; id++) {
         if (NULL == phpc_stream_handles[id]) {
             phpc_stream_handles[id] = fp;
+            phpc_stream_chunk_size[id] = PHPC_STREAM_DEFAULT_CHUNK_SIZE;
+            phpc_stream_write_buffer[id] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
+            phpc_stream_read_buffer[id] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
+            phpc_stream_paths[id] = strdup(phpc_string_data(path));
+            if (NULL == phpc_stream_paths[id]) {
+                fclose(fp);
+                phpc_stream_handles[id] = NULL;
+
+                return -1;
+            }
+
+            return id;
+        }
+    }
+    fclose(fp);
+
+    return -1;
+}
+
+int64_t __compiler_tmpfile(void)
+{
+    FILE *fp;
+    int64_t id;
+
+    fp = tmpfile();
+    if (NULL == fp) {
+        return -1;
+    }
+    for (id = 3; id < PHPC_MAX_STREAM_HANDLES; id++) {
+        if (NULL == phpc_stream_handles[id]) {
+            phpc_stream_handles[id] = fp;
+            phpc_stream_chunk_size[id] = PHPC_STREAM_DEFAULT_CHUNK_SIZE;
+            phpc_stream_write_buffer[id] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
+            phpc_stream_read_buffer[id] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
+            phpc_stream_paths[id] = NULL;
 
             return id;
         }
@@ -139,8 +185,15 @@ __string__ *__compiler_fread(int64_t handle, int64_t length)
     return result;
 }
 
+extern int __compiler_is_dir_resource(int64_t handle);
+
+#define PHPC_DIR_HANDLE_BASE ((int64_t) 0x10000000)
+
 int __compiler_is_resource(int64_t handle)
 {
+    if (handle >= PHPC_DIR_HANDLE_BASE && __compiler_is_dir_resource(handle)) {
+        return 1;
+    }
     /* fopen() handles start at 3; 1/2 are stdio aliases in phpc_resolve_stream (#3519). */
     if (handle <= 2) {
         return 0;
@@ -161,6 +214,10 @@ int __compiler_fclose(int64_t handle)
         return 0;
     }
     phpc_stream_handles[handle] = NULL;
+    if (NULL != phpc_stream_paths[handle]) {
+        free(phpc_stream_paths[handle]);
+        phpc_stream_paths[handle] = NULL;
+    }
 
     return fclose(fp) == 0 ? 1 : 0;
 }
@@ -267,6 +324,138 @@ int __compiler_fflush(int64_t handle)
     }
 
     return fflush(fp) == 0 ? 1 : 0;
+}
+
+int64_t __compiler_stream_set_chunk_size(int64_t handle, int64_t chunk_size)
+{
+    int previous;
+
+    if (handle <= 0 || handle >= PHPC_MAX_STREAM_HANDLES || NULL == phpc_stream_handles[handle]) {
+        return -1;
+    }
+    if (chunk_size <= 0) {
+        return -1;
+    }
+    previous = phpc_stream_chunk_size[handle];
+    if (0 == previous) {
+        previous = PHPC_STREAM_DEFAULT_CHUNK_SIZE;
+    }
+    phpc_stream_chunk_size[handle] = (int) chunk_size;
+
+    return (int64_t) previous;
+}
+
+int __compiler_stream_set_timeout(int64_t handle, int64_t seconds, int64_t microseconds)
+{
+    if (handle <= 0 || handle >= PHPC_MAX_STREAM_HANDLES || NULL == phpc_stream_handles[handle]) {
+        return 0;
+    }
+    if (seconds < 0 || microseconds < 0) {
+        return 0;
+    }
+    (void) seconds;
+    (void) microseconds;
+
+    /* AOT FILE* table is file-backed; socket timeout is applied in VM via host stream_set_timeout(). */
+    return 1;
+}
+
+static int phpc_apply_stream_buffer(FILE *fp, int64_t buffer, char *storage, size_t storage_size)
+{
+    if (0 == buffer) {
+        return setvbuf(fp, NULL, _IONBF, 0);
+    }
+    if (buffer < 0) {
+        return setvbuf(fp, NULL, _IOFBF, (size_t) PHPC_STREAM_DEFAULT_BUFFER_SIZE);
+    }
+    if ((size_t) buffer > storage_size) {
+        return setvbuf(fp, NULL, _IOFBF, (size_t) buffer);
+    }
+
+    return setvbuf(fp, storage, _IOFBF, (size_t) buffer);
+}
+
+int64_t __compiler_stream_set_write_buffer(int64_t handle, int64_t buffer)
+{
+    FILE *fp;
+    int previous;
+
+    if (handle <= 0 || handle >= PHPC_MAX_STREAM_HANDLES || NULL == phpc_stream_handles[handle]) {
+        return -1;
+    }
+    fp = phpc_stream_handles[handle];
+    previous = phpc_stream_write_buffer[handle];
+    if (0 == previous) {
+        previous = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
+    }
+    if (0 != phpc_apply_stream_buffer(fp, buffer, phpc_stream_write_buffer_storage[handle], sizeof(phpc_stream_write_buffer_storage[handle]))) {
+        return -1;
+    }
+    if (0 == buffer) {
+        phpc_stream_write_buffer[handle] = 0;
+    } else if (buffer < 0) {
+        phpc_stream_write_buffer[handle] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
+    } else {
+        phpc_stream_write_buffer[handle] = (int) buffer;
+    }
+
+    return (int64_t) previous;
+}
+
+int64_t __compiler_stream_set_read_buffer(int64_t handle, int64_t buffer)
+{
+    FILE *fp;
+    int previous;
+
+    if (handle <= 0 || handle >= PHPC_MAX_STREAM_HANDLES || NULL == phpc_stream_handles[handle]) {
+        return -1;
+    }
+    fp = phpc_stream_handles[handle];
+    previous = phpc_stream_read_buffer[handle];
+    if (0 == previous) {
+        previous = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
+    }
+    if (0 != phpc_apply_stream_buffer(fp, buffer, phpc_stream_write_buffer_storage[handle], sizeof(phpc_stream_write_buffer_storage[handle]))) {
+        return -1;
+    }
+    if (0 == buffer) {
+        phpc_stream_read_buffer[handle] = 0;
+    } else if (buffer < 0) {
+        phpc_stream_read_buffer[handle] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
+    } else {
+        phpc_stream_read_buffer[handle] = (int) buffer;
+    }
+
+    return (int64_t) previous;
+}
+
+int __compiler_ftruncate(int64_t handle, int64_t size)
+{
+    FILE *fp = phpc_resolve_stream(handle);
+    int fd;
+    int rc;
+
+    if (NULL == fp) {
+        return 0;
+    }
+    if (fflush(fp) != 0) {
+        return 0;
+    }
+    fd = fileno(fp);
+    if (fd < 0) {
+        return 0;
+    }
+#if defined(_WIN32)
+    rc = _chsize(fd, (long) size);
+#else
+    rc = ftruncate(fd, (off_t) size);
+#endif
+    if (rc != 0) {
+        return 0;
+    }
+    clearerr(fp);
+
+    return 1;
 }
 
 int64_t __compiler_ftell(int64_t handle)
@@ -451,6 +640,48 @@ int64_t __compiler_fseek(int64_t handle, int64_t offset, int64_t whence)
     return fseek(fp, (long) offset, (int) whence) == 0 ? 0 : -1;
 }
 
+/** fstat() metadata via stored fopen path + __phpc_stat (issue #3482). */
+__hashtable__ *__phpc_fstat(int64_t handle)
+{
+    const char *path;
+    size_t len;
+
+    if (handle <= 0 || handle >= PHPC_MAX_STREAM_HANDLES) {
+        return NULL;
+    }
+    if (NULL == phpc_stream_handles[handle]) {
+        return NULL;
+    }
+    path = phpc_stream_paths[handle];
+    if (NULL == path) {
+        return NULL;
+    }
+    len = strlen(path);
+
+    return __phpc_stat(__string__init((long long) len, path), 0);
+}
+
+/** Open stream path for fstat() JIT lowering via stat() (issue #3482). */
+__string__ *__phpc_stream_path(int64_t handle)
+{
+    const char *path;
+    size_t len;
+
+    if (handle <= 0 || handle >= PHPC_MAX_STREAM_HANDLES) {
+        return NULL;
+    }
+    if (NULL == phpc_stream_handles[handle]) {
+        return NULL;
+    }
+    path = phpc_stream_paths[handle];
+    if (NULL == path) {
+        return NULL;
+    }
+    len = strlen(path);
+
+    return __string__init((long long) len, path);
+}
+
 typedef struct __hashtable__ __hashtable__;
 
 extern __hashtable__ *__hashtable__alloc(void);
@@ -632,4 +863,123 @@ __hashtable__ *__compiler_fgetcsv(
 
         return result;
     }
+}
+
+static __string__ *phpc_read_stream_bytes(FILE *fp, int64_t maxlength)
+{
+    char chunk[4096];
+    char *buf = NULL;
+    size_t len = 0;
+    size_t cap = 0;
+    __string__ *result;
+
+    while (maxlength < 0 || (int64_t) len < maxlength) {
+        size_t to_read = sizeof(chunk);
+        if (maxlength >= 0) {
+            int64_t remaining = maxlength - (int64_t) len;
+            if (remaining <= 0) {
+                break;
+            }
+            if ((size_t) remaining < to_read) {
+                to_read = (size_t) remaining;
+            }
+        }
+        size_t got = fread(chunk, 1, to_read, fp);
+        if (0 == got) {
+            if (ferror(fp)) {
+                free(buf);
+
+                return NULL;
+            }
+            break;
+        }
+        if (len + got + 1 > cap) {
+            size_t new_cap = cap < 4096 ? 4096 : cap * 2;
+            while (len + got + 1 > new_cap) {
+                new_cap *= 2;
+            }
+            char *grown = (char *) realloc(buf, new_cap);
+            if (NULL == grown) {
+                free(buf);
+
+                return NULL;
+            }
+            buf = grown;
+            cap = new_cap;
+        }
+        memcpy(buf + len, chunk, got);
+        len += got;
+    }
+    if (0 == len) {
+        free(buf);
+
+        return __string__init(0, "");
+    }
+    result = __string__init((long long) len, buf);
+    free(buf);
+
+    return result;
+}
+
+__string__ *__compiler_stream_get_contents(int64_t handle, int64_t maxlength, int64_t offset)
+{
+    FILE *fp;
+
+    if (offset < -1) {
+        return NULL;
+    }
+    fp = phpc_resolve_stream(handle);
+    if (NULL == fp) {
+        return NULL;
+    }
+    if (offset >= 0 && 0 != fseek(fp, (long) offset, SEEK_SET)) {
+        return NULL;
+    }
+    if (0 == maxlength) {
+        return __string__init(0, "");
+    }
+
+    return phpc_read_stream_bytes(fp, maxlength);
+}
+
+__string__ *__compiler_get_resource_type(int64_t handle)
+{
+    if (0 == __compiler_is_resource(handle)) {
+        return NULL;
+    }
+
+    return __string__init(6, "stream");
+}
+
+extern void __hashtable__setLongAt(__hashtable__ *ht, size_t index, long long val);
+
+/*
+ * get_resources() — active fopen/tmpfile handles (php-src basic_functions.c, #3646).
+ * type_filter NULL: all streams; "stream": same; any other string is invalid (caller validates).
+ */
+__hashtable__ *__compiler_get_resources(__string__ *type_filter)
+{
+    __hashtable__ *ht;
+    size_t index = 1;
+    int64_t id;
+
+    if (NULL != type_filter) {
+        size_t len = phpc_string_len(type_filter);
+        const char *data = phpc_string_data(type_filter);
+        if (len != 6 || 0 != memcmp(data, "stream", 6)) {
+            return NULL;
+        }
+    }
+
+    ht = __hashtable__alloc();
+    if (NULL == ht) {
+        return NULL;
+    }
+    for (id = 3; id < PHPC_MAX_STREAM_HANDLES; id++) {
+        if (NULL != phpc_stream_handles[id]) {
+            __hashtable__setLongAt(ht, index++, (long long) id);
+        }
+    }
+
+    return ht;
 }

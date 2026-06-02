@@ -12,12 +12,17 @@ namespace PHPCompiler\JIT;
 class Scope {
     public int $classId = 0;
     public string $className = '';
+    /** True while lowering a `readonly class` body (#4082). */
+    public bool $classIsReadonly = false;
     /** Runtime called class for late static binding (issue #1231). */
     public string $calledClassName = '';
     public \SplObjectStorage $blockStorage;
     public \SplObjectStorage $variables;
     public ?Call $toCall = null;
     public array $args = [];
+
+    /** Original method name when dispatching via __call (#146, #4022). */
+    public ?string $magicCallMethodName = null;
 
     /** Resume LLVM symbol when calling a user generator (#3074). */
     public ?string $generatorResumeCallee = null;

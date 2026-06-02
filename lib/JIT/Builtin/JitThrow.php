@@ -19,7 +19,8 @@ final class JitThrow
 
     private static ?int $takeAddress = null;
 
-    private static bool $globalsRegistered = false;
+    /** @var array<int, true> module object id => registered */
+    private static array $globalsRegisteredForModule = [];
 
     public static function ensureLinked(Context $context): void
     {
@@ -63,7 +64,8 @@ final class JitThrow
 
     private static function registerPendingGlobals(Context $context): void
     {
-        if (self::$globalsRegistered) {
+        $moduleId = spl_object_id($context->module);
+        if (isset(self::$globalsRegisteredForModule[$moduleId])) {
             return;
         }
         $i8 = $context->getTypeFromString('int8');
@@ -76,7 +78,7 @@ final class JitThrow
             $obj = $context->module->addGlobal($i64, 'phpc_jit_throw_obj_i64');
             $obj->setInitializer($i64->constInt(0, false));
         }
-        self::$globalsRegistered = true;
+        self::$globalsRegisteredForModule[$moduleId] = true;
     }
 
     private static function implementPendingHelpers(Context $context): void

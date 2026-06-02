@@ -47,7 +47,7 @@ Environment:
   THROWSWEB_SERVE_AOT_SMOKE_GATE=1 require 007 phpc serve --aot caught invalid POST (#2387)
   THROWSWEB_SERVE_JIT_SMOKE_GATE=1 require 007 phpc serve --jit caught invalid POST (#2408)
   THROWSWEB_UNCAUGHT_500_GATE=1    include 007 uncaught.php HTTP 500 curl (#2200)
-  FASTCGI_WEB_SMOKE_GATE=1         include 009 health + PATH_INFO curls (#2351)
+  FASTCGI_WEB_SMOKE_GATE=1         include 009 health + PATH_INFO curls (default #2351, #2369)
 EOF
 }
 
@@ -892,7 +892,7 @@ if [[ "${MINIWEBAPP_ONLY}" -eq 0 ]]; then
     run_throws_web_smoke
   fi
 
-  if [[ "${FASTCGI_WEB_SMOKE_GATE:-0}" == "1" ]]; then
+  if [[ "${FASTCGI_WEB_SMOKE_GATE:-1}" == "1" ]]; then
     run_fastcgi_web_smoke
   fi
 fi

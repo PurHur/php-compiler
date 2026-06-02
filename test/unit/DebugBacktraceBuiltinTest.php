@@ -22,6 +22,10 @@ final class DebugBacktraceBuiltinTest extends BaseTest
             __DIR__.'/../compliance/cases/stdlib/debug_backtrace.phpt',
             'debug_backtrace.phpt'
         );
+        yield 'debug_backtrace_ignore_args.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/stdlib/debug_backtrace_ignore_args.phpt',
+            'debug_backtrace_ignore_args.phpt'
+        );
     }
 
     public function testVmDebugBacktraceInline(): void
@@ -39,6 +43,18 @@ function outer() {
 outer();
 PHP;
         $this->assertSame("inner|outer|{main}\nkeys\n0\n", $this->runInline($code));
+    }
+
+    public function testVmDebugBacktraceIgnoreArgs(): void
+    {
+        $code = <<<'PHP'
+function inner(string $secret) {
+    $t = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+    echo isset($t[0]['args']) ? 'has_args' : 'no_args', "\n";
+}
+inner('x');
+PHP;
+        $this->assertSame("no_args\n", $this->runInline($code));
     }
 
     private function runInline(string $code, string $bin = 'vm'): string

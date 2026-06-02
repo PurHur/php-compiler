@@ -25,6 +25,8 @@ final class ReflectionSupport
 
     public const REFLECTION_ATTRIBUTE = 'reflectionattribute';
 
+    public const REFLECTION_ENUM = 'reflectionenum';
+
     public const REFLECTION_ENUM_UNIT_CASE = 'reflectionenumunitcase';
 
     public const REFLECTION_PARAMETER = 'reflectionparameter';
@@ -184,6 +186,74 @@ final class ReflectionSupport
     }
 
     /**
+     * Map stored attribute ctor args to invokePhpFunction arguments in parameter order (#3216).
+     *
+     * @param list<array{name: ?string, value: mixed}> $argSpecs
+     *
+     * @return list<Variable>
+     */
+    public static function constructorInvokeVariables(\PHPCompiler\Func\PHP $ctor, array $argSpecs): array
+    {
+        $positional = [];
+        $named = [];
+        foreach ($argSpecs as $spec) {
+            if (null !== $spec['name']) {
+                $named[$spec['name']] = $spec['value'];
+            } else {
+                $positional[] = $spec['value'];
+            }
+        }
+        $vars = [];
+        $pi = 0;
+        foreach ($ctor->block->paramNames as $paramName) {
+            if (isset($named[$paramName])) {
+                $vars[] = self::scalarToVariable($named[$paramName]);
+            } elseif (array_key_exists($pi, $positional)) {
+                $vars[] = self::scalarToVariable($positional[$pi++]);
+            } else {
+                $null = new Variable();
+                $null->null();
+                $vars[] = $null;
+            }
+        }
+
+        return $vars;
+    }
+
+    /**
+     * Sync promoted / declared instance properties from attribute ctor args (#3216).
+     *
+     * VM ctor promotion assignments can fail when invoked from builtins; Zend sets properties in __construct.
+     *
+     * @param list<array{name: ?string, value: mixed}> $argSpecs
+     */
+    public static function applyConstructorPropertyArgs(ObjectEntry $object, \PHPCompiler\Func\PHP $ctor, array $argSpecs): void
+    {
+        $positional = [];
+        $named = [];
+        foreach ($argSpecs as $spec) {
+            if (null !== $spec['name']) {
+                $named[$spec['name']] = $spec['value'];
+            } else {
+                $positional[] = $spec['value'];
+            }
+        }
+        $pi = 0;
+        foreach ($ctor->block->paramNames as $paramName) {
+            if (isset($named[$paramName])) {
+                $value = $named[$paramName];
+            } elseif (array_key_exists($pi, $positional)) {
+                $value = $positional[$pi++];
+            } else {
+                continue;
+            }
+            if ($object->hasProperty($paramName)) {
+                $object->getProperty($paramName)->copyFrom(self::scalarToVariable($value));
+            }
+        }
+    }
+
+    /**
      * @return list<array{name: ?string, value: mixed}>
      */
     public static function argsFromReflectionObject(ObjectEntry $attr): array
@@ -283,6 +353,20 @@ final class ReflectionSupport
         $obj = $receiver->toObject();
         if (strtolower($obj->class->name) !== self::REFLECTION_PARAMETER) {
             throw new \LogicException('Expected ReflectionParameter instance');
+        }
+
+        return $obj;
+    }
+
+    public static function requireReflectionEnum(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('ReflectionEnum method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (strtolower($obj->class->name) !== self::REFLECTION_ENUM) {
+            throw new \LogicException('Expected ReflectionEnum instance');
         }
 
         return $obj;
@@ -395,6 +479,26 @@ final class ReflectionSupport
         }
 
         return $nameVar->toString();
+    }
+
+    public static function isReflectionFunctionAnonymous(ObjectEntry $reflection): bool
+    {
+        $state = $reflection->reflectionClosureState;
+
+        return null !== $state && $state->isUserClosure();
+    }
+
+    /**
+     * @return \PHPCompiler\Func\PHP
+     */
+    public static function resolveFunctionFromReflection(Context $ctx, ObjectEntry $reflection): \PHPCompiler\Func\PHP
+    {
+        $closure = $reflection->reflectionClosureState;
+        if (null !== $closure) {
+            return $closure->func;
+        }
+
+        return self::resolveUserFunction($ctx, self::functionNameFromReflection($reflection));
     }
 
     public static function constantNameFromReflection(ObjectEntry $reflection): string

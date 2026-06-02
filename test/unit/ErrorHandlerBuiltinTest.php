@@ -22,6 +22,10 @@ final class ErrorHandlerBuiltinTest extends BaseTest
             __DIR__.'/../compliance/cases/stdlib/set_error_handler.phpt',
             'set_error_handler.phpt'
         );
+        yield 'set_error_handler_closure.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/stdlib/set_error_handler_closure.phpt',
+            'set_error_handler_closure.phpt'
+        );
         yield 'restore_error_handler.phpt' => self::parsePHPT(
             __DIR__.'/../compliance/cases/stdlib/restore_error_handler.phpt',
             'restore_error_handler.phpt'

@@ -34,10 +34,10 @@ final class str_ends_with extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $haystack->type || Variable::TYPE_STRING !== $needle->type) {
-            throw new \LogicException('str_ends_with() only supports strings in this compiler build');
-        }
-        $frame->returnVar->bool(VmString::endsWith($haystack->toString(), $needle->toString()));
+        $frame->returnVar->bool(VmString::endsWith(
+            VmString::coerceOperand($haystack),
+            VmString::coerceOperand($needle)
+        ));
     }
 
     public Context $context;
