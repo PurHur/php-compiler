@@ -4459,6 +4459,9 @@ class JIT {
     private function includedAtEntryOpcodeLimit(Block $block): int
     {
         $limit = $block->nOpCodes;
+        while ($limit > 0 && !isset($block->opCodes[$limit - 1])) {
+            --$limit;
+        }
         if ($limit > 0 && OpCode::TYPE_JUMP === $block->opCodes[$limit - 1]->type) {
             $jump = $block->opCodes[$limit - 1];
             if (null !== $jump->block1 && $this->isRedundantTryEntryJump($block, $jump->block1)) {
@@ -5161,6 +5164,9 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $this->context->builder->not($truthy)
                     );
+                    break;
+                case OpCode::TYPE_EVAL:
+                    JIT\EvalHelper::compile($this, $func, $block, $op);
                     break;
                 case OpCode::TYPE_ISSET:
                     $containerOp = $block->getOperand($op->arg2);

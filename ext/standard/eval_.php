@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * eval() — dynamic PHP execution in caller scope (VM-only; ext/standard/basic_functions.c parity, #3358).
+ * eval() — dynamic PHP execution in caller scope (#3358, JIT/AOT inline lowering #4652).
  */
 final class eval_ extends Internal
 {
@@ -36,6 +36,13 @@ final class eval_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('eval() is VM-only in this compiler build');
+        if (\count($args) < 1) {
+            throw new \LogicException('eval() requires at least one argument');
+        }
+        if (\count($args) > 1) {
+            throw new \LogicException('eval() takes exactly one argument');
+        }
+
+        return JitEval::invoke($context, $args[0]);
     }
 }
