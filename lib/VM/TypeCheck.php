@@ -95,6 +95,32 @@ final class TypeCheck
         self::coerceTypedSlot($value, $strict, 'Return value', $constraint);
     }
 
+    /**
+     * PHP 8.3 typed class constants: strict match; int literal allowed for float (zend_compile.c, #4541).
+     */
+    public static function assertClassConstantValue(
+        Variable $value,
+        int $constraint,
+        ?string $constName = null
+    ): void {
+        $target = $value->resolveIndirect();
+        if (self::isExactType($target, $constraint)) {
+            return;
+        }
+        if (Variable::TYPE_FLOAT === $constraint && Variable::TYPE_INTEGER === $target->type) {
+            $target->float((float) $target->toInt());
+
+            return;
+        }
+        $expected = self::typeName($constraint);
+        $given = self::typeName($target->type);
+        if (null !== $constName && '' !== $constName) {
+            throw new \TypeError("Cannot assign {$given} to class constant {$constName} of type {$expected}");
+        }
+
+        throw new \TypeError("Cannot assign {$given} to class constant of type {$expected}");
+    }
+
     public static function assertVoidReturn(?Variable $value): void
     {
         if (null !== $value) {

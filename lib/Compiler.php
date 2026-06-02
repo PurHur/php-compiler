@@ -24,6 +24,7 @@ use PHPCfg\Operand\Variable as CfgVariable;
 use PHPCfg\Script;
 use PHPTypes\Type;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\ClassReadonly;
 use PHPCompiler\JIT\OperandName;
@@ -2596,32 +2597,11 @@ class Compiler {
         if (Variable::TYPE_UNDEFINED === $mapped) {
             return;
         }
-        if ($value->type === $mapped) {
-            return;
-        }
         $constName = $nameOp instanceof Operand\Literal ? (string) $nameOp->value : 'constant';
-        $expected = self::vmTypeName($mapped);
-        $given = self::vmTypeName($value->type);
-        throw new \TypeError("Cannot assign {$given} to class constant {$constName} of type {$expected}");
-    }
-
-    private static function vmTypeName(int $type): string
-    {
-        switch ($type) {
-            case Variable::TYPE_INTEGER:
-                return 'int';
-            case Variable::TYPE_FLOAT:
-                return 'float';
-            case Variable::TYPE_BOOLEAN:
-                return 'bool';
-            case Variable::TYPE_STRING:
-                return 'string';
-            case Variable::TYPE_NULL:
-                return 'null';
-            case Variable::TYPE_ARRAY:
-                return 'array';
-            default:
-                return 'mixed';
+        try {
+            TypeCheck::assertClassConstantValue($value, $mapped, $constName);
+        } catch (\TypeError $e) {
+            $this->throwCompileError($e->getMessage());
         }
     }
 

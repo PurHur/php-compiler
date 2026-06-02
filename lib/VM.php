@@ -5643,7 +5643,8 @@ restart:
                         if (null !== $constraint) {
                             $check = new Variable();
                             $check->copyFrom($value);
-                            TypeCheck::coerceReturn($check, true, $constraint);
+                            TypeCheck::assertClassConstantValue($check, $constraint, $name);
+                            $value->copyFrom($check);
                         }
                     }
                     $entry->constants[$name] = $value;
