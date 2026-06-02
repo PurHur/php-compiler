@@ -50,7 +50,12 @@ final class StringNetworkServices
 
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach (['__compiler_getprotobynumber', '__compiler_getservbyport'] as $name) {
+        foreach ([
+            '__compiler_getprotobynumber',
+            '__compiler_getservbyport',
+            '__phpc_getprotobyname',
+            '__phpc_getservbyname',
+        ] as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
                 throw new \LogicException($name.' missing after network services bitcode link');

@@ -19,13 +19,13 @@ final class VmNetwork
     private static ?array $serviceCache = null;
 
     /**
-     * @return array<string, mixed>|false
+     * @return int|false Protocol number.
      */
     public static function getprotobyname(string $name)
     {
         if (\function_exists('getprotobyname')) {
             $host = @\getprotobyname($name);
-            if (\is_array($host)) {
+            if (\is_int($host)) {
                 return $host;
             }
         }
@@ -33,11 +33,11 @@ final class VmNetwork
         $key = strtolower($name);
         foreach (self::protocolTable() as $proto) {
             if ($proto['name'] === $key) {
-                return $proto;
+                return (int) $proto['number'];
             }
             foreach ($proto['aliases'] as $alias) {
                 if (strtolower($alias) === $key) {
-                    return $proto;
+                    return (int) $proto['number'];
                 }
             }
         }
@@ -46,13 +46,13 @@ final class VmNetwork
     }
 
     /**
-     * @return array<string, mixed>|false
+     * @return int|false Service port.
      */
     public static function getservbyname(string $service, string $protocol)
     {
         if (\function_exists('getservbyname')) {
             $host = @\getservbyname($service, $protocol);
-            if (\is_array($host)) {
+            if (\is_int($host)) {
                 return $host;
             }
         }
@@ -62,11 +62,11 @@ final class VmNetwork
         $byProto = self::serviceTable()[$protoKey] ?? [];
         foreach ($byProto as $entry) {
             if ($entry['name'] === $serviceKey) {
-                return $entry;
+                return (int) $entry['port'];
             }
             foreach ($entry['aliases'] as $alias) {
                 if (strtolower($alias) === $serviceKey) {
-                    return $entry;
+                    return (int) $entry['port'];
                 }
             }
         }

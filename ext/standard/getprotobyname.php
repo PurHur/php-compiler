@@ -11,7 +11,11 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** getprotobyname() — protocol entry array (VM host; JIT/AOT deferred, issue #3593). */
+/**
+ * getprotobyname() — protocol number by name (JIT/AOT via libc, issue #4024).
+ *
+ * @see https://github.com/php/php-src/blob/master/ext/standard/network.c PHP_FUNCTION(getprotobyname)
+ */
 final class getprotobyname extends Internal
 {
     public function __construct()
@@ -31,17 +35,21 @@ final class getprotobyname extends Internal
         if (Variable::TYPE_STRING !== $nameVar->type) {
             throw new \LogicException('getprotobyname() requires a string name in this compiler build');
         }
-        $result = VmNetwork::getprotobyname($nameVar->toString());
-        if (false === $result) {
+        $number = VmNetwork::getprotobyname($nameVar->toString());
+        if (false === $number) {
             $frame->returnVar->bool(false);
 
             return;
         }
-        $frame->returnVar->copyFrom(VmJson::import($result));
+        $frame->returnVar->int($number);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('getprotobyname() is not implemented for JIT in this compiler build (issue #3593)');
+        if (1 !== \count($args)) {
+            throw new \LogicException('getprotobyname() requires exactly one argument in this compiler build');
+        }
+
+        return JitNetworkServices::getprotobyname($context, $args[0]);
     }
 }
