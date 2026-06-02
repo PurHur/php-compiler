@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\string_trim;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -1313,6 +1314,11 @@ final class HashTableHelper
 
             return;
         }
+        if (Variable::TYPE_OBJECT === $key->type || Variable::TYPE_HASHTABLE === $key->type) {
+            self::emitIllegalOffsetType($context);
+
+            return;
+        }
         if (Variable::TYPE_STRING === $key->type) {
             $keyPtr = $context->helper->loadValue($key);
             self::setAtKeyCoercingNumericString($context, $ht, $keyPtr, $element);
@@ -2230,5 +2236,13 @@ final class HashTableHelper
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($done);
+    }
+
+    private static function emitIllegalOffsetType(Context $context): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, 'Illegal offset type');
+        $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
     }
 }
