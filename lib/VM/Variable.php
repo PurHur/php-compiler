@@ -1125,6 +1125,12 @@ restart:
             case TYPE_PAIR_OBJECT_OBJECT:
                 $this->int($left->object->compareSpaceship($right->object));
                 break;
+            case TYPE_PAIR_ENUM_CASE_ENUM_CASE:
+                $this->int(EnumCaseSupport::compareEnumCaseEntrySpaceship(
+                    $left->toEnumCase(),
+                    $right->toEnumCase()
+                ));
+                break;
             case TYPE_PAIR_ARRAY_ARRAY:
                 $this->int($left->array->compareSpaceship($right->array));
                 break;
@@ -1135,10 +1141,41 @@ restart:
                 } elseif ($right->type === self::TYPE_INDIRECT) {
                     $right = $right->indirect;
                     goto restart;
+                } elseif (self::isEnumCaseOperand($left) || self::isEnumCaseOperand($right)) {
+                    if (self::isEnumCaseOperand($left) && self::isEnumCaseOperand($right)) {
+                        $this->int(self::compareEnumCaseOperands($left, $right));
+                    } else {
+                        // Zend compare_function: enum case vs non-case is always 1 (#4554).
+                        $this->int(1);
+                    }
                 } else {
                     $this->int($this->_spaceship($left->toNumeric(), $right->toNumeric()));
                 }
         }
+    }
+
+    private static function isEnumCaseOperand(Variable $var): bool
+    {
+        $var = $var->resolveIndirect();
+        if (self::TYPE_ENUM_CASE === $var->type) {
+            return true;
+        }
+
+        return self::TYPE_OBJECT === $var->type && EnumCaseSupport::isEnumCase($var->object);
+    }
+
+    private static function compareEnumCaseOperands(Variable $left, Variable $right): int
+    {
+        $left = $left->resolveIndirect();
+        $right = $right->resolveIndirect();
+        if (self::TYPE_OBJECT === $left->type && self::TYPE_OBJECT === $right->type) {
+            return EnumCaseSupport::compareSpaceship($left->object, $right->object);
+        }
+        if (self::TYPE_ENUM_CASE === $left->type && self::TYPE_ENUM_CASE === $right->type) {
+            return EnumCaseSupport::compareEnumCaseEntrySpaceship($left->toEnumCase(), $right->toEnumCase());
+        }
+
+        return 1;
     }
 
     private function _spaceship($left, $right): int {
