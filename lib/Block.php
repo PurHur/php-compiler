@@ -1585,6 +1585,67 @@ class Block {
         return false;
     }
 
+    /**
+     * Trait `__construct` merged into a using class — MCJIT execute segfaults (#4671).
+     */
+    public static function containsTraitConstructorOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_TRAIT === $op->type && null !== $op->block1) {
+                    if (self::classBodyDeclaresMethod($op->block1, '__construct')) {
+                        return true;
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static function classBodyDeclaresMethod(self $body, string $methodLc): bool
+    {
+        $seen = new \SplObjectStorage();
+        $stack = [$body];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if ($seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_METHOD === $op->type) {
+                    $name = $block->getOperand($op->arg1);
+                    if ($name instanceof Literal && $methodLc === strtolower($name->value)) {
+                        return true;
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     public static function requiresVmLowering(?self $root): bool
     {
         return self::containsGeneratorOpcodesInScriptScope($root)
@@ -1595,6 +1656,7 @@ class Block {
             || self::containsReadonlyPropertyOpcodes($root)
             || self::containsReadonlyClassOpcodes($root)
             || self::containsDynamicPropertyDeprecationOpcodes($root)
-            || self::containsFiberSuspendOpcodes($root);
+            || self::containsFiberSuspendOpcodes($root)
+            || self::containsTraitConstructorOpcodes($root);
     }
 }

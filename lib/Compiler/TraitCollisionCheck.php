@@ -15,10 +15,10 @@ use PHPCfg\Script;
  */
 final class TraitCollisionCheck
 {
-    /** @var array<string, array{display: string, methods: array<string, true>}> */
+    /** @var array<string, array{display: string, methods: array<string, true>, promotedProperties: array<string, true>}> */
     private array $traits = [];
 
-    /** @var array<string, array{display: string, extends: ?string, ownMethods: array<string, true>, traitUses: list<list<string>>}> */
+    /** @var array<string, array{display: string, extends: ?string, ownMethods: array<string, true>, ownProperties: array<string, true>, traitUses: list<list<string>>}> */
     private array $classes = [];
 
     public static function validate(Script $script): void
@@ -48,6 +48,7 @@ final class TraitCollisionCheck
         $this->traits[$lc] = [
             'display' => $this->operandDisplayName($trait->name, $lc),
             'methods' => $this->collectConcreteMethods($trait->stmts->children),
+            'promotedProperties' => $this->collectPromotedPropertyNames($trait->stmts->children),
         ];
     }
 
@@ -83,6 +84,7 @@ final class TraitCollisionCheck
             'display' => $this->operandDisplayName($class->name, $lc),
             'extends' => $parentLc,
             'ownMethods' => $this->collectConcreteMethods($class->stmts->children),
+            'ownProperties' => $this->collectInstancePropertyNames($class->stmts->children),
             'traitUses' => $traitUses,
         ];
     }
@@ -117,6 +119,56 @@ final class TraitCollisionCheck
         return [] !== $cfg->children;
     }
 
+    /**
+     * @param list<Op> $members
+     *
+     * @return array<string, true>
+     */
+    private function collectPromotedPropertyNames(array $members): array
+    {
+        $names = [];
+        foreach ($members as $member) {
+            if (!$member instanceof Op\Stmt\ClassMethod || '__construct' !== $member->func->name) {
+                continue;
+            }
+            foreach ($member->func->params as $param) {
+                if (!$this->isPromotedParam($param)) {
+                    continue;
+                }
+                if ($param->name instanceof Operand\Literal && is_string($param->name->value)) {
+                    $names[strtolower($param->name->value)] = true;
+                }
+            }
+        }
+
+        return $names;
+    }
+
+    /**
+     * @param list<Op> $members
+     *
+     * @return array<string, true>
+     */
+    private function collectInstancePropertyNames(array $members): array
+    {
+        $names = [];
+        foreach ($members as $member) {
+            if (!$member instanceof Op\Stmt\Property || $member->static) {
+                continue;
+            }
+            if ($member->name instanceof Operand\Literal && is_string($member->name->value)) {
+                $names[strtolower($member->name->value)] = true;
+            }
+        }
+
+        return $names;
+    }
+
+    private function isPromotedParam(Op\Expr\Param $param): bool
+    {
+        return property_exists($param, 'promotionFlags') && 0 !== $param->promotionFlags;
+    }
+
     private function verify(): void
     {
         foreach ($this->classes as $class) {
@@ -125,7 +177,7 @@ final class TraitCollisionCheck
     }
 
     /**
-     * @param array{display: string, extends: ?string, ownMethods: array<string, true>, traitUses: list<list<string>>} $class
+     * @param array{display: string, extends: ?string, ownMethods: array<string, true>, ownProperties: array<string, true>, traitUses: list<list<string>>} $class
      */
     private function verifyClass(array $class): void
     {
@@ -145,6 +197,8 @@ final class TraitCollisionCheck
 
         /** @var array<string, string> method lc => trait display */
         $traitSources = [];
+        /** @var array<string, string> property lc => trait display */
+        $traitPropertySources = [];
         foreach ($class['traitUses'] as $useGroup) {
             foreach ($useGroup as $traitLc) {
                 if (!isset($this->traits[$traitLc])) {
@@ -163,6 +217,19 @@ final class TraitCollisionCheck
                         );
                     }
                     $traitSources[$methodLc] = $trait['display'];
+                }
+                foreach ($trait['promotedProperties'] as $propLc => $_) {
+                    if (isset($class['ownProperties'][$propLc])) {
+                        throw new \CompileError(
+                            sprintf('Cannot redeclare %s::$%s', $class['display'], $propLc)
+                        );
+                    }
+                    if (isset($traitPropertySources[$propLc])) {
+                        throw new \CompileError(
+                            "Trait property {$trait['display']}::\${$propLc} conflicts with a property declared in another trait"
+                        );
+                    }
+                    $traitPropertySources[$propLc] = $trait['display'];
                 }
             }
         }

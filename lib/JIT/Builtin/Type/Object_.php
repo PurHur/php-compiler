@@ -2630,6 +2630,57 @@ class Object_ extends Type {
         }
     }
 
+    public function inheritTraitInstanceProperties(int $classId, int $traitId, string $traitName): void
+    {
+        foreach ($this->properties[$traitId] ?? [] as $propset) {
+            $name = $propset[1];
+            $nameLc = strtolower($name);
+            foreach ($this->properties[$classId] ?? [] as $existing) {
+                if (strtolower($existing[1]) === $nameLc) {
+                    throw new \LogicException(
+                        "Trait property {$traitName}::\${$name} conflicts with a property declared in another trait"
+                    );
+                }
+            }
+            $type = $propset[2];
+            $this->defineProperty($classId, $name, $type);
+            $this->definePropertyVisibility($classId, $name, $this->propertyVisibility($traitId, $name));
+            $setVis = $this->propertySetVisibility($traitId, $name);
+            if (0 !== $setVis) {
+                $this->definePropertySetVisibility($classId, $name, $setVis);
+            }
+            if ($this->isPropertyReadonly($traitId, $name)) {
+                $this->markPropertyReadonly($classId, $name);
+            }
+            $arms = $this->dnfArmsForProperty($traitId, $name);
+            if (null !== $arms) {
+                $this->definePropertyDnfArms($classId, $name, $arms);
+            }
+            $classSlot = $this->propertySlotIndex($classId, $name);
+            if (null === $classSlot) {
+                throw new \LogicException("Property {$name} not defined for class {$classId}");
+            }
+            if (isset($this->propertyDefaults[$traitId])) {
+                foreach ($this->propertyDefaults[$traitId] as $slotIndex => $entry) {
+                    if (($this->properties[$traitId][$slotIndex][1] ?? '') !== $name) {
+                        continue;
+                    }
+                    $this->propertyDefaults[$classId][$classSlot] = $entry;
+                    break;
+                }
+            }
+            if (isset($this->runtimePropertyNewDefaults[$traitId])) {
+                foreach ($this->runtimePropertyNewDefaults[$traitId] as $slotIndex => $newClassId) {
+                    if (($this->properties[$traitId][$slotIndex][1] ?? '') !== $name) {
+                        continue;
+                    }
+                    $this->runtimePropertyNewDefaults[$classId][$classSlot] = $newClassId;
+                    break;
+                }
+            }
+        }
+    }
+
     public function inheritParentStaticProperties(int $childId, string $parentLc): void
     {
         if (!$this->hasDeclaredClass($parentLc)) {
