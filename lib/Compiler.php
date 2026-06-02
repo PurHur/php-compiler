@@ -579,6 +579,18 @@ class Compiler {
         return $merges;
     }
 
+    /** CFG block jumped to at the end of a ?: / if branch (may have one parent while lowering). */
+    private function branchJumpMergeTarget(CfgBlock $branchCfg): ?CfgBlock
+    {
+        foreach ($branchCfg->children as $child) {
+            if ($child instanceof Op\Stmt\Jump) {
+                return $child->target;
+            }
+        }
+
+        return null;
+    }
+
     private function recordTernaryMergeVarSlots(CfgBlock $branchCfg, Block $compiled): void
     {
         foreach ($this->ternaryMergeTargets($branchCfg) as $mergeCfg) {
@@ -587,12 +599,58 @@ class Compiler {
             }
             /** @var SplObjectStorage<CfgVariable, int> $map */
             $map = $this->ternaryMergeVarSlots[$mergeCfg];
+            $phiRoot = $this->mergeBranchAssignVarRoot($branchCfg);
+            $phiSlot = null;
+            if (null !== $phiRoot) {
+                foreach ($compiled->scope as $operand) {
+                    if (Block::cfgVarRoot($operand) === $phiRoot) {
+                        $phiSlot = $compiled->scope[$operand];
+                        break;
+                    }
+                }
+            }
+            if (null === $phiSlot && $this->seen->contains($mergeCfg)) {
+                $phiSlot = $this->mergePhiResultSlot($this->seen[$mergeCfg]);
+            }
+            if (null !== $phiRoot && null !== $phiSlot) {
+                $map[$phiRoot] = $phiSlot;
+
+                continue;
+            }
             foreach ($compiled->eachCfgVarRootSlot() as [$root, $slot]) {
                 if (!$map->contains($root)) {
                     $map[$root] = $slot;
                 }
             }
         }
+    }
+
+    private function mergeBranchAssignVarRoot(CfgBlock $branchCfg): ?Operand\Variable
+    {
+        $children = $branchCfg->children;
+        $jumpIdx = null;
+        foreach ($children as $i => $child) {
+            if ($child instanceof Op\Stmt\Jump) {
+                $jumpIdx = $i;
+                break;
+            }
+        }
+        if (null === $jumpIdx) {
+            return null;
+        }
+        for ($i = $jumpIdx - 1; $i >= 0; --$i) {
+            $child = $children[$i];
+            if ($child instanceof Op\Expr\Assign) {
+                $root = Block::cfgVarRoot($child->var);
+
+                return $root instanceof Operand\Variable ? $root : null;
+            }
+            if (!$child instanceof Op\Expr) {
+                break;
+            }
+        }
+
+        return null;
     }
 
     private function applyTernaryMergeVarSlots(CfgBlock $branchCfg, Block $compiled): void
@@ -612,20 +670,62 @@ class Compiler {
     /** When merge block is already lowered, ?: branch assigns must use its ECHO slot (#3790). */
     private function branchMergeAssignSlot(Block $branch, Op\Expr\Assign $assign): ?int
     {
-        // Match arm `default => expr` assigns to a Temporary result — not a named merge var (#3787).
-        if (null === Block::resolveVariableName($assign->var)) {
+        if (null === $branch->orig) {
             return null;
         }
-        if (null === $branch->orig || !$this->isMergeBranchAssign($branch, $assign)) {
+        if (!$this->isMergeBranchAssign($branch, $assign)) {
             return null;
+        }
+        $mergeCfg = $this->branchJumpMergeTarget($branch->orig);
+        if (null !== $mergeCfg && $this->seen->contains($mergeCfg)) {
+            // Match `default => expr` uses echo-merge; return ?: phi may be an unnamed Temporary (#3787, #4280).
+            if ($assign->var instanceof Temporary && null === $this->mergeReturnSlot($this->seen[$mergeCfg])) {
+                return null;
+            }
+        }
+        if (null === Block::cfgVarRoot($assign->var) && !$assign->var instanceof Temporary) {
+            return null;
+        }
+        if (null !== $mergeCfg) {
+            if ($this->seen->contains($mergeCfg)) {
+                $phiSlot = $this->mergePhiResultSlot($this->seen[$mergeCfg]);
+                if (null !== $phiSlot) {
+                    return $phiSlot;
+                }
+            }
+            $siblingSlot = $this->siblingMergeBranchAssignDestSlot($mergeCfg, $branch->orig);
+            if (null !== $siblingSlot) {
+                return $siblingSlot;
+            }
         }
         foreach ($this->ternaryMergeTargets($branch->orig) as $mergeCfg) {
             if (!$this->seen->contains($mergeCfg)) {
                 continue;
             }
-            $echoSlot = $this->mergeEchoSlot($this->seen[$mergeCfg]);
-            if (null !== $echoSlot) {
-                return $echoSlot;
+            $phiSlot = $this->mergePhiResultSlot($this->seen[$mergeCfg]);
+            if (null !== $phiSlot) {
+                return $phiSlot;
+            }
+        }
+
+        return null;
+    }
+
+    private function siblingMergeBranchAssignDestSlot(CfgBlock $mergeCfg, CfgBlock $currentBranch): ?int
+    {
+        foreach ($mergeCfg->parents as $parentCfg) {
+            if ($parentCfg === $currentBranch || !$this->seen->contains($parentCfg)) {
+                continue;
+            }
+            $sibling = $this->seen[$parentCfg];
+            for ($i = $sibling->nOpCodes - 1; $i >= 0; --$i) {
+                $op = $sibling->opCodes[$i];
+                if (OpCode::TYPE_ASSIGN === $op->type) {
+                    return $op->arg2;
+                }
+                if (OpCode::TYPE_JUMP === $op->type) {
+                    break;
+                }
             }
         }
 
@@ -672,6 +772,23 @@ class Compiler {
         return null;
     }
 
+    /** `return $a ? $b : $c` merge block carries the phi slot on RETURN (#4280). */
+    private function mergeReturnSlot(Block $merge): ?int
+    {
+        foreach ($merge->opCodes as $op) {
+            if (OpCode::TYPE_RETURN === $op->type) {
+                return $op->arg1;
+            }
+        }
+
+        return null;
+    }
+
+    private function mergePhiResultSlot(Block $merge): ?int
+    {
+        return $this->mergeEchoSlot($merge) ?? $this->mergeReturnSlot($merge);
+    }
+
     /** ?: branch throw `new` must not reuse merge phi / echo slot (#3802). */
     private function mergeEchoSlotForBranch(Block $branch): ?int
     {
@@ -680,7 +797,7 @@ class Compiler {
         }
         foreach ($this->ternaryMergeTargets($branch->orig) as $mergeCfg) {
             if ($this->seen->contains($mergeCfg)) {
-                $slot = $this->mergeEchoSlot($this->seen[$mergeCfg]);
+                $slot = $this->mergePhiResultSlot($this->seen[$mergeCfg]);
                 if (null !== $slot) {
                     return $slot;
                 }
