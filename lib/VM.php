@@ -991,6 +991,23 @@ restart:
                         );
                     }
                     $name = $nameHolder->toString();
+                    if ('this' === strtolower($name)) {
+                        if (null !== $frame->block->func && null !== $frame->block->func->class) {
+                            $isStatic = (($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0;
+                            $thisIdx = $frame->block->slotIndexForVariableName('this');
+                            if ($isStatic || null === $thisIdx || !isset($frame->scope[$thisIdx])) {
+                                $catchFrame = $this->dispatchVmError(
+                                    'Using $this when not in object context',
+                                    $frame
+                                );
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                break;
+                            }
+                        }
+                    }
                     $forWrite = $this->varFetchDestUsedAsAssignLvalue($frame, $op);
                     if ('' === $name) {
                         $dest->indirect(new Variable());
@@ -1795,6 +1812,33 @@ restart:
                     $closureFunc = new Func\PHP($funcName, $op->block1);
                     $captures = $this->bindClosureCaptures($frame, $op->closureCaptures);
                     $state = new ClosureState($closureFunc, $captures);
+                    if (
+                        null !== $frame->block->func
+                        && null !== $frame->block->func->class
+                        && null !== $frame->block->func->class->value
+                        && '' !== $frame->block->func->class->value
+                    ) {
+                        // Preserve declaring scope on the closure function so self:: resolves like Zend.
+                        if (null !== $op->block1->func) {
+                            $op->block1->func->class = $frame->block->func->class;
+                        }
+
+                        // Preserve late-static binding (static::) from the creation scope (called class).
+                        $called = $this->inferCalledClass($frame);
+                        $state->boundScopeClass = null !== $called && '' !== $called
+                            ? $called
+                            : $frame->block->func->class->value;
+                        $isStaticClosure = null !== $op->block1->func
+                            && (($op->block1->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0;
+                        if (!$isStaticClosure) {
+                            $thisVar = $this->resolveCallerThis($frame);
+                            if (null !== $thisVar) {
+                                $bound = new Variable();
+                                $bound->copyFrom($thisVar->resolveIndirect());
+                                $state->boundThis = $bound;
+                            }
+                        }
+                    }
                     $frame->scope[$op->arg1]->object($state->wrapObject($this->context));
                     break;
                 case OpCode::TYPE_RETURN_VOID:
@@ -1944,6 +1988,20 @@ restart:
                     );
                     $this->applyClosureBinding($new, $frame->closureCall);
                     $frame->closureCall = null;
+                    if (null !== $new->block->func && (int) ($new->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) {
+                        $thisIdx = $new->block->slotIndexForVariableName('this');
+                        if (null !== $thisIdx) {
+                            $catchFrame = $this->dispatchVmError(
+                                'Using $this when not in object context',
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
+                    }
                     if (null === $new->calledClass || '' === $new->calledClass) {
                         $new->calledClass = $this->inferCalledClass($frame);
                     }

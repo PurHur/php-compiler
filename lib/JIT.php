@@ -6096,6 +6096,44 @@ class JIT {
                         $callProxy,
                         $internalName
                     );
+                    if (null !== $block->func && null !== $block->func->class) {
+                        JIT\ClosureBindHelper::ensureClosureBindingProperties($this->context);
+
+                        $scopeName = (string) $block->func->class->value;
+                        $scopeConst = $this->context->context->constString($scopeName, true);
+                        $boundScope = new Variable(
+                            $this->context,
+                            Variable::TYPE_STRING,
+                            Variable::KIND_VALUE,
+                            $scopeConst
+                        );
+                        $boundScope->compileTimeString = $scopeName;
+
+                        $isStaticClosure = null !== $op->block1->func
+                            && (($op->block1->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0;
+                        $boundThis = JIT\ClosureHelper::nullCapture($this->context);
+                        if (!$isStaticClosure) {
+                            $thisVar = $this->context->variableForScopedName('this');
+                            if (null !== $thisVar) {
+                                $boundThis = JIT\ClosureHelper::snapshotCapture($this->context, $thisVar);
+                            }
+                        }
+
+                        $obj = $this->context->helper->loadValue($closureObj);
+                        $this->context->type->object->storeInstanceProperty(
+                            $obj,
+                            'Closure',
+                            JIT\ClosureBindHelper::BOUND_THIS_PROPERTY,
+                            $boundThis
+                        );
+                        $this->context->type->object->storeInstanceProperty(
+                            $obj,
+                            'Closure',
+                            JIT\ClosureBindHelper::BOUND_SCOPE_PROPERTY,
+                            $boundScope
+                        );
+                        $closureObj->closureCall = new JIT\Call\ClosureWithBinding($callProxy, $boundThis, $boundScope);
+                    }
                     $this->assignOperand($block->getOperand($op->arg1), $closureObj, true);
                     break;
                 case OpCode::TYPE_YIELD:
