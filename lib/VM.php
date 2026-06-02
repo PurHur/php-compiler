@@ -1447,6 +1447,24 @@ restart:
                 case OpCode::TYPE_CLASS_CONST_FETCH:
                     $memberNameRaw = $frame->scope[$op->arg3]->toString();
                     $classOperand = $frame->scope[$op->arg2]->resolveIndirect();
+                    if ($op->classConstFetchOnObject) {
+                        if (Variable::TYPE_OBJECT !== $classOperand->type) {
+                            $catchFrame = $this->dispatchVmTypeError(
+                                new \TypeError(
+                                    'Cannot use "::class" on value of type '
+                                    .$this->valueDebugTypeLabel($classOperand)
+                                ),
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
+                        $frame->scope[$op->arg1]->string($classOperand->toObject()->class->name);
+                        break;
+                    }
                     if (Variable::TYPE_OBJECT === $classOperand->type) {
                         $classEntry = $classOperand->toObject()->class;
                         if (!$this->copyClassConstOrStaticPropertyByName(
@@ -2692,6 +2710,24 @@ restart:
     {
         $where = '' !== $frame->scriptPath ? $frame->scriptPath : 'script';
         throw new \LogicException($message.' in '.$where);
+    }
+
+    /** Zend get_debug_type() labels for TypeError messages (#4241). */
+    private function valueDebugTypeLabel(Variable $value): string
+    {
+        if (Variable::TYPE_OBJECT === $value->type) {
+            return 'object';
+        }
+
+        return match ($value->type) {
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_ARRAY => 'array',
+            default => 'mixed',
+        };
     }
 
     /** True when the next opcode assigns through this VAR_FETCH destination slot (#3801). */

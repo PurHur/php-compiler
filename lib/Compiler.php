@@ -5385,12 +5385,20 @@ class Compiler {
      */
     protected function compileClassConstFetch(Op\Expr\ClassConstFetch $expr, Block $block): array
     {
-        return [new OpCode(
+        $constName = $this->staticNameFromOperand($expr->name);
+        $op = new OpCode(
             OpCode::TYPE_CLASS_CONST_FETCH,
             $this->compileOperand($expr->result, $block, false),
             $this->compileOperand($expr->class, $block, true),
             $this->compileOperand($expr->name, $block, true)
-        )];
+        );
+        if (null !== $constName
+            && 'class' === strtolower($constName)
+            && ($expr->class instanceof Operand\Variable || $expr->class instanceof Operand\Temporary)) {
+            $op->classConstFetchOnObject = true;
+        }
+
+        return [$op];
     }
 
     /**

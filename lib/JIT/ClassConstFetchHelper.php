@@ -15,12 +15,42 @@ use PHPCompiler\Block;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ReadonlyRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCfg\Operand;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 final class ClassConstFetchHelper
 {
+    /**
+     * Lower `$expr::class` when the class operand is a runtime expression (#4241).
+     *
+     * @return Value {@see __string__*}
+     */
+    public static function emitExprClassPseudoConst(Object_ $objectType, Variable $classVar): Value
+    {
+        $context = $objectType->jitContext();
+        if (Variable::TYPE_OBJECT === $classVar->type) {
+            return ReflectionBuiltinHelper::getClassName($context, $classVar);
+        }
+        $label = self::compileTimeNonObjectTypeLabel($classVar);
+        if (null !== $label) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitRaise(
+                $context,
+                'Cannot use "::class" on value of type '.$label
+            );
+
+            return $context->builder->load($context->constantStringFromString(''));
+        }
+        if (Variable::TYPE_VALUE === $classVar->type) {
+            return self::emitValueBoxExprClassPseudoConst($objectType, $classVar);
+        }
+
+        throw new \LogicException('Unsupported operand for expression ::class in JIT');
+    }
+
     /**
      * Lower `$operand::class` when the class operand is not a compile-time literal (#4179).
      *
@@ -402,5 +432,122 @@ final class ClassConstFetchHelper
             $context->builder->structGep($strPtr, $strMap['value']),
             $context->getTypeFromString('int8*')
         );
+    }
+
+    private static function compileTimeNonObjectTypeLabel(Variable $classVar): ?string
+    {
+        return match ($classVar->type) {
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_NATIVE_LONG => 'int',
+            Variable::TYPE_NATIVE_DOUBLE => 'float',
+            Variable::TYPE_NATIVE_BOOL => 'bool',
+            Variable::TYPE_NULL => 'null',
+            default => null,
+        };
+    }
+
+    /**
+     * @return Value {@see __string__*}
+     */
+    private static function emitValueBoxExprClassPseudoConst(Object_ $objectType, Variable $classVar): Value
+    {
+        $context = $objectType->jitContext();
+        TypeErrorRaise::ensureLinked($context);
+        $objMap = $context->structFieldMap['__object__'];
+        $fn = BasicBlockHelper::parentFunction($context);
+        $entry = $context->builder->getInsertBlock();
+        $ok = $fn->appendBasicBlock('expr_class_pseudo_ok');
+        $failEntry = $fn->appendBasicBlock('expr_class_pseudo_fail');
+        $merge = $fn->appendBasicBlock('expr_class_pseudo_merge');
+
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $classVar);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $objType = $context->getTypeFromString('__object__*');
+        $isObject = $context->builder->icmp(
+            Builder::INT_NE,
+            $obj,
+            $objType->constNull()
+        );
+        $context->builder->branchIf($isObject, $ok, $failEntry);
+
+        $context->builder->positionAtEnd($ok);
+        $classId = $context->builder->load(
+            $context->builder->structGep($obj, $objMap['class_id'])
+        );
+        $nameWhenObject = self::classNameStringFromId($objectType, $classId);
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($failEntry);
+        self::emitClassPseudoConstTypeErrorFromValueBox($context, $valuePtr);
+
+        $context->builder->positionAtEnd($merge);
+
+        return $nameWhenObject;
+    }
+
+    /**
+     * @return Value {@see __string__*}
+     */
+    private static function classNameStringFromId(Object_ $objectType, Value $classId): Value
+    {
+        $context = $objectType->jitContext();
+        $result = $context->builder->load($context->constantStringFromString(''));
+        foreach ($objectType->allClassNamesById() as $id => $name) {
+            $expected = $context->constantFromInteger($id, 'int64');
+            $isId = $context->builder->icmp(Builder::INT_EQ, $classId, $expected);
+            $candidate = $context->builder->load($context->constantStringFromString($name));
+            $result = $context->builder->select($isId, $candidate, $result);
+        }
+
+        return $result;
+    }
+
+    private static function emitClassPseudoConstTypeErrorFromValueBox(Context $context, Value $valuePtr): void
+    {
+        $typeField = $context->structFieldMap['__value__']['type'];
+        $kind = $context->builder->load(
+            $context->builder->structGep($valuePtr, $typeField)
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $masked = $context->builder->and($kind, $i8->constInt(0x7f, false));
+        $fn = BasicBlockHelper::parentFunction($context);
+        $checkBlock = $context->builder->getInsertBlock();
+        $labels = [
+            4 => 'string',
+            1 => 'int',
+            2 => 'float',
+            3 => 'bool',
+            0 => 'null',
+            6 => 'array',
+        ];
+        $n = count($labels);
+        $i = 0;
+        foreach ($labels as $tag => $typeName) {
+            ++$i;
+            $raiseBlock = $fn->appendBasicBlock('expr_class_pseudo_err_'.$typeName);
+            $nextCheck = ($i < $n)
+                ? $fn->appendBasicBlock('expr_class_pseudo_try_'.$typeName)
+                : $fn->appendBasicBlock('expr_class_pseudo_err_mixed');
+            $context->builder->positionAtEnd($checkBlock);
+            $isTag = $context->builder->icmp(
+                Builder::INT_EQ,
+                $masked,
+                $i8->constInt($tag, false)
+            );
+            $context->builder->branchIf($isTag, $raiseBlock, $nextCheck);
+            $context->builder->positionAtEnd($raiseBlock);
+            TypeErrorRaise::emitRaise(
+                $context,
+                'Cannot use "::class" on value of type '.$typeName
+            );
+            $context->builder->returnVoid();
+            $checkBlock = $nextCheck;
+        }
+        $context->builder->positionAtEnd($checkBlock);
+        TypeErrorRaise::emitRaise($context, 'Cannot use "::class" on value of type mixed');
+        $context->builder->returnVoid();
     }
 }

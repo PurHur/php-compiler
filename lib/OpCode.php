@@ -227,6 +227,8 @@ class OpCode {
     public array $traitAdaptations = [];
     /** Asymmetric set visibility on TYPE_DECLARE_PROPERTY (#3165); 0 = symmetric with read. */
     public int $propertySetVisibility = 0;
+    /** TYPE_CLASS_CONST_FETCH: `::class` on a runtime expression operand (must be object, #4241). */
+    public bool $classConstFetchOnObject = false;
 
     public function __construct(int $type, ?int $arg1 = null, ?int $arg2 = null, ?int $arg3 = null) {
         $this->type = $type;
