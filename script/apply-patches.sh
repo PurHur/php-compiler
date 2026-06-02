@@ -1379,120 +1379,14 @@ incdec_case = """            case 'Expr_PostInc':
 
                 return false;
 """
-anchors = [
-    (
-        """            case 'Expr_FirstClassCallable':
-                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
-                    return [Type::array()];
-                }
-
-                return [Type::string()];
-            case 'Expr_MagicScriptConst':
-                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
-                    return [Type::int()];
-                }
-
-                return [Type::string()];
+marker = """
         }
 
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
-        """            case 'Expr_FirstClassCallable':
-                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
-                    return [Type::array()];
-                }
-
-                return [Type::string()];
-            case 'Expr_MagicScriptConst':
-                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
-                    return [Type::int()];
-                }
-
-                return [Type::string()];
-""" + incdec_case + """        }
-
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
-    ),
-    (
-        """            case 'Expr_MagicScriptConst':
-                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
-                    return [Type::int()];
-                }
-
-                return [Type::string()];
-        }
-
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
-        """            case 'Expr_MagicScriptConst':
-                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
-                    return [Type::int()];
-                }
-
-                return [Type::string()];
-""" + incdec_case + """        }
-
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
-    ),
-    (
-        """            case 'Expr_FirstClassCallable':
-                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
-                    return [new Type(Type::TYPE_ARRAY)];
-                }
-
-                return [Type::string()];
-        }
-
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
-        """            case 'Expr_FirstClassCallable':
-                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
-                    return [new Type(Type::TYPE_ARRAY)];
-                }
-
-                return [Type::string()];
-""" + incdec_case + """        }
-
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
-    ),
-    (
-        """            case 'Expr_Yield':
-            case 'Expr_YieldFrom':
-            case 'Expr_Include':
-                // TODO: we may be able to determine these...
-                return false;
-        }
-
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
-        """            case 'Expr_Yield':
-            case 'Expr_YieldFrom':
-            case 'Expr_Include':
-                // TODO: we may be able to determine these...
-                return false;
-""" + incdec_case + """        }
-
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
-    ),
-    (
-        """            case 'Expr_Yield':
-            case 'Expr_Include':
-                // TODO: we may be able to determine these...
-                return false;
-        }
-
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
-        """            case 'Expr_Yield':
-            case 'Expr_Include':
-                // TODO: we may be able to determine these...
-                return false;
-""" + incdec_case + """        }
-
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
-    ),
-]
-for old, new in anchors:
-    if old in text:
-        path.write_text(text.replace(old, new, 1))
-        raise SystemExit(0)
-sys.stderr.write("php-types-incdec-type: TypeReconstructor anchor not found\n")
-raise SystemExit(1)
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());"""
+if marker not in text:
+    sys.stderr.write("php-types-incdec-type: TypeReconstructor switch marker not found\\n")
+    raise SystemExit(1)
+path.write_text(text.replace(marker, incdec_case + marker, 1))
 PY
     echo "Applied php-types-incdec-type.patch (overlay): ${target}"
   }
