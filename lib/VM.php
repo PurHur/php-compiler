@@ -1855,16 +1855,16 @@ restart:
                     }
                     $propNameRaw = $frame->scope[$op->arg3]->toString();
                     $propName = strtolower($propNameRaw);
-                    $classEntry = $this->context->classes[$lcClass];
-                    if (!isset($classEntry->staticProperties[$propName])) {
-                        $classLabel = $classEntry->name;
+                    $storage = $this->resolveStaticPropertyStorage($lcClass, $propName);
+                    if (null === $storage) {
+                        $classLabel = $this->context->classes[$lcClass]->name;
 
                         return $this->raise(
                             "Access to undeclared static property {$classLabel}::\${$propNameRaw}",
                             $frame
                         );
                     }
-                    $frame->scope[$op->arg1]->indirect($classEntry->staticProperties[$propName]);
+                    $frame->scope[$op->arg1]->indirect($storage);
                     break;
                 case OpCode::TYPE_STATIC_PROPERTY_UNSET:
                     $rawClass = $frame->scope[$op->arg2]->toString();
@@ -1879,16 +1879,15 @@ restart:
                     }
                     $propNameRaw = $frame->scope[$op->arg3]->toString();
                     $propName = strtolower($propNameRaw);
-                    $classEntry = $this->context->classes[$lcClass];
-                    if (!isset($classEntry->staticProperties[$propName])) {
-                        $classLabel = $classEntry->name;
+                    $storage = $this->resolveStaticPropertyStorage($lcClass, $propName);
+                    if (null === $storage) {
+                        $classLabel = $this->context->classes[$lcClass]->name;
 
                         return $this->raise(
                             "Access to undeclared static property {$classLabel}::\${$propNameRaw}",
                             $frame
                         );
                     }
-                    $storage = $classEntry->staticProperties[$propName];
                     $storage->reset();
                     $storage->type = Variable::TYPE_UNDEFINED;
                     break;
@@ -4770,6 +4769,26 @@ restart:
         return $this->resolveClassScopeName($className, $frame);
     }
 
+    /**
+     * Static property storage for $class::$prop, walking ancestors (Zend inheritance; #4668).
+     */
+    protected function resolveStaticPropertyStorage(string $classLc, string $propLc): ?Variable
+    {
+        $currentLc = $classLc;
+        while (isset($this->context->classes[$currentLc])) {
+            $entry = $this->context->classes[$currentLc];
+            if (isset($entry->staticProperties[$propLc])) {
+                return $entry->staticProperties[$propLc];
+            }
+            if (null === $entry->parentLc) {
+                break;
+            }
+            $currentLc = $entry->parentLc;
+        }
+
+        return null;
+    }
+
     protected function resolveClassScopeName(string $className, Frame $frame): string
     {
         $lcClass = strtolower($className);
@@ -5161,6 +5180,7 @@ restart:
                     );
                 }
                 $entry->staticProperties[$name] = $this->cloneStaticPropertyStorage($storage);
+                $entry->traitStaticPropertyNames[$name] = true;
             }
             foreach ($trait->constants as $name => $value) {
                 if (isset($entry->constants[$name])) {
@@ -5474,7 +5494,13 @@ restart:
         }
         foreach ($parent->staticProperties as $name => $storage) {
             if (!isset($entry->staticProperties[$name])) {
-                $entry->staticProperties[$name] = $this->cloneStaticPropertyStorage($storage);
+                if (isset($parent->traitStaticPropertyNames[$name])) {
+                    $entry->staticProperties[$name] = $this->cloneStaticPropertyStorage($storage);
+                    $entry->traitStaticPropertyNames[$name] = true;
+                } else {
+                    // Class-declared inherited statics share one slot (Zend; #4668).
+                    $entry->staticProperties[$name] = $storage;
+                }
             }
         }
         foreach ($parent->constants as $name => $value) {

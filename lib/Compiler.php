@@ -5767,6 +5767,10 @@ class Compiler {
             $className = $this->literalScopeClassName($class);
             if (null !== $className) {
                 $lcClass = strtolower(ltrim($className, '\\'));
+                // self::/static::/parent:: with a literal member — property name, not a local (#4668).
+                if (in_array($lcClass, ['self', 'static', 'parent'], true)) {
+                    return $this->compileOperand($name, $block, true);
+                }
                 if (isset($this->compiledClassStaticProperties[$lcClass][$lcProp])) {
                     return $this->compileOperand($name, $block, true);
                 }
