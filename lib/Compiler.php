@@ -5564,15 +5564,17 @@ class Compiler {
                         OpCode::TYPE_RETURN_VOID
                     )];
                 }
-                if (
-                    $block->returnTypeVoid
-                    && !$terminal->expr instanceof Operand\Literal
-                    && !$terminal->expr instanceof Operand\Variable
-                ) {
-                    // php-cfg may lower trailing include/call expr as return in void bodies.
-                    return [new OpCode(
-                        OpCode::TYPE_RETURN_VOID
-                    )];
+                if ($block->returnTypeVoid) {
+                    if (
+                        !$terminal->expr instanceof Operand\Literal
+                        && !$terminal->expr instanceof Operand\Variable
+                    ) {
+                        // php-cfg may lower trailing include/call expr as return in void bodies.
+                        return [new OpCode(
+                            OpCode::TYPE_RETURN_VOID
+                        )];
+                    }
+                    $this->throwCompileError('A void function must not return a value');
                 }
 
                 $callResultSlot = $this->funcCallExecReturnSlotForReturn($block, $terminal->expr);
