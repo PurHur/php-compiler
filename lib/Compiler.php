@@ -2592,6 +2592,7 @@ class Compiler {
             $valueSlot,
             $typeSlot
         );
+        $constOp->classConstVisibilityFlags = $child->flags;
         $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $constOp->attributeNames = AttributeNames::fromOp($child);
         $this->assignAttributeMetadata($constOp, $child);

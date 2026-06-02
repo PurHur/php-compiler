@@ -1757,6 +1757,14 @@ restart:
                     }
                     if (Variable::TYPE_OBJECT === $classOperand->type) {
                         $classEntry = $classOperand->toObject()->class;
+                        $constLc = strtolower($memberNameRaw);
+                        if (isset($classEntry->constants[$constLc])) {
+                            $visFrame = $this->enforceClassConstVisibility($classEntry, $memberNameRaw, $frame);
+                            if (null !== $visFrame) {
+                                $frame = $visFrame;
+                                goto restart;
+                            }
+                        }
                         if (!$this->copyClassConstOrStaticPropertyByName(
                             $classEntry,
                             $memberNameRaw,
@@ -1794,6 +1802,14 @@ restart:
                         return $this->raise("Unknown class for constant fetch: {$className}", $frame);
                     }
                     $classEntry = $this->context->classes[$lcClass];
+                    $constLc = strtolower($memberNameRaw);
+                    if (isset($classEntry->constants[$constLc])) {
+                        $visFrame = $this->enforceClassConstVisibility($classEntry, $memberNameRaw, $frame);
+                        if (null !== $visFrame) {
+                            $frame = $visFrame;
+                            goto restart;
+                        }
+                    }
                     if (!$this->copyClassConstOrStaticPropertyByName(
                         $classEntry,
                         $memberNameRaw,
@@ -4244,6 +4260,29 @@ restart:
         return null;
     }
 
+    private function enforceClassConstVisibility(ClassEntry $classEntry, string $constName, Frame $frame): ?Frame
+    {
+        $constLc = strtolower($constName);
+        $vis = $classEntry->constVisibility[$constLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        if (MethodVisibility::isPublic($vis)) {
+            return null;
+        }
+        try {
+            ClassConstVisibility::assertAccessible(
+                $vis,
+                $this->callerClassLc($frame),
+                strtolower($classEntry->name),
+                $classEntry->name,
+                $constName,
+                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc)
+            );
+        } catch (\LogicException $e) {
+            return $this->dispatchVmError($e->getMessage(), $frame);
+        }
+
+        return null;
+    }
+
     private function callerClassLc(Frame $frame): ?string
     {
         if (null !== $frame->block->func && null !== $frame->block->func->class) {
@@ -5125,11 +5164,19 @@ restart:
             }
             foreach ($trait->constants as $name => $value) {
                 if (isset($entry->constants[$name])) {
+                    if ($this->classConstValuesIdentical($entry->constants[$name], $value)) {
+                        continue;
+                    }
+                    $prevTrait = $entry->traitConstSources[$name] ?? $entry->name;
                     throw new \LogicException(
-                        "Trait constant {$trait->name}::{$name} conflicts with an existing class constant"
+                        "Trait constant {$trait->name}::{$name} conflicts with {$prevTrait}::{$name}"
                     );
                 }
                 $entry->constants[$name] = $value;
+                $entry->traitConstSources[$name] = $trait->name;
+                if (isset($trait->constVisibility[$name])) {
+                    $entry->constVisibility[$name] = $trait->constVisibility[$name];
+                }
                 if (isset($trait->constDeprecated[$name])) {
                     $entry->constDeprecated[$name] = $trait->constDeprecated[$name];
                 }
@@ -5337,6 +5384,9 @@ restart:
             foreach ($iface->constants as $name => $value) {
                 if (!isset($entry->constants[$name])) {
                     $entry->constants[$name] = $value;
+                    if (isset($iface->constVisibility[$name])) {
+                        $entry->constVisibility[$name] = $iface->constVisibility[$name];
+                    }
                 }
             }
         }
@@ -5430,6 +5480,9 @@ restart:
         foreach ($parent->constants as $name => $value) {
             if (!isset($entry->constants[$name])) {
                 $entry->constants[$name] = $value;
+                if (isset($parent->constVisibility[$name])) {
+                    $entry->constVisibility[$name] = $parent->constVisibility[$name];
+                }
                 if (isset($parent->constDeprecated[$name])) {
                     $entry->constDeprecated[$name] = $parent->constDeprecated[$name];
                 }
@@ -5686,6 +5739,8 @@ restart:
                         }
                     }
                     $entry->constants[$name] = $value;
+                    $entry->constVisibility[$name] = ClassConstVisibility::mask($op->classConstVisibilityFlags);
+                    unset($entry->traitConstSources[$name]);
                     if ([] !== $op->attributeNames) {
                         $entry->constAttributeNames[$name] = $op->attributeNames;
                     }
@@ -6034,6 +6089,16 @@ restart:
      * ClassConstFetch with a runtime member name (php-parser: Class::{$var}).
      * Zend resolves constants first; when no constant exists, fall back to static property (#3788).
      */
+    private function classConstValuesIdentical(Variable $left, Variable $right): bool
+    {
+        $a = new Variable();
+        $a->copyFrom($left);
+        $b = new Variable();
+        $b->copyFrom($right);
+
+        return $a->identicalTo($b);
+    }
+
     private function copyClassConstOrStaticPropertyByName(
         ClassEntry $classEntry,
         string $memberNameRaw,
