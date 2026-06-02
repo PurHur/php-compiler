@@ -250,7 +250,7 @@ class ObjectEntry {
     public function cloneShallow(): self {
         $clone = new self($this->class);
         foreach ($this->properties as $name => $var) {
-            $clone->properties[$name]->copyFrom($var);
+            $clone->properties[$name]->copyFromForClone($var);
         }
         $clone->constructed = $this->constructed;
         $clone->closureState = $this->closureState;
