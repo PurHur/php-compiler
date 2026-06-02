@@ -1450,10 +1450,16 @@ restart:
                     break;
                 case OpCode::TYPE_STATICCALL_INIT:
                     try {
-                        $className = $frame->scope[$op->arg1]->toString();
+                        $classOperand = $frame->scope[$op->arg1]->resolveIndirect();
                         $methodName = $frame->scope[$op->arg2]->toString();
-                        $lcClass = $this->resolveClassScopeName($className, $frame);
-                        $callableName = $this->context->classes[$lcClass]->name.'::'.$methodName;
+                        if (Variable::TYPE_OBJECT === $classOperand->type) {
+                            $classEntry = $classOperand->toObject()->class;
+                            $callableName = $classEntry->name.'::'.$methodName;
+                        } else {
+                            $className = $classOperand->toString();
+                            $lcClass = $this->resolveClassScopeName($className, $frame);
+                            $callableName = $this->context->classes[$lcClass]->name.'::'.$methodName;
+                        }
                         $this->initStaticCallable($frame, $callableName);
                     } catch (\LogicException $e) {
                         return $this->raise($e->getMessage(), $frame);
