@@ -234,6 +234,8 @@ function opcode_type_name(int $type): string
             return 'TYPE_JUMPIF_FUNCTION_STATIC_INITIALIZED';
         case 122:
             return 'TYPE_FUNCTION_STATIC_INIT_STORE';
+        case 123:
+            return 'TYPE_IN';
         default:
             return 'unknown opcode';
     }

@@ -1906,6 +1906,17 @@ restart:
                     }
                     $frame->scope[$op->arg1]->bool($matches);
                     break;
+                case OpCode::TYPE_IN:
+                    try {
+                        $found = VM\InOperator::contains(
+                            $frame->scope[$op->arg2],
+                            $frame->scope[$op->arg3]
+                        );
+                        $frame->scope[$op->arg1]->bool($found);
+                    } catch (\TypeError $e) {
+                        return $this->raise($e->getMessage(), $frame);
+                    }
+                    break;
                 case OpCode::TYPE_STATIC_PROPERTY_FETCH:
                     $rawClass = $frame->scope[$op->arg2]->toString();
                     $lcClass = $this->resolveStaticClassName(
