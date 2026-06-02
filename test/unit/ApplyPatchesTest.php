@@ -157,7 +157,8 @@ PHP;
     public function testPhpCfgPropertyReadonlyOverlayApplied(): void
     {
         $prop = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php';
-        if (!is_readable($prop)) {
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        if (!is_readable($prop) || !is_readable($parser)) {
             self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
         }
 
@@ -165,8 +166,49 @@ PHP;
         self::assertTrue(
             str_contains($body, 'public $readonly')
             || str_contains($body, 'propertyFlags'),
-            'php-cfg-property-readonly overlay must expose readonly metadata (#3149, #4234)'
+            'php-cfg-property-readonly overlay must expose readonly metadata (#3149, #4230)'
         );
+        $parserBody = (string) file_get_contents($parser);
+        self::assertMatchesRegularExpression(
+            '/propertyFlags\s*=\s*\$node->flags|\$(cfgProp|prop)->readonly\s*=/',
+            $parserBody,
+            'php-cfg-property-readonly overlay must populate flags in parseStmt_Property (#4230)'
+        );
+    }
+
+    public function testPhpCfgPropertyReadonlyOverlayReappliesAfterPartialVendor(): void
+    {
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        if (!is_readable($parser)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $original = (string) file_get_contents($parser);
+        $stripped = preg_replace(
+            '/^\s*\$prop->propertyFlags = \$node->flags;\n/m',
+            '',
+            $original
+        );
+        self::assertIsString($stripped);
+        self::assertNotSame($original, $stripped, 'fixture must include propertyFlags assignment');
+        file_put_contents($parser, $stripped);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertSame(0, $exitCode, "apply-patches failed after stripping propertyFlags:\n".$joined);
+
+            $restored = (string) file_get_contents($parser);
+            self::assertMatchesRegularExpression(
+                '/propertyFlags\s*=\s*\$node->flags/',
+                $restored,
+                'overlay must re-insert propertyFlags on harness tar-copy vendor (#4230)'
+            );
+        } finally {
+            file_put_contents($parser, $original);
+        }
     }
 
     public function testPhpCfgEnumParserPassesImplementsArrayNotBlock(): void

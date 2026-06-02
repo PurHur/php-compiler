@@ -44,7 +44,7 @@ class Box {
 $o = new Box();
 $o->v = 2;
 PHP;
-        $this->expectException(\Exception::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot modify readonly property Box::$v');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_after.php'));
     }
@@ -60,7 +60,7 @@ class C {
 $c = new C('a');
 $c->id = 'b';
 PHP;
-        $this->expectException(\Exception::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot modify readonly property C::$id');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_promoted.php'));
     }
@@ -80,7 +80,7 @@ class C extends P {}
 $c = new C();
 $c->x = 2;
 PHP;
-        $this->expectException(\Exception::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot modify readonly property P::$x');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_inherited.php'));
     }
@@ -99,7 +99,7 @@ class C {
 $c = new C();
 unset($c->x);
 PHP;
-        $this->expectException(\Exception::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot unset readonly property C::$x');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_unset.php'));
     }
@@ -118,7 +118,7 @@ class C {
 $c = new C();
 $c->x++;
 PHP;
-        $this->expectException(\Exception::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot modify readonly property C::$x');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_post_inc.php'));
     }
@@ -137,7 +137,7 @@ class C {
 $c = new C();
 --$c->x;
 PHP;
-        $this->expectException(\Exception::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot modify readonly property C::$x');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_pre_dec.php'));
     }
@@ -156,7 +156,7 @@ class C {
 $c = new C();
 $c->x += 1;
 PHP;
-        $this->expectException(\Exception::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot modify readonly property C::$x');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_compound.php'));
     }
@@ -175,7 +175,7 @@ class C {
 $c = new C();
 $c->x .= 'b';
 PHP;
-        $this->expectException(\Exception::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot modify readonly property C::$x');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_concat.php'));
     }
