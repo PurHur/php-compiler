@@ -2082,6 +2082,9 @@ restart:
                             && $frame->block->strictTypes
                             && [] !== $calledArgs
                         ) {
+                            $callSiteLine = OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
+                                ? (int) ($op->arg2 ?? 0)
+                                : (int) ($op->arg1 ?? 0);
                             $calleeBlock = $frame->call->block;
                             foreach ($calleeBlock->opCodes as $recv) {
                                 if (OpCode::TYPE_ARG_RECV !== $recv->type) {
@@ -2096,10 +2099,19 @@ restart:
                                 if (null === $constraint) {
                                     continue;
                                 }
-                                $probe = new Variable();
-                                $probe->copyFrom($calledArgs[$paramIdx]);
-                                $probe->resolveIndirect()->typeConstraint = $constraint;
-                                TypeCheck::coerceParameter($probe, true);
+                                $arg = $calledArgs[$paramIdx];
+                                if (!TypeCheck::parameterMatchesType($arg, $constraint)) {
+                                    $paramName = $calleeBlock->paramNames[$paramIdx] ?? 'param'.$paramIdx;
+                                    throw VM\ParamTypeError::forUserCall(
+                                        $frame->call->getName(),
+                                        $paramIdx,
+                                        $paramName,
+                                        $constraint,
+                                        $arg,
+                                        $frame->scriptPath,
+                                        $callSiteLine
+                                    );
+                                }
                             }
                         }
                     } catch (\TypeError $e) {

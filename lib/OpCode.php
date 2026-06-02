@@ -23,7 +23,9 @@ class OpCode {
     const TYPE_FUNCCALL_INIT = 11;
     const TYPE_ARG_SEND = 12;
     const TYPE_ARG_RECV = 13;
+    /** arg2 = call-site line when known (#4482). */
     const TYPE_FUNCCALL_EXEC_RETURN = 14;
+    /** arg1 = call-site line when known (#4482). */
     const TYPE_FUNCCALL_EXEC_NORETURN = 15;
     const TYPE_IDENTICAL = 16;
     const TYPE_RETURN = 17;

@@ -183,6 +183,16 @@ final class TypeCheck
         }
     }
 
+    public static function parameterMatchesType(Variable $value, int $constraint): bool
+    {
+        return self::isExactType($value->resolveIndirect(), $constraint);
+    }
+
+    public static function typeNameForConstraint(int $type): string
+    {
+        return self::typeName($type);
+    }
+
     private static function isExactType(Variable $value, int $constraint): bool
     {
         return $value->type === $constraint;

@@ -3696,7 +3696,8 @@ class Compiler {
                     $this->compileOperand($expr->name, $block, true),
                     $expr->args,
                     $expr->result,
-                    $block
+                    $block,
+                    max(0, $expr->getLine())
                 );
             case Op\Expr\NsFuncCall::class:
                 if ($this->operandIsInvokableReceiver($expr->nsName, $block)) {
@@ -3713,7 +3714,8 @@ class Compiler {
                     $this->compileOperand($expr->nsName, $block, true),
                     $expr->args,
                     $expr->result,
-                    $block
+                    $block,
+                    max(0, $expr->getLine())
                 );
             case Op\Expr\StaticCall::class:
                 $return = [
@@ -3726,16 +3728,11 @@ class Compiler {
                 foreach ($this->compileCallArgSends($expr->args, $block) as $send) {
                     $return[] = $send;
                 }
-                if ($this->callNeedsReturnSlot($expr->result, $block)) {
-                    $return[] = new OpCode(
-                        OpCode::TYPE_FUNCCALL_EXEC_RETURN,
-                        $this->compileOperand($expr->result, $block, false)
-                    );
-                } else {
-                    $return[] = new OpCode(
-                        OpCode::TYPE_FUNCCALL_EXEC_NORETURN,
-                    );
-                }
+                $return[] = $this->compileFuncCallExecOpcode(
+                    $expr->result,
+                    $block,
+                    max(0, $expr->getLine())
+                );
                 return $return;
             case Op\Expr\New_::class:
                 $className = $this->literalScopeClassName($expr->class);
@@ -3761,8 +3758,10 @@ class Compiler {
                 foreach ($this->compileCallArgSends($expr->args, $block) as $send) {
                     $return[] = $send;
                 }
-                $return[] = new OpCode(
-                    OpCode::TYPE_FUNCCALL_EXEC_NORETURN
+                $return[] = $this->compileFuncCallExecOpcode(
+                    $expr->result,
+                    $block,
+                    $line > 0 ? $line : 0
                 );
                 return $return;
             case Op\Expr\MethodCall::class:
@@ -3771,7 +3770,8 @@ class Compiler {
                     $this->compileOperand($expr->name, $block, true),
                     $expr->args,
                     $expr->result,
-                    $block
+                    $block,
+                    max(0, $expr->getLine())
                 );
             case Op\Expr\PropertyFetch::class:
                 return [new OpCode(
@@ -4321,8 +4321,10 @@ class Compiler {
         foreach ($this->compileCallArgSends($expr->args, $block) as $send) {
             $return[] = $send;
         }
-        $return[] = new OpCode(
-            OpCode::TYPE_FUNCCALL_EXEC_NORETURN
+        $return[] = $this->compileFuncCallExecOpcode(
+            $expr->result,
+            $block,
+            $line > 0 ? $line : 0
         );
 
         return $return;
@@ -4686,16 +4688,11 @@ class Compiler {
         foreach ($this->compileCallArgSends($expr->args, $fetchBlock) as $send) {
             $fetchBlock->addOpCode($send);
         }
-        if (!empty($expr->result->usages)) {
-            $fetchBlock->addOpCode(new OpCode(
-                OpCode::TYPE_FUNCCALL_EXEC_RETURN,
-                $this->compileOperand($expr->result, $fetchBlock, false)
-            ));
-        } else {
-            $fetchBlock->addOpCode(new OpCode(
-                OpCode::TYPE_FUNCCALL_EXEC_NORETURN,
-            ));
-        }
+        $fetchBlock->addOpCode($this->compileFuncCallExecOpcode(
+            $expr->result,
+            $fetchBlock,
+            max(0, $expr->getLine())
+        ));
         $fetchJump = new OpCode(OpCode::TYPE_JUMP);
         $fetchJump->block1 = $endBlock;
         $fetchBlock->addOpCode($fetchJump);
@@ -6250,7 +6247,8 @@ class Compiler {
         ?int $methodName,
         array $args,
         Operand $result,
-        Block $block
+        Block $block,
+        int $startLine = 0
     ): array {
         $return = [
             new OpCode(
@@ -6262,21 +6260,29 @@ class Compiler {
         foreach ($this->compileCallArgSends($args, $block) as $send) {
             $return[] = $send;
         }
-        if ($this->callNeedsReturnSlot($result, $block)) {
-            $return[] = new OpCode(
-                OpCode::TYPE_FUNCCALL_EXEC_RETURN,
-                $this->compileOperand($result, $block, false)
-            );
-        } else {
-            $return[] = new OpCode(
-                OpCode::TYPE_FUNCCALL_EXEC_NORETURN,
-            );
-        }
+        $return[] = $this->compileFuncCallExecOpcode($result, $block, $startLine);
 
         return $return;
     }
 
-    protected function compileFuncCall(?int $name, array $args, Operand $result, Block $block): array
+    protected function compileFuncCallExecOpcode(Operand $result, Block $block, int $startLine = 0): OpCode
+    {
+        $line = $startLine > 0 ? $startLine : null;
+        if ($this->callNeedsReturnSlot($result, $block)) {
+            return new OpCode(
+                OpCode::TYPE_FUNCCALL_EXEC_RETURN,
+                $this->compileOperand($result, $block, false),
+                $line
+            );
+        }
+
+        return new OpCode(
+            OpCode::TYPE_FUNCCALL_EXEC_NORETURN,
+            $line
+        );
+    }
+
+    protected function compileFuncCall(?int $name, array $args, Operand $result, Block $block, int $startLine = 0): array
     {
         $folded = $this->tryCompileDefineAsGlobalConst($name, $args, $result, $block);
         if (null !== $folded) {
@@ -6289,11 +6295,7 @@ class Compiler {
         foreach ($this->compileCallArgSends($args, $block) as $send) {
             $return[] = $send;
         }
-        if ($this->callNeedsReturnSlot($result, $block)) {
-            $return[] = new OpCode(OpCode::TYPE_FUNCCALL_EXEC_RETURN, $this->compileOperand($result, $block, false));
-        } else {
-            $return[] = new OpCode(OpCode::TYPE_FUNCCALL_EXEC_NORETURN);
-        }
+        $return[] = $this->compileFuncCallExecOpcode($result, $block, $startLine);
         return $return;
     }
 
