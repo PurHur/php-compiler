@@ -629,9 +629,9 @@ class Compiler {
             $phiRoot = $this->mergeBranchAssignVarRoot($branchCfg);
             $phiSlot = null;
             if (null !== $phiRoot) {
-                foreach ($compiled->scope as $operand) {
-                    if (Block::cfgVarRoot($operand) === $phiRoot) {
-                        $phiSlot = $compiled->scope[$operand];
+                foreach ($compiled->eachCfgVarRootSlot() as [$root, $slot]) {
+                    if ($root === $phiRoot) {
+                        $phiSlot = $slot;
                         break;
                     }
                 }
