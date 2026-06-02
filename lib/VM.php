@@ -4802,11 +4802,14 @@ restart:
         $perTraitMethods = [];
         /** @var array<string, true> */
         $excludedByPrecedence = [];
+        /** @var array<string, string> */
+        $usedTraitNameByLc = [];
 
         foreach ($traitNames as $traitName) {
             $trait = $this->resolveTraitEntry($traitName);
             $traitLc = strtolower(ltrim($trait->name, '\\'));
             $entry->usedTraits[$trait->name] = $trait->name;
+            $usedTraitNameByLc[$traitLc] = $trait->name;
             if (!isset($perTraitMethods[$traitLc])) {
                 $perTraitMethods[$traitLc] = [];
             }
@@ -4849,9 +4852,37 @@ restart:
             if ('precedence' !== ($adaptation['kind'] ?? '')) {
                 continue;
             }
+            $winnerTraitLc = strtolower(ltrim((string) ($adaptation['trait'] ?? ''), '\\'));
+            if ('' === $winnerTraitLc) {
+                throw new \LogicException('Trait precedence adaptation must specify a trait');
+            }
+            if (!isset($usedTraitNameByLc[$winnerTraitLc])) {
+                // Zend: "Could not find trait X" (even though this name is in an insteadof list).
+                throw new \LogicException('Could not find trait ' . (string) ($adaptation['trait'] ?? ''));
+            }
             $methodLc = strtolower((string) $adaptation['method']);
+            if (!isset($perTraitMethods[$winnerTraitLc][$methodLc])) {
+                throw new \LogicException(
+                    'A precedence rule was defined for '
+                    . $usedTraitNameByLc[$winnerTraitLc]
+                    . '::' . (string) ($adaptation['method'] ?? '')
+                    . ' but this method does not exist'
+                );
+            }
             foreach ($adaptation['insteadof'] as $loserTrait) {
                 $loserLc = strtolower(ltrim((string) $loserTrait, '\\'));
+                if (!isset($usedTraitNameByLc[$loserLc])) {
+                    throw new \LogicException('Could not find trait ' . (string) $loserTrait);
+                }
+                if (!isset($perTraitMethods[$loserLc][$methodLc])) {
+                    throw new \LogicException(
+                        'A precedence rule was defined for '
+                        . $usedTraitNameByLc[$winnerTraitLc]
+                        . '::' . (string) ($adaptation['method'] ?? '')
+                        . ' but this method does not exist in '
+                        . $usedTraitNameByLc[$loserLc]
+                    );
+                }
                 $excludedByPrecedence["{$loserLc}\0{$methodLc}"] = true;
             }
         }
@@ -4864,9 +4895,10 @@ restart:
                     continue;
                 }
                 if (isset($merged[$methodLc])) {
+                    $prevTrait = $merged[$methodLc]['traitName'];
                     throw new \LogicException(
-                        'Trait method ' . $methodLc . ' has not been applied, because there are collisions'
-                        . ' with other trait methods on ' . $entry->name
+                        "Trait method {$data['traitName']}::{$methodLc} has not been applied as {$entry->name}::{$methodLc}, "
+                        ."because of collision with {$prevTrait}::{$methodLc}"
                     );
                 }
                 $merged[$methodLc] = [
@@ -4892,11 +4924,18 @@ restart:
                 ? strtolower(ltrim((string) $adaptation['trait'], '\\'))
                 : null;
             if (!isset($merged[$methodLc])) {
-                throw new \LogicException('Could not find trait method ' . $adaptation['method']);
+                $traitPrefix = null !== ($adaptation['trait'] ?? null)
+                    ? (string) $adaptation['trait'] . '::'
+                    : '';
+                throw new \LogicException(
+                    'An alias was defined for ' . $traitPrefix . (string) ($adaptation['method'] ?? '')
+                    . ' but this method does not exist'
+                );
             }
             if (null !== $traitLcFilter && $merged[$methodLc]['traitLc'] !== $traitLcFilter) {
                 throw new \LogicException(
-                    'Could not find trait method ' . $adaptation['method'] . ' in trait ' . $adaptation['trait']
+                    'An alias was defined for ' . (string) ($adaptation['trait'] ?? '') . '::' . (string) ($adaptation['method'] ?? '')
+                    . ' but this method does not exist'
                 );
             }
             $newName = $adaptation['newName'] ?? null;
