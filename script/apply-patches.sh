@@ -296,9 +296,8 @@ patch_already_applied() {
       grep -q 'promotionReadonly' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null
       ;;
     php-cfg-property-readonly.patch)
-      # Legacy patch adds $readonly; upstream overlay uses propertyFlags (#3149).
-      grep -q 'public $readonly = false' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null \
-        || grep -q 'propertyFlags' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null
+      grep -qE 'propertyFlags = \$node->flags|\$cfgProp->readonly =|\$prop->readonly =' \
+        "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-attribute-groups.patch)
       grep -q "attrGroups'\] = \$expr->attrGroups" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
@@ -1964,6 +1963,81 @@ PY
   echo "Applied php-cfg-halt-compiler.patch (overlay)"
 }
 
+# Per-property MODIFIER_READONLY: Property.propertyFlags + Parser assignment (#3149, #4230).
+apply_php_cfg_property_readonly_overlay() {
+  local prop="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php"
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if [[ ! -f "$prop" || ! -f "$parser" ]]; then
+    return 0
+  fi
+  if grep -qE 'propertyFlags = \$node->flags|\$cfgProp->readonly =|\$prop->readonly =' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-property-readonly.patch (already applied)"
+    return 0
+  fi
+  if ! grep -q 'propertyFlags' "$prop" 2>/dev/null && ! grep -q 'public $readonly' "$prop" 2>/dev/null; then
+    python3 - "$prop" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+if 'propertyFlags' in text or 'public $readonly' in text:
+    raise SystemExit(0)
+needle = "    public $declaredType;\n"
+insert = (
+    needle
+    + "\n"
+    + "    /** php-parser Stmt\\Property flags (includes MODIFIER_READONLY, issue #3149). */\n"
+    + "    public int $propertyFlags = 0;\n"
+)
+if needle not in text:
+    sys.stderr.write("php-cfg-property-readonly: Property.php declaredType anchor missing\n")
+    raise SystemExit(1)
+path.write_text(text.replace(needle, insert, 1))
+PY
+    echo "Applied php-cfg-property-readonly.patch (Property overlay)"
+  fi
+  python3 - "$parser" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+if re.search(r'propertyFlags\s*=\s*\$node->flags', text):
+    raise SystemExit(0)
+if re.search(r'\$(cfgProp|prop)->readonly\s*=', text):
+    raise SystemExit(0)
+assign = "            $prop->propertyFlags = $node->flags;\n"
+needle = "            $this->block->children[] = $prop;\n"
+if needle in text and assign not in text:
+    path.write_text(text.replace(needle, assign + needle, 1))
+    raise SystemExit(0)
+inline = re.compile(
+    r"(\s+)\$this->block->children\[\] = new Op\\Stmt\\Property\(\n"
+    r"([\s\S]*?)\n\1\);\n",
+    re.M,
+)
+match = inline.search(text)
+if match:
+    indent = match.group(1)
+    inner = match.group(2)
+    replacement = (
+        f"{indent}$prop = new Op\\Stmt\\Property(\n"
+        f"{inner}\n"
+        f"{indent});\n"
+        f"{assign}"
+        f"{indent}$this->block->children[] = $prop;\n"
+    )
+    path.write_text(text[: match.start()] + replacement + text[match.end() :])
+    raise SystemExit(0)
+sys.stderr.write("php-cfg-property-readonly: parseStmt_Property insert anchor missing\n")
+raise SystemExit(1)
+PY
+  echo "Applied php-cfg-property-readonly.patch (Parser overlay)"
+  return 0
+}
+
 apply_php_cfg_throw_expr_overlay() {
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Throw_.php"
@@ -2355,6 +2429,10 @@ apply_patch() {
     apply_php_cfg_throw_expr_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-property-readonly.patch" ]]; then
+    apply_php_cfg_property_readonly_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-llvm-memory-buffer-bitcode.patch" ]]; then
     apply_php_llvm_memory_buffer_overlay
     return $?
@@ -2563,7 +2641,10 @@ verify_critical_language_patches() {
     missing+=("php-types-union-type")
   fi
   if ! grep -qE 'public \$readonly|propertyFlags' "$prop" 2>/dev/null; then
-    missing+=("php-cfg-property-readonly")
+    missing+=("php-cfg-property-readonly-Property")
+  fi
+  if ! grep -qE 'propertyFlags = \$node->flags|\$cfgProp->readonly =|\$prop->readonly =' "$parser" 2>/dev/null; then
+    missing+=("php-cfg-property-readonly-Parser")
   fi
   if ((${#missing[@]} > 0)); then
     echo "apply-patches: critical language patch markers missing: ${missing[*]}" >&2
