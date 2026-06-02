@@ -27,7 +27,12 @@ PHP;
     private const CODE_VM = <<<'PHP'
 $path = 'test/compliance/cases/stdlib/readfile_fixture/data.txt';
 foreach (['fileowner', 'filegroup'] as $fn) {
-    echo $fn, ': ', function_exists($fn) ? 'yes' : 'no', "\n";
+    echo $fn, ': ';
+    if (function_exists($fn)) {
+        echo "yes\n";
+    } else {
+        echo "no\n";
+    }
 }
 $o1 = fileowner($path);
 $o2 = fileowner($path);
