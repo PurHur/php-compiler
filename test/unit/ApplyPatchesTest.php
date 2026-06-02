@@ -100,8 +100,58 @@ PHP;
         self::assertMatchesRegularExpression(
             '/parseExpr_Throw|Op\\\\Expr\\\\Throw_/',
             $body,
-            'php-cfg-throw-expr overlay must register throw expressions (#3802, #4234)'
+            'php-cfg-throw-expr overlay must register throw expressions (#3802, #4232)'
         );
+    }
+
+    public function testPhpCfgThrowExprParserOverlayReappliesAfterPartialVendor(): void
+    {
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        $op = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Throw_.php';
+        if (!is_readable($parser)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $originalParser = (string) file_get_contents($parser);
+        $hadOp = is_readable($op);
+        $originalOp = $hadOp ? (string) file_get_contents($op) : null;
+
+        $stripped = preg_replace(
+            '/    protected function parseExpr_Throw\(Expr\\\\Throw_ \$expr\)\s*\{.*?\n    \}\n/s',
+            '',
+            $originalParser
+        );
+        self::assertIsString($stripped);
+        self::assertNotSame($originalParser, $stripped, 'fixture must include parseExpr_Throw');
+        file_put_contents($parser, $stripped);
+        if ($hadOp) {
+            unlink($op);
+        }
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertSame(0, $exitCode, "apply-patches failed after stripping throw-expr:\n".$joined);
+
+            $restored = (string) file_get_contents($parser);
+            self::assertMatchesRegularExpression(
+                '/parseExpr_Throw|return new Op\\\\Expr\\\\Throw_/',
+                $restored,
+                'overlay must re-insert parseExpr_Throw on harness tar-copy vendor (#4232)'
+            );
+            self::assertFileIsReadable($op);
+        } finally {
+            file_put_contents($parser, $originalParser);
+            if ($hadOp && $originalOp !== null) {
+                $dir = dirname($op);
+                if (!is_dir($dir)) {
+                    mkdir($dir, 0777, true);
+                }
+                file_put_contents($op, $originalOp);
+            }
+        }
     }
 
     public function testPhpCfgPropertyReadonlyOverlayApplied(): void
