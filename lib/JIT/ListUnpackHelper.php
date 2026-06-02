@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\ext\standard\JitArrayIsList;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 
-/** Runtime guard for `list()` / `[]` destructuring on non-list arrays (#4298) and non-array RHS (#4325). */
+/** Runtime guard for `list()` / `[]` destructuring on non-list arrays (#4298) and non-array RHS (#4325, #4308). */
 final class ListUnpackHelper
 {
     public const TYPE_ERROR_MESSAGE = 'Cannot unpack array with string keys';
@@ -45,8 +45,60 @@ final class ListUnpackHelper
         $context->builder->positionAtEnd($okBb);
     }
 
+    /**
+     * Guarded `[]` / list() destructuring: skip assign path when RHS is not an array at run time (#4325, #4308).
+     *
+     * @return bool true when assign-path opcodes should compile as unreachable stubs (compile-time non-array RHS)
+     */
+    public static function emitGuardedListUnpackCheck(
+        Context $context,
+        Variable $array,
+        \PHPLLVM\BasicBlock $branchBlock,
+        \PHPLLVM\BasicBlock $mergeEntry
+    ): bool {
+        if (self::isDefinitelyNonArrayAtCompileTime($array)) {
+            $context->builder->positionAtEnd($branchBlock);
+            $context->builder->branch($mergeEntry);
+            $deadBb = BasicBlockHelper::append($context, 'list_unpack_skip_assign');
+            $context->builder->positionAtEnd($deadBb);
+
+            return true;
+        }
+        $isArray = self::isArrayValue($context, $array);
+        $arrayCheckBb = BasicBlockHelper::append($context, 'list_unpack_array_check');
+        $context->builder->positionAtEnd($branchBlock);
+        $context->builder->branchIf($isArray, $arrayCheckBb, $mergeEntry);
+        $context->builder->positionAtEnd($arrayCheckBb);
+        self::emitIsListBranchOrFail($context, $array);
+
+        return false;
+    }
+
+    public static function isDefinitelyNonArrayAtCompileTime(Variable $array): bool
+    {
+        if (self::isDefinitelyArrayAtCompileTime($array)) {
+            return false;
+        }
+
+        return Variable::TYPE_STRING === $array->type
+            || Variable::TYPE_OBJECT === $array->type
+            || Variable::TYPE_NULL === $array->type
+            || Variable::TYPE_NATIVE_BOOL === $array->type
+            || Variable::TYPE_NATIVE_LONG === $array->type
+            || Variable::TYPE_NATIVE_DOUBLE === $array->type;
+    }
+
+    public static function isDefinitelyArrayAtCompileTime(Variable $array): bool
+    {
+        return Variable::TYPE_HASHTABLE === $array->type
+            || 0 !== ($array->type & Variable::IS_NATIVE_ARRAY);
+    }
+
     public static function emitIsListBranchOrFail(Context $context, Variable $array): void
     {
+        if (self::isDefinitelyNonArrayAtCompileTime($array)) {
+            return;
+        }
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
         $isList = JitArrayIsList::invoke($context, $array);
@@ -81,7 +133,7 @@ final class ListUnpackHelper
             return $builder->icmp(
                 \PHPLLVM\Builder::INT_EQ,
                 $typeByte,
-                $i8->constInt(Variable::TYPE_HASHTABLE, false)
+                $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ARRAY, false)
             );
         }
 

@@ -153,6 +153,9 @@ class Context {
     /** ?? / ?-> result operands that must receive branch assigns even when php-cfg marks them dead (#99, #3219). */
     public \SplObjectStorage $coalesceAssignTargets;
 
+    /** Guarded list destruct: assign-path dim fetches compile as unreachable stubs (#4308). */
+    public bool $listUnpackSkipAssignPath = false;
+
     /** Nested compile-time include inlining depth (issue #568). */
     public int $inlineIncludeDepth = 0;
 
