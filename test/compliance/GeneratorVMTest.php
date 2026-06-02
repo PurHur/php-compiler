@@ -22,6 +22,7 @@ final class GeneratorVMTest extends BaseTest
                 'generator_yield_from_generator.phpt',
                 'generator_yield_from_iterator.phpt',
                 'generator_yield_from_non_traversable.phpt',
+                'generator_iterator_protocol.phpt',
                 'generator_get_return.phpt',
                 'generator_get_return_early.phpt',
                 'generator_get_return_unreachable_yield.phpt',

@@ -86,6 +86,7 @@ final class BuiltinClasses
         StringableSupport::register($ctx);
         self::registerStdClass($ctx);
         self::registerCountable($ctx);
+        self::registerTraversableInterfaces($ctx);
         SensitiveParamSupport::register($ctx);
         self::registerWeakReference($ctx);
         self::registerWeakMap($ctx);
@@ -96,6 +97,19 @@ final class BuiltinClasses
         self::registerFiber($ctx);
         GeneratorState::register($ctx);
         ClosureState::register($ctx);
+    }
+
+    /** Zend: Traversable/Iterator interfaces for instanceof and foreach parity. */
+    private static function registerTraversableInterfaces(Context $ctx): void
+    {
+        $traversable = new ClassEntry('Traversable');
+        $traversable->isInterface = true;
+        $ctx->classes['traversable'] = $traversable;
+
+        $iterator = new ClassEntry('Iterator');
+        $iterator->isInterface = true;
+        $iterator->interfaces = ['traversable'];
+        $ctx->classes['iterator'] = $iterator;
     }
 
     /** Zend zend_interfaces.c — Countable interface (#3364). */
