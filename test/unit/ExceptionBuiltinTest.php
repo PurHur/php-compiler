@@ -24,6 +24,21 @@ try {
         );
     }
 
+    /** void __construct must not null the TYPE_NEW temp (#4540, match throw arms). */
+    public function testThrowBareNewExceptionCaught(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+try {
+    throw new Exception();
+} catch (Exception $e) {
+    echo "caught\n";
+}
+',
+            "caught\n"
+        );
+    }
+
     public function testCatchThrowableMatchesExceptionAndError(): void
     {
         $this->assertVmOutput(

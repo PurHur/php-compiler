@@ -117,7 +117,15 @@ final class ExceptionSupport
         $lineProp->int($line);
         $receiver->constructed = true;
         if (null !== $frame->returnVar) {
-            $frame->returnVar->null();
+            $ret = $frame->returnVar->resolveIndirect();
+            // void __construct must not wipe the `new Exception()` temp when returnVar
+            // aliases the same slot as $this (FUNCCALL_EXEC_RETURN after TYPE_NEW, #4540).
+            if (
+                Variable::TYPE_OBJECT !== $ret->type
+                || $ret->toObject() !== $receiver
+            ) {
+                $frame->returnVar->null();
+            }
         }
     }
 
