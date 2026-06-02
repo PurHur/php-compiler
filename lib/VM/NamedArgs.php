@@ -94,6 +94,8 @@ final class NamedArgs
             $result[$idx] = $value;
         }
 
+        ksort($result);
+
         return $result;
     }
 }
