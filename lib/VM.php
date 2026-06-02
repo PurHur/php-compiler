@@ -531,6 +531,68 @@ class VM {
     }
 
     /**
+     * True when zend_std_read_property must invoke __get (undeclared slot or inaccessible declared prop).
+     */
+    protected function propertyReadUsesMagicGet(ObjectEntry $object, string $name, Frame $frame): bool
+    {
+        if (!$this->hasInstanceMethod($object->class, '__get')) {
+            return false;
+        }
+        $meta = $this->classPropertyMeta($object, $name);
+        if (null === $meta) {
+            return true;
+        }
+        $declaringDisplay = $this->context->classes[$meta->declaringClassLc]->name
+            ?? $meta->declaringClassLc;
+        try {
+            PropertyVisibility::assertAccessible(
+                $meta->visibility,
+                $this->callerClassLc($frame),
+                $meta->declaringClassLc,
+                $declaringDisplay,
+                $name,
+                strtolower($object->class->name),
+                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc)
+            );
+
+            return false;
+        } catch (\LogicException $e) {
+            return true;
+        }
+    }
+
+    /**
+     * Copy __get return into $result and mark for indirect-modify detection (#4673).
+     */
+    protected function deliverMagicGetRead(Variable $result, ObjectEntry $object, string $name): void
+    {
+        $result->copyFrom($this->invokeMagicGet($object, $name));
+        $result->magicGetOverloadedTarget = $object;
+        $result->magicGetOverloadedName = $name;
+    }
+
+    /**
+     * Reject []= / dim-write on a value produced by __get (#4673).
+     */
+    protected function rejectMagicGetIndirectModify(Variable $containerSlot, bool $forWrite, Frame $frame): ?Frame
+    {
+        if (!$forWrite) {
+            return null;
+        }
+        if (null === $containerSlot->magicGetOverloadedTarget || null === $containerSlot->magicGetOverloadedName) {
+            return null;
+        }
+        $class = $containerSlot->magicGetOverloadedTarget->class->name;
+        $prop = $containerSlot->magicGetOverloadedName;
+
+        return $this->dispatchVmError(sprintf(
+            'Indirect modification of overloaded property %s::$%s has no effect',
+            $class,
+            $prop
+        ), $frame);
+    }
+
+    /**
      * Resolve an instance property write lvalue, including __set / dynamic properties (#146).
      */
     protected function fetchObjectPropertyWriteLvalue(ObjectEntry $object, string $name, Frame $frame): Variable
@@ -1202,6 +1264,11 @@ restart:
                     $containerSlot = $frame->scope[$op->arg2];
                     $container = $containerSlot->resolveIndirect();
                     $forWrite = OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type;
+                    $catchFrame = $this->rejectMagicGetIndirectModify($containerSlot, $forWrite, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     if ($container->isArrayAccessOffset()) {
                         if ($forWrite || is_null($op->arg3)) {
                             throw new \Error('Cannot indirectly modify an element of ArrayAccess');
@@ -2527,15 +2594,19 @@ restart:
                         $result->copyFrom(EnumCaseSupport::getProperty($propertyObject, $name));
                         break;
                     }
-                    $catchFrame = $this->enforcePropertyVisibilityRead($propertyObject, $name, $frame);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
                     $forWrite = $frame->pos < $frame->block->nOpCodes
                         && OpCode::TYPE_ASSIGN === $frame->block->opCodes[$frame->pos]->type
                         && (int) $frame->block->opCodes[$frame->pos]->arg2 === (int) $op->arg1;
-                    if ($propertyObject->hasProperty($name)) {
+                    $magicGetForRead = !$forWrite
+                        && $this->propertyReadUsesMagicGet($propertyObject, $name, $frame);
+                    if (!$magicGetForRead) {
+                        $catchFrame = $this->enforcePropertyVisibilityRead($propertyObject, $name, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                    }
+                    if ($propertyObject->hasProperty($name) && !$magicGetForRead) {
                         if ($forWrite) {
                             $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
                             break;
@@ -2552,8 +2623,8 @@ restart:
                         $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
                         break;
                     }
-                    if ($this->hasInstanceMethod($propertyObject->class, '__get')) {
-                        $result->copyFrom($this->invokeMagicGet($propertyObject, $name));
+                    if ($magicGetForRead) {
+                        $this->deliverMagicGetRead($result, $propertyObject, $name);
                         break;
                     }
                     if ($propertyObject->class->allowsDynamicProperties) {
@@ -2572,6 +2643,11 @@ restart:
                 case OpCode::TYPE_ADD_ARRAY_ELEMENT:
                     try {
                         $result = $frame->scope[$op->arg1];
+                        $catchFrame = $this->rejectMagicGetIndirectModify($result, true, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                         $ht = $result->toArray();
                         if (is_null($op->arg3)) {
                             $ht->append($frame->scope[$op->arg2]);

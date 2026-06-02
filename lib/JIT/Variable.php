@@ -142,6 +142,11 @@ final class Variable {
 
     public ?string $magicSetName = null;
 
+    /** __get return value; dim-write must error (#4673). */
+    public ?string $magicGetOverloadedClass = null;
+
+    public ?string $magicGetOverloadedName = null;
+
     /** Native call proxy when this object is a JIT-lowered closure (#72). */
     public ?Call $closureCall = null;
 
