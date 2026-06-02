@@ -13,6 +13,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\ReadonlyRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
@@ -78,6 +79,86 @@ final class ClassConstFetchHelper
         return self::emitCanonicalClassNameFromResolved($objectType, $resolvedStr);
     }
 
+    public static function fetchLiteralConstWithRuntimeClass(
+        Object_ $objectType,
+        Block $block,
+        Variable $classVar,
+        Operand $classOp,
+        string $constName
+    ): Variable {
+        $classIdVal = self::emitResolveClassId($objectType, $block, $classVar, $classOp);
+        $key = strtolower($constName);
+        $context = $objectType->jitContext();
+        $resultSlot = JitValueBox::alloc($context);
+        $fn = BasicBlockHelper::parentFunction($context);
+        $entry = $context->builder->getInsertBlock();
+        $merge = $fn->appendBasicBlock('class_const_var_cls_lit_merge');
+        $fail = $fn->appendBasicBlock('class_const_var_cls_lit_fail');
+        $i64 = $context->getTypeFromString('int64');
+        $checkBlock = $entry;
+        $hasCandidate = false;
+        foreach ($objectType->allClassNamesById() as $id => $_) {
+            $constants = $objectType->classConstantsForId($id);
+            $entryData = null;
+            foreach ($constants as [$constKey, $entry]) {
+                if ($constKey === $key) {
+                    $entryData = $entry;
+                    break;
+                }
+            }
+            if (null === $entryData) {
+                continue;
+            }
+            $hasCandidate = true;
+            $matchBlock = $fn->appendBasicBlock('class_const_var_cls_lit_match_'.$id.'_'.$key);
+            $nextCheck = $fn->appendBasicBlock('class_const_var_cls_lit_try_'.$id.'_'.$key);
+            $context->builder->positionAtEnd($checkBlock);
+            $expectedId = $context->constantFromInteger($id, 'int64');
+            $isId = $context->builder->icmp(Builder::INT_EQ, $classIdVal, $expectedId);
+            $context->builder->branchIf($isId, $matchBlock, $nextCheck);
+            $context->builder->positionAtEnd($matchBlock);
+            self::writeConstEntry($context, $resultSlot, $entryData);
+            $context->builder->branch($merge);
+            $checkBlock = $nextCheck;
+        }
+        $context->builder->positionAtEnd($checkBlock);
+        if (!$hasCandidate) {
+            throw new \LogicException("Undefined class constant for JIT: {$constName}");
+        }
+        $context->builder->branch($fail);
+
+        $context->builder->positionAtEnd($fail);
+        $displayClass = self::displayClassName($objectType, -1, $classOp);
+        $message = "Undefined class constant {$displayClass}::{$constName}";
+        $context->builder->call(
+            $context->lookupFunction('__compiler_jit_raise_logic_exception'),
+            self::messageDataPtr($context, $message),
+            $context->constantFromInteger(strlen($message), 'size_t')
+        );
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($merge);
+
+        return new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $resultSlot
+        );
+    }
+
+    public static function fetchDynamicWithRuntimeClass(
+        Object_ $objectType,
+        Block $block,
+        Variable $classVar,
+        Variable $nameVar,
+        Operand $classOp
+    ): Variable {
+        $classIdVal = self::emitResolveClassId($objectType, $block, $classVar, $classOp);
+
+        return self::fetchDynamicByClassIdValue($objectType, $classIdVal, $nameVar, $classOp);
+    }
+
     public static function fetchDynamic(
         Object_ $objectType,
         int $classId,
@@ -93,6 +174,49 @@ final class ClassConstFetchHelper
             return $objectType->classConstFetch($classId, $literal);
         }
 
+        $context = $objectType->jitContext();
+        $classIdVal = $context->constantFromInteger($classId, 'int64');
+
+        return self::fetchDynamicByClassIdValue($objectType, $classIdVal, $nameVar, $classOp);
+    }
+
+    /**
+     * @return Value int64 class id
+     */
+    public static function emitResolveClassId(
+        Object_ $objectType,
+        Block $block,
+        Variable $classVar,
+        Operand $classOp
+    ): Value {
+        if (Variable::TYPE_OBJECT === $classVar->type) {
+            $context = $objectType->jitContext();
+            $objMap = $context->structFieldMap['__object__'];
+
+            return $context->builder->load(
+                $context->builder->structGep($classVar->value, $objMap['class_id'])
+            );
+        }
+        $literal = JitStringArg::compileTimeLiteral($classVar);
+        if (null !== $literal) {
+            $resolved = self::resolveJitClassNameString($objectType, $block, $literal);
+            $id = $objectType->lookup($resolved);
+
+            return $objectType->jitContext()->constantFromInteger($id, 'int64');
+        }
+        $context = $objectType->jitContext();
+        $nameStr = JitStringArg::lowerDominating($context, $classVar, 'class constant class operand');
+        $resolvedStr = self::emitScopeResolveClassNameString($objectType, $block, $nameStr);
+
+        return self::emitResolveClassIdFromNameString($objectType, $resolvedStr);
+    }
+
+    private static function fetchDynamicByClassIdValue(
+        Object_ $objectType,
+        Value $classIdVal,
+        Variable $nameVar,
+        Operand $classOp
+    ): Variable {
         $context = $objectType->jitContext();
         self::ensureStrCaseCmp($context);
         ReadonlyRaise::ensureLinked($context);
@@ -121,34 +245,32 @@ final class ClassConstFetchHelper
         );
 
         $context->builder->positionAtEnd($classMatch);
-        $className = $objectType->classNameForId($classId);
+        $classNameStr = self::classNameStringFromId($objectType, $classIdVal);
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             JitValueBox::pointer($context, $resultSlot),
-            $context->builder->load($context->constantStringFromString($className))
+            $classNameStr
         );
         $context->builder->branch($merge);
 
-        $constants = $objectType->classConstantsForId($classId);
         $checkBlock = $constChain;
-        $n = count($constants);
         $context->builder->positionAtEnd($constChain);
-        if (0 === $n) {
-            $context->builder->branch($fail);
-        } else {
-            foreach ($constants as $i => [$constKey, $entry]) {
-                $nextCheck = ($i < $n - 1)
-                    ? $fn->appendBasicBlock('class_const_dyn_try_'.$constKey)
-                    : $fail;
-                $matchBlock = $fn->appendBasicBlock('class_const_dyn_match_'.$constKey);
+        foreach ($objectType->allClassNamesById() as $id => $_) {
+            $constants = $objectType->classConstantsForId($id);
+            foreach ($constants as [$constKey, $entry]) {
+                $nextCheck = $fn->appendBasicBlock('class_const_dyn_try_'.$id.'_'.$constKey);
+                $matchBlock = $fn->appendBasicBlock('class_const_dyn_match_'.$id.'_'.$constKey);
                 $context->builder->positionAtEnd($checkBlock);
+                $expectedId = $context->constantFromInteger($id, 'int64');
+                $isId = $context->builder->icmp(Builder::INT_EQ, $classIdVal, $expectedId);
                 $keyGlobal = $context->builder->load($context->constantStringFromString($constKey));
                 $cmp = $context->builder->call(
                     $context->lookupFunction('strcasecmp'),
                     self::stringDataPtr($context, $nativeName),
                     self::stringDataPtr($context, $keyGlobal)
                 );
-                $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+                $isName = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+                $isMatch = $context->builder->and($isId, $isName);
                 $context->builder->branchIf($isMatch, $matchBlock, $nextCheck);
 
                 $context->builder->positionAtEnd($matchBlock);
@@ -157,9 +279,11 @@ final class ClassConstFetchHelper
                 $checkBlock = $nextCheck;
             }
         }
+        $context->builder->positionAtEnd($checkBlock);
+        $context->builder->branch($fail);
 
         $context->builder->positionAtEnd($fail);
-        $displayClass = self::displayClassName($objectType, $classId, $classOp);
+        $displayClass = self::displayClassName($objectType, -1, $classOp);
         $message = "Undefined class constant {$displayClass}::*";
         $context->builder->call(
             $context->lookupFunction('__compiler_jit_raise_logic_exception'),
@@ -300,6 +424,51 @@ final class ClassConstFetchHelper
     }
 
     /**
+     * @return Value int64 class id
+     */
+    private static function emitResolveClassIdFromNameString(Object_ $objectType, Value $resolvedNameStr): Value
+    {
+        $context = $objectType->jitContext();
+        self::ensureStrCaseCmp($context);
+        ErrorRaise::ensureLinked($context);
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $sentinel = $i64->constInt(-1, false);
+        $result = $sentinel;
+        foreach ($objectType->allClassNamesById() as $id => $canonical) {
+            $lcGlobal = $context->builder->load(
+                $context->constantStringFromString(strtolower(ltrim($canonical, '\\')))
+            );
+            $cmp = $context->builder->call(
+                $context->lookupFunction('strcasecmp'),
+                self::stringDataPtr($context, $resolvedNameStr),
+                self::stringDataPtr($context, $lcGlobal)
+            );
+            $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+            $idVal = $context->constantFromInteger($id, 'int64');
+            $result = $context->builder->select($isMatch, $idVal, $result);
+        }
+
+        $fn = BasicBlockHelper::parentFunction($context);
+        $entry = $context->builder->getInsertBlock();
+        $ok = $fn->appendBasicBlock('class_const_resolve_id_ok');
+        $fail = $fn->appendBasicBlock('class_const_resolve_id_fail');
+        $merge = $fn->appendBasicBlock('class_const_resolve_id_merge');
+        $isUnknown = $context->builder->icmp(Builder::INT_EQ, $result, $sentinel);
+        $context->builder->branchIf($isUnknown, $fail, $ok);
+
+        $context->builder->positionAtEnd($fail);
+        ErrorRaise::emitRaise($context, 'Class not found');
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($ok);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($merge);
+
+        return $result;
+    }
+
+    /**
      * @return Value {@see __string__*}
      */
     private static function emitCanonicalClassNameFromResolved(Object_ $objectType, Value $resolvedNameStr): Value
@@ -398,6 +567,9 @@ final class ClassConstFetchHelper
     {
         if ($classOp instanceof Operand\Literal) {
             return $classOp->value;
+        }
+        if ($classId < 0) {
+            return '*';
         }
 
         return $objectType->classNameForId($classId);

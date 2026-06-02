@@ -268,7 +268,11 @@ function syntaxRowDefinitions(): array
             'construct' => 'Class member constants `public` / `private` / `protected const`',
             'opcodes' => ['TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH'],
             'issue' => 2199,
-            'notes' => ['MiniWebApp `Router::DEFAULT_CONTACT_NAME_MAX` (#2059)'],
+            'jit' => true,
+            'notes' => [
+                'MiniWebApp `Router::DEFAULT_CONTACT_NAME_MAX` (#2059)',
+                'JIT: literal class + dynamic const name (#3150); runtime `$class::CONST` class operand (#4095)',
+            ],
             'probe' => 'class C { private const M = 1; public function f(): int { return self::M; } } echo (new C())->f();',
         ],
         [
