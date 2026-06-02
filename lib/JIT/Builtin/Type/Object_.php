@@ -1932,6 +1932,7 @@ class Object_ extends Type {
         $this->seedExternalClassProperties($id, $lcname);
         if ('reflectionattribute' === $lcname) {
             $this->defineProperty($id, 'name', Variable::TYPE_VALUE);
+            $this->defineProperty($id, 'args', Variable::TYPE_HASHTABLE);
         }
         if ('reflectionclass' === $lcname) {
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);

@@ -565,6 +565,7 @@ class Context {
         $this->functionProxies['reflectionconstant::getattributes'] = new Call\ReflectionConstantGetAttributes();
         $this->functionProxies['reflectionmethod::getattributes'] = new Call\ReflectionMethodGetAttributes();
         $this->functionProxies['reflectionattribute::getname'] = new Call\ReflectionAttributeGetName();
+        $this->functionProxies['reflectionattribute::newinstance'] = new Call\ReflectionAttributeNewInstance();
 
         FiberHelper::registerJitMethods($this);
         ClosureBindHelper::registerJitMethods($this);

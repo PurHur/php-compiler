@@ -63,12 +63,15 @@ final class ReflectionRuntime
                 'phpc_reflect_get_method_name',
                 'phpc_reflect_set_attr_name',
                 'phpc_reflect_get_attr_name',
+                'phpc_reflect_set_attr_owner',
+                'phpc_reflect_get_attr_owner',
                 'phpc_attr_register_class_attrs',
                 'phpc_attr_register_method_attrs',
                 'phpc_attr_class_count',
                 'phpc_attr_class_name_at',
                 'phpc_attr_method_count',
                 'phpc_attr_method_name_at',
+                'phpc_attr_class_args_hashtable',
             ] as $fnName
         ) {
             $fn = $context->module->getNamedFunction($fnName);

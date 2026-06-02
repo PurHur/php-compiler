@@ -6547,7 +6547,7 @@ class JIT {
                             );
                         }
                     }
-                    if ([] !== $op->attributeNames) {
+                    if ([] !== $op->attributeNames || [] !== $op->attributeEntries) {
                         $attrNames = [];
                         foreach ($op->attributeNames as $n) {
                             $attrNames[] = ltrim($n, '\\');
@@ -6555,7 +6555,7 @@ class JIT {
                         AttributeRegistry::emitRegisterClass(
                             $this->context,
                             strtolower(ltrim($nameOp->value, '\\')),
-                            $attrNames
+                            [] !== $op->attributeEntries ? $op->attributeEntries : $attrNames
                         );
                     }
                     $this->compileClass($op->block1, $this->context->scope->classId);
@@ -9705,6 +9705,9 @@ class JIT {
 
         if ('object' === $declaringClassLc) {
             if ('getname' === $methodLc && $this->context->functionIsRegistered('reflectionattribute::getname')) {
+                $className = 'ReflectionAttribute';
+                $declaringClassLc = 'reflectionattribute';
+            } elseif ('newinstance' === $methodLc && $this->context->functionIsRegistered('reflectionattribute::newinstance')) {
                 $className = 'ReflectionAttribute';
                 $declaringClassLc = 'reflectionattribute';
             } elseif ('getattributes' === $methodLc && $this->context->functionIsRegistered('reflectionmethod::getattributes')) {
