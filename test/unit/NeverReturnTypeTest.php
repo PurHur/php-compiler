@@ -64,4 +64,24 @@ PHP;
         $type = \PHPTypes\Type::fromTypeDecl($script->functions[0]->returnType);
         $this->assertSame(\PHPTypes\Type::TYPE_NULL, $type->type);
     }
+
+    public function testNeverCallSiteDoesNotFallThroughAfterThrowInTry(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function fail(): never {
+    throw new Exception('x');
+}
+try {
+    fail();
+    echo "after\n";
+} catch (Exception $e) {
+    echo "caught\n";
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'never_throw_callsite.php'));
+        $this->assertSame("caught\n", ob_get_clean());
+    }
 }

@@ -20,6 +20,17 @@ final class ErrorReporter
     public const E_USER_DEPRECATED = 16384;
     public const E_DEPRECATED = 8192;
 
+    /** Valid trigger_error() $error_level values (ext/standard/basic_functions.c). */
+    public static function isUserErrorLevel(int $level): bool
+    {
+        return \in_array($level, [
+            self::E_USER_ERROR,
+            self::E_USER_WARNING,
+            self::E_USER_NOTICE,
+            self::E_USER_DEPRECATED,
+        ], true);
+    }
+
     private int $errorReporting;
     private bool $displayErrors;
 
@@ -152,6 +163,19 @@ final class ErrorReporter
         array_pop($this->handlerStack);
 
         return true;
+    }
+
+    public function stringOffsetCastOccurred(
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        $this->emitWarning(
+            'String offset cast occurred',
+            $context,
+            $frame,
+            $file
+        );
     }
 
     public function uninitializedStringOffset(

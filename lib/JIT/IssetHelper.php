@@ -143,14 +143,8 @@ final class IssetHelper
 
                 return $context->builder->icmp(Builder::INT_NE, $loaded, $null);
             default:
-                if ($var->type & Variable::IS_NATIVE_ARRAY) {
-                    return $i1->constInt(1, false);
-                }
-                throw new \LogicException(
-                    'isset() on variables of type '
-                    .Variable::getStringType($var->type)
-                    .' is not implemented for JIT in this compiler build'
-                );
+                // Zend: isset($var) is true for any defined non-null local (php_var.c / basic_functions.c #4081).
+                return $i1->constInt(1, false);
         }
     }
 
@@ -192,6 +186,15 @@ final class IssetHelper
             }
         }
         if (Variable::TYPE_OBJECT === $container->type) {
+            $arrayAccessIsset = ArrayAccessHelper::tryCompileOffsetIsSet(
+                $context,
+                $container,
+                $dim,
+                $containerOp
+            );
+            if (null !== $arrayAccessIsset) {
+                return $arrayAccessIsset;
+            }
             $htVar = self::hashtableFromObjectContainer($context, $container, $containerOp);
             $containerUserType = '';
             if (null !== $containerOp && null !== $containerOp->type) {
@@ -214,9 +217,8 @@ final class IssetHelper
             return self::compileHashTableOffsetIsSet($context, $htVar, $dim, $dimOp, $containerOp);
         }
 
-        throw new \LogicException(
-            'isset() with array offset is not supported for this container type in JIT mode'
-        );
+        // Zend zend_isset_dim: unsupported container types yield false, not compile errors (#4081).
+        return $context->getTypeFromString('int1')->constInt(0, false);
     }
 
     private static function hashtableFromValueBox(Context $context, Variable $container): Variable
@@ -291,7 +293,7 @@ final class IssetHelper
     private static function compileStringOffsetIsSet(Context $context, Variable $container, Variable $dim): Value
     {
         if (Variable::TYPE_NATIVE_LONG !== $dim->type) {
-            throw new \LogicException('isset() on string offsets only supports integer indices in this compiler build');
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $str = $context->helper->loadValue($container);
         $map = $context->structFieldMap['__string__'];
@@ -355,7 +357,7 @@ final class IssetHelper
     private static function compileNativeArrayOffsetIsSet(Context $context, Variable $container, Variable $dim): Value
     {
         if (Variable::TYPE_NATIVE_LONG !== $dim->type) {
-            throw new \LogicException('isset() on native arrays only supports integer indices in this compiler build');
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $index = $context->helper->loadValue($dim);
         $size = $context->constantFromInteger($container->nextFreeElement, 'int32');

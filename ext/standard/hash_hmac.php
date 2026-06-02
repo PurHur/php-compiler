@@ -38,7 +38,7 @@ final class hash_hmac extends Internal
         $raw = false;
         if (4 === $argc) {
             $rawArg = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_BOOL !== $rawArg->type) {
+            if (Variable::TYPE_BOOLEAN !== $rawArg->type) {
                 throw new \LogicException('hash_hmac() raw_output must be boolean in this compiler build');
             }
             $raw = $rawArg->toBool();

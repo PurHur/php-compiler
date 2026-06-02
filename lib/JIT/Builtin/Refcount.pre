@@ -46,6 +46,9 @@ class Refcount extends Builtin {
             static inline function __ref__separate(__ref__virtual**): void;
             static inline function __ref__separate_ex(__ref__virtual**, int32): void;
             static function phpc_weakref_clear_object_typed(__object__*, int32): void;
+            static function phpc_destruct_delref_allowed(): int32;
+            static function phpc_destruct_try_invoke(int8*): void;
+            static function phpc_gc_unregister(__object__*): void;
         }
         $this->struct = $this->context->getTypeFromString('__ref__');
         $this->virtualStruct = $this->context->getTypeFromString('__ref__virtual');
@@ -111,7 +114,16 @@ class Refcount extends Builtin {
                     $ref.refcount = $current;
                     $test = $current <= 0;
                     if ($test) {
+                        $allow = phpc_destruct_delref_allowed();
+                        $objMask = (int32) self::TYPE_INFO_TYPE_OBJECT;
+                        if (($typeinfo & $objMask) != 0) {
+                            phpc_destruct_try_invoke((int8*) $refVirtual);
+                        }
+                        if (!$allow) {
+                            return;
+                        }
                         phpc_weakref_clear_object_typed((__object__*) $refVirtual, $typeinfo);
+                        phpc_gc_unregister((__object__*) $refVirtual);
                         free $refVirtual;
                     }
                 }

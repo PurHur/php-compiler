@@ -11,7 +11,7 @@ use PHPCfg\Operand;
 use PHPCfg\Script;
 use PHPTypes\State;
 use PHPCompiler\Compiler\CompileFatal;
-use PHPCompiler\AOT\AutoloadDiscovery;
+use PHPCompiler\AOT\ProjectGraph;
 use PHPCompiler\Runtime;
 use PHPCompiler\Web\ConstStringFolder;
 use PHPCompiler\Web\IncludePathResolver;
@@ -58,23 +58,11 @@ final class Linter
             return $issues;
         }
 
-        $extraFiles = ProjectManifest::resolveIncludePaths($projectDir, $manifest);
-        $extraFiles = array_merge(
-            $extraFiles,
-            ProjectAutoload::collectPhpFiles(
-                $projectDir,
-                ProjectAutoload::parsePsr4Map($projectDir, $manifest)
-            )
-        );
-
-        $psr4Map = ProjectAutoload::parsePsr4Map($projectDir, $manifest);
-        if ([] !== $psr4Map) {
-            $seedFiles = array_merge($extraFiles, [$entry]);
-            $autoload = AutoloadDiscovery::discover($this->runtime, $projectDir, $psr4Map, $seedFiles);
-            foreach ($autoload['errors'] as $message) {
-                $issues[] = new Issue($entry, 0, 'autoload', $message, 1803);
-            }
+        $graph = ProjectGraph::resolve($projectDir);
+        foreach ($graph['errors'] as $message) {
+            $issues[] = new Issue($entry, 0, 'project-graph', $message, 154);
         }
+        $extraFiles = $graph['files'];
 
         $entryReal = realpath($entry) ?: $entry;
         foreach ($extraFiles as $file) {

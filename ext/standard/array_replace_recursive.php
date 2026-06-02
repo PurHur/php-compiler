@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -52,6 +53,10 @@ final class array_replace_recursive extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('array_replace_recursive() is not implemented for JIT in this compiler build');
+        if (\count($args) < 2) {
+            throw new \LogicException('array_replace_recursive() requires at least two arguments');
+        }
+
+        return ArrayBuiltinHelper::arrayReplaceRecursive($context, $args[0], ...\array_slice($args, 1));
     }
 }

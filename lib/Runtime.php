@@ -31,6 +31,7 @@ use PHPCompiler\Ast\SealedClassPreprocessor;
 use PHPCompiler\Ast\PipeOperatorDesugar;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Lint\LintCompiler;
+use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\ShutdownQueue;
 
 class Runtime {
@@ -59,6 +60,27 @@ class Runtime {
 
     /** Last parse/compile failure for native M3 emit bridge (#3037). */
     private static ?string $lastParseFailure = null;
+
+    /**
+     * Whether parse/compile null diagnostics should be emitted (#2988).
+     */
+    public static function isParseDiagEnabled(): bool
+    {
+        if (JIT\EmitTuMode::isMinimalRuntime()) {
+            return true;
+        }
+        if (!\function_exists('getenv')) {
+            return false;
+        }
+        foreach (['PHP_COMPILER_PARSE_DIAG', 'PHP_COMPILER_SELFHOST_AOT', 'PHP_COMPILER_M3_COMPILE_MODE'] as $name) {
+            $value = getenv($name);
+            if (false !== $value && ('1' === $value || 'true' === strtolower((string) $value))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     public function __construct(int $mode = self::MODE_NORMAL) {
         ObjectRegistry::reset();
@@ -142,6 +164,13 @@ class Runtime {
         $this->debugFile = $debugFile;
     }
 
+    public function setAotDebugSymbols(bool $enabled = true): void
+    {
+        if ($enabled) {
+            JIT\AotDebugSymbols::enable();
+        }
+    }
+
     private function loadCoreModules(): void {
         $this->load(new ext\types\Module);
         $this->load(new ext\standard\Module);
@@ -164,7 +193,53 @@ class Runtime {
             return true;
         }
 
-        return JIT\EmitTuMode::isMinimalRuntime();
+        if (JIT\EmitTuMode::isMinimalRuntime()) {
+            return true;
+        }
+
+        $loadType = $this->mode === self::MODE_NORMAL
+            ? JIT\Builtin::LOAD_TYPE_EMBED
+            : JIT\Builtin::LOAD_TYPE_STANDALONE;
+
+        return JIT\LazyBuiltins::isEnabled($loadType);
+    }
+
+    /**
+     * Lower a registered ext/* function on first reference (issue #94).
+     */
+    public function ensureJitBuiltinCompiled(string $proxyName): bool
+    {
+        foreach ($this->jitBuiltinLookupCandidates($proxyName) as $candidate) {
+            foreach ($this->modules as $module) {
+                foreach ($module->getFunctions() as $func) {
+                    if (strtolower($func->getName()) !== $candidate) {
+                        continue;
+                    }
+                    $this->loadJit()->compileFunc($func);
+
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function jitBuiltinLookupCandidates(string $proxyName): array
+    {
+        $lc = strtolower($proxyName);
+        $candidates = [$lc];
+        if (preg_match('/^(.+)\\\\([^\\\\]+)::(.+)$/', $lc, $matches)) {
+            $candidates[] = $matches[2].'::'.$matches[3];
+        }
+        if (str_contains($lc, '\\') && !str_contains($lc, '::')) {
+            $candidates[] = substr($lc, strrpos($lc, '\\') + 1);
+        }
+
+        return array_values(array_unique($candidates));
     }
 
     /** Avoid inlining loadJitContext into loadJit (LLVM 9 crash when both are real-lowered #1402). */
@@ -229,6 +304,7 @@ class Runtime {
         $this->compiler->setBareRethrowLines($bareRethrowLines);
         $code = AsymmetricVisibilityRewriter::rewrite($code);
         $code = PipeOperatorDesugar::desugar($code);
+        $fileStrictTypes = $this->detectFileStrictTypes($code);
         try {
             $script = $this->parser->parse($code, $filename);
         } finally {
@@ -241,7 +317,76 @@ class Runtime {
         }
         $this->postprocessor->traverse($script);
         $this->detector->detect($script);
+        // `declare(strict_types=1)` is file-scoped and influences call-site scalar type checks.
+        // Some parser paths miss the directive when `<?php declare(...)` shares a line (#4411).
+        if ($fileStrictTypes) {
+            $script->main->strictTypes = true;
+        }
         return $script;
+    }
+
+    private function detectFileStrictTypes(string $code): bool
+    {
+        if (!\function_exists('token_get_all')) {
+            return false;
+        }
+        $tokens = @token_get_all($code);
+        if (!\is_array($tokens)) {
+            return false;
+        }
+        $i = 0;
+        $n = \count($tokens);
+        while ($i < $n) {
+            $t = $tokens[$i];
+            $id = \is_array($t) ? $t[0] : null;
+            if (\in_array($id, [T_OPEN_TAG, T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
+                ++$i;
+                continue;
+            }
+            break;
+        }
+        if ($i >= $n) {
+            return false;
+        }
+        $t = $tokens[$i];
+        if (!\is_array($t) || T_DECLARE !== $t[0]) {
+            return false;
+        }
+        ++$i;
+        while ($i < $n) {
+            $t = $tokens[$i];
+            $text = \is_array($t) ? (string) $t[1] : (string) $t;
+            if ('(' === $text) {
+                break;
+            }
+            ++$i;
+        }
+        if ($i >= $n) {
+            return false;
+        }
+        ++$i; // after '('
+        $level = 1;
+        $body = '';
+        for (; $i < $n; ++$i) {
+            $t = $tokens[$i];
+            $text = \is_array($t) ? (string) $t[1] : (string) $t;
+            if ('(' === $text) {
+                ++$level;
+            } elseif (')' === $text) {
+                --$level;
+                if (0 === $level) {
+                    break;
+                }
+            }
+            if ($level > 0) {
+                $body .= $text;
+            }
+        }
+        if ('' === $body) {
+            return false;
+        }
+
+        return (bool) preg_match('/\\bstrict_types\\s*=\\s*1\\b/i', $body);
     }
 
     /**
@@ -251,7 +396,7 @@ class Runtime {
     {
         $detail = $this->compiler->getCompileAbortDetail();
         $primary = null !== $detail && '' !== $detail ? $detail : $e->getMessage();
-        $this->recordLastParseFailure($primary);
+        $this->recordLastParseFailure(sprintf('%s: %s', $sourcePath, $primary));
         $line = sprintf("parseAndCompile failure: target=%s: %s\n", $sourcePath, $primary);
         $context = null;
         if (null !== $sourceCode && $e instanceof \PhpParser\Error) {
@@ -316,7 +461,8 @@ class Runtime {
         if (!$block instanceof Block) {
             // Self-host AOT can surface unexpected stub returns as null; preserve a stable abort detail.
             $this->compiler->setCompileAbortDetailIfEmpty('Runtime::compile: Compiler::compile returned non-Block');
-            $this->recordLastParseFailure($this->formatParseAndCompileNullDetail($script));
+            $sourceFile = $this->compiler->getDebugLastPhaseInputFile() ?? $script->main->getFile();
+            $this->emitParseAndCompileNullDiagnostic($script, $sourceFile);
 
             return null;
         }
@@ -331,7 +477,8 @@ class Runtime {
         $block = $this->compiler->compileEmitSmoke($script);
         if (!$block instanceof Block) {
             $this->compiler->setCompileAbortDetailIfEmpty('Runtime::compileEmitSmoke: Compiler::compileEmitSmoke returned non-Block');
-            $this->recordLastParseFailure($this->formatParseAndCompileNullDetail($script));
+            $sourceFile = $this->compiler->getDebugLastPhaseInputFile() ?? $script->main->getFile();
+            $this->emitParseAndCompileNullDiagnostic($script, $sourceFile);
 
             return null;
         }
@@ -376,13 +523,12 @@ class Runtime {
     {
         self::clearLastParseFailure();
         $this->compiler->resetCompileAbortDetail();
+        $this->compiler->setDebugLastPhaseInputFile($filename);
         try {
             $script = $this->parse($code, $filename);
             $block = $this->compileEmitSmoke($script);
             if (null !== $block) {
                 $block->setScriptPath($filename);
-            } else {
-                $this->emitParseAndCompileNullDiagnostic($script);
             }
 
             return $block;
@@ -453,6 +599,9 @@ class Runtime {
     public function standalone(?Block $block, string $outfile, ?string $sourceCode = null, ?string $sourceFilename = null) {
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_begin');
         $context = $this->loadJitContext();
+        if (null !== $sourceFilename && '' !== $sourceFilename) {
+            $context->setAotSourceFilename($sourceFilename);
+        }
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_loadjitcontext_done');
         // Generator bodies use GeneratorHelper resume lowering; script-scope yield still blocked (#3115).
         if (null !== $block && Block::containsGeneratorOpcodesInScriptScope($block)) {
@@ -475,8 +624,6 @@ class Runtime {
             $block = $this->compile($script);
             if (null !== $block) {
                 $block->setScriptPath($filename);
-            } else {
-                $this->emitParseAndCompileNullDiagnostic($script);
             }
 
             return $block;
@@ -507,8 +654,6 @@ class Runtime {
             \PHPCompiler\JIT\Progress::noteFunction('runtime_parseandcompilefile_compile_done');
             if (null !== $block) {
                 $block->setScriptPath($filename);
-            } else {
-                $this->emitParseAndCompileNullDiagnostic($script);
             }
 
             return $block;
@@ -553,21 +698,30 @@ class Runtime {
      * `parseAndCompile()` returning null is a common self-host bootstrap failure mode (#2642).
      * Best-effort: re-run compile under the lint compiler and print the first unsupported kind.
      */
-    private function emitParseAndCompileNullDiagnostic(Script $script): void
+    private function emitParseAndCompileNullDiagnostic(Script $script, ?string $sourceFile = null): void
     {
-        if (
-            false === getenv('PHP_COMPILER_SELFHOST_AOT')
-            && false === getenv('PHP_COMPILER_M3_COMPILE_MODE')
-            && !JIT\EmitTuMode::isMinimalRuntime()
-        ) {
+        $detail = $this->formatParseAndCompileNullDetail($script);
+        $this->recordLastParseFailure($detail);
+        if (!self::isParseDiagEnabled()) {
             return;
         }
 
-        $detail = $this->formatParseAndCompileNullDetail($script);
-        $this->recordLastParseFailure($detail);
-        if (null !== $detail && '' !== $detail) {
-            echo "parseAndCompile: {$detail}\n";
+        if (null === $detail || '' === $detail) {
+            $detail = 'unknown compile failure (no lint issue recorded)';
         }
+        if (null === $sourceFile || '' === $sourceFile) {
+            $sourceFile = $script->main->getFile();
+        }
+        if ('' === $sourceFile) {
+            $sourceFile = 'unknown';
+        }
+        $line = sprintf("parseAndCompile: %s: %s\n", $sourceFile, $detail);
+        if (\defined('STDERR') && \is_resource(STDERR)) {
+            fwrite(STDERR, $line);
+
+            return;
+        }
+        echo $line;
     }
 
     /**
@@ -596,6 +750,7 @@ class Runtime {
             return $this->vm->run($block);
         } finally {
             ShutdownQueue::run($this->vmContext);
+            OutputBuffer::endAllAtShutdown();
             Superglobals::setActiveContext(null);
         }
     }

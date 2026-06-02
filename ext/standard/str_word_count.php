@@ -13,10 +13,10 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * str_word_count() — count words or return word list (subset of PHP; issue #2382).
+ * str_word_count() — count words or return word list (subset of PHP; issue #2382, #3584).
  *
  * VM: all formats via {@see VmString::str_word_count()}.
- * JIT/AOT: format 0 via {@see JitStrWordCount} LLVM lowering.
+ * JIT/AOT: format 0 via {@see JitStrWordCount} LLVM lowering; formats 1/2 via C runtime.
  */
 final class str_word_count extends Internal
 {
@@ -83,22 +83,52 @@ final class str_word_count extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('str_word_count() accepts one to three arguments in this compiler build');
         }
-        if (2 === $argc) {
-            $formatVal = $args[1]->compileTimeLong ?? null;
-            if (null === $formatVal || 0 !== $formatVal) {
-                throw new \LogicException(
-                    'str_word_count() JIT/AOT only supports format 0 in this compiler build; use bin/vm.php for format 1/2'
-                );
+
+        $literal = $args[0]->compileTimeString ?? null;
+        $formatCt = null;
+        if ($argc >= 2) {
+            $formatCt = $args[1]->compileTimeLong ?? null;
+        }
+        $charsCt = null;
+        if (3 === $argc) {
+            $charsCt = $args[2]->compileTimeString ?? null;
+            if (null === $charsCt && JITVariable::TYPE_STRING === $args[2]->type) {
+                $charsCt = '';
             }
         }
-        if ($argc >= 3) {
-            throw new \LogicException(
-                'str_word_count() custom characters are not supported in JIT/AOT yet; use bin/vm.php'
-            );
+
+        if (null !== $literal && null !== $formatCt && (2 === $argc || null !== $charsCt)) {
+            $format = (int) $formatCt;
+            $chars = $charsCt ?? '';
+            $result = VmString::str_word_count($literal, $format, $chars);
+            if (\is_int($result)) {
+                return $context->constantFromInteger($result, 'int64');
+            }
+
+            return JitStrWordCount::hashTableFromVmResult($context, $result, $format);
         }
 
-        $str = $this->jitString($context, $args[0], 'str_word_count() argument #1');
+        $str = null !== $literal
+            ? $context->builder->load($context->constantStringFromString($literal))
+            : $this->jitString($context, $args[0], 'str_word_count() argument #1');
 
-        return JitStrWordCount::count($context, $str);
+        $formatVal = 1 === $argc
+            ? $context->getTypeFromString('int64')->constInt(0, false)
+            : (null !== $formatCt
+                ? $context->getTypeFromString('int64')->constInt((int) $formatCt, false)
+                : JitStrWordCount::jitFormatArg($context, $args[1]));
+
+        if (null !== $formatCt && 0 === (int) $formatCt && $argc < 3) {
+            return JitStrWordCount::count($context, $str);
+        }
+
+        $charsVal = null;
+        if (3 === $argc) {
+            $charsVal = null !== $charsCt
+                ? $context->builder->load($context->constantStringFromString($charsCt))
+                : $this->jitString($context, $args[2], 'str_word_count() argument #3');
+        }
+
+        return JitStrWordCount::wordHashTableRuntime($context, $str, $formatVal, $charsVal);
     }
 }

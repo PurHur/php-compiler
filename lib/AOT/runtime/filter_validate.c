@@ -101,6 +101,43 @@ static int fv_email_subset(const char *s, size_t len)
     return 1;
 }
 
+/**
+ * FILTER_VALIDATE_INT decimal string check (php-src logical_filters.c parity).
+ * Rejects leading zeros except a lone "0" after optional sign.
+ */
+int __compiler_filter_int_string_is_valid(__string__ *input)
+{
+    const char *data;
+    size_t len;
+    size_t i;
+
+    if (NULL == input) {
+        return 0;
+    }
+    data = fv_strdata(input);
+    len = fv_strlen(input);
+    if (len == 0) {
+        return 0;
+    }
+    i = 0;
+    if (data[0] == '+' || data[0] == '-') {
+        if (len == 1) {
+            return 0;
+        }
+        i = 1;
+    }
+    if (len - i > 1 && data[i] == '0') {
+        return 0;
+    }
+    for (; i < len; i++) {
+        if (data[i] < '0' || data[i] > '9') {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 /** Returns input on valid email; NULL on invalid (caller boxes as false). */
 __string__ *__compiler_filter_validate_email(__string__ *input)
 {

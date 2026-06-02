@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -46,6 +47,7 @@ final class var_dump_ extends Internal
 
     private static function dumpVariable(VM $vm, Variable $var, int $level): void
     {
+        TypedPropertyCheck::assertReadable($var);
         if ($level > 1) {
             echo str_repeat(' ', $level - 1);
         }

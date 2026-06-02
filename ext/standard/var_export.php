@@ -80,8 +80,11 @@ final class var_export extends Internal
         if (Variable::TYPE_BOOLEAN === $v->type) {
             return $v->toBool() ? 'true' : 'false';
         }
-        if (Variable::TYPE_NULL === $v->type) {
+        if (Variable::TYPE_NULL === $v->type || Variable::TYPE_UNDEFINED === $v->type) {
             return 'NULL';
+        }
+        if (Variable::TYPE_INTEGER === $v->type) {
+            return (string) $v->toInt();
         }
 
         throw new \LogicException('var_export() does not support this value type in this compiler build');
@@ -101,6 +104,32 @@ final class var_export extends Internal
                 $printf,
                 $context->builder->pointerCast($context->constantFromString('NULL'), $charPtr)
             );
+
+            return;
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            $typeByte = $context->builder->load(
+                $context->builder->structGep(
+                    JitValueBox::valuePtrFromVariable($context, $arg),
+                    $context->structFieldMap['__value__']['type']
+                )
+            );
+            $i8 = $context->getTypeFromString('int8');
+            $isNull = $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_NULL, false)
+            );
+            $done = BasicBlockHelper::append($context, 'var_export_null_done');
+            $emit = BasicBlockHelper::append($context, 'var_export_null_emit');
+            $context->builder->branchIf($isNull, $emit, $done);
+            $context->builder->positionAtEnd($emit);
+            $context->builder->call(
+                $printf,
+                $context->builder->pointerCast($context->constantFromString('NULL'), $charPtr)
+            );
+            $context->builder->branch($done);
+            $context->builder->positionAtEnd($done);
 
             return;
         }

@@ -13,13 +13,15 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringNl2brRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * nl2br() for strings (subset of PHP; JIT/AOT via __string__nl2br).
+ * nl2br() for strings (subset of PHP; JIT/AOT via __compiler_nl2br C runtime).
  */
 final class nl2br extends Internal
 {
@@ -53,7 +55,15 @@ final class nl2br extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('nl2br() requires one or two arguments');
         }
-        $str = $this->jitString($context, $args[0], 'nl2br() argument #1');
+
+        $literal = JitStringArg::compileTimeLiteral($args[0]);
+        if (null !== $literal && 1 === $argc) {
+            return $context->builder->load(
+                $context->constantStringFromString(VmString::nl2br($literal, true))
+            );
+        }
+
+        $str = JitStringArg::lower($context, $args[0], 'nl2br() argument #1');
         $i8 = $context->getTypeFromString('int8');
         $useXhtmlI8 = $i8->constInt(1, false);
         if (2 === $argc) {
@@ -64,6 +74,8 @@ final class nl2br extends Internal
             $bv = $context->helper->loadValue($flagVar);
             $useXhtmlI8 = $context->builder->zExt($bv, $i8);
         }
+
+        StringNl2brRuntime::ensureLinked($context);
 
         return JitNl2br::nl2br($context, $str, $useXhtmlI8);
     }

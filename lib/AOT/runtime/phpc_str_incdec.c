@@ -1,14 +1,58 @@
 /*
- * str_increment() / str_decrement() runtime for VM/JIT/AOT (issue #3102).
+ * str_increment() / str_decrement() runtime for VM/JIT/AOT (issues #3102, #3726).
  * PHP 8.3 ext/standard/string.c — alphanumeric ASCII inc/dec via __string__init.
  */
 
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 
 typedef struct __string__ __string__;
 
 extern __string__ *__string__init(long long size, const char *value);
+extern void __compiler_jit_raise_type_error(const char *msg, unsigned long len);
+
+#define PHPC_STR_INCDEC_BUF 256
+
+static void phpc_str_incdec_raise(const char *msg)
+{
+    if (NULL == msg) {
+        return;
+    }
+    __compiler_jit_raise_type_error(msg, (unsigned long) strlen(msg));
+}
+
+static void phpc_str_incdec_raise_empty(const char *fn)
+{
+    char buf[PHPC_STR_INCDEC_BUF];
+    snprintf(buf, sizeof(buf), "%s(): Argument #1 ($string) must not be empty", fn);
+    phpc_str_incdec_raise(buf);
+}
+
+static void phpc_str_incdec_raise_non_alnum(const char *fn)
+{
+    char buf[PHPC_STR_INCDEC_BUF];
+    snprintf(
+        buf,
+        sizeof(buf),
+        "%s(): Argument #1 ($string) must be composed only of alphanumeric ASCII characters",
+        fn
+    );
+    phpc_str_incdec_raise(buf);
+}
+
+static void phpc_str_incdec_raise_out_of_range(const char *fn, const char *str)
+{
+    char buf[PHPC_STR_INCDEC_BUF];
+    snprintf(
+        buf,
+        sizeof(buf),
+        "%s(): Argument #1 ($string) \"%s\" is out of decrement range",
+        fn,
+        (NULL != str) ? str : ""
+    );
+    phpc_str_incdec_raise(buf);
+}
 
 static int phpc_only_ascii_alnum(const char *str, size_t len)
 {
@@ -27,7 +71,7 @@ static int phpc_only_ascii_alnum(const char *str, size_t len)
 
 __string__ *phpc_str_increment(const char *str)
 {
-    char buf[256];
+    char buf[PHPC_STR_INCDEC_BUF];
     size_t len;
     size_t position;
     int carry;
@@ -36,10 +80,16 @@ __string__ *phpc_str_increment(const char *str)
         str = "";
     }
     len = strlen(str);
-    if (0 == len || len >= sizeof(buf)) {
+    if (0 == len) {
+        phpc_str_incdec_raise_empty("str_increment");
+        return NULL;
+    }
+    if (len >= sizeof(buf)) {
+        phpc_str_incdec_raise_non_alnum("str_increment");
         return NULL;
     }
     if (!phpc_only_ascii_alnum(str, len)) {
+        phpc_str_incdec_raise_non_alnum("str_increment");
         return NULL;
     }
 
@@ -77,7 +127,7 @@ __string__ *phpc_str_increment(const char *str)
 
 __string__ *phpc_str_decrement(const char *str)
 {
-    char buf[256];
+    char buf[PHPC_STR_INCDEC_BUF];
     size_t len;
     size_t position;
     int carry;
@@ -86,13 +136,20 @@ __string__ *phpc_str_decrement(const char *str)
         str = "";
     }
     len = strlen(str);
-    if (0 == len || len >= sizeof(buf)) {
+    if (0 == len) {
+        phpc_str_incdec_raise_empty("str_decrement");
+        return NULL;
+    }
+    if (len >= sizeof(buf)) {
+        phpc_str_incdec_raise_non_alnum("str_decrement");
         return NULL;
     }
     if (!phpc_only_ascii_alnum(str, len)) {
+        phpc_str_incdec_raise_non_alnum("str_decrement");
         return NULL;
     }
     if (str[0] == '0') {
+        phpc_str_incdec_raise_out_of_range("str_decrement", str);
         return NULL;
     }
 
@@ -117,6 +174,7 @@ __string__ *phpc_str_decrement(const char *str)
 
     if (carry || (buf[0] == '0' && len > 1)) {
         if (1 == len) {
+            phpc_str_incdec_raise_out_of_range("str_decrement", str);
             return NULL;
         }
 

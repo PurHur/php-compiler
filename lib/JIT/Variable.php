@@ -11,6 +11,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\Block;
+use PHPCompiler\OpCode;
 use PHPCfg\Operand;
 use PHPTypes\Type;
 use PHPCompiler\VM\Variable as VMVariable;
@@ -80,6 +81,13 @@ final class Variable {
     /** Boxed foreach / SplObjectStorage offset key for $arr[$key] = … (issue #86). */
     public ?Variable $writableValueBoxKey = null;
 
+    /** Writable ArrayAccess $obj[$key] assignment target (#3331, #4012). */
+    public ?Variable $writableArrayAccessReceiver = null;
+
+    public ?Variable $writableArrayAccessKey = null;
+
+    public bool $isArrayAccessWritableOffset = false;
+
     /** String literal value when this variable represents a constant string operand. */
     public ?string $compileTimeString = null;
 
@@ -94,6 +102,9 @@ final class Variable {
 
     /** Hashtable pointer from {@see __value__readHashtable}; do not addref/delref (issue #107). */
     public bool $borrowedHashtable = false;
+
+    /** Borrowed {@see __value__} entry from foreach by-ref; skip valueDelref (#4364). */
+    public bool $borrowedValueEntry = false;
 
     /** void** property slot on {@see __object__} when this variable is a property lvalue (#58). */
     public ?\PHPLLVM\Value $objectPropertySlot = null;
@@ -119,6 +130,18 @@ final class Variable {
     /** Declaring class name for readonly diagnostics (#1360). */
     public ?string $objectPropertyClassName = null;
 
+    /**
+     * DNF declared-type arms for property writes (#4111).
+     *
+     * @var list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>|null
+     */
+    public ?array $objectPropertyDnfArms = null;
+
+    /** __set dispatch when the property slot does not exist (#146, #4022). */
+    public ?\PHPLLVM\Value $magicSetReceiver = null;
+
+    public ?string $magicSetName = null;
+
     /** Native call proxy when this object is a JIT-lowered closure (#72). */
     public ?Call $closureCall = null;
 
@@ -126,6 +149,10 @@ final class Variable {
     public ?\PHPLLVM\Value $generatorStatePtr = null;
 
     public ?string $generatorResumeName = null;
+
+    public ?string $fiberResumeName = null;
+
+    public ?\PHPLLVM\Value $fiberStatePtr = null;
 
     /** MCJIT/AOT foreach over a {@see Generator} object (#3074, #3115). */
     public bool $isJitGenerator = false;
@@ -291,6 +318,14 @@ final class Variable {
         Block $block,
         Operand $op
     ): Variable {
+        if (self::isVariadicParamOperand($block, $op)) {
+            return new Variable(
+                $context,
+                self::TYPE_HASHTABLE,
+                self::KIND_VARIABLE,
+                BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__hashtable__*'))
+            );
+        }
         $type = self::getTypeFromType($op->type);
         if ($type === self::TYPE_NULL) {
             $slot = JitValueBox::alloc($context);
@@ -307,7 +342,7 @@ final class Variable {
             // see if it can be converted into a native array
             if (!$context->analyzer->canEscape($op)) {
                 $size = $context->analyzer->computeStaticArraySize($op);
-                if (!is_null($size) && !$context->analyzer->hasDynamicArrayAppend($op, $size)) {
+                if (!is_null($size) && $size > 0 && !$context->analyzer->hasDynamicArrayAppend($op, $size)) {
                     $subTypes = $op->type->subTypes ?? [];
                     $origType = self::homogeneousNativeElementType($subTypes);
                     if (null !== $origType) {
@@ -323,6 +358,27 @@ final class Variable {
             self::KIND_VARIABLE,
             BasicBlockHelper::entryAlloca($context, $context->getTypeFromString($stringType))
         );
+    }
+
+    private static function isVariadicParamOperand(Block $block, Operand $op): bool
+    {
+        if (null === $block->variadicParamIndex) {
+            return false;
+        }
+        $slot = $block->slotForOperand($op);
+        if (null === $slot) {
+            return false;
+        }
+        foreach ($block->opCodes as $recv) {
+            if (OpCode::TYPE_ARG_RECV !== $recv->type) {
+                continue;
+            }
+            if ((int) $recv->arg1 === $slot && (int) $recv->arg2 === $block->variadicParamIndex) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -578,7 +634,17 @@ final class Variable {
                 return;
         }
         if ($this->type === self::TYPE_VALUE || $this->type === self::TYPE_NULL) {
-            // TODO: free owned resources
+            if (
+                self::KIND_VARIABLE === $this->kind
+                && null === $this->objectPropertySlot
+                && !$this->borrowedValueEntry
+            ) {
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__valueDelref'),
+                    $this->value
+                );
+            }
+
             return;
         }
         if ($this->type & self::IS_NATIVE_ARRAY) {
@@ -880,6 +946,8 @@ const TYPE_PAIR_NATIVE_LONG_NATIVE_DOUBLE = 65539;
 const TYPE_PAIR_NATIVE_DOUBLE_NATIVE_LONG = 196609;
 const TYPE_PAIR_NATIVE_LONG_NATIVE_BOOL = 65538;
 const TYPE_PAIR_NATIVE_BOOL_NATIVE_LONG = 131073;
+const TYPE_PAIR_NATIVE_DOUBLE_NATIVE_BOOL = 196610;
+const TYPE_PAIR_NATIVE_BOOL_NATIVE_DOUBLE = 131075;
 const TYPE_PAIR_NATIVE_BOOL_NATIVE_BOOL = 131074;
 const TYPE_PAIR_STRING_STRING = 8650884;
 

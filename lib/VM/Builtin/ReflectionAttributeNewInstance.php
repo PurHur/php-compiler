@@ -33,25 +33,23 @@ final class ReflectionAttributeNewInstance extends VmClassMethod
             $ctx->autoloadClass($className);
         }
         if (!isset($ctx->classes[$lc])) {
-            throw new \LogicException('Attribute class "'.$className.'" not found');
+            // Zend ext/reflection/php_reflection.c — Error when attribute class is missing (#3206, #3216).
+            throw new \Error('Attribute class "'.$className.'" not found');
         }
         $classEntry = $ctx->classes[$lc];
         $object = new ObjectEntry($classEntry);
-        $thisVar = new Variable(Variable::TYPE_OBJECT);
+        $argSpecs = ReflectionSupport::argsFromReflectionObject($receiver);
+        $thisVar = new Variable();
         $thisVar->object($object);
-        $callArgs = [$thisVar];
-        foreach (ReflectionSupport::argsFromReflectionObject($receiver) as $spec) {
-            if (null !== $spec['name']) {
-                continue;
-            }
-            $callArgs[] = ReflectionSupport::scalarToVariable($spec['value']);
-        }
         $vm = VM::running();
         if (null === $vm) {
             throw new \LogicException('ReflectionAttribute::newInstance() requires active VM');
         }
         if (null !== $classEntry->constructor) {
-            $vm->invokePhpFunction($classEntry->constructor, ...$callArgs);
+            $invokeArgs = ReflectionSupport::constructorInvokeVariables($classEntry->constructor, $argSpecs);
+            $vm->invokePhpFunction($classEntry->constructor, $thisVar, ...$invokeArgs);
+            ReflectionSupport::applyConstructorPropertyArgs($object, $classEntry->constructor, $argSpecs);
+            $object->constructed = true;
         } else {
             $object->constructed = true;
         }

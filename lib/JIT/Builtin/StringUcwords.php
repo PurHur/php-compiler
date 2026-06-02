@@ -134,7 +134,9 @@ final class StringUcwords
     }
 
     /**
-     * @return mixed sep-check entry basic block (caller branches here from ucwords_body)
+     * sep-check entry basic block (caller branches here from ucwords_body).
+     *
+     * @return mixed
      */
     private static function emitCharInStringCheck(
         Context $context,

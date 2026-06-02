@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -25,6 +26,8 @@ use PHPLLVM\Value;
  */
 final class array_flip extends Internal
 {
+    private const ILLEGAL_OFFSET_TYPE = 'Illegal offset type';
+
     public function execute(Frame $frame): void
     {
         if (1 !== \count($frame->calledArgs)) {
@@ -39,6 +42,10 @@ final class array_flip extends Internal
         }
         $out = new HashTable();
         foreach ($array->toArray()->iterateKeyed(true) as [$key, $value]) {
+            $keyVar = $key->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $keyVar->type && Variable::TYPE_STRING !== $keyVar->type) {
+                throw new \TypeError(self::ILLEGAL_OFFSET_TYPE);
+            }
             $val = $value->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $val->type && Variable::TYPE_STRING !== $val->type) {
                 throw new \LogicException('array_flip() values must be integers or strings in this compiler build');
@@ -46,9 +53,9 @@ final class array_flip extends Internal
             $stored = new Variable();
             $stored->copyFrom($key);
             if (Variable::TYPE_INTEGER === $val->type) {
-                $out->addIndex($val->toInt(), $stored);
+                $out->updateIndex($val->toInt(), $stored);
             } else {
-                $out->add($val->toString(), $stored);
+                $out->update($val->toString(), $stored);
             }
         }
         $frame->returnVar->array($out);
@@ -71,6 +78,8 @@ final class array_flip extends Internal
                 $this->jitString($context, $arg, 'array_flip() argument #'.((int) $i + 1));
             }
         }
+        TypeErrorRaise::ensureLinked($context);
+
         return ArrayBuiltinHelper::buildFlipArray($context, $args[0]);
     }
 }

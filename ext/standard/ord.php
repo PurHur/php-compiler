@@ -14,14 +14,14 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Ordinal value of the first byte of a non-empty string, or 0 for empty string
- * (subset behaviour; PHP 8 throws ValueError on empty string).
+ * Ordinal value of the first byte of a string (ext/standard/string.c parity, #4331).
  */
 final class ord extends Internal
 {
@@ -30,16 +30,11 @@ final class ord extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('ord() requires exactly one argument');
         }
-        $s = $frame->calledArgs[0]->resolveIndirect()->toString();
+        $s = InternalStrictArg::requireString($frame, 0, 'ord', 'character')->toString();
         if (null === $frame->returnVar) {
             return;
         }
-        if ('' === $s) {
-            $frame->returnVar->int(0);
-
-            return;
-        }
-        $frame->returnVar->int(\ord($s));
+        $frame->returnVar->int('' === $s ? 0 : \ord($s));
     }
 
     public Context $context;
@@ -50,6 +45,8 @@ final class ord extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('ord() requires exactly one argument');
         }
+
+        JitInternalStrictArg::requireString($context, $args[0], 'ord', 'character', 1);
         $strPtr = $this->jitString($context, $args[0], 'ord() argument #1');
         $structName = $strPtr->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
@@ -57,11 +54,13 @@ final class ord extends Internal
         $len = $context->builder->load($lenPtr);
         $zero = $len->typeOf()->constInt(0, false);
         $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $zero);
+
         $charPtr = $context->builder->structGep($strPtr, $map['value']);
         $ch = $context->builder->load($charPtr);
+        $zeroByte = $ch->typeOf()->constInt(0, false);
+        $byte = $context->builder->select($isEmpty, $zeroByte, $ch);
         $i64 = $context->getTypeFromString('int64');
-        $extended = $context->builder->zExt($ch, $i64);
 
-        return $context->builder->select($isEmpty, $zero, $extended);
+        return $context->builder->zExt($byte, $i64);
     }
 }

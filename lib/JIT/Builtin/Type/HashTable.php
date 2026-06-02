@@ -96,6 +96,7 @@ class HashTable extends Type
         $this->registerFn('__hashtable__setStringKeyString', 'void', ['__hashtable__*', '__string__*', '__string__*']);
         $this->registerFn('__hashtable__setStringKeyHashtable', 'void', ['__hashtable__*', '__string__*', '__hashtable__*']);
         $this->registerFn('__hashtable__setStringKeyLong', 'void', ['__hashtable__*', '__string__*', 'int64']);
+        $this->registerFn('__hashtable__setStringKeyDouble', 'void', ['__hashtable__*', '__string__*', 'double']);
         $this->registerFn('__hashtable__setStringKeyBool', 'void', ['__hashtable__*', '__string__*', 'int1']);
         $this->registerFn('__hashtable__peekStringKeyValue', '__value__*', ['__hashtable__*', '__string__*']);
         $this->registerFn('__hashtable__readStringKeyValue', '__value__*', ['__hashtable__*', '__string__*']);
@@ -118,7 +119,6 @@ class HashTable extends Type
         $this->registerFn('__hashtable__sortStringKeyValuesNatural', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeyValuesNaturalCase', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeyValuesReverse', 'void', ['__hashtable__*']);
-
         $this->pointer = $this->context->getTypeFromString('__hashtable__*');
     }
 
@@ -144,6 +144,7 @@ class HashTable extends Type
     public function implement(): void
     {
         $this->ensureLibcStringCompare();
+        $this->ensureLibcStrtol();
         \PHPCompiler\JIT\Builtin\StringStrnatcmp::ensureLinked($this->context);
         \PHPCompiler\JIT\Builtin\StringStrnatcasecmp::ensureLinked($this->context);
         $this->implementAlloc();
@@ -163,6 +164,7 @@ class HashTable extends Type
         $this->implementUnsetStringKey();
         $this->implementSetStringKeyString();
         $this->implementSetStringKeyLong();
+        $this->implementSetStringKeyDouble();
         $this->implementSetStringKeyBool();
         $this->implementSetStringKeyHashtable();
         $this->implementOffsetIsSetStringKey();
@@ -187,6 +189,21 @@ class HashTable extends Type
         $this->implementSortStringKeyValuesNatural();
         $this->implementSortStringKeyValuesNaturalCase();
         $this->implementSortStringKeyValuesReverse();
+    }
+
+    private function ensureLibcStrtol(): void
+    {
+        try {
+            $this->context->lookupFunction('strtol');
+        } catch (\Throwable $e) {
+            $i8p = $this->context->getTypeFromString('int8*');
+            $i8pp = $this->context->getTypeFromString('int8**');
+            $i32 = $this->context->getTypeFromString('int32');
+            $i64 = $this->context->getTypeFromString('int64');
+            $ft = $this->context->context->functionType($i64, false, $i8p, $i8pp, $i32);
+            $fn = $this->context->module->addFunction('strtol', $ft);
+            $this->context->registerFunction('strtol', $fn);
+        }
     }
 
     private function ensureLibcStringCompare(): void
@@ -1018,6 +1035,117 @@ class HashTable extends Type
         $this->context->builder->returnVoid();
     }
 
+    private function implementSetStringKeyDouble(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__setStringKeyDouble');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $ht = $fn->getParam(0);
+        $key = $fn->getParam(1);
+        $double = $fn->getParam(2);
+
+        $htMap = $this->context->structFieldMap['__hashtable__'];
+        $nodeMap = $this->context->structFieldMap['__strkey_node__'];
+        $headSlot = $this->context->builder->structGep($ht, $htMap['strKeys']);
+        $head = $this->context->builder->load($headSlot);
+
+        $done = $fn->appendBasicBlock('strkey_double_done');
+        $prepend = $fn->appendBasicBlock('strkey_double_prepend');
+        $loopHead = $fn->appendBasicBlock('strkey_double_head');
+        $loopBody = $fn->appendBasicBlock('strkey_double_body');
+        $this->context->builder->branch($loopHead);
+
+        $this->context->builder->positionAtEnd($loopHead);
+        $node = $this->context->builder->phi($head->typeOf());
+        $node->addIncoming($head, $block);
+        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $node, $node->typeOf()->constNull());
+        $this->context->builder->branchIf($isNull, $prepend, $loopBody);
+
+        $this->context->builder->positionAtEnd($loopBody);
+        $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
+        $cmp = $this->context->builder->call(
+            $this->context->lookupFunction('strcmp'),
+            $this->stringDataPtr($key),
+            $this->stringDataPtr($nodeKey)
+        );
+        $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
+        $update = $fn->appendBasicBlock('strkey_double_update');
+        $next = $fn->appendBasicBlock('strkey_double_next');
+        $this->context->builder->branchIf($isMatch, $update, $next);
+
+        $this->context->builder->positionAtEnd($update);
+        $valField = $this->context->builder->structGep($node, $nodeMap['value']);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeDouble'),
+            $valField,
+            $double
+        );
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($next);
+        $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
+        $this->context->builder->branch($loopHead);
+        $node->addIncoming($nextNode, $next);
+
+        $this->context->builder->positionAtEnd($prepend);
+        $nodeType = $this->context->getTypeFromString('__strkey_node__');
+        $newNode = $this->context->memory->malloc($nodeType);
+        $typeinfo = $this->context->getTypeFromString('int32')->constInt(
+            Refcount::TYPE_INFO_TYPE_STRING | Refcount::TYPE_INFO_REFCOUNTED,
+            false
+        );
+        $ref = $this->context->builder->pointerCast(
+            $newNode,
+            $this->context->getTypeFromString('__ref__virtual*')
+        );
+        $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
+        $storedKey = $this->context->builder->call($this->context->lookupFunction('__string__separate'), $key);
+        $this->context->builder->store($storedKey, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeDouble'),
+            $this->context->builder->structGep($newNode, $nodeMap['value']),
+            $double
+        );
+        $this->context->builder->store(
+            $newNode->typeOf()->constNull(),
+            $this->context->builder->structGep($newNode, $nodeMap['next'])
+        );
+        $tail = $fn->appendBasicBlock('strkey_double_tail');
+        $emptyHead = $fn->appendBasicBlock('strkey_double_empty_head');
+        $tailWalk = $fn->appendBasicBlock('strkey_double_tail_walk');
+        $tailDone = $fn->appendBasicBlock('strkey_double_tail_done');
+        $this->context->builder->branch($tail);
+
+        $this->context->builder->positionAtEnd($tail);
+        $currentHead = $this->loadStrKeysHead($headSlot);
+        $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $currentHead, $currentHead->typeOf()->constNull());
+        $this->context->builder->branchIf($isEmpty, $emptyHead, $tailWalk);
+
+        $this->context->builder->positionAtEnd($tailWalk);
+        $walkNode = $this->context->builder->phi($currentHead->typeOf());
+        $walkNode->addIncoming($currentHead, $tail);
+        $nextWalk = $this->context->builder->load($this->context->builder->structGep($walkNode, $nodeMap['next']));
+        $atEnd = $this->context->builder->icmp(Builder::INT_EQ, $nextWalk, $nextWalk->typeOf()->constNull());
+        $this->context->builder->branchIf($atEnd, $tailDone, $tailWalk);
+        $walkNode->addIncoming($nextWalk, $tailWalk);
+
+        $this->context->builder->positionAtEnd($tailDone);
+        $this->context->builder->store(
+            $newNode,
+            $this->context->builder->structGep($walkNode, $nodeMap['next'])
+        );
+        $this->incrementNumElements($ht);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($emptyHead);
+        $this->context->builder->store($newNode, $headSlot);
+        $this->incrementNumElements($ht);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+    }
+
     private function implementSetStringKeyBool(): void
     {
         $fn = $this->context->lookupFunction('__hashtable__setStringKeyBool');
@@ -1613,11 +1741,94 @@ class HashTable extends Type
         $this->context->builder->branch($loopHead);
 
         $this->context->builder->positionAtEnd($notFound);
-        $this->context->builder->branch($done);
+        $this->tryLookupPackedIntFromStringKey($fn, $notFound, $ht, $key, $resultSlot, $done);
 
         $this->context->builder->positionAtEnd($done);
 
         return $this->context->builder->load($resultSlot);
+    }
+
+    /**
+     * Zend numeric-string → int key fallback when string-key chain misses (#3679).
+     */
+    private function tryLookupPackedIntFromStringKey(
+        PHPLLVM\Value\Function_ $fn,
+        PHPLLVM\BasicBlock $entryBlock,
+        PHPLLVM\Value $ht,
+        PHPLLVM\Value $key,
+        PHPLLVM\Value $resultSlot,
+        PHPLLVM\BasicBlock $done
+    ): void {
+        $tryInt = $fn->appendBasicBlock('strkey_lookup_try_int');
+        $parseInt = $fn->appendBasicBlock('strkey_lookup_parse_int');
+        $intFound = $fn->appendBasicBlock('strkey_lookup_int_found');
+        $skipInt = $fn->appendBasicBlock('strkey_lookup_skip_int');
+
+        $this->context->builder->positionAtEnd($entryBlock);
+        $this->context->builder->branch($tryInt);
+
+        $this->context->builder->positionAtEnd($tryInt);
+        $isIntKey = $this->stringIsIntegerNumericKey($key);
+        $this->context->builder->branchIf($isIntKey, $parseInt, $skipInt);
+
+        $this->context->builder->positionAtEnd($parseInt);
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $i8p = $this->context->getTypeFromString('int8*');
+        $i64 = $this->context->getTypeFromString('int64');
+        $endPtrSlot = $this->context->builder->alloca($i8p, 1, 'strkey_lookup_strtol_end');
+        $this->context->builder->store($i8p->constNull(), $endPtrSlot);
+        $parsed = $this->context->builder->call(
+            $this->context->lookupFunction('strtol'),
+            $this->stringDataPtr($key),
+            $endPtrSlot,
+            $this->context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $index = $this->context->builder->truncOrBitCast($parsed, $sizeT);
+        $isSet = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $index
+        );
+        $this->context->builder->branchIf($isSet, $intFound, $skipInt);
+
+        $this->context->builder->positionAtEnd($intFound);
+        $htMap = $this->context->structFieldMap['__hashtable__'];
+        $entry = $this->listEntryAt($ht, $htMap, $index);
+        $this->context->builder->store($entry, $resultSlot);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($skipInt);
+        $this->context->builder->branch($done);
+    }
+
+    /** True when strtol(base 10) consumes the entire __string__ (integer numeric string). */
+    private function stringIsIntegerNumericKey(PHPLLVM\Value $strPtr): PHPLLVM\Value
+    {
+        $map = $this->context->structFieldMap['__string__'];
+        $len = $this->context->builder->load(
+            $this->context->builder->structGep($strPtr, $map['length'])
+        );
+        $i64 = $this->context->getTypeFromString('int64');
+        $i8p = $this->context->getTypeFromString('int8*');
+        $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $len, $len->typeOf()->constInt(0, false));
+
+        $charPtr = $this->context->builder->structGep($strPtr, $map['value']);
+        $endPtrSlot = $this->context->builder->alloca($i8p, 1, 'strkey_is_int_end');
+        $this->context->builder->store($i8p->constNull(), $endPtrSlot);
+        $this->context->builder->call(
+            $this->context->lookupFunction('strtol'),
+            $charPtr,
+            $endPtrSlot,
+            $this->context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $endPtr = $this->context->builder->load($endPtrSlot);
+        $endOffset = $this->context->builder->sub(
+            $this->context->builder->ptrToInt($endPtr, $i64),
+            $this->context->builder->ptrToInt($charPtr, $i64)
+        );
+        $consumedAll = $this->context->builder->icmp(Builder::INT_EQ, $endOffset, $len);
+
+        return $this->context->builder->select($isEmpty, $this->context->constantFromBool(false), $consumedAll);
     }
 
     private function implementSortPacked(): void

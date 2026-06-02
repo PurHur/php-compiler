@@ -31,6 +31,13 @@ final class LevenshteinBuiltinTest extends TestCase
         $this->assertSame(3, $this->runLevenshtein('', 'abc'));
     }
 
+    public function testLongStringsBeyond255Bytes(): void
+    {
+        $a = str_repeat('a', 300);
+        $b = str_repeat('b', 300);
+        $this->assertSame(300, $this->runLevenshtein($a, $b));
+    }
+
     private function runLevenshtein(
         string $a,
         string $b,

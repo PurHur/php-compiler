@@ -40,6 +40,9 @@ final class trigger_error_ extends Internal
                 throw new \LogicException('trigger_error() error type must be an integer');
             }
             $level = $levelVar->toInt();
+            if (!ErrorReporter::isUserErrorLevel($level)) {
+                throw new \ValueError('trigger_error(): Argument #2 ($error_level) must be one of E_USER_ERROR, E_USER_WARNING, E_USER_NOTICE, or E_USER_DEPRECATED');
+            }
         }
         $frame->vmContext->errors->triggerError(
             $messageVar->toString(),
@@ -68,14 +71,7 @@ final class trigger_error_ extends Internal
         }
         $level = ErrorReporter::E_USER_NOTICE;
         if (2 === $argc) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-                throw new \LogicException('trigger_error() error type must be a compile-time integer in this compiler build');
-            }
-            $lib = $context->llvm->lib;
-            if (null === $lib->LLVMIsAConstantInt($args[1]->value->value)) {
-                throw new \LogicException('trigger_error() error type must be a compile-time integer in this compiler build');
-            }
-            $level = (int) $lib->LLVMConstIntGetSExtValue($args[1]->value->value);
+            $level = self::jitResolveErrorLevel($context, $args[1]);
         }
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
@@ -91,5 +87,23 @@ final class trigger_error_ extends Internal
         $i1 = $context->getTypeFromString('int1');
 
         return $i1->constInt(1, false);
+    }
+
+    private static function jitResolveErrorLevel(Context $context, JITVariable $arg): int
+    {
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($arg->value->value)) {
+                return (int) $lib->LLVMConstIntGetSExtValue($arg->value->value);
+            }
+        }
+        if (null !== $arg->compileTimeConstantName) {
+            $errorInt = \PHPCompiler\VM\Context::errorReportingConstant($arg->compileTimeConstantName);
+            if (null !== $errorInt) {
+                return $errorInt;
+            }
+        }
+
+        throw new \LogicException('trigger_error() error type must be a compile-time integer in this compiler build');
     }
 }

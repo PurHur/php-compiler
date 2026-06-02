@@ -151,6 +151,39 @@ final class BootstrapVendorPrelinkColdBootTest extends TestCase
         }
     }
 
+    /** Issue #3049: vendor FAIL lines surface parseAndCompile / PHPTypes context. */
+    public function testExtractCompileFailureDetailPrefersParseAndCompileLine(): void
+    {
+        require_once dirname(__DIR__, 2).'/script/bootstrap-vendor-prelink-lib.php';
+
+        $output = [
+            'helloworld_compile_smoke: native emit failed at phase=parseAndCompile',
+            'parseAndCompile failure: target=/compiler/bundle.php: Unknown type declaration found: PHPTypes\\Type The type',
+            'RuntimeException in vendor/ircmaxell/php-types/lib/PHPTypes/Type.php:419',
+        ];
+        $detail = bootstrapVendorPrelinkExtractCompileFailureDetail($output);
+        $this->assertSame(
+            'parseAndCompile failure: target=/compiler/bundle.php: Unknown type declaration found: PHPTypes\Type The type',
+            $detail
+        );
+    }
+
+    /** Issue #3049: Type.php location when parseAndCompile line absent. */
+    public function testExtractCompileFailureDetailFallsBackToTypePhpLine(): void
+    {
+        require_once dirname(__DIR__, 2).'/script/bootstrap-vendor-prelink-lib.php';
+
+        $output = [
+            'helloworld_compile_smoke: parseAndCompile returned null (CFG/compile spine)',
+            'RuntimeException in vendor/ircmaxell/php-types/lib/PHPTypes/Type.php:419',
+        ];
+        $detail = bootstrapVendorPrelinkExtractCompileFailureDetail($output);
+        $this->assertSame(
+            'RuntimeException in vendor/ircmaxell/php-types/lib/PHPTypes/Type.php:419',
+            $detail
+        );
+    }
+
     /** Issue #2723: pre-plugin autoload must not pass deprecated spl_autoload_register do_throw. */
     public function testBootstrapGatesAvoidSplAutoloadRegisterNotice(): void
     {

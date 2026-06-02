@@ -1,0 +1,592 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\JIT;
+
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\JIT\Call;
+use PHPCompiler\JIT\Call\ClosureWithBinding;
+use PHPCompiler\JIT\Call\ClosureWithCaptures;
+use PHPCompiler\JIT\Call\Native;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
+
+/**
+ * Closure::bind / bindTo JIT lowering (#4192, Zend zend_closures.c).
+ */
+final class ClosureBindHelper
+{
+    public const BOUND_THIS_PROPERTY = '__closure_bound_this';
+
+    public const BOUND_SCOPE_PROPERTY = '__closure_bound_scope';
+
+    public static function registerJitMethods(Context $context): void
+    {
+        $context->functionProxies['closure::bindto'] = new Call\ClosureBindTo();
+        $context->functionProxies['closure::bind'] = new Call\ClosureBind();
+    }
+
+    public static function ensureClosureBindingProperties(Context $context): void
+    {
+        $classId = $context->type->object->lookup('Closure');
+        $objectType = $context->type->object;
+        if (!$objectType->hasProperty($classId, self::BOUND_THIS_PROPERTY)) {
+            $objectType->defineProperty($classId, self::BOUND_THIS_PROPERTY, Variable::TYPE_VALUE);
+        }
+        if (!$objectType->hasProperty($classId, self::BOUND_SCOPE_PROPERTY)) {
+            $objectType->defineProperty($classId, self::BOUND_SCOPE_PROPERTY, Variable::TYPE_STRING);
+        }
+    }
+
+    public static function bind(
+        Context $context,
+        Variable $closure,
+        Variable $newThis,
+        ?Variable $newScope,
+        string $errorContext
+    ): Variable {
+        self::ensureClosureBindingProperties($context);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+
+        self::assertNullableObject($context, $newThis, self::thisArgLabel($errorContext));
+        if (null !== $newScope) {
+            self::assertNullableObjectOrString($context, $newScope, self::scopeArgLabel($errorContext));
+        }
+
+        $inner = self::resolveInnerCall($context, $closure);
+        if (null === $inner) {
+            return self::nullResult($context);
+        }
+
+        $boundThis = self::materializeBoundThis($context, $newThis);
+        $boundScope = self::materializeBoundScope($context, $newThis, $newScope);
+        $boundObj = self::cloneClosureObject($context, $closure, $boundThis, $boundScope);
+        $result = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $boundObj);
+        $result->closureCall = new ClosureWithBinding(
+            $inner,
+            $boundThis,
+            $boundScope
+        );
+
+        return $result;
+    }
+
+    public static function wrapCallWithBindingFromObject(
+        Context $context,
+        Value $closureObj,
+        Call $inner,
+        Variable ...$args
+    ): Value {
+        self::ensureClosureBindingProperties($context);
+        $boundThis = $context->type->object->propertyFetch(
+            $closureObj,
+            'Closure',
+            self::BOUND_THIS_PROPERTY
+        );
+        if ($boundThis->isNullConstant ?? false) {
+            return $inner->call($context, ...$args);
+        }
+        $boundScope = $context->type->object->propertyFetch(
+            $closureObj,
+            'Closure',
+            self::BOUND_SCOPE_PROPERTY
+        );
+
+        return (new ClosureWithBinding($inner, $boundThis, $boundScope))->call($context, ...$args);
+    }
+
+    public static function unwrapInnerCall(Call $call): Call
+    {
+        while ($call instanceof ClosureWithBinding) {
+            $call = $call->inner();
+        }
+        if ($call instanceof ClosureWithCaptures) {
+            return $call->innerNative();
+        }
+
+        return $call;
+    }
+
+    /**
+     * @param list<Variable> $args
+     *
+     * @return list<Variable>
+     */
+    public static function prependBoundThisForInvoke(
+        Context $context,
+        Call $inner,
+        Variable $boundThis,
+        array $args
+    ): array {
+        if (!self::closureInnerUsesThis($context, $inner)) {
+            return $args;
+        }
+        if ($boundThis->isNullConstant ?? false) {
+            return $args;
+        }
+        $thisArg = self::boundThisAsObject($context, $boundThis);
+
+        return array_merge([$thisArg], $args);
+    }
+
+    public static function compileTimeScopeName(Variable $boundScope): string
+    {
+        if (Variable::TYPE_STRING === $boundScope->type && null !== $boundScope->compileTimeString) {
+            return $boundScope->compileTimeString;
+        }
+
+        return '';
+    }
+
+    public static function boxReturn(Context $context, Variable $result): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        if (Variable::TYPE_OBJECT === $result->type) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeObject'),
+                $ptr,
+                $context->helper->loadValue($result)
+            );
+        } else {
+            JitValueBox::copyFromPointer($context, $slot, JitValueBox::valuePtrFromVariable($context, $result));
+        }
+
+        return $ptr;
+    }
+
+    private static function closureInnerUsesThis(Context $context, Call $inner): bool
+    {
+        if (!$inner instanceof Native) {
+            return false;
+        }
+        if (0 === $inner->function->countParams()) {
+            return false;
+        }
+        $first = $inner->function->getParam(0);
+
+        return '__object__*' === $context->getStringFromType($first->typeOf());
+    }
+
+    private static function resolveInnerCall(Context $context, Variable $closure): ?Call
+    {
+        if (null !== $closure->closureCall) {
+            return self::unwrapInnerCall($closure->closureCall);
+        }
+        if (Variable::TYPE_OBJECT !== $closure->type && Variable::TYPE_VALUE !== $closure->type) {
+            return null;
+        }
+        $obj = Variable::TYPE_OBJECT === $closure->type
+            ? $context->helper->loadValue($closure)
+            : $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::valuePtrFromVariable($context, $closure)
+            );
+        $targetVar = $context->type->object->propertyFetch(
+            $obj,
+            'Closure',
+            ClosureHelper::TARGET_PROPERTY
+        );
+        if (Variable::TYPE_STRING !== $targetVar->type || null === $targetVar->compileTimeString) {
+            return null;
+        }
+        $proxy = $context->functionProxies[strtolower($targetVar->compileTimeString)] ?? null;
+
+        return $proxy instanceof Call ? $proxy : null;
+    }
+
+    private static function cloneClosureObject(
+        Context $context,
+        Variable $source,
+        Variable $boundThis,
+        Variable $boundScope
+    ): Value {
+        $classId = $context->type->object->lookup('Closure');
+        $srcObj = self::loadClosureObject($context, $source);
+        $dest = $context->type->object->allocate($classId);
+        $context->type->object->markObjectConstructed($dest);
+
+        $targetVar = $context->type->object->propertyFetch(
+            $srcObj,
+            'Closure',
+            ClosureHelper::TARGET_PROPERTY
+        );
+        $context->type->object->storeInstanceProperty(
+            $dest,
+            'Closure',
+            ClosureHelper::TARGET_PROPERTY,
+            $targetVar
+        );
+        $context->type->object->storeInstanceProperty(
+            $dest,
+            'Closure',
+            self::BOUND_THIS_PROPERTY,
+            $boundThis
+        );
+        $context->type->object->storeInstanceProperty(
+            $dest,
+            'Closure',
+            self::BOUND_SCOPE_PROPERTY,
+            $boundScope
+        );
+
+        return $dest;
+    }
+
+    private static function loadClosureObject(Context $context, Variable $closure): Value
+    {
+        if (Variable::TYPE_OBJECT === $closure->type) {
+            return $context->helper->loadValue($closure);
+        }
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::valuePtrFromVariable($context, $closure)
+        );
+    }
+
+    private static function materializeBoundThis(Context $context, Variable $newThis): Variable
+    {
+        if (Variable::TYPE_NULL === $newThis->type) {
+            return self::nullValueBox($context);
+        }
+        if (Variable::TYPE_OBJECT === $newThis->type) {
+            $slot = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeObject'),
+                JitValueBox::pointer($context, $slot),
+                $context->helper->loadValue($newThis)
+            );
+            $var = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+            $var->addref();
+
+            return $var;
+        }
+
+        return ClosureHelper::snapshotCapture($context, $newThis);
+    }
+
+    private static function materializeBoundScope(
+        Context $context,
+        Variable $newThis,
+        ?Variable $newScope
+    ): Variable {
+        if (null === $newScope) {
+            return self::defaultScopeString($context, $newThis);
+        }
+        if (Variable::TYPE_NULL === $newScope->type) {
+            return self::defaultScopeString($context, $newThis);
+        }
+        if (Variable::TYPE_STRING === $newScope->type) {
+            $scope = $newScope->compileTimeString ?? '';
+            if ('' === $scope && Variable::KIND_VALUE === $newScope->kind) {
+                $scope = self::loadStringFromVariable($context, $newScope);
+            }
+            if ('static' === strtolower($scope)) {
+                return self::defaultScopeString($context, $newThis);
+            }
+
+            return self::stringVariable($context, $scope);
+        }
+        if (Variable::TYPE_OBJECT === $newScope->type) {
+            return self::classNameStringFromObject($context, $newScope);
+        }
+        if (Variable::TYPE_VALUE === $newScope->type) {
+            return self::classNameStringFromValueBox($context, $newScope);
+        }
+
+        throw new \LogicException('Closure bind scope resolution failed in JIT');
+    }
+
+    private static function defaultScopeString(Context $context, Variable $newThis): Variable
+    {
+        if (Variable::TYPE_NULL === $newThis->type || ($newThis->isNullConstant ?? false)) {
+            return self::emptyScopeString($context);
+        }
+        if (Variable::TYPE_OBJECT === $newThis->type) {
+            return self::classNameStringFromObject($context, $newThis);
+        }
+        if (Variable::TYPE_VALUE === $newThis->type) {
+            return self::classNameStringFromValueBox($context, $newThis);
+        }
+
+        return self::emptyScopeString($context);
+    }
+
+    private static function emptyScopeString(Context $context): Variable
+    {
+        $lit = $context->builder->load($context->constantStringFromString(''));
+        $var = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $lit);
+        $var->compileTimeString = '';
+        $var->addref();
+
+        return $var;
+    }
+
+    private static function nullValueBox(Context $context): Variable
+    {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $slot)
+        );
+        $var = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+        $var->isNullConstant = true;
+        $var->addref();
+
+        return $var;
+    }
+
+    private static function nullResult(Context $context): Variable
+    {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $slot)
+        );
+
+        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+    }
+
+    private static function boundThisAsObject(Context $context, Variable $boundThis): Variable
+    {
+        if (Variable::TYPE_OBJECT === $boundThis->type) {
+            return $boundThis;
+        }
+        $slot = JitValueBox::alloc($context);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::valuePtrFromVariable($context, $boundThis)
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            JitValueBox::pointer($context, $slot),
+            $obj
+        );
+        $var = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
+        $var->addref();
+
+        return $var;
+    }
+
+    private static function stringVariable(Context $context, string $scope): Variable
+    {
+        $lit = $context->builder->load($context->constantStringFromString($scope));
+        $var = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $lit);
+        $var->compileTimeString = $scope;
+        $var->addref();
+
+        return $var;
+    }
+
+    private static function classNameStringFromObject(Context $context, Variable $object): Variable
+    {
+        $obj = $context->helper->loadValue($object);
+
+        return self::runtimeClassNameFromObject($context, $obj);
+    }
+
+    private static function classNameStringFromValueBox(Context $context, Variable $box): Variable
+    {
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::valuePtrFromVariable($context, $box)
+        );
+        $tmp = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
+        $tmp->addref();
+
+        return self::classNameStringFromObject($context, $tmp);
+    }
+
+    private static function runtimeClassNameFromObject(Context $context, Value $obj): Variable
+    {
+        Builtin\ReflectionNative::registerDeclarations($context);
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $lenSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $namePtr = $context->builder->call(
+            $context->lookupFunction('phpc_reflect_get_class_name'),
+            $context->builder->pointerCast($obj, $i8p),
+            $lenSlot
+        );
+        $len = $context->builder->load($lenSlot);
+        $len64 = $context->builder->zExt($len, $i64);
+        $str = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $len64,
+            $namePtr
+        );
+        $var = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $str);
+        $var->addref();
+
+        return $var;
+    }
+
+    private static function loadStringFromVariable(Context $context, Variable $str): string
+    {
+        if (null !== $str->compileTimeString) {
+            return $str->compileTimeString;
+        }
+        if (Variable::KIND_VALUE === $str->kind) {
+            return '';
+        }
+
+        return '';
+    }
+
+    private static function assertNullableObject(
+        Context $context,
+        Variable $arg,
+        string $label
+    ): void {
+        if (Variable::TYPE_NULL === $arg->type || Variable::TYPE_OBJECT === $arg->type) {
+            return;
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            self::emitValueBoxObjectOrNullCheck($context, $arg, $label);
+
+            return;
+        }
+        self::raiseTypeError($context, $label, '?object', self::scalarLabel($arg));
+    }
+
+    private static function assertNullableObjectOrString(
+        Context $context,
+        Variable $arg,
+        string $label
+    ): void {
+        if (Variable::TYPE_NULL === $arg->type
+            || Variable::TYPE_OBJECT === $arg->type
+            || Variable::TYPE_STRING === $arg->type
+        ) {
+            return;
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            self::emitValueBoxObjectStringOrNullCheck($context, $arg, $label);
+
+            return;
+        }
+        self::raiseTypeError($context, $label, 'object|string|null', self::scalarLabel($arg));
+    }
+
+    private static function emitValueBoxObjectOrNullCheck(
+        Context $context,
+        Variable $arg,
+        string $label
+    ): void {
+        $ptr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $typeByte = self::loadValueTypeByte($context, $ptr);
+        $i8 = $context->getTypeFromString('int8');
+        $ok = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $okBlock = BasicBlockHelper::append($context, 'closure_bind_this_null');
+        $objBlock = BasicBlockHelper::append($context, 'closure_bind_this_obj');
+        $failBlock = BasicBlockHelper::append($context, 'closure_bind_this_fail');
+        $mergeBlock = BasicBlockHelper::append($context, 'closure_bind_this_merge');
+        $context->builder->branchIf($ok, $okBlock, $objBlock);
+        $context->builder->positionAtEnd($objBlock);
+        $isObj = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_OBJECT, false)
+        );
+        $context->builder->branchIf($isObj, $mergeBlock, $failBlock);
+        $context->builder->positionAtEnd($okBlock);
+        $context->builder->branch($mergeBlock);
+        $context->builder->positionAtEnd($failBlock);
+        self::raiseTypeError($context, $label, '?object', 'int');
+        $context->builder->branch($mergeBlock);
+        $context->builder->positionAtEnd($mergeBlock);
+    }
+
+    private static function emitValueBoxObjectStringOrNullCheck(
+        Context $context,
+        Variable $arg,
+        string $label
+    ): void {
+        $ptr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $typeByte = self::loadValueTypeByte($context, $ptr);
+        $i8 = $context->getTypeFromString('int8');
+        $okTypes = [
+            Variable::TYPE_NULL,
+            Variable::TYPE_OBJECT,
+            Variable::TYPE_STRING,
+        ];
+        $checkBlock = $context->builder->getInsertBlock();
+        $failBlock = BasicBlockHelper::append($context, 'closure_bind_scope_fail');
+        $mergeBlock = BasicBlockHelper::append($context, 'closure_bind_scope_merge');
+        $next = $checkBlock;
+        foreach ($okTypes as $idx => $ty) {
+            $matchBlock = BasicBlockHelper::append($context, 'closure_bind_scope_ok_'.$idx);
+            $missBlock = ($idx < \count($okTypes) - 1)
+                ? BasicBlockHelper::append($context, 'closure_bind_scope_try_'.$idx)
+                : $failBlock;
+            $context->builder->positionAtEnd($next);
+            $isTy = $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt($ty, false)
+            );
+            $context->builder->branchIf($isTy, $matchBlock, $missBlock);
+            $context->builder->positionAtEnd($matchBlock);
+            $context->builder->branch($mergeBlock);
+            $next = $missBlock;
+        }
+        $context->builder->positionAtEnd($failBlock);
+        self::raiseTypeError($context, $label, 'object|string|null', 'int');
+        $context->builder->branch($mergeBlock);
+        $context->builder->positionAtEnd($mergeBlock);
+    }
+
+    private static function loadValueTypeByte(Context $context, Value $valuePtr): Value
+    {
+        return $context->builder->load(
+            $context->builder->structGep(
+                $valuePtr,
+                $context->structFieldMap['__value__']['type']
+            )
+        );
+    }
+
+    private static function raiseTypeError(
+        Context $context,
+        string $label,
+        string $expected,
+        string $given
+    ): void {
+        TypeErrorRaise::emitRaise(
+            $context,
+            "{$label} must be of type {$expected}, {$given} given"
+        );
+        $context->builder->call($context->lookupFunction('abort'));
+    }
+
+    private static function scalarLabel(Variable $arg): string
+    {
+        return match ($arg->type) {
+            Variable::TYPE_INTEGER, Variable::TYPE_NATIVE_LONG => 'int',
+            Variable::TYPE_FLOAT, Variable::TYPE_NATIVE_DOUBLE => 'float',
+            Variable::TYPE_BOOLEAN, Variable::TYPE_NATIVE_BOOL => 'bool',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_ARRAY, Variable::TYPE_HASHTABLE => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            default => 'mixed',
+        };
+    }
+
+    private static function thisArgLabel(string $context): string
+    {
+        return 'Closure::bind()' === $context ? '#2 ($newThis)' : '#1 ($newThis)';
+    }
+
+    private static function scopeArgLabel(string $context): string
+    {
+        return 'Closure::bind()' === $context ? '#3 ($newScope)' : '#2 ($newScope)';
+    }
+}

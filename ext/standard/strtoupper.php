@@ -33,10 +33,7 @@ final class strtoupper extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('strtoupper() only supports strings in this compiler build');
-        }
-        $frame->returnVar->string(VmString::asciiUpper($v->toString()));
+        $frame->returnVar->string(VmString::asciiUpper(VmString::coerceOperand($v)));
     }
 
     public Context $context;

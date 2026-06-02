@@ -40,6 +40,11 @@ final class substr extends Internal
         }
         if (3 === $argc) {
             $length = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_NULL === $length->type) {
+                $frame->returnVar->string(VmString::substr($s->toString(), $offset->toInt()));
+
+                return;
+            }
             if (Variable::TYPE_INTEGER !== $length->type) {
                 throw new \LogicException('substr() length must be an integer in this compiler build');
             }
@@ -70,12 +75,23 @@ final class substr extends Internal
         $offset = $this->jitLong($context, $args[1], 'substr() argument #2');
         $start = JitStringIndex::clamp($context, $offset, $zero, $len);
 
+        $sliceLen = null;
         if (3 === $argc) {
-            $lengthArg = $this->jitLong($context, $args[2], 'substr() argument #3');
-            $negLen = $context->builder->icmp(Builder::INT_SLT, $lengthArg, $zero);
-            $remaining = $context->builder->sub($len, $start);
-            $maxLen = $context->builder->select($negLen, $zero, $lengthArg);
-            $sliceLen = JitStringIndex::min($context, $maxLen, $remaining);
+            if (JITVariable::TYPE_NATIVE_LONG === $args[2]->type) {
+                $lengthArg = $this->jitLong($context, $args[2], 'substr() argument #3');
+                $negLen = $context->builder->icmp(Builder::INT_SLT, $lengthArg, $zero);
+                $remaining = $context->builder->sub($len, $start);
+                $maxLen = $context->builder->select($negLen, $zero, $lengthArg);
+                $sliceLen = JitStringIndex::min($context, $maxLen, $remaining);
+            } elseif (JITVariable::TYPE_VALUE === $args[2]->type) {
+                if (!$args[2]->isNullConstant) {
+                    throw new \LogicException('substr() length must be an integer or literal null in this compiler build');
+                }
+                $sliceLen = $context->builder->sub($len, $start);
+                $sliceLen = JitStringIndex::max($context, $sliceLen, $zero);
+            } else {
+                throw new \LogicException('substr() length must be an integer or null in this compiler build');
+            }
         } else {
             $sliceLen = $context->builder->sub($len, $start);
             $sliceLen = JitStringIndex::max($context, $sliceLen, $zero);

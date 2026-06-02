@@ -28,7 +28,7 @@ class strlen extends Internal {
         }
         $var = $frame->calledArgs[0];
         if (!is_null($frame->returnVar)) {
-            $frame->returnVar->int(VmString::byteLength($var->resolveIndirect()->toString()));
+            $frame->returnVar->int(VmString::byteLength(VmString::coerceOperand($var)));
         }
     }
 

@@ -37,7 +37,7 @@ final class GeneratorJitExecuteTest extends TestCase
     {
         $this->assertMcjitOutput(<<<'PHP'
 <?php
-function gen(): Generator {
+function gen() {
     yield 1;
     yield 2;
 }
@@ -49,12 +49,68 @@ PHP
             '12');
     }
 
+    public function testYieldFromArrayForeachExecutesViaMcjit(): void
+    {
+        $this->assertMcjitOutput(<<<'PHP'
+<?php
+function gen() {
+    yield from [1, 2, 3];
+}
+foreach (gen() as $v) {
+    echo $v;
+}
+PHP
+            ,
+            '123');
+    }
+
+    public function testYieldFromGeneratorForeachExecutesViaMcjit(): void
+    {
+        $this->assertMcjitOutput(<<<'PHP'
+<?php
+function inner() {
+    yield 1;
+    yield 2;
+}
+function outer() {
+    yield from inner();
+    yield 3;
+}
+foreach (outer() as $v) {
+    echo $v;
+}
+PHP
+            ,
+            '123');
+    }
+
+    public function testGeneratorTryCatchExecutesViaMcjit(): void
+    {
+        $this->assertMcjitOutput(<<<'PHP'
+<?php
+function gen() {
+    try {
+        yield 1;
+        throw new Exception('boom');
+        yield 2;
+    } catch (Exception $e) {
+        yield 'caught:boom';
+    }
+}
+foreach (gen() as $v) {
+    echo $v, "\n";
+}
+PHP
+            ,
+            "1\ncaught:boom\n");
+    }
+
     public function testRequiresVmLoweringSkipsNestedGeneratorBodies(): void
     {
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
-function gen(): Generator {
+function gen() {
     yield 1;
 }
 foreach (gen() as $v) {

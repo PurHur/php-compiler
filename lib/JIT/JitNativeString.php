@@ -18,6 +18,15 @@ final class JitNativeString
         if (Variable::TYPE_STRING === $var->type) {
             return $var;
         }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $magic = MagicMethodDispatch::coerceObjectToString($context, $var);
+            if (null !== $magic) {
+                return $magic;
+            }
+            throw new \LogicException(
+                'Cannot coerce JIT type '.Variable::getStringType($var->type).' to string for concat'
+            );
+        }
         if (Variable::TYPE_VALUE === $var->type) {
             return new Variable(
                 $context,
@@ -73,6 +82,18 @@ final class JitNativeString
                     'Cannot coerce JIT type '.Variable::getStringType($var->type).' to string for concat'
                 );
         }
+    }
+
+    /** Decimal string for a packed-list index (array_merge numeric-string keys; #3607). */
+    public static function formatIndexKey(Context $context, Value $indexI64): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+
+        return self::format(
+            $context,
+            $context->builder->truncOrBitCast($indexI64, $sizeT),
+            '%zu'
+        );
     }
 
     private static function format(Context $context, Value $value, string $format): Value

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 /**
- * PHP 8.4 lazy proxy initialization (#3317).
+ * PHP 8.4 lazy proxy and ghost initialization (#3317, #4026).
  *
  * @see Zend/zend_lazy_objects.c
  */
@@ -17,6 +17,22 @@ final class LazyObjectSupport
         $object->constructed = false;
         $object->lazyInitializer = $initializer;
         $object->lazyPending = true;
+        $object->lazyGhost = false;
+
+        return $object;
+    }
+
+    public static function createGhost(ClassEntry $class, ClosureState $initializer): ObjectEntry
+    {
+        $object = new ObjectEntry($class);
+        foreach ($object->getRawProperties() as $var) {
+            $var->reset();
+            $var->type = Variable::TYPE_UNDEFINED;
+        }
+        $object->constructed = false;
+        $object->lazyInitializer = $initializer;
+        $object->lazyPending = true;
+        $object->lazyGhost = true;
 
         return $object;
     }
@@ -29,6 +45,21 @@ final class LazyObjectSupport
 
         $initializer = $object->lazyInitializer;
         $object->lazyInitializer = null;
+
+        if ($object->lazyGhost) {
+            self::applyPropertyDefaults($object);
+            $ghostArg = new Variable(Variable::TYPE_OBJECT);
+            $ghostArg->object($object);
+            $result = $vm->invokeClosure($initializer, $ghostArg);
+            $result = $result->resolveIndirect();
+            if (!$result->isUndefined() && Variable::TYPE_NULL !== $result->type) {
+                throw new \LogicException('Lazy object initializer must return NULL or no value');
+            }
+            $object->constructed = true;
+            $object->lazyPending = false;
+
+            return;
+        }
 
         $result = $vm->invokeClosure($initializer);
         $result = $result->resolveIndirect();
@@ -51,5 +82,21 @@ final class LazyObjectSupport
         }
         $object->constructed = true;
         $object->lazyPending = false;
+    }
+
+    private static function applyPropertyDefaults(ObjectEntry $object): void
+    {
+        foreach ($object->class->properties as $property) {
+            if (!isset($object->getRawProperties()[$property->name])) {
+                continue;
+            }
+            $var = $object->getProperty($property->name);
+            if (!$var->isUndefined()) {
+                continue;
+            }
+            if (null !== $property->default && !$property->hasRuntimeDefaultInit()) {
+                $var->copyFrom($property->default);
+            }
+        }
     }
 }

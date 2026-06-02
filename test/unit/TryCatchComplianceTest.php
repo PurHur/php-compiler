@@ -60,7 +60,7 @@ try {
         );
     }
 
-    public function testFinallyRunsBeforeCatchOnThrow(): void
+    public function testCatchRunsBeforeFinallyOnMatchedThrow(): void
     {
         $this->assertVmOutput(
             '<?php
@@ -74,7 +74,7 @@ try {
 }
 echo "after\n";
 ',
-            "finally\ncatch\nafter\n"
+            "catch\nfinally\nafter\n"
         );
     }
 
@@ -168,6 +168,25 @@ try {
             // finally must run before the VM maps the throw to a native exception
         }
         $this->assertSame("finally\n", ob_get_clean(), 'VM stdout');
+    }
+
+    /** Issue #4120: throw expression as assignment RHS (Zend zend_compile.c). */
+    public function testThrowExpressionInAssignment(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+function f(): int {
+    $x = throw new LogicException("abort");
+    return $x;
+}
+try {
+    f();
+} catch (LogicException $e) {
+    echo $e->getMessage(), "\n";
+}
+',
+            "abort\n"
+        );
     }
 
     public function testUncaughtThrowNonZeroExit(): void

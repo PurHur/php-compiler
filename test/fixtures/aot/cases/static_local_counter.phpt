@@ -5,7 +5,7 @@ AOT: function-local static int counter (issue #2286)
 function f(): int
 {
     static $n = 0;
-    $n++;
+    $n = $n + 1;
 
     return $n;
 }

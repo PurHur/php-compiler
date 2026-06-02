@@ -16,7 +16,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -34,34 +33,12 @@ final class pow extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\pow(self::toFloat($base), self::toFloat($exp)));
+        VmMath::applyPow($frame->returnVar, $base, $exp);
     }
-
-    public Context $context;
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $this->context = $context;
-        if (2 !== count($args)) {
-            throw new \LogicException('pow() requires exactly two arguments');
-        }
-        $double = $context->getTypeFromString('double');
-        $base = self::toJitDouble($context, $args[0], $double);
-        $exp = self::toJitDouble($context, $args[1], $double);
-        $fn = $context->lookupFunction('pow');
-
-        return $context->builder->call($fn, $base, $exp);
-    }
-
-    private static function toFloat(Variable $v): float
-    {
-        if (Variable::TYPE_INTEGER === $v->type) {
-            return (float) $v->toInt();
-        }
-        if (Variable::TYPE_FLOAT === $v->type) {
-            return $v->toFloat();
-        }
-        throw new \LogicException('pow() only supports integers and floats in this compiler build');
+        return JitPow::invoke($context, ...$args);
     }
 
     public static function toJitDouble(Context $context, JITVariable $arg, $double): Value

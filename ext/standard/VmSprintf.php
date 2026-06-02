@@ -59,9 +59,6 @@ final class VmSprintf
                 throw new \LogicException('sprintf() output exceeds maximum length in this compiler build');
             }
         }
-        if ($argIdx < \count($args)) {
-            throw new \LogicException('sprintf() too many arguments for format string');
-        }
 
         return $out;
     }

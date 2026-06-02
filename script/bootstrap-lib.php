@@ -8,7 +8,7 @@ declare(strict_types=1);
 
 /** Language constructs excluded from the bootstrap AOT subset until lowered. */
 const BOOTSTRAP_UNSUPPORTED_CONSTRUCTS = [
-    'generator yield',
+    'generator yield (script scope)',
     'enum',
     'eval()',
     'create_function()',
@@ -32,10 +32,18 @@ if (class_exists(\PhpParser\NodeVisitorAbstract::class)) {
 
         private int $closureCount = 0;
 
+        /** Nesting depth inside function/method/closure bodies (issue #2483). */
+        private int $functionNesting = 0;
+
         public function enterNode(\PhpParser\Node $node)
         {
+            if ($node instanceof \PhpParser\Node\FunctionLike) {
+                ++$this->functionNesting;
+            }
             if ($node instanceof \PhpParser\Node\Expr\Yield_ || $node instanceof \PhpParser\Node\Expr\YieldFrom) {
-                $this->blockers[] = 'generator yield (line '.$node->getLine().')';
+                if (0 === $this->functionNesting) {
+                    $this->blockers[] = 'generator yield (script scope, line '.$node->getLine().')';
+                }
             } elseif ($node instanceof \PhpParser\Node\Stmt\ClassMethod && $node->name->toString() !== '__construct') {
                 ++$this->classMethodCount;
             } elseif ($node instanceof \PhpParser\Node\Stmt\Enum_) {
@@ -63,10 +71,18 @@ if (class_exists(\PhpParser\NodeVisitorAbstract::class)) {
             }
         }
 
+        public function leaveNode(\PhpParser\Node $node)
+        {
+            if ($node instanceof \PhpParser\Node\FunctionLike) {
+                --$this->functionNesting;
+            }
+        }
+
         public function beforeTraverse(array $nodes)
         {
             $this->classMethodCount = 0;
             $this->closureCount = 0;
+            $this->functionNesting = 0;
         }
 
         public function afterTraverse(array $nodes)
@@ -147,6 +163,8 @@ function bootstrapScanConstructsToken(string $code): array
     $classMethodCount = 0;
     $closureCount = 0;
     $inClass = 0;
+    $functionNesting = 0;
+    $pendingFunctionBrace = false;
 
     $count = count($tokens);
     for ($i = 0; $i < $count; ++$i) {
@@ -154,10 +172,17 @@ function bootstrapScanConstructsToken(string $code): array
 
         if (!is_array($t)) {
             if ('{' === $t) {
+                if ($pendingFunctionBrace) {
+                    ++$functionNesting;
+                    $pendingFunctionBrace = false;
+                }
                 if ($inClass > 0) {
                     ++$inClass;
                 }
             } elseif ('}' === $t) {
+                if ($functionNesting > 0) {
+                    --$functionNesting;
+                }
                 if ($inClass > 0) {
                     --$inClass;
                 }
@@ -168,7 +193,9 @@ function bootstrapScanConstructsToken(string $code): array
         [$id, $text, $line] = $t;
 
         if (T_YIELD === $id || (defined('T_YIELD_FROM') && T_YIELD_FROM === $id)) {
-            $blockers[] = 'generator yield (line '.$line.')';
+            if (0 === $functionNesting) {
+                $blockers[] = 'generator yield (script scope, line '.$line.')';
+            }
             continue;
         }
 
@@ -188,6 +215,7 @@ function bootstrapScanConstructsToken(string $code): array
         }
 
         if (T_FUNCTION === $id) {
+            $pendingFunctionBrace = true;
             $j = $i + 1;
             while ($j < $count) {
                 $n = $tokens[$j];
@@ -214,6 +242,7 @@ function bootstrapScanConstructsToken(string $code): array
 
         if (defined('T_FN') && T_FN === $id) {
             ++$closureCount;
+            $pendingFunctionBrace = true;
             continue;
         }
 
