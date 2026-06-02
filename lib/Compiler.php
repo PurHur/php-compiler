@@ -70,6 +70,12 @@ class Compiler {
     /** Lowercase class name while compiling a class body (#3803). */
     private ?string $compilingClassLc = null;
 
+    /** Display class name while compiling a class body (#4286). */
+    private ?string $compilingClassDisplayName = null;
+
+    /** @var array<string, true> instance property names declared in the current class body (#4286) */
+    private array $compilingClassInstancePropertyNames = [];
+
     /** @var array<string, array<string, Variable>> compile-time class constants by lc name */
     private array $compileTimeClassConsts = [];
 
@@ -2108,17 +2114,30 @@ class Compiler {
     protected function compileClassBody(CfgBlock $block, int $type, ?string $className = null): Block {
         $result = new Block($block);
         $prevClassLc = $this->compilingClassLc;
+        $prevClassDisplayName = $this->compilingClassDisplayName;
+        $prevInstancePropertyNames = $this->compilingClassInstancePropertyNames;
+        $this->compilingClassInstancePropertyNames = [];
         if (null !== $className) {
             $this->compilingClassLc = strtolower(ltrim($className, '\\'));
+            $this->compilingClassDisplayName = ltrim($className, '\\');
             if (!isset($this->compileTimeClassConsts[$this->compilingClassLc])) {
                 $this->compileTimeClassConsts[$this->compilingClassLc] = [];
             }
+        } else {
+            $this->compilingClassDisplayName = null;
         }
         foreach ($block->children as $child) {
             switch (get_class($child)) {
                 case Op\Stmt\Property::class:
                     if (OpCode::TYPE_DECLARE_CLASS !== $type) {
                         $this->throwCompileLogic('Properties are only supported on classes for now');
+                    }
+                    if (
+                        !$child->static
+                        && $child->name instanceof Operand\Literal
+                        && is_string($child->name->value)
+                    ) {
+                        $this->registerInstancePropertyDeclaration($child->name->value);
                     }
                     if (!is_null($child->defaultBlock)) {
                         $this->compileOps($child->defaultBlock->children, $result);
@@ -2224,8 +2243,19 @@ class Compiler {
             }
         }
         $this->compilingClassLc = $prevClassLc;
+        $this->compilingClassDisplayName = $prevClassDisplayName;
+        $this->compilingClassInstancePropertyNames = $prevInstancePropertyNames;
 
         return $result;
+    }
+
+    protected function registerInstancePropertyDeclaration(string $propName): void
+    {
+        if (isset($this->compilingClassInstancePropertyNames[$propName])) {
+            $class = $this->compilingClassDisplayName ?? 'class';
+            $this->throwCompileError(sprintf('Cannot redeclare %s::$%s', $class, $propName));
+        }
+        $this->compilingClassInstancePropertyNames[$propName] = true;
     }
 
     protected function compileClassConstDeclaration(Op\Terminal\Const_ $child, Block $result): void
@@ -2370,6 +2400,9 @@ class Compiler {
 
     protected function compilePromotedPropertyDeclaration(Op\Expr\Param $param, Block $result): void
     {
+        if ($param->name instanceof Operand\Literal && is_string($param->name->value)) {
+            $this->registerInstancePropertyDeclaration($param->name->value);
+        }
         $defaultSlot = $this->resolvePropertyOrParamDefaultSlot($param, $result);
         $declared = $this->typeFromParamDecl($param);
         $propName = new Operand\Literal($param->name->value);

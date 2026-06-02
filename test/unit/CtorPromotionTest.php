@@ -48,4 +48,19 @@ PHP;
         $out = ob_get_clean();
         $this->assertSame('7', $out);
     }
+
+    public function testPromotedPropertyCollidesWithDeclaredProperty(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public int $x = 0;
+    public function __construct(public int $x) {}
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot redeclare C::$x');
+        $runtime->parseAndCompile($code, 'promotion_collision.php');
+    }
 }
