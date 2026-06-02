@@ -120,6 +120,9 @@ class Object_ extends Type {
     /** @var array<int, true> class ids declared readonly (issue #1360) */
     private array $readonlyClassIds = [];
 
+    /** @var array<int, true> class ids with #[\AllowDynamicProperties] or stdClass (#3467, #4570) */
+    private array $allowsDynamicPropertiesClassIds = [];
+
     /** @var array<int, array<string, true>> class id => property lc => true (#3149, #3432) */
     private array $readonlyPropertyNames = [];
 
@@ -942,6 +945,20 @@ class Object_ extends Type {
     public function isReadonlyClass(int $classId): bool
     {
         return isset($this->readonlyClassIds[$classId]);
+    }
+
+    public function setClassAllowsDynamicProperties(int $classId, bool $allows): void
+    {
+        if ($allows) {
+            $this->allowsDynamicPropertiesClassIds[$classId] = true;
+        } else {
+            unset($this->allowsDynamicPropertiesClassIds[$classId]);
+        }
+    }
+
+    public function allowsDynamicProperties(int $classId): bool
+    {
+        return isset($this->allowsDynamicPropertiesClassIds[$classId]);
     }
 
     public function inheritReadonlyFromParent(int $childId, string $parentLc): void
@@ -1957,6 +1974,9 @@ class Object_ extends Type {
         $this->classes[$lcname] = $id;
         // propertyFetch / copyProperties use classNameForId; declareClass sets this, externals must too (#1514, #1056).
         $this->classIdToName[$id] = $lcname;
+        if ('stdclass' === $lcname) {
+            $this->allowsDynamicPropertiesClassIds[$id] = true;
+        }
         $this->ensureExternalClassConstants($id, $lcname);
         $this->seedExternalClassProperties($id, $lcname);
         if ('reflectionattribute' === $lcname) {

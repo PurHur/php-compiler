@@ -15,6 +15,6 @@ $d = new D();
 $d->z = 1;
 echo $d->z, "\n";
 --EXPECTF--
-Deprecated: Creation of dynamic property C::$y is deprecated
+PHP Deprecated:  Creation of dynamic property C::$y is deprecated
 2
 1
