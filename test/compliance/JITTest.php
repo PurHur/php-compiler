@@ -338,10 +338,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'object_loose_equals')) {
                 continue;
             }
-            // object <=> is VM-only until JIT zend_compare_objects lowering (#3691).
-            if (str_contains($name, 'spaceship_objects')) {
-                continue;
-            }
             // Return-by-reference MCJIT execute: LLVM verify in ReturnByRefJitCompileTest (#3778).
             if (str_contains($name, 'return_by_ref_jit')) {
                 continue;
