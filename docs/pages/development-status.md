@@ -60,14 +60,30 @@ Closure callbacks in **`array_map` / `array_filter` / `usort`** on VM ([#3086](h
 
 - **`phpc` CLI** — `run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`, `doctor`
 - **Examples 000–009** — VM and AOT link/execute for the curated web subset
-- **Self-host M0–M2** — minimal bundle ✅; spine native link **822/973** 🚧
+- **Self-host M0–M2** — minimal bundle ✅; spine native link **1253**/**1259** 🚧
 - **Self-host M3** — HelloWorld strict **`emit_path=native`** ✅; thin TU + **inventory emit** strict ✅ ([#3070](https://github.com/PurHur/php-compiler/pull/3070)); production **`bin/compile.php`** inventory emit 🚧 ([#3024](https://github.com/PurHur/php-compiler/issues/3024))
-- **Self-host M4** — gen-2→gen-3 **822/973** without Zend on compile ✅; full revision probe ✅ ([#3058](https://github.com/PurHur/php-compiler/pull/3058))
+- **Self-host M4** — gen-2→gen-3 **1253**/**1259** without Zend on compile ✅; full revision probe ✅ ([#3058](https://github.com/PurHur/php-compiler/pull/3058))
 - **Self-host M5 (partial)** — vendor prelink **3/3** ✅; committed `.o` cold boot ✅; gen-0 seed ✅; Zend still used for empty `build/` bootstrap
 
 **Not claimed:** full Zend PHP compatibility (subset compiler only).
 
 ---
+
+## Shipped examples (000–009)
+
+Shipped examples under `examples/` are **regression fixtures** for VM/JIT/AOT and the web subset (see `examples/README.md`).
+
+| Example | VM | AOT build | Notes / gates |
+|---------|----|-----------|--------------|
+| 006-FileUploadWeb | ✅ | ✅ | multipart `$_FILES`; gates default-on: `FILE_UPLOAD_WEB_SMOKE_GATE=1`, `FILE_UPLOAD_WEB_AOT_LINK_GATE=1`, `FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1` (see [#2009](https://github.com/PurHur/php-compiler/issues/2009), [#2011](https://github.com/PurHur/php-compiler/issues/2011), [#2012](https://github.com/PurHur/php-compiler/issues/2012)) |
+| 007-ThrowsWeb | ✅ | ✅ | throw/catch form smoke; `THROWS_WEB_SMOKE_GATE=1` default-on ([#2093](https://github.com/PurHur/php-compiler/issues/2093), [#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2125](https://github.com/PurHur/php-compiler/issues/2125)) |
+| 009-FastCGIWeb | ✅ | ✅ | FastCGI execute 📋 (adapter [#173](https://github.com/PurHur/php-compiler/issues/173)); fixture SSOT [#2331](https://github.com/PurHur/php-compiler/issues/2331); gate default-on: `FASTCGI_WEB_SMOKE_GATE=1` ([#2351](https://github.com/PurHur/php-compiler/issues/2351), [#2353](https://github.com/PurHur/php-compiler/issues/2353)) |
+
+### Self-host probes (north star)
+
+- **M3 HelloWorld strict**: `emit_path=native` ✅ ([#1493](https://github.com/PurHur/php-compiler/issues/1493))
+- **M3 compile-smoke**: still 🚧 ([#1937](https://github.com/PurHur/php-compiler/issues/1937))
+- Gate: `BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE=1` (see `docs/bootstrap-selfhost.md`)
 
 ## North star ladder
 
@@ -75,7 +91,7 @@ Closure callbacks in **`array_map` / `array_filter` / `usort`** on VM ([#3086](h
 |-----------|--------|
 | **M0** — Small `lib/` bundle runs | ✅ |
 | **M1** — Compiler-shaped bundle + compile-smoke | ✅ |
-| **M2** — Spine toward full inventory | 🚧 **822/973** |
+| **M2** — Spine toward full inventory | 🚧 **1253**/**1259** |
 | **M3** — Native compiles PHP (no Zend emit) | 🚧 Smoke + inventory emit ✅ · `bin/compile.php` production emit 🚧 |
 | **M4** — Bootstrap loop (next revision) | ✅ |
 | **M5** — Full self-host, no `vendor/` cold boot | 🚧 |
