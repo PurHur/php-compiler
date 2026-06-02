@@ -49,6 +49,46 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_after.php'));
     }
 
+    public function testReadonlyPropertyRejectsAssignThroughReferenceAfterConstruct(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public readonly int $x;
+    public function __construct() {
+        $this->x = 1;
+    }
+}
+$c = new C();
+$r = &$c->x;
+$r = 99;
+PHP;
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Cannot modify readonly property C::$x');
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_assign_ref.php'));
+    }
+
+    public function testReadonlyClassPropertyRejectsAssignThroughReferenceAfterConstruct(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+readonly class RC {
+    public int $x;
+    public function __construct() {
+        $this->x = 1;
+    }
+}
+$c = new RC();
+$r = &$c->x;
+$r = 2;
+PHP;
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Cannot modify readonly property RC::$x');
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_class_assign_ref.php'));
+    }
+
     public function testPromotedReadonlyPropertyRejectsAssignAfterConstruct(): void
     {
         $runtime = new Runtime();
@@ -308,6 +348,41 @@ PHP;
             'readonly_allow_store',
             $ir,
             'JIT should allow readonly property stores while object is not constructed (#3149)'
+        );
+    }
+
+    /**
+     * @group llvm
+     * @group jit
+     */
+    public function testReadonlyPropertyJitLowersAssignThroughReferenceAfterConstructCheck(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $code = <<<'PHP'
+<?php
+class C {
+    public readonly int $x;
+    public function __construct() {
+        $this->x = 1;
+    }
+}
+$c = new C();
+$r = &$c->x;
+$r = 99;
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'readonly_prop_assign_ref_jit.php');
+        $runtime->jitCompileBlock($block);
+        $ir = $runtime->loadJitContext()->module->printToString();
+        self::assertStringContainsString(
+            '__compiler_jit_raise_logic_exception',
+            $ir,
+            'JIT should lower readonly checks for reference writes to properties (#4273)'
+        );
+        self::assertStringContainsString(
+            'readonly_violation',
+            $ir,
+            'JIT should branch on readonly violation for reference property writes (#4273)'
         );
     }
 
