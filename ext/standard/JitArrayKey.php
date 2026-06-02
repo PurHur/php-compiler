@@ -6,15 +6,19 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /** LLVM JIT helpers for array_key_first() / array_key_last(). */
 final class JitArrayKey
 {
+    private const TYPE_ERROR = '%s(): Argument #1 ($array) must be of type array, %s given';
+
     public static function keyFirst(Context $context, JITVariable $array): Value
     {
         return self::keyAtEnd($context, $array, true);
@@ -23,6 +27,63 @@ final class JitArrayKey
     public static function keyLast(Context $context, JITVariable $array): Value
     {
         return self::keyAtEnd($context, $array, false);
+    }
+
+    /**
+     * JIT/AOT runtime guard for array_key_first()/array_key_last().
+     *
+     * In this compiler, boxed TYPE_VALUE operands can contain arrays or other scalars; we must
+     * reject non-arrays (especially null) to match Zend’s TypeError behavior.
+     */
+    public static function requireArrayArg(Context $context, JITVariable $array, string $fn): void
+    {
+        if (JITVariable::TYPE_HASHTABLE === $array->type
+            || ($array->type & JITVariable::IS_NATIVE_ARRAY)
+        ) {
+            return;
+        }
+        if (JITVariable::TYPE_VALUE === $array->type) {
+            $loaded = JitValueBox::valuePtrFromVariable($context, $array);
+            $typeField = $context->structFieldMap['__value__']['type'];
+            $typeByte = $context->builder->load(
+                $context->builder->structGep($loaded, $typeField)
+            );
+            $i8 = $context->getTypeFromString('int8');
+            $isArray = $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_ARRAY, false)
+            );
+            $okBlock = BasicBlockHelper::append($context, 'array_key_req_ok');
+            $errBlock = BasicBlockHelper::append($context, 'array_key_req_err');
+            $context->builder->branchIf($isArray, $okBlock, $errBlock);
+            $context->builder->positionAtEnd($errBlock);
+            $isNull = $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_NULL, false)
+            );
+            $nullBlock = BasicBlockHelper::append($context, 'array_key_req_null');
+            $mixedBlock = BasicBlockHelper::append($context, 'array_key_req_mixed');
+            $context->builder->branchIf($isNull, $nullBlock, $mixedBlock);
+            $context->builder->positionAtEnd($nullBlock);
+            self::emitErrorAndAbort($context, \sprintf(self::TYPE_ERROR, $fn, 'null'));
+            $context->builder->positionAtEnd($mixedBlock);
+            self::emitErrorAndAbort($context, \sprintf(self::TYPE_ERROR, $fn, 'mixed'));
+            $context->builder->positionAtEnd($okBlock);
+
+            return;
+        }
+
+        self::emitErrorAndAbort($context, \sprintf(self::TYPE_ERROR, $fn, 'mixed'));
+    }
+
+    private static function emitErrorAndAbort(Context $context, string $message): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, $message);
+        $context->builder->call($context->lookupFunction('abort'));
     }
 
     private static function keyAtEnd(Context $context, JITVariable $array, bool $first): Value
