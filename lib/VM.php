@@ -1989,9 +1989,55 @@ restart:
                         $frame->callArgEntries = [];
                         break;
                     }
+                    try {
+                        $calledArgs = $this->resolveOutgoingCallArgs($frame);
+                        // Zend strict_types is a *caller* (call-site) rule; enforce scalar param checks
+                        // before entering the callee so exceptions abort argument evaluation correctly.
+                        if (
+                            $frame->call instanceof Func\PHP
+                            && $frame->block->strictTypes
+                            && [] !== $calledArgs
+                        ) {
+                            $calleeBlock = $frame->call->block;
+                            foreach ($calleeBlock->opCodes as $recv) {
+                                if (OpCode::TYPE_ARG_RECV !== $recv->type) {
+                                    continue;
+                                }
+                                $paramIdx = (int) $recv->arg2;
+                                if (!array_key_exists($paramIdx, $calledArgs)) {
+                                    continue;
+                                }
+                                $slot = (int) $recv->arg1;
+                                $constraint = $calleeBlock->paramTypeConstraints[$slot] ?? null;
+                                if (null === $constraint) {
+                                    continue;
+                                }
+                                $probe = new Variable();
+                                $probe->copyFrom($calledArgs[$paramIdx]);
+                                $probe->resolveIndirect()->typeConstraint = $constraint;
+                                TypeCheck::coerceParameter($probe, true);
+                            }
+                        }
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    } catch (\Error $e) {
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    } catch (\LogicException $e) {
+                        return $this->raise($e->getMessage(), $frame);
+                    }
                     $new = $frame->call->getFrame(
                         $this->context,
-                        !empty($frame->callArgs) ? $frame : null
+                        $frame
                     );
                     $this->applyClosureBinding($new, $frame->closureCall);
                     $frame->closureCall = null;
@@ -2018,18 +2064,7 @@ restart:
                     } else {
                         $new->returnVar = null;
                     }
-                    try {
-                        $new->calledArgs = $this->resolveOutgoingCallArgs($frame);
-                    } catch (\Error $e) {
-                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                        break;
-                    } catch (\LogicException $e) {
-                        return $this->raise($e->getMessage(), $frame);
-                    }
+                    $new->calledArgs = $calledArgs;
                     if ($new->hasHandler()) {
                         $new->parent = $frame;
                         $new->vmContext = $this->context;
