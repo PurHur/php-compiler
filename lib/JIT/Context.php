@@ -570,6 +570,7 @@ class Context {
         $this->functionProxies['reflectionattribute::getname'] = new Call\ReflectionAttributeGetName();
 
         FiberHelper::registerJitMethods($this);
+        GeneratorHelper::registerJitMethods($this);
         ClosureBindHelper::registerJitMethods($this);
     }
 

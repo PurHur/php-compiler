@@ -9682,6 +9682,17 @@ class JIT {
                 return;
             }
         }
+        $receiverVar = $this->context->getVariableFromOp($receiverOp);
+        if (JIT\GeneratorHelper::isGeneratorVariable($receiverVar)) {
+            $methodLc = strtolower($methodName);
+            $proxyName = 'generator::'.$methodLc;
+            if ($this->context->functionIsRegistered($proxyName)) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+        }
         if (null === $receiverOp->type) {
             // Bootstrap/self-host can hit methodcall init before operand typing stabilizes.
             // Prefer a safe short-circuit for stubbed self-host JIT paths over hard-crashing.
