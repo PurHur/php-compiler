@@ -2126,6 +2126,8 @@ final class HashTableHelper
         if (1 === \count($entries)) {
             $only = $entries[0];
             if (\is_array($only) && isset($only['unpack'])) {
+                ListUnpackHelper::emitCheck($context, $only['unpack']);
+
                 return self::coerceToPackedHashtable($context, $only['unpack']);
             }
         }
@@ -2139,6 +2141,7 @@ final class HashTableHelper
         );
         foreach ($entries as $entry) {
             if (\is_array($entry) && isset($entry['unpack'])) {
+                ListUnpackHelper::emitCheck($context, $entry['unpack']);
                 self::spreadInto($context, $destVar, $entry['unpack']);
                 continue;
             }

@@ -1835,6 +1835,17 @@ restart:
                         if (Variable::TYPE_ARRAY !== $spread->type) {
                             throw new \LogicException('Only arrays can be unpacked');
                         }
+                        if (!\PHPCompiler\ext\standard\VmArray::isList($spread->toArray())) {
+                            $catchFrame = $this->dispatchVmTypeError(
+                                new \TypeError('Cannot unpack array with string keys'),
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
                         foreach ($spread->toArray()->iterate(true) as $element) {
                             $frame->callArgEntries[] = ['p', $element];
                         }
