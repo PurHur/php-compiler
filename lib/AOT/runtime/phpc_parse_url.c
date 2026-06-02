@@ -13,6 +13,7 @@ typedef struct __hashtable__ __hashtable__;
 
 extern __string__ *__string__init(long long size, const char *value);
 extern void __value__writeNull(__value__ *out);
+extern void __value__writeBool(__value__ *out, int value);
 extern void __value__writeLong(__value__ *out, long long v);
 extern void __value__writeString(__value__ *out, __string__ *str);
 extern void __value__writeHashtable(__value__ *out, __hashtable__ *ht);
@@ -298,7 +299,7 @@ static void pu_write_component(__value__ *out, int component, pu_parts_t *parts)
     switch (component) {
         case PHP_URL_SCHEME:
             if (parts->scheme == NULL || parts->scheme[0] == '\0') {
-                __value__writeNull(out);
+                __value__writeBool(out, 0);
             } else {
                 __value__writeString(out, pu_cstr(parts->scheme));
             }
@@ -306,7 +307,7 @@ static void pu_write_component(__value__ *out, int component, pu_parts_t *parts)
             return;
         case PHP_URL_HOST:
             if (parts->host == NULL || parts->host[0] == '\0') {
-                __value__writeNull(out);
+                __value__writeBool(out, 0);
             } else {
                 __value__writeString(out, pu_cstr(parts->host));
             }
@@ -314,7 +315,7 @@ static void pu_write_component(__value__ *out, int component, pu_parts_t *parts)
             return;
         case PHP_URL_PORT:
             if (parts->port <= 0) {
-                __value__writeNull(out);
+                __value__writeBool(out, 0);
             } else {
                 __value__writeLong(out, (long long) parts->port);
             }
@@ -322,7 +323,7 @@ static void pu_write_component(__value__ *out, int component, pu_parts_t *parts)
             return;
         case PHP_URL_USER:
             if (parts->user == NULL || parts->user[0] == '\0') {
-                __value__writeNull(out);
+                __value__writeBool(out, 0);
             } else {
                 __value__writeString(out, pu_cstr(parts->user));
             }
@@ -330,7 +331,7 @@ static void pu_write_component(__value__ *out, int component, pu_parts_t *parts)
             return;
         case PHP_URL_PASS:
             if (parts->pass == NULL || parts->pass[0] == '\0') {
-                __value__writeNull(out);
+                __value__writeBool(out, 0);
             } else {
                 __value__writeString(out, pu_cstr(parts->pass));
             }
@@ -342,7 +343,7 @@ static void pu_write_component(__value__ *out, int component, pu_parts_t *parts)
             return;
         case PHP_URL_QUERY:
             if (parts->query == NULL || parts->query[0] == '\0') {
-                __value__writeNull(out);
+                __value__writeBool(out, 0);
             } else {
                 __value__writeString(out, pu_cstr(parts->query));
             }
@@ -350,14 +351,14 @@ static void pu_write_component(__value__ *out, int component, pu_parts_t *parts)
             return;
         case PHP_URL_FRAGMENT:
             if (parts->fragment == NULL || parts->fragment[0] == '\0') {
-                __value__writeNull(out);
+                __value__writeBool(out, 0);
             } else {
                 __value__writeString(out, pu_cstr(parts->fragment));
             }
 
             return;
         default:
-            __value__writeNull(out);
+            __value__writeBool(out, 0);
 
             return;
     }

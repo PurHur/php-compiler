@@ -1408,7 +1408,7 @@ final class VmString
     /**
      * Minimal parse_url() for routing (http/https, path, query, host).
      *
-     * @return array|string|null
+     * @return array|string|int|false
      */
     public static function parseUrl(string $url, int $component = -1)
     {
@@ -1489,24 +1489,38 @@ final class VmString
 
         switch ($component) {
             case \PHP_URL_SCHEME:
-                return $scheme;
+                return self::parseUrlComponentOrFalse($scheme);
             case \PHP_URL_HOST:
-                return $host;
+                return self::parseUrlComponentOrFalse($host);
             case \PHP_URL_PORT:
-                return $port;
+                return null !== $port && $port > 0 ? $port : false;
             case \PHP_URL_USER:
-                return $user;
+                return self::parseUrlComponentOrFalse($user);
             case \PHP_URL_PASS:
-                return $pass;
+                return self::parseUrlComponentOrFalse($pass);
             case \PHP_URL_PATH:
                 return $path;
             case \PHP_URL_QUERY:
-                return $query;
+                return self::parseUrlComponentOrFalse($query);
             case \PHP_URL_FRAGMENT:
-                return $fragment;
+                return self::parseUrlComponentOrFalse($fragment);
             default:
                 throw new \LogicException('parse_url() component not supported in this compiler build');
         }
+    }
+
+    /**
+     * @param string|null $value
+     *
+     * @return string|false
+     */
+    private static function parseUrlComponentOrFalse(?string $value)
+    {
+        if (null === $value || '' === $value) {
+            return false;
+        }
+
+        return $value;
     }
 
     private static function percentEncode(string $data, bool $formEncoding): string
