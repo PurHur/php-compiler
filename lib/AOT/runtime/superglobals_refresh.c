@@ -2484,6 +2484,39 @@ void __phpc_last_error_record(int type, const char *msg, size_t msg_len, const c
 
 extern int __compiler_phpc_error_level_enabled(int level);
 
+static void phpc_stderr_print_cli_error(int level, const char *message, const char *file, int line)
+{
+    const char *prefix = "PHP Unknown error";
+
+    switch (level) {
+        case 2:
+        case 512:
+            prefix = "PHP Warning";
+            break;
+        case 8:
+        case 1024:
+            prefix = "PHP Notice";
+            break;
+        case 8192:
+        case 16384:
+            prefix = "PHP Deprecated";
+            break;
+        case 256:
+            prefix = "PHP Fatal error";
+            break;
+    }
+    if (file && file[0] != '\0') {
+        if (line > 0) {
+            fprintf(stderr, "%s:  %s in %s on line %d\n", prefix, message, file, line);
+        } else {
+            fprintf(stderr, "%s:  %s in %s\n", prefix, message, file);
+        }
+
+        return;
+    }
+    fprintf(stderr, "%s:  %s\n", prefix, message);
+}
+
 void __compiler_undefined_array_key_warning_cstr(const char *key, size_t len)
 {
     char msg[512];
@@ -2496,7 +2529,7 @@ void __compiler_undefined_array_key_warning_cstr(const char *key, size_t len)
     if (!__compiler_phpc_error_level_enabled(2)) {
         return;
     }
-    fprintf(stderr, "Warning: %s\n", msg);
+    phpc_stderr_print_cli_error(2, msg, "", 0);
 }
 
 void __compiler_undefined_array_key_warning_long(long long key)
@@ -2508,7 +2541,7 @@ void __compiler_undefined_array_key_warning_long(long long key)
     if (!__compiler_phpc_error_level_enabled(2)) {
         return;
     }
-    fprintf(stderr, "Warning: %s\n", msg);
+    phpc_stderr_print_cli_error(2, msg, "", 0);
 }
 
 extern int __phpc_error_handler_dispatch(int errno, const char *msg, size_t msg_len, int line);
@@ -2534,25 +2567,16 @@ void __compiler_trigger_error(const char *message, size_t len, int level, const 
         }
         return;
     }
-    const char *prefix = "Unknown error";
-    switch (level) {
-        case 2:
-            prefix = "Warning";
-            break;
-        case 256:
-            prefix = "Fatal error";
-            break;
-        case 512:
-            prefix = "Warning";
-            break;
-        case 1024:
-            prefix = "Notice";
-            break;
-        case 16384:
-            prefix = "Deprecated";
-            break;
+    {
+        char buf[4096];
+
+        if (len >= sizeof(buf)) {
+            len = sizeof(buf) - 1;
+        }
+        memcpy(buf, message, len);
+        buf[len] = '\0';
+        phpc_stderr_print_cli_error(level, buf, file, line);
     }
-    fprintf(stderr, "%s: %.*s\n", prefix, (int) len, message);
     if (256 == level) {
         abort();
     }
