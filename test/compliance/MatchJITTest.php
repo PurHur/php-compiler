@@ -20,6 +20,7 @@ final class MatchJITTest extends BaseTest
             [
                 'match_int_jit.phpt',
                 'match_identical_jit.phpt',
+                'match_guard_falsy_jit.phpt',
                 'match_unhandled_jit.phpt',
             ] as $file
         ) {
