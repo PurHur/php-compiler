@@ -225,14 +225,14 @@ final class ScopeBuiltinHelper
         }
 
         $result = HashTableHelper::alloc($context);
-        foreach ($nameArgs as $arg) {
-            self::addCompactArgument($context, $result, $arg);
+        foreach ($nameArgs as $i => $arg) {
+            self::addCompactArgument($context, $result, $arg, (int) $i + 1);
         }
 
         return $result;
     }
 
-    private static function addCompactArgument(Context $context, Value $result, Variable $arg): void
+    private static function addCompactArgument(Context $context, Value $result, Variable $arg, int $argNum): void
     {
         if (null !== $arg->compileTimeString) {
             self::addCompactByName($context, $result, $arg->compileTimeString);
@@ -240,7 +240,7 @@ final class ScopeBuiltinHelper
             return;
         }
 
-        self::applyRuntimeCompactArgument($context, $result, $arg);
+        self::applyRuntimeCompactArgument($context, $result, $arg, $argNum);
     }
 
     private static function addCompactByName(Context $context, Value $result, string $name): void
@@ -255,7 +255,7 @@ final class ScopeBuiltinHelper
         self::storeVariableAtStringKey($context, $result, $keyStr, $source);
     }
 
-    private static function applyRuntimeCompactArgument(Context $context, Value $result, Variable $arg): void
+    private static function applyRuntimeCompactArgument(Context $context, Value $result, Variable $arg, int $argNum): void
     {
         $names = self::tryCompileTimeCompactNames($arg);
         if (null !== $names) {
@@ -312,7 +312,8 @@ final class ScopeBuiltinHelper
             $argPtr,
             $namesPtr,
             $slotsPtr,
-            $i64->constInt($bindingCount, false)
+            $i64->constInt($bindingCount, false),
+            $i64->constInt($argNum, false)
         );
     }
 

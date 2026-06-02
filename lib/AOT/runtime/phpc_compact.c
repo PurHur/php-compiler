@@ -144,12 +144,47 @@ static void phpc_compact_apply_name(
     }
 }
 
+static const char *phpc_compact_value_type_name(int kind)
+{
+    switch (kind) {
+        case PHPC_TYPE_NATIVE_LONG:
+            return "int";
+        case PHPC_TYPE_NATIVE_DOUBLE:
+            return "float";
+        case PHPC_TYPE_NATIVE_BOOL:
+            return "bool";
+        case PHPC_TYPE_STRING:
+            return "string";
+        case PHPC_TYPE_HASHTABLE:
+            return "array";
+        default:
+            return "unknown type";
+    }
+}
+
+static void phpc_compact_invalid_argument_warning(long long arg_num, int kind)
+{
+    char msg[128];
+    int n = snprintf(
+        msg,
+        sizeof(msg),
+        "compact(): Argument #%lld must be string or array of strings, %s given",
+        arg_num,
+        phpc_compact_value_type_name(kind)
+    );
+
+    if (n > 0) {
+        __compiler_trigger_error(msg, (size_t) n, PHPC_COMPACT_ERR_LEVEL);
+    }
+}
+
 static void phpc_compact_collect_value(
     __hashtable__ *result,
     __value__ *v,
     const char **binding_names,
     __value__ **binding_slots,
-    size_t binding_count
+    size_t binding_count,
+    long long arg_num
 )
 {
     size_t i;
@@ -182,7 +217,8 @@ static void phpc_compact_collect_value(
                         &ht->values[i],
                         binding_names,
                         binding_slots,
-                        binding_count
+                        binding_count,
+                        arg_num
                     );
                 }
             }
@@ -192,12 +228,14 @@ static void phpc_compact_collect_value(
                     &node->value,
                     binding_names,
                     binding_slots,
-                    binding_count
+                    binding_count,
+                    arg_num
                 );
             }
             break;
         }
         default:
+            phpc_compact_invalid_argument_warning(arg_num, phpc_value_kind(v));
             break;
     }
 }
@@ -207,7 +245,8 @@ void __compiler_compact_apply_arg(
     __value__ *arg,
     const char **binding_names,
     __value__ **binding_slots,
-    long long binding_count
+    long long binding_count,
+    long long arg_num
 )
 {
     if (
@@ -225,6 +264,7 @@ void __compiler_compact_apply_arg(
         arg,
         binding_names,
         binding_slots,
-        (size_t) binding_count
+        (size_t) binding_count,
+        arg_num
     );
 }
