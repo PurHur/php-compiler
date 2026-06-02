@@ -4945,6 +4945,40 @@ class JIT {
                         }
                         break;
                     }
+                    if (Variable::TYPE_VALUE === $value->type) {
+                        $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite);
+                        if ($forWrite) {
+                            $this->context->setVariableOp($resultOp, $fetched);
+                        } elseif ($forceBranchMerge) {
+                            $this->assignOperand($resultOp, $fetched, true);
+                        } else {
+                            $this->assignOperand($resultOp, $fetched);
+                        }
+                        break;
+                    }
+                    if (
+                        Variable::TYPE_NULL === $value->type
+                        || Variable::TYPE_NATIVE_BOOL === $value->type
+                        || Variable::TYPE_NATIVE_LONG === $value->type
+                        || Variable::TYPE_NATIVE_DOUBLE === $value->type
+                    ) {
+                        // Guarded list destruct compiles dim fetches on non-array RHS (#4325); unreachable at run time.
+                        $boxed = new Variable(
+                            $this->context,
+                            Variable::TYPE_VALUE,
+                            Variable::KIND_VALUE,
+                            JIT\JitValueBox::alloc($this->context)
+                        );
+                        $fetched = $boxed->dimFetch($dim, $resultOp->type, $forWrite);
+                        if ($forWrite) {
+                            $this->context->setVariableOp($resultOp, $fetched);
+                        } elseif ($forceBranchMerge) {
+                            $this->assignOperand($resultOp, $fetched, true);
+                        } else {
+                            $this->assignOperand($resultOp, $fetched);
+                        }
+                        break;
+                    }
                     if (Variable::TYPE_OBJECT === $value->type && null !== $op->arg3) {
                         $arrayAccess = JIT\ArrayAccessHelper::tryCompileDimFetch(
                             $this->context,
@@ -5011,6 +5045,28 @@ class JIT {
                     );
                     break;
                 case OpCode::TYPE_LIST_UNPACK_CHECK:
+                    if (null !== $op->block1) {
+                        $branchBlock = $builder->getInsertBlock();
+                        $builder->positionAtEnd($branchBlock);
+                        $array = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                        if (!$this->context->scope->blockStorage->contains($op->block1)) {
+                            ++self::$blockNumber;
+                            $mergeEntry = $func->appendBasicBlock('block_'.self::$blockNumber);
+                            $this->context->scope->blockStorage[$op->block1] = $mergeEntry;
+                        } else {
+                            $mergeEntry = $this->context->scope->blockStorage[$op->block1];
+                        }
+                        $isArray = JIT\ListUnpackHelper::isArrayValue($this->context, $array);
+                        $arrayCheckBb = JIT\BasicBlockHelper::append($this->context, 'list_unpack_array_check');
+                        $builder->positionAtEnd($branchBlock);
+                        $builder->branchIf($isArray, $arrayCheckBb, $mergeEntry);
+                        $builder->positionAtEnd($arrayCheckBb);
+                        JIT\ListUnpackHelper::emitIsListBranchOrFail(
+                            $this->context,
+                            $array
+                        );
+                        break;
+                    }
                     JIT\ListUnpackHelper::emitCheck(
                         $this->context,
                         $this->context->getVariableFromOp($block->getOperand($op->arg2))

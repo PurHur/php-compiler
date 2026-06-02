@@ -980,17 +980,12 @@ class Compiler {
                     ) {
                         // Lowered by compileExpr Empty_ via TYPE_ISSET + TYPE_BOOLEAN_NOT (#3298).
                         break;
+                    } elseif (
+                        $child instanceof Op\Expr\ArrayDimFetch
+                        && $this->isListDestructGroupStart($ops, $i)
+                    ) {
+                        [$block, $i] = $this->compileListDestructGroup($ops, $i, $block);
                     } else {
-                        if (
-                            $child instanceof Op\Expr\ArrayDimFetch
-                            && $this->isListDestructGroupStart($ops, $i)
-                        ) {
-                            $block->addOpCode(new OpCode(
-                                OpCode::TYPE_LIST_UNPACK_CHECK,
-                                null,
-                                $this->compileOperand($child->var, $block, true),
-                            ));
-                        }
                         if ($this->needsCfgSplitBeforeStringDimFetch($child, $block, $ops, $i)) {
                             $block = $this->splitCfgBlockAfterStringKeyedArray($block);
                         }
@@ -1131,6 +1126,83 @@ class Compiler {
         return $next instanceof Op\Expr\ArrayDimFetch
             && $next->var === $fetch->result
             && $this->isPlainListDestructDimFetch($ops, $index + 1);
+    }
+
+    /**
+     * Last CFG op index belonging to one top-level `list()` / `[]` destructuring group (#4325).
+     *
+     * @param Op[] $ops
+     */
+    private function listDestructGroupEndIndex(array $ops, int $start): int
+    {
+        $i = $start;
+        while ($i < count($ops) && $this->isPlainListDestructDimFetch($ops, $i)) {
+            $i = $this->listDestructOpEndIndex($ops, $i);
+        }
+
+        return $i - 1;
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    private function listDestructOpEndIndex(array $ops, int $index): int
+    {
+        /** @var Op\Expr\ArrayDimFetch $fetch */
+        $fetch = $ops[$index];
+        if ($index + 1 >= count($ops)) {
+            return $index + 1;
+        }
+        $next = $ops[$index + 1];
+        if (
+            ($next instanceof Op\Expr\Assign || $next instanceof Op\Expr\AssignRef)
+            && $next->expr === $fetch->result
+        ) {
+            return $index + 2;
+        }
+        if ($next instanceof Op\Expr\ArrayDimFetch && $next->var === $fetch->result) {
+            return $this->listDestructOpEndIndex($ops, $index + 1);
+        }
+
+        return $index + 1;
+    }
+
+    /**
+     * Guard list destructuring: skip slot assignments when RHS is not a list array (#4325, #4298).
+     *
+     * @param Op[] $ops
+     *
+     * @return array{0: Block, 1: int}
+     */
+    private function compileListDestructGroup(array $ops, int $start, Block $block): array
+    {
+        $end = $this->listDestructGroupEndIndex($ops, $start);
+        /** @var Op\Expr\ArrayDimFetch $firstFetch */
+        $firstFetch = $ops[$start];
+
+        $checkOp = new OpCode(
+            OpCode::TYPE_LIST_UNPACK_CHECK,
+            null,
+            $this->compileOperand($firstFetch->var, $block, true),
+        );
+        $block->addOpCode($checkOp);
+
+        for ($j = $start; $j <= $end; ++$j) {
+            $this->compileOp($ops[$j], $block);
+        }
+
+        $mergeBlock = new Block($block->orig);
+        $mergeBlock->inheritUndefinedLocals = true;
+        $mergeBlock->inheritScopeFrom($block);
+        $this->inheritFuncFromParent($mergeBlock, $block);
+        $checkOp->block1 = $mergeBlock;
+
+        $assignJump = new OpCode(OpCode::TYPE_JUMP);
+        $assignJump->block1 = $mergeBlock;
+        $block->addOpCode($assignJump);
+        $mergeBlock->parents[] = $block;
+
+        return [$mergeBlock, $end];
     }
 
     private function splitCfgBlockAfterStringKeyedArray(Block $block): Block
