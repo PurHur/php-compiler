@@ -84,6 +84,34 @@ PHP
             '123');
     }
 
+    public function testYieldFromIteratorForeachExecutesViaMcjit(): void
+    {
+        $this->assertMcjitOutput(<<<'PHP'
+<?php
+class R implements IteratorAggregate {
+    public function getIterator() {
+        return new Inner();
+    }
+}
+class Inner implements Iterator {
+    private int $i = 0;
+    public function current() { return $this->i + 1; }
+    public function key() { return $this->i; }
+    public function next(): void { $this->i++; }
+    public function rewind(): void { $this->i = 0; }
+    public function valid(): bool { return $this->i < 3; }
+}
+function f(): Generator {
+    yield from new R();
+}
+foreach (f() as $v) {
+    echo $v;
+}
+PHP
+            ,
+            '123');
+    }
+
     public function testGeneratorTryCatchExecutesViaMcjit(): void
     {
         $this->assertMcjitOutput(<<<'PHP'
