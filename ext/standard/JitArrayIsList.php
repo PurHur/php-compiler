@@ -21,14 +21,6 @@ final class JitArrayIsList
         if ($array->type & JITVariable::IS_NATIVE_ARRAY) {
             return $context->constantFromBool(true);
         }
-        if (
-            JITVariable::TYPE_NULL === $array->type
-            || JITVariable::TYPE_NATIVE_BOOL === $array->type
-            || JITVariable::TYPE_NATIVE_LONG === $array->type
-            || JITVariable::TYPE_NATIVE_DOUBLE === $array->type
-        ) {
-            return $context->constantFromBool(false);
-        }
         if (JITVariable::TYPE_HASHTABLE === $array->type
             || JITVariable::TYPE_VALUE === $array->type
             || JitValueBox::isValueOperand($array)) {
@@ -37,7 +29,7 @@ final class JitArrayIsList
             return self::hashTableIsList($context, $ht);
         }
 
-        throw new \LogicException('array_is_list() requires an array in this compiler build');
+        throw new \LogicException('array_is_list() does not support this value type in this compiler build');
     }
 
     public static function hashTableIsList(Context $context, Value $ht): Value
