@@ -103,6 +103,14 @@ class VM {
      */
     private function invokePhpFunctionOnStack(Func\PHP $func, ...$args): Variable
     {
+        if ($func->block->isGenerator) {
+            $state = new GeneratorState($this, $func, [...$args]);
+            $out = new Variable();
+            $out->object($state->wrapObject());
+
+            return $out;
+        }
+
         $child = $func->getFrame($this->context, null);
         $child->calledArgs = $args;
         if (
@@ -2015,30 +2023,17 @@ restart:
                 case OpCode::TYPE_ARG_SEND:
                     $value = $frame->scope[$op->arg1];
                     if (null !== $op->arg3) {
-                        $spread = $value->resolveIndirect();
-                        if (Variable::TYPE_ARRAY !== $spread->type) {
-                            $catchFrame = $this->dispatchVmTypeError(
-                                new \TypeError('Only arrays and Traversables can be unpacked'),
-                                $frame
-                            );
+                        try {
+                            $elements = VM\CallUnpack::materialize($this, $frame, $value);
+                        } catch (\TypeError $e) {
+                            $catchFrame = $this->dispatchVmTypeError($e, $frame);
                             if (null !== $catchFrame) {
                                 $frame = $catchFrame;
                                 goto restart;
                             }
                             break;
                         }
-                        if (!\PHPCompiler\ext\standard\VmArray::isList($spread->toArray())) {
-                            $catchFrame = $this->dispatchVmTypeError(
-                                new \TypeError('Cannot unpack array with string keys'),
-                                $frame
-                            );
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            break;
-                        }
-                        foreach ($spread->toArray()->iterate(true) as $element) {
+                        foreach ($elements as $element) {
                             $frame->callArgEntries[] = ['p', $element];
                         }
                         break;
