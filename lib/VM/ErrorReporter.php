@@ -234,26 +234,43 @@ final class ErrorReporter
         $this->emitWarning($message, $context, $frame, $file);
     }
 
+    /**
+     * Zend E_WARNING for language-level diagnostics (issue #4502).
+     */
+    public function languageWarning(
+        string $message,
+        ?string $file,
+        int $line,
+        ?Context $context = null,
+        ?Frame $frame = null
+    ): void {
+        $this->emitWarning($message, $context, $frame, $file, $line);
+    }
+
     private function emitWarning(
         string $message,
         ?Context $context = null,
         ?Frame $frame = null,
-        ?string $file = null
+        ?string $file = null,
+        int $line = 0
     ): void {
         if (0 === ($this->errorReporting & self::E_WARNING)) {
             return;
         }
-        $this->recordLastError(self::E_WARNING, $message, $file, 0);
-        if ($this->dispatchUserHandler($context, $frame, self::E_WARNING, $message, $file, 0)) {
+        $this->recordLastError(self::E_WARNING, $message, $file, $line);
+        if ($this->dispatchUserHandler($context, $frame, self::E_WARNING, $message, $file, $line)) {
             return;
         }
-        $line = "Warning: {$message}";
+        $formatted = "Warning: {$message}";
         if (null !== $file && '' !== $file) {
-            $line .= " in {$file}";
+            $formatted .= " in {$file}";
+            if ($line > 0) {
+                $formatted .= " on line {$line}";
+            }
         }
-        $line .= "\n";
+        $formatted .= "\n";
         if ($this->displayErrors) {
-            fwrite(STDERR, $line);
+            fwrite(STDERR, $formatted);
         }
     }
 
