@@ -463,6 +463,24 @@ class Compiler {
         return false;
     }
 
+    /**
+     * @param list<Op\Expr\Param> $params
+     */
+    protected function assertNoDuplicateParameterNames(array $params): void
+    {
+        $seen = [];
+        foreach ($params as $param) {
+            if (!($param->name instanceof Operand\Literal) || !is_string($param->name->value)) {
+                continue;
+            }
+            $name = $param->name->value;
+            if (isset($seen[$name])) {
+                $this->throwCompileError(sprintf('Redefinition of parameter $%s', $name));
+            }
+            $seen[$name] = true;
+        }
+    }
+
     protected function compileCfgBlock(CfgBlock $block, array $params = [], ?CfgFunc $func = null): Block {
         if (null === $this->seen) {
             $this->seen = new SplObjectStorage;
@@ -473,6 +491,9 @@ class Compiler {
                 $new->func = $func;
                 $new->strictTypes = isset($func->strictTypes) ? (bool) $func->strictTypes : false;
                 $this->applyReturnTypeFromFunc($new, $func);
+            }
+            if ([] !== $params) {
+                $this->assertNoDuplicateParameterNames($params);
             }
             $paramIdx = 0;
             foreach ($params as $param) {
