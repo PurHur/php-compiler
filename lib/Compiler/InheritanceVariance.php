@@ -186,16 +186,19 @@ final class InheritanceVariance
         return $sources;
     }
 
-    private function compatibilityError(
+    /**
+     * @param callable(string, string): bool $isClassSubtypeOf
+     * @param callable(string, string): bool $classImplementsInterface
+     */
+    public static function methodCompatibilityError(
         string $childClass,
         string $methodLc,
         MethodSig $child,
         string $parentClass,
-        MethodSig $parent
+        MethodSig $parent,
+        callable $isClassSubtypeOf,
+        callable $classImplementsInterface
     ): ?string {
-        // Zend: concrete inherited constructors are not subject to parameter/return
-        // compatibility (child may call parent::__construct with a different signature).
-        // Abstract/interface constructors still enforce compatibility (#55375).
         if ('__construct' === $methodLc && !$parent->isAbstract) {
             return null;
         }
@@ -203,35 +206,70 @@ final class InheritanceVariance
         if (count($child->params) < count($parent->params)) {
             for ($i = count($child->params); $i < count($parent->params); ++$i) {
                 if (!($parent->paramHasDefault[$i] ?? false)) {
-                    return $this->formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
+                    return self::formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
                 }
             }
         }
         if ($parent->isAbstract && count($child->params) > count($parent->params)) {
             for ($i = count($parent->params); $i < count($child->params); ++$i) {
                 if (!($child->paramHasDefault[$i] ?? false)) {
-                    return $this->formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
+                    return self::formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
                 }
             }
         }
         $paramCount = min(count($child->params), count($parent->params));
         for ($i = 0; $i < $paramCount; ++$i) {
-            if (!$this->isParameterCompatible($parent->params[$i], $child->params[$i], $parent->ownerLc, $child->ownerLc)) {
-                return $this->formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
+            if (!self::isParameterCompatibleStatic(
+                $parent->params[$i],
+                $child->params[$i],
+                $parent->ownerLc,
+                $child->ownerLc,
+                $isClassSubtypeOf
+            )) {
+                return self::formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
             }
         }
-        if (!$this->isReturnCompatible($parent->returnType, $child->returnType, $parent->ownerLc, $child->ownerLc)) {
-            return $this->formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
+        if (!self::isReturnCompatibleStatic(
+            $parent->returnType,
+            $child->returnType,
+            $parent->ownerLc,
+            $child->ownerLc,
+            $isClassSubtypeOf,
+            $classImplementsInterface
+        )) {
+            return self::formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
         }
 
         return null;
     }
 
-    private function isParameterCompatible(
+    private function compatibilityError(
+        string $childClass,
+        string $methodLc,
+        MethodSig $child,
+        string $parentClass,
+        MethodSig $parent
+    ): ?string {
+        return self::methodCompatibilityError(
+            $childClass,
+            $methodLc,
+            $child,
+            $parentClass,
+            $parent,
+            fn (string $subtype, string $supertype): bool => $this->isClassSubtypeOf($subtype, $supertype),
+            fn (string $classLc, string $interfaceLc): bool => $this->classImplementsInterface($classLc, $interfaceLc)
+        );
+    }
+
+    /**
+     * @param callable(string, string): bool $isClassSubtypeOf
+     */
+    private static function isParameterCompatibleStatic(
         ?TypeSig $parent,
         ?TypeSig $child,
         string $parentOwnerLc,
-        string $childOwnerLc
+        string $childOwnerLc,
+        callable $isClassSubtypeOf
     ): bool {
         if (null === $parent || $parent->isMixed()) {
             return true;
@@ -254,14 +292,20 @@ final class InheritanceVariance
             return true;
         }
 
-        return $this->isClassSubtypeOf($parentClass, $childClass);
+        return $isClassSubtypeOf($parentClass, $childClass);
     }
 
-    private function isReturnCompatible(
+    /**
+     * @param callable(string, string): bool $isClassSubtypeOf
+     * @param callable(string, string): bool $classImplementsInterface
+     */
+    private static function isReturnCompatibleStatic(
         ?TypeSig $parent,
         ?TypeSig $child,
         string $parentOwnerLc,
-        string $childOwnerLc
+        string $childOwnerLc,
+        callable $isClassSubtypeOf,
+        callable $classImplementsInterface
     ): bool {
         if (null === $parent || $parent->isMixed()) {
             return true;
@@ -292,11 +336,42 @@ final class InheritanceVariance
         if ($parentClass === $childClass) {
             return true;
         }
-        if ($this->isClassSubtypeOf($childClass, $parentClass)) {
+        if ($isClassSubtypeOf($childClass, $parentClass)) {
             return true;
         }
 
-        return $this->classImplementsInterface($childClass, $parentClass);
+        return $classImplementsInterface($childClass, $parentClass);
+    }
+
+    private function isParameterCompatible(
+        ?TypeSig $parent,
+        ?TypeSig $child,
+        string $parentOwnerLc,
+        string $childOwnerLc
+    ): bool {
+        return self::isParameterCompatibleStatic(
+            $parent,
+            $child,
+            $parentOwnerLc,
+            $childOwnerLc,
+            fn (string $subtype, string $supertype): bool => $this->isClassSubtypeOf($subtype, $supertype)
+        );
+    }
+
+    private function isReturnCompatible(
+        ?TypeSig $parent,
+        ?TypeSig $child,
+        string $parentOwnerLc,
+        string $childOwnerLc
+    ): bool {
+        return self::isReturnCompatibleStatic(
+            $parent,
+            $child,
+            $parentOwnerLc,
+            $childOwnerLc,
+            fn (string $subtype, string $supertype): bool => $this->isClassSubtypeOf($subtype, $supertype),
+            fn (string $classLc, string $interfaceLc): bool => $this->classImplementsInterface($classLc, $interfaceLc)
+        );
     }
 
     private function classImplementsInterface(string $classLc, string $interfaceLc): bool
@@ -354,7 +429,7 @@ final class InheritanceVariance
         return false;
     }
 
-    private function formatDeclarationError(
+    private static function formatDeclarationError(
         string $childClass,
         string $methodLc,
         MethodSig $child,
