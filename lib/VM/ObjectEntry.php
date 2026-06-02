@@ -186,6 +186,9 @@ class ObjectEntry {
         if ($this === $other) {
             return true;
         }
+        if (EnumCaseSupport::isEnumCase($this) && EnumCaseSupport::isEnumCase($other)) {
+            return EnumCaseSupport::compareEquals($this, $other);
+        }
         if ($this->class->name !== $other->class->name) {
             return false;
         }

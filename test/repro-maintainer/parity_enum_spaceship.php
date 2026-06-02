@@ -10,3 +10,8 @@ var_dump(Size::S <=> Size::M);
 
 enum Unit { case A; case B; case C; }
 var_dump(Unit::A <=> Unit::B);
+var_dump(Unit::B <=> Unit::A);
+var_dump(Unit::A <=> Unit::A);
+var_dump(Unit::A == Unit::B);
+var_dump(Unit::A === Unit::A);
+var_dump(Unit::A == Unit::cases()[0]);
