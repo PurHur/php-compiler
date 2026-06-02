@@ -5548,6 +5548,7 @@ class JIT {
                     if (Variable::KIND_VARIABLE === $arg->kind) {
                         $slotType = $this->context->getStringFromType($arg->value->typeOf());
                         if ('__value__' === $slotType) {
+                            JIT\TypedPropertyUninitGuard::emitBeforeRead($this->context, $arg);
                             JIT\ValueEchoHelper::echo(
                                 $this->context,
                                 JIT\JitValueBox::pointer($this->context, $arg->value)

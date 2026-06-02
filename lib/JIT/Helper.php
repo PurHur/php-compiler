@@ -1305,6 +1305,7 @@ return_bool:
     }
 
     public function loadValue(Variable $variable): PHPLLVM\Value {
+        TypedPropertyUninitGuard::emitBeforeRead($this->context, $variable);
         if (null !== $variable->valueBoxAliasPtr) {
             $ptr = JitValueBox::normalizeValuePtr($this->context, $variable->valueBoxAliasPtr);
             switch ($variable->type) {

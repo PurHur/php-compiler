@@ -864,7 +864,10 @@ class Object_ extends Type {
                 $this->context->getTypeFromString('__value__*')
             );
             $this->context->builder->store(
-                $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+                $this->context->getTypeFromString('int8')->constInt(
+                    \PHPCompiler\VM\Variable::TYPE_UNDEFINED,
+                    false
+                ),
                 $this->context->builder->structGep($heapVal, $valueMap['type'])
             );
             $this->context->builder->store(
@@ -1811,6 +1814,26 @@ class Object_ extends Type {
     public function propertyDefaultEntries(int $classId): array
     {
         return $this->propertyDefaults[$classId] ?? [];
+    }
+
+    public function propertySlotIndex(int $classId, string $name): ?int
+    {
+        $nameId = $this->propNameMap[$name] ?? null;
+        if (null === $nameId) {
+            return null;
+        }
+        foreach ($this->properties[$classId] ?? [] as $propset) {
+            if ($propset[0] === $nameId) {
+                return $propset[3];
+            }
+        }
+
+        return null;
+    }
+
+    public function propertySlotHasCompileTimeDefault(int $classId, int $slotIndex): bool
+    {
+        return isset($this->propertyDefaults[$classId][$slotIndex]);
     }
 
     public function lookupOperand(Operand $name): int
@@ -3302,9 +3325,13 @@ class Object_ extends Type {
             $typeByte = $this->context->builder->load(
                 $this->context->builder->structGep($prop->value, $valueMap['type'])
             );
-            $nullType = $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false);
+            $i8 = $this->context->getTypeFromString('int8');
+            $nullType = $i8->constInt(Variable::TYPE_NULL, false);
+            $undefType = $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED, false);
+            $notNull = $this->context->builder->icmp(PHPLLVM\Builder::INT_NE, $typeByte, $nullType);
+            $notUndef = $this->context->builder->icmp(PHPLLVM\Builder::INT_NE, $typeByte, $undefType);
 
-            return $this->context->builder->icmp(PHPLLVM\Builder::INT_NE, $typeByte, $nullType);
+            return $this->context->builder->and($notNull, $notUndef);
         }
         $loaded = $this->context->helper->loadValue($prop);
         $nullPtr = $this->context->getTypeFromString('void*')->constNull();

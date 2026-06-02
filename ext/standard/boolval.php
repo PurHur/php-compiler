@@ -83,6 +83,8 @@ final class boolval extends Internal
                     $context->builder->structGep($loaded, $map['type'])
                 );
                 $i8 = $context->getTypeFromString('int8');
+                $undefType = $i8->constInt(Variable::TYPE_UNDEFINED, false);
+                $isUndef = $context->builder->icmp(Builder::INT_EQ, $typeByte, $undefType);
                 $nullType = $i8->constInt(Variable::TYPE_NULL, false);
                 $boolType = $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false);
                 $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullType);
@@ -96,9 +98,10 @@ final class boolval extends Internal
                 $boolByte = $context->builder->load($firstByte);
                 $boolTruthy = $context->builder->icmp(Builder::INT_NE, $boolByte, $i8->constInt(0, false));
                 $nonNull = $context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
+                $falsy = $context->builder->or($isNull, $isUndef);
 
                 return $context->builder->select(
-                    $isNull,
+                    $falsy,
                     $context->constantFromBool(false),
                     $context->builder->select($isBool, $boolTruthy, $nonNull)
                 );
