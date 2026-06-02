@@ -6611,6 +6611,28 @@ class JIT {
                             }
                             break;
                         }
+                        if (
+                            $forWrite
+                            && !$this->context->type->object->hasProperty($classId, $name->value)
+                            && $this->context->type->object->isReadonlyClass($classId)
+                            && !JIT\MagicMethodDispatch::hasInstanceMethod(
+                                $this->context->type->object,
+                                $classId,
+                                '__set'
+                            )
+                        ) {
+                            \PHPCompiler\JIT\Builtin\ErrorRaise::emitRaise(
+                                $this->context,
+                                sprintf(
+                                    'Cannot create dynamic property %s::$%s',
+                                    $declaringClass,
+                                    $name->value
+                                )
+                            );
+                            $this->context->builder->returnVoid();
+                            $this->context->builder->clearInsertionPosition();
+                            break;
+                        }
                         if (!$forWrite) {
                             $magicFetched = JIT\MagicMethodDispatch::tryEmitMagicGet(
                                 $this->context,

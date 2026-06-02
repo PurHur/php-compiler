@@ -65,6 +65,25 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'readonly_no_ctor.php'));
     }
 
+    public function testReadonlyClassRejectsDynamicPropertyCreation(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+readonly class R {
+    public int $x;
+    public function __construct(int $x) {
+        $this->x = $x;
+    }
+}
+$r = new R(1);
+$r->y = 3;
+PHP;
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Cannot create dynamic property R::$y');
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_dynamic_prop.php'));
+    }
+
     public function testReadonlyClassDeclRequiresVmLoweringForBinJit(): void
     {
         $runtime = new Runtime();

@@ -541,6 +541,13 @@ class VM {
         if ($object->hasProperty($name)) {
             return $object->getProperty($name);
         }
+        if ($object->class->readonly && !$this->hasInstanceMethod($object->class, '__set')) {
+            throw new \Error(sprintf(
+                'Cannot create dynamic property %s::$%s',
+                $object->class->name,
+                $name
+            ));
+        }
         if ($this->hasInstanceMethod($object->class, '__set')) {
             $proxy = new Variable();
             $proxy->magicSetTarget = $object;
