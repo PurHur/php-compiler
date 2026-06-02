@@ -2493,12 +2493,24 @@ restart:
                     }
                     if (!$gen->yieldFromActive) {
                         $container = $frame->scope[$op->arg2]->resolveIndirect();
-                        $gen->yieldFromContainer->copyFrom($container);
                         $gen->yieldFromActive = true;
+                        $gen->yieldFromIteratorAdvance = false;
                         if (Variable::TYPE_ARRAY === $container->type) {
+                            $gen->yieldFromContainer->copyFrom($container);
                             $container->toArray()->iterReset();
                         } elseif ($this->variableIsGenerator($container)) {
+                            $gen->yieldFromContainer->copyFrom($container);
                             $container->toObject()->generatorState->rewind();
+                        } elseif (Variable::TYPE_OBJECT === $container->type) {
+                            $iterable = VM\ForeachIterator::resolveTraversableObject($this, $frame, $container);
+                            $gen->yieldFromContainer->copyFrom($iterable);
+                            if ($this->variableIsGenerator($iterable)) {
+                                $iterable->toObject()->generatorState->rewind();
+                            } else {
+                                $this->invokeForeachInstanceMethod($frame, $iterable, 'rewind');
+                            }
+                        } else {
+                            throw new \TypeError('Can only use yield from on Traversable|array');
                         }
                     }
                     $container = $gen->yieldFromContainer->resolveIndirect();
@@ -2513,6 +2525,7 @@ restart:
                             break;
                         }
                         $gen->yieldFromActive = false;
+                        $gen->yieldFromIteratorAdvance = false;
                         break;
                     }
                     if ($this->variableIsGenerator($container)) {
@@ -2527,9 +2540,33 @@ restart:
                             break;
                         }
                         $gen->yieldFromActive = false;
+                        $gen->yieldFromIteratorAdvance = false;
                         break;
                     }
-                    throw new \LogicException('yield from requires array or Generator');
+                    if (Variable::TYPE_OBJECT === $container->type) {
+                        if ($gen->yieldFromIteratorAdvance) {
+                            $this->invokeForeachInstanceMethod($frame, $container, 'next');
+                        }
+                        $valid = $this->invokeForeachInstanceMethod($frame, $container, 'valid');
+                        if ($valid->toBool()) {
+                            $gen->currentKey->copyFrom(
+                                $this->invokeForeachInstanceMethod($frame, $container, 'key')
+                            );
+                            $gen->currentValue->copyFrom(
+                                $this->invokeForeachInstanceMethod($frame, $container, 'current')
+                            );
+                            $gen->yieldFromIteratorAdvance = true;
+                            $gen->hasCurrent = true;
+                            $gen->frame = $frame;
+                            $frame->pos--;
+                            $frame->generatorYield = true;
+                            break;
+                        }
+                        $gen->yieldFromActive = false;
+                        $gen->yieldFromIteratorAdvance = false;
+                        break;
+                    }
+                    throw new \TypeError('Can only use yield from on Traversable|array');
                 case OpCode::TYPE_ITER_RESET:
                     $container = $frame->scope[$op->arg1]->resolveIndirect();
                     if ($this->variableIsGenerator($container)) {
@@ -2582,9 +2619,15 @@ restart:
                         break;
                     }
                     if ($this->variableIsGenerator($container)) {
-                        $frame->scope[$op->arg1]->bool(
-                            $this->advanceGeneratorIteration($container->toObject()->generatorState)
+                        $catchFrame = $this->foreachAdvanceGenerator(
+                            $frame,
+                            $container->toObject()->generatorState,
+                            (int) $op->arg1
                         );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                         break;
                     }
                     if (Variable::TYPE_OBJECT === $container->type) {
@@ -4029,6 +4072,22 @@ restart:
         return null;
     }
 
+    /**
+     * Foreach / Iterator valid over a Generator; bridge uncaught generator throws to caller catch (#4338).
+     *
+     * @return Frame|null catch redirect frame when a handler consumed the throw
+     */
+    private function foreachAdvanceGenerator(Frame $frame, GeneratorState $gen, int $validSlot): ?Frame
+    {
+        try {
+            $frame->scope[$validSlot]->bool($this->advanceGeneratorIteration($gen));
+
+            return null;
+        } catch (VM\GeneratorUncaughtThrow $e) {
+            return $this->dispatchUncaughtGeneratorThrow($e->thrown, $frame);
+        }
+    }
+
     private function advanceGeneratorIteration(GeneratorState $gen): bool
     {
         if ($gen->done) {
@@ -4045,7 +4104,21 @@ restart:
         $savedStack = $this->context->swapRunStack(null);
         try {
             $this->context->push($gen->frame);
-            $result = $this->runFrames();
+            try {
+                $result = $this->runFrames();
+            } catch (\TypeError $e) {
+                $thrown = VM\BuiltinExceptionSupport::materializeTypeError($this->context, $e->getMessage());
+                $catchFrame = $this->findCatchFrameForGeneratorThrow($gen, $thrown);
+                if (null !== $catchFrame) {
+                    $catchFrame->generatorState = $gen;
+                    $gen->frame = $catchFrame;
+
+                    return $this->advanceGeneratorIteration($gen);
+                }
+                $gen->frame = null;
+                $gen->markReturned(null);
+                throw new VM\GeneratorUncaughtThrow($thrown);
+            }
         } finally {
             $this->context->swapRunStack($savedStack);
         }
