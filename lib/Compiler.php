@@ -32,6 +32,7 @@ use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
 use PHPCompiler\Compiler\AttributeMetadata;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\DeprecatedMetadata;
+use PHPCompiler\Compiler\FinalClassConstCheck;
 use PHPCompiler\Compiler\FinalClassExtensionCheck;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
 use PHPCompiler\Compiler\ParameterMetadata;
@@ -328,6 +329,7 @@ class Compiler {
         InterfaceImplementationCheck::validate($script);
         TraitCollisionCheck::validate($script);
         FinalClassExtensionCheck::validate($script);
+        FinalClassConstCheck::validate($script);
         AbstractMethodVisibilityCheck::validate($script);
         ReadonlyClassCompileCheck::validate($script);
 
