@@ -751,7 +751,8 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'VM refcount + shutdown pass (#3144); unset/end-of-scope invoke before later statements (#4096)',
                 'JIT/AOT: __object__invoke_destructor + phpc_destruct_try_invoke on delref; shutdown via phpc_gc_run_shutdown_destructors (#4013)',
-                'AOT shutdown + user-function return verified (class_destruct_user.phpt); AOT immediate unset($o) still tracked (#4096)',
+                'AOT unset($o) before later statements verified (destruct_unset_echo_4096.php, class_destruct_user.phpt)',
+                'Cyclic graphs: Zend defers __destruct until gc_collect_cycles(); refcount-zero path runs immediately — see #4023 for gc JIT/AOT',
                 'MCJIT execute deferred when harness MCJIT unstable (#98)',
             ],
             'probe' => 'class D { function __destruct() { echo "bye"; } } new D();',
