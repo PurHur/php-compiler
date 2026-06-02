@@ -23,6 +23,7 @@ require_once __DIR__.'/JIT/VmUnitProbeExecuteNative.php';
 use PHPCfg\Operand;
 use PHPCfg\Op;
 use PHPTypes\Type;
+use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\JIT\Builtin\AttributeRegistry;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\IssetHelper;
@@ -6571,6 +6572,12 @@ class JIT {
                         foreach ($op->attributeNames as $n) {
                             $attrNames[] = ltrim($n, '\\');
                         }
+                        if (AttributeNames::hasAllowDynamicProperties($attrNames)) {
+                            $this->context->type->object->setClassAllowsDynamicProperties(
+                                $this->context->scope->classId,
+                                true
+                            );
+                        }
                         AttributeRegistry::emitRegisterClass(
                             $this->context,
                             strtolower(ltrim($nameOp->value, '\\')),
@@ -6735,6 +6742,18 @@ class JIT {
                             $this->context->builder->returnVoid();
                             $this->context->builder->clearInsertionPosition();
                             break;
+                        }
+                        if (
+                            $forWrite
+                            && !$this->context->type->object->hasProperty($classId, $name->value)
+                        ) {
+                            JIT\DynamicPropertyDeprecationGuard::emitBeforeUndeclaredWrite(
+                                $this->context,
+                                $this->context->type->object,
+                                $classId,
+                                $declaringClass,
+                                $name->value
+                            );
                         }
                         if (!$forWrite) {
                             $magicFetched = JIT\MagicMethodDispatch::tryEmitMagicGet(

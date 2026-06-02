@@ -18,6 +18,7 @@ use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCfg\Operand\Temporary;
 use PHPCfg\Operand\Variable as VarOperand;
+use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ScriptStack;
 use PHPCompiler\VM\Variable;
@@ -1395,6 +1396,195 @@ class Block {
         return false;
     }
 
+    /**
+     * Writes to undeclared instance properties on classes without #[\AllowDynamicProperties].
+     * MCJIT execute segfaults on this path (#4570); VM emits E_DEPRECATED (zend_object_handlers.c).
+     */
+    public static function containsDynamicPropertyDeprecationOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        /** @var array<string, array<string, true>> $declaredProps lc class => lc prop => true */
+        $declaredProps = [];
+        /** @var array<string, true> $allowsDynamic lc class => true */
+        $allowsDynamic = [];
+        /** @var array<string, true> $hasMagicSet lc class => true */
+        $hasMagicSet = [];
+        self::collectDynamicPropertyClassMetadata($root, $declaredProps, $allowsDynamic, $hasMagicSet);
+
+        return self::scanUndeclaredInstancePropertyWrites($root, $declaredProps, $allowsDynamic, $hasMagicSet);
+    }
+
+    /**
+     * @param array<string, array<string, true>> $declaredProps
+     * @param array<string, true>               $allowsDynamic
+     * @param array<string, true>               $hasMagicSet
+     */
+    private static function collectDynamicPropertyClassMetadata(
+        ?self $root,
+        array &$declaredProps,
+        array &$allowsDynamic,
+        array &$hasMagicSet
+    ): void {
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_CLASS === $op->type) {
+                    $nameOp = $block->getOperand($op->arg1);
+                    if ($nameOp instanceof Literal) {
+                        $classLc = strtolower(ltrim($nameOp->value, '\\'));
+                        $declaredProps[$classLc] = $declaredProps[$classLc] ?? [];
+                        if (AttributeNames::hasAllowDynamicProperties($op->attributeNames)) {
+                            $allowsDynamic[$classLc] = true;
+                        }
+                        if ($op->block1 instanceof self) {
+                            self::collectDeclaredPropertiesFromClassBody(
+                                $op->block1,
+                                $classLc,
+                                $declaredProps,
+                                $hasMagicSet
+                            );
+                        }
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @param array<string, array<string, true>> $declaredProps
+     * @param array<string, true>               $hasMagicSet
+     */
+    private static function collectDeclaredPropertiesFromClassBody(
+        self $classBlock,
+        string $classLc,
+        array &$declaredProps,
+        array &$hasMagicSet
+    ): void {
+        $seen = new \SplObjectStorage();
+        $stack = [$classBlock];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if ($seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_PROPERTY === $op->type) {
+                    $propOp = $block->getOperand($op->arg1);
+                    if ($propOp instanceof Literal) {
+                        $declaredProps[$classLc][strtolower($propOp->value)] = true;
+                    }
+                }
+                if (OpCode::TYPE_DECLARE_METHOD === $op->type) {
+                    $methodOp = $block->getOperand($op->arg1);
+                    if ($methodOp instanceof Literal && '__set' === strtolower($methodOp->value)) {
+                        $hasMagicSet[$classLc] = true;
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @param array<string, array<string, true>> $declaredProps
+     * @param array<string, true>               $allowsDynamic
+     * @param array<string, true>               $hasMagicSet
+     */
+    private static function scanUndeclaredInstancePropertyWrites(
+        ?self $root,
+        array $declaredProps,
+        array $allowsDynamic,
+        array $hasMagicSet
+    ): bool {
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $i => $op) {
+                if (OpCode::TYPE_PROPERTY_FETCH !== $op->type) {
+                    foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                        if ($sub instanceof self) {
+                            $stack[] = $sub;
+                        }
+                    }
+                    continue;
+                }
+                $nameOp = $block->getOperand($op->arg3);
+                $objOp = $block->getOperand($op->arg2);
+                if (!$nameOp instanceof Literal || null === $objOp->type->userType) {
+                    foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                        if ($sub instanceof self) {
+                            $stack[] = $sub;
+                        }
+                    }
+                    continue;
+                }
+                if (!self::propertyFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1)) {
+                    foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                        if ($sub instanceof self) {
+                            $stack[] = $sub;
+                        }
+                    }
+                    continue;
+                }
+                $classLc = strtolower(ltrim($objOp->type->userType, '\\'));
+                if (isset($allowsDynamic[$classLc]) || isset($hasMagicSet[$classLc])) {
+                    foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                        if ($sub instanceof self) {
+                            $stack[] = $sub;
+                        }
+                    }
+                    continue;
+                }
+                $propLc = strtolower($nameOp->value);
+                if (!isset($declaredProps[$classLc][$propLc])) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static function propertyFetchDestUsedAsAssignLvalue(self $block, int $opIndex, int $destSlot): bool
+    {
+        for ($j = $opIndex + 1, $n = count($block->opCodes); $j < $n; $j++) {
+            $next = $block->opCodes[$j];
+            if (OpCode::TYPE_ASSIGN === $next->type && $next->arg2 === $destSlot) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static function requiresVmLowering(?self $root): bool
     {
         return self::containsGeneratorOpcodesInScriptScope($root)
@@ -1404,6 +1594,7 @@ class Block {
             || self::containsTypedNonVoidReturnOpcodes($root)
             || self::containsReadonlyPropertyOpcodes($root)
             || self::containsReadonlyClassOpcodes($root)
+            || self::containsDynamicPropertyDeprecationOpcodes($root)
             || self::containsFiberSuspendOpcodes($root);
     }
 }
