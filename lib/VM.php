@@ -1850,7 +1850,15 @@ restart:
                     if (null !== $op->arg3) {
                         $spread = $value->resolveIndirect();
                         if (Variable::TYPE_ARRAY !== $spread->type) {
-                            throw new \LogicException('Only arrays can be unpacked');
+                            $catchFrame = $this->dispatchVmTypeError(
+                                new \TypeError('Only arrays and Traversables can be unpacked'),
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
                         }
                         if (!\PHPCompiler\ext\standard\VmArray::isList($spread->toArray())) {
                             $catchFrame = $this->dispatchVmTypeError(
