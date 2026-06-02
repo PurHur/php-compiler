@@ -2519,6 +2519,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-nullsafe-parser.patch"
   apply_patch "$PATCH_DIR/php-cfg-error-suppress-read.patch"
   apply_patch "$PATCH_DIR/php-cfg-error-suppress-simplifier.patch"
+  apply_patch "$PATCH_DIR/php-cfg-simplifier-call-unpack.patch"
   apply_patch "$PATCH_DIR/php-cfg-strict-types.patch"
   apply_patch "$PATCH_DIR/php-cfg-trycatch.patch"
   apply_patch "$PATCH_DIR/php-cfg-phi-resolver-null.patch"
