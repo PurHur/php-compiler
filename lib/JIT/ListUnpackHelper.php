@@ -79,6 +79,9 @@ final class ListUnpackHelper
         if (self::isDefinitelyArrayAtCompileTime($array)) {
             return false;
         }
+        if ($array->isNullConstant) {
+            return true;
+        }
 
         return Variable::TYPE_STRING === $array->type
             || Variable::TYPE_OBJECT === $array->type

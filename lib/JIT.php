@@ -189,6 +189,8 @@ class JIT {
             $this->context->inlineIncludeReturnOperands = [];
             $this->context->coalesceAssignTargets = new \SplObjectStorage();
             $this->context->listUnpackSkipAssignPath = false;
+            $this->context->listUnpackMergeLlvmBlocks = new \SplObjectStorage();
+            $this->context->listUnpackMergeNullInitTargets = [];
             $this->context->jitPropertyHookRawProperty = null;
             // Each queued CFG function gets a fresh try/catch stack — dispatch BBs are per-LLVM-function (#3012).
             $this->context->tryCatch->reset();
@@ -4574,6 +4576,37 @@ class JIT {
         );
     }
 
+    /**
+     * Dest operands for guarded list() / [] destruct in this CFG block (#4531).
+     *
+     * @return list<Operand>
+     */
+    private function listUnpackAssignTargetsInBlock(Block $block): array
+    {
+        $targets = [];
+        $seen = new \SplObjectStorage();
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN !== $op->type) {
+                continue;
+            }
+            if (null === $op->arg2) {
+                continue;
+            }
+            $dest = $block->getOperand($op->arg2);
+            $name = JIT\OperandName::resolve($dest);
+            if (null === $name || '' === $name) {
+                continue;
+            }
+            if ($seen->contains($dest)) {
+                continue;
+            }
+            $seen[$dest] = true;
+            $targets[] = $dest;
+        }
+
+        return $targets;
+    }
+
     private function compileBlockInternal(
         PHPLLVM\Value $func,
         Block $block,
@@ -4612,7 +4645,24 @@ class JIT {
             }
             $this->context->makeVariableFromOp($func, $basicBlock, $block, $operand);
         }
-
+        $blockKey = spl_object_id($block);
+        if (isset($this->context->listUnpackMergeNullInitTargets[$blockKey])) {
+            foreach ($this->context->listUnpackMergeNullInitTargets[$blockKey] as $destOp) {
+                if (!$this->context->hasVariableOpInScopes($destOp)) {
+                    $this->context->makeVariableFromOp($func, $basicBlock, $block, $destOp);
+                }
+                $dest = $this->context->getVariableFromOpInScopes($destOp);
+                if (JIT\Variable::KIND_VARIABLE !== $dest->kind) {
+                    continue;
+                }
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeNull'),
+                    JIT\JitValueBox::pointer($this->context, $dest->value)
+                );
+                $dest->isNullConstant = true;
+            }
+            unset($this->context->listUnpackMergeNullInitTargets[$blockKey]);
+        }
         $thisParamOffset = 0;
         if (null !== $block->func && $block->orig === $block->func->cfg) {
             $this->context->jitEnclosingBlock = $block;
@@ -5131,18 +5181,18 @@ class JIT {
                         $branchBlock = $builder->getInsertBlock();
                         $builder->positionAtEnd($branchBlock);
                         $array = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                        if (!$this->context->scope->blockStorage->contains($op->block1)) {
+                        if (!$this->context->listUnpackMergeLlvmBlocks->contains($op->block1)) {
                             ++self::$blockNumber;
-                            $mergeEntry = $func->appendBasicBlock('block_'.self::$blockNumber);
-                            $this->context->scope->blockStorage[$op->block1] = $mergeEntry;
+                            $mergeBody = $func->appendBasicBlock('block_'.self::$blockNumber);
+                            $this->context->listUnpackMergeLlvmBlocks[$op->block1] = $mergeBody;
                         } else {
-                            $mergeEntry = $this->context->scope->blockStorage[$op->block1];
+                            $mergeBody = $this->context->listUnpackMergeLlvmBlocks[$op->block1];
                         }
                         $this->context->listUnpackSkipAssignPath = JIT\ListUnpackHelper::emitGuardedListUnpackCheck(
                             $this->context,
                             $array,
                             $branchBlock,
-                            $mergeEntry
+                            $mergeBody
                         );
                         break;
                     }
@@ -5849,10 +5899,23 @@ class JIT {
                     $builder->positionAtEnd($nextBb);
                     break;
                 case OpCode::TYPE_JUMP:
+                    $skippedListUnpackAssign = $this->context->listUnpackSkipAssignPath;
                     $this->context->listUnpackSkipAssignPath = false;
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
-                    $this->compileBlockInternal($func, $op->block1, null, null, 0, false, ...$args);
+                    $mergeLlvm = null;
+                    $allowRecompile = false;
+                    if ($this->context->listUnpackMergeLlvmBlocks->contains($op->block1)) {
+                        $mergeLlvm = $this->context->listUnpackMergeLlvmBlocks[$op->block1];
+                        $allowRecompile = true;
+                        $this->context->listUnpackMergeLlvmBlocks->detach($op->block1);
+                        if ($skippedListUnpackAssign) {
+                            $mergeKey = spl_object_id($op->block1);
+                            $this->context->listUnpackMergeNullInitTargets[$mergeKey]
+                                = $this->listUnpackAssignTargetsInBlock($block);
+                        }
+                    }
+                    $this->compileBlockInternal($func, $op->block1, null, $mergeLlvm, 0, $allowRecompile, ...$args);
                     $targetEntry = $this->context->scope->blockStorage[$op->block1];
                     if ($this->context->inlineIncludeDepth > 0) {
                         // Use the merge block itself (not getInsertBlock — callee may be cached) (#846, #784).

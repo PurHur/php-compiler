@@ -162,6 +162,21 @@ class Context {
     /** Guarded list destruct: assign-path dim fetches compile as unreachable stubs (#4308). */
     public bool $listUnpackSkipAssignPath = false;
 
+    /**
+     * LLVM merge body blocks for guarded list destruct — not in {@see Scope::$blockStorage}
+     * until TYPE_JUMP compiles the CFG merge (#4531).
+     *
+     * @var \SplObjectStorage<Block, \PHPLLVM\BasicBlock>
+     */
+    public \SplObjectStorage $listUnpackMergeLlvmBlocks;
+
+    /**
+     * List destruct targets to null-init at guarded-merge CFG block entry (#4531).
+     *
+     * @var array<int, list<Operand>>
+     */
+    public array $listUnpackMergeNullInitTargets = [];
+
     /** Nested compile-time include inlining depth (issue #568). */
     public int $inlineIncludeDepth = 0;
 
@@ -254,6 +269,7 @@ class Context {
         $this->scope = new Scope;
         $this->tryCatch = TryCatchState::create();
         $this->coalesceAssignTargets = new \SplObjectStorage();
+        $this->listUnpackMergeLlvmBlocks = new \SplObjectStorage();
         $this->loadType = $loadType;
         $this->llvm = PHPLLVM\Chooser::choose();
         $this->llvm->initializeNative();
