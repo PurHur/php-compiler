@@ -529,12 +529,9 @@ final class VmArray
         if (0 === $n) {
             throw new \ValueError('array_rand(): Argument #1 ($array) cannot be empty');
         }
-        if ($num < 1) {
-            throw new \ValueError('array_rand(): Argument #2 ($num) must be greater than 0');
-        }
-        if ($num > $n) {
+        if ($num < 1 || $num > $n) {
             throw new \ValueError(
-                'array_rand(): Argument #2 ($num) must be between 1 and the number of elements in Argument #1 ($array)'
+                'array_rand(): Argument #2 ($num) must be between 1 and the number of elements in argument #1 ($array)'
             );
         }
         $indices = [];

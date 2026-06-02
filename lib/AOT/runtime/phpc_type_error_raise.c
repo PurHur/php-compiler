@@ -9,6 +9,7 @@
 #define PHPC_JIT_TYPE_ERROR_PENDING_MAX 512
 #define PHPC_PENDING_TYPE_ERROR 1
 #define PHPC_PENDING_ARGUMENT_COUNT_ERROR 2
+#define PHPC_PENDING_VALUE_ERROR 3
 
 static char phpc_jit_type_error_pending_msg[PHPC_JIT_TYPE_ERROR_PENDING_MAX];
 static int phpc_jit_type_error_pending_set;
@@ -73,6 +74,11 @@ void __compiler_jit_raise_argument_count_error(const char *msg, unsigned long le
     phpc_jit_store_pending_error(PHPC_PENDING_ARGUMENT_COUNT_ERROR, msg, len);
 }
 
+void __compiler_jit_raise_value_error(const char *msg, unsigned long len)
+{
+    phpc_jit_store_pending_error(PHPC_PENDING_VALUE_ERROR, msg, len);
+}
+
 /** Standalone AOT: fatal when a builtin left a pending TypeError/ArgumentCountError (#4034). */
 void phpc_jit_abort_if_pending_type_error(void)
 {
@@ -89,9 +95,13 @@ void phpc_jit_abort_if_pending_type_error(void)
         strncpy(buf, "Error", sizeof buf - 1);
         buf[sizeof buf - 1] = '\0';
     }
-    class_name = (PHPC_PENDING_ARGUMENT_COUNT_ERROR == kind)
-        ? "ArgumentCountError"
-        : "TypeError";
+    if (PHPC_PENDING_ARGUMENT_COUNT_ERROR == kind) {
+        class_name = "ArgumentCountError";
+    } else if (PHPC_PENDING_VALUE_ERROR == kind) {
+        class_name = "ValueError";
+    } else {
+        class_name = "TypeError";
+    }
     fprintf(
         stderr,
         "PHP Fatal error:  Uncaught %s: %s\n",

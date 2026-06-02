@@ -42,10 +42,11 @@ final class array_rand extends Internal
             }
             $num = $numArg->toInt();
         }
+        $result = VmArray::arrayRandPacked($array->toArray(), $num);
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->copyFrom(VmArray::arrayRandPacked($array->toArray(), $num));
+        $frame->returnVar->copyFrom($result);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
