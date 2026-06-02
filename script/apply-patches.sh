@@ -2446,6 +2446,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-simplifier-call-unpack.patch"
   apply_patch "$PATCH_DIR/php-cfg-strict-types.patch"
   apply_patch "$PATCH_DIR/php-cfg-trycatch.patch"
+  apply_patch "$PATCH_DIR/php-cfg-goto-scope.patch"
   apply_patch "$PATCH_DIR/php-cfg-phi-resolver-null.patch"
   apply_patch "$PATCH_DIR/php-cfg-magic-constants.patch"
   apply_patch "$PATCH_DIR/php-cfg-magic-script-const.patch"
