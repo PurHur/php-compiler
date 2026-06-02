@@ -689,6 +689,10 @@ class Block {
                         continue;
                     }
                     if ($this->inheritUndefinedLocals) {
+                        if (self::usesMainScriptGlobalSlot($op, $this)) {
+                            $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
+                            continue;
+                        }
                         $scope[$pos] = new Variable(Variable::TYPE_UNDEFINED);
                         continue;
                     }

@@ -21,6 +21,14 @@ final class JitArrayIsList
         if ($array->type & JITVariable::IS_NATIVE_ARRAY) {
             return $context->constantFromBool(true);
         }
+        if (
+            JITVariable::TYPE_NULL === $array->type
+            || JITVariable::TYPE_NATIVE_BOOL === $array->type
+            || JITVariable::TYPE_NATIVE_LONG === $array->type
+            || JITVariable::TYPE_NATIVE_DOUBLE === $array->type
+        ) {
+            return $context->constantFromBool(false);
+        }
         if (JITVariable::TYPE_HASHTABLE === $array->type
             || JITVariable::TYPE_VALUE === $array->type
             || JitValueBox::isValueOperand($array)) {

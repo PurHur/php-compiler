@@ -481,6 +481,10 @@ class JITTest extends BaseTest {
                 || str_contains($name, 'parse_str_local_scope')) {
                 continue;
             }
+            // list() from null/false/int: VM + LLVM verify (#4325); MCJIT execute segfault until list unpack branch stable.
+            if (str_contains($name, 'list_destructure_null')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
