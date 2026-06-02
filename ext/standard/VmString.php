@@ -30,6 +30,49 @@ final class VmString
         return $var->resolveIndirect()->toString();
     }
 
+    /**
+     * Coerce a string builtin operand (php-src Z_PARAM_STR; rejects array / plain object, #4553).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function coerceStringBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'string'
+    ): string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'array'));
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $vm = VM::running();
+            $object = $var->toObject();
+            if (null === $vm || !$vm->hasInstanceMethod($object->class, '__tostring')) {
+                throw new \TypeError(
+                    self::stringBuiltinTypeError($function, $argIndex, $paramName, $object->class->name)
+                );
+            }
+        }
+
+        return self::coerceOperand($var);
+    }
+
+    private static function stringBuiltinTypeError(
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $given
+    ): string {
+        return sprintf(
+            '%s(): Argument #%d ($%s) must be of type string, %s given',
+            $function,
+            $argIndex + 1,
+            $paramName,
+            $given
+        );
+    }
+
     /** Regex metacharacters escaped by preg_quote() (PHP 8.2 byte subset). */
     private const PREG_QUOTE_ESCAPE = '.\\+*?[^]()$={}-|!<>:';
 
