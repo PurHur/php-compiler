@@ -140,13 +140,14 @@ final class VmScope
             return;
         }
         $typeName = self::compactInvalidArgTypeName($var);
-        $file = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+        [$file, $line] = self::compactCallSite($frame);
         $frame->vmContext->errors->triggerError(
             "compact(): Argument #{$argNum} must be string or array of strings, {$typeName} given",
             ErrorReporter::E_WARNING,
             $file,
             $frame->vmContext,
-            $frame
+            $frame,
+            $line
         );
     }
 
@@ -169,14 +170,29 @@ final class VmScope
         if (null === $frame->vmContext) {
             return;
         }
-        $file = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+        [$file, $line] = self::compactCallSite($frame);
         $frame->vmContext->errors->triggerError(
             "compact(): Undefined variable \${$name}",
             ErrorReporter::E_WARNING,
             $file,
             $frame->vmContext,
-            $frame
+            $frame,
+            $line
         );
+    }
+
+    /**
+     * @return array{0: ?string, 1: int}
+     */
+    private static function compactCallSite(Frame $frame): array
+    {
+        $caller = $frame->parent;
+        if (null === $caller) {
+            return [null, 0];
+        }
+        $file = '' !== $caller->scriptPath ? $caller->scriptPath : null;
+
+        return [$file, $caller->callSiteLine];
     }
 
     private static function callerVarIsSet(Variable $var): bool

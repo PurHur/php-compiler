@@ -14,6 +14,7 @@ final class ErrorReporter
 {
     public const E_PARSE = 4;
     public const E_WARNING = 2;
+    public const E_NOTICE = 8;
     public const E_USER_ERROR = 256;
     public const E_USER_WARNING = 512;
     public const E_USER_NOTICE = 1024;
@@ -248,6 +249,7 @@ final class ErrorReporter
         ?string $file = null,
         int $line = 0
     ): void {
+        [$file, $line] = $this->resolveDisplayLocation($frame, $file, $line);
         $this->recordLastError(self::E_WARNING, $message, $file, $line);
         if (0 === ($this->errorReporting & self::E_WARNING)) {
             return;
@@ -255,16 +257,8 @@ final class ErrorReporter
         if ($this->dispatchUserHandler($context, $frame, self::E_WARNING, $message, $file, $line)) {
             return;
         }
-        $formatted = "Warning: {$message}";
-        if (null !== $file && '' !== $file) {
-            $formatted .= " in {$file}";
-            if ($line > 0) {
-                $formatted .= " on line {$line}";
-            }
-        }
-        $formatted .= "\n";
         if ($this->displayErrors) {
-            fwrite(STDERR, $formatted);
+            fwrite(STDERR, $this->formatCliError(self::E_WARNING, $message, $file, $line));
         }
     }
 
@@ -287,13 +281,8 @@ final class ErrorReporter
         if ($this->dispatchUserHandler($context, $frame, self::E_DEPRECATED, $message, $file, 0)) {
             return;
         }
-        $line = "Deprecated: {$message}";
-        if (null !== $file && '' !== $file) {
-            $line .= " in {$file}";
-        }
-        $line .= "\n";
         if ($this->displayErrors) {
-            fwrite(STDERR, $line);
+            fwrite(STDERR, $this->formatCliError(self::E_DEPRECATED, $message, $file, 0));
         }
     }
 
@@ -305,6 +294,7 @@ final class ErrorReporter
         ?Frame $frame = null,
         int $line = 0
     ): void {
+        [$file, $line] = $this->resolveDisplayLocation($frame, $file, $line);
         $this->recordLastError($level, $message, $file, $line);
         if (0 === ($this->errorReporting & $level)) {
             return;
@@ -316,28 +306,53 @@ final class ErrorReporter
 
             return;
         }
-        $prefix = match ($level) {
-            self::E_WARNING => 'Warning',
-            self::E_USER_ERROR => 'Fatal error',
-            self::E_USER_WARNING => 'Warning',
-            self::E_USER_NOTICE => 'Notice',
-            self::E_USER_DEPRECATED => 'Deprecated',
-            default => 'Unknown error',
-        };
-        $formatted = "{$prefix}: {$message}";
-        if (null !== $file && '' !== $file) {
-            $formatted .= " in {$file}";
-            if ($line > 0) {
-                $formatted .= " on line {$line}";
-            }
-        }
-        $formatted .= "\n";
+        $formatted = $this->formatCliError($level, $message, $file, $line);
         if ($this->displayErrors) {
             fwrite(STDERR, $formatted);
         }
         if (self::E_USER_ERROR === $level) {
             throw new \LogicException(rtrim($formatted));
         }
+    }
+
+    /**
+     * Zend CLI stderr line (main/main.c php_error_cb).
+     */
+    private function formatCliError(int $level, string $message, ?string $file, int $line): string
+    {
+        $prefix = match ($level) {
+            self::E_WARNING, self::E_USER_WARNING => 'PHP Warning',
+            self::E_NOTICE, self::E_USER_NOTICE => 'PHP Notice',
+            self::E_DEPRECATED, self::E_USER_DEPRECATED => 'PHP Deprecated',
+            self::E_USER_ERROR => 'PHP Fatal error',
+            default => 'PHP Unknown error',
+        };
+        $formatted = "{$prefix}:  {$message}";
+        if (null !== $file && '' !== $file) {
+            $formatted .= " in {$file}";
+            if ($line > 0) {
+                $formatted .= " on line {$line}";
+            }
+        }
+
+        return $formatted."\n";
+    }
+
+    /**
+     * @return array{0: ?string, 1: int}
+     */
+    private function resolveDisplayLocation(?Frame $frame, ?string $file, int $line): array
+    {
+        if (null !== $frame) {
+            if ((null === $file || '' === $file) && '' !== $frame->scriptPath) {
+                $file = $frame->scriptPath;
+            }
+            if ($line <= 0 && $frame->callSiteLine > 0) {
+                $line = $frame->callSiteLine;
+            }
+        }
+
+        return [$file, $line];
     }
 
     private function activeHandlerCopy(): ?Variable
