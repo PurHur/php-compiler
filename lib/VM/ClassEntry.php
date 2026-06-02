@@ -60,6 +60,8 @@ class ClassEntry {
     public array $enumCases = [];
     /** @var array<string, Variable> static property name (lowercase) => shared storage */
     public array $staticProperties = [];
+    /** @var array<string, true> static props imported from a trait (per-class storage, #4670) */
+    public array $traitStaticPropertyNames = [];
     /** Readonly class: instance properties cannot change after construction (issue #1360). */
     public bool $readonly = false;
     /** Sealed class/interface: only listed types may extend/implement (#3322). */
