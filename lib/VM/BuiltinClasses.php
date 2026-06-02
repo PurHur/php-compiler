@@ -17,10 +17,14 @@ use PHPCompiler\VM\Builtin\ExceptionGetLine;
 use PHPCompiler\VM\Builtin\ExceptionGetMessage;
 use PHPCompiler\VM\Builtin\FiberConstruct;
 use PHPCompiler\VM\Builtin\FiberGetCurrent;
+use PHPCompiler\VM\Builtin\FiberIsRunning;
+use PHPCompiler\VM\Builtin\FiberIsStarted;
+use PHPCompiler\VM\Builtin\FiberIsSuspended;
 use PHPCompiler\VM\Builtin\FiberIsTerminated;
 use PHPCompiler\VM\Builtin\FiberResume;
 use PHPCompiler\VM\Builtin\FiberStart;
 use PHPCompiler\VM\Builtin\FiberSuspend;
+use PHPCompiler\VM\Builtin\FiberThrow;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetArguments;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetName;
 use PHPCompiler\VM\Builtin\ReflectionAttributeNewInstance;
@@ -542,8 +546,12 @@ final class BuiltinClasses
             [
                 'start' => new FiberStart(),
                 'resume' => new FiberResume(),
+                'throw' => new FiberThrow(),
                 'suspend' => new FiberSuspend(),
                 'getcurrent' => new FiberGetCurrent(),
+                'isstarted' => new FiberIsStarted(),
+                'issuspended' => new FiberIsSuspended(),
+                'isrunning' => new FiberIsRunning(),
                 'isterminated' => new FiberIsTerminated(),
             ] as $name => $method
         ) {

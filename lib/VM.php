@@ -691,6 +691,26 @@ class VM {
         }
     }
 
+    /**
+     * Throw into a suspended fiber (Fiber->throw()) (Zend/zend_fibers.c parity, #4481).
+     */
+    public function throwFiber(FiberState $fiber, Variable $exception): Variable
+    {
+        if (FiberState::STATUS_TERMINATED === $fiber->status) {
+            throw new VM\NativeFiberError('Cannot throw into a fiber that is terminated');
+        }
+        if (FiberState::STATUS_SUSPENDED !== $fiber->status) {
+            throw new VM\NativeFiberError('Cannot throw into a fiber that is not suspended');
+        }
+        $fiber->pendingThrow->copyFrom($exception->resolveIndirect());
+        $fiber->hasPendingThrow = true;
+        $fiber->resumeArgument->null();
+
+        $returnSlot = new Variable();
+
+        return $this->runFiberExecution($fiber, $returnSlot);
+    }
+
     private function runFiberExecution(FiberState $fiber, Variable $returnSlot): Variable
     {
         $child = $fiber->frame;
@@ -701,8 +721,20 @@ class VM {
         $this->context->currentFiber = $fiber;
         $savedStack = $this->context->swapRunStack(null);
         try {
+            $this->applyFiberPendingThrow($fiber);
+            $child = $fiber->frame;
+            if (null === $child) {
+                throw new \LogicException('Fiber execution missing frame after throw dispatch');
+            }
             $this->context->push($child);
-            $result = $this->runFrames();
+            try {
+                $result = $this->runFrames();
+            } catch (\Throwable $e) {
+                $fiber->status = FiberState::STATUS_TERMINATED;
+                $fiber->frame = null;
+                $fiber->pendingSuspendReturnVar = null;
+                throw $e;
+            }
         } finally {
             $this->context->swapRunStack($savedStack);
             $this->context->currentFiber = $savedFiber;
@@ -724,6 +756,51 @@ class VM {
         }
 
         throw new \LogicException('Fiber execution failed in this compiler build');
+    }
+
+    private function findFiberState(Frame $frame): ?FiberState
+    {
+        while (null !== $frame) {
+            if (null !== $frame->fiberState) {
+                return $frame->fiberState;
+            }
+            $frame = $frame->parent;
+        }
+
+        return null;
+    }
+
+    private function applyFiberPendingThrow(FiberState $fiber): void
+    {
+        if (!$fiber->hasPendingThrow) {
+            return;
+        }
+        $thrown = new Variable();
+        $thrown->copyFrom($fiber->pendingThrow);
+        $fiber->hasPendingThrow = false;
+        $fiber->pendingThrow->null();
+        $frame = $fiber->frame;
+        if (null === $frame) {
+            $fiber->status = FiberState::STATUS_TERMINATED;
+            $this->raiseUncaughtException($thrown);
+        }
+        $this->context->pendingException = $thrown;
+        for ($handler = $frame; null !== $handler; $handler = $handler->parent) {
+            if ($handler->fiberState !== $fiber && $this->findFiberState($handler) !== $fiber) {
+                break;
+            }
+            $catchFrame = $this->dispatchCatchForHandlerFrame($handler);
+            if (null !== $catchFrame) {
+                $catchFrame->fiberState = $fiber;
+                $fiber->frame = $catchFrame;
+
+                return;
+            }
+        }
+        $this->clearTryCatchUnwindState();
+        $fiber->status = FiberState::STATUS_TERMINATED;
+        $fiber->frame = null;
+        $this->raiseUncaughtException($thrown);
     }
 
     /**
