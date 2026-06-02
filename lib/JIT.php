@@ -4679,12 +4679,15 @@ class JIT {
                         }
                         $captureArg = $args[$captureBase + $captureIdx];
                         $captureVar = $this->context->getVariableFromOp($captureOperand);
-                        // By-ref binds live storage; by-value binds snapshot __value__* formal (#72, #2483).
-                        JIT\ClosureHelper::bindCaptureSlotByReference(
-                            $this->context,
-                            $captureVar,
-                            $captureArg
-                        );
+                        if (isset($block->closureCaptureByRef[$captureSlot])) {
+                            JIT\ClosureHelper::bindCaptureSlotByReference(
+                                $this->context,
+                                $captureVar,
+                                $captureArg
+                            );
+                        } else {
+                            $this->assignOperand($captureOperand, $captureArg, true);
+                        }
                     }
                 }
             }

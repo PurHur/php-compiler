@@ -1173,8 +1173,8 @@ class Block {
     }
 
     /**
-     * Closures with {@code use (&$var)} — MCJIT execute segfaults after IR verify (#72, #2483).
-     * {@see JIT::compileIncDecOp} uses {@see Variable::$valueBoxAliasPtr}; execute ABI still unstable.
+     * Closures with {@code use (&$var)} — detection helper (#72, #3097, #4625).
+     * No longer forces {@see requiresVmLowering}; MCJIT uses {@see Variable::$valueBoxAliasPtr}.
      */
     public static function containsClosureByRefCaptureOpcodes(?self $root): bool
     {
@@ -1402,7 +1402,6 @@ class Block {
             || self::containsExceptionHandlingOpcodesInScriptScope($root)
             || self::containsMatchExpressionOpcodesInScriptScope($root)
             || self::containsTypedNonVoidReturnOpcodes($root)
-            || self::containsClosureByRefCaptureOpcodes($root)
             || self::containsReadonlyPropertyOpcodes($root)
             || self::containsReadonlyClassOpcodes($root)
             || self::containsFiberSuspendOpcodes($root);

@@ -204,6 +204,8 @@ final class ClosureHelper
         Variable $captureArg
     ): void {
         $captureSlot->valueBoxAliasPtr = JitValueBox::valuePtrFromVariable($context, $captureArg);
+        $captureSlot->type = Variable::TYPE_VALUE;
+        $captureSlot->kind = Variable::KIND_VARIABLE;
     }
 
     /**
