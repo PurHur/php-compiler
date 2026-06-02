@@ -1896,7 +1896,11 @@ restart:
                             $this->initClosureCall($frame, $closureState);
                             break;
                         }
-                        $this->initMethodCall($frame, $callee, '__invoke');
+                        $catchFrame = $this->initMethodCall($frame, $callee, '__invoke');
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                         break;
                     }
                     if (Variable::TYPE_ARRAY === $callee->type) {
@@ -1921,11 +1925,15 @@ restart:
                     if ($receiver->type !== Variable::TYPE_OBJECT) {
                         throw new \LogicException('Method call on non-object');
                     }
-                    $this->initMethodCall(
+                    $catchFrame = $this->initMethodCall(
                         $frame,
                         $receiver,
                         $frame->scope[$op->arg2]->toString()
                     );
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     break;
                 case OpCode::TYPE_ARG_SEND:
                     $value = $frame->scope[$op->arg1];
@@ -4486,7 +4494,7 @@ restart:
         return $frame->calledClass;
     }
 
-    protected function initMethodCall(Frame $frame, Variable $receiver, string $methodName): void
+    protected function initMethodCall(Frame $frame, Variable $receiver, string $methodName): ?Frame
     {
         $methodLc = strtolower($methodName);
         $object = $receiver->toObject();
@@ -4496,7 +4504,7 @@ restart:
         if (null !== $object->closureState && '__invoke' === $methodLc) {
             $this->initClosureCall($frame, $object->closureState);
 
-            return;
+            return null;
         }
         $class = $object->class;
         if (!isset($class->methods[$methodLc])) {
@@ -4506,7 +4514,7 @@ restart:
                 $frame->callArgs = [$receiver];
                 $frame->callArgEntries = [];
 
-                return;
+                return null;
             }
             throw new \LogicException("Call to undefined method {$class->name}::{$methodLc}()");
         }
@@ -4518,16 +4526,22 @@ restart:
         if (null === $callerClassLc && null !== $frame->calledClass && '' !== $frame->calledClass) {
             $callerClassLc = strtolower($frame->calledClass);
         }
-        MethodVisibility::assertCallable(
-            $vis,
-            $callerClassLc,
-            strtolower($class->name),
-            $class->name,
-            $methodName
-        );
+        try {
+            MethodVisibility::assertCallable(
+                $vis,
+                $callerClassLc,
+                strtolower($class->name),
+                $class->name,
+                $methodName
+            );
+        } catch (\LogicException $e) {
+            return $this->dispatchVmError($e->getMessage(), $frame);
+        }
         $frame->call = $class->methods[$methodLc];
         $frame->callArgs = [$receiver];
         $frame->callArgEntries = [];
+
+        return null;
     }
 
     protected function initStaticCallable(Frame $frame, string $callableName): void

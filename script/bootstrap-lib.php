@@ -88,7 +88,7 @@ if (class_exists(\PhpParser\NodeVisitorAbstract::class)) {
         public function afterTraverse(array $nodes)
         {
             if ($this->classMethodCount > 0) {
-                $this->warnings[] = $this->classMethodCount.' class method(s) — PHPCfg Op\\Stmt\\ClassMethod not lowered in Compiler';
+                $this->warnings[] = $this->classMethodCount.' class method(s)';
             }
             if ($this->closureCount > 0) {
                 $this->warnings[] = $this->closureCount.' closure(s)';
@@ -267,7 +267,7 @@ function bootstrapScanConstructsToken(string $code): array
     }
 
     if ($classMethodCount > 0) {
-        $warnings[] = $classMethodCount.' class method(s) — PHPCfg Op\\Stmt\\ClassMethod not lowered in Compiler';
+        $warnings[] = $classMethodCount.' class method(s)';
     }
     if ($closureCount > 0) {
         $warnings[] = $closureCount.' closure(s)';
