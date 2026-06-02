@@ -36,10 +36,21 @@ final class sscanf extends Internal
         for ($i = 2; $i < $argc; ++$i) {
             $outVars[] = $frame->calledArgs[$i];
         }
-        $count = VmSscanf::parse($strVar->toString(), $fmtVar->toString(), $outVars);
+        $input = $strVar->toString();
+        $format = $fmtVar->toString();
         if (null === $frame->returnVar) {
+            if ([] !== $outVars) {
+                VmSscanf::parse($input, $format, $outVars);
+            }
+
             return;
         }
+        if ([] === $outVars) {
+            $frame->returnVar->array(VmSscanf::parseToArray($input, $format));
+
+            return;
+        }
+        $count = VmSscanf::parse($input, $format, $outVars);
         $frame->returnVar->int($count);
     }
 

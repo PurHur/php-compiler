@@ -99,6 +99,14 @@ class Type extends Builtin {
         );
         $fnSscanf = $this->context->module->addFunction('__compiler_sscanf', $fntypeSscanf);
         $this->context->registerFunction('__compiler_sscanf', $fnSscanf);
+        $fntypeSscanfArray = $this->context->context->functionType(
+            $this->context->getTypeFromString('__hashtable__*'),
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('__string__*')
+        );
+        $fnSscanfArray = $this->context->module->addFunction('__compiler_sscanf_array', $fntypeSscanfArray);
+        $this->context->registerFunction('__compiler_sscanf_array', $fnSscanfArray);
         $fntypePack = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,

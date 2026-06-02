@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 final class VmSscanf
@@ -85,6 +86,48 @@ final class VmSscanf
         }
 
         return $assigned;
+    }
+
+    /** Two-arg sscanf(): return parsed values as a list array (php-src ext/standard/sscanf.c, #4201). */
+    public static function parseToArray(string $input, string $format): HashTable
+    {
+        $slots = self::countConversionSpecs($format);
+        if (0 === $slots) {
+            return new HashTable();
+        }
+        $temps = [];
+        for ($i = 0; $i < $slots; ++$i) {
+            $temps[] = new Variable();
+        }
+        $assigned = self::parse($input, $format, $temps);
+        $ht = new HashTable();
+        for ($i = 0; $i < $assigned; ++$i) {
+            $copy = new Variable();
+            $copy->copyFrom($temps[$i]);
+            $ht->append($copy);
+        }
+
+        return $ht;
+    }
+
+    private static function countConversionSpecs(string $format): int
+    {
+        $count = 0;
+        $len = VmString::byteLength($format);
+        for ($fpos = 0; $fpos < $len; ++$fpos) {
+            if ('%' !== $format[$fpos]) {
+                continue;
+            }
+            if ($fpos + 1 >= $len) {
+                break;
+            }
+            $spec = $format[++$fpos];
+            if ('%' !== $spec) {
+                ++$count;
+            }
+        }
+
+        return $count;
     }
 
     /**
