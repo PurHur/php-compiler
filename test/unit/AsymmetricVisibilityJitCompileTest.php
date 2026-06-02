@@ -30,9 +30,7 @@ final class AsymmetricVisibilityJitCompileTest extends TestCase
 
     public function testAsymmetricVisibilityModuleVerify(): void
     {
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(
-            <<<'PHP'
+        $this->assertModuleVerifies(<<<'PHP'
 <?php
 class Demo {
     public private(set) string $name = 'x';
@@ -40,9 +38,28 @@ class Demo {
 $d = new Demo();
 echo $d->name, "\n";
 $d->name = 'z';
-PHP,
-            'asymmetric_visibility_compile.php'
-        );
+PHP);
+    }
+
+    /** In-class writes on private(set) properties must compile (#4639). */
+    public function testAsymmetricVisibilityInClassWriteModuleVerify(): void
+    {
+        $this->assertModuleVerifies(<<<'PHP'
+<?php
+class Demo {
+    public private(set) string $name = 'x';
+    public function mutate(): void { $this->name = 'y'; }
+}
+$d = new Demo();
+$d->mutate();
+echo $d->name, "\n";
+PHP);
+    }
+
+    private function assertModuleVerifies(string $code): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'asymmetric_visibility_compile.php');
         $this->assertNotNull($block);
         $runtime->jitCompileBlock($block);
 

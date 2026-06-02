@@ -9,9 +9,11 @@ use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\PropertyVisibility;
+use PHPLLVM\Type;
+use PHPLLVM\Value\Function_;
 
 /**
- * Compile-time asymmetric set-visibility checks before JIT property stores (#3165, #4029).
+ * Compile-time asymmetric set-visibility checks before JIT property stores (#3165, #4029, #4639).
  *
  * php-src: Zend/zend_object_handlers.c zend_check_property_access
  */
@@ -55,9 +57,7 @@ final class AsymmetricVisibilityGuard
             return false;
         }
 
-        $callerLc = '' !== $context->scope->className
-            ? strtolower(ltrim($context->scope->className, '\\'))
-            : null;
+        $callerLc = self::callerClassLc($context, $enclosingBlock);
         try {
             PropertyVisibility::assertWritable(
                 $setVis,
@@ -76,16 +76,32 @@ final class AsymmetricVisibilityGuard
         return false;
     }
 
+    private static function callerClassLc(Context $context, ?Block $enclosingBlock): ?string
+    {
+        if (null !== $enclosingBlock?->func?->class) {
+            return strtolower(ltrim($enclosingBlock->func->class->value, '\\'));
+        }
+        if ('' !== $context->scope->className) {
+            return strtolower(ltrim($context->scope->className, '\\'));
+        }
+
+        return null;
+    }
+
     private static function emitViolation(Context $context, \PHPCompiler\JIT $jit, string $message): void
     {
         ErrorRaise::registerDeclarations($context);
         ErrorRaise::ensureLinked($context);
 
         $fn = $context->builder->getInsertBlock()->getParent();
-        assert($fn instanceof \PHPLLVM\Value\Function_);
+        assert($fn instanceof Function_);
         $entry = $context->builder->getInsertBlock();
+        if (null === $entry || null !== $entry->getTerminator()) {
+            return;
+        }
+
         $failBlock = $fn->appendBasicBlock('asymmetric_violation');
-        $exitBlock = $fn->appendBasicBlock('asymmetric_guard_exit');
+        $continueBlock = $fn->appendBasicBlock('asymmetric_guard_continue');
 
         $context->builder->positionAtEnd($entry);
         $context->builder->branch($failBlock);
@@ -94,21 +110,47 @@ final class AsymmetricVisibilityGuard
         if ([] !== $context->tryCatch->handlerStack) {
             TryCatchHelper::emitCatchableErrorMessage($context, $jit, $message);
         } else {
-            $msgLen = $context->constantFromInteger(strlen($message), 'size_t');
-            $msgCStr = $context->builder->pointerCast(
-                $context->constantFromString($message),
-                $context->getTypeFromString('int8*')
-            );
-            $context->builder->call(
-                $context->lookupFunction('__compiler_jit_raise_error'),
-                $msgCStr,
-                $msgLen
-            );
-            // returnVoid after pending raise — same as ReadonlyClassGuard (#3149, #4020).
-            $context->builder->returnVoid();
+            ErrorRaise::emitRaise($context, $message);
+            self::returnAfterPendingError($context, $fn);
         }
 
-        $context->builder->positionAtEnd($exitBlock);
+        $context->builder->positionAtEnd($continueBlock);
+    }
+
+    private static function returnAfterPendingError(Context $context, Function_ $fn): void
+    {
+        $fnType = $fn->typeOf();
+        if ($fnType instanceof \PHPLLVM\Type\Function_
+            && Type::KIND_VOID === $fnType->getReturnType()->getKind()) {
+            $context->builder->returnVoid();
+
+            return;
+        }
+        if ($fnType instanceof \PHPLLVM\Type\Function_) {
+            $returnType = $fnType->getReturnType();
+            if (Type::KIND_POINTER === $returnType->getKind()) {
+                $context->builder->returnValue($returnType->constNull());
+
+                return;
+            }
+            if (Type::KIND_INTEGER === $returnType->getKind()) {
+                $context->builder->returnValue($returnType->constInt(0, false));
+
+                return;
+            }
+            $structName = $context->getStringFromType($returnType);
+            if ('__value__' === $structName) {
+                $slot = JitValueBox::alloc($context);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeNull'),
+                    JitValueBox::pointer($context, $slot)
+                );
+                $context->builder->returnValue($context->builder->load($slot));
+
+                return;
+            }
+        }
+        $context->builder->returnVoid();
     }
 
     private static function isSubclassOf(Object_ $object, string $childLc, string $parentLc): bool
