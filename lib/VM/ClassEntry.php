@@ -50,6 +50,10 @@ class ClassEntry {
     public array $methodNames = [];
     /** @var array<string, Variable> constant name (lowercase) => value */
     public array $constants = [];
+    /** @var array<string, int> constant name (lowercase) => PHPCfg visibility flags (#4651) */
+    public array $constVisibility = [];
+    /** @var array<string, string> constant name (lowercase) => trait FQCN when imported via use Trait */
+    public array $traitConstSources = [];
     /** @var array<string, string> lowercase enum case name => declared case name (#3420) */
     public array $enumCaseCanonicalNames = [];
     /** @var list<array{name: string, value: Variable}> enum cases in declaration order (#3308) */

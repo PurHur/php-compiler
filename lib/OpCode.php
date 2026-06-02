@@ -244,6 +244,8 @@ class OpCode {
     public int $propertySetVisibility = 0;
     /** TYPE_CLASS_CONST_FETCH: `::class` on a runtime expression operand (must be object, #4241). */
     public bool $classConstFetchOnObject = false;
+    /** TYPE_DECLARE_CLASS_CONST: PHPCfg visibility flags (#4651). */
+    public int $classConstVisibilityFlags = 0;
 
     /** TYPE_INCLUDE: include/require + once/non-once semantics (issue #4426). */
     public int $includeKind = self::INCLUDE_KIND_INCLUDE_ONCE;
