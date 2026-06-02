@@ -310,10 +310,23 @@ class VM {
     }
 
     /**
-     * isset($obj->prop) — Zend zend_std_has_property / __isset parity (#3298).
+     * isset($obj->prop) — Zend zend_std_has_property / __isset parity (#3298, #4586).
      */
-    public function objectPropertyIsSet(ObjectEntry $object, string $propName): bool
+    public function objectPropertyIsSet(ObjectEntry $object, string $propName, ?Frame $frame = null): bool
     {
+        if (null !== $frame) {
+            $meta = $this->classPropertyMeta($object, $propName);
+            $getLc = $meta?->getHookMethodLc
+                ?? strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($propName));
+            if (isset($object->class->methods[$getLc])) {
+                $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
+                if (null !== $hookValue) {
+                    $value = $hookValue->resolveIndirect();
+
+                    return !$value->isUndefined() && Variable::TYPE_NULL !== $value->type;
+                }
+            }
+        }
         $props = $object->getRawProperties();
         if (isset($props[$propName])) {
             $value = $props[$propName]->resolveIndirect();
@@ -2619,7 +2632,7 @@ restart:
                             }
                             $propName = $frame->scope[$op->arg3]->toString();
                             VM\LazyObjectSupport::ensureInitialized($this, $object);
-                            $dst->bool($this->objectPropertyIsSet($object, $propName));
+                            $dst->bool($this->objectPropertyIsSet($object, $propName, $frame));
                             break;
                         }
                         $dst->bool(false);

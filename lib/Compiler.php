@@ -1054,9 +1054,9 @@ class Compiler {
                     } elseif (
                         $child instanceof Op\Expr\PropertyFetch
                         && $i + 1 < $opCount
-                        && $this->isPropertyFetchOnlyEmptyVar($child, $ops[$i + 1])
+                        && $this->isPropertyFetchOnlyEmptyVar($child, $ops[$i + 1], $block)
                     ) {
-                        // Lowered by compileExpr Empty_ via TYPE_ISSET + TYPE_BOOLEAN_NOT (#3298).
+                        // Lowered by compileExpr Empty_ via TYPE_ISSET + TYPE_BOOLEAN_NOT (#3298, #4586).
                         break;
                     } elseif (
                         $child instanceof Op\Expr\ArrayDimFetch
@@ -1801,13 +1801,14 @@ class Compiler {
 
     private function isPropertyFetchOnlyEmptyVar(
         Op\Expr\PropertyFetch $fetch,
-        Op $next
+        Op $next,
+        Block $block
     ): bool {
         if (!$next instanceof Op\Expr\Empty_) {
             return false;
         }
         $target = $next->expr;
-        if ($target === $fetch) {
+        if ($target === $fetch || $target === $fetch->result) {
             return true;
         }
         while ($target instanceof Temporary) {
@@ -1819,8 +1820,11 @@ class Compiler {
             }
             $target = $target->original;
         }
+        if ($target === $fetch->result) {
+            return true;
+        }
 
-        return $target === $fetch->result;
+        return $this->findCoalescePropertyFetch($target, $block) === $fetch;
     }
 
     private function isPropertyFetchOnlyUnsetVar(
@@ -3619,6 +3623,9 @@ class Compiler {
             case Op\Expr\Clone_::class:
             case Op\Expr\Empty_::class:
                 $propFetch = $this->unwrapPropertyFetch($expr->expr);
+                if (null === $propFetch) {
+                    $propFetch = $this->findCoalescePropertyFetch($expr->expr, $block);
+                }
                 if (null !== $propFetch) {
                     $resultSlot = $this->compileOperand($expr->result, $block, false);
                     $checkSlot = $this->compileBoolTemporary($block);
@@ -5176,9 +5183,21 @@ class Compiler {
         if (null !== $direct) {
             return $direct;
         }
-        foreach ($block->orig->children as $child) {
-            if ($child instanceof Op\Expr\PropertyFetch && $child->result === $operand) {
-                return $child;
+        $candidates = [$operand];
+        $seen = [];
+        while ([] !== $candidates) {
+            $current = array_shift($candidates);
+            if (isset($seen[spl_object_id($current)])) {
+                continue;
+            }
+            $seen[spl_object_id($current)] = true;
+            foreach ($block->orig->children as $child) {
+                if ($child instanceof Op\Expr\PropertyFetch && $child->result === $current) {
+                    return $child;
+                }
+            }
+            if ($current instanceof Temporary && null !== $current->original) {
+                $candidates[] = $current->original;
             }
         }
 
