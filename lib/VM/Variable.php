@@ -794,6 +794,11 @@ final class Variable {
             return false;
         }
         if (self::TYPE_OBJECT === $self->type) {
+            if (EnumCaseSupport::isEnumCase($self->object) && EnumCaseSupport::isEnumCase($other->object)) {
+                return $self->object->class === $other->object->class
+                    && 0 === strcasecmp($self->object->enumCaseName ?? '', $other->object->enumCaseName ?? '');
+            }
+
             return $self->object === $other->object;
         }
         if (self::TYPE_STRING === $self->type) {

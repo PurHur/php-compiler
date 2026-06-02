@@ -507,11 +507,10 @@ class Compiler {
             $this->inheritCfgVarSlotsFromSiblingCfgBranches($block, $new);
             $this->applyTernaryMergeVarSlots($block, $new);
             $this->inheritFuncFromParent($new, $parent);
+            // Match/ternary branch blocks reuse unnamed temporaries (subject slot) from the parent (#4274).
+            $new->inheritUndefinedLocals = true;
             if ($block instanceof ErrorSuppressBlock) {
-                $new->inheritUndefinedLocals = true;
                 $new->addOpCode(new OpCode(OpCode::TYPE_BEGIN_SILENCE));
-            } elseif ($this->isErrorSuppressEndBlock($block)) {
-                $new->inheritUndefinedLocals = true;
             }
             $this->compileBlock($new);
             $this->recordTernaryMergeVarSlots($block, $new);

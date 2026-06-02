@@ -22,6 +22,7 @@ final class MatchVMTest extends BaseTest
                 'match_guard.phpt',
                 'match_arm_assign.phpt',
                 'match_unhandled.phpt',
+                'match_enum_case.phpt',
             ] as $file
         ) {
             yield $file => self::parsePHPT(
