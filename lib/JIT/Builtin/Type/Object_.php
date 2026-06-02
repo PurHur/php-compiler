@@ -27,6 +27,7 @@ use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\MagicMethodDispatch;
 use PHPCompiler\JIT\PropertyHookDispatch;
+use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable as VMVariable;
@@ -1832,6 +1833,33 @@ class Object_ extends Type {
         return null;
     }
 
+    /**
+     * Resolve [declaring class id, slot index] walking the extends chain (#4614, zend_object_handlers.c).
+     *
+     * @return array{0: int, 1: int}|null
+     */
+    public function resolvePropertySlot(string $className, string $propName): ?array
+    {
+        $currentLc = strtolower(ltrim($className, '\\'));
+        for ($depth = 0; $depth < 64; ++$depth) {
+            if (!isset($this->classes[$currentLc])) {
+                break;
+            }
+            $classId = $this->classes[$currentLc];
+            $slotIndex = $this->propertySlotIndex($classId, $propName);
+            if (null !== $slotIndex) {
+                return [$classId, $slotIndex];
+            }
+            $parent = $this->classParentLc[$currentLc] ?? null;
+            if (null === $parent) {
+                break;
+            }
+            $currentLc = $parent;
+        }
+
+        return null;
+    }
+
     public function propertySlotHasCompileTimeDefault(int $classId, int $slotIndex): bool
     {
         return isset($this->propertyDefaults[$classId][$slotIndex]);
@@ -3411,6 +3439,7 @@ class Object_ extends Type {
             $this->context->builder->branchIf($match, $caseBlock, $nextCheck);
             $this->context->builder->positionAtEnd($caseBlock);
             $fetched = $this->propertyFetch($obj, $class, $propName);
+            TypedPropertyUninitGuard::emitBeforeRead($this->context, $fetched);
             $this->boxFetchedPropertyIntoValue($destSlot, $fetched, $propset[2]);
             $this->context->builder->branch($done);
             $checkBlock = $nextCheck;
