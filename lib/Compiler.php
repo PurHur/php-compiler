@@ -985,24 +985,26 @@ class Compiler {
                         $block = $this->compileNullsafeArrayDimFetch($child, $block);
                     } elseif (
                         $child instanceof Op\Expr\ArrayDimFetch
-                        && $i + 1 < $opCount
-                        && $ops[$i + 1] instanceof Op\Expr\BinaryOp\Coalesce
-                        && $this->isArrayDimFetchOnlyCoalesceLeft($child, $ops[$i + 1])
+                        && null !== ($coalesceMatch = $this->findCoalesceUsingArrayDimFetchLeft($child, $ops, $i))
                     ) {
                         /** @var Op\Expr\BinaryOp\Coalesce $coalesce */
-                        $coalesce = $ops[$i + 1];
+                        [$coalesce, $coalesceIndex] = $coalesceMatch;
                         $resultOverride = null;
                         if (
-                            $i + 2 < $opCount
-                            && $ops[$i + 2] instanceof Op\Expr\Assign
-                            && $this->isRedundantCoalesceTailAssign($ops[$i + 2], $child, $coalesce)
+                            $coalesceIndex + 1 < $opCount
+                            && $ops[$coalesceIndex + 1] instanceof Op\Expr\Assign
+                            && $this->isRedundantCoalesceTailAssign(
+                                $ops[$coalesceIndex + 1],
+                                $child,
+                                $coalesce
+                            )
                         ) {
                             /** @var Op\Expr\Assign $tailAssign */
-                            $tailAssign = $ops[$i + 2];
+                            $tailAssign = $ops[$coalesceIndex + 1];
                             $resultOverride = $tailAssign->var;
                         }
                         $block = $this->compileCoalesceForAssign($coalesce, $block, $resultOverride);
-                        ++$i;
+                        $i = $coalesceIndex;
                         if (null !== $resultOverride) {
                             ++$i;
                         }
@@ -1315,6 +1317,38 @@ class Compiler {
         }
 
         return $left === $fetch->result;
+    }
+
+    /**
+     * php-cfg may emit RHS expr stmts (FuncCall, …) between ArrayDimFetch and Coalesce (#4416).
+     *
+     * @param Op[] $ops
+     *
+     * @return ?array{0: Op\Expr\BinaryOp\Coalesce, 1: int}
+     */
+    private function findCoalesceUsingArrayDimFetchLeft(
+        Op\Expr\ArrayDimFetch $fetch,
+        array $ops,
+        int $index
+    ): ?array {
+        $count = count($ops);
+        for ($j = $index + 1; $j < $count; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Expr\BinaryOp\Coalesce) {
+                if (!$this->isArrayDimFetchOnlyCoalesceLeft($fetch, $next)) {
+                    return null;
+                }
+
+                return [$next, $j];
+            }
+            if ($this->isLoweredByFollowingCoalesce($next, $ops, $j)) {
+                continue;
+            }
+
+            return null;
+        }
+
+        return null;
     }
 
     /**
