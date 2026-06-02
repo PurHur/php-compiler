@@ -3,6 +3,7 @@
  * Linked with LLVM object code; reads getenv and repopulates sg_* globals.
  */
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -2184,6 +2185,17 @@ __string__ *__compiler_number_format(
     __string__ *dec_sep,
     __string__ *thou_sep
 ) {
+    (void) decimals;
+    (void) dec_sep;
+    (void) thou_sep;
+
+    if (isnan(num)) {
+        return cstr_to_string("nan");
+    }
+    if (isinf(num)) {
+        return cstr_to_string("inf");
+    }
+
     char buf[128];
     char int_buf[64];
     char frac_buf[32];

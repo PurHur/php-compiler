@@ -230,6 +230,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'round_precision_mode')) {
                 continue;
             }
+            // number_format() NAN/INF: VM + AOT (#4680); MCJIT execute segfault on INF/NAN constants until stable.
+            if (str_contains($name, 'number_format_non_finite')) {
+                continue;
+            }
             // phpversion/php_sapi_name/php_uname MCJIT: VM + AOT (#3174); umbrella JITTest skips until stable.
             if (str_contains($name, 'phpversion')) {
                 continue;

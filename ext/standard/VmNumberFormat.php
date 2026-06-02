@@ -42,6 +42,14 @@ final class VmNumberFormat
         string $decimalSeparator = '.',
         string $thousandsSeparator = ','
     ): string {
+        // php-src ext/standard/math.c _php_math_number_format_ex: non-finite via %F, lowercased
+        if (\is_nan($number)) {
+            return 'nan';
+        }
+        if (\is_infinite($number)) {
+            return 'inf';
+        }
+
         $negative = $number < 0.0;
         if ($negative) {
             $number = -$number;

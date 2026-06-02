@@ -55,6 +55,59 @@ class Helper {
             case Variable::TYPE_VALUE:
                 switch ($opcode->type) {
                     case OpCode::TYPE_UNARY_MINUS:
+                        $constName = strtolower($var->compileTimeConstantName ?? '');
+                        if ('inf' === $constName) {
+                            $result = $this->context->getTypeFromString('double')->constReal(-INF);
+                            goto return_double;
+                        }
+                        if ('nan' === $constName) {
+                            $result = $this->context->getTypeFromString('double')->constReal(NAN);
+                            goto return_double;
+                        }
+                        if (JitValueBox::isValueOperand($var)) {
+                            $valuePtr = JitValueBox::valuePtrFromVariable($this->context, $var);
+                            $map = $this->context->structFieldMap['__value__'];
+                            $typeByte = $this->context->builder->load(
+                                $this->context->builder->structGep($valuePtr, $map['type'])
+                            );
+                            $i8 = $this->context->getTypeFromString('int8');
+                            $doubleBlock = BasicBlockHelper::append($this->context, 'unary_minus_vbox_double');
+                            $longBlock = BasicBlockHelper::append($this->context, 'unary_minus_vbox_long');
+                            $doneBlock = BasicBlockHelper::append($this->context, 'unary_minus_vbox_done');
+                            $this->context->builder->branchIf(
+                                $this->context->builder->icmp(
+                                    Builder::INT_EQ,
+                                    $typeByte,
+                                    $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+                                ),
+                                $doubleBlock,
+                                $longBlock
+                            );
+                            $this->context->builder->positionAtEnd($doubleBlock);
+                            $dval = $this->context->builder->call(
+                                $this->context->lookupFunction('__value__readDouble'),
+                                $valuePtr
+                            );
+                            $dneg = $this->context->builder->fNegate($dval);
+                            $doubleEnd = $this->context->builder->getInsertBlock();
+                            $this->context->builder->branch($doneBlock);
+                            $this->context->builder->positionAtEnd($longBlock);
+                            $lval = $this->context->builder->call(
+                                $this->context->lookupFunction('__value__readLong'),
+                                $valuePtr
+                            );
+                            $lneg = $this->context->builder->negate($lval);
+                            $f64 = $this->context->getTypeFromString('double');
+                            $lnegFloat = $this->context->builder->sitofp($lneg, $f64);
+                            $longEnd = $this->context->builder->getInsertBlock();
+                            $this->context->builder->branch($doneBlock);
+                            $this->context->builder->positionAtEnd($doneBlock);
+                            $dphi = $this->context->builder->phi($f64, 'unary_minus_vbox_double_phi');
+                            $dphi->addIncoming($dneg, $doubleEnd);
+                            $dphi->addIncoming($lnegFloat, $longEnd);
+                            $result = $dphi;
+                            goto return_double;
+                        }
                         $long = JitLongArg::lower($this->context, $var, 'unary minus operand');
                         $result = $this->context->builder->negate($long);
                         goto return_long;
