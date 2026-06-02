@@ -75,7 +75,7 @@ $c->f();
 PHP;
         $rt = new Runtime();
         $block = $rt->parseAndCompile($code, 'trait_vis.php');
-        $this->expectException(\LogicException::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Call to private method');
         $rt->run($block);
     }

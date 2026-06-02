@@ -7890,39 +7890,63 @@ class JIT {
             $traitLcFilter = null !== ($adaptation['trait'] ?? null)
                 ? strtolower(ltrim((string) $adaptation['trait'], '\\'))
                 : null;
-            if (!isset($merged[$methodLc])) {
-                $traitPrefix = null !== ($adaptation['trait'] ?? null)
-                    ? (string) $adaptation['trait'] . '::'
-                    : '';
-                throw new \LogicException(
-                    'An alias was defined for ' . $traitPrefix . (string) ($adaptation['method'] ?? '')
-                    . ' but this method does not exist'
-                );
-            }
-            if (null !== $traitLcFilter && $merged[$methodLc]['traitLc'] !== $traitLcFilter) {
-                throw new \LogicException(
-                    'An alias was defined for ' . (string) ($adaptation['trait'] ?? '') . '::' . (string) ($adaptation['method'] ?? '')
-                    . ' but this method does not exist'
-                );
-            }
             $newName = $adaptation['newName'] ?? null;
             $newModifier = $adaptation['newModifier'] ?? null;
             if (null === $newName && null === $newModifier) {
                 continue;
             }
-            $data = $merged[$methodLc];
-            if (null !== $newModifier) {
-                $data['vis'] = (int) $newModifier;
-            }
+
+            $traitPrefix = null !== ($adaptation['trait'] ?? null)
+                ? (string) $adaptation['trait'] . '::'
+                : '';
+
             if (null === $newName) {
-                $merged[$methodLc] = $data;
+                if (!isset($merged[$methodLc])) {
+                    throw new \LogicException(
+                        'An alias was defined for ' . $traitPrefix . (string) ($adaptation['method'] ?? '')
+                        . ' but this method does not exist'
+                    );
+                }
+                if (null !== $traitLcFilter && $merged[$methodLc]['traitLc'] !== $traitLcFilter) {
+                    throw new \LogicException(
+                        'An alias was defined for ' . (string) ($adaptation['trait'] ?? '') . '::' . (string) ($adaptation['method'] ?? '')
+                        . ' but this method does not exist'
+                    );
+                }
+                if (null !== $newModifier) {
+                    $merged[$methodLc]['vis'] = (int) $newModifier;
+                }
+
                 continue;
             }
+
             $newNameLc = strtolower((string) $newName);
-            unset($merged[$methodLc]);
             if (isset($merged[$newNameLc])) {
                 throw new \LogicException('Cannot redefine method ' . $newName);
             }
+
+            if (null !== $traitLcFilter) {
+                if (!isset($usedTraitNameByLc[$traitLcFilter]) || !isset($perTraitMethods[$traitLcFilter][$methodLc])) {
+                    throw new \LogicException(
+                        'An alias was defined for ' . (string) ($adaptation['trait'] ?? '') . '::' . (string) ($adaptation['method'] ?? '')
+                        . ' but this method does not exist'
+                    );
+                }
+                $data = $perTraitMethods[$traitLcFilter][$methodLc];
+            } else {
+                if (!isset($merged[$methodLc])) {
+                    throw new \LogicException(
+                        'An alias was defined for ' . $traitPrefix . (string) ($adaptation['method'] ?? '')
+                        . ' but this method does not exist'
+                    );
+                }
+                $data = $merged[$methodLc];
+            }
+
+            if (null !== $newModifier) {
+                $data['vis'] = (int) $newModifier;
+            }
+            $data['sourceMethodLc'] = $methodLc;
             $data['methodLc'] = $newNameLc;
             $merged[$newNameLc] = $data;
         }
