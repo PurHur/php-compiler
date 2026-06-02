@@ -304,6 +304,7 @@ class Runtime {
         $this->compiler->setBareRethrowLines($bareRethrowLines);
         $code = AsymmetricVisibilityRewriter::rewrite($code);
         $code = PipeOperatorDesugar::desugar($code);
+        $fileStrictTypes = $this->detectFileStrictTypes($code);
         try {
             $script = $this->parser->parse($code, $filename);
         } finally {
@@ -316,7 +317,76 @@ class Runtime {
         }
         $this->postprocessor->traverse($script);
         $this->detector->detect($script);
+        // `declare(strict_types=1)` is file-scoped and influences call-site scalar type checks.
+        // Some parser paths miss the directive when `<?php declare(...)` shares a line (#4411).
+        if ($fileStrictTypes) {
+            $script->main->strictTypes = true;
+        }
         return $script;
+    }
+
+    private function detectFileStrictTypes(string $code): bool
+    {
+        if (!\function_exists('token_get_all')) {
+            return false;
+        }
+        $tokens = @token_get_all($code);
+        if (!\is_array($tokens)) {
+            return false;
+        }
+        $i = 0;
+        $n = \count($tokens);
+        while ($i < $n) {
+            $t = $tokens[$i];
+            $id = \is_array($t) ? $t[0] : null;
+            if (\in_array($id, [T_OPEN_TAG, T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
+                ++$i;
+                continue;
+            }
+            break;
+        }
+        if ($i >= $n) {
+            return false;
+        }
+        $t = $tokens[$i];
+        if (!\is_array($t) || T_DECLARE !== $t[0]) {
+            return false;
+        }
+        ++$i;
+        while ($i < $n) {
+            $t = $tokens[$i];
+            $text = \is_array($t) ? (string) $t[1] : (string) $t;
+            if ('(' === $text) {
+                break;
+            }
+            ++$i;
+        }
+        if ($i >= $n) {
+            return false;
+        }
+        ++$i; // after '('
+        $level = 1;
+        $body = '';
+        for (; $i < $n; ++$i) {
+            $t = $tokens[$i];
+            $text = \is_array($t) ? (string) $t[1] : (string) $t;
+            if ('(' === $text) {
+                ++$level;
+            } elseif (')' === $text) {
+                --$level;
+                if (0 === $level) {
+                    break;
+                }
+            }
+            if ($level > 0) {
+                $body .= $text;
+            }
+        }
+        if ('' === $body) {
+            return false;
+        }
+
+        return (bool) preg_match('/\\bstrict_types\\s*=\\s*1\\b/i', $body);
     }
 
     /**
