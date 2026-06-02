@@ -145,6 +145,9 @@ final class Variable {
     /** Native call proxy when this object is a JIT-lowered closure (#72). */
     public ?Call $closureCall = null;
 
+    /** Anonymous `static function` — cannot bind $this (Zend zend_closures.c, #4613). */
+    public bool $closureIsStatic = false;
+
     /** Heap {@see __generator_state__*} for JIT Generator objects (#3074). */
     public ?\PHPLLVM\Value $generatorStatePtr = null;
 

@@ -110,6 +110,9 @@ final class ClosureSupport
         if (null !== $state->wrappedFunc || null !== $state->methodName) {
             return null;
         }
+        if (Variable::TYPE_OBJECT === $newThis->type && $state->isStaticClosure()) {
+            throw new \Error('Cannot bind static closure to object');
+        }
         $bound = $state->cloneForBind();
         if (Variable::TYPE_NULL === $newThis->type) {
             $bound->boundThis = null;

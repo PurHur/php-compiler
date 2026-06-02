@@ -6141,6 +6141,15 @@ class JIT {
                         $callProxy,
                         $internalName
                     );
+                    $isStaticClosure = null !== $op->block1->func
+                        && (($op->block1->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0;
+                    if ($isStaticClosure) {
+                        $closureObj->closureIsStatic = true;
+                        JIT\ClosureBindHelper::storeStaticClosureFlag(
+                            $this->context,
+                            $this->context->helper->loadValue($closureObj)
+                        );
+                    }
                     if (null !== $block->func && null !== $block->func->class) {
                         JIT\ClosureBindHelper::ensureClosureBindingProperties($this->context);
 
@@ -6154,8 +6163,6 @@ class JIT {
                         );
                         $boundScope->compileTimeString = $scopeName;
 
-                        $isStaticClosure = null !== $op->block1->func
-                            && (($op->block1->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0;
                         $boundThis = JIT\ClosureHelper::nullCapture($this->context);
                         if (!$isStaticClosure) {
                             $thisVar = $this->context->variableForScopedName('this');

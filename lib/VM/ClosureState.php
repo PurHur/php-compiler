@@ -93,6 +93,21 @@ final class ClosureState
         return null === $this->wrappedFunc && null === $this->methodName;
     }
 
+    /** Zend zend_closure_bind(): static closures cannot receive a bound $this. */
+    public function isStaticClosure(): bool
+    {
+        $compilerFunc = $this->wrappedFunc ?? $this->func;
+        if (!$compilerFunc instanceof Func\PHP) {
+            return false;
+        }
+        $cfgFunc = $compilerFunc->block->func ?? null;
+        if (null === $cfgFunc) {
+            return false;
+        }
+
+        return (($cfgFunc->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0;
+    }
+
     public static function register(Context $ctx): void
     {
         $entry = new ClassEntry('Closure');
