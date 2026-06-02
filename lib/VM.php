@@ -2310,10 +2310,14 @@ restart:
                     break;
                 case OpCode::TYPE_DECLARE_GLOBAL_CONST:
                     $name = $frame->scope[$op->arg1]->toString();
-                    if (!isset($frame->block->constants[$op->arg2])) {
+                    if (isset($frame->block->constants[$op->arg2])) {
+                        $constValue = $frame->block->constants[$op->arg2];
+                    } elseif (isset($frame->scope[$op->arg2])) {
+                        $constValue = VM\ClassConstMaterializer::detachConstantValue($frame->scope[$op->arg2]);
+                    } else {
                         throw new \LogicException('Global constant value must be a compile-time constant');
                     }
-                    if (!$this->context->defineConstant($name, $frame->block->constants[$op->arg2])) {
+                    if (!$this->context->defineConstant($name, $constValue)) {
                         throw new \LogicException("Cannot redefine constant {$name}");
                     }
                     break;

@@ -6383,15 +6383,30 @@ class JIT {
                 case OpCode::TYPE_DECLARE_GLOBAL_CONST:
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
-                    if (!isset($block->constants[$op->arg2])) {
+                    if (isset($block->constants[$op->arg2])) {
+                        $constValue = $block->constants[$op->arg2];
+                    } else {
                         if ($this->shouldUseSelfHostJitStubs()) {
                             break;
                         }
-                        throw new \LogicException('Global constant value must be a compile-time constant');
+                        $vm = new VM($this->context->runtime->vmContext);
+                        $frame = $block->getFrame($vm->context);
+                        foreach ($block->opCodes as $initOp) {
+                            if (OpCode::TYPE_DECLARE_GLOBAL_CONST === $initOp->type && $op->arg2 === $initOp->arg2) {
+                                break;
+                            }
+                            if ($vm->isClassBodyConstInitOpcode($initOp->type)) {
+                                $vm->executeClassBodyConstInitOpcode($frame, $initOp);
+                            }
+                        }
+                        if (!isset($frame->scope[$op->arg2])) {
+                            throw new \LogicException('Global constant value must be a compile-time constant');
+                        }
+                        $constValue = VM\ClassConstMaterializer::detachConstantValue($frame->scope[$op->arg2]);
                     }
                     if (!$this->context->runtime->vmContext->defineConstant(
                         $nameOp->value,
-                        $block->constants[$op->arg2]
+                        $constValue
                     )) {
                         // Spine may require bin/vm.php after tokenizer-compat shims (#2134).
                         if ($this->shouldUseSelfHostJitStubs()) {

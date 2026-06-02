@@ -4964,7 +4964,7 @@ class Compiler {
             if (!empty($unpackFlags[$i])) {
                 return null;
             }
-            $valueVm = $this->vmVariableFromCfgLiteralOperand($expr->values[$i]);
+            $valueVm = $this->compileTimeVariableFromCfgArrayElement($expr->values[$i]);
             if (null === $valueVm) {
                 return null;
             }
@@ -4993,6 +4993,29 @@ class Compiler {
         $vmArray->array($ht);
 
         return $vmArray;
+    }
+
+    protected function compileTimeVariableFromCfgArrayElement(Operand $operand): ?Variable
+    {
+        $vm = $this->vmVariableFromCfgLiteralOperand($operand);
+        if (null !== $vm) {
+            return $vm;
+        }
+        $nested = $this->unwrapCfgArrayExprOperand($operand);
+        if (null !== $nested) {
+            return $this->tryBuildCompileTimeArrayFromExpr($nested);
+        }
+
+        return null;
+    }
+
+    protected function unwrapCfgArrayExprOperand(Operand $operand): ?Op\Expr\Array_
+    {
+        while ($operand instanceof Operand\Temporary && null !== $operand->original) {
+            $operand = $operand->original;
+        }
+
+        return $operand instanceof Op\Expr\Array_ ? $operand : null;
     }
 
     protected function vmVariableFromCfgLiteralOperand(Operand $operand): ?Variable
@@ -6055,13 +6078,36 @@ class Compiler {
 
     protected function compileGlobalConst(Op\Terminal\Const_ $const, Block $block): OpCode
     {
-        $this->compileOps($const->valueBlock->children, $block);
+        $valueSlot = $this->tryFoldGlobalConstValueSlot($const, $block);
+        if (null === $valueSlot) {
+            $this->compileOps($const->valueBlock->children, $block);
+            $valueSlot = $this->compileOperand($const->value, $block, true);
+        }
 
         return new OpCode(
             OpCode::TYPE_DECLARE_GLOBAL_CONST,
             $this->compileOperand($const->name, $block, true),
-            $this->compileOperand($const->value, $block, true)
+            $valueSlot
         );
+    }
+
+    protected function tryFoldGlobalConstValueSlot(Op\Terminal\Const_ $terminal, Block $block): ?int
+    {
+        if (null !== $terminal->valueBlock && [] !== $terminal->valueBlock->children) {
+            $children = $terminal->valueBlock->children;
+            if (1 === \count($children) && $children[0] instanceof Op\Expr\Array_) {
+                $vm = $this->tryBuildCompileTimeArrayFromExpr($children[0]);
+                if (null !== $vm) {
+                    return $block->registerConstant(new Operand\Temporary(), $vm);
+                }
+            }
+        }
+        $vm = $this->vmVariableFromCfgLiteralOperand($terminal->value);
+        if (null === $vm) {
+            return null;
+        }
+
+        return $block->registerConstant(new Operand\Temporary(), $vm);
     }
 
     protected function operandIsInvokableReceiver(Operand $operand, Block $block): bool
