@@ -76,4 +76,40 @@ final class EnumCaseSupport
                 throw new \Error("Object of class {$className} could not be converted to string");
         }
     }
+
+    /**
+     * Zend {@see zend_compare_enum()} (#4554).
+     *
+     * Identical case singleton: 0. Different cases (same enum): 1. Different enums: 1.
+     */
+    public static function compareSpaceship(ObjectEntry $left, ObjectEntry $right): int
+    {
+        if (!$left->isEnumCase || !$right->isEnumCase) {
+            throw new \LogicException('compareSpaceship requires enum case objects');
+        }
+        if ($left === $right) {
+            return 0;
+        }
+        if ($left->class !== $right->class) {
+            return 1;
+        }
+        if (0 === strcasecmp($left->enumCaseName ?? '', $right->enumCaseName ?? '')) {
+            return 0;
+        }
+
+        return 1;
+    }
+
+    /** @see EnumCaseEntry spaceship for TYPE_ENUM_CASE operands (#4554). */
+    public static function compareEnumCaseEntrySpaceship(EnumCaseEntry $left, EnumCaseEntry $right): int
+    {
+        if ($left->enumClass !== $right->enumClass) {
+            return 1;
+        }
+        if ($left->caseName === $right->caseName) {
+            return 0;
+        }
+
+        return 1;
+    }
 }
