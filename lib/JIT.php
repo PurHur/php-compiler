@@ -7356,6 +7356,9 @@ class JIT {
 
     private function assignCallResultOperand(Operand $result, PHPLLVM\Value $llvmResult, bool $returnsByRef): void
     {
+        if ('void' === $this->context->getStringFromType($llvmResult->typeOf())) {
+            return;
+        }
         if (!$returnsByRef) {
             $this->assignOperandValue($result, $llvmResult);
 
@@ -7555,12 +7558,16 @@ class JIT {
                     $declaredJitType = Variable::getTypeFromType($block->getOperand($op->arg3)->type);
                     if (Variable::TYPE_HASHTABLE === $declaredJitType || Variable::TYPE_STRING === $declaredJitType) {
                         $jitType = $declaredJitType;
-                        if (Variable::TYPE_HASHTABLE === $declaredJitType) {
-                            $lcClass = strtolower(str_replace('/', '\\', ltrim($className, '\\')));
-                            if (
-                                !str_starts_with($lcClass, 'phpcfg\\')
-                                && !str_starts_with($lcClass, 'phpcompiler\\')
-                            ) {
+                        $lcClass = strtolower(str_replace('/', '\\', ltrim($className, '\\')));
+                        if (
+                            !str_starts_with($lcClass, 'phpcfg\\')
+                            && !str_starts_with($lcClass, 'phpcompiler\\')
+                        ) {
+                            if (Variable::TYPE_HASHTABLE === $declaredJitType) {
+                                $jitType = Variable::TYPE_VALUE;
+                            }
+                            // User string properties: boxed __value__ slots (fetch/store parity, #4598).
+                            if (Variable::TYPE_STRING === $declaredJitType) {
                                 $jitType = Variable::TYPE_VALUE;
                             }
                         }

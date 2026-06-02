@@ -3576,6 +3576,34 @@ class Object_ extends Type {
             return;
         }
 
+        if (Variable::TYPE_STRING === $propertyType) {
+            $stringPtr = null;
+            if (Variable::TYPE_STRING === $value->type) {
+                $str = $this->context->helper->loadValue($value);
+                $stringPtr = $this->context->builder->call(
+                    $this->context->lookupFunction('__string__separate'),
+                    $str
+                );
+            } elseif (Variable::TYPE_VALUE === $value->type) {
+                $valuePtr = Variable::KIND_VARIABLE === $value->kind
+                    ? JitValueBox::pointer($this->context, $value->value)
+                    : $value->value;
+                $stringPtr = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readString'),
+                    $valuePtr
+                );
+            }
+            if (null !== $stringPtr) {
+                $this->context->builder->store(
+                    $this->context->builder->pointerCast($stringPtr, $voidPtr),
+                    $slot
+                );
+                $value->addref();
+
+                return;
+            }
+        }
+
         $valueType = $this->context->getTypeFromString('__value__');
         $heapVal = $this->context->memory->malloc($valueType);
         $heapPtr = $this->context->builder->pointerCast(
