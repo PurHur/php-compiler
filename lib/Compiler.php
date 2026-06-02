@@ -874,8 +874,71 @@ class Compiler {
                     break;
             }
         }
+
+        // php-cfg may linearize nullsafe-call arguments into eager temporaries:
+        //
+        //   $t = sideEffect();
+        //   $c?->f($t);
+        //
+        // For PHP semantics, those argument temporaries must only be evaluated on the
+        // non-null receiver branch (Zend `?->` short-circuit). We detect a small
+        // producer slice that is used exclusively to feed a nullsafe method-call
+        // argument and compile that slice into the nullsafe fetch block instead (#4394).
+        $deferredNullsafePreludeOps = new SplObjectStorage();
+        $deferredOpIndexes = [];
         $opCount = count($ops);
         for ($i = 0; $i < $opCount; ++$i) {
+            $child = $ops[$i];
+            if (!$child instanceof Op\Expr\NullsafeMethodCall) {
+                continue;
+            }
+
+            $needed = [];
+            foreach ($child->args as $arg) {
+                if ($arg instanceof \PHPCfg\Operand\Temporary) {
+                    $needed[spl_object_id($arg)] = $arg;
+                }
+            }
+            if (empty($needed)) {
+                continue;
+            }
+
+            $slice = [];
+            for ($j = $i - 1; $j >= 0 && !empty($needed); --$j) {
+                $candidate = $ops[$j] ?? null;
+                if (!$candidate instanceof Op\Expr) {
+                    break;
+                }
+                if ($candidate instanceof Op\Expr\Assign) {
+                    break;
+                }
+                if (!property_exists($candidate, 'result') || !$candidate->result instanceof \PHPCfg\Operand\Temporary) {
+                    break;
+                }
+                $resultVar = $candidate->result;
+                if (!isset($needed[spl_object_id($resultVar)])) {
+                    continue;
+                }
+
+                $slice[] = $candidate;
+                unset($needed[spl_object_id($resultVar)]);
+                $deferredOpIndexes[$j] = true;
+
+                foreach ($this->nullsafePreludeOperandVars($candidate) as $dep) {
+                    if ($dep instanceof \PHPCfg\Operand\Temporary) {
+                        $needed[spl_object_id($dep)] = $dep;
+                    }
+                }
+            }
+
+            if (!empty($slice)) {
+                $deferredNullsafePreludeOps[$child] = array_reverse($slice);
+            }
+        }
+        for ($i = 0; $i < $opCount; ++$i) {
+            if (isset($deferredOpIndexes[$i])) {
+                continue;
+            }
             $child = $ops[$i];
             $this->debugWriteLastPhase('Compiler::compileOps op', $block, $child);
             switch (get_class($child)) {
@@ -910,7 +973,11 @@ class Compiler {
                     } elseif ($child instanceof Op\Expr\NullsafePropertyFetch) {
                         $block = $this->compileNullsafePropertyFetch($child, $block);
                     } elseif ($child instanceof Op\Expr\NullsafeMethodCall) {
-                        $block = $this->compileNullsafeMethodCall($child, $block);
+                        $block = $this->compileNullsafeMethodCall(
+                            $child,
+                            $block,
+                            $deferredNullsafePreludeOps->contains($child) ? $deferredNullsafePreludeOps[$child] : []
+                        );
                     } elseif ($this->isNullsafeChainArrayDimFetch($ops, $i)) {
                         /** @var Op\Expr\ArrayDimFetch $child */
                         $block = $this->compileNullsafeArrayDimFetch($child, $block);
@@ -4554,7 +4621,14 @@ class Compiler {
         return $endBlock;
     }
 
-    protected function compileNullsafeMethodCall(Op\Expr\NullsafeMethodCall $expr, Block $block): Block
+    /**
+     * @param list<Op> $deferredPreludeOps
+     */
+    protected function compileNullsafeMethodCall(
+        Op\Expr\NullsafeMethodCall $expr,
+        Block $block,
+        array $deferredPreludeOps = []
+    ): Block
     {
         $resultSlot = $this->compileOperand($expr->result, $block, false);
         $receiverSlot = $this->compileOperand($expr->var, $block, true);
@@ -4582,6 +4656,9 @@ class Compiler {
         $fetchBlock = new Block($block->orig);
         $fetchBlock->inheritUndefinedLocals = true;
         $fetchBlock->inheritScopeFrom($block);
+        if (!empty($deferredPreludeOps)) {
+            $this->compileOps($deferredPreludeOps, $fetchBlock);
+        }
         $fetchBlock->addOpCode(new OpCode(
             OpCode::TYPE_METHODCALL_INIT,
             $this->compileOperand($expr->var, $fetchBlock, true),
@@ -4617,6 +4694,19 @@ class Compiler {
         $block->addOpCode($nullsafeOp);
 
         return $endBlock;
+    }
+
+    /**
+     * @return list<\PHPCfg\Operand>
+     */
+    private function nullsafePreludeOperandVars(Op\Expr $expr): array
+    {
+        // Minimal dependency extraction for nullsafe argument prelude sinking (#4394).
+        // Extend carefully; keep conservative (only single-use temporaries are eligible).
+        return match (get_class($expr)) {
+            Op\Expr\FuncCall::class => array_merge([$expr->name], $expr->args),
+            default => [],
+        };
     }
 
     protected function functionStaticStorageKey(\PHPCfg\Func $func, string $varName): string
