@@ -16,7 +16,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -30,14 +29,16 @@ final class strrev extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('strrev() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('strrev() only supports strings in this compiler build');
-        }
-        $frame->returnVar->string(VmString::strrev($v->toString()));
+        $subject = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'strrev',
+            0,
+            'string'
+        );
+        $frame->returnVar->string(VmString::strrev($subject));
     }
 
     public Context $context;
