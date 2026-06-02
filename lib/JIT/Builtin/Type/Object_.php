@@ -23,6 +23,7 @@ use PHPCompiler\JIT\Builtin\Type;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\MagicMethodDispatch;
@@ -2863,6 +2864,211 @@ class Object_ extends Type {
         $var->staticPropertyType = $entry['type'];
 
         return $var;
+    }
+
+    /**
+     * Runtime static property name (`Class::$$name`, issue #4597).
+     */
+    public function staticPropertyFetchDynamic(int $classId, Variable $nameVar): Variable
+    {
+        $globals = $this->staticPropertyGlobals[$classId] ?? [];
+        if ([] === $globals) {
+            throw new \LogicException('Dynamic static property fetch requires at least one declared static property');
+        }
+
+        if (1 === count($globals)) {
+            $propName = array_key_first($globals);
+            $runtimeName = JitStringArg::lowerDominating($this->context, $nameVar, 'dynamic static property name');
+            $litLoaded = $this->context->builder->load($this->context->constantStringFromString($propName));
+            $match = JitStringCompare::identical($this->context, $runtimeName, $litLoaded);
+            $fn = BasicBlockHelper::parentFunction($this->context);
+            $entry = $this->context->builder->getInsertBlock();
+            $ok = $fn->appendBasicBlock('dyn_static_prop_one_ok');
+            $fail = $fn->appendBasicBlock('dyn_static_prop_one_fail');
+            $this->context->builder->branchIf($match, $ok, $fail);
+            $this->context->builder->positionAtEnd($fail);
+            $classLabel = $this->classNameForId($classId);
+            ErrorRaise::ensureLinked($this->context);
+            ErrorRaise::emitRaise(
+                $this->context,
+                'Access to undeclared static property '.$classLabel.'::$'
+            );
+            $this->context->builder->returnVoid();
+            $this->context->builder->positionAtEnd($ok);
+
+            return $this->staticPropertyFetch($classId, $propName);
+        }
+
+        $runtimeName = JitStringArg::lowerDominating($this->context, $nameVar, 'dynamic static property name');
+        $fn = BasicBlockHelper::parentFunction($this->context);
+        $entry = $this->context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock('dyn_static_prop_done');
+        $exit = $fn->appendBasicBlock('dyn_static_prop_exit');
+        $fallback = $fn->appendBasicBlock('dyn_static_prop_undef');
+        $destSlot = JitValueBox::alloc($this->context);
+        $multiGlobal = count($globals) > 1;
+        $globalSlot = null;
+        if ($multiGlobal) {
+            $firstGlobal = reset($globals)['global'];
+            $globalSlot = $this->context->memory->malloc($firstGlobal->getType());
+        }
+        $checkBlock = $entry;
+        $i = 0;
+        foreach ($globals as $propName => $entry) {
+            $this->context->builder->positionAtEnd($checkBlock);
+            $litLoaded = $this->context->builder->load($this->context->constantStringFromString($propName));
+            $match = JitStringCompare::identical($this->context, $runtimeName, $litLoaded);
+            $caseBlock = $fn->appendBasicBlock('dyn_static_prop_case_'.$classId.'_'.$i);
+            $nextCheck = $i + 1 < count($globals)
+                ? $fn->appendBasicBlock('dyn_static_prop_try_'.$classId.'_'.($i + 1))
+                : $fallback;
+            $this->context->builder->branchIf($match, $caseBlock, $nextCheck);
+            $this->context->builder->positionAtEnd($caseBlock);
+            $fetched = $this->staticPropertyFetch($classId, $propName);
+            $this->boxStaticFetchedIntoValue($destSlot, $fetched, $entry['type']);
+            if ($multiGlobal && null !== $globalSlot) {
+                $this->context->builder->store($entry['global'], $globalSlot);
+            }
+            $this->context->builder->branch($done);
+            $checkBlock = $nextCheck;
+            ++$i;
+        }
+        $this->context->builder->positionAtEnd($fallback);
+        $classLabel = $this->classNameForId($classId);
+        ErrorRaise::ensureLinked($this->context);
+        ErrorRaise::emitRaise(
+            $this->context,
+            'Access to undeclared static property '.$classLabel.'::$'
+        );
+        $this->context->builder->returnVoid();
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->branch($exit);
+        $this->context->builder->positionAtEnd($exit);
+        $result = new Variable(
+            $this->context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $destSlot
+        );
+        if (1 === count($globals)) {
+            $onlyEntry = reset($globals);
+            $result->staticPropertyGlobal = $onlyEntry['global'];
+            $result->staticPropertyType = $onlyEntry['type'];
+        } elseif (null !== $globalSlot) {
+            $result->staticPropertyGlobal = $this->context->builder->load($globalSlot);
+            $types = array_unique(array_map(
+                static fn (array $entry): int => $entry['type'],
+                $globals
+            ));
+            if (1 !== count($types)) {
+                throw new \LogicException(
+                    'Dynamic static property assign JIT requires uniform static property types per class'
+                );
+            }
+            $result->staticPropertyType = $types[0];
+        }
+
+        return $result;
+    }
+
+    private function boxStaticFetchedIntoValue(
+        PHPLLVM\Value $destSlot,
+        Variable $fetched,
+        int $propertyType
+    ): void {
+        $destPtr = JitValueBox::pointer($this->context, $destSlot);
+        if (Variable::TYPE_VALUE === $propertyType) {
+            JitValueBox::copyFromPointer(
+                $this->context,
+                $destSlot,
+                JitValueBox::pointer($this->context, $fetched->value)
+            );
+
+            return;
+        }
+        if (Variable::TYPE_NATIVE_LONG === $propertyType) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeLong'),
+                $destPtr,
+                $this->context->builder->load($fetched->value)
+            );
+
+            return;
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $propertyType) {
+            JitValueBox::writeBool(
+                $this->context,
+                $destSlot,
+                $this->context->builder->load($fetched->value)
+            );
+
+            return;
+        }
+        if (Variable::TYPE_NATIVE_DOUBLE === $propertyType) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeDouble'),
+                $destPtr,
+                $this->context->builder->load($fetched->value)
+            );
+
+            return;
+        }
+        if (Variable::TYPE_STRING === $propertyType) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeString'),
+                $destPtr,
+                $fetched->value
+            );
+
+            return;
+        }
+
+        throw new \LogicException(
+            'Dynamic static property fetch JIT box unsupported type: '.Variable::getStringType($propertyType)
+        );
+    }
+
+    /**
+     * Runtime static property name for unset (`unset(Class::$$name)`, issue #4597).
+     */
+    public function staticPropertyUnsetDynamic(int $classId, Variable $nameVar): void
+    {
+        $globals = $this->staticPropertyGlobals[$classId] ?? [];
+        if ([] === $globals) {
+            throw new \LogicException('Dynamic static property unset requires at least one declared static property');
+        }
+
+        $runtimeName = JitStringArg::lowerDominating($this->context, $nameVar, 'dynamic static property name');
+        $fn = BasicBlockHelper::parentFunction($this->context);
+        $entry = $this->context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock('dyn_static_prop_unset_done');
+        $fallback = $fn->appendBasicBlock('dyn_static_prop_unset_undef');
+        $checkBlock = $entry;
+        $i = 0;
+        foreach ($globals as $propName => $_entry) {
+            $this->context->builder->positionAtEnd($checkBlock);
+            $litLoaded = $this->context->builder->load($this->context->constantStringFromString($propName));
+            $match = JitStringCompare::identical($this->context, $runtimeName, $litLoaded);
+            $caseBlock = $fn->appendBasicBlock('dyn_static_prop_unset_case_'.$classId.'_'.$i);
+            $nextCheck = $i + 1 < count($globals)
+                ? $fn->appendBasicBlock('dyn_static_prop_unset_try_'.$classId.'_'.($i + 1))
+                : $fallback;
+            $this->context->builder->branchIf($match, $caseBlock, $nextCheck);
+            $this->context->builder->positionAtEnd($caseBlock);
+            $this->staticPropertyUnset($classId, $propName);
+            $this->context->builder->branch($done);
+            $checkBlock = $nextCheck;
+            ++$i;
+        }
+        $this->context->builder->positionAtEnd($fallback);
+        $classLabel = $this->classNameForId($classId);
+        ErrorRaise::ensureLinked($this->context);
+        ErrorRaise::emitRaise(
+            $this->context,
+            'Access to undeclared static property '.$classLabel.'::$'
+        );
+        $this->context->builder->returnVoid();
+        $this->context->builder->positionAtEnd($done);
     }
 
     public function staticPropertyStore(\PHPLLVM\Value $global, Variable $value, int $propertyType): void

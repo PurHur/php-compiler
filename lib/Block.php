@@ -1401,7 +1401,6 @@ class Block {
             || self::containsFinallyOpcodesInScriptScope($root)
             || self::containsExceptionHandlingOpcodesInScriptScope($root)
             || self::containsMatchExpressionOpcodesInScriptScope($root)
-            || self::containsDynamicStaticPropertyOpcodes($root)
             || self::containsTypedNonVoidReturnOpcodes($root)
             || self::containsClosureByRefCaptureOpcodes($root)
             || self::containsReadonlyPropertyOpcodes($root)
