@@ -31,6 +31,27 @@ class FuncContext
     /** @var array[] */
     public $unresolvedGotos = [];
 
+    /**
+     * Nesting scopes used to validate `goto` jumps (Zend parity).
+     *
+     * Loop/switch: jumps into a loop/switch are disallowed.
+     * Finally: jumps into/out of a finally block are disallowed.
+     *
+     * @var int[]
+     */
+    public $gotoLoopSwitchStack = [];
+
+    /** @var int[] */
+    public $gotoFinallyStack = [];
+
+    /** @var int */
+    public $gotoScopeId = 0;
+
+    /**
+     * @var array<string, array{loopSwitch: int[], finally: int[]}>
+     */
+    public $gotoLabelScopes = [];
+
     public function __construct()
     {
         $this->scope = new \SplObjectStorage();

@@ -21,7 +21,7 @@ final class VmRandom
     {
         if ($min > $max) {
             throw new \ValueError(
-                'random_int(): Argument #1 ($min) must be less than or equal to Argument #2 ($max)'
+                'random_int(): Argument #1 ($min) must be less than or equal to argument #2 ($max)'
             );
         }
         if ($min === $max) {

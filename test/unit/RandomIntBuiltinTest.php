@@ -40,6 +40,24 @@ final class RandomIntBuiltinTest extends TestCase
         $frame->calledArgs = [$minVar, $maxVar];
         $frame->returnVar = new VMVariable();
         $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage(
+            'random_int(): Argument #1 ($min) must be less than or equal to argument #2 ($max)'
+        );
+        $fn->execute($frame);
+    }
+
+    public function testMinGreaterThanMaxThrowsWhenReturnDiscarded(): void
+    {
+        $runtime = new Runtime();
+        $fn = new random_int();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $minVar = new VMVariable();
+        $minVar->int(5);
+        $maxVar = new VMVariable();
+        $maxVar->int(1);
+        $frame->calledArgs = [$minVar, $maxVar];
+        $frame->returnVar = null;
+        $this->expectException(\ValueError::class);
         $fn->execute($frame);
     }
 }

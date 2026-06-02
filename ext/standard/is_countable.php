@@ -31,11 +31,22 @@ use PHPLLVM\Value;
 final class is_countable extends Internal
 {
     private const COUNTABLE_LC = 'countable';
+    private const EXPECTED_ARGC = 1;
+
+    private static function argcError(int $given): \ArgumentCountError
+    {
+        // Zend: "is_countable() expects exactly 1 argument, X given"
+        return new \ArgumentCountError(sprintf(
+            'is_countable() expects exactly %d argument, %d given',
+            self::EXPECTED_ARGC,
+            $given
+        ));
+    }
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('is_countable() requires exactly one argument');
+        if (self::EXPECTED_ARGC !== \count($frame->calledArgs)) {
+            throw self::argcError(\count($frame->calledArgs));
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
@@ -61,8 +72,8 @@ final class is_countable extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== \count($args)) {
-            throw new \LogicException('is_countable() requires exactly one argument');
+        if (self::EXPECTED_ARGC !== \count($args)) {
+            throw self::argcError(\count($args));
         }
         if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY) {
             return $context->constantFromBool(true);
@@ -143,13 +154,36 @@ final class is_countable extends Internal
             $context->lookupFunction('__value__readObject'),
             $valuePtr
         );
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $obj,
+            $objPtrTy->constNull()
+        );
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $ok = $fn->appendBasicBlock('is_countable_vbox_obj_ok');
+        $empty = $fn->appendBasicBlock('is_countable_vbox_obj_empty');
+        $merge = $fn->appendBasicBlock('is_countable_vbox_obj_merge');
+        $context->builder->branchIf($isNull, $empty, $ok);
+
+        $context->builder->positionAtEnd($ok);
         $objMap = $context->structFieldMap['__object__'];
         $classId = $context->builder->load(
             $context->builder->structGep($obj, $objMap['class_id'])
         );
         $result = self::jitClassIdImplementsCountable($context, $classId);
+        $loaded = $context->helper->loadValue($result);
+        $context->builder->branch($merge);
 
-        return $context->helper->loadValue($result);
+        $context->builder->positionAtEnd($empty);
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($merge);
+        $phi = $context->builder->phi($context->getTypeFromString('int1'));
+        $phi->addIncoming($loaded, $ok);
+        $phi->addIncoming($context->constantFromBool(false), $empty);
+
+        return $phi;
     }
 
     private static function jitClassIdImplementsCountable(Context $context, Value $classId): JITVariable

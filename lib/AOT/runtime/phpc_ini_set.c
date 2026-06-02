@@ -15,6 +15,7 @@ typedef struct __value__ {
 
 extern __string__ *__string__init(long long size, const char *value);
 extern void __value__writeString(__value__ *out, __string__ *str);
+extern void __value__writeLong(__value__ *out, long long v);
 
 #define PHPC_TYPE_BOOL 2
 
@@ -39,6 +40,10 @@ static const char *ini_strdata(__string__ *s)
 static int phpc_ini_error_reporting = 32767;
 static int phpc_ini_display_errors = 1;
 static char phpc_ini_memory_limit[64] = "128M";
+
+/** Nesting depth for `@` (issue #3546 / #4070). */
+static int phpc_silence_depth = 0;
+static int phpc_silence_saved_error_reporting = 0;
 
 static void ini_write_bool_false(__value__ *out)
 {
@@ -139,6 +144,44 @@ void __compiler_ini_get(__string__ *option, __value__ *out)
     }
 
     free(opt);
+}
+
+void __compiler_error_reporting(int has_new_level, long long new_level, __value__ *out)
+{
+    long long old = phpc_ini_error_reporting;
+
+    if (has_new_level) {
+        phpc_ini_error_reporting = (int) new_level;
+    }
+    if (NULL != out) {
+        __value__writeLong(out, old);
+    }
+}
+
+/** Non-zero when errno should be emitted (Zend EG(error_reporting) & level). */
+int __compiler_phpc_error_level_enabled(int level)
+{
+    return (phpc_ini_error_reporting & level) != 0;
+}
+
+void __compiler_begin_silence(void)
+{
+    if (0 == phpc_silence_depth) {
+        phpc_silence_saved_error_reporting = phpc_ini_error_reporting;
+        phpc_ini_error_reporting = 0;
+    }
+    ++phpc_silence_depth;
+}
+
+void __compiler_end_silence(void)
+{
+    if (phpc_silence_depth <= 0) {
+        return;
+    }
+    --phpc_silence_depth;
+    if (0 == phpc_silence_depth) {
+        phpc_ini_error_reporting = phpc_silence_saved_error_reporting;
+    }
 }
 
 void __compiler_ini_set(__string__ *option, __string__ *new_value, __value__ *out)

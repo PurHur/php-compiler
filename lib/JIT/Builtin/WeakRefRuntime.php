@@ -47,6 +47,7 @@ final class WeakRefRuntime
                 'phpc_weakref_reset',
                 'phpc_weakref_register_ref',
                 'phpc_weakref_register_map',
+                'phpc_weakref_unregister_map',
                 'phpc_weakref_clear_object',
                 'phpc_weakref_clear_object_typed',
                 'phpc_weakref_format_object_key',

@@ -25,7 +25,7 @@ final class ClassValidator
     public static function assertInstantiable(ClassEntry $entry): void
     {
         if ($entry->isAbstract || [] !== $entry->abstractMethods) {
-            throw new \LogicException("Cannot instantiate abstract class {$entry->name}");
+            throw new \Error("Cannot instantiate abstract class {$entry->name}");
         }
     }
 

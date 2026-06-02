@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCfg\Op;
+use PHPCfg\Op\Expr\FirstClassCallable;
 use PHPCfg\Operand;
 use PHPTypes\Type;
 use SplObjectStorage;
@@ -69,7 +70,9 @@ class Analyzer
                 || $usage instanceof Op\Iterator\Value
                 || $usage instanceof Op\Iterator\Next
                 || $usage instanceof Op\Terminal\Echo_
-                || $usage instanceof Op\Expr\Array_) {
+                || $usage instanceof Op\Expr\Array_
+                || $usage instanceof Op\Expr\Yield_
+                || $usage instanceof Op\Expr\YieldFrom) {
                 continue;
             } else {
                 throw new \LogicException('Not implemented escape operand '.get_class($usage));
@@ -129,7 +132,9 @@ class Analyzer
                 || $usage instanceof Op\Iterator\Key
                 || $usage instanceof Op\Iterator\Value
                 || $usage instanceof Op\Iterator\Next
-                || $usage instanceof Op\Terminal\Return_) {
+                || $usage instanceof Op\Terminal\Return_
+                || $usage instanceof Op\Expr\Yield_
+                || $usage instanceof Op\Expr\YieldFrom) {
                 // not a dynamic packed-array append
             } else {
                 throw new \LogicException('Not implemented dynamic append operand '.get_class($usage));
@@ -183,13 +188,14 @@ class Analyzer
                 || $op instanceof Op\Expr\StaticCall
                 || $op instanceof Op\Expr\MethodCall
                 || $op instanceof Op\Expr\PropertyFetch
-                || $op instanceof Op\Expr\Param) {
+                || $op instanceof Op\Expr\Param
+                || $op instanceof FirstClassCallable) {
                 return null;
             } else {
                 throw new \LogicException('Unknown array write op: '.get_class($op));
             }
         }
 
-        return $size;
+        return $size > 0 ? $size : null;
     }
 }

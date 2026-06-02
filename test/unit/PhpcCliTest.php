@@ -24,6 +24,7 @@ final class PhpcCliTest extends TestCase
         $this->assertStringContainsString('--list-units', $result['stdout']);
         $this->assertStringContainsString('--print-includes', $result['stdout']);
         $this->assertStringContainsString('--verbose', $result['stdout']);
+        $this->assertStringContainsString('--jit', $result['stdout']);
         $this->assertStringContainsString('PHPC_BUILD_VERBOSE', $result['stdout']);
         $this->assertStringContainsString('phpc deploy', $result['stdout']);
         $this->assertStringContainsString('phpc cgi', $result['stdout']);

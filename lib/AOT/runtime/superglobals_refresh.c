@@ -16,6 +16,7 @@ extern char **environ;
 #define phpc_environ environ
 #endif
 
+typedef struct __value__ __value__;
 typedef struct __hashtable__ __hashtable__;
 typedef struct __string__ __string__;
 
@@ -23,6 +24,8 @@ extern __hashtable__ *__hashtable__alloc(void);
 extern void __hashtable__setStringKeyString(__hashtable__ *ht, __string__ *key, __string__ *val);
 extern void __hashtable__setStringKeyHashtable(__hashtable__ *ht, __string__ *key, __hashtable__ *child);
 extern void __hashtable__setStringAt(__hashtable__ *ht, size_t index, __string__ *val);
+extern void __hashtable__setLongAt(__hashtable__ *ht, size_t index, long long val);
+extern void __hashtable__setDoubleAt(__hashtable__ *ht, size_t index, double val);
 extern size_t __hashtable__getNumElements(__hashtable__ *ht);
 extern __hashtable__ *__hashtable__readStringKeyHashtable(__hashtable__ *ht, __string__ *key);
 extern __string__ *__string__init(long long size, const char *value);
@@ -1865,6 +1868,313 @@ __string__ *__compiler_sprintf(__string__ *fmt, long long argc, __value__ *argv)
     return cstr_to_string(out);
 }
 
+extern void __phpc_ob_echo_substr(const char *s, unsigned long len);
+
+/**
+ * LLVM/AOT runtime: printf() subset — format, write via ob/SAPI echo, return byte length.
+ */
+long long __compiler_printf(__string__ *fmt, long long argc, __value__ *argv)
+{
+    __string__ *out;
+    const char *data;
+    size_t len;
+
+    out = __compiler_sprintf(fmt, argc, argv);
+    if (NULL == out) {
+        return 0;
+    }
+    data = nf_strdata(out);
+    len = nf_strlen(out);
+    if (len > 0 && NULL != data) {
+        __phpc_ob_echo_substr(data, (unsigned long) len);
+    }
+
+    return (long long) len;
+}
+
+static int ss_is_space(char c)
+{
+    return ' ' == c || '\t' == c || '\n' == c || '\r' == c || '\f' == c || '\v' == c;
+}
+
+static int ss_scan_int(const char *s, size_t len, size_t *pos, long long *out)
+{
+    size_t i = *pos;
+    int neg = 0;
+    int any = 0;
+    long long val = 0;
+
+    while (i < len && ss_is_space(s[i])) {
+        i++;
+    }
+    if (i >= len) {
+        return 0;
+    }
+    if ('-' == s[i]) {
+        neg = 1;
+        i++;
+    } else if ('+' == s[i]) {
+        i++;
+    }
+    while (i < len && s[i] >= '0' && s[i] <= '9') {
+        any = 1;
+        val = val * 10 + (long long) (s[i] - '0');
+        i++;
+    }
+    if (!any) {
+        return 0;
+    }
+    if (neg) {
+        val = -val;
+    }
+    *out = val;
+    *pos = i;
+
+    return 1;
+}
+
+static int ss_scan_string(const char *s, size_t len, size_t *pos, char *buf, size_t buf_cap)
+{
+    size_t i = *pos;
+    size_t out = 0;
+
+    while (i < len && ss_is_space(s[i])) {
+        i++;
+    }
+    if (i >= len) {
+        return 0;
+    }
+    while (i < len && !ss_is_space(s[i]) && out + 1 < buf_cap) {
+        buf[out++] = s[i++];
+    }
+    if (0 == out) {
+        return 0;
+    }
+    buf[out] = '\0';
+    *pos = i;
+
+    return 1;
+}
+
+static int ss_scan_float(const char *s, size_t len, size_t *pos, double *out)
+{
+    size_t i = *pos;
+    size_t start;
+    int any = 0;
+    char tmp[64];
+
+    while (i < len && ss_is_space(s[i])) {
+        i++;
+    }
+    if (i >= len) {
+        return 0;
+    }
+    start = i;
+    if ('-' == s[i] || '+' == s[i]) {
+        i++;
+    }
+    while (i < len && s[i] >= '0' && s[i] <= '9') {
+        any = 1;
+        i++;
+    }
+    if (i < len && '.' == s[i]) {
+        i++;
+        while (i < len && s[i] >= '0' && s[i] <= '9') {
+            any = 1;
+            i++;
+        }
+    }
+    if (!any || i - start >= sizeof(tmp)) {
+        return 0;
+    }
+    memcpy(tmp, s + start, i - start);
+    tmp[i - start] = '\0';
+    *out = strtod(tmp, NULL);
+    *pos = i;
+
+    return 1;
+}
+
+extern void __value__writeLong(__value__ *out, long long v);
+extern void __value__writeDouble(__value__ *out, double v);
+
+/**
+ * LLVM/AOT runtime: sscanf() subset (%d, %s, %f, %%) (issue #3190).
+ */
+long long __compiler_sscanf(
+    __string__ *str,
+    __string__ *fmt,
+    long long out_count,
+    __value__ **out_ptrs
+) {
+    const char *input;
+    size_t in_len;
+    const char *format;
+    size_t fmt_len;
+    size_t in_pos = 0;
+    long long assigned = 0;
+    long long out_idx = 0;
+    size_t fpos;
+
+    if (NULL == str || NULL == fmt) {
+        return 0;
+    }
+    input = nf_strdata(str);
+    in_len = nf_strlen(str);
+    format = nf_strdata(fmt);
+    fmt_len = nf_strlen(fmt);
+    for (fpos = 0; fpos < fmt_len; fpos++) {
+        char ch = format[fpos];
+
+        if ('%' != ch) {
+            if (in_pos >= in_len || input[in_pos] != ch) {
+                return assigned;
+            }
+            in_pos++;
+            continue;
+        }
+        if (fpos + 1 >= fmt_len) {
+            return assigned;
+        }
+        ch = format[++fpos];
+        if ('%' == ch) {
+            if (in_pos >= in_len || input[in_pos] != '%') {
+                return assigned;
+            }
+            in_pos++;
+            continue;
+        }
+        if (out_idx >= out_count || NULL == out_ptrs || NULL == out_ptrs[out_idx]) {
+            return assigned;
+        }
+        switch (ch) {
+            case 'd': {
+                long long val;
+
+                if (!ss_scan_int(input, in_len, &in_pos, &val)) {
+                    return assigned;
+                }
+                __value__writeLong(out_ptrs[out_idx], val);
+                out_idx++;
+                assigned++;
+                break;
+            }
+            case 's': {
+                char buf[4096];
+
+                if (!ss_scan_string(input, in_len, &in_pos, buf, sizeof(buf))) {
+                    return assigned;
+                }
+                __value__writeString(out_ptrs[out_idx], __string__init((long long) strlen(buf), buf));
+                out_idx++;
+                assigned++;
+                break;
+            }
+            case 'f': {
+                double val;
+
+                if (!ss_scan_float(input, in_len, &in_pos, &val)) {
+                    return assigned;
+                }
+                __value__writeDouble(out_ptrs[out_idx], val);
+                out_idx++;
+                assigned++;
+                break;
+            }
+            default:
+                return assigned;
+        }
+    }
+
+    return assigned;
+}
+
+/**
+ * Two-arg sscanf(): return parsed values as a list array (issue #4201, php-src ext/standard/sscanf.c).
+ */
+__hashtable__ *__compiler_sscanf_array(__string__ *str, __string__ *fmt)
+{
+    const char *input;
+    size_t in_len;
+    const char *format;
+    size_t fmt_len;
+    size_t in_pos = 0;
+    size_t out_idx = 0;
+    size_t fpos;
+    __hashtable__ *ht;
+
+    if (NULL == str || NULL == fmt) {
+        return __hashtable__alloc();
+    }
+    input = nf_strdata(str);
+    in_len = nf_strlen(str);
+    format = nf_strdata(fmt);
+    fmt_len = nf_strlen(fmt);
+    ht = __hashtable__alloc();
+    for (fpos = 0; fpos < fmt_len; fpos++) {
+        char ch = format[fpos];
+
+        if ('%' != ch) {
+            if (in_pos >= in_len || input[in_pos] != ch) {
+                return ht;
+            }
+            in_pos++;
+            continue;
+        }
+        if (fpos + 1 >= fmt_len) {
+            return ht;
+        }
+        ch = format[++fpos];
+        if ('%' == ch) {
+            if (in_pos >= in_len || input[in_pos] != '%') {
+                return ht;
+            }
+            in_pos++;
+            continue;
+        }
+        switch (ch) {
+            case 'd': {
+                long long val;
+
+                if (!ss_scan_int(input, in_len, &in_pos, &val)) {
+                    return ht;
+                }
+                __hashtable__setLongAt(ht, out_idx, val);
+                out_idx++;
+                break;
+            }
+            case 's': {
+                char buf[4096];
+
+                if (!ss_scan_string(input, in_len, &in_pos, buf, sizeof(buf))) {
+                    return ht;
+                }
+                __hashtable__setStringAt(
+                    ht,
+                    out_idx,
+                    __string__init((long long) strlen(buf), buf)
+                );
+                out_idx++;
+                break;
+            }
+            case 'f': {
+                double val;
+
+                if (!ss_scan_float(input, in_len, &in_pos, &val)) {
+                    return ht;
+                }
+                __hashtable__setDoubleAt(ht, out_idx, val);
+                out_idx++;
+                break;
+            }
+            default:
+                return ht;
+        }
+    }
+
+    return ht;
+}
+
 /**
  * LLVM/AOT runtime: number_format() subset (int/float, custom separators).
  */
@@ -2172,11 +2482,16 @@ long long __compiler_utf8_strlen(__string__ *input)
  */
 void __phpc_last_error_record(int type, const char *msg, size_t msg_len, const char *file, int line);
 
+extern int __compiler_phpc_error_level_enabled(int level);
+
 void __compiler_undefined_array_key_warning_cstr(const char *key, size_t len)
 {
     char msg[512];
 
     if (!key) {
+        return;
+    }
+    if (!__compiler_phpc_error_level_enabled(2)) {
         return;
     }
     snprintf(msg, sizeof msg, "Undefined array key \"%.*s\"", (int) len, key);
@@ -2188,6 +2503,9 @@ void __compiler_undefined_array_key_warning_long(long long key)
 {
     char msg[64];
 
+    if (!__compiler_phpc_error_level_enabled(2)) {
+        return;
+    }
     snprintf(msg, sizeof msg, "Undefined array key %lld", key);
     __phpc_last_error_record(2, msg, strlen(msg), "", 0);
     fprintf(stderr, "Warning: %s\n", msg);
@@ -2198,6 +2516,9 @@ extern int __phpc_error_handler_dispatch(int errno, const char *msg, size_t msg_
 void __compiler_trigger_error(const char *message, size_t len, int level)
 {
     if (!message) {
+        return;
+    }
+    if (!__compiler_phpc_error_level_enabled(level)) {
         return;
     }
     __phpc_last_error_record(level, message, len, "", 0);

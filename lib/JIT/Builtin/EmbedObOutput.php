@@ -24,6 +24,8 @@ final class EmbedObOutput
         self::implementReturnZero($context, '__phpc_ob_get_clean');
         self::implementReturnZero($context, '__phpc_ob_end_flush');
         self::implementNoop($context, '__phpc_flush');
+        self::implementNoop($context, '__phpc_ob_end_all');
+        self::implementObImplicitFlush($context);
         self::implementEchoCstr($context);
         self::implementEchoChar($context);
         self::implementEchoLl($context);
@@ -51,6 +53,18 @@ final class EmbedObOutput
         }
 
         return $fn;
+    }
+
+    private static function implementObImplicitFlush(Context $context): void
+    {
+        $fn = $context->module->getNamedFunction('__phpc_ob_implicit_flush');
+        if (null === $fn || $fn->countBasicBlocks() > 0) {
+            return;
+        }
+        $entry = $fn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
     }
 
     private static function implementNoop(Context $context, string $name): void

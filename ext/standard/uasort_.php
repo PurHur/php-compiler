@@ -17,7 +17,8 @@ use PHPLLVM\Value;
 /**
  * uasort() — sort by values preserving keys (subset of PHP; issue #1211).
  *
- * VM: strcmp and strcasecmp callbacks. JIT/AOT: strcmp on packed list arrays only.
+ * VM: strcmp and strcasecmp string callbacks; closure comparators (#3086, #3582).
+ * JIT/AOT: strcmp on packed list arrays only.
  */
 final class uasort_ extends Internal
 {
@@ -36,14 +37,6 @@ final class uasort_ extends Internal
             throw new \LogicException('uasort() first argument must be an array in this compiler build');
         }
         $callback = $frame->calledArgs[1]->resolveIndirect();
-        if (!UsortCallbackPolicy::isVmSupportedType($callback->type)) {
-            throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
-        }
-        $name = $callback->toString();
-        if (!UsortCallbackPolicy::isVmSupportedName($name)) {
-            throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
-        }
-        $compare = VmInternalCompare::resolveStringCallback($name);
         $ht = $array->toArray();
         if ($ht->getNumElements() < 2) {
             if (null !== $frame->returnVar) {
@@ -60,7 +53,26 @@ final class uasort_ extends Internal
             $valCopy->copyFrom($value);
             $pairs[] = [$keyCopy, $valCopy];
         }
-        VmInternalCompare::sortKeyedPairsByValue($pairs, $compare);
+        if (VmClosureCall::isClosure($callback)) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException('uasort() requires VM context in this compiler build');
+            }
+            VmClosureCall::sortKeyedPairsByValue(
+                $frame->vmContext,
+                $pairs,
+                VmClosureCall::resolve($callback)
+            );
+        } else {
+            if (!UsortCallbackPolicy::isVmSupportedType($callback->type)) {
+                throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
+            }
+            $name = $callback->toString();
+            if (!UsortCallbackPolicy::isVmSupportedName($name)) {
+                throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
+            }
+            $compare = VmInternalCompare::resolveStringCallback($name);
+            VmInternalCompare::sortKeyedPairsByValue($pairs, $compare);
+        }
         $sorted = new HashTable();
         foreach ($pairs as [$key, $value]) {
             array_map::appendKeyedCopy($sorted, $key, $value);

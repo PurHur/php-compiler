@@ -8,12 +8,16 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** define() — register a user constant at runtime (issue #204). */
 final class define_ extends Internal
 {
+    private const MSG_CASE_INSENSITIVE_IGNORED =
+        'define(): Argument #3 ($case_insensitive) is ignored since declaration of case-insensitive constants is no longer supported';
+
     public function __construct()
     {
         parent::__construct('define');
@@ -31,6 +35,16 @@ final class define_ extends Internal
         $value = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->vmContext) {
             throw new \LogicException('define() requires VM context');
+        }
+        if (\count($frame->calledArgs) >= 3 && $frame->calledArgs[2]->resolveIndirect()->toBool()) {
+            $file = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+            $frame->vmContext->errors->triggerError(
+                self::MSG_CASE_INSENSITIVE_IGNORED,
+                ErrorReporter::E_WARNING,
+                $file,
+                $frame->vmContext,
+                $frame
+            );
         }
         $ok = $frame->vmContext->defineConstant($nameVar->toString(), $value);
         if (null !== $frame->returnVar) {
@@ -51,6 +65,10 @@ final class define_ extends Internal
         }
         $name = $args[0]->compileTimeString;
         $value = self::compileTimeVmVariable($context, $args[1]);
+        if (\count($args) >= 3
+            && (JITVariable::TYPE_NATIVE_BOOL !== $args[2]->type || null === $args[2]->value->value)) {
+            throw new \LogicException('define() case_insensitive must be a boolean literal in this compiler build');
+        }
         if (!$context->runtime->vmContext->defineConstant($name, $value)) {
             throw new \LogicException("Cannot redefine constant {$name}");
         }

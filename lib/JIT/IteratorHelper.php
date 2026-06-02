@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPLLVM\Builder;
 
 /**
@@ -11,6 +12,8 @@ use PHPLLVM\Builder;
  */
 final class IteratorHelper
 {
+    private const FOREACH_ITERATOR_BYREF_ERROR = 'An iterator cannot be used with foreach by reference';
+
     private static function icmpUltSizeT(Context $context, \PHPLLVM\Value $left, \PHPLLVM\Value $right): \PHPLLVM\Value
     {
         $sizeT = $context->getTypeFromString('size_t');
@@ -27,6 +30,12 @@ final class IteratorHelper
     {
         return null !== $containerUserType
             && 'splobjectstorage' === strtolower($containerUserType);
+    }
+
+    private static function usesWeakMapHashtable(?string $containerUserType): bool
+    {
+        return null !== $containerUserType
+            && 'weakmap' === strtolower($containerUserType);
     }
 
     /**
@@ -117,6 +126,9 @@ final class IteratorHelper
             if (self::usesObjectKeys($containerUserType)) {
                 return $context->type->object->splBackingHashtable($array);
             }
+            if (self::usesWeakMapHashtable($containerUserType)) {
+                return $context->type->object->weakMapBackingHashtable($array);
+            }
 
             if (Variable::KIND_VALUE === $array->kind || Variable::KIND_VARIABLE === $array->kind) {
                 // Variadic packs (e.g. OpCode ...$ops) are lowered as __hashtable__* but typed as object.
@@ -174,6 +186,11 @@ final class IteratorHelper
     public static function compileReset(Context $context, Variable $array, ?string $containerUserType = null): void
     {
         $slotKey = $array;
+        if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
+            IteratorProtocolHelper::compileForeachReset($context, $array, $slotKey, $containerUserType);
+
+            return;
+        }
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
             $nodePtrType = $context->getTypeFromString('__objkey_node__*');
@@ -197,6 +214,9 @@ final class IteratorHelper
         ?string $containerUserType = null
     ): \PHPLLVM\Value {
         $slotKey = $array;
+        if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
+            return IteratorProtocolHelper::compileForeachValid($context, $slotKey, $containerUserType);
+        }
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
             return self::compileValidObjectKeys($context, $array, $slotKey);
@@ -300,11 +320,11 @@ final class IteratorHelper
         $context->builder->branch($packedBody);
 
         $context->builder->positionAtEnd($strInit);
-        $context->builder->store($zero, $slot);
         $strEntry = $fn->appendBasicBlock('foreach_str_entry');
         $context->builder->branch($strEntry);
 
         $context->builder->positionAtEnd($strEntry);
+        $ord = $context->builder->load($slot);
         $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
         $headNull = $context->builder->icmp(Builder::INT_EQ, $head, $head->typeOf()->constNull());
         $context->builder->branchIf($headNull, $empty, $strWalk);
@@ -313,7 +333,7 @@ final class IteratorHelper
         $node = $context->builder->phi($head->typeOf());
         $node->addIncoming($head, $strEntry);
         $remaining = $context->builder->phi($sizeT);
-        $remaining->addIncoming($zero, $strEntry);
+        $remaining->addIncoming($ord, $strEntry);
         $atTarget = $context->builder->icmp(Builder::INT_EQ, $remaining, $zero);
         $strStep = $fn->appendBasicBlock('foreach_str_step');
         $context->builder->branchIf($atTarget, $found, $strStep);
@@ -345,6 +365,9 @@ final class IteratorHelper
         ?string $containerUserType = null
     ): Variable {
         $slotKey = $array;
+        if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
+            return IteratorProtocolHelper::compileForeachKey($context, $slotKey, $containerUserType);
+        }
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
             return self::compileKeyObject($context, $slotKey);
@@ -412,6 +435,9 @@ final class IteratorHelper
         ?string $containerUserType = null
     ): Variable {
         $slotKey = $array;
+        if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
+            return IteratorProtocolHelper::compileForeachValue($context, $slotKey, $containerUserType);
+        }
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
             return self::compileValueObject($context, $slotKey);
@@ -423,8 +449,15 @@ final class IteratorHelper
     public static function compileValueByRef(
         Context $context,
         Variable $array,
-        ?string $containerUserType = null
+        ?string $containerUserType = null,
+        ?\PHPCompiler\JIT $jit = null
     ): Variable {
+        if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
+            self::emitForeachIteratorByRefError($context, $jit);
+            $slot = JitValueBox::alloc($context);
+
+            return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+        }
         $slotKey = $array;
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
@@ -434,6 +467,18 @@ final class IteratorHelper
         return self::compileValueByRefHashtable($context, $array, $slotKey);
     }
 
+    private static function emitForeachIteratorByRefError(Context $context, ?\PHPCompiler\JIT $jit): void
+    {
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        if (null !== $jit && [] !== $context->tryCatch->handlerStack) {
+            TryCatchHelper::emitCatchableErrorMessage($context, $jit, self::FOREACH_ITERATOR_BYREF_ERROR);
+
+            return;
+        }
+        ErrorRaise::emitRaise($context, self::FOREACH_ITERATOR_BYREF_ERROR);
+    }
+
     private static function compileValueByRefNativeArray(Context $context, Variable $array): Variable
     {
         $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
@@ -441,7 +486,10 @@ final class IteratorHelper
         $zero = $context->getTypeFromString('size_t')->constInt(0, false);
         $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
 
-        return new Variable($context, $elemType, Variable::KIND_VARIABLE, $slot);
+        $var = new Variable($context, $elemType, Variable::KIND_VARIABLE, $slot);
+        $var->borrowedValueEntry = true;
+
+        return $var;
     }
 
     private static function compileValueObject(Context $context, Variable $slotKey): Variable
@@ -464,7 +512,10 @@ final class IteratorHelper
         $node = $context->builder->load(self::objNodeSlot($context, $slotKey));
         $valField = $context->builder->structGep($node, $nodeMap['value']);
 
-        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $valField);
+        $var = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $valField);
+        $var->borrowedValueEntry = true;
+
+        return $var;
     }
 
     private static function compileValueByRefHashtable(Context $context, Variable $array, Variable $slotKey): Variable
@@ -495,8 +546,10 @@ final class IteratorHelper
         $entry = $context->builder->phi($packedEntry->typeOf());
         $entry->addIncoming($packedEntry, $packed);
         $entry->addIncoming($strEntry, $strEntryBlock);
+        $var = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $entry);
+        $var->borrowedValueEntry = true;
 
-        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $entry);
+        return $var;
     }
 
     private static function compileValueHashtable(Context $context, Variable $array, Variable $slotKey): Variable

@@ -18,6 +18,15 @@ final class JitStringArg
     /** @return Value */
     public static function lower(Context $context, Variable $arg, string $contextLabel = 'argument'): Value
     {
+        if (\in_array($arg->type, [
+            Variable::TYPE_NATIVE_LONG,
+            Variable::TYPE_NATIVE_DOUBLE,
+            Variable::TYPE_NATIVE_BOOL,
+        ], true)) {
+            $coerced = JitNativeString::coerce($context, $arg);
+
+            return $context->helper->loadValue($coerced);
+        }
         if (Variable::TYPE_VALUE === $arg->type) {
             return $context->builder->call(
                 $context->lookupFunction('__value__readString'),
@@ -58,6 +67,45 @@ final class JitStringArg
         }
 
         throw new \LogicException("{$contextLabel} must be a string in this compiler build");
+    }
+
+    /**
+     * Lower to {@see __string__*} with an entry-block scratch slot so uses dominate CFG branches (#4066).
+     *
+     * @return Value
+     */
+    public static function lowerDominating(Context $context, Variable $arg, string $contextLabel = 'argument'): Value
+    {
+        $literal = self::compileTimeLiteral($arg);
+        if (null !== $literal) {
+            return $context->builder->load($context->constantStringFromString($literal));
+        }
+        if (Variable::TYPE_STRING === $arg->type && Variable::KIND_VARIABLE === $arg->kind) {
+            return self::materializeStringSlot($context, $context->helper->loadValue($arg));
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            $str = $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                JitValueBox::valuePtrFromVariable($context, $arg)
+            );
+
+            return self::materializeStringSlot($context, $str);
+        }
+
+        return self::lower($context, $arg, $contextLabel);
+    }
+
+    /** @return Value owning {@see __string__*} in an entry alloca */
+    private static function materializeStringSlot(Context $context, Value $sourceStr): Value
+    {
+        $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__string__*'));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $sourceStr
+        );
+        $context->builder->store($owned, $slot);
+
+        return $context->builder->load($slot);
     }
 
     public static function compileTimeLiteral(Variable $arg): ?string

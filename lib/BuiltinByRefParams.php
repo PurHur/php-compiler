@@ -18,8 +18,20 @@ final class BuiltinByRefParams
                 return [1];
             case 'frexp':
                 return [1];
+            case 'similar_text':
+                return [2];
         }
 
         return [];
+    }
+
+    /** First argument index passed by reference for variadic tail (issue #3190). */
+    public static function variadicByRefFromIndex(string $name): ?int
+    {
+        if ('sscanf' === strtolower($name)) {
+            return 2;
+        }
+
+        return null;
     }
 }

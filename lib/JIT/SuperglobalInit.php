@@ -83,15 +83,55 @@ final class SuperglobalInit
     }
 
     /**
-     * Re-copy VM superglobals into LLVM sg_* globals (MCJIT embed, issue #642).
+     * Rebind sg_* LLVM globals after MCJIT bitcode cache restore (#153, #49).
+     */
+    public static function rebindGlobalsFromModule(Context $context): void
+    {
+        if (Builtin::LOAD_TYPE_EMBED !== $context->loadType
+            && Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return;
+        }
+        foreach (Superglobals::NAMES as $name) {
+            $globalName = 'sg_'.substr($name, 1);
+            $global = $context->module->getNamedGlobal($globalName);
+            if (null !== $global) {
+                self::$globals[$name] = $global;
+            }
+        }
+        $refreshFn = $context->module->getNamedFunction('__superglobals__refresh');
+        if ($refreshFn instanceof \PHPLLVM\Value\Function_) {
+            $context->registerFunction('__superglobals__refresh', $refreshFn);
+        }
+    }
+
+    /**
+     * Re-copy VM superglobals into LLVM sg_* globals (MCJIT embed, issue #642, #49).
+     *
+     * Uses live VM data via FFI — not the compile-time LLVM __superglobals__refresh body.
      */
     public static function refreshFromVm(Context $context): void
     {
-        if (null === $context->jitResult()) {
+        $result = $context->jitResult();
+        if (null === $result) {
             return;
         }
-        $refresh = $context->jitResult()->getCallable('__superglobals__refresh', 'void(*)()');
-        $refresh();
+        self::rebindGlobalsFromModule($context);
+
+        foreach (self::STANDALONE_REFRESHED as $name) {
+            if (!isset(self::$globals[$name])) {
+                continue;
+            }
+            $vmVar = $context->runtime->vmContext->getSuperglobal($name);
+            $table = null;
+            if (null !== $vmVar && VMVariable::TYPE_ARRAY === $vmVar->type) {
+                $candidate = $vmVar->toArray();
+                if ($candidate instanceof HashTable) {
+                    $table = $candidate;
+                }
+            }
+            $ht = self::runtimePopulateHashtableFromVm($result, $table);
+            $result->writeGlobalPointer('sg_'.substr($name, 1), $ht);
+        }
     }
 
     public static function initialize(Context $context): void
@@ -141,6 +181,62 @@ final class SuperglobalInit
             return;
         }
         self::populateHashTableFromVm($context, $ht, $table);
+    }
+
+    /**
+     * Build a native __hashtable__ from the current VM table (MCJIT runtime refresh).
+     */
+    private static function runtimePopulateHashtableFromVm(Result $result, ?HashTable $table): \FFI\CData
+    {
+        $alloc = $result->getCallable('__hashtable__alloc', 'void*(*)()');
+        $setString = $result->getCallable(
+            '__hashtable__setStringKeyString',
+            'void(*)(void*, void*, void*)'
+        );
+        $setHashtable = $result->getCallable(
+            '__hashtable__setStringKeyHashtable',
+            'void(*)(void*, void*, void*)'
+        );
+        $setAt = $result->getCallable(
+            '__hashtable__setStringAt',
+            'void(*)(void*, int64_t, void*)'
+        );
+        $stringInit = $result->getCallable('__string__init', 'void*(*)(int64_t, char*)');
+
+        $ht = $alloc();
+        if (null === $table) {
+            return $ht;
+        }
+
+        foreach ($table->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $resolved = $valueVar->resolveIndirect();
+            if (VMVariable::TYPE_INTEGER === $keyVar->type) {
+                if (VMVariable::TYPE_STRING !== $resolved->type) {
+                    continue;
+                }
+                $str = $resolved->toString();
+                $setAt($ht, $keyVar->toInt(), $stringInit(strlen($str), $str));
+
+                continue;
+            }
+            if (VMVariable::TYPE_STRING !== $keyVar->type) {
+                continue;
+            }
+            $keyStr = $keyVar->toString();
+            $keyPtr = $stringInit(strlen($keyStr), $keyStr);
+            if (VMVariable::TYPE_STRING === $resolved->type) {
+                $valStr = $resolved->toString();
+                $setString($ht, $keyPtr, $stringInit(strlen($valStr), $valStr));
+            } elseif (VMVariable::TYPE_ARRAY === $resolved->type) {
+                $nested = $resolved->toArray();
+                if ($nested instanceof HashTable) {
+                    $child = self::runtimePopulateHashtableFromVm($result, $nested);
+                    $setHashtable($ht, $keyPtr, $child);
+                }
+            }
+        }
+
+        return $ht;
     }
 
     private static function populateHashTableFromVm(

@@ -14,36 +14,49 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * round() for integer or float arguments (subset of PHP standard library).
+ * round() for integer or float arguments with optional precision and mode (php-src math.c).
  */
 final class round extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('round() requires exactly one argument');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('round() requires one to three arguments');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER === $v->type) {
-            $frame->returnVar->float((float) \round($v->toInt()));
 
-            return;
+        $numVar = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $numVar->type && Variable::TYPE_FLOAT !== $numVar->type) {
+            throw new \LogicException('round() only supports integers and floats in this compiler build');
         }
-        if (Variable::TYPE_FLOAT === $v->type) {
-            $frame->returnVar->float(\round($v->toFloat()));
 
-            return;
+        $precision = 0;
+        if ($argc >= 2) {
+            $precisionVar = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $precisionVar->type) {
+                throw new \LogicException('round() precision must be an integer in this compiler build');
+            }
+            $precision = $precisionVar->toInt();
         }
-        throw new \LogicException('round() only supports integers and floats in this compiler build');
+
+        $mode = StdlibConstants::PHP_ROUND_HALF_UP;
+        if (3 === $argc) {
+            $modeVar = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $modeVar->type) {
+                throw new \LogicException('round() mode must be an integer in this compiler build');
+            }
+            $mode = $modeVar->toInt();
+        }
+
+        VmRound::apply($frame->returnVar, $numVar, $precision, $mode);
     }
 
     public Context $context;
@@ -51,23 +64,7 @@ final class round extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('round() requires exactly one argument');
-        }
-        $double = $context->getTypeFromString('double');
-        $v = $context->helper->loadValue($args[0]);
-        switch ($args[0]->type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                $asFloat = $context->builder->siToFp(JitLongArg::lower($context, $args[0], 'round() argument #1'), $double);
-                break;
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                $asFloat = $v;
-                break;
-            default:
-                throw new \LogicException('round() only supports integers and floats in this compiler build');
-        }
-        $fn = $context->lookupFunction('round');
 
-        return $context->builder->call($fn, $asFloat);
+        return JitRound::round($context, ...$args);
     }
 }

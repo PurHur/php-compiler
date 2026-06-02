@@ -25,9 +25,8 @@ final class stristr extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $haystack->type || Variable::TYPE_STRING !== $needle->type) {
-            throw new \LogicException('stristr() only supports strings in this compiler build');
-        }
+        $haystackStr = VmString::coerceOperand($haystack);
+        $needleStr = VmString::coerceOperand($needle);
         $beforeNeedle = false;
         if (3 === $argc) {
             $flag = $frame->calledArgs[2]->resolveIndirect();
@@ -36,7 +35,7 @@ final class stristr extends Internal
             }
             $beforeNeedle = $flag->toBool();
         }
-        $result = VmString::stristr($haystack->toString(), $needle->toString(), $beforeNeedle);
+        $result = VmString::stristr($haystackStr, $needleStr, $beforeNeedle);
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {

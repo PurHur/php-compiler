@@ -31,13 +31,14 @@ final class random_int extends Internal
         }
         $minArg = $frame->calledArgs[0]->resolveIndirect();
         $maxArg = $frame->calledArgs[1]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_INTEGER !== $minArg->type || Variable::TYPE_INTEGER !== $maxArg->type) {
             throw new \LogicException('random_int() only supports integers in this compiler build');
         }
-        $frame->returnVar->int(VmRandom::randomInt($minArg->toInt(), $maxArg->toInt()));
+        $result = VmRandom::randomInt($minArg->toInt(), $maxArg->toInt());
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int($result);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -46,10 +47,10 @@ final class random_int extends Internal
             throw new \LogicException('random_int() requires exactly two arguments');
         }
 
-        return JitRandomInt::call(
-            $context,
-            JitLongArg::lower($context, $args[0], 'random_int() min'),
-            JitLongArg::lower($context, $args[1], 'random_int() max')
-        );
+        $min = JitLongArg::lower($context, $args[0], 'random_int() min');
+        $max = JitLongArg::lower($context, $args[1], 'random_int() max');
+        JitRandomInt::emitRuntimeRangeGuard($context, $min, $max);
+
+        return JitRandomInt::call($context, $min, $max);
     }
 }

@@ -33,12 +33,21 @@ final class sort_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('sort() requires exactly one argument');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('sort() requires one or two arguments');
         }
         $array = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('sort() argument must be an array in this compiler build');
+        }
+        $flags = StdlibConstants::SORT_REGULAR;
+        if (2 === $argc) {
+            $flagsArg = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $flagsArg->type) {
+                throw new \LogicException('sort() flags must be an integer in this compiler build');
+            }
+            $flags = $flagsArg->toInt();
         }
         $ht = $array->toArray();
         if ($ht->getNumElements() < 2) {
@@ -58,7 +67,7 @@ final class sort_ extends Internal
         if (Variable::TYPE_STRING === $first->type) {
             VmInternalCompare::sortVariableValues(
                 $values,
-                VmInternalCompare::resolveStringCallback('strcmp')
+                VmInternalCompare::stringCompareForSortFlags($flags)
             );
         } elseif (Variable::TYPE_INTEGER === $first->type) {
             $n = \count($values);
@@ -97,11 +106,59 @@ final class sort_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('sort() requires exactly one argument');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('sort() requires one or two arguments');
         }
-        ArrayBuiltinHelper::sortPacked($context, $args[0]);
+        if (1 === $argc) {
+            ArrayBuiltinHelper::sortPacked($context, $args[0]);
+        } else {
+            self::jitSortWithFlags($context, $args[0], self::resolveJitSortFlags($context, $args[1]));
+        }
 
         return $context->getTypeFromString('int1')->constInt(1, false);
+    }
+
+    private static function resolveJitSortFlags(Context $context, JITVariable $flagsArg): int
+    {
+        if (null !== $flagsArg->compileTimeConstantName) {
+            $phpVar = $context->runtime->vmContext->constantFetch($flagsArg->compileTimeConstantName);
+            if (null !== $phpVar && Variable::TYPE_INTEGER === $phpVar->type) {
+                return $phpVar->toInt();
+            }
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $flagsArg->type) {
+            throw new \LogicException(
+                'sort() flags must be a predefined constant in JIT/AOT in this compiler build'
+            );
+        }
+        throw new \LogicException('sort() flags must be an integer in this compiler build');
+    }
+
+    private static function jitSortWithFlags(Context $context, JITVariable $array, int $flags): void
+    {
+        $caseFlag = $flags & StdlibConstants::SORT_FLAG_CASE;
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+
+        if (StdlibConstants::SORT_NATURAL === $sortType) {
+            if (0 !== $caseFlag) {
+                ArrayBuiltinHelper::sortPackedNaturalCase($context, $array);
+            } else {
+                ArrayBuiltinHelper::sortPackedNatural($context, $array);
+            }
+
+            return;
+        }
+        if (
+            StdlibConstants::SORT_REGULAR === $sortType
+            || StdlibConstants::SORT_STRING === $sortType
+            || StdlibConstants::SORT_NUMERIC === $sortType
+            || StdlibConstants::SORT_LOCALE_STRING === $sortType
+        ) {
+            ArrayBuiltinHelper::sortPacked($context, $array);
+
+            return;
+        }
+        throw new \LogicException('sort() flags are not supported in this compiler build');
     }
 }

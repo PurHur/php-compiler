@@ -1,0 +1,10 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
+@@ -1833,6 +1833,7 @@
+         'get_declared_classes' => ['array'],
+         'get_declared_interfaces' => ['array'],
+         'get_declared_traits' => ['array'],
++        'get_declared_functions' => ['array'],
+         'get_defined_constants' => ['array', 'categorize=' => 'bool'],
+         'get_defined_functions' => ['array'],
+         'get_defined_vars' => ['array'],

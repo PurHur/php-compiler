@@ -50,6 +50,10 @@ final class InheritanceVariance
      */
     public static function validateScript(Script $script, callable $report): void
     {
+        if ('1' === (string) getenv('PHP_COMPILER_VENDOR_PRELINK')) {
+            return;
+        }
+
         $checker = new self();
         $checker->indexScript($script);
         $checker->validate($report);
@@ -189,9 +193,23 @@ final class InheritanceVariance
         string $parentClass,
         MethodSig $parent
     ): ?string {
+        // Zend: concrete inherited constructors are not subject to parameter/return
+        // compatibility (child may call parent::__construct with a different signature).
+        // Abstract/interface constructors still enforce compatibility (#55375).
+        if ('__construct' === $methodLc && !$parent->isAbstract) {
+            return null;
+        }
+
         if (count($child->params) < count($parent->params)) {
             for ($i = count($child->params); $i < count($parent->params); ++$i) {
                 if (!($parent->paramHasDefault[$i] ?? false)) {
+                    return $this->formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
+                }
+            }
+        }
+        if ($parent->isAbstract && count($child->params) > count($parent->params)) {
+            for ($i = count($parent->params); $i < count($child->params); ++$i) {
+                if (!($child->paramHasDefault[$i] ?? false)) {
                     return $this->formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
                 }
             }
@@ -274,8 +292,43 @@ final class InheritanceVariance
         if ($parentClass === $childClass) {
             return true;
         }
+        if ($this->isClassSubtypeOf($childClass, $parentClass)) {
+            return true;
+        }
 
-        return $this->isClassSubtypeOf($childClass, $parentClass);
+        return $this->classImplementsInterface($childClass, $parentClass);
+    }
+
+    private function classImplementsInterface(string $classLc, string $interfaceLc): bool
+    {
+        if ($classLc === $interfaceLc) {
+            return true;
+        }
+        foreach ($this->implements[$classLc] ?? [] as $ifaceLc) {
+            if ($this->interfaceExtendsOrEquals($ifaceLc, $interfaceLc)) {
+                return true;
+            }
+        }
+        $parent = $this->extends[$classLc] ?? null;
+        if (null !== $parent) {
+            return $this->classImplementsInterface($parent, $interfaceLc);
+        }
+
+        return false;
+    }
+
+    private function interfaceExtendsOrEquals(string $ifaceLc, string $targetLc): bool
+    {
+        if ($ifaceLc === $targetLc) {
+            return true;
+        }
+        foreach ($this->interfaceExtends[$ifaceLc] ?? [] as $parentIface) {
+            if ($this->interfaceExtendsOrEquals($parentIface, $targetLc)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function isClassSubtypeOf(string $subtypeLc, string $supertypeLc): bool
@@ -374,18 +427,27 @@ final class MethodSig
 
     public string $ownerLc;
 
+    public bool $isAbstract;
+
     /**
      * @param list<?TypeSig>   $params
      * @param list<string>     $paramNames
      * @param list<bool>       $paramHasDefault
      */
-    public function __construct(string $ownerLc, array $params, array $paramNames, array $paramHasDefault, ?TypeSig $returnType)
-    {
+    public function __construct(
+        string $ownerLc,
+        array $params,
+        array $paramNames,
+        array $paramHasDefault,
+        ?TypeSig $returnType,
+        bool $isAbstract = false
+    ) {
         $this->ownerLc = $ownerLc;
         $this->params = $params;
         $this->paramNames = $paramNames;
         $this->paramHasDefault = $paramHasDefault;
         $this->returnType = $returnType;
+        $this->isAbstract = $isAbstract;
     }
 
     public static function fromFunc(Func $func, string $ownerLc): self
@@ -398,8 +460,16 @@ final class MethodSig
             $names[] = self::paramNameFromOperand($param->name);
             $hasDefault[] = null !== $param->defaultVar;
         }
+        $isAbstract = 0 !== ($func->flags & Func::FLAG_ABSTRACT);
 
-        return new self($ownerLc, $params, $names, $hasDefault, TypeSig::fromCfgType($func->returnType));
+        return new self(
+            $ownerLc,
+            $params,
+            $names,
+            $hasDefault,
+            TypeSig::fromCfgType($func->returnType),
+            $isAbstract
+        );
     }
 
     private static function paramNameFromOperand(Operand $name): string

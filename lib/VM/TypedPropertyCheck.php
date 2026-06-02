@@ -23,8 +23,16 @@ final class TypedPropertyCheck
             if ($property->name !== $name) {
                 continue;
             }
+            // Typed slots use TYPE_UNDEFINED prototype; untyped use TYPE_NULL (#4240).
+            if ($property->prototype->isUndefined()) {
+                return true;
+            }
+            // Readonly without default stays uninitialized until constructor assigns (#4248).
+            if ($property->readonly && null === $property->default && !$property->hasRuntimeDefaultInit()) {
+                return Variable::TYPE_UNDEFINED === $target->type;
+            }
 
-            return null === $property->default;
+            return false;
         }
 
         return false;

@@ -174,6 +174,7 @@ class Refcount extends Builtin {
     public function implement(): void {
         \PHPCompiler\JIT\Builtin\WeakRefRuntime::ensureLinked($this->context);
         \PHPCompiler\JIT\Builtin\WeakRefNative::registerDeclarations($this->context);
+        \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
         $this->implementInit();
         $this->implementAddref();
         $this->implementDelref();
@@ -518,13 +519,55 @@ class Refcount extends Builtin {
                     $this->context->builder->branchIf($bool, $ifBlock, $tmp);
                 
                 $this->context->builder->positionAtEnd($ifBlock);
-                { $this->context->builder->call(
+                { $parentFn = $ifBlock->getParent();
+                    assert($parentFn instanceof PHPLLVM\Value\Function_);
+                    $objMask = $this->context->getTypeFromString('int32')->constInt(self::TYPE_INFO_TYPE_OBJECT, false);
+                    $isObject = $this->context->builder->icmp(
+                        PHPLLVM\Builder::INT_NE,
+                        $this->context->builder->bitwiseAnd($typeinfo, $objMask),
+                        $objMask->typeOf()->constInt(0, false)
+                    );
+                    $objDestructBlock = $parentFn->appendBasicBlock('delref_object_destruct');
+                    $afterDestructBlock = $parentFn->appendBasicBlock('delref_after_destruct');
+                    $this->context->builder->branchIf($isObject, $objDestructBlock, $afterDestructBlock);
+                    $this->context->builder->positionAtEnd($objDestructBlock);
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('phpc_destruct_try_invoke'),
+                        $this->context->builder->pointerCast(
+                            $refVirtual,
+                            $this->context->getTypeFromString('int8*')
+                        )
+                    );
+                    $this->context->builder->branch($afterDestructBlock);
+                    $this->context->builder->positionAtEnd($afterDestructBlock);
+                    $allowDestructDelref = $this->context->builder->call(
+                        $this->context->lookupFunction('phpc_destruct_delref_allowed')
+                    );
+                    $deferDestroy = $this->context->builder->icmp(
+                        PHPLLVM\Builder::INT_EQ,
+                        $allowDestructDelref,
+                        $allowDestructDelref->typeOf()->constInt(0, false)
+                    );
+                    $deferBlock = $parentFn->appendBasicBlock('delref_defer_destroy');
+                    $destroyBlock = $parentFn->appendBasicBlock('delref_destroy');
+                    $this->context->builder->branchIf($deferDestroy, $deferBlock, $destroyBlock);
+                    $this->context->builder->positionAtEnd($deferBlock);
+                    $this->context->builder->returnVoid();
+                    $this->context->builder->positionAtEnd($destroyBlock);
+                    $this->context->builder->call(
                     $this->context->lookupFunction('phpc_weakref_clear_object_typed'),
                     $this->context->builder->pointerCast(
                         $refVirtual,
                         $this->context->getTypeFromString('int8*')
                     ),
                     $typeinfo
+                );
+                $this->context->builder->call(
+                    $this->context->lookupFunction('phpc_gc_unregister'),
+                    $this->context->builder->pointerCast(
+                        $refVirtual,
+                        $this->context->getTypeFromString('int8*')
+                    )
                 );
                 $this->context->memory->free($refVirtual);
     }

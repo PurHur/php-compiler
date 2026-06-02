@@ -128,7 +128,7 @@ On Runforge / harness hosts (do **not** use raw `docker run -v "$(pwd):/compiler
 ./script/docker-exec.sh -- bash -lc './script/north-star4-verify.sh --dry-run-only'
 ```
 
-**Next steps:** `BOOTSTRAP_M4_GEN2_STRICT_GATE=1` in `ci-local.sh` ([#2112](https://github.com/PurHur/php-compiler/issues/2112)); opt-in `NORTH_STAR4_VERIFY_GATE=1` ([#2429](https://github.com/PurHur/php-compiler/issues/2429)); argv `bin/compile.php -o` on compiled driver ([#1937](https://github.com/PurHur/php-compiler/issues/1937), [#1521](https://github.com/PurHur/php-compiler/issues/1521)); full revision rebuild ([#1498](https://github.com/PurHur/php-compiler/issues/1498)).
+**Next steps:** opt-in `NORTH_STAR4_VERIFY_GATE=1` ([#2429](https://github.com/PurHur/php-compiler/issues/2429)); argv `bin/compile.php -o` on compiled driver ([#1937](https://github.com/PurHur/php-compiler/issues/1937), [#1521](https://github.com/PurHur/php-compiler/issues/1521)); full revision rebuild ([#1498](https://github.com/PurHur/php-compiler/issues/1498)). M4 gen-2 strict CI gate is default-on in `ci-local.sh` ([#2112](https://github.com/PurHur/php-compiler/issues/2112)); opt-out `BOOTSTRAP_M4_GEN2_STRICT_GATE=0`.
 
 ### 8. (Optional) Full local CI
 

@@ -29,9 +29,6 @@ final class htmlentities extends Internal
             throw new \LogicException('htmlentities() requires one to four arguments in this compiler build');
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_STRING !== $v->type) {
             throw new \LogicException('htmlentities() only supports strings in this compiler build');
         }
@@ -47,11 +44,7 @@ final class htmlentities extends Internal
             $flags = $flagsVar->toInt();
         }
         if ($argc >= 3) {
-            $encVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $encVar->type) {
-                throw new \LogicException('htmlentities() encoding must be a string in this compiler build');
-            }
-            $encoding = $encVar->toString();
+            $encoding = self::resolveEncodingVm($frame->calledArgs[2]->resolveIndirect());
         }
         if (4 === $argc) {
             $deVar = $frame->calledArgs[3]->resolveIndirect();
@@ -59,6 +52,9 @@ final class htmlentities extends Internal
                 throw new \LogicException('htmlentities() double_encode must be a boolean in this compiler build');
             }
             $doubleEncode = $deVar->toBool();
+        }
+        if (null === $frame->returnVar) {
+            return;
         }
         $frame->returnVar->string(VmString::htmlentities($string, $flags, $encoding, $doubleEncode));
     }
@@ -72,7 +68,7 @@ final class htmlentities extends Internal
         if ($argc < 1 || $argc > 4) {
             throw new \LogicException('htmlentities() requires one to four arguments in this compiler build');
         }
-        if ($argc >= 3) {
+        if (self::jitEffectiveArgc($argc, $args) >= 3) {
             throw new \LogicException(
                 'htmlentities() JIT only supports string and optional flags in this compiler build'
             );
@@ -104,5 +100,50 @@ final class htmlentities extends Internal
         }
 
         return JitHtmlentities::escape($context, $str, $flags);
+    }
+
+    private static function resolveEncodingVm(Variable $encVar): string
+    {
+        if (Variable::TYPE_NULL === $encVar->type) {
+            return 'UTF-8';
+        }
+        if (Variable::TYPE_STRING !== $encVar->type) {
+            throw new \TypeError(
+                'htmlentities(): Argument #3 ($encoding) must be of type ?string, '
+                .self::vmTypeName($encVar->type).' given'
+            );
+        }
+
+        return $encVar->toString();
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function jitEffectiveArgc(int $argc, array $args): int
+    {
+        if ($argc >= 3 && self::encodingArgIsNull($args[2])) {
+            return 2;
+        }
+
+        return $argc;
+    }
+
+    private static function encodingArgIsNull(JITVariable $var): bool
+    {
+        return JITVariable::TYPE_NULL === $var->type || $var->isNullConstant;
+    }
+
+    private static function vmTypeName(int $type): string
+    {
+        return match ($type) {
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            Variable::TYPE_RESOURCE => 'resource',
+            default => 'unknown type',
+        };
     }
 }

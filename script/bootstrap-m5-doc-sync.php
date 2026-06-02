@@ -79,6 +79,11 @@ function bootstrap_m5_doc_symbol_to_key(string $symbol): string
         return '\\'.strtolower(str_replace('::', '\\', $symbol));
     }
 
+    // Global allowlist entries from lib/JIT.php (not bootstrap-aot fixtures).
+    if (str_starts_with(strtolower($symbol), 'php_compiler_')) {
+        return '\\'.strtolower($symbol);
+    }
+
     return '\\bootstrapaot\\'.strtolower($symbol);
 }
 

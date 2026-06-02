@@ -28,7 +28,7 @@ ci_ensure_vendor_patches() {
   local root
   root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
   if [[ -x "${root}/script/apply-patches.sh" && -d "${root}/vendor/ircmaxell/php-cfg" ]]; then
-    "${root}/script/apply-patches.sh" >/dev/null 2>&1 || true
+    "${root}/script/apply-patches.sh" >/dev/null 2>&1
   fi
 }
 

@@ -50,6 +50,8 @@ final class Variable {
     private Variable $stringOffsetParent;
     private int $stringOffsetIndex;
     private ?ErrorReporter $stringOffsetReporter = null;
+    private ?Context $stringOffsetContext = null;
+    private ?\PHPCompiler\Frame $stringOffsetFrame = null;
     private ?string $stringOffsetFile = null;
     private ArrayAccessDimension $arrayAccessDimension;
 
@@ -68,6 +70,9 @@ final class Variable {
     /** list&lt;T&gt; / array&lt;K,V&gt; shape when declaration used generic array syntax (#3705). */
     public ?GenericArrayTypeSpec $genericArrayTypeSpec = null;
 
+    /** @var list<array{kind: string, interfaces?: list<string>, name?: string}>|null */
+    public ?array $dnfArms = null;
+
     /** Set for instance properties so readonly-class writes can be enforced (issue #1360). */
     public ?ObjectEntry $objectPropertyOwner = null;
 
@@ -75,6 +80,8 @@ final class Variable {
 
     /** Stream handle from fopen()/similar; distinguishes handle ints from plain integers (#3519). */
     public bool $streamResource = false;
+
+    public bool $dirResource = false;
 
     /** Lvalue proxy for __set dispatch when the property slot does not exist (#146). */
     public ?ObjectEntry $magicSetTarget = null;
@@ -135,6 +142,7 @@ final class Variable {
         $this->resetScalars();
         $this->type = self::TYPE_ARRAY;
         $this->streamResource = false;
+        $this->dirResource = false;
         $this->array = $ht;
     }
 
@@ -175,17 +183,31 @@ final class Variable {
         $this->type = self::TYPE_INTEGER;
         $this->integer = $value;
         $this->streamResource = false;
+        $this->dirResource = false;
     }
 
     public function streamHandle(int $value): void
     {
         $this->int($value);
         $this->streamResource = true;
+        $this->dirResource = false;
+    }
+
+    public function dirHandle(int $value): void
+    {
+        $this->int($value);
+        $this->dirResource = true;
+        $this->streamResource = false;
     }
 
     public function isStreamResource(): bool
     {
         return $this->streamResource && self::TYPE_INTEGER === $this->type;
+    }
+
+    public function isDirResource(): bool
+    {
+        return $this->dirResource && self::TYPE_INTEGER === $this->type;
     }
 
     public function is(int $type): bool {
@@ -449,9 +471,13 @@ final class Variable {
     }
 
     public function object(ObjectEntry $value): void {
+        if (self::TYPE_OBJECT === $this->type && isset($this->object) && $this->object->id === $value->id) {
+            return;
+        }
         $this->reset();
         $this->type = self::TYPE_OBJECT;
         $this->object = $value;
+        ObjectLifetime::addRef($value);
     }
 
     public function enumCase(EnumCaseEntry $value): void
@@ -490,10 +516,14 @@ final class Variable {
     }
 
     public function reset(): void {
+        if (self::TYPE_OBJECT === $this->type && isset($this->object)) {
+            ObjectLifetime::releaseRef($this->object);
+        }
         $this->releaseArrayRef();
         $this->resetScalars();
         $this->type = self::TYPE_NULL;
         $this->streamResource = false;
+        $this->dirResource = false;
     }
 
     private function releaseArrayRef(): void
@@ -516,6 +546,8 @@ final class Variable {
         unset($this->stringOffsetParent);
         unset($this->stringOffsetIndex);
         unset($this->stringOffsetReporter);
+        unset($this->stringOffsetContext);
+        unset($this->stringOffsetFrame);
         unset($this->stringOffsetFile);
         unset($this->arrayAccessDimension);
     }
@@ -542,10 +574,34 @@ final class Variable {
         return $this->arrayAccessDimension->read()->resolveIndirect();
     }
 
+    /**
+     * Zend string offset index: float emits "String offset cast occurred" then truncates.
+     */
+    public static function stringOffsetIndexFromDim(
+        self $dim,
+        ?ErrorReporter $reporter = null,
+        ?Context $context = null,
+        ?\PHPCompiler\Frame $frame = null,
+        ?string $file = null
+    ): int {
+        $dim = $dim->resolveIndirect();
+        if (self::TYPE_FLOAT === $dim->type) {
+            if (null !== $reporter) {
+                $reporter->stringOffsetCastOccurred($context, $frame, $file);
+            }
+
+            return (int) $dim->float;
+        }
+
+        return $dim->toInt();
+    }
+
     public function stringOffset(
         Variable $parent,
         int $index,
         ?ErrorReporter $reporter = null,
+        ?Context $context = null,
+        ?\PHPCompiler\Frame $frame = null,
         ?string $file = null
     ): void {
         $this->reset();
@@ -553,6 +609,8 @@ final class Variable {
         $this->stringOffsetParent = $parent;
         $this->stringOffsetIndex = $index;
         $this->stringOffsetReporter = $reporter;
+        $this->stringOffsetContext = $context;
+        $this->stringOffsetFrame = $frame;
         $this->stringOffsetFile = $file;
     }
 
@@ -597,6 +655,33 @@ final class Variable {
         }
     }
 
+    /**
+     * Shallow property copy for {@see ObjectEntry::cloneShallow()} — skips typed-property
+     * read guards so uninitialized slots clone like Zend zend_objects_clone_obj (#4245).
+     */
+    public function copyFromForClone(self $var): void
+    {
+        if (self::TYPE_INDIRECT === $this->type) {
+            $this->indirect->copyFromForClone($var);
+
+            return;
+        }
+        while (self::TYPE_INDIRECT === $var->type) {
+            $var = $var->indirect;
+        }
+        if (TypedPropertyCheck::isUninitialized($var)) {
+            $owner = $this->objectPropertyOwner;
+            $name = $this->objectPropertyName;
+            $this->reset();
+            $this->type = self::TYPE_UNDEFINED;
+            $this->objectPropertyOwner = $owner;
+            $this->objectPropertyName = $name;
+
+            return;
+        }
+        $this->copyFrom($var);
+    }
+
     public function copyFrom(self $var): void {
         if ($this->type === self::TYPE_INDIRECT) {
             // always assign to the indirection
@@ -625,9 +710,13 @@ final class Variable {
             case self::TYPE_STRING:
                 $this->string($var->string);
                 break;
+            case self::TYPE_STRING_OFFSET:
+                $this->string($var->toString());
+                break;
             case self::TYPE_INTEGER:
                 $this->int($var->integer);
                 $this->streamResource = $var->streamResource;
+                $this->dirResource = $var->dirResource;
                 break;
             case self::TYPE_FLOAT:
                 $this->float($var->float);
@@ -636,6 +725,10 @@ final class Variable {
                 $this->bool($var->bool);
                 break;
             case self::TYPE_OBJECT:
+                if (!isset($var->object)) {
+                    $this->null();
+                    break;
+                }
                 $this->object($var->object);
                 break;
             case self::TYPE_ENUM_CASE:
@@ -656,7 +749,15 @@ final class Variable {
                 $var->array->addRef();
                 $this->type = self::TYPE_ARRAY;
                 $this->streamResource = false;
+                $this->dirResource = false;
                 $this->array = $var->array;
+                break;
+            case self::TYPE_ENUM_CASE:
+                $this->enumCase(new EnumCaseEntry(
+                    $var->enumCase->enumClass,
+                    $var->enumCase->caseName,
+                    clone $var->enumCase->backingValue,
+                ));
                 break;
             default:
                 var_dump($var);
@@ -693,6 +794,11 @@ final class Variable {
             return false;
         }
         if (self::TYPE_OBJECT === $self->type) {
+            if (EnumCaseSupport::isEnumCase($self->object) && EnumCaseSupport::isEnumCase($other->object)) {
+                return $self->object->class === $other->object->class
+                    && 0 === strcasecmp($self->object->enumCaseName ?? '', $other->object->enumCaseName ?? '');
+            }
+
             return $self->object === $other->object;
         }
         if (self::TYPE_STRING === $self->type) {
@@ -713,6 +819,9 @@ restart:
                 return $self->float === $other->float;
             case TYPE_PAIR_OBJECT_OBJECT:
                 return $self->object->looseEquals($other->object);
+            case TYPE_PAIR_ENUM_CASE_ENUM_CASE:
+                return $self->enumCase->enumClass === $other->enumCase->enumClass
+                    && $self->enumCase->caseName === $other->enumCase->caseName;
             case TYPE_PAIR_BOOLEAN_BOOLEAN:
                 return $self->bool === $other->bool;
             case TYPE_PAIR_NULL_NULL:
@@ -749,6 +858,24 @@ restart:
         return (float) $s;
     }
 
+    /**
+     * Int↔string loose == prefers exact integer numeric strings; other numeric strings (e.g. '0e5')
+     * fall back to {@see looseNumericFromString} (#4035, Zend zend_operators.c).
+     *
+     * Non-numeric strings still compare as 0 (#3644).
+     */
+    private static function looseIntegerFromString(string $s): ?int
+    {
+        if (!is_numeric($s)) {
+            return 0;
+        }
+        if (((string) (int) $s) === $s) {
+            return (int) $s;
+        }
+
+        return null;
+    }
+
     private function looseEqual(Variable $self, Variable $other): bool {
         if ($self->type === self::TYPE_NULL) {
             switch ($other->type) {
@@ -781,15 +908,29 @@ restart:
             if ('' === $self->string) {
                 return false;
             }
+            $parsed = self::looseIntegerFromString($self->string);
+            if (null !== $parsed) {
+                return $other->integer == $parsed;
+            }
+            if (is_numeric($self->string)) {
+                return $other->integer == self::looseNumericFromString($self->string);
+            }
 
-            return $other->integer == self::looseNumericFromString($self->string);
+            return false;
         }
         if ($self->type === self::TYPE_INTEGER && $other->type === self::TYPE_STRING) {
             if ('' === $other->string) {
                 return false;
             }
+            $parsed = self::looseIntegerFromString($other->string);
+            if (null !== $parsed) {
+                return $self->integer == $parsed;
+            }
+            if (is_numeric($other->string)) {
+                return $self->integer == self::looseNumericFromString($other->string);
+            }
 
-            return $self->integer == self::looseNumericFromString($other->string);
+            return false;
         }
         if ($self->type === self::TYPE_STRING && $other->type === self::TYPE_FLOAT) {
             return $other->float == self::looseNumericFromString($self->string);
@@ -1354,8 +1495,8 @@ restart:
             if (null !== $this->stringOffsetReporter) {
                 $this->stringOffsetReporter->uninitializedStringOffset(
                     $rawIndex,
-                    null,
-                    null,
+                    $this->stringOffsetContext,
+                    $this->stringOffsetFrame,
                     $this->stringOffsetFile
                 );
             }
@@ -1380,8 +1521,8 @@ restart:
             if (null !== $this->stringOffsetReporter) {
                 $this->stringOffsetReporter->illegalStringOffset(
                     $rawIndex,
-                    null,
-                    null,
+                    $this->stringOffsetContext,
+                    $this->stringOffsetFrame,
                     $this->stringOffsetFile
                 );
             }
@@ -1423,6 +1564,7 @@ const TYPE_PAIR_FLOAT_INTEGER = 513;
 const TYPE_PAIR_FLOAT_FLOAT = 514;
 const TYPE_PAIR_STRING_STRING = 1028;
 const TYPE_PAIR_OBJECT_OBJECT = 1285;
+const TYPE_PAIR_ENUM_CASE_ENUM_CASE = 2313;
 const TYPE_PAIR_BOOLEAN_BOOLEAN = 771;
 const TYPE_PAIR_NULL_NULL = 0;
 const TYPE_PAIR_ARRAY_ARRAY = 1542;

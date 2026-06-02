@@ -407,7 +407,7 @@ smoke_008_selfhostprobe() {
 
 # 009-FastCGIWeb project AOT + CGI health + PATH_INFO diagnostics (#2331, #2352).
 smoke_009_fastcgiweb() {
-  if [[ "${FASTCGI_WEB_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+  if [[ "${FASTCGI_WEB_AOT_SMOKE_GATE:-1}" != "1" ]]; then
     echo "examples-aot-smoke: 009-FastCGIWeb: skip (FASTCGI_WEB_AOT_SMOKE_GATE=0)"
     return 0
   fi

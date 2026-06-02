@@ -21,6 +21,7 @@ final class WeakRefNative
                 ['phpc_weakref_reset', $void, []],
                 ['phpc_weakref_register_ref', $void, [$i8p, $i8p]],
                 ['phpc_weakref_register_map', $void, [$i8p, $i8p, $i8p]],
+                ['phpc_weakref_unregister_map', $void, [$i8p, $i8p, $i8p]],
                 ['phpc_weakref_clear_object', $void, [$i8p]],
                 ['phpc_weakref_clear_object_typed', $void, [$i8p, $i32]],
                 ['phpc_weakref_format_object_key', $void, [$i8p, $i8p, $sizeT]],

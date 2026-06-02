@@ -26,6 +26,9 @@ final class UnsetHelper
         $container = $context->getVariableFromOp($containerOp);
         $dim = $context->getVariableFromOp($dimOp);
         if (Variable::TYPE_OBJECT === $container->type) {
+            if (ArrayAccessHelper::tryCompileOffsetUnset($context, $container, $dim, $containerOp)) {
+                return;
+            }
             self::compilePropertyUnset($context, $block, $containerOp, $dimOp);
 
             return;
@@ -65,6 +68,12 @@ final class UnsetHelper
         if ($dimOp instanceof Literal) {
             $prop = $context->type->object->propertyFetch($receiver, $declaringClass, $dimOp->value);
             if (null !== $prop->objectPropertySlot && null !== $prop->objectPropertyType) {
+                ReadonlyClassGuard::emitBeforePropertyStore(
+                    $context,
+                    $prop,
+                    $context->jitEnclosingBlock,
+                    'unset'
+                );
                 $context->type->object->propertyStore(
                     $prop->objectPropertySlot,
                     $null,
@@ -77,6 +86,12 @@ final class UnsetHelper
         $nameVar = $context->getVariableFromOp($dimOp);
         $prop = $context->type->object->propertyFetchDynamic($receiver, $declaringClass, $nameVar);
         if (null !== $prop->objectPropertySlot && null !== $prop->objectPropertyType) {
+            ReadonlyClassGuard::emitBeforePropertyStore(
+                $context,
+                $prop,
+                $context->jitEnclosingBlock,
+                'unset'
+            );
             $context->type->object->propertyStore(
                 $prop->objectPropertySlot,
                 $null,

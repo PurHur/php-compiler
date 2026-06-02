@@ -162,6 +162,38 @@ final class Superglobals
     }
 
     /**
+     * Populate CLI globals ($argc/$argv) and mirror into $_SERVER (php-src sapi/cli parity, #4139).
+     *
+     * @param list<string> $argv
+     */
+    public static function populateCliArgv(Context $context, array $argv): void
+    {
+        // Always define both globals (Zend: they exist even when empty).
+        $argc = count($argv);
+
+        $argvHt = new HashTable();
+        foreach ($argv as $i => $arg) {
+            $v = new Variable();
+            $v->string((string) $arg);
+            $argvHt->addIndex((int) $i, $v);
+        }
+        $argvVar = $context->ensureGlobal('argv');
+        $argvVar->array($argvHt);
+        $argcVar = $context->ensureGlobal('argc');
+        $argcVar->int($argc);
+
+        $server = $context->ensureSuperglobal('_SERVER')->toArray();
+        $argcServer = new Variable();
+        $argcServer->int($argc);
+        $server->add('argc', $argcServer);
+
+        $argvServer = new Variable(Variable::TYPE_ARRAY);
+        // Zend exposes an array value here; keep it independent of $argv mutations.
+        $argvServer->array($argvHt->duplicate());
+        $server->add('argv', $argvServer);
+    }
+
+    /**
      * Parse a CGI HTTP_COOKIE / Cookie header into $_COOKIE (issue #271).
      */
     public static function populateCookie(Context $context, string $cookieHeader): void

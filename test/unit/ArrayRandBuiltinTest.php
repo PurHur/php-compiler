@@ -28,6 +28,48 @@ final class ArrayRandBuiltinTest extends TestCase
         $this->assertLessThanOrEqual(2, $key);
     }
 
+    public function testEmptyArrayThrowsValueError(): void
+    {
+        $runtime = new Runtime();
+        $fn = new array_rand();
+        $ht = new HashTable();
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage('array_rand(): Argument #1 ($array) cannot be empty');
+        $this->runRandResult($fn, $runtime, $ht, 1);
+    }
+
+    public function testNumZeroThrowsValueError(): void
+    {
+        $runtime = new Runtime();
+        $fn = new array_rand();
+        $ht = new HashTable();
+        $val = new VMVariable();
+        $val->string('a');
+        $ht->addIndex(0, $val);
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage(
+            'array_rand(): Argument #2 ($num) must be between 1 and the number of elements in argument #1 ($array)'
+        );
+        $this->runRandResult($fn, $runtime, $ht, 0);
+    }
+
+    public function testNumExceedsCountThrowsValueError(): void
+    {
+        $runtime = new Runtime();
+        $fn = new array_rand();
+        $ht = new HashTable();
+        foreach (['a', 'b'] as $i => $v) {
+            $val = new VMVariable();
+            $val->string($v);
+            $ht->addIndex($i, $val);
+        }
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage(
+            'array_rand(): Argument #2 ($num) must be between 1 and the number of elements in argument #1 ($array)'
+        );
+        $this->runRandResult($fn, $runtime, $ht, 3);
+    }
+
     public function testMultipleUniqueKeys(): void
     {
         $runtime = new Runtime();

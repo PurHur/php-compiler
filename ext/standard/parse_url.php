@@ -53,8 +53,8 @@ final class parse_url extends Internal
 
             return;
         }
-        if (null === $result) {
-            $frame->returnVar->null();
+        if (false === $result) {
+            $frame->returnVar->bool(false);
 
             return;
         }

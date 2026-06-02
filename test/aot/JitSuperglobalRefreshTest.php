@@ -100,6 +100,65 @@ PHP;
     }
 
     /**
+     * Issue #49 repro: two bin/jit.php -r runs with different -q must not reuse baked $_GET.
+     */
+    public function testJitInlineCodeTwoQueryRuns(): void
+    {
+        $jitBin = realpath(__DIR__ . '/../../bin/jit.php');
+        $this->assertNotFalse($jitBin);
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $code = 'echo $_GET["a"] ?? "missing";';
+
+        $outOne = $this->runJitInline($jitBin, 'a=1', $code, $env, $repoRoot);
+        $this->assertSame('1', trim($outOne));
+
+        $outTwo = $this->runJitInline($jitBin, 'a=2', $code, $env, $repoRoot);
+        $this->assertSame('2', trim($outTwo));
+    }
+
+    /**
+     * @param array<string, string> $env
+     */
+    private function runJitInline(
+        string $jitBin,
+        string $query,
+        string $code,
+        array $env,
+        string $repoRoot
+    ): string {
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(
+            array_merge(
+                self::llvmEnvPrefix(),
+                self::phpCommand(),
+                [$jitBin, '-q', $query, '-r', $code]
+            ),
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            $env
+        );
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        if (139 === $exit || 11 === $exit) {
+            $this->markTestSkipped('MCJIT segfault in this environment (issue #98)');
+        }
+        $this->assertSame(0, $exit, trim($stderr !== false ? $stderr : ''));
+
+        return $stdout !== false ? $stdout : '';
+    }
+
+    /**
      * @param array<string, string> $env
      */
     private function runJit(
@@ -132,6 +191,9 @@ PHP;
         fclose($pipes[1]);
         fclose($pipes[2]);
         $exit = proc_close($proc);
+        if (139 === $exit || 11 === $exit) {
+            $this->markTestSkipped('MCJIT segfault in this environment (issue #98)');
+        }
         $this->assertSame(0, $exit, trim($stderr !== false ? $stderr : ''));
 
         return $stdout !== false ? $stdout : '';

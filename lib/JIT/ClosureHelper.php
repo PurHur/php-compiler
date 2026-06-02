@@ -115,11 +115,70 @@ final class ClosureHelper
     }
 
     /** By-value snapshot of an enclosing variable at closure creation (issue #72). */
+    /** By-value snapshot of an enclosing variable at closure creation (issue #72). */
     public static function snapshotCapture(Context $context, Variable $src): Variable
     {
         $slot = JitValueBox::alloc($context);
-        $srcPtr = JitValueBox::valuePtrFromVariable($context, $src);
-        JitValueBox::copyFromPointer($context, $slot, $srcPtr);
+        if (Variable::TYPE_VALUE === $src->type) {
+            JitValueBox::copyFromPointer(
+                $context,
+                $slot,
+                JitValueBox::valuePtrFromVariable($context, $src)
+            );
+        } else {
+            $ptr = JitValueBox::pointer($context, $slot);
+            switch ($src->type) {
+                case Variable::TYPE_NATIVE_LONG:
+                    JitValueBox::writeLong($context, $slot, $context->helper->loadValue($src));
+                    break;
+                case Variable::TYPE_NATIVE_DOUBLE:
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeDouble'),
+                        $ptr,
+                        $context->helper->loadValue($src)
+                    );
+                    break;
+                case Variable::TYPE_NATIVE_BOOL:
+                    JitValueBox::writeBool($context, $slot, $context->helper->loadValue($src));
+                    break;
+                case Variable::TYPE_NULL:
+                    $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
+                    break;
+                case Variable::TYPE_STRING:
+                    $owned = $context->builder->call(
+                        $context->lookupFunction('__string__separate'),
+                        $context->helper->loadValue($src)
+                    );
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeString'),
+                        $ptr,
+                        $owned
+                    );
+                    break;
+                case Variable::TYPE_OBJECT:
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeObject'),
+                        $ptr,
+                        $context->helper->loadValue($src)
+                    );
+                    break;
+                case Variable::TYPE_HASHTABLE:
+                    $ht = $context->helper->loadValue($src);
+                    $context->refcount->addref($ht);
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeHashtable'),
+                        $ptr,
+                        $ht
+                    );
+                    break;
+                default:
+                    JitValueBox::copyFromPointer(
+                        $context,
+                        $slot,
+                        JitValueBox::valuePtrFromVariable($context, $src)
+                    );
+            }
+        }
         $dest = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
         $dest->addref();
 
@@ -138,7 +197,7 @@ final class ClosureHelper
         return $src;
     }
 
-    /** Alias a closure capture slot to live enclosing {@see __value__*} storage (issue #72). */
+    /** Alias a closure capture slot to the capture formal {@see __value__*} (issue #72). */
     public static function bindCaptureSlotByReference(
         Context $context,
         Variable $captureSlot,

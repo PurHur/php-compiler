@@ -30,6 +30,13 @@ function run(string $filename, string $code, array $options): void
         is_string($postBody) ? $postBody : null,
         $scriptFilename
     );
+    $scriptArgv = $options['--script-argv'] ?? null;
+    if (is_array($scriptArgv)) {
+        Superglobals::populateCliArgv(
+            $runtime->vmContext,
+            array_values(array_map('strval', $scriptArgv))
+        );
+    }
     $block = $runtime->parseAndCompile($code, $filename);
     if (! isset($options['-l'])) {
         try {

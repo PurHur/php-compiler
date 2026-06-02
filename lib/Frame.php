@@ -70,6 +70,9 @@ class Frame {
     /** Set when Fiber::suspend() suspends; runFrames returns FIBER_SUSPEND. */
     public bool $fiberSuspend = false;
 
+    /** Skip one ECHO after builtin string coercion throw was caught (#4284). */
+    public bool $suppressNextEcho = false;
+
     /**
      * Foreach iterator container cache keyed by scope slot.
      * php-cfg SSA temps may alias (issue #1885); ITER_* must not rely on rereading the slot.

@@ -49,4 +49,17 @@ final class GeneratorGetReturn extends VmClassMethod
 
         return $gen;
     }
+
+    /**
+     * Zend parity: most Generator iteration methods implicitly start the generator
+     * on first access (without requiring an explicit ->rewind()).
+     */
+    public static function ensureStarted(GeneratorState $gen): void
+    {
+        if ($gen->done || $gen->hasCurrent || null !== $gen->frame || $gen->hasReturned) {
+            return;
+        }
+
+        $gen->vm->resumeGenerator($gen);
+    }
 }

@@ -43,6 +43,29 @@ final class JitHash
         ));
     }
 
+    public static function hashPbkdf2(
+        Context $context,
+        Value $algo,
+        Value $password,
+        Value $salt,
+        Value $iterations,
+        Value $length,
+        Value $raw
+    ): Value {
+        StringHashCrypto::ensureLinked($context);
+        $rawI32 = $context->builder->zExt($raw, $context->getTypeFromString('int32'));
+
+        return self::digestToValue($context, $context->builder->call(
+            $context->lookupFunction('__compiler_hash_pbkdf2'),
+            $algo,
+            $password,
+            $salt,
+            $iterations,
+            $length,
+            $rawI32
+        ));
+    }
+
     public static function equals(Context $context, Value $known, Value $user): Value
     {
         StringHashCrypto::ensureLinked($context);

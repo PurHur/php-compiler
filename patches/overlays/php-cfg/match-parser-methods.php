@@ -57,14 +57,39 @@
         if (null !== $defaultArm) {
             $this->lowerMatchArmBody($defaultArm->body, $result, $attrs, $endBlock);
         } else {
-            // Non-empty fallthrough keeps JumpIf else wiring valid for comma arms (#3717).
-            $this->block->children[] = new Jump($endBlock, $attrs);
-            $endBlock->addParent($this->block);
+            // Zend zend_throw_unhandled_match_error() when no arm matches (#4221).
+            $this->lowerUnhandledMatchError($cond, $attrs);
         }
 
         $this->block = $endBlock;
 
         return $result;
+    }
+
+    /**
+     * throw new UnhandledMatchError('Unhandled match case '.$subject) — zend_exceptions.c (#4221).
+     */
+    private function lowerUnhandledMatchError(Operand $cond, array $attrs): void
+    {
+        $prefix = $this->readVariable(new Literal('Unhandled match case '));
+        $strCond = new Op\Expr\Cast\String_($cond, $attrs);
+        $this->block->children[] = $strCond;
+        $msg = new Op\Expr\BinaryOp\Concat(
+            $prefix,
+            $this->readVariable($strCond->result),
+            $attrs
+        );
+        $this->block->children[] = $msg;
+        $class = $this->readVariable(new Literal('UnhandledMatchError'));
+        $new = new Op\Expr\New_($class, [$this->readVariable($msg->result)], $attrs);
+        $this->block->children[] = $new;
+        $this->block->children[] = new Op\Terminal\Throw_(
+            $this->readVariable($new->result),
+            $attrs
+        );
+        $dead = $this->block->create();
+        $dead->dead = true;
+        $this->block = $dead;
     }
 
     /**

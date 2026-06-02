@@ -1,0 +1,209 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/FuncContext.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/FuncContext.php
+@@ -31,6 +31,18 @@
+     /** @var array[] */
+     public $unresolvedGotos = [];
+ 
++    /** @var int[] */
++    public $gotoLoopSwitchStack = [];
++
++    /** @var int[] */
++    public $gotoFinallyStack = [];
++
++    /** @var int */
++    public $gotoScopeId = 0;
++
++    /** @var array<string, array{loopSwitch: int[], finally: int[]}> */
++    public $gotoLabelScopes = [];
++
+     public function __construct()
+     {
+         $this->scope = new \SplObjectStorage();
+
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -329,7 +329,13 @@
+         $loopBody->addParent($this->block);
+ 
+         $this->block = $loopBody;
+-        $this->block = $this->parseNodes($node->stmts, $loopBody);
++        $loopId = ++$this->ctx->gotoScopeId;
++        $this->ctx->gotoLoopSwitchStack[] = $loopId;
++        try {
++            $this->block = $this->parseNodes($node->stmts, $loopBody);
++        } finally {
++            array_pop($this->ctx->gotoLoopSwitchStack);
++        }
+         $cond = $this->readVariable($this->parseExprNode($node->cond));
+         $this->block->children[] = new JumpIf($cond, $loopBody, $loopEnd, $this->mapAttributes($node));
+         $this->processAssertions($cond, $loopBody, $loopEnd);
+@@ -427,7 +433,13 @@
+         $loopBody->addParent($this->block);
+         $loopEnd->addParent($this->block);
+ 
+-        $this->block = $this->parseNodes($node->stmts, $loopBody);
++        $loopId = ++$this->ctx->gotoScopeId;
++        $this->ctx->gotoLoopSwitchStack[] = $loopId;
++        try {
++            $this->block = $this->parseNodes($node->stmts, $loopBody);
++        } finally {
++            array_pop($this->ctx->gotoLoopSwitchStack);
++        }
+         $this->parseExprList($node->loop, self::MODE_READ);
+         $this->block->children[] = new Jump($loopInit, $this->mapAttributes($node));
+         $loopInit->addParent($this->block);
+@@ -470,7 +482,13 @@
+             $this->block->children[] = new Op\Expr\Assign($this->writeVariable($this->parseExprNode($node->valueVar)), $valueOp->result, $attrs);
+         }
+ 
+-        $this->block = $this->parseNodes($node->stmts, $this->block);
++        $loopId = ++$this->ctx->gotoScopeId;
++        $this->ctx->gotoLoopSwitchStack[] = $loopId;
++        try {
++            $this->block = $this->parseNodes($node->stmts, $this->block);
++        } finally {
++            array_pop($this->ctx->gotoLoopSwitchStack);
++        }
+         $this->block->children[] = new Jump($loopInit, $attrs);
+ 
+         $loopInit->addParent($this->block);
+@@ -505,12 +523,18 @@
+     protected function parseStmt_Goto(Stmt\Goto_ $node)
+     {
+         $attributes = $this->mapAttributes($node);
++        $fromScope = [
++            'loopSwitch' => $this->ctx->gotoLoopSwitchStack,
++            'finally' => $this->ctx->gotoFinallyStack,
++        ];
+         if (isset($this->ctx->labels[$node->name->toString()])) {
+             $labelBlock = $this->ctx->labels[$node->name->toString()];
++            $labelScope = $this->ctx->gotoLabelScopes[$node->name->toString()] ?? ['loopSwitch' => [], 'finally' => []];
++            $this->validateGotoScope($fromScope, $labelScope);
+             $this->block->children[] = new Jump($labelBlock, $attributes);
+             $labelBlock->addParent($this->block);
+         } else {
+-            $this->ctx->unresolvedGotos[$node->name->toString()][] = [$this->block, $attributes];
++            $this->ctx->unresolvedGotos[$node->name->toString()][] = [$this->block, $attributes, $fromScope];
+         }
+         $this->block = new Block();
+         $this->block->dead = true;
+@@ -592,6 +616,10 @@
+         }
+ 
+         $labelBlock = new Block();
++        $this->ctx->gotoLabelScopes[$node->name->toString()] = [
++            'loopSwitch' => $this->ctx->gotoLoopSwitchStack,
++            'finally' => $this->ctx->gotoFinallyStack,
++        ];
+         $this->block->children[] = new Jump($labelBlock, $this->mapAttributes($node));
+         $labelBlock->addParent($this->block);
+         if (isset($this->ctx->unresolvedGotos[$node->name->toString()])) {
+@@ -599,7 +627,9 @@
+              * @var Block
+              * @var array $attributes
+              */
+-            foreach ($this->ctx->unresolvedGotos[$node->name->toString()] as list($block, $attributes)) {
++            $labelScope = $this->ctx->gotoLabelScopes[$node->name->toString()];
++            foreach ($this->ctx->unresolvedGotos[$node->name->toString()] as list($block, $attributes, $fromScope)) {
++                $this->validateGotoScope($fromScope, $labelScope);
+                 $block->children[] = new Op\Stmt\Jump($labelBlock, $attributes);
+                 $labelBlock->addParent($block);
+             }
+@@ -608,6 +638,44 @@
+         $this->block = $this->ctx->labels[$node->name->toString()] = $labelBlock;
+     }
+ 
++    /**
++     * @param array{loopSwitch: int[], finally: int[]} $from
++     * @param array{loopSwitch: int[], finally: int[]} $to
++     */
++    private function validateGotoScope(array $from, array $to): void
++    {
++        if (!$this->isPrefix($to['loopSwitch'], $from['loopSwitch'])) {
++            throw new \RuntimeException("'goto' into loop or switch statement is disallowed");
++        }
++        if ($from['finally'] !== $to['finally']) {
++            if ($this->isPrefix($from['finally'], $to['finally'])) {
++                throw new \RuntimeException('jump into a finally block is disallowed');
++            }
++            if ($this->isPrefix($to['finally'], $from['finally'])) {
++                throw new \RuntimeException('jump out of a finally block is disallowed');
++            }
++            throw new \RuntimeException('jump into a finally block is disallowed');
++        }
++    }
++
++    /**
++     * @param int[] $prefix
++     * @param int[] $full
++     */
++    private function isPrefix(array $prefix, array $full): bool
++    {
++        $n = count($prefix);
++        if ($n > count($full)) {
++            return false;
++        }
++        for ($i = 0; $i < $n; ++$i) {
++            if ($prefix[$i] !== $full[$i]) {
++                return false;
++            }
++        }
++        return true;
++    }
++
+     protected function parseStmt_Namespace(Stmt\Namespace_ $node)
+     {
+         $this->currentNamespace = $node->name;
+@@ -694,7 +762,10 @@
+         $defaultBlock = $endBlock;
+         /** @var Block|null $prevBlock */
+         $prevBlock = null;
+-        foreach ($node->cases as $case) {
++        $switchId = ++$this->ctx->gotoScopeId;
++        $this->ctx->gotoLoopSwitchStack[] = $switchId;
++        try {
++            foreach ($node->cases as $case) {
+             $ifBlock = new Block();
+             if ($prevBlock && ! $prevBlock->dead) {
+                 $prevBlock->children[] = new Jump($ifBlock);
+@@ -717,6 +788,9 @@
+             }
+ 
+             $prevBlock = $this->parseNodes($case->stmts, $ifBlock);
++            }
++        } finally {
++            array_pop($this->ctx->gotoLoopSwitchStack);
+         }
+ 
+         if ($prevBlock && ! $prevBlock->dead) {
+@@ -819,7 +893,13 @@
+         }
+ 
+         if (null !== $finallyBlock) {
+-            $this->block = $this->parseNodes($node->finally->stmts, $finallyBlock);
++            $finallyId = ++$this->ctx->gotoScopeId;
++            $this->ctx->gotoFinallyStack[] = $finallyId;
++            try {
++                $this->block = $this->parseNodes($node->finally->stmts, $finallyBlock);
++            } finally {
++                array_pop($this->ctx->gotoFinallyStack);
++            }
+             $this->block->children[] = new Jump($endBlock, $attrs);
+             $endBlock->addParent($this->block);
+         }
+@@ -855,7 +935,13 @@
+         $loopBody->addParent($this->block);
+         $loopEnd->addParent($this->block);
+ 
+-        $this->block = $this->parseNodes($node->stmts, $loopBody);
++        $loopId = ++$this->ctx->gotoScopeId;
++        $this->ctx->gotoLoopSwitchStack[] = $loopId;
++        try {
++            $this->block = $this->parseNodes($node->stmts, $loopBody);
++        } finally {
++            array_pop($this->ctx->gotoLoopSwitchStack);
++        }
+         $this->block->children[] = new Jump($loopInit, $this->mapAttributes($node));
+         $loopInit->addParent($this->block);
+         $this->block = $loopEnd;
+

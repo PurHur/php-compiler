@@ -35,6 +35,9 @@ final class GeneratorState
 
     public bool $yieldFromActive = false;
 
+    /** Iterator protocol advance pending (Zend foreach/yield-from parity, #4338). */
+    public bool $yieldFromIteratorAdvance = false;
+
     public Variable $yieldFromContainer;
 
     /** True after the generator body has returned (void or value). */
@@ -72,6 +75,7 @@ final class GeneratorState
     public static function register(Context $ctx): void
     {
         $entry = new ClassEntry('Generator');
+        $entry->interfaces = ['iterator'];
         $pub = CfgFunc::FLAG_PUBLIC;
         $entry->methods['getreturn'] = new GeneratorGetReturn();
         $entry->methodVisibility['getreturn'] = $pub;
@@ -121,6 +125,7 @@ final class GeneratorState
         $this->frame = null;
         $this->autoKey = 0;
         $this->yieldFromActive = false;
+        $this->yieldFromIteratorAdvance = false;
         $this->hasReturned = false;
         $this->returnValue->null();
         $this->yieldResultSlot = null;

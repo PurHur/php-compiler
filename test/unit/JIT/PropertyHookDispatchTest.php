@@ -14,5 +14,7 @@ final class PropertyHookDispatchTest extends TestCase
         self::assertSame('__phpc_property_set_email', PropertyHooks::setHookMethodName('email'));
         self::assertSame('__phpc_property_get_email', PropertyHooks::getHookMethodName('email'));
         self::assertSame('email', PropertyHooks::propertyNameFromSetHookMethod('__phpc_property_set_email'));
+        self::assertSame('email', PropertyHooks::propertyNameFromGetHookMethod('__phpc_property_get_email'));
+        self::assertNull(PropertyHooks::propertyNameFromGetHookMethod('__phpc_property_set_email'));
     }
 }

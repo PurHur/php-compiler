@@ -234,7 +234,8 @@ run_deployed_sessions_cgi() {
   fi
   run_env+=("$@")
   if [[ -n "$stdin_body" ]]; then
-    stdout="$(printf '%s' "$stdin_body" | env "${run_env[@]}" "${dist}/bin/app" 2>"$stderr_file")"
+    run_env+=(REQUEST_BODY="$stdin_body")
+    stdout="$(env "${run_env[@]}" "${dist}/bin/app" 2>"$stderr_file")"
   else
     stdout="$(env "${run_env[@]}" "${dist}/bin/app" 2>"$stderr_file")"
   fi
