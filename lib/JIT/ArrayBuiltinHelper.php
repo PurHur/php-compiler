@@ -4375,10 +4375,100 @@ final class ArrayBuiltinHelper
         return $phi;
     }
 
+    /**
+     * array_merge() with one source — reindex integer keys, preserve string keys (#4620).
+     */
+    private static function mergeSingleArgumentCopy(Context $context, Variable $array): Value
+    {
+        $src = self::isNativeArray($array->type)
+            ? self::nativeListToHashTable($context, $array)
+            : self::loadHashTable($context, $array);
+        $dest = HashTableHelper::alloc($context);
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+
+        $nextFree = $context->builder->load($context->builder->structGep($src, $map['nextFreeElement']));
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_merge_single_packed_idx');
+        $context->builder->store($zero, $idxSlot);
+
+        $packedHead = BasicBlockHelper::append($context, 'array_merge_single_packed_head');
+        $packedBody = BasicBlockHelper::append($context, 'array_merge_single_packed_body');
+        $packedAppend = BasicBlockHelper::append($context, 'array_merge_single_packed_append');
+        $packedNext = BasicBlockHelper::append($context, 'array_merge_single_packed_next');
+        $packedDone = BasicBlockHelper::append($context, 'array_merge_single_packed_done');
+        $context->builder->branch($packedHead);
+
+        $context->builder->positionAtEnd($packedHead);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
+        $context->builder->branchIf($atEnd, $packedDone, $packedBody);
+
+        $context->builder->positionAtEnd($packedBody);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $idx
+        );
+        $context->builder->branchIf($isSet, $packedAppend, $packedNext);
+
+        $context->builder->positionAtEnd($packedAppend);
+        self::appendListEntryScalars($context, $src, $idx, $dest);
+        $context->builder->branch($packedNext);
+
+        $context->builder->positionAtEnd($packedNext);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($packedHead);
+
+        $strInit = BasicBlockHelper::append($context, 'array_merge_single_str_init');
+        $strHead = BasicBlockHelper::append($context, 'array_merge_single_str_head');
+        $context->builder->positionAtEnd($packedDone);
+        $context->builder->branch($strInit);
+
+        $context->builder->positionAtEnd($strInit);
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_merge_single_walk');
+        $head = $context->builder->load($context->builder->structGep($src, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+        $strBody = BasicBlockHelper::append($context, 'array_merge_single_str_body');
+        $strSet = BasicBlockHelper::append($context, 'array_merge_single_str_set');
+        $strNext = BasicBlockHelper::append($context, 'array_merge_single_str_next');
+        $strDone = BasicBlockHelper::append($context, 'array_merge_single_str_done');
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $strDone, $strBody);
+
+        $context->builder->positionAtEnd($strBody);
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $context->builder->branch($strSet);
+
+        $context->builder->positionAtEnd($strSet);
+        self::storeValueEntryAtStringKey($context, $dest, $keyStr, $valEntry);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strNext);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strDone);
+
+        return $dest;
+    }
+
     public static function merge(Context $context, Variable ...$arrays): Value
     {
-        if (\count($arrays) < 2) {
-            throw new \LogicException('array_merge() requires at least two arguments');
+        if (\count($arrays) < 1) {
+            throw new \ArgumentCountError('array_merge() expects at least 1 argument, 0 given');
+        }
+        if (1 === \count($arrays)) {
+            return self::mergeSingleArgumentCopy($context, $arrays[0]);
         }
 
         $allNative = true;
@@ -4448,8 +4538,11 @@ final class ArrayBuiltinHelper
      */
     public static function mergeRecursive(Context $context, Variable ...$arrays): Value
     {
-        if (\count($arrays) < 2) {
-            throw new \LogicException('array_merge_recursive() requires at least two arguments');
+        if (\count($arrays) < 1) {
+            throw new \ArgumentCountError('array_merge_recursive() expects at least 1 argument, 0 given');
+        }
+        if (1 === \count($arrays)) {
+            return self::merge($context, ...$arrays);
         }
 
         $allReindexable = true;
@@ -8137,9 +8230,6 @@ final class ArrayBuiltinHelper
      */
     public static function arrayDiff(Context $context, Variable $first, Variable ...$others): Value
     {
-        if (\count($others) < 1) {
-            throw new \LogicException('array_diff() requires at least two arguments');
-        }
         $otherHts = [];
         foreach ($others as $other) {
             $otherHts[] = self::isNativeArray($other->type)
@@ -8388,10 +8478,6 @@ final class ArrayBuiltinHelper
      */
     public static function arrayReplaceRecursive(Context $context, Variable $first, Variable ...$others): Value
     {
-        if (\count($others) < 1) {
-            throw new \LogicException('array_replace_recursive() requires at least two arguments');
-        }
-
         $result = HashTableHelper::alloc($context);
         self::overlayHashTable($context, $result, self::loadHashTable($context, $first));
         foreach ($others as $other) {
@@ -8659,9 +8745,6 @@ final class ArrayBuiltinHelper
      */
     public static function arrayReplace(Context $context, Variable $first, Variable ...$others): Value
     {
-        if (\count($others) < 1) {
-            throw new \LogicException('array_replace() requires at least two arguments');
-        }
         $dest = HashTableHelper::alloc($context);
         foreach ([$first, ...$others] as $array) {
             self::overlayHashTable($context, $dest, self::loadHashTable($context, $array));
@@ -8753,9 +8836,6 @@ final class ArrayBuiltinHelper
      */
     public static function arrayIntersect(Context $context, Variable $first, Variable ...$others): Value
     {
-        if (\count($others) < 1) {
-            throw new \LogicException('array_intersect() requires at least two arguments');
-        }
         $otherHts = [];
         foreach ($others as $other) {
             $otherHts[] = self::isNativeArray($other->type)

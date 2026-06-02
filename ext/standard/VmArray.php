@@ -85,6 +85,10 @@ final class VmArray
      */
     public static function merge(HashTable $first, HashTable ...$others): HashTable
     {
+        if ([] === $others) {
+            return self::mergeSingleArgumentCopy($first);
+        }
+
         foreach ([$first, ...$others] as $ht) {
             if (!self::isReindexableList($ht)) {
                 $out = $first->replaceCopy();
@@ -106,6 +110,32 @@ final class VmArray
                 $copy = new Variable();
                 $copy->copyFrom($value);
                 $out->append($copy);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * array_merge() with one source array — reindex integer keys, preserve string keys (php-src array.c).
+     */
+    public static function mergeSingleArgumentCopy(HashTable $first): HashTable
+    {
+        $out = new HashTable();
+        foreach ($first->iterateKeyed(true) as [$key, $value]) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->append($copy);
+            } elseif (Variable::TYPE_STRING === $key->type) {
+                $s = $key->toString();
+                if (self::isCanonicalNonNegativeIntStringKey($s)) {
+                    $out->append($copy);
+                } else {
+                    $out->add($s, $copy);
+                }
+            } else {
+                $out->add($key->toString(), $copy);
             }
         }
 
