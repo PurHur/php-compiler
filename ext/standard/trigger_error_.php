@@ -40,6 +40,9 @@ final class trigger_error_ extends Internal
                 throw new \LogicException('trigger_error() error type must be an integer');
             }
             $level = $levelVar->toInt();
+            if (!ErrorReporter::isUserErrorLevel($level)) {
+                throw new \ValueError('trigger_error(): Argument #2 ($error_level) must be one of E_USER_ERROR, E_USER_WARNING, E_USER_NOTICE, or E_USER_DEPRECATED');
+            }
         }
         $frame->vmContext->errors->triggerError(
             $messageVar->toString(),
