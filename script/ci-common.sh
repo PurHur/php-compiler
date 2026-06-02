@@ -47,7 +47,7 @@ ci_install_deps() {
     fi
   fi
   if [[ -x script/apply-patches.sh ]]; then
-    script/apply-patches.sh || true
+    script/apply-patches.sh
   fi
 }
 

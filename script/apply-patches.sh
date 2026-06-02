@@ -71,7 +71,8 @@ patch_already_applied() {
       grep -q "non-empty-string" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
     php-types-generics-list-array.patch)
-      grep -qF "preg_match('/^(list|array)" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      grep -qE "preg_match\('/\^\(list\|array" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
+        || grep -qF "preg_match('/^(list|array|iterable)" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
     php-types-generic-null-tail.patch)
       grep -q 'list<T|null> union splits' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
@@ -310,6 +311,9 @@ patch_already_applied() {
         || grep -q 'parseExpr_Throw' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
         || [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Throw_.php" ]]
       ;;
+    php-cfg-is-resource-no-assertion.patch)
+      ! grep -q "'is_resource' => 'resource'" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-types-never-type.patch)
       grep -q 'Op\\Type\\Never_' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
@@ -494,17 +498,20 @@ path = Path(sys.argv[1])
 text = path.read_text()
 if 'promotionSetVisibility' in text:
     raise SystemExit(0)
-needle = "    public bool $promotionReadonly = false;\n"
-insert = (
-    needle
-    + "\n"
+insert_block = (
+    "\n"
     + "    /** Constructor promotion: asymmetric set visibility (#3165). */\n"
     + "    public int $promotionSetVisibility = 0;\n"
 )
-if needle not in text:
-    sys.stderr.write("php-cfg-asymmetric-visibility: Param.php promotionReadonly anchor missing\n")
-    raise SystemExit(1)
-path.write_text(text.replace(needle, insert, 1))
+for needle in (
+    "    public bool $promotionReadonly = false;\n",
+    "    public $promotionReadonly = false;\n",
+):
+    if needle in text:
+        path.write_text(text.replace(needle, needle + insert_block, 1))
+        raise SystemExit(0)
+sys.stderr.write("php-cfg-asymmetric-visibility: Param.php promotionReadonly anchor missing\n")
+raise SystemExit(1)
 PY
     echo "Applied php-cfg-asymmetric-visibility.patch (Param overlay)"
   fi
@@ -1481,6 +1488,31 @@ PY
   echo "Applied php-types-incdec-type.patch (overlay)"
 }
 
+apply_php_types_yield_from_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  if grep -q "case 'Expr_YieldFrom':" "$target" 2>/dev/null; then
+    echo "Skip php-types-yield-from.patch (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+anchor = """            case 'Expr_Yield':
+            case 'Expr_Include':"""
+if anchor not in text:
+    sys.stderr.write("php-types-yield-from: TypeReconstructor Expr_Yield anchor not found\n")
+    raise SystemExit(1)
+insert = """            case 'Expr_Yield':
+            case 'Expr_YieldFrom':
+            case 'Expr_Include':"""
+path.write_text(text.replace(anchor, insert, 1))
+PY
+  echo "Applied php-types-yield-from.patch (overlay)"
+}
+
 apply_php_types_throw_expr_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
   if grep -q "case 'Expr_Throw':" "$target" 2>/dev/null; then
@@ -1750,6 +1782,32 @@ sys.stderr.write("php-types-array-shape: anchor not found\n")
 raise SystemExit(1)
 PY
   echo "Applied php-types-array-shape.patch (overlay)"
+}
+
+apply_php_types_anonymous_class_type_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  if grep -q 'AnonymousClass@' "$target" 2>/dev/null; then
+    echo "Skip php-types-anonymous-class-type.patch (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+needle = "        $regex = '(^([a-zA-Z_"
+block = """        if (preg_match('/^AnonymousClass@\\d+$/', trim($decl))) {
+            return new self(self::TYPE_OBJECT, [], $decl);
+        }
+"""
+idx = text.find(needle)
+if idx < 0:
+    sys.stderr.write("php-types-anonymous-class-type: Type.php anchor not found\n")
+    raise SystemExit(1)
+path.write_text(text[:idx] + block + text[idx:])
+PY
+  echo "Applied php-types-anonymous-class-type.patch (overlay)"
 }
 
 apply_php_types_fromdecl_junk_fragments_overlay() {
@@ -2241,8 +2299,16 @@ apply_patch() {
     apply_php_types_incdec_type_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-types-yield-from.patch" ]]; then
+    apply_php_types_yield_from_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-types-throw-expr.patch" ]]; then
     apply_php_types_throw_expr_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-types-anonymous-class-type.patch" ]]; then
+    apply_php_types_anonymous_class_type_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-types-fromdecl-junk-fragments.patch" ]]; then
@@ -2479,3 +2545,29 @@ if ((${#APPLY_PATCH_FAILURES[@]} > 0)); then
   echo "apply-patches: ${#APPLY_PATCH_FAILURES[@]} patch(es) failed: ${APPLY_PATCH_FAILURES[*]}" >&2
   exit 1
 fi
+
+# Language capabilities (#3802 throw expr, #3094 union, #3149 readonly) must survive harness tar-copy.
+verify_critical_language_patches() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local recon="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  local prop="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php"
+  local missing=()
+
+  if [[ ! -d "$ROOT/vendor/ircmaxell/php-cfg" || ! -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
+    return 0
+  fi
+  if ! grep -qE 'parseExpr_Throw|Op\\Expr\\Throw_' "$parser" 2>/dev/null; then
+    missing+=("php-cfg-throw-expr")
+  fi
+  if ! grep -q 'instanceof Op\\Type\\Union_' "$recon" 2>/dev/null; then
+    missing+=("php-types-union-type")
+  fi
+  if ! grep -qE 'public \$readonly|propertyFlags' "$prop" 2>/dev/null; then
+    missing+=("php-cfg-property-readonly")
+  fi
+  if ((${#missing[@]} > 0)); then
+    echo "apply-patches: critical language patch markers missing: ${missing[*]}" >&2
+    exit 1
+  fi
+}
+verify_critical_language_patches

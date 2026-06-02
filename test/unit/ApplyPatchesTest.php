@@ -89,6 +89,36 @@ PHP;
         }
     }
 
+    public function testPhpCfgThrowExprParserOverlayApplied(): void
+    {
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        if (!is_readable($parser)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $body = (string) file_get_contents($parser);
+        self::assertMatchesRegularExpression(
+            '/parseExpr_Throw|Op\\\\Expr\\\\Throw_/',
+            $body,
+            'php-cfg-throw-expr overlay must register throw expressions (#3802, #4234)'
+        );
+    }
+
+    public function testPhpCfgPropertyReadonlyOverlayApplied(): void
+    {
+        $prop = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php';
+        if (!is_readable($prop)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $body = (string) file_get_contents($prop);
+        self::assertTrue(
+            str_contains($body, 'public $readonly')
+            || str_contains($body, 'propertyFlags'),
+            'php-cfg-property-readonly overlay must expose readonly metadata (#3149, #4234)'
+        );
+    }
+
     public function testPhpCfgEnumParserPassesImplementsArrayNotBlock(): void
     {
         $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';

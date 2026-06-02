@@ -1315,6 +1315,7 @@ final class Doctor
         $checks[] = self::checkPhpVersion();
         $checks = array_merge($checks, self::checkExtensions());
         $checks[] = self::checkVendor($repoRoot);
+        $checks[] = self::checkCriticalVendorLanguagePatches($repoRoot);
         $checks[] = self::checkPhpParserHostCompatibility($repoRoot);
         $checks[] = self::checkLlvm($repoRoot);
         $checks[] = self::checkJitCompliance($repoRoot);
@@ -1380,6 +1381,51 @@ final class Doctor
             'required' => true,
             'detail' => $ok ? 'vendor/ installed (pre/plugin present)' : 'vendor/ incomplete',
             'hint' => 'composer install --no-interaction && script/apply-patches.sh',
+        ];
+    }
+
+    /**
+     * Throw expressions, union types, and readonly properties depend on vendor overlays (#4234).
+     *
+     * @return array{name: string, ok: bool, required: bool, detail: string, hint: string}
+     */
+    private static function checkCriticalVendorLanguagePatches(string $repoRoot): array
+    {
+        $parser = $repoRoot.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        $recon = $repoRoot.'/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php';
+        $prop = $repoRoot.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php';
+        if (!is_file($parser) || !is_file($recon) || !is_file($prop)) {
+            return [
+                'name' => 'Vendor language patches',
+                'ok' => true,
+                'required' => false,
+                'detail' => 'skipped (php-cfg/php-types not installed)',
+                'hint' => '',
+            ];
+        }
+
+        $missing = [];
+        $parserBody = (string) file_get_contents($parser);
+        if (!preg_match('/parseExpr_Throw|Op\\\\Expr\\\\Throw_/', $parserBody)) {
+            $missing[] = 'throw-expr';
+        }
+        $reconBody = (string) file_get_contents($recon);
+        if (!str_contains($reconBody, 'instanceof Op\\Type\\Union_')) {
+            $missing[] = 'union-type';
+        }
+        $propBody = (string) file_get_contents($prop);
+        if (!str_contains($propBody, 'public $readonly') && !str_contains($propBody, 'propertyFlags')) {
+            $missing[] = 'property-readonly';
+        }
+
+        $ok = [] === $missing;
+
+        return [
+            'name' => 'Vendor language patches',
+            'ok' => $ok,
+            'required' => true,
+            'detail' => $ok ? 'throw/union/readonly overlays present' : 'missing: '.implode(', ', $missing),
+            'hint' => $ok ? '' : './script/apply-patches.sh (#4234)',
         ];
     }
 
