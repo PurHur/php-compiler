@@ -62,6 +62,21 @@ PHP;
         $this->assertNotNull($block);
     }
 
+    public function testMissingInheritedAbstractStaticFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+abstract class Base {
+    abstract public static function make(): string;
+}
+class Child extends Base {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Base::make');
+        $runtime->parseAndCompile($code, 'missing_inherited_static.php');
+    }
+
     public function testParentImplementationSatisfiesChild(): void
     {
         $runtime = new Runtime();
