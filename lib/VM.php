@@ -924,10 +924,10 @@ restart:
                     $arg2->copyFrom($arg3);
                     $arg1->copyFrom($arg3);
                     if ($op->arg2 !== $op->arg3) {
-                        $arg3->resolveIndirect()->null();
+                        $arg3->null();
                     }
                     if ($op->arg1 !== $op->arg2 && $op->arg1 !== $op->arg3) {
-                        $arg1->resolveIndirect()->null();
+                        $arg1->null();
                     }
                     $strict = null !== $frame->parent
                         ? $frame->parent->block->strictTypes
@@ -982,7 +982,12 @@ restart:
                         }
                     }
                     $rhs = $frame->scope[$op->arg2]->resolveIndirect();
-                    $lhs->indirect($rhs);
+                    if (Variable::TYPE_INDIRECT !== $rhs->type) {
+                        $ref = new Variable();
+                        $ref->copyFrom($rhs);
+                        $rhs->indirect($ref);
+                    }
+                    $lhs->indirect($rhs->resolveIndirect());
                     break;
                 case OpCode::TYPE_VAR_FETCH:
                     $dest = $frame->scope[$op->arg1];
