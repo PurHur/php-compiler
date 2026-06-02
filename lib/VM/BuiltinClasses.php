@@ -17,6 +17,7 @@ use PHPCompiler\VM\Builtin\ExceptionGetLine;
 use PHPCompiler\VM\Builtin\ExceptionGetMessage;
 use PHPCompiler\VM\Builtin\FiberConstruct;
 use PHPCompiler\VM\Builtin\FiberGetCurrent;
+use PHPCompiler\VM\Builtin\FiberIsTerminated;
 use PHPCompiler\VM\Builtin\FiberResume;
 use PHPCompiler\VM\Builtin\FiberStart;
 use PHPCompiler\VM\Builtin\FiberSuspend;
@@ -421,6 +422,7 @@ final class BuiltinClasses
         self::registerThrowableClass($ctx, 'Error', ExceptionSupport::CLASS_ERROR);
         self::registerThrowableClass($ctx, 'TypeError', ExceptionSupport::CLASS_TYPE_ERROR, ExceptionSupport::CLASS_ERROR);
         self::registerThrowableClass($ctx, 'ValueError', ExceptionSupport::CLASS_VALUE_ERROR, ExceptionSupport::CLASS_ERROR);
+        self::registerThrowableClass($ctx, 'FiberError', ExceptionSupport::CLASS_FIBER_ERROR, ExceptionSupport::CLASS_ERROR);
         self::registerThrowableClass(
             $ctx,
             'ArgumentCountError',
@@ -512,6 +514,7 @@ final class BuiltinClasses
                 'resume' => new FiberResume(),
                 'suspend' => new FiberSuspend(),
                 'getcurrent' => new FiberGetCurrent(),
+                'isterminated' => new FiberIsTerminated(),
             ] as $name => $method
         ) {
             $entry->methods[$name] = $method;

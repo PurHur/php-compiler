@@ -26,6 +26,7 @@ final class ExceptionSupport
     public const CLASS_ARITHMETIC_ERROR = 'arithmeticerror';
     public const CLASS_DIVISION_BY_ZERO_ERROR = 'divisionbyzeroerror';
     public const CLASS_ASSERTION_ERROR = 'assertionerror';
+    public const CLASS_FIBER_ERROR = 'fibererror';
 
     public const PROP_MESSAGE = 'message';
     public const PROP_CODE = 'code';
@@ -78,6 +79,7 @@ final class ExceptionSupport
             self::CLASS_ARITHMETIC_ERROR,
             self::CLASS_DIVISION_BY_ZERO_ERROR,
             self::CLASS_ASSERTION_ERROR,
+            self::CLASS_FIBER_ERROR,
         ], true);
     }
 
@@ -177,6 +179,9 @@ final class ExceptionSupport
             self::CLASS_PARSE_ERROR => new \ParseError($message),
             self::CLASS_UNHANDLED_MATCH_ERROR => new \UnhandledMatchError($message),
             self::CLASS_ASSERTION_ERROR => new \AssertionError($message),
+            // FiberError is reserved for internal use in Zend; cannot be instantiated from userland PHP.
+            // Map uncaught VM FiberError to a native Error for the test runner / CLI.
+            self::CLASS_FIBER_ERROR => new \Error('FiberError: '.$message),
             self::CLASS_ERROR => new \Error($message),
             self::CLASS_LOGIC_EXCEPTION => new \LogicException($message),
             self::CLASS_EXCEPTION => new \Exception($message),

@@ -32,6 +32,13 @@ final class FiberState
     /** Value passed to start()/resume() — returned from suspend(). */
     public Variable $resumeArgument;
 
+    /**
+     * Return target for the in-fiber `Fiber::suspend()` call.
+     *
+     * In Zend, suspend() returns only when the fiber is resumed; the resume argument is the return value.
+     */
+    public ?Variable $pendingSuspendReturnVar = null;
+
     public function __construct(
         public readonly ClosureState $callback,
         public readonly ObjectEntry $object,
