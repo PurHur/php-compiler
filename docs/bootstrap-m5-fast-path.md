@@ -30,19 +30,19 @@ Supporting fixes from #1402:
 
 | Allowlist / native spine | Gate |
 |--------------------------|------|
-| `Compiler::unwrapOperandChain` / `operandsChainEqual` | Native via `JIT\CompilerOperandChainNative` (PHP CFG hits LLVM 9 dominance verify — #1768); `make bootstrap-selfhost-compile-driver-link` |
-| `Runtime::parseAndCompile` | On M3 allowlist when `PHP_COMPILER_M3_COMPILE_DRIVER=1` |
-| `Runtime::parse` / `Runtime::compile` | On M3 allowlist; compile-driver link OK (#1496) |
+| `php_compiler_cli_dispatch` / `php_compiler_cli_should_run_entry_driver` | On M3 allowlist; CLI driver dispatch without Zend |
+| `Runtime::parseAndCompile` / `parseAndCompileEmitSmoke` | On M3 allowlist when `PHP_COMPILER_M3_COMPILE_DRIVER=1` |
+| `Runtime::parse` / `Runtime::compile` / `compileEmitSmoke` | On M3 allowlist; compile-driver link OK (#1496) |
 | `Runtime::loadJitContext` | PHP CFG via `compileRuntimeLoadJitContextM3Native` (separate FUNCDEF from `loadJit` — #2846) |
 | `Runtime::__construct` | Slim ctor via `compileRuntimeConstructM3Native` → `compileBlockPhpLowering` (#1494) |
+| `Runtime::__destruct` | Void no-op via `compileRuntimeDestructM3Native` (#2867) |
 | `Runtime::initParsePipeline` / `Runtime::loadCoreModules` | `compileRuntime*M3Native` → PHP CFG lowering (#1494) |
 | `Runtime::initCompiler` | **Native** via `RuntimeInitCompiler::emit` on M3 compile-driver + emit TU (#2568); not PHP CFG |
 | `Runtime::initVmContext` | **Native** via `RuntimeInitVmContext::emit` (allocate `VM\Context` + `ErrorReporter` + `ScriptStack`, wire `runtime` + `vmContext`); wired in `compileBlock()`; off deny list (#1494, #2126). PHP CFG `new VMContext` still LLVM 9 link crash when combined with ctor spine. |
 | `Runtime::loadJit` | `compileRuntimeLoadJitM3Native` — outer orchestration (#1495) |
 | `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | Separate FUNCDEFs via `compileRuntime*M3Native` → PHP CFG (#2847) |
+| `Runtime::noteParseCompileNullForScript` / `peekLastParseFailure` | On M3 allowlist; compile-driver diagnostics + last failure peek |
 | `Block::slotIndexForVariableName` / `Block::slotForOperand` | PHP CFG via `isM3CompileDriverBlockPhpLoweringName` (#2848) |
-| `Compiler::compileIsset` / `compileCoalesce` / `resolveIsset` / `requireOperandSlot` | PHP CFG via `m3CompileDriverCompilerPhpLoweringSuffixes` (emit-TU chain parity on compile-driver link) |
-| `Compiler::compileGlobalConst` / `compileIncludeOp` / `compileSwitchAsJumpIfChain` | PHP CFG via `m3CompileDriverCompilerPhpLoweringSuffixes` (emit-TU chain parity on compile-driver link) |
 | `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |
 | `helloworld_compile_smoke` | Deny-listed for link (LLVM 9); compile_driver bundle keeps stub; runtime emit via `compiler_helloworld_smoke/compile_driver.php` / `compiler_compile_smoke/compile_driver.php` + `PHP_COMPILER_EMIT_HELPER_LINK=1` (#1768, #1983) |
 | Native emit runtime | `BOOTSTRAP_M3_RUNTIME_COMPILE=1` + `PHP_COMPILER_M3_EMIT_MINIMAL=1` skips eager `loadJitCompileModuleFuncs` during smoke emit |
@@ -100,7 +100,6 @@ PHP_COMPILER_M3_SOURCE=bin/compile.php PHP_COMPILER_M3_OUT=/tmp/bin-compile-aot 
 
 | Symbol | Notes |
 |--------|-------|
-| `Runtime::__destruct` | Void no-op via `compileRuntimeDestructM3Native` (#2867) |
 | `helloworld_compile_smoke` | Deny-listed FUNCDEF (#1514); emit via M3 sidecar |
 
 **Next:** complete native `VM\Context` (hashtable props + sub-objects) without LLVM 9 link regression, or small `lib/AOT/runtime/` C floor (#1494).

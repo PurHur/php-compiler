@@ -57,6 +57,11 @@ final class ClassConstMaterializer
             case Variable::TYPE_OBJECT:
                 $stored->object($src->toObject());
                 break;
+            case Variable::TYPE_ENUM_CASE:
+                $case = $src->toEnumCase();
+                $objVar = EnumCaseSupport::createCase($case->enumClass, $case->caseName, $case->backingValue);
+                $stored->object($objVar->toObject());
+                break;
             case Variable::TYPE_ARRAY:
                 $stored->array($src->toArray());
                 break;
