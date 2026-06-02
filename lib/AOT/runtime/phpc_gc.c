@@ -76,6 +76,13 @@ static int phpc_gc_index_of(void *obj)
     return -1;
 }
 
+int phpc_object_prop_count(void *obj)
+{
+    int idx = phpc_gc_index_of(obj);
+
+    return idx >= 0 ? phpc_gc_prop_counts[idx] : 0;
+}
+
 void phpc_gc_register(void *obj, int prop_count)
 {
     if (NULL == obj || phpc_gc_count >= PHPC_GC_MAX_OBJECTS) {

@@ -45,13 +45,74 @@ extern __hashtable__ *__value__readHashtable(__value__ *v);
 
 long long __value__spaceship(__value__ *left, __value__ *right);
 long long __hashtable__compareSpaceship(__hashtable__ *left, __hashtable__ *right);
+long long __object__compareSpaceship(__object__ *left, __object__ *right);
+
+static int phpc_slot_is_object(void *slot)
+{
+    phpc_ref_head *head;
+
+    if (NULL == slot) {
+        return 0;
+    }
+    head = (phpc_ref_head *) slot;
+    if ((head->typeinfo & PHPC_TYPEINFO_TYPEMASK) == PHPC_TYPEINFO_TYPE_OBJECT) {
+        return 1;
+    }
+
+    return 0;
+}
+
+static void phpc_slot_content_to_value(void *content, __value__ *dest)
+{
+    __value__ *boxed;
+
+    if (NULL == content) {
+        __value__writeNull(dest);
+
+        return;
+    }
+    if (phpc_slot_is_object(content)) {
+        dest->type = PHPC_TYPE_OBJECT;
+        memcpy(dest->value, &content, sizeof(void *));
+
+        return;
+    }
+    boxed = (__value__ *) content;
+    memcpy(dest, boxed, sizeof(__value__));
+}
+
+static size_t phpc_object_header_bytes(void)
+{
+    return sizeof(phpc_object_header);
+}
 
 #define PHPC_TYPE_NULL 0
 #define PHPC_TYPE_NATIVE_LONG 1
 #define PHPC_TYPE_NATIVE_BOOL 2
 #define PHPC_TYPE_NATIVE_DOUBLE 3
 #define PHPC_TYPE_STRING 4
+#define PHPC_TYPE_OBJECT 5
 #define PHPC_TYPE_HASHTABLE 7
+
+#define PHPC_TYPEINFO_TYPEMASK 0xFFFFFFFC
+#define PHPC_TYPEINFO_TYPE_OBJECT 8
+
+typedef void __object__;
+
+typedef struct {
+    int32_t refcount;
+    int32_t typeinfo;
+} phpc_ref_head;
+
+typedef struct {
+    phpc_ref_head ref;
+    int64_t class_id;
+    int8_t constructed;
+} phpc_object_header;
+
+extern void __value__writeNull(__value__ *out);
+extern __object__ *__value__readObject(__value__ *v);
+extern int phpc_object_prop_count(void *obj);
 
 static int phpc_value_kind(const __value__ *v)
 {
@@ -160,12 +221,66 @@ long long __value__spaceship(__value__ *left, __value__ *right)
                     __value__readHashtable(left),
                     __value__readHashtable(right)
                 );
+            case PHPC_TYPE_OBJECT:
+                return __object__compareSpaceship(
+                    __value__readObject(left),
+                    __value__readObject(right)
+                );
             default:
                 break;
         }
     }
 
     return phpc_long_spaceship((long long) lkind, (long long) rkind);
+}
+
+long long __object__compareSpaceship(__object__ *left, __object__ *right)
+{
+    phpc_object_header *lhdr;
+    phpc_object_header *rhdr;
+    int prop_count;
+    int slot;
+    size_t header;
+    char *lbase;
+    char *rbase;
+    __value__ lval;
+    __value__ rval;
+
+    if (left == right) {
+        return 0;
+    }
+    if (NULL == left || NULL == right) {
+        return phpc_long_spaceship(
+            left != NULL ? (long long) PHPC_TYPE_OBJECT : (long long) PHPC_TYPE_NULL,
+            right != NULL ? (long long) PHPC_TYPE_OBJECT : (long long) PHPC_TYPE_NULL
+        );
+    }
+
+    lhdr = (phpc_object_header *) left;
+    rhdr = (phpc_object_header *) right;
+    if (lhdr->class_id != rhdr->class_id) {
+        return 1;
+    }
+
+    prop_count = phpc_object_prop_count(left);
+    header = phpc_object_header_bytes();
+    lbase = (char *) left;
+    rbase = (char *) right;
+
+    for (slot = 0; slot < prop_count; ++slot) {
+        void **lslot_ptr = (void **) (lbase + header + (size_t) slot * sizeof(void *));
+        void **rslot_ptr = (void **) (rbase + header + (size_t) slot * sizeof(void *));
+        long long cmp;
+
+        phpc_slot_content_to_value(*lslot_ptr, &lval);
+        phpc_slot_content_to_value(*rslot_ptr, &rval);
+        cmp = __value__spaceship(&lval, &rval);
+        if (0 != cmp) {
+            return cmp;
+        }
+    }
+
+    return 0;
 }
 
 long long __hashtable__compareSpaceship(__hashtable__ *left, __hashtable__ *right)

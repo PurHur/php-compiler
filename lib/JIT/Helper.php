@@ -1027,6 +1027,15 @@ restart:
             }
         }
         if (Variable::TYPE_OBJECT === $leftType && $leftType === $rightType) {
+            if (OpCode::TYPE_SPACESHIP === $opcode->type) {
+                Builtin\SpaceshipRuntime::ensureLinked($this->context);
+                $result = $this->context->builder->call(
+                    $this->context->lookupFunction('__object__compareSpaceship'),
+                    $leftValue,
+                    $rightValue
+                );
+                goto return_long;
+            }
             $voidp = $this->context->getTypeFromString('void')->pointerType(0);
             $leftNorm = $this->context->builder->pointerCast($leftValue, $voidp);
             $rightNorm = $this->context->builder->pointerCast($rightValue, $voidp);
@@ -1040,6 +1049,49 @@ restart:
             if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
                 $result = $this->context->builder->icmp(Builder::INT_NE, $leftPtr, $rightPtr);
                 goto return_bool;
+            }
+        }
+        if (OpCode::TYPE_SPACESHIP === $opcode->type) {
+            if (JitValueBox::isValueOperand($left) && JitValueBox::isValueOperand($right)) {
+                Builtin\SpaceshipRuntime::ensureLinked($this->context);
+                $result = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__spaceship'),
+                    JitValueBox::valuePtrFromVariable($this->context, $left),
+                    JitValueBox::valuePtrFromVariable($this->context, $right)
+                );
+                goto return_long;
+            }
+            if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_OBJECT === $rightType) {
+                Builtin\SpaceshipRuntime::ensureLinked($this->context);
+                $boxed = JitValueBox::valuePtrFromVariable($this->context, $left);
+                $tmp = $this->context->memory->malloc($this->context->getTypeFromString('__value__'));
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeObject'),
+                    $this->context->builder->pointerCast($tmp, $this->context->getTypeFromString('__value__*')),
+                    $rightValue
+                );
+                $result = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__spaceship'),
+                    $boxed,
+                    $this->context->builder->pointerCast($tmp, $this->context->getTypeFromString('__value__*'))
+                );
+                goto return_long;
+            }
+            if (Variable::TYPE_OBJECT === $leftType && Variable::TYPE_VALUE === $rightType) {
+                Builtin\SpaceshipRuntime::ensureLinked($this->context);
+                $boxed = JitValueBox::valuePtrFromVariable($this->context, $right);
+                $tmp = $this->context->memory->malloc($this->context->getTypeFromString('__value__'));
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeObject'),
+                    $this->context->builder->pointerCast($tmp, $this->context->getTypeFromString('__value__*')),
+                    $leftValue
+                );
+                $result = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__spaceship'),
+                    $this->context->builder->pointerCast($tmp, $this->context->getTypeFromString('__value__*')),
+                    $boxed
+                );
+                goto return_long;
             }
         }
         if (Variable::TYPE_HASHTABLE === $leftType && $leftType === $rightType) {
