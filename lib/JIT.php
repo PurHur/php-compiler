@@ -5470,23 +5470,25 @@ class JIT {
                 case OpCode::TYPE_STATIC_PROPERTY_FETCH:
                     $classOp = $block->getOperand($op->arg2);
                     $nameOp = $block->getOperand($op->arg3);
-                    if (!$nameOp instanceof Operand\Literal) {
-                        throw new \LogicException('JIT static property fetch requires a literal property name');
-                    }
                     $classId = $this->context->type->object->resolveClassId($classOp);
-                    $this->context->setVariableOp(
-                        $block->getOperand($op->arg1),
-                        $this->context->type->object->staticPropertyFetch($classId, $nameOp->value)
-                    );
+                    if ($nameOp instanceof Operand\Literal) {
+                        $fetched = $this->context->type->object->staticPropertyFetch($classId, $nameOp->value);
+                    } else {
+                        $nameVar = $this->context->getVariableFromOp($nameOp);
+                        $fetched = $this->context->type->object->staticPropertyFetchDynamic($classId, $nameVar);
+                    }
+                    $this->context->setVariableOp($block->getOperand($op->arg1), $fetched);
                     break;
                 case OpCode::TYPE_STATIC_PROPERTY_UNSET:
                     $classOp = $block->getOperand($op->arg2);
                     $nameOp = $block->getOperand($op->arg3);
-                    if (!$nameOp instanceof Operand\Literal) {
-                        throw new \LogicException('JIT static property unset requires a literal property name');
-                    }
                     $classId = $this->context->type->object->resolveClassId($classOp);
-                    $this->context->type->object->staticPropertyUnset($classId, $nameOp->value);
+                    if ($nameOp instanceof Operand\Literal) {
+                        $this->context->type->object->staticPropertyUnset($classId, $nameOp->value);
+                    } else {
+                        $nameVar = $this->context->getVariableFromOp($nameOp);
+                        $this->context->type->object->staticPropertyUnsetDynamic($classId, $nameVar);
+                    }
                     break;
                 case OpCode::TYPE_UNSET:
                     if (null === $op->arg3) {

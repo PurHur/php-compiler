@@ -420,7 +420,7 @@ function syntaxRowDefinitions(): array
             'construct' => 'Static property `Class::$prop`',
             'opcodes' => ['TYPE_STATIC_PROPERTY_FETCH', 'TYPE_DECLARE_STATIC_PROPERTY'],
             'issue' => 1225,
-            'notes' => ['Class-scoped storage; `self::` / `static::`; literal property names in JIT'],
+            'notes' => ['Class-scoped storage; `self::` / `static::`; runtime property name on JIT/AOT (#4597)'],
             'probe' => 'class C { public static int $n = 1; } echo C::$n;',
         ],
         [
