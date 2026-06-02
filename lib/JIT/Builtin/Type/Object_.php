@@ -874,6 +874,11 @@ class Object_ extends Type {
         }
     }
 
+    public function isReadonlyClass(int $classId): bool
+    {
+        return isset($this->readonlyClassIds[$classId]);
+    }
+
     public function inheritReadonlyFromParent(int $childId, string $parentLc): void
     {
         $parentLc = strtolower(ltrim($parentLc, '\\'));
