@@ -7787,7 +7787,9 @@ class JIT {
         if ($result === $value) {
             return;
         }
-        if (null !== $result->valueBoxAliasPtr) {
+        // Reference aliases to object properties keep objectPropertySlot; guard before
+        // valueBoxAliasPtr writes so readonly checks are not skipped (#4273, #3149).
+        if (null !== $result->valueBoxAliasPtr && null === $result->objectPropertySlot) {
             JIT\JitValueBox::assignToPointer(
                 $this->context,
                 $result->valueBoxAliasPtr,
