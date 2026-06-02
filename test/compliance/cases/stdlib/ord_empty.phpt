@@ -1,13 +1,7 @@
 --TEST--
-ord(): empty string throws ValueError (#4324)
+ord(): empty string returns 0 (#4331)
 --FILE--
 <?php
-try {
-    ord('');
-} catch (Throwable $e) {
-    echo get_class($e), "\n";
-    echo $e->getMessage(), "\n";
-}
+echo ord(''), "\n";
 --EXPECT--
-ValueError
-ord(): Argument #1 ($string) must not be empty
+0
