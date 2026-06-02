@@ -1348,12 +1348,13 @@ PY
 }
 
 apply_php_types_incdec_type_overlay() {
-  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
-  if grep -q "case 'Expr_PostInc':" "$target" 2>/dev/null; then
-    echo "Skip php-types-incdec-type.patch (already applied)"
-    return 0
-  fi
-  python3 - "$target" <<'PY'
+  apply_php_types_incdec_type_overlay_to_target() {
+    local target="$1"
+    if grep -q "case 'Expr_PostInc':" "$target" 2>/dev/null; then
+      echo "Skip php-types-incdec-type.patch (already applied): ${target}"
+      return 0
+    fi
+    python3 - "$target" <<'PY'
 import sys
 from pathlib import Path
 
@@ -1484,7 +1485,11 @@ for old, new in anchors:
 sys.stderr.write("php-types-incdec-type: TypeReconstructor anchor not found\n")
 raise SystemExit(1)
 PY
-  echo "Applied php-types-incdec-type.patch (overlay)"
+    echo "Applied php-types-incdec-type.patch (overlay): ${target}"
+  }
+
+  apply_php_types_incdec_type_overlay_to_target "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  apply_php_types_incdec_type_overlay_to_target "$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
 }
 
 apply_php_types_yield_from_overlay() {
