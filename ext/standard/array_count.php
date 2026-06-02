@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -38,9 +39,6 @@ final class array_count extends Internal
             throw new \LogicException('count() expects at least 1 argument, at most 2');
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (null === $frame->vmContext) {
             throw new \LogicException('count() requires VM context in this compiler build');
         }
@@ -59,13 +57,14 @@ final class array_count extends Internal
         }
         if (Variable::TYPE_ARRAY === $v->type) {
             $ht = $v->toArray();
-            if (VmArray::COUNT_RECURSIVE === $mode) {
-                $frame->returnVar->int(VmArray::countRecursive($ht));
-            } else {
-                $frame->returnVar->int($ht->getNumElements());
-            }
+            $result = VmArray::COUNT_RECURSIVE === $mode
+                ? VmArray::countRecursive($ht)
+                : $ht->getNumElements();
         } else {
-            $frame->returnVar->int(VmArray::countValue($frame->vmContext, $v));
+            $result = VmArray::countValue($frame->vmContext, $v);
+        }
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int($result);
         }
     }
 
@@ -74,13 +73,14 @@ final class array_count extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
+        TypeErrorRaise::ensureLinked($context);
         if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('count() expects at least 1 argument, at most 2');
-        }
-        foreach ($args as $i => $arg) {
-            if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
-                $this->jitString($context, $arg, 'array_count() argument #'.((int) $i + 1));
-            }
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'count() expects at least 1 argument, '.$argc.' given'
+            );
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (2 === $argc) {
             $modeLit = JitLongArg::compileTimeLiteral($args[1]);
@@ -110,6 +110,35 @@ final class array_count extends Internal
 
             return ArrayBuiltinHelper::getNumElements($context, $ht);
         }
-        throw new \LogicException('count() only supports native arrays in this compiler build');
+        $this->emitCountTypeError($context, $args[0]);
+
+        return $context->getTypeFromString('int64')->constInt(0, false);
+    }
+
+    private function emitCountTypeError(Context $context, JITVariable $arg): void
+    {
+        TypeErrorRaise::emitRaise(
+            $context,
+            'count(): Argument #1 ($value) must be of type Countable|array, '
+            .$this->jitArgTypeLabel($arg).' given'
+        );
+    }
+
+    private function jitArgTypeLabel(JITVariable $arg): string
+    {
+        switch ($arg->type) {
+            case JITVariable::TYPE_NATIVE_LONG:
+                return 'int';
+            case JITVariable::TYPE_NATIVE_DOUBLE:
+                return 'float';
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return 'bool';
+            case JITVariable::TYPE_STRING:
+                return 'string';
+            case JITVariable::TYPE_OBJECT:
+                return 'object';
+            default:
+                return 'mixed';
+        }
     }
 }
