@@ -2325,16 +2325,33 @@ restart:
                         $msg = $class->isEnum
                             ? "Cannot instantiate enum {$class->name}"
                             : "Cannot instantiate abstract class {$class->name}";
-
-                        return $this->raise($msg, $frame);
+                        $catchFrame = $this->dispatchVmError($msg, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
                     }
                     if ($class->isInterface) {
-                        throw new \LogicException("Cannot instantiate interface $name");
+                        $catchFrame = $this->dispatchVmError(
+                            "Cannot instantiate interface {$class->name}",
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
                     }
                     try {
                         VM\ClassValidator::assertInstantiable($class);
-                    } catch (\LogicException $e) {
-                        return $this->raise($e->getMessage(), $frame);
+                    } catch (\Error $e) {
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
                     }
                     $object = new ObjectEntry($class);
                     $this->initInstancePropertyDefaults($object);
