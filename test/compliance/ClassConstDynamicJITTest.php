@@ -86,5 +86,6 @@ final class ClassConstDynamicJITTest extends BaseTest
     public static function dynamicClassConstFixtureProvider(): iterable
     {
         yield 'class_const_dynamic_jit' => ['class_const_dynamic_jit.phpt'];
+        yield 'class_const_variable_class_jit' => ['class_const_variable_class_jit.phpt'];
     }
 }
