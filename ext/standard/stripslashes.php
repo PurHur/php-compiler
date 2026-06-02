@@ -23,10 +23,9 @@ final class stripslashes extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $subject->type) {
-            throw new \LogicException('stripslashes() only supports strings in this compiler build');
-        }
-        $frame->returnVar->string(VmString::stripslashes($subject->toString()));
+        $frame->returnVar->string(
+            VmString::stripslashes(VmString::coerceStringBuiltinArg($subject, 'stripslashes'))
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
