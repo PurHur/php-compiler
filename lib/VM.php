@@ -258,11 +258,6 @@ class VM {
         } finally {
             $this->context->coercingObjectToString = false;
         }
-        if (Variable::TYPE_STRING !== $result->type) {
-            throw new \LogicException(
-                "{$object->class->name}::__toString() must return a string in this compiler build"
-            );
-        }
 
         return $result->toString();
     }
@@ -381,7 +376,7 @@ class VM {
             return $typeString;
         }
         if (!$this->hasInstanceMethod($object->class, '__tostring')) {
-            throw new \LogicException(
+            throw new \Error(
                 'Object of class '.$object->class->name.' could not be converted to string'
             );
         }
@@ -390,11 +385,6 @@ class VM {
             $result = $this->invokeInstanceMethod($object, '__toString')->resolveIndirect();
         } finally {
             $this->context->coercingObjectToString = false;
-        }
-        if (Variable::TYPE_STRING !== $result->type) {
-            throw new \LogicException(
-                $object->class->name.'::__toString() must return a string'
-            );
         }
 
         return $result->toString();
@@ -423,20 +413,6 @@ class VM {
             $result = $this->invokeInstanceMethod($object, '__toString')->resolveIndirect();
         } finally {
             $this->context->coercingObjectToString = false;
-        }
-        if (Variable::TYPE_STRING !== $result->type) {
-            $returned = match ($result->type) {
-                Variable::TYPE_INTEGER => 'int',
-                Variable::TYPE_FLOAT => 'float',
-                Variable::TYPE_BOOLEAN => 'bool',
-                Variable::TYPE_NULL => 'null',
-                Variable::TYPE_ARRAY => 'array',
-                Variable::TYPE_OBJECT => 'object',
-                default => 'unknown type',
-            };
-            throw new \TypeError(
-                "Return value of {$object->class->name}::__toString() must be of type string, {$returned} returned"
-            );
         }
 
         return $result->toString();
@@ -1333,6 +1309,20 @@ restart:
                 case OpCode::TYPE_CAST_STRING:
                     try {
                         $frame->scope[$op->arg1]->castFrom(Variable::TYPE_STRING, $frame->scope[$op->arg2], $this);
+                    } catch (\Error $e) {
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
                     } catch (VM\MagicMethodInvocationAborted) {
                         $this->clearTryCatchUnwindState();
                         ++$frame->pos;
