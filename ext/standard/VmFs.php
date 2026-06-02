@@ -75,6 +75,24 @@ final class VmFs
         return (int) $stat['ino'];
     }
 
+    public static function fileOwner(string $path) {
+        $stat = @stat($path);
+        if (false === $stat) {
+            return false;
+        }
+
+        return (int) $stat['uid'];
+    }
+
+    public static function fileGroup(string $path) {
+        $stat = @stat($path);
+        if (false === $stat) {
+            return false;
+        }
+
+        return (int) $stat['gid'];
+    }
+
     public static function filePerms(string $path) {
         $stat = @stat($path);
         if (false === $stat) {
