@@ -30,10 +30,6 @@ final class set_error_handler_ extends Internal
         if (null === $frame->vmContext) {
             return;
         }
-        $callback = $frame->calledArgs[0]->resolveIndirect();
-        if (!ErrorHandlerCallbackPolicy::isVmSupportedType($callback->type)) {
-            throw new \LogicException(ErrorHandlerCallbackPolicy::vmRejectionMessage());
-        }
         $maskVar = 2 === $argc ? $frame->calledArgs[1] : null;
         $result = VmErrorHandler::set($frame->vmContext, $frame->calledArgs[0], $maskVar);
         if (null !== $frame->returnVar) {

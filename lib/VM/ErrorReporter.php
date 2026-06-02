@@ -39,7 +39,7 @@ final class ErrorReporter
 
     private int $savedErrorReporting = 0;
 
-    /** @var list<array{0: ?string, 1: int}> */
+    /** @var list<array{0: Variable, 1: int}> */
     private array $handlerStack = [];
 
     /** @var array{type: int, message: string, file: string, line: int}|null */
@@ -147,10 +147,12 @@ final class ErrorReporter
         return $out;
     }
 
-    public function pushHandler(?string $callbackName, int $mask): ?string
+    public function pushHandler(Variable $callback, int $mask): ?Variable
     {
-        $previous = $this->activeHandlerName();
-        $this->handlerStack[] = [$callbackName, $mask];
+        $previous = $this->activeHandlerCopy();
+        $stored = new Variable();
+        $stored->copyFrom($callback->resolveIndirect());
+        $this->handlerStack[] = [$stored, $mask];
 
         return $previous;
     }
@@ -323,13 +325,15 @@ final class ErrorReporter
         }
     }
 
-    private function activeHandlerName(): ?string
+    private function activeHandlerCopy(): ?Variable
     {
         if ([] === $this->handlerStack) {
             return null;
         }
+        $out = new Variable();
+        $out->copyFrom($this->handlerStack[\count($this->handlerStack) - 1][0]);
 
-        return $this->handlerStack[\count($this->handlerStack) - 1][0];
+        return $out;
     }
 
     private function dispatchUserHandler(
@@ -343,8 +347,9 @@ final class ErrorReporter
         if (null === $context || null === $frame || [] === $this->handlerStack) {
             return false;
         }
-        [$callbackName, $mask] = $this->handlerStack[\count($this->handlerStack) - 1];
-        if (null === $callbackName) {
+        [$callback, $mask] = $this->handlerStack[\count($this->handlerStack) - 1];
+        $callback = $callback->resolveIndirect();
+        if (Variable::TYPE_NULL === $callback->type) {
             return false;
         }
         if (0 === ($mask & $errno)) {
@@ -354,7 +359,7 @@ final class ErrorReporter
         return VmErrorHandler::invokeHandler(
             $context,
             $frame,
-            $callbackName,
+            $callback,
             $errno,
             $errstr,
             $errfile,
