@@ -34,10 +34,10 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | Layer | Today | Target |
 |-------|-------|--------|
 | **Bootstrap driver** | Gen-0 Zend once on empty `build/`; after `bootstrap-selfhost-driver-smoke`, `bootstrap-selfhost-link` uses `build/bin-compile-aot` via link-time sidecars ([#2894](https://github.com/PurHur/php-compiler/issues/2894), [#2842](https://github.com/PurHur/php-compiler/issues/2842)) | Compiled `bin/compile.php` only |
-| **Bundle size** | **822** curated `require_once` in spine smoke (`cli_spine_shim` for `src/cli.php` only) | **973** Phase A inventory files (SSOT) |
-| **Inventory coverage** | **822** / **973** literal `require_once` with real **`bin/vm.php`** ([#2134](https://github.com/PurHur/php-compiler/issues/2134); **#2652** emit-TU JIT batch; **`lib/VM/HashTable.php`** promoted [#2543](https://github.com/PurHur/php-compiler/issues/2543); **`src/cli_driver.php`** literal [#2868](https://github.com/PurHur/php-compiler/issues/2868)) | **~84%** |
+| **Bundle size** | **1253** curated `require_once` in spine smoke (`cli_spine_shim` for `src/cli.php` only) | **1259** Phase A inventory files (SSOT) |
+| **Inventory coverage** | **1253** / **1259** literal `require_once` with real **`bin/vm.php`** ([#2134](https://github.com/PurHur/php-compiler/issues/2134); **#2652** emit-TU JIT batch; **`lib/VM/HashTable.php`** promoted [#2543](https://github.com/PurHur/php-compiler/issues/2543); **`src/cli_driver.php`** literal [#2868](https://github.com/PurHur/php-compiler/issues/2868)) | **~99%** |
 | **HelloWorld** | Native **run** ✅; strict probe **emit_path=native** ✅ (27 May 2026) | Native compile for arbitrary PHP |
-| **Bootstrap loop (M4)** | Gen-1→gen-2 smoke/spine **native** ✅; gen-2→gen-3 spine **822/973** ✅; full revision argv probe ✅ (`make bootstrap-selfhost-full-revision-probe`, [#2880](https://github.com/PurHur/php-compiler/issues/2880)) | Native full revision rebuild |
+| **Bootstrap loop (M4)** | Gen-1→gen-2 smoke/spine **native** ✅; gen-2→gen-3 spine **1253/1259** ✅; full revision argv probe ✅ (`make bootstrap-selfhost-full-revision-probe`, [#2880](https://github.com/PurHur/php-compiler/issues/2880)) | Native full revision rebuild |
 | **Vendor** | **3/3** vendor `object_ok` (cfg, types, llvm) ([#3036](https://github.com/PurHur/php-compiler/pull/3036), [#1416](https://github.com/PurHur/php-compiler/issues/1416)); committed `.o` cold boot without `vendor/` ✅ | No Zend `vendor/autoload.php` at bootstrap |
 
 ### Gates (run after `script/apply-patches.sh`)

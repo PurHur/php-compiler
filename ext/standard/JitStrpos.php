@@ -36,7 +36,7 @@ final class JitStrpos
         $needlePtr = $context->builder->structGep($needle, $map['value']);
         $searchPtr = $hayPtr;
         if (null !== $offset) {
-            $clamped = self::clampIndex($context, $offset, $zero, $hayLen);
+            $clamped = self::normalizeSearchOffset($context, $offset, $zero, $hayLen);
             $searchPtr = $context->builder->inBoundsGEP($hayPtr, $clamped);
         }
 
@@ -57,9 +57,19 @@ final class JitStrpos
         return $context->builder->select($isNull, $sentinel, $pos);
     }
 
-    private static function clampIndex(Context $context, Value $index, Value $min, Value $max): Value
+    /**
+     * Zend strpos offset: negative counts from end, then clamp for safe GEP (php-src string.c).
+     */
+    private static function normalizeSearchOffset(Context $context, Value $index, Value $min, Value $max): Value
     {
-        return self::minValue($context, self::maxValue($context, $index, $min), $max);
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $isNegative = $context->builder->icmp(Builder::INT_SLT, $index, $zero);
+        $maxI64 = $context->builder->zExt($max, $i64);
+        $negAdjusted = $context->builder->add($maxI64, $index);
+        $adjusted = $context->builder->select($isNegative, $negAdjusted, $index);
+
+        return self::minValue($context, self::maxValue($context, $adjusted, $min), $maxI64);
     }
 
     private static function minValue(Context $context, Value $a, Value $b): Value

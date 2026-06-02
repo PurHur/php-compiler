@@ -22,10 +22,7 @@ final class ReflectionFunctionGetParameters extends VmClassMethod
     {
         $ctx = VmReflection::requireContext($frame);
         $receiver = ReflectionSupport::requireReflectionFunction($frame, $frame->calledArgs[0]);
-        $func = ReflectionSupport::resolveUserFunction(
-            $ctx,
-            ReflectionSupport::functionNameFromReflection($receiver)
-        );
+        $func = ReflectionSupport::resolveFunctionFromReflection($ctx, $receiver);
         $paramClass = $ctx->classes[ReflectionSupport::REFLECTION_PARAMETER] ?? null;
         if (null === $paramClass) {
             throw new \LogicException('ReflectionParameter is not registered in this compiler build');

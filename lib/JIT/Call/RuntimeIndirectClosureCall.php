@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
+use PHPCompiler\JIT\ClosureBindHelper;
 use PHPCompiler\JIT\ClosureHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
@@ -59,10 +60,10 @@ final class RuntimeIndirectClosureCall implements Call
             $name = array_key_first($this->candidates);
             assert(is_string($name));
 
-            return $this->dispatchSingleCandidate($context, $targetStr, $name, $this->candidates[$name], ...$args);
+            return $this->dispatchSingleCandidate($context, $obj, $targetStr, $name, $this->candidates[$name], ...$args);
         }
 
-        return $this->dispatchCandidates($context, $targetStr, ...$args);
+        return $this->dispatchCandidates($context, $obj, $targetStr, ...$args);
     }
 
     private function loadCallableObject(Context $context): Value
@@ -103,7 +104,7 @@ final class RuntimeIndirectClosureCall implements Call
     /**
      * @param array<string, Call> $candidates
      */
-    private function dispatchCandidates(Context $context, Value $targetStr, Variable ...$args): Value
+    private function dispatchCandidates(Context $context, Value $obj, Value $targetStr, Variable ...$args): Value
     {
         $tag = 'cl'.(string) ++self::$blockSeq;
         $merge = BasicBlockHelper::append($context, 'closure_indirect_merge_'.$tag);
@@ -129,7 +130,7 @@ final class RuntimeIndirectClosureCall implements Call
             $context->builder->branchIf($isMatch, $onMatch, $onMiss);
 
             $context->builder->positionAtEnd($onMatch);
-            $raw = $proxy->call($context, ...$args);
+            $raw = ClosureBindHelper::wrapCallWithBindingFromObject($context, $obj, $proxy, ...$args);
             $context->builder->store($raw, $resultSlot);
             $context->builder->branch($merge);
             ++$i;
@@ -147,6 +148,7 @@ final class RuntimeIndirectClosureCall implements Call
 
     private function dispatchSingleCandidate(
         Context $context,
+        Value $obj,
         Value $targetStr,
         string $fnName,
         Call $proxy,
@@ -162,6 +164,6 @@ final class RuntimeIndirectClosureCall implements Call
         $context->builder->call($context->lookupFunction('abort'));
         $context->builder->positionAtEnd($matchBlock);
 
-        return $proxy->call($context, ...$args);
+        return ClosureBindHelper::wrapCallWithBindingFromObject($context, $obj, $proxy, ...$args);
     }
 }

@@ -1,40 +1,7 @@
-diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php
---- vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php
-+++ vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php
-@@ -38,6 +38,12 @@
-             $this->namespaceStack[] = $name;
-         }
-         if ($node instanceof Node\Stmt\ClassLike) {
-+            if (null === $node->namespacedName) {
-+                $node->namespacedName = new Node\Name\FullyQualified(
-+                    $this->anonymousClassName($node),
-+                    $node->getAttributes()
-+                );
-+            }
-             $this->classStack[] = $node->namespacedName->toString();
-             if (! empty($node->extends) && ! is_array($node->extends)) {
-                 // Should always be fully qualified
-@@ -132,6 +139,16 @@
- 
-         return end($parts);
-     }
-+
-+    private function anonymousClassName(Node\Stmt\ClassLike $node): string
-+    {
-+        $start = $node->getStartLine();
-+        if (null === $start) {
-+            $start = 0;
-+        }
-+
-+        return 'AnonymousClass@' . $start;
-+    }
- 
-     private function repairCommentsCallback($match)
-     {
 diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
-@@ -1289,8 +1289,15 @@
+@@ -1353,8 +1353,15 @@
  
      protected function parseExpr_New(Expr\New_ $expr)
      {

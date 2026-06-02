@@ -21,7 +21,7 @@ function g(int $a): int {
 }
 g(foo: 1);
 PHP;
-        $this->expectException(\LogicException::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Unknown named parameter $foo');
         $runtime->run($runtime->parseAndCompile($code, 'named_args_unknown.php'));
     }

@@ -159,6 +159,7 @@ if (!function_exists('php_compiler_cli_dispatch')) {
         $execFile = '';
         $execCode = '';
         $options = [];
+        $scriptArgv = null;
         php_compiler_cli_note_progress('php:cli_dispatch_parse_begin');
         // Avoid array_shift() in the compiled CLI driver: it mutates arrays and can hit
         // bootstrap AOT lowering gaps. Use an index cursor instead (#3004).
@@ -191,6 +192,10 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                     }
 
                     break;
+                case '--debug-symbols':
+                    $options['--debug-symbols'] = true;
+
+                    break;
                 case '-o':
                     if ($i >= $argc || substr((string) $argv[$i], 0, 1) === '-') {
                         $options['-o'] = true;
@@ -210,6 +215,10 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                     $execCode = '<?php '.$argv[$i];
                     ++$i;
                     $execFile = 'Command line code';
+                    // Mirror Zend CLI: user-level $argv[0] is "Command line code" and remaining args follow.
+                    $scriptArgv = array_merge([$execFile], array_slice($argv, $i));
+                    // Do not parse trailing args as compiler options; they belong to user code.
+                    $i = $argc;
 
                     break;
                 case '-q':
@@ -245,9 +254,6 @@ if (!function_exists('php_compiler_cli_dispatch')) {
 
                     break;
                 default:
-                    if ($i < $argc) {
-                        die("Extra argument not understood: {$opt}\n");
-                    }
                     if (! empty($execCode)) {
                         die("Unsupported argument combination leading to multiple executions\n");
                     }
@@ -255,6 +261,10 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                         if (strlen($opt) === 1) {
                             $execFile = '-';
                             $execCode = stream_get_contents(\STDIN);
+                            // Mirror Zend CLI stdin: $argv[0] is "-" and remaining args follow.
+                            $scriptArgv = array_merge([$execFile], array_slice($argv, $i));
+                            // Do not parse trailing args as compiler options; they belong to user code.
+                            $i = $argc;
 
                             break;
                         }
@@ -266,6 +276,10 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                     }
                     $execCode = file_get_contents($scriptPath);
                     $execFile = realpath($scriptPath) ?: $scriptPath;
+                    // Allow arbitrary user script args after the script path (Zend CLI parity, #4139).
+                    $scriptArgv = array_merge([$execFile], array_slice($argv, $i));
+                    // Stop parsing: remaining args are for the user script.
+                    $i = $argc;
             }
         }
         php_compiler_cli_note_progress('php:cli_dispatch_parse_done');
@@ -273,12 +287,25 @@ if (!function_exists('php_compiler_cli_dispatch')) {
         if (empty($execCode)) {
             $execFile = '-';
             $execCode = stream_get_contents(\STDIN);
+            $scriptArgv = array_merge([$execFile], array_slice($argv, $i));
         }
+        if (null === $scriptArgv) {
+            // Fallback: ensure user code sees $argv/$argc even if no args were parsed.
+            $scriptArgv = [$execFile];
+        }
+        $options['--script-argv'] = $scriptArgv;
 
         if (function_exists('run')) {
             php_compiler_cli_note_progress('php:cli_dispatch_run');
-            // @phan-suppress-next-line PhanUndeclaredFunction yes it is we just made a function_exists call
-            run($execFile, $execCode, $options);
+            try {
+                // @phan-suppress-next-line PhanUndeclaredFunction yes it is we just made a function_exists call
+                run($execFile, $execCode, $options);
+            } catch (PHPCompiler\VM\ScriptExit $e) {
+                exit($e->status);
+            } catch (\LogicException $e) {
+                echo $e->getMessage(), "\n";
+                exit(255);
+            }
         } else {
             throw new \RuntimeException('Must define run before including cli.php');
         }

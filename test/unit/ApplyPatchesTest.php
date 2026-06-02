@@ -49,6 +49,168 @@ final class ApplyPatchesTest extends TestCase
         );
     }
 
+    public function testPhpTypesUnionTypeReconstructorOverlayReappliesAfterPartialVendor(): void
+    {
+        $recon = self::$root.'/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php';
+        if (!is_readable($recon)) {
+            self::markTestSkipped('vendor/ircmaxell/php-types not installed');
+        }
+
+        $original = (string) file_get_contents($recon);
+        $block = <<<'PHP'
+        } elseif ($type instanceof Op\Type\Union_) {
+            $subs = [];
+            foreach ($type->types as $sub) {
+                $subs[] = $this->resolveOpType($sub);
+            }
+
+            return (new Type(Type::TYPE_UNION, $subs))->simplify();
+PHP;
+        self::assertStringContainsString($block, $original, 'fixture must include Union_ handler');
+
+        $stripped = str_replace($block, '', $original);
+        file_put_contents($recon, $stripped);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertSame(0, $exitCode, "apply-patches failed after stripping Union_:\n".$joined);
+
+            $restored = (string) file_get_contents($recon);
+            self::assertStringContainsString(
+                'instanceof Op\\Type\\Union_',
+                $restored,
+                'overlay must re-insert Union_ when Intersection handler is present (#4229)'
+            );
+        } finally {
+            file_put_contents($recon, $original);
+        }
+    }
+
+    public function testPhpCfgThrowExprParserOverlayApplied(): void
+    {
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        if (!is_readable($parser)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $body = (string) file_get_contents($parser);
+        self::assertMatchesRegularExpression(
+            '/parseExpr_Throw|Op\\\\Expr\\\\Throw_/',
+            $body,
+            'php-cfg-throw-expr overlay must register throw expressions (#3802, #4232)'
+        );
+    }
+
+    public function testPhpCfgThrowExprParserOverlayReappliesAfterPartialVendor(): void
+    {
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        $op = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Throw_.php';
+        if (!is_readable($parser)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $originalParser = (string) file_get_contents($parser);
+        $hadOp = is_readable($op);
+        $originalOp = $hadOp ? (string) file_get_contents($op) : null;
+
+        $stripped = preg_replace(
+            '/    protected function parseExpr_Throw\(Expr\\\\Throw_ \$expr\)\s*\{.*?\n    \}\n/s',
+            '',
+            $originalParser
+        );
+        self::assertIsString($stripped);
+        self::assertNotSame($originalParser, $stripped, 'fixture must include parseExpr_Throw');
+        file_put_contents($parser, $stripped);
+        if ($hadOp) {
+            unlink($op);
+        }
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertSame(0, $exitCode, "apply-patches failed after stripping throw-expr:\n".$joined);
+
+            $restored = (string) file_get_contents($parser);
+            self::assertMatchesRegularExpression(
+                '/parseExpr_Throw|return new Op\\\\Expr\\\\Throw_/',
+                $restored,
+                'overlay must re-insert parseExpr_Throw on harness tar-copy vendor (#4232)'
+            );
+            self::assertFileIsReadable($op);
+        } finally {
+            file_put_contents($parser, $originalParser);
+            if ($hadOp && $originalOp !== null) {
+                $dir = dirname($op);
+                if (!is_dir($dir)) {
+                    mkdir($dir, 0777, true);
+                }
+                file_put_contents($op, $originalOp);
+            }
+        }
+    }
+
+    public function testPhpCfgPropertyReadonlyOverlayApplied(): void
+    {
+        $prop = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php';
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        if (!is_readable($prop) || !is_readable($parser)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $body = (string) file_get_contents($prop);
+        self::assertTrue(
+            str_contains($body, 'public $readonly')
+            || str_contains($body, 'propertyFlags'),
+            'php-cfg-property-readonly overlay must expose readonly metadata (#3149, #4230)'
+        );
+        $parserBody = (string) file_get_contents($parser);
+        self::assertMatchesRegularExpression(
+            '/propertyFlags\s*=\s*\$node->flags|\$(cfgProp|prop)->readonly\s*=/',
+            $parserBody,
+            'php-cfg-property-readonly overlay must populate flags in parseStmt_Property (#4230)'
+        );
+    }
+
+    public function testPhpCfgPropertyReadonlyOverlayReappliesAfterPartialVendor(): void
+    {
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        if (!is_readable($parser)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $original = (string) file_get_contents($parser);
+        $stripped = preg_replace(
+            '/^\s*\$prop->propertyFlags = \$node->flags;\n/m',
+            '',
+            $original
+        );
+        self::assertIsString($stripped);
+        self::assertNotSame($original, $stripped, 'fixture must include propertyFlags assignment');
+        file_put_contents($parser, $stripped);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertSame(0, $exitCode, "apply-patches failed after stripping propertyFlags:\n".$joined);
+
+            $restored = (string) file_get_contents($parser);
+            self::assertMatchesRegularExpression(
+                '/propertyFlags\s*=\s*\$node->flags/',
+                $restored,
+                'overlay must re-insert propertyFlags on harness tar-copy vendor (#4230)'
+            );
+        } finally {
+            file_put_contents($parser, $original);
+        }
+    }
+
     public function testPhpCfgEnumParserPassesImplementsArrayNotBlock(): void
     {
         $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
@@ -62,6 +224,64 @@ final class ApplyPatchesTest extends TestCase
             '/function parseStmt_Enum[\s\S]*?parseExprList\(\$node->implements\)/',
             $body,
             'parseStmt_Enum must pass implements[] to Op\\Stmt\\Enum_ ctor (#3083, #3419)'
+        );
+        self::assertMatchesRegularExpression(
+            '/new Op\\\\Stmt\\\\Enum_\([\s\S]*?\$flags,\s*\n\s*\$this->mapAttributes/',
+            $body,
+            'parseStmt_Enum must pass int $flags before attributes (#3114, Enum_ ctor)'
+        );
+    }
+
+    public function testPhpCfgYieldFromOverlayApplied(): void
+    {
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        $op = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/YieldFrom.php';
+        if (!is_readable($parser)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        self::assertFileIsReadable($op, 'php-cfg yield-from overlay must ship Op\\Expr\\YieldFrom');
+        $body = file_get_contents($parser);
+        self::assertIsString($body);
+        self::assertStringContainsString(
+            'function parseExpr_YieldFrom',
+            $body,
+            'php-cfg yield-from overlay must register parseExpr_YieldFrom (#2997)'
+        );
+        self::assertFileDoesNotExist(
+            self::$root.'/patches/php-cfg-yield-from.patch',
+            'placeholder patch retired; overlay is invoked directly (#2997)'
+        );
+    }
+
+    public function testApplyPatchesInvokesYieldFromOverlayDirectly(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
+        self::assertStringContainsString('apply_php_cfg_yield_from_overlay', $script);
+        self::assertStringNotContainsString('php-cfg-yield-from.patch', $script);
+    }
+
+    public function testApplyPatchesInvokesAsymmetricVisibilityOverlay(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
+        self::assertStringContainsString('apply_php_cfg_asymmetric_visibility_overlay', $script);
+    }
+
+    public function testPhpCfgAsymmetricVisibilityFieldsPresentAfterApplyPatches(): void
+    {
+        $prop = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php';
+        $param = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php';
+        if (!is_readable($prop) || !is_readable($param)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $propBody = (string) file_get_contents($prop);
+        $paramBody = (string) file_get_contents($param);
+        self::assertStringContainsString('public int $setVisibility', $propBody, '#3165 Property setVisibility');
+        self::assertSame(
+            1,
+            substr_count($paramBody, 'promotionSetVisibility'),
+            'Param must declare promotionSetVisibility exactly once (#1492 partial vendor)'
         );
     }
 }

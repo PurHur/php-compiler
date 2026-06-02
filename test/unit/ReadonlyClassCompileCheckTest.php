@@ -50,6 +50,51 @@ PHP;
         $runtime->parseAndCompile($code, 'readonly_default.php');
     }
 
+    public function testReadonlyPropertyDefaultOnNormalClassFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public readonly int $x = 1;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Readonly property C::$x cannot have default value');
+        $runtime->parseAndCompile($code, 'readonly_prop_default.php');
+    }
+
+    public function testStaticReadonlyPropertyFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public static readonly int $p;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Static property C::$p cannot be readonly');
+        $runtime->parseAndCompile($code, 'static_readonly.php');
+    }
+
+    public function testStaticMutablePropertyStillCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public static int $p;
+}
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'static_mutable.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
     public function testReadonlyExtendsReadonlyCompiles(): void
     {
         $runtime = new Runtime();

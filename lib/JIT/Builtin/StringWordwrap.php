@@ -4,396 +4,169 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
-use PHPLLVM\Value;
 
 /**
- * LLVM implementation of __string__wordwrap (mirrors VmString::wordwrap).
+ * MCJIT bitcode link for __compiler_wordwrap (lib/AOT/runtime/compiler_wordwrap.c).
  */
 final class StringWordwrap
 {
-    public static function implement(Context $context): void
+    private const RUNTIME_SOURCE = __DIR__.'/../../AOT/runtime/compiler_wordwrap.c';
+
+    public static function ensureLinked(Context $context): void
     {
-        $fn = $context->lookupFunction('__string__wordwrap');
-        $entry = $fn->appendBasicBlock('wordwrap_main');
-        $context->builder->positionAtEnd($entry);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            return;
+        }
 
-        $string = $fn->getParam(0);
-        $width = $fn->getParam(1);
-        $break = $fn->getParam(2);
-        $cutI8 = $fn->getParam(3);
-        $map = $context->structFieldMap['__string__'];
-        $i64 = $context->getTypeFromString('int64');
-        $i8 = $context->getTypeFromString('int8');
-        $zero = $i64->constInt(0, false);
-        $one = $i64->constInt(1, false);
-        $spaceOrd = $i64->constInt(32, false);
+        $probe = $context->module->getNamedFunction('__compiler_wordwrap');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
 
-        $inLen = $context->builder->load($context->builder->structGep($string, $map['length']));
-        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $inLen, $zero);
-        $emptyBlock = BasicBlockHelper::append($context, 'wordwrap_empty');
-        $workBlock = BasicBlockHelper::append($context, 'wordwrap_work');
-        $doneBlock = BasicBlockHelper::append($context, 'wordwrap_done');
-        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+            return;
+        }
 
-        $context->builder->positionAtEnd($emptyBlock);
-        $emptyStr = $context->builder->call($context->lookupFunction('__string__alloc'), $zero);
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($workBlock);
-        $breakLen = $context->builder->load($context->builder->structGep($break, $map['length']));
-        $cut = $context->builder->icmp(Builder::INT_NE, $cutI8, $i8->constInt(0, false));
-        $useFast = $context->builder->and(
-            $context->builder->icmp(Builder::INT_EQ, $breakLen, $one),
-            $context->builder->not($cut)
-        );
-        $fastBlock = BasicBlockHelper::append($context, 'wordwrap_fast');
-        $generalBlock = BasicBlockHelper::append($context, 'wordwrap_general');
-        $context->builder->branchIf($useFast, $fastBlock, $generalBlock);
-
-        $context->builder->positionAtEnd($fastBlock);
-        [$fastResult, $fastDone] = self::fastPath($context, $string, $width, $break, $map, $i64, $zero, $one, $spaceOrd);
-        $context->builder->positionAtEnd($fastDone);
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($generalBlock);
-        [$generalResult, $generalDone] = self::generalPath(
-            $context,
-            $string,
-            $width,
-            $break,
-            $cut,
-            $map,
-            $i64,
-            $zero,
-            $one,
-            $spaceOrd
-        );
-        $context->builder->positionAtEnd($generalDone);
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($doneBlock);
-        $phi = $context->builder->phi($emptyStr->typeOf());
-        $phi->addIncoming($emptyStr, $emptyBlock);
-        $phi->addIncoming($fastResult, $fastDone);
-        $phi->addIncoming($generalResult, $generalDone);
-        $context->builder->returnValue($phi);
-        $context->builder->clearInsertionPosition();
+        $bitcode = self::ensureBitcode();
+        $data = file_get_contents($bitcode);
+        if (false === $data || '' === $data) {
+            throw new \LogicException('Failed to read wordwrap JIT bitcode: '.$bitcode);
+        }
+        $buffer = $context->llvm->createMemoryBufferWithString($data, 'compiler_wordwrap.bc');
+        $runtimeModule = $buffer->parseBitcode($context->context);
+        if (!$context->module->link($runtimeModule)) {
+            throw new \LogicException('Failed to link wordwrap JIT runtime bitcode');
+        }
+        self::registerLinkedRuntime($context);
     }
 
-    private static function fastPath(
-        Context $context,
-        Value $string,
-        Value $width,
-        Value $break,
-        array $map,
-        $i64,
-        Value $zero,
-        Value $one,
-        Value $spaceOrd
-    ): array {
-        $copy = $context->builder->call($context->lookupFunction('__string__separate'), $string);
-        $len = $context->builder->load($context->builder->structGep($copy, $map['length']));
-        $chars = $context->builder->structGep($copy, $map['value']);
-        $breakByte = $context->builder->load($context->builder->structGep($break, $map['value']));
-
-        $laststartSlot = $context->builder->alloca($i64, 1, 'ww_fast_laststart');
-        $lastspaceSlot = $context->builder->alloca($i64, 1);
-        $currentSlot = $context->builder->alloca($i64, 1);
-        $context->builder->store($zero, $laststartSlot);
-        $context->builder->store($zero, $lastspaceSlot);
-        $context->builder->store($zero, $currentSlot);
-
-        $head = BasicBlockHelper::append($context, 'ww_fast_head');
-        $body = BasicBlockHelper::append($context, 'ww_fast_body');
-        $done = BasicBlockHelper::append($context, 'ww_fast_done');
-        $onBreak = BasicBlockHelper::append($context, 'ww_fast_on_break');
-        $classify = BasicBlockHelper::append($context, 'ww_fast_classify');
-        $onSpace = BasicBlockHelper::append($context, 'ww_fast_on_space');
-        $spaceNoWrap = BasicBlockHelper::append($context, 'ww_fast_space_nowrap');
-        $spaceWrap = BasicBlockHelper::append($context, 'ww_fast_space_wrap');
-        $onOther = BasicBlockHelper::append($context, 'ww_fast_on_other');
-        $doWrap = BasicBlockHelper::append($context, 'ww_fast_do_wrap');
-        $next = BasicBlockHelper::append($context, 'ww_fast_next');
-
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($head);
-        $current = $context->builder->load($currentSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $current, $len);
-        $context->builder->branchIf($atEnd, $done, $body);
-
-        $context->builder->positionAtEnd($body);
-        $current = $context->builder->load($currentSlot);
-        $laststart = $context->builder->load($laststartSlot);
-        $lastspace = $context->builder->load($lastspaceSlot);
-        $ch = $context->builder->load($context->builder->gep($chars, $current));
-        $chI64 = $context->builder->zExt($ch, $i64);
-        $isBreak = $context->builder->icmp(Builder::INT_EQ, $ch, $breakByte);
-        $isSpace = $context->builder->icmp(Builder::INT_EQ, $chI64, $spaceOrd);
-        $lineLen = $context->builder->sub($current, $laststart);
-        $atWidth = $context->builder->icmp(Builder::INT_SGE, $lineLen, $width);
-        $hasSpace = $context->builder->icmp(Builder::INT_NE, $laststart, $lastspace);
-
-        $context->builder->branchIf($isBreak, $onBreak, $classify);
-
-        $context->builder->positionAtEnd($onBreak);
-        $nextStart = $context->builder->add($current, $one);
-        $context->builder->store($nextStart, $laststartSlot);
-        $context->builder->store($nextStart, $lastspaceSlot);
-        $context->builder->branch($next);
-
-        $context->builder->positionAtEnd($classify);
-        $context->builder->branchIf($isSpace, $onSpace, $onOther);
-
-        $context->builder->positionAtEnd($onSpace);
-        $context->builder->branchIf($atWidth, $spaceWrap, $spaceNoWrap);
-
-        $context->builder->positionAtEnd($spaceNoWrap);
-        $context->builder->store($current, $lastspaceSlot);
-        $context->builder->branch($next);
-
-        $context->builder->positionAtEnd($spaceWrap);
-        $context->builder->store($breakByte, $context->builder->gep($chars, $current));
-        $context->builder->store($context->builder->add($current, $one), $laststartSlot);
-        $context->builder->store($current, $lastspaceSlot);
-        $context->builder->branch($next);
-
-        $context->builder->positionAtEnd($onOther);
-        $needWrap = $context->builder->and($atWidth, $hasSpace);
-        $context->builder->branchIf($needWrap, $doWrap, $next);
-
-        $context->builder->positionAtEnd($doWrap);
-        $context->builder->store($breakByte, $context->builder->gep($chars, $lastspace));
-        $context->builder->store($context->builder->add($lastspace, $one), $laststartSlot);
-        $context->builder->branch($next);
-
-        $context->builder->positionAtEnd($next);
-        $context->builder->store($context->builder->add($current, $one), $currentSlot);
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($done);
-
-        return [$copy, $done];
+    private static function registerLinkedRuntime(Context $context): void
+    {
+        $fn = $context->module->getNamedFunction('__compiler_wordwrap');
+        if (null === $fn) {
+            throw new \LogicException('__compiler_wordwrap missing after wordwrap bitcode link');
+        }
+        $context->registerFunction('__compiler_wordwrap', $fn);
     }
 
-    private static function generalPath(
-        Context $context,
-        Value $string,
-        Value $width,
-        Value $break,
-        Value $cut,
-        array $map,
-        $i64,
-        Value $zero,
-        Value $one,
-        Value $spaceOrd
-    ): array {
-        $inLen = $context->builder->load($context->builder->structGep($string, $map['length']));
-        $breakLen = $context->builder->load($context->builder->structGep($break, $map['length']));
-        $widthSafe = $context->builder->select(
-            $context->builder->icmp(Builder::INT_SGT, $width, $zero),
-            $width,
-            $one
-        );
-        $chunks = $context->builder->unsignedDiv($inLen, $widthSafe);
-        $outCap = $context->builder->add(
-            $inLen,
-            $context->builder->mul(
-                $context->builder->add($chunks, $i64->constInt(2, false)),
-                $breakLen
-            )
-        );
-        $dest = $context->builder->call($context->lookupFunction('__string__alloc'), $outCap);
-        $destChars = $context->builder->structGep($dest, $map['value']);
-        $inChars = $context->builder->structGep($string, $map['value']);
-        $breakChars = $context->builder->structGep($break, $map['value']);
-        $breakFirst = $context->builder->load($breakChars);
+    private static function ensureBitcode(): string
+    {
+        $source = realpath(self::RUNTIME_SOURCE);
+        if (false === $source || !is_file($source)) {
+            throw new \LogicException('wordwrap runtime source not found: '.self::RUNTIME_SOURCE);
+        }
 
-        $outLenSlot = $context->builder->alloca($i64, 1);
-        $laststartSlot = $context->builder->alloca($i64, 1);
-        $lastspaceSlot = $context->builder->alloca($i64, 1);
-        $currentSlot = $context->builder->alloca($i64, 1);
-        $context->builder->store($zero, $outLenSlot);
-        $context->builder->store($zero, $laststartSlot);
-        $context->builder->store($zero, $lastspaceSlot);
-        $context->builder->store($zero, $currentSlot);
+        $compiler = self::resolveCompiler();
+        $cacheDir = sys_get_temp_dir().'/phpc-jit-runtime';
+        if (!is_dir($cacheDir) && !mkdir($cacheDir, 0777, true) && !is_dir($cacheDir)) {
+            throw new \LogicException('Cannot create JIT runtime cache: '.$cacheDir);
+        }
 
-        $head = BasicBlockHelper::append($context, 'ww_gen_head');
-        $body = BasicBlockHelper::append($context, 'ww_gen_body');
-        $loopDone = BasicBlockHelper::append($context, 'ww_gen_loop_done');
-        $onBreak = BasicBlockHelper::append($context, 'ww_gen_on_break');
-        $classify = BasicBlockHelper::append($context, 'ww_gen_classify');
-        $onSpace = BasicBlockHelper::append($context, 'ww_gen_on_space');
-        $spaceNoWrap = BasicBlockHelper::append($context, 'ww_gen_space_nowrap');
-        $spaceWrap = BasicBlockHelper::append($context, 'ww_gen_space_wrap');
-        $onOther = BasicBlockHelper::append($context, 'ww_gen_on_other');
-        $cutWrap = BasicBlockHelper::append($context, 'ww_gen_cut_wrap');
-        $wordWrap = BasicBlockHelper::append($context, 'ww_gen_word_wrap');
-        $next = BasicBlockHelper::append($context, 'ww_gen_next');
+        $cache = $cacheDir.'/'.basename($source, '.c').'-'.substr(
+            sha1($source.filemtime($source).$compiler.'host'),
+            0,
+            16
+        ).'.bc';
+        if (is_file($cache) && filemtime($cache) >= filemtime($source)) {
+            return $cache;
+        }
 
-        $context->builder->branch($head);
+        $includes = self::hostLibcIncludeFlags();
+        $cmd = escapeshellarg($compiler)
+            .' -emit-llvm -c -fPIC -O2'.$includes.' '
+            .escapeshellarg($source).' -o '.escapeshellarg($cache).' 2>&1';
+        $output = shell_exec($cmd);
+        if (!is_file($cache)) {
+            throw new \LogicException(
+                'Failed to compile wordwrap JIT bitcode: '.trim((string) $output)
+            );
+        }
 
-        $context->builder->positionAtEnd($head);
-        $current = $context->builder->load($currentSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $current, $inLen);
-        $context->builder->branchIf($atEnd, $loopDone, $body);
+        return $cache;
+    }
 
-        $context->builder->positionAtEnd($body);
-        $current = $context->builder->load($currentSlot);
-        $laststart = $context->builder->load($laststartSlot);
-        $lastspace = $context->builder->load($lastspaceSlot);
-        $outLen = $context->builder->load($outLenSlot);
-        $ch = $context->builder->load($context->builder->gep($inChars, $current));
-        $chI64 = $context->builder->zExt($ch, $i64);
-        $isBreakFirst = $context->builder->icmp(Builder::INT_EQ, $ch, $breakFirst);
-        $roomForBreak = $context->builder->icmp(
-            Builder::INT_SLT,
-            $context->builder->add($current, $breakLen),
-            $inLen
-        );
-        $isSpace = $context->builder->icmp(Builder::INT_EQ, $chI64, $spaceOrd);
-        $lineLen = $context->builder->sub($current, $laststart);
-        $atWidth = $context->builder->icmp(Builder::INT_SGE, $lineLen, $width);
-        $hasSpace = $context->builder->icmp(Builder::INT_SLT, $laststart, $lastspace);
+    private static function resolveCompiler(): string
+    {
+        $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
+        if (false !== $llvmDir && '' !== $llvmDir) {
+            foreach (['clang-9', 'clang'] as $name) {
+                $candidate = $llvmDir.'/'.$name;
+                if (is_executable($candidate)) {
+                    return $candidate;
+                }
+            }
+        }
 
-        $context->builder->branchIf(
-            $context->builder->and($isBreakFirst, $roomForBreak),
-            $onBreak,
-            $classify
-        );
+        foreach (['clang-9', 'clang', 'gcc', 'cc'] as $name) {
+            $path = trim((string) shell_exec('command -v '.escapeshellarg($name).' 2>/dev/null'));
+            if ('' !== $path) {
+                return $path;
+            }
+        }
 
-        $context->builder->positionAtEnd($onBreak);
-        $segLen = $context->builder->add($context->builder->sub($current, $laststart), $breakLen);
-        $context->intrinsic->memcpy(
-            $context->builder->gep($destChars, $outLen),
-            $context->builder->gep($inChars, $laststart),
-            $segLen,
-            false
-        );
-        $outAfter = $context->builder->add($outLen, $segLen);
-        $context->builder->store($outAfter, $outLenSlot);
-        $newCurrent = $context->builder->add($current, $breakLen);
-        $context->builder->store($newCurrent, $currentSlot);
-        $context->builder->store($newCurrent, $laststartSlot);
-        $context->builder->store($newCurrent, $lastspaceSlot);
-        $context->builder->branch($head);
+        throw new \LogicException('No C compiler found for wordwrap JIT runtime bitcode');
+    }
 
-        $context->builder->positionAtEnd($classify);
-        $context->builder->branchIf($isSpace, $onSpace, $onOther);
+    private static function hostLibcIncludeFlags(): string
+    {
+        $flags = '';
+        foreach (self::discoverSystemIncludeDirs() as $dir) {
+            $flags .= ' -isystem '.escapeshellarg($dir);
+        }
+        if ('' === $flags && is_file('/usr/include/stdio.h')) {
+            $flags = ' -isystem /usr/include';
+        }
 
-        $context->builder->positionAtEnd($onSpace);
-        $context->builder->branchIf($atWidth, $spaceWrap, $spaceNoWrap);
+        return $flags;
+    }
 
-        $context->builder->positionAtEnd($spaceNoWrap);
-        $context->builder->store($current, $lastspaceSlot);
-        $context->builder->branch($next);
+    /**
+     * @return list<string>
+     */
+    private static function discoverSystemIncludeDirs(): array
+    {
+        $dirs = [];
+        foreach (['gcc', 'cc', 'clang'] as $compiler) {
+            $path = trim((string) shell_exec('command -v '.escapeshellarg($compiler).' 2>/dev/null'));
+            if ('' === $path) {
+                continue;
+            }
+            $verbose = shell_exec(
+                escapeshellarg($path).' -E -Wp,-v -xc /dev/null 2>&1'
+            );
+            if (!is_string($verbose)) {
+                continue;
+            }
+            $capture = false;
+            foreach (explode("\n", $verbose) as $line) {
+                if (str_contains($line, '#include <...> search starts here:')) {
+                    $capture = true;
 
-        $context->builder->positionAtEnd($spaceWrap);
-        $segLen = $context->builder->sub($current, $laststart);
-        $context->intrinsic->memcpy(
-            $context->builder->gep($destChars, $outLen),
-            $context->builder->gep($inChars, $laststart),
-            $segLen,
-            false
-        );
-        $outAfter = $context->builder->add($outLen, $segLen);
-        $context->intrinsic->memcpy(
-            $context->builder->gep($destChars, $outAfter),
-            $breakChars,
-            $breakLen,
-            false
-        );
-        $context->builder->store($context->builder->add($outAfter, $breakLen), $outLenSlot);
-        $nextStart = $context->builder->add($current, $one);
-        $context->builder->store($nextStart, $laststartSlot);
-        $context->builder->store($current, $lastspaceSlot);
-        $context->builder->branch($next);
+                    continue;
+                }
+                if ($capture) {
+                    if (str_contains($line, 'End of search list')) {
+                        break;
+                    }
+                    $dir = trim($line);
+                    if ('' !== $dir && is_dir($dir)) {
+                        $dirs[$dir] = true;
+                    }
+                }
+            }
+            if ([] !== $dirs) {
+                break;
+            }
+        }
 
-        $context->builder->positionAtEnd($onOther);
-        $cutNow = $context->builder->and(
-            $atWidth,
-            $cut,
-            $context->builder->icmp(Builder::INT_SGE, $laststart, $lastspace)
-        );
-        $context->builder->branchIf($cutNow, $cutWrap, $wordWrap);
+        if ([] === $dirs) {
+            foreach (['/usr/include', '/usr/include/x86_64-linux-gnu'] as $fallback) {
+                if (is_dir($fallback)) {
+                    $dirs[$fallback] = true;
+                }
+            }
+        }
 
-        $context->builder->positionAtEnd($cutWrap);
-        $segLen = $context->builder->sub($current, $laststart);
-        $context->intrinsic->memcpy(
-            $context->builder->gep($destChars, $outLen),
-            $context->builder->gep($inChars, $laststart),
-            $segLen,
-            false
-        );
-        $outAfter = $context->builder->add($outLen, $segLen);
-        $context->intrinsic->memcpy(
-            $context->builder->gep($destChars, $outAfter),
-            $breakChars,
-            $breakLen,
-            false
-        );
-        $context->builder->store($context->builder->add($outAfter, $breakLen), $outLenSlot);
-        $context->builder->store($current, $laststartSlot);
-        $context->builder->store($current, $lastspaceSlot);
-        $context->builder->branch($next);
-
-        $context->builder->positionAtEnd($wordWrap);
-        $doWrap = $context->builder->and($atWidth, $hasSpace);
-        $wrapBlock = BasicBlockHelper::append($context, 'ww_gen_do_word_wrap');
-        $context->builder->branchIf($doWrap, $wrapBlock, $next);
-
-        $context->builder->positionAtEnd($wrapBlock);
-        $segLen = $context->builder->sub($lastspace, $laststart);
-        $context->intrinsic->memcpy(
-            $context->builder->gep($destChars, $outLen),
-            $context->builder->gep($inChars, $laststart),
-            $segLen,
-            false
-        );
-        $outAfter = $context->builder->add($outLen, $segLen);
-        $context->intrinsic->memcpy(
-            $context->builder->gep($destChars, $outAfter),
-            $breakChars,
-            $breakLen,
-            false
-        );
-        $context->builder->store($context->builder->add($outAfter, $breakLen), $outLenSlot);
-        $newStart = $context->builder->add($lastspace, $one);
-        $context->builder->store($newStart, $laststartSlot);
-        $context->builder->store($newStart, $lastspaceSlot);
-        $context->builder->branch($next);
-
-        $context->builder->positionAtEnd($next);
-        $context->builder->store($context->builder->add($current, $one), $currentSlot);
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($loopDone);
-        $laststart = $context->builder->load($laststartSlot);
-        $current = $context->builder->load($currentSlot);
-        $outLen = $context->builder->load($outLenSlot);
-        $remain = $context->builder->sub($current, $laststart);
-        $needTail = $context->builder->icmp(Builder::INT_NE, $laststart, $current);
-        $tailBlock = BasicBlockHelper::append($context, 'ww_gen_tail');
-        $retBlock = BasicBlockHelper::append($context, 'ww_gen_ret');
-        $context->builder->branchIf($needTail, $tailBlock, $retBlock);
-
-        $context->builder->positionAtEnd($tailBlock);
-        $context->intrinsic->memcpy(
-            $context->builder->gep($destChars, $outLen),
-            $context->builder->gep($inChars, $laststart),
-            $remain,
-            false
-        );
-        $context->builder->store($context->builder->add($outLen, $remain), $outLenSlot);
-        $context->builder->branch($retBlock);
-
-        $context->builder->positionAtEnd($retBlock);
-        $finalLen = $context->builder->load($outLenSlot);
-        $context->builder->store($finalLen, $context->builder->structGep($dest, $map['length']));
-
-        return [$dest, $retBlock];
+        return array_keys($dirs);
     }
 }

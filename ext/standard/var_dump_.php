@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -44,10 +45,15 @@ final class var_dump_ extends Internal
         throw new \LogicException('var_dump() is not implemented for JIT in this compiler build');
     }
 
-    private static function dumpVariable(VM $vm, Variable $var, int $level): void
+    private static function dumpVariable(VM $vm, Variable $var, int $level, bool $showRefMarker = false): void
     {
+        TypedPropertyCheck::assertReadable($var);
         if ($level > 1) {
             echo str_repeat(' ', $level - 1);
+        }
+        if ($showRefMarker && Variable::TYPE_INDIRECT === $var->type) {
+            echo '&';
+            $var = $var->resolveIndirect();
         }
         if (Variable::TYPE_INTEGER === $var->type) {
             echo 'int(', $var->toInt(), ")\n";
@@ -91,14 +97,14 @@ final class var_dump_ extends Internal
     private static function dumpArray(VM $vm, VM\HashTable $table, int $level): void
     {
         $count = 0;
-        foreach ($table->iterateKeyed(true) as $_) {
+        foreach ($table->iterateKeyed(false) as $_) {
             ++$count;
         }
         echo 'array(', $count, ") {\n";
-        foreach ($table->iterateKeyed(true) as [$key, $value]) {
+        foreach ($table->iterateKeyed(false) as [$key, $value]) {
             echo str_repeat(' ', $level);
             echo self::formatKey($key), "\n";
-            self::dumpVariable($vm, $value->resolveIndirect(), $level + 1);
+            self::dumpVariable($vm, $value, $level + 1, true);
         }
         if ($level > 1) {
             echo str_repeat(' ', $level - 1);
@@ -114,7 +120,7 @@ final class var_dump_ extends Internal
         foreach ($props as $name => $value) {
             echo str_repeat(' ', $level);
             echo '["', $name, "\"]=>\n";
-            self::dumpVariable($vm, $value->resolveIndirect(), $level + 1);
+            self::dumpVariable($vm, $value, $level + 1, true);
         }
         if ($level > 1) {
             echo str_repeat(' ', $level - 1);

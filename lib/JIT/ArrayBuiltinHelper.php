@@ -21,6 +21,7 @@ use PHPCompiler\ext\standard\strtoupper;
 use PHPCompiler\ext\standard\VmInternalCall;
 use PHPCompiler\ext\types\strlen;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Call\ClosureWithCaptures;
 use PHPCompiler\JIT\Call\ExternalMethod;
@@ -29,6 +30,9 @@ use PHPLLVM\Value;
 
 final class ArrayBuiltinHelper
 {
+    private const ARRAY_PRODUCT_ELEMENT_TYPE_ERROR =
+        'array_product(): Argument #1 ($array) must contain only int and float values';
+
     /** Monotonic id so copyListEntry basic blocks stay unique per LLVM function. */
     private static int $copyListEntrySeq = 0;
 
@@ -588,6 +592,32 @@ final class ArrayBuiltinHelper
             $context,
             self::loadHashTable($context, $array),
             $columnKeyStr
+        );
+    }
+
+    /**
+     * array_column() with compile-time string column + index_key (ext/standard/array.c php_array_column).
+     */
+    public static function buildColumnArrayWithIndex(
+        Context $context,
+        Variable $array,
+        Value $columnKeyStr,
+        Value $indexKeyStr
+    ): Value {
+        if (self::isNativeArray($array->type)) {
+            return self::buildColumnWithIndexFromHashTable(
+                $context,
+                self::nativeListToHashTable($context, $array),
+                $columnKeyStr,
+                $indexKeyStr
+            );
+        }
+
+        return self::buildColumnWithIndexFromHashTable(
+            $context,
+            self::loadHashTable($context, $array),
+            $columnKeyStr,
+            $indexKeyStr
         );
     }
 
@@ -1185,7 +1215,14 @@ final class ArrayBuiltinHelper
             $typeByte,
             $i8->constInt(Variable::TYPE_STRING & 0xff, false)
         );
-        $context->builder->branchIf($isString, $stringBlock, $longBlock);
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $afterString = BasicBlockHelper::append($context, 'ht_copy_packed_after_str_'.$tag);
+        $htBlock = BasicBlockHelper::append($context, 'ht_copy_packed_ht_'.$tag);
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
 
         $context->builder->positionAtEnd($stringBlock);
         $context->builder->call(
@@ -1193,6 +1230,18 @@ final class ArrayBuiltinHelper
             $dest,
             $destIndex,
             $context->builder->call($context->lookupFunction('__value__readString'), $srcEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $context->builder->branchIf($isHt, $htBlock, $longBlock);
+
+        $context->builder->positionAtEnd($htBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setHashtableAt'),
+            $dest,
+            $destIndex,
+            $context->builder->call($context->lookupFunction('__value__readHashtable'), $srcEntry)
         );
         $context->builder->branch($done);
 
@@ -2810,15 +2859,63 @@ final class ArrayBuiltinHelper
     }
 
     /**
-     * Split a packed list array into consecutive chunks (array_chunk subset; matches VM HashTable::chunkCopy).
+     * Split an array into consecutive chunks (array_chunk subset; matches VM HashTable::chunkCopy).
+     *
+     * @param Value|null $preserveKeys i1 when the third argument is present; null for default false
      */
-    public static function buildChunkArray(Context $context, Variable $array, Value $size): Value
+    public static function buildChunkArray(
+        Context $context,
+        Variable $array,
+        Value $size,
+        ?Value $preserveKeys = null
+    ): Value {
+        if (null === $preserveKeys) {
+            return self::buildChunkArrayFast($context, $array, $size);
+        }
+
+        $fastBlock = BasicBlockHelper::append($context, 'array_chunk_fast');
+        $preserveBlock = BasicBlockHelper::append($context, 'array_chunk_preserve');
+        $doneBlock = BasicBlockHelper::append($context, 'array_chunk_branch_done');
+        $context->builder->branchIf($preserveKeys, $preserveBlock, $fastBlock);
+
+        $context->builder->positionAtEnd($fastBlock);
+        $fastResult = self::buildChunkArrayFast($context, $array, $size);
+        $fastEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($preserveBlock);
+        $preserveResult = self::buildChunkArrayPreserveKeys($context, $array, $size);
+        $preserveEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($fastResult->typeOf());
+        $phi->addIncoming($fastResult, $fastEnd);
+        $phi->addIncoming($preserveResult, $preserveEnd);
+
+        return $phi;
+    }
+
+    private static function buildChunkArrayFast(Context $context, Variable $array, Value $size): Value
     {
         if (self::isNativeArray($array->type)) {
             return self::buildChunkFromNativeArray($context, $array, $size);
         }
 
         return self::buildChunkFromHashTable(
+            $context,
+            self::loadHashTable($context, $array),
+            $size
+        );
+    }
+
+    private static function buildChunkArrayPreserveKeys(Context $context, Variable $array, Value $size): Value
+    {
+        if (self::isNativeArray($array->type)) {
+            return self::buildChunkPreserveKeysFromNativeArray($context, $array, $size);
+        }
+
+        return self::buildChunkPreserveKeysFromHashTable(
             $context,
             self::loadHashTable($context, $array),
             $size
@@ -3050,6 +3147,312 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($hasPartial, $finalizeFlush, $doneBlock);
 
         $context->builder->positionAtEnd($finalizeFlush);
+        $outIdx = $context->builder->load($outIdxSlot);
+        self::appendChunkHashtable($context, $out, $context->builder->load($chunkHtSlot), $outIdx);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $out;
+    }
+
+    private static function buildChunkPreserveKeysFromNativeArray(
+        Context $context,
+        Variable $array,
+        Value $size
+    ): Value {
+        $tag = 'acpkn'.(string) ++self::$copyListEntrySeq;
+        $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
+        $sizeT = $context->getTypeFromString('size_t');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+        $chunkSize = $context->builder->truncOrBitCast($size, $sizeT);
+
+        $out = HashTableHelper::alloc($context);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_chunk_pk_native_src_'.$tag);
+        $chunkCountSlot = $context->builder->alloca($sizeT, 1, 'array_chunk_pk_native_count_'.$tag);
+        $chunkHtSlot = $context->builder->alloca($htPtr, 1, 'array_chunk_pk_native_chunk_'.$tag);
+        $outIdxSlot = $context->builder->alloca($sizeT, 1, 'array_chunk_pk_native_out_'.$tag);
+        $context->builder->store($zero, $srcIdxSlot);
+        $context->builder->store($zero, $chunkCountSlot);
+        $context->builder->store($zero, $outIdxSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_chunk_pk_native_head_'.$tag);
+        $startChunk = BasicBlockHelper::append($context, 'array_chunk_pk_native_start_'.$tag);
+        $copyBlock = BasicBlockHelper::append($context, 'array_chunk_pk_native_copy_'.$tag);
+        $flushCheck = BasicBlockHelper::append($context, 'array_chunk_pk_native_flush_chk_'.$tag);
+        $flushBlock = BasicBlockHelper::append($context, 'array_chunk_pk_native_flush_'.$tag);
+        $advance = BasicBlockHelper::append($context, 'array_chunk_pk_native_advance_'.$tag);
+        $finalize = BasicBlockHelper::append($context, 'array_chunk_pk_native_finalize_'.$tag);
+        $finalizeFlush = BasicBlockHelper::append($context, 'array_chunk_pk_native_finalize_flush_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'array_chunk_pk_native_done_'.$tag);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $count);
+        $context->builder->branchIf($atEnd, $finalize, $startChunk);
+
+        $context->builder->positionAtEnd($startChunk);
+        $chunkCount = $context->builder->load($chunkCountSlot);
+        $needsChunk = $context->builder->icmp(Builder::INT_EQ, $chunkCount, $zero);
+        $newChunkBlock = BasicBlockHelper::append($context, 'array_chunk_pk_native_new_'.$tag);
+        $context->builder->branchIf($needsChunk, $newChunkBlock, $copyBlock);
+
+        $context->builder->positionAtEnd($newChunkBlock);
+        $newChunk = HashTableHelper::alloc($context);
+        $context->builder->store($newChunk, $chunkHtSlot);
+        $context->builder->branch($copyBlock);
+
+        $context->builder->positionAtEnd($copyBlock);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $chunkCount = $context->builder->load($chunkCountSlot);
+        $chunkHt = $context->builder->load($chunkHtSlot);
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $srcIdx);
+        if (Variable::TYPE_STRING === $elemType) {
+            $elem = new Variable($context, $elemType, Variable::KIND_VARIABLE, $slot);
+        } else {
+            $elem = new Variable(
+                $context,
+                $elemType,
+                Variable::KIND_VALUE,
+                $context->builder->load($slot)
+            );
+        }
+        HashTableHelper::setAtIndex($context, $chunkHt, $srcIdx, $elem);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($chunkCount, $one),
+            $chunkCountSlot
+        );
+        $context->builder->branch($flushCheck);
+
+        $context->builder->positionAtEnd($flushCheck);
+        $chunkCount = $context->builder->load($chunkCountSlot);
+        $shouldFlush = $context->builder->icmp(Builder::INT_SGE, $chunkCount, $chunkSize);
+        $context->builder->branchIf($shouldFlush, $flushBlock, $advance);
+
+        $context->builder->positionAtEnd($flushBlock);
+        $outIdx = $context->builder->load($outIdxSlot);
+        self::appendChunkHashtable($context, $out, $context->builder->load($chunkHtSlot), $outIdx);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($outIdx, $one),
+            $outIdxSlot
+        );
+        $context->builder->store($zero, $chunkCountSlot);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($context->builder->load($srcIdxSlot), $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($finalize);
+        $chunkCount = $context->builder->load($chunkCountSlot);
+        $hasPartial = $context->builder->icmp(Builder::INT_SGT, $chunkCount, $zero);
+        $context->builder->branchIf($hasPartial, $finalizeFlush, $doneBlock);
+
+        $context->builder->positionAtEnd($finalizeFlush);
+        $outIdx = $context->builder->load($outIdxSlot);
+        self::appendChunkHashtable($context, $out, $context->builder->load($chunkHtSlot), $outIdx);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $out;
+    }
+
+    private static function buildChunkPreserveKeysFromHashTable(Context $context, Value $src, Value $size): Value
+    {
+        $tag = 'acpk'.(string) ++self::$copyListEntrySeq;
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $chunkSize = $context->builder->truncOrBitCast($size, $sizeT);
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+
+        $out = HashTableHelper::alloc($context);
+        $chunkCountSlot = $context->builder->alloca($sizeT, 1, 'array_chunk_pk_count_'.$tag);
+        $chunkHtSlot = $context->builder->alloca($htPtr, 1, 'array_chunk_pk_chunk_'.$tag);
+        $outIdxSlot = $context->builder->alloca($sizeT, 1, 'array_chunk_pk_out_'.$tag);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_chunk_pk_src_'.$tag);
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_chunk_pk_walk_'.$tag);
+        $context->builder->store($zero, $chunkCountSlot);
+        $context->builder->store($zero, $outIdxSlot);
+        $context->builder->store($zero, $srcIdxSlot);
+
+        $flushChunkBlock = BasicBlockHelper::append($context, 'array_chunk_pk_flush_'.$tag);
+        $flushChunkContinue = BasicBlockHelper::append($context, 'array_chunk_pk_flush_cont_'.$tag);
+        $finalizeBlock = BasicBlockHelper::append($context, 'array_chunk_pk_finalize_'.$tag);
+        $finalizeFlushBlock = BasicBlockHelper::append($context, 'array_chunk_pk_finalize_flush_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'array_chunk_pk_done_'.$tag);
+
+        // Packed int keys (preserve original index).
+        $packedHead = BasicBlockHelper::append($context, 'array_chunk_pk_packed_head_'.$tag);
+        $packedCheck = BasicBlockHelper::append($context, 'array_chunk_pk_packed_check_'.$tag);
+        $packedSkip = BasicBlockHelper::append($context, 'array_chunk_pk_packed_skip_'.$tag);
+        $packedStart = BasicBlockHelper::append($context, 'array_chunk_pk_packed_start_'.$tag);
+        $packedNew = BasicBlockHelper::append($context, 'array_chunk_pk_packed_new_'.$tag);
+        $packedCopy = BasicBlockHelper::append($context, 'array_chunk_pk_packed_copy_'.$tag);
+        $packedFlushCheck = BasicBlockHelper::append($context, 'array_chunk_pk_packed_flush_chk_'.$tag);
+        $packedAdvance = BasicBlockHelper::append($context, 'array_chunk_pk_packed_advance_'.$tag);
+        $packedDone = BasicBlockHelper::append($context, 'array_chunk_pk_packed_done_'.$tag);
+        $context->builder->branch($packedHead);
+
+        $context->builder->positionAtEnd($packedHead);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $nextFree);
+        $context->builder->branchIf($atEnd, $packedDone, $packedCheck);
+
+        $context->builder->positionAtEnd($packedCheck);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $srcIdx
+        );
+        $context->builder->branchIf($isSet, $packedStart, $packedSkip);
+
+        $context->builder->positionAtEnd($packedSkip);
+        $context->builder->branch($packedAdvance);
+
+        $context->builder->positionAtEnd($packedStart);
+        $chunkCount = $context->builder->load($chunkCountSlot);
+        $needsChunk = $context->builder->icmp(Builder::INT_EQ, $chunkCount, $zero);
+        $context->builder->branchIf($needsChunk, $packedNew, $packedCopy);
+
+        $context->builder->positionAtEnd($packedNew);
+        $newChunk = HashTableHelper::alloc($context);
+        $context->builder->store($newChunk, $chunkHtSlot);
+        $context->builder->branch($packedCopy);
+
+        $context->builder->positionAtEnd($packedCopy);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $chunkHt = $context->builder->load($chunkHtSlot);
+        self::storeValueEntryAtIndex(
+            $context,
+            $chunkHt,
+            $srcIdx,
+            self::listEntryAt($context, $src, $srcIdx)
+        );
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($context->builder->load($chunkCountSlot), $one),
+            $chunkCountSlot
+        );
+        $context->builder->branch($packedFlushCheck);
+
+        $context->builder->positionAtEnd($packedFlushCheck);
+        $chunkCount = $context->builder->load($chunkCountSlot);
+        $shouldFlush = $context->builder->icmp(Builder::INT_SGE, $chunkCount, $chunkSize);
+        $context->builder->branchIf($shouldFlush, $flushChunkBlock, $packedAdvance);
+
+        $context->builder->positionAtEnd($flushChunkBlock);
+        $outIdx = $context->builder->load($outIdxSlot);
+        self::appendChunkHashtable($context, $out, $context->builder->load($chunkHtSlot), $outIdx);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($outIdx, $one),
+            $outIdxSlot
+        );
+        $context->builder->store($zero, $chunkCountSlot);
+        $context->builder->branch($flushChunkContinue);
+
+        $context->builder->positionAtEnd($flushChunkContinue);
+        $context->builder->branch($packedAdvance);
+
+        $context->builder->positionAtEnd($packedAdvance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($context->builder->load($srcIdxSlot), $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($packedHead);
+
+        // String keys (preserve original key).
+        $strInit = BasicBlockHelper::append($context, 'array_chunk_pk_str_init_'.$tag);
+        $strHead = BasicBlockHelper::append($context, 'array_chunk_pk_str_head_'.$tag);
+        $strBody = BasicBlockHelper::append($context, 'array_chunk_pk_str_body_'.$tag);
+        $strStart = BasicBlockHelper::append($context, 'array_chunk_pk_str_start_'.$tag);
+        $strNew = BasicBlockHelper::append($context, 'array_chunk_pk_str_new_'.$tag);
+        $strCopy = BasicBlockHelper::append($context, 'array_chunk_pk_str_copy_'.$tag);
+        $strFlushCheck = BasicBlockHelper::append($context, 'array_chunk_pk_str_flush_chk_'.$tag);
+        $strNext = BasicBlockHelper::append($context, 'array_chunk_pk_str_next_'.$tag);
+        $context->builder->positionAtEnd($packedDone);
+        $context->builder->branch($strInit);
+
+        $context->builder->positionAtEnd($strInit);
+        $head = $context->builder->load($context->builder->structGep($src, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $finalizeBlock, $strBody);
+
+        $context->builder->positionAtEnd($strBody);
+        $context->builder->branch($strStart);
+
+        $context->builder->positionAtEnd($strStart);
+        $chunkCount = $context->builder->load($chunkCountSlot);
+        $needsChunk = $context->builder->icmp(Builder::INT_EQ, $chunkCount, $zero);
+        $context->builder->branchIf($needsChunk, $strNew, $strCopy);
+
+        $context->builder->positionAtEnd($strNew);
+        $newChunk = HashTableHelper::alloc($context);
+        $context->builder->store($newChunk, $chunkHtSlot);
+        $context->builder->branch($strCopy);
+
+        $context->builder->positionAtEnd($strCopy);
+        $node = $context->builder->load($walkSlot);
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        self::storeValueEntryAtStringKey(
+            $context,
+            $context->builder->load($chunkHtSlot),
+            $keyStr,
+            $valEntry
+        );
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($context->builder->load($chunkCountSlot), $one),
+            $chunkCountSlot
+        );
+        $context->builder->branch($strFlushCheck);
+
+        $context->builder->positionAtEnd($strFlushCheck);
+        $chunkCount = $context->builder->load($chunkCountSlot);
+        $shouldFlush = $context->builder->icmp(Builder::INT_SGE, $chunkCount, $chunkSize);
+        $strFlushBlock = BasicBlockHelper::append($context, 'array_chunk_pk_str_flush_'.$tag);
+        $context->builder->branchIf($shouldFlush, $strFlushBlock, $strNext);
+
+        $context->builder->positionAtEnd($strFlushBlock);
+        $outIdx = $context->builder->load($outIdxSlot);
+        self::appendChunkHashtable($context, $out, $context->builder->load($chunkHtSlot), $outIdx);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($outIdx, $one),
+            $outIdxSlot
+        );
+        $context->builder->store($zero, $chunkCountSlot);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strNext);
+        $node = $context->builder->load($walkSlot);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($finalizeBlock);
+        $chunkCount = $context->builder->load($chunkCountSlot);
+        $hasPartial = $context->builder->icmp(Builder::INT_SGT, $chunkCount, $zero);
+        $context->builder->branchIf($hasPartial, $finalizeFlushBlock, $doneBlock);
+
+        $context->builder->positionAtEnd($finalizeFlushBlock);
         $outIdx = $context->builder->load($outIdxSlot);
         self::appendChunkHashtable($context, $out, $context->builder->load($chunkHtSlot), $outIdx);
         $context->builder->branch($doneBlock);
@@ -3407,6 +3810,132 @@ final class ArrayBuiltinHelper
             $context->builder->addNoSignedWrap($destIdx, $one),
             $destIdxSlot
         );
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($srcIdx, $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
+    private static function buildColumnWithIndexFromHashTable(
+        Context $context,
+        Value $src,
+        Value $columnKeyStr,
+        Value $indexKeyStr
+    ): Value {
+        $tag = (string) ++self::$copyListEntrySeq;
+        $map = $context->structFieldMap['__hashtable__'];
+        $valueMap = $context->structFieldMap['__value__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_column_idx_empty_'.$tag);
+        $workBlock = BasicBlockHelper::append($context, 'array_column_idx_work_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'array_column_idx_done_'.$tag);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_column_idx_src');
+        $context->builder->store($zero, $srcIdxSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_column_idx_head_'.$tag);
+        $check = BasicBlockHelper::append($context, 'array_column_idx_check_'.$tag);
+        $copyBlock = BasicBlockHelper::append($context, 'array_column_idx_copy_'.$tag);
+        $skip = BasicBlockHelper::append($context, 'array_column_idx_skip_'.$tag);
+        $rowHtBlock = BasicBlockHelper::append($context, 'array_column_idx_row_ht_'.$tag);
+        $rowSkip = BasicBlockHelper::append($context, 'array_column_idx_row_skip_'.$tag);
+        $indexCheck = BasicBlockHelper::append($context, 'array_column_idx_index_check_'.$tag);
+        $columnCheck = BasicBlockHelper::append($context, 'array_column_idx_column_check_'.$tag);
+        $storeBlock = BasicBlockHelper::append($context, 'array_column_idx_store_'.$tag);
+        $advance = BasicBlockHelper::append($context, 'array_column_idx_advance_'.$tag);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBlock, $check);
+
+        $context->builder->positionAtEnd($check);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $srcIdx
+        );
+        $context->builder->branchIf($isSet, $copyBlock, $skip);
+
+        $context->builder->positionAtEnd($copyBlock);
+        $rowEntry = self::listEntryAt($context, $src, $srcIdx);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($rowEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isHt, $rowHtBlock, $rowSkip);
+
+        $context->builder->positionAtEnd($rowHtBlock);
+        $rowHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $rowEntry
+        );
+        $indexIsSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+            $rowHt,
+            $indexKeyStr
+        );
+        $context->builder->branchIf($indexIsSet, $indexCheck, $rowSkip);
+
+        $context->builder->positionAtEnd($indexCheck);
+        $columnIsSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+            $rowHt,
+            $columnKeyStr
+        );
+        $context->builder->branchIf($columnIsSet, $columnCheck, $rowSkip);
+
+        $context->builder->positionAtEnd($columnCheck);
+        $indexEntry = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringKeyValue'),
+            $rowHt,
+            $indexKeyStr
+        );
+        $columnEntry = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringKeyValue'),
+            $rowHt,
+            $columnKeyStr
+        );
+        $context->builder->branch($storeBlock);
+
+        $context->builder->positionAtEnd($storeBlock);
+        self::storeCombinedEntry($context, $dest, $indexEntry, $columnEntry);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($rowSkip);
         $context->builder->branch($advance);
 
         $context->builder->positionAtEnd($skip);
@@ -3876,29 +4405,29 @@ final class ArrayBuiltinHelper
         }
 
         $i1 = $context->getTypeFromString('int1');
-        $allListsSlot = $context->builder->alloca($i1, 1, 'array_merge_all_lists');
-        $context->builder->store($context->constantFromBool(true), $allListsSlot);
+        $allReindexableSlot = $context->builder->alloca($i1, 1, 'array_merge_all_reindexable');
+        $context->builder->store($context->constantFromBool(true), $allReindexableSlot);
 
         $hts = [];
         foreach ($arrays as $array) {
             $ht = self::loadHashTable($context, $array);
             $hts[] = $ht;
-            $isList = \PHPCompiler\ext\standard\JitArrayIsList::hashTableIsList($context, $ht);
+            $isReindexable = \PHPCompiler\ext\standard\JitArrayIsList::hashTableIsReindexableList($context, $ht);
             $context->builder->store(
-                $context->builder->and($context->builder->load($allListsSlot), $isList),
-                $allListsSlot
+                $context->builder->and($context->builder->load($allReindexableSlot), $isReindexable),
+                $allReindexableSlot
             );
         }
 
         $listBb = BasicBlockHelper::append($context, 'array_merge_list');
         $assocBb = BasicBlockHelper::append($context, 'array_merge_assoc');
         $mergeDone = BasicBlockHelper::append($context, 'array_merge_done');
-        $context->builder->branchIf($context->builder->load($allListsSlot), $listBb, $assocBb);
+        $context->builder->branchIf($context->builder->load($allReindexableSlot), $listBb, $assocBb);
 
         $context->builder->positionAtEnd($listBb);
         $listResult = HashTableHelper::alloc($context);
         foreach ($hts as $ht) {
-            self::copyInto($context, $listResult, $ht);
+            self::copyReindexableInto($context, $listResult, $ht);
         }
         $listEndBb = $context->builder->getInsertBlock();
         $context->builder->branch($mergeDone);
@@ -3919,6 +4448,37 @@ final class ArrayBuiltinHelper
         $phi->addIncoming($assocResult, $assocEndBb);
 
         return $phi;
+    }
+
+    /**
+     * array_merge_recursive() — deep merge with scalar→array promotion (#3297).
+     */
+    public static function mergeRecursive(Context $context, Variable ...$arrays): Value
+    {
+        if (\count($arrays) < 2) {
+            throw new \LogicException('array_merge_recursive() requires at least two arguments');
+        }
+
+        $allReindexable = true;
+        $hts = [];
+        foreach ($arrays as $array) {
+            $ht = self::loadHashTable($context, $array);
+            $hts[] = $ht;
+            if (!\PHPCompiler\ext\standard\JitArrayIsList::hashTableIsReindexableList($context, $ht)) {
+                $allReindexable = false;
+            }
+        }
+        if ($allReindexable) {
+            return self::merge($context, ...$arrays);
+        }
+
+        $result = HashTableHelper::alloc($context);
+        self::overlayHashTable($context, $result, $hts[0]);
+        for ($i = 1, $n = \count($hts); $i < $n; ++$i) {
+            \PHPCompiler\ext\standard\JitArrayMergeRecursive::overlay($context, $result, $hts[$i]);
+        }
+
+        return $result;
     }
 
     /**
@@ -3974,15 +4534,66 @@ final class ArrayBuiltinHelper
      */
     public static function combine(Context $context, Variable $keys, Variable $values): Value
     {
-        if (self::isNativeArray($keys->type) && self::isNativeArray($values->type)) {
-            return self::combineNativeArrays($context, $keys, $values);
-        }
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $resultSlot = JitValueBox::alloc($context);
+        $resultPtr = JitValueBox::pointer($context, $resultSlot);
+        JitValueBox::writeBool($context, $resultSlot, $context->constantFromBool(false));
 
-        return self::combineHashTables(
+        // Count operands before materializeNativeArrayForCall (same as array_count(); #4353).
+        $keysNum = self::packedListElementCount($context, $keys);
+        $valsNum = self::packedListElementCount($context, $values);
+        $keysEmpty = $context->builder->icmp(Builder::INT_EQ, $keysNum, $zero);
+        $valsEmpty = $context->builder->icmp(Builder::INT_EQ, $valsNum, $zero);
+        $eitherEmpty = $context->builder->or($keysEmpty, $valsEmpty);
+        $lengthMismatch = $context->builder->icmp(Builder::INT_NE, $keysNum, $valsNum);
+        $returnFalse = $context->builder->or($eitherEmpty, $lengthMismatch);
+
+        $exitBlock = BasicBlockHelper::append($context, 'array_combine_exit');
+        $falseBlock = BasicBlockHelper::append($context, 'array_combine_false');
+        $workBlock = BasicBlockHelper::append($context, 'array_combine_work');
+        $context->builder->branchIf($returnFalse, $falseBlock, $workBlock);
+
+        $context->builder->positionAtEnd($falseBlock);
+        $context->builder->branch($exitBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+
+        self::combineHashTablesInto(
             $context,
             self::loadHashTable($context, $keys),
-            self::loadHashTable($context, $values)
+            self::loadHashTable($context, $values),
+            $resultPtr,
+            $exitBlock
         );
+
+        $context->builder->positionAtEnd($exitBlock);
+
+        return $resultPtr;
+    }
+
+    /**
+     * Packed list length for array_combine() guards (mirrors ext/standard/array_count.php).
+     */
+    private static function packedListElementCount(Context $context, Variable $array): Value
+    {
+        if (0 !== ($array->type & Variable::IS_NATIVE_ARRAY)) {
+            return $context->constantFromInteger($array->nextFreeElement, 'size_t');
+        }
+        if (Variable::TYPE_HASHTABLE === $array->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__getNumElements'),
+                self::loadHashTable($context, $array)
+            );
+        }
+        if (Variable::TYPE_VALUE === $array->type || JitValueBox::isValueOperand($array)) {
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__getNumElements'),
+                self::loadHashTable($context, $array)
+            );
+        }
+
+        throw new \LogicException('array_combine() packedListElementCount: unsupported array operand type');
     }
 
     /**
@@ -4292,36 +4903,20 @@ final class ArrayBuiltinHelper
         return $ptr;
     }
 
-    private static function combineHashTables(Context $context, Value $keysHt, Value $valsHt): Value
-    {
+    private static function combineHashTablesInto(
+        Context $context,
+        Value $keysHt,
+        Value $valsHt,
+        Value $resultPtr,
+        \PHPLLVM\BasicBlock $doneBlock
+    ): void {
         $sizeT = $context->getTypeFromString('size_t');
-        $i1 = $context->getTypeFromString('int1');
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
         $keysNum = $context->builder->call(
             $context->lookupFunction('__hashtable__getNumElements'),
             $keysHt
         );
-        $valsNum = $context->builder->call(
-            $context->lookupFunction('__hashtable__getNumElements'),
-            $valsHt
-        );
-        $lengthMismatch = $context->builder->icmp(Builder::INT_NE, $keysNum, $valsNum);
-
-        $failSlot = JitValueBox::alloc($context);
-        $failPtr = JitValueBox::pointer($context, $failSlot);
-        $okSlot = JitValueBox::alloc($context);
-        $okPtr = JitValueBox::pointer($context, $okSlot);
-        $failBlock = BasicBlockHelper::append($context, 'array_combine_fail');
-        $workBlock = BasicBlockHelper::append($context, 'array_combine_work');
-        $mergeBlock = BasicBlockHelper::append($context, 'array_combine_merge');
-        $context->builder->branchIf($lengthMismatch, $failBlock, $workBlock);
-
-        $context->builder->positionAtEnd($failBlock);
-        JitValueBox::writeBool($context, $failSlot, $i1->constInt(0, false));
-        $context->builder->branch($mergeBlock);
-
-        $context->builder->positionAtEnd($workBlock);
         $dest = HashTableHelper::alloc($context);
         $idxSlot = $context->builder->alloca($sizeT, 1, 'array_combine_idx');
         $context->builder->store($zero, $idxSlot);
@@ -4352,17 +4947,10 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($loopDone);
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
-            $okPtr,
+            $resultPtr,
             $dest
         );
-        $context->builder->branch($mergeBlock);
-
-        $context->builder->positionAtEnd($mergeBlock);
-        $phi = $context->builder->phi($failPtr->typeOf());
-        $phi->addIncoming($failPtr, $failBlock);
-        $phi->addIncoming($okPtr, $loopDone);
-
-        return $phi;
+        $context->builder->branch($doneBlock);
     }
 
     private static function combineNativeArrays(Context $context, Variable $keys, Variable $values): Value
@@ -4378,7 +4966,11 @@ final class ArrayBuiltinHelper
         $one = $sizeT->constInt(1, false);
         $keysCount = $context->constantFromInteger($keys->nextFreeElement, 'size_t');
         $valsCount = $context->constantFromInteger($values->nextFreeElement, 'size_t');
+        $keysEmpty = $context->builder->icmp(Builder::INT_EQ, $keysCount, $zero);
+        $valsEmpty = $context->builder->icmp(Builder::INT_EQ, $valsCount, $zero);
+        $eitherEmpty = $context->builder->or($keysEmpty, $valsEmpty);
         $lengthMismatch = $context->builder->icmp(Builder::INT_NE, $keysCount, $valsCount);
+        $returnFalse = $context->builder->or($eitherEmpty, $lengthMismatch);
 
         $failSlot = JitValueBox::alloc($context);
         $failPtr = JitValueBox::pointer($context, $failSlot);
@@ -4387,10 +4979,10 @@ final class ArrayBuiltinHelper
         $failBlock = BasicBlockHelper::append($context, 'array_combine_native_fail');
         $workBlock = BasicBlockHelper::append($context, 'array_combine_native_work');
         $mergeBlock = BasicBlockHelper::append($context, 'array_combine_native_merge');
-        $context->builder->branchIf($lengthMismatch, $failBlock, $workBlock);
+        $context->builder->branchIf($returnFalse, $failBlock, $workBlock);
 
         $context->builder->positionAtEnd($failBlock);
-        JitValueBox::writeBool($context, $failSlot, $i1->constInt(0, false));
+        JitValueBox::writeBool($context, $failSlot, $context->constantFromBool(false));
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($workBlock);
@@ -4937,7 +5529,9 @@ final class ArrayBuiltinHelper
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($afterLong);
-        $context->builder->branchIf($isBool, $boolBlock, $done);
+        $afterBool = BasicBlockHelper::append($context, 'array_combine_sval_after_bool');
+        $htBlock = BasicBlockHelper::append($context, 'array_combine_sval_ht');
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
 
         $context->builder->positionAtEnd($boolBlock);
         $context->builder->call(
@@ -4951,13 +5545,40 @@ final class ArrayBuiltinHelper
         );
         $context->builder->branch($done);
 
+        $context->builder->positionAtEnd($afterBool);
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isHt, $htBlock, $done);
+
+        $context->builder->positionAtEnd($htBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyHashtable'),
+            $dest,
+            $keyStr,
+            $context->builder->call($context->lookupFunction('__value__readHashtable'), $valEntry)
+        );
+        $context->builder->branch($done);
+
         $context->builder->positionAtEnd($done);
     }
 
     public static function copyInto(Context $context, Value $dest, Value $src): void
     {
+        self::copyReindexableInto($context, $dest, $src);
+    }
+
+    /**
+     * Append values from a packed list or numeric-string-key list (#3607).
+     */
+    public static function copyReindexableInto(Context $context, Value $dest, Value $src): void
+    {
         $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
         $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
         $idxSlot = $context->builder->alloca($sizeT, 1, 'merge_idx');
         $context->builder->store($zero, $idxSlot);
         $num = $context->builder->call(
@@ -4968,6 +5589,9 @@ final class ArrayBuiltinHelper
         $done = BasicBlockHelper::append($context, 'merge_copy_done');
         $head = BasicBlockHelper::append($context, 'merge_copy_head');
         $body = BasicBlockHelper::append($context, 'merge_copy_body');
+        $bodyInt = BasicBlockHelper::append($context, 'merge_copy_body_int');
+        $bodyStr = BasicBlockHelper::append($context, 'merge_copy_body_str');
+        $bodyStore = BasicBlockHelper::append($context, 'merge_copy_body_store');
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($head);
@@ -4976,11 +5600,35 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
+        $presentInt = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $idx
+        );
+        $context->builder->branchIf($presentInt, $bodyInt, $bodyStr);
+
+        $context->builder->positionAtEnd($bodyInt);
+        $srcEntryInt = self::listEntryAt($context, $src, $idx);
+        $context->builder->branch($bodyStore);
+
+        $context->builder->positionAtEnd($bodyStr);
+        $idxI64 = $context->builder->zExt($idx, $i64);
+        $keyStr = \PHPCompiler\JIT\JitNativeString::formatIndexKey($context, $idxI64);
+        $srcEntryStr = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringKeyValue'),
+            $src,
+            $keyStr
+        );
+        $context->builder->branch($bodyStore);
+
+        $context->builder->positionAtEnd($bodyStore);
+        $srcEntry = $context->builder->phi($srcEntryInt->typeOf());
+        $srcEntry->addIncoming($srcEntryInt, $bodyInt);
+        $srcEntry->addIncoming($srcEntryStr, $bodyStr);
         $destMap = $context->structFieldMap['__hashtable__'];
         $destNextPtr = $context->builder->structGep($dest, $destMap['nextFreeElement']);
         $destIdx = $context->builder->load($destNextPtr);
-        self::copyPackedListEntry($context, $src, $idx, $dest, $destIdx);
-        $one = $sizeT->constInt(1, false);
+        self::copyPackedValueEntry($context, $srcEntry, $dest, $destIdx);
         $context->builder->store(
             $context->builder->addNoSignedWrap($idx, $one),
             $idxSlot
@@ -5609,27 +6257,10 @@ final class ArrayBuiltinHelper
 
     private static function looseEqualStringLong(Context $context, Variable $str, Variable $long): Value
     {
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $numBuf = $context->builder->alloca($context->getTypeFromString('int8'), $i64->constInt(32, false), 'loose_strlong_buf');
-        $num = $context->helper->loadValue($long);
-        $bufC = $context->builder->pointerCast($numBuf, $i8p);
-        $fmt = $context->builder->pointerCast($context->constantFromString('%lld'), $i8p);
-        $context->builder->call($context->lookupFunction('sprintf'), $bufC, $fmt, $num);
-        $len = $context->builder->call($context->lookupFunction('strlen'), $bufC);
-        $lenI64 = $len->typeOf() === $i64
-            ? $len
-            : $context->builder->zExt($len, $i64);
-        $numStr = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $lenI64,
-            $bufC
-        );
-
-        return JitStringCompare::identical(
+        return JitValueCompare::looseEqualStringToNativeLong(
             $context,
             $context->helper->loadValue($str),
-            $numStr
+            $context->helper->loadValue($long)
         );
     }
 
@@ -5901,6 +6532,326 @@ final class ArrayBuiltinHelper
     }
 
     /**
+     * True when __string__* is fully consumed by base-10 strtol (integer numeric string; #3619).
+     */
+    private static function stringPtrIsIntegerNumeric(Context $context, Value $strPtr): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $len = $context->builder->load(
+            $context->builder->structGep($strPtr, $map['length'])
+        );
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $endPtrSlot = $context->builder->alloca($i8p, 1, 'array_sum_str_long_end');
+        $nullEnd = $i8p->constNull();
+        $context->builder->store($nullEnd, $endPtrSlot);
+        $context->builder->call(
+            $context->lookupFunction('strtol'),
+            $charPtr,
+            $endPtrSlot,
+            $context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $endPtr = $context->builder->load($endPtrSlot);
+        $endOffset = $context->builder->sub(
+            $context->builder->ptrToInt($endPtr, $i64),
+            $context->builder->ptrToInt($charPtr, $i64)
+        );
+
+        return $context->builder->icmp(Builder::INT_EQ, $endOffset, $len);
+    }
+
+    /**
+     * True when __string__* is fully consumed by strtod (float numeric string; #4262).
+     */
+    private static function stringPtrIsDoubleNumeric(Context $context, Value $strPtr): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $len = $context->builder->load(
+            $context->builder->structGep($strPtr, $map['length'])
+        );
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $endPtrSlot = $context->builder->alloca($i8p, 1, 'array_product_str_double_end');
+        $context->builder->store($i8p->constNull(), $endPtrSlot);
+        $context->builder->call(
+            $context->lookupFunction('strtod'),
+            $charPtr,
+            $endPtrSlot
+        );
+        $endPtr = $context->builder->load($endPtrSlot);
+        $endOffset = $context->builder->sub(
+            $context->builder->ptrToInt($endPtr, $i64),
+            $context->builder->ptrToInt($charPtr, $i64)
+        );
+
+        return $context->builder->icmp(Builder::INT_EQ, $endOffset, $len);
+    }
+
+    /** True when __string__* is a Zend numeric string (int or float form; #4262). */
+    private static function stringPtrIsNumericString(Context $context, Value $strPtr): Value
+    {
+        $isIntNumeric = self::stringPtrIsIntegerNumeric($context, $strPtr);
+        $isDoubleNumeric = self::stringPtrIsDoubleNumeric($context, $strPtr);
+
+        return $context->builder->or($isIntNumeric, $isDoubleNumeric);
+    }
+
+    private static function arrayProductEmitInvalidElementType(Context $context): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, self::ARRAY_PRODUCT_ELEMENT_TYPE_ERROR);
+        $context->builder->call($context->lookupFunction('abort'));
+    }
+
+    private static function stringPtrToDouble(Context $context, Value $strPtr): Value
+    {
+        $structName = $strPtr->typeOf()->getElementType()->getName();
+        $map = $context->structFieldMap[$structName];
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $endPtr = $context->getTypeFromString('int8**')->constNull();
+
+        return $context->builder->call($context->lookupFunction('strtod'), $charPtr, $endPtr);
+    }
+
+    /**
+     * Emit LLVM to accumulate a __string__* element into array_sum slots (#3619).
+     */
+    private static function arraySumAccumulateStringPtr(
+        Context $context,
+        Value $strPtr,
+        Value $sumIntSlot,
+        Value $sumFloatSlot,
+        Value $useFloatSlot,
+        string $tag
+    ): void {
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        $i1 = $context->getTypeFromString('int1');
+
+        $isIntNumeric = self::stringPtrIsIntegerNumeric($context, $strPtr);
+        $intBlock = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_str_int');
+        $floatBlock = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_str_float');
+        $strDone = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_str_done');
+        $context->builder->branchIf($isIntNumeric, $intBlock, $floatBlock);
+
+        $context->builder->positionAtEnd($intBlock);
+        $charPtr = $context->builder->structGep(
+            $strPtr,
+            $context->structFieldMap['__string__']['value']
+        );
+        $endPtrSlot = $context->builder->alloca(
+            $context->getTypeFromString('int8*'),
+            1,
+            'array_sum_'.$tag.'_strtol_end'
+        );
+        $context->builder->store($context->getTypeFromString('int8*')->constNull(), $endPtrSlot);
+        $longVal = $context->builder->call(
+            $context->lookupFunction('strtol'),
+            $charPtr,
+            $endPtrSlot,
+            $context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $useFloat = $context->builder->load($useFloatSlot);
+        $intAsFloat = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_str_int_f');
+        $intAsInt = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_str_int_i');
+        $intPathDone = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_str_int_done');
+        $context->builder->branchIf($useFloat, $intAsFloat, $intAsInt);
+
+        $context->builder->positionAtEnd($intAsInt);
+        $sumInt = $context->builder->load($sumIntSlot);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($sumInt, $longVal),
+            $sumIntSlot
+        );
+        $context->builder->branch($intPathDone);
+
+        $context->builder->positionAtEnd($intAsFloat);
+        $sumFloat = $context->builder->load($sumFloatSlot);
+        $context->builder->store(
+            $context->builder->fadd($sumFloat, $context->builder->sitofp($longVal, $double)),
+            $sumFloatSlot
+        );
+        $context->builder->branch($intPathDone);
+
+        $context->builder->positionAtEnd($intPathDone);
+        $context->builder->branch($strDone);
+
+        $context->builder->positionAtEnd($floatBlock);
+        $doubleVal = self::stringPtrToDouble($context, $strPtr);
+        $useFloatNow = $context->builder->load($useFloatSlot);
+        $promoteBlock = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_str_promote');
+        $addFloatBlock = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_str_add_float');
+        $floatPathDone = BasicBlockHelper::append($context, 'array_sum_'.$tag.'_str_float_done');
+        $context->builder->branchIf($useFloatNow, $addFloatBlock, $promoteBlock);
+
+        $context->builder->positionAtEnd($promoteBlock);
+        $sumInt = $context->builder->load($sumIntSlot);
+        $context->builder->store(
+            $context->builder->fadd($context->builder->sitofp($sumInt, $double), $doubleVal),
+            $sumFloatSlot
+        );
+        $context->builder->store($i1->constInt(1, false), $useFloatSlot);
+        $context->builder->branch($floatPathDone);
+
+        $context->builder->positionAtEnd($addFloatBlock);
+        $sumFloat = $context->builder->load($sumFloatSlot);
+        $context->builder->store($context->builder->fadd($sumFloat, $doubleVal), $sumFloatSlot);
+        $context->builder->branch($floatPathDone);
+
+        $context->builder->positionAtEnd($floatPathDone);
+        $context->builder->branch($strDone);
+
+        $context->builder->positionAtEnd($strDone);
+    }
+
+    /**
+     * Emit LLVM to accumulate a string __value__* element into array_sum slots (#3619).
+     */
+    private static function arraySumAccumulateStringEntry(
+        Context $context,
+        Value $entry,
+        Value $sumIntSlot,
+        Value $sumFloatSlot,
+        Value $useFloatSlot,
+        string $tag
+    ): void {
+        $strPtr = $context->builder->call($context->lookupFunction('__value__readString'), $entry);
+        self::arraySumAccumulateStringPtr(
+            $context,
+            $strPtr,
+            $sumIntSlot,
+            $sumFloatSlot,
+            $useFloatSlot,
+            $tag
+        );
+    }
+
+    /**
+     * Emit LLVM to accumulate a __string__* element into array_product slots (#3619).
+     */
+    private static function arrayProductAccumulateStringPtr(
+        Context $context,
+        Value $strPtr,
+        Value $prodIntSlot,
+        Value $prodFloatSlot,
+        Value $useFloatSlot,
+        string $tag
+    ): void {
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        $i1 = $context->getTypeFromString('int1');
+
+        $isNumeric = self::stringPtrIsNumericString($context, $strPtr);
+        $validBlock = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_valid');
+        $invalidBlock = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_invalid');
+        $strDone = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_done');
+        $context->builder->branchIf($isNumeric, $validBlock, $invalidBlock);
+
+        $context->builder->positionAtEnd($invalidBlock);
+        self::arrayProductEmitInvalidElementType($context);
+
+        $context->builder->positionAtEnd($validBlock);
+        $isIntNumeric = self::stringPtrIsIntegerNumeric($context, $strPtr);
+        $intBlock = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_int');
+        $floatBlock = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_float');
+        $context->builder->branchIf($isIntNumeric, $intBlock, $floatBlock);
+
+        $context->builder->positionAtEnd($intBlock);
+        $charPtr = $context->builder->structGep(
+            $strPtr,
+            $context->structFieldMap['__string__']['value']
+        );
+        $endPtrSlot = $context->builder->alloca(
+            $context->getTypeFromString('int8*'),
+            1,
+            'array_product_'.$tag.'_strtol_end'
+        );
+        $context->builder->store($context->getTypeFromString('int8*')->constNull(), $endPtrSlot);
+        $longVal = $context->builder->call(
+            $context->lookupFunction('strtol'),
+            $charPtr,
+            $endPtrSlot,
+            $context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $useFloat = $context->builder->load($useFloatSlot);
+        $intAsFloat = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_int_f');
+        $intAsInt = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_int_i');
+        $intPathDone = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_int_done');
+        $context->builder->branchIf($useFloat, $intAsFloat, $intAsInt);
+
+        $context->builder->positionAtEnd($intAsInt);
+        $prodInt = $context->builder->load($prodIntSlot);
+        $context->builder->store(
+            $context->builder->mulNoSignedWrap($prodInt, $longVal),
+            $prodIntSlot
+        );
+        $context->builder->branch($intPathDone);
+
+        $context->builder->positionAtEnd($intAsFloat);
+        $prodFloat = $context->builder->load($prodFloatSlot);
+        $context->builder->store(
+            $context->builder->fmul($prodFloat, $context->builder->sitofp($longVal, $double)),
+            $prodFloatSlot
+        );
+        $context->builder->branch($intPathDone);
+
+        $context->builder->positionAtEnd($intPathDone);
+        $context->builder->branch($strDone);
+
+        $context->builder->positionAtEnd($floatBlock);
+        $doubleVal = self::stringPtrToDouble($context, $strPtr);
+        $useFloatNow = $context->builder->load($useFloatSlot);
+        $promoteBlock = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_promote');
+        $addFloatBlock = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_add_float');
+        $floatPathDone = BasicBlockHelper::append($context, 'array_product_'.$tag.'_str_float_done');
+        $context->builder->branchIf($useFloatNow, $addFloatBlock, $promoteBlock);
+
+        $context->builder->positionAtEnd($promoteBlock);
+        $prodInt = $context->builder->load($prodIntSlot);
+        $context->builder->store(
+            $context->builder->fmul($context->builder->sitofp($prodInt, $double), $doubleVal),
+            $prodFloatSlot
+        );
+        $context->builder->store($i1->constInt(1, false), $useFloatSlot);
+        $context->builder->branch($floatPathDone);
+
+        $context->builder->positionAtEnd($addFloatBlock);
+        $prodFloat = $context->builder->load($prodFloatSlot);
+        $context->builder->store($context->builder->fmul($prodFloat, $doubleVal), $prodFloatSlot);
+        $context->builder->branch($floatPathDone);
+
+        $context->builder->positionAtEnd($floatPathDone);
+        $context->builder->branch($strDone);
+
+        $context->builder->positionAtEnd($strDone);
+    }
+
+    /**
+     * Emit LLVM to accumulate a string __value__* element into array_product slots (#3619).
+     */
+    private static function arrayProductAccumulateStringEntry(
+        Context $context,
+        Value $entry,
+        Value $prodIntSlot,
+        Value $prodFloatSlot,
+        Value $useFloatSlot,
+        string $tag
+    ): void {
+        $strPtr = $context->builder->call($context->lookupFunction('__value__readString'), $entry);
+        self::arrayProductAccumulateStringPtr(
+            $context,
+            $strPtr,
+            $prodIntSlot,
+            $prodFloatSlot,
+            $useFloatSlot,
+            $tag
+        );
+    }
+
+    /**
      * array_sum() for packed lists (integers and floats; subset of PHP).
      */
     public static function arraySum(Context $context, Variable $array): Value
@@ -5955,6 +6906,10 @@ final class ArrayBuiltinHelper
 
         if (Variable::TYPE_VALUE === $elemType) {
             return self::arraySumNativeValue($context, $array);
+        }
+
+        if (Variable::TYPE_STRING === $elemType) {
+            return self::arraySumNativeString($context, $array);
         }
 
         if (Variable::TYPE_NATIVE_LONG !== $elemType) {
@@ -6023,6 +6978,8 @@ final class ArrayBuiltinHelper
         $afterLong = BasicBlockHelper::append($context, 'array_sum_ht_after_long');
         $longBlock = BasicBlockHelper::append($context, 'array_sum_ht_long');
         $doubleBlock = BasicBlockHelper::append($context, 'array_sum_ht_double');
+        $afterDouble = BasicBlockHelper::append($context, 'array_sum_ht_after_double');
+        $stringBlock = BasicBlockHelper::append($context, 'array_sum_ht_string');
         $continueBlock = BasicBlockHelper::append($context, 'array_sum_ht_continue');
         $doneBlock = BasicBlockHelper::append($context, 'array_sum_ht_done');
 
@@ -6053,7 +7010,26 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isLong, $longBlock, $afterLong);
 
         $context->builder->positionAtEnd($afterLong);
-        $context->builder->branchIf($isDouble, $doubleBlock, $continueBlock);
+        $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $continueBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
+        self::arraySumAccumulateStringEntry(
+            $context,
+            $entry,
+            $sumIntSlot,
+            $sumFloatSlot,
+            $useFloatSlot,
+            'ht'
+        );
+        $context->builder->branch($continueBlock);
 
         $context->builder->positionAtEnd($longBlock);
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
@@ -6154,6 +7130,8 @@ final class ArrayBuiltinHelper
         $afterLong = BasicBlockHelper::append($context, 'array_sum_nv_after_long');
         $longBlock = BasicBlockHelper::append($context, 'array_sum_nv_long');
         $doubleBlock = BasicBlockHelper::append($context, 'array_sum_nv_double');
+        $afterDouble = BasicBlockHelper::append($context, 'array_sum_nv_after_double');
+        $stringBlock = BasicBlockHelper::append($context, 'array_sum_nv_string');
         $continueBlock = BasicBlockHelper::append($context, 'array_sum_nv_continue');
         $doneBlock = BasicBlockHelper::append($context, 'array_sum_nv_done');
         $context->builder->branch($head);
@@ -6181,7 +7159,26 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isLong, $longBlock, $afterLong);
 
         $context->builder->positionAtEnd($afterLong);
-        $context->builder->branchIf($isDouble, $doubleBlock, $continueBlock);
+        $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $continueBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
+        self::arraySumAccumulateStringEntry(
+            $context,
+            $entry,
+            $sumIntSlot,
+            $sumFloatSlot,
+            $useFloatSlot,
+            'nv'
+        );
+        $context->builder->branch($continueBlock);
 
         $context->builder->positionAtEnd($longBlock);
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
@@ -6250,6 +7247,75 @@ final class ArrayBuiltinHelper
             $context->builder->siToFp($sumInt, $double)
         );
     }
+
+    /** Native packed __string__* list (compile-time string literals; #3619). */
+    private static function arraySumNativeString(Context $context, Variable $array): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        $i1 = $context->getTypeFromString('int1');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+
+        $sumIntSlot = $context->builder->alloca($i64, 1, 'array_sum_ns_int');
+        $sumFloatSlot = $context->builder->alloca($double, 1, 'array_sum_ns_float');
+        $useFloatSlot = $context->builder->alloca($i1, 1, 'array_sum_ns_use_float');
+        $context->builder->store($i64->constInt(0, false), $sumIntSlot);
+        $context->builder->store($double->constReal(0.0), $sumFloatSlot);
+        $context->builder->store($i1->constInt(0, false), $useFloatSlot);
+
+        if (0 === $array->nextFreeElement) {
+            return $context->builder->load($sumIntSlot);
+        }
+
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_sum_ns_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_sum_ns_head');
+        $body = BasicBlockHelper::append($context, 'array_sum_ns_body');
+        $accumulate = BasicBlockHelper::append($context, 'array_sum_ns_accumulate');
+        $continueBlock = BasicBlockHelper::append($context, 'array_sum_ns_continue');
+        $doneBlock = BasicBlockHelper::append($context, 'array_sum_ns_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $doneBlock, $body);
+
+        $context->builder->positionAtEnd($body);
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
+        $strPtr = $context->builder->load($slot);
+        $context->builder->branch($accumulate);
+
+        $context->builder->positionAtEnd($accumulate);
+        self::arraySumAccumulateStringPtr(
+            $context,
+            $strPtr,
+            $sumIntSlot,
+            $sumFloatSlot,
+            $useFloatSlot,
+            'ns'
+        );
+        $context->builder->branch($continueBlock);
+
+        $context->builder->positionAtEnd($continueBlock);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $useFloat = $context->builder->load($useFloatSlot);
+        $sumInt = $context->builder->load($sumIntSlot);
+        $sumFloat = $context->builder->load($sumFloatSlot);
+
+        return $context->builder->select(
+            $useFloat,
+            $sumFloat,
+            $context->builder->siToFp($sumInt, $double)
+        );
+    }
+
     /**
      * array_product() for packed lists (integers and floats; subset of PHP).
      */
@@ -6307,10 +7373,12 @@ final class ArrayBuiltinHelper
             return self::arrayProductNativeValue($context, $array);
         }
 
+        if (Variable::TYPE_STRING === $elemType) {
+            return self::arrayProductNativeString($context, $array);
+        }
+
         if (Variable::TYPE_NATIVE_LONG !== $elemType) {
-            throw new \LogicException(
-                'array_product() only supports integer and float elements in this compiler build'
-            );
+            throw new \TypeError(self::ARRAY_PRODUCT_ELEMENT_TYPE_ERROR);
         }
 
         $prodSlot = $context->builder->alloca($i64, 1, 'array_product_native_i');
@@ -6344,6 +7412,74 @@ final class ArrayBuiltinHelper
         return $context->builder->load($prodSlot);
     }
 
+    /** Native packed __string__* list (compile-time string literals; #3619). */
+    private static function arrayProductNativeString(Context $context, Variable $array): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        $i1 = $context->getTypeFromString('int1');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+
+        $prodIntSlot = $context->builder->alloca($i64, 1, 'array_product_ns_int');
+        $prodFloatSlot = $context->builder->alloca($double, 1, 'array_product_ns_float');
+        $useFloatSlot = $context->builder->alloca($i1, 1, 'array_product_ns_use_float');
+        $context->builder->store($i64->constInt(1, false), $prodIntSlot);
+        $context->builder->store($double->constReal(1.0), $prodFloatSlot);
+        $context->builder->store($i1->constInt(0, false), $useFloatSlot);
+
+        if (0 === $array->nextFreeElement) {
+            return $context->builder->load($prodIntSlot);
+        }
+
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_product_ns_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_product_ns_head');
+        $body = BasicBlockHelper::append($context, 'array_product_ns_body');
+        $accumulate = BasicBlockHelper::append($context, 'array_product_ns_accumulate');
+        $continueBlock = BasicBlockHelper::append($context, 'array_product_ns_continue');
+        $doneBlock = BasicBlockHelper::append($context, 'array_product_ns_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $doneBlock, $body);
+
+        $context->builder->positionAtEnd($body);
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
+        $strPtr = $context->builder->load($slot);
+        $context->builder->branch($accumulate);
+
+        $context->builder->positionAtEnd($accumulate);
+        self::arrayProductAccumulateStringPtr(
+            $context,
+            $strPtr,
+            $prodIntSlot,
+            $prodFloatSlot,
+            $useFloatSlot,
+            'ns'
+        );
+        $context->builder->branch($continueBlock);
+
+        $context->builder->positionAtEnd($continueBlock);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $useFloat = $context->builder->load($useFloatSlot);
+        $prodInt = $context->builder->load($prodIntSlot);
+        $prodFloat = $context->builder->load($prodFloatSlot);
+
+        return $context->builder->select(
+            $useFloat,
+            $prodFloat,
+            $context->builder->siToFp($prodInt, $double)
+        );
+    }
+
     private static function arrayProductHashTable(Context $context, Value $ht): Value
     {
         $sizeT = $context->getTypeFromString('size_t');
@@ -6373,6 +7509,9 @@ final class ArrayBuiltinHelper
         $afterLong = BasicBlockHelper::append($context, 'array_product_ht_after_long');
         $longBlock = BasicBlockHelper::append($context, 'array_product_ht_long');
         $doubleBlock = BasicBlockHelper::append($context, 'array_product_ht_double');
+        $afterDouble = BasicBlockHelper::append($context, 'array_product_ht_after_double');
+        $stringBlock = BasicBlockHelper::append($context, 'array_product_ht_string');
+        $invalidBlock = BasicBlockHelper::append($context, 'array_product_ht_invalid');
         $continueBlock = BasicBlockHelper::append($context, 'array_product_ht_continue');
         $doneBlock = BasicBlockHelper::append($context, 'array_product_ht_done');
 
@@ -6403,7 +7542,29 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isLong, $longBlock, $afterLong);
 
         $context->builder->positionAtEnd($afterLong);
-        $context->builder->branchIf($isDouble, $doubleBlock, $continueBlock);
+        $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $invalidBlock);
+
+        $context->builder->positionAtEnd($invalidBlock);
+        self::arrayProductEmitInvalidElementType($context);
+
+        $context->builder->positionAtEnd($stringBlock);
+        self::arrayProductAccumulateStringEntry(
+            $context,
+            $entry,
+            $prodIntSlot,
+            $prodFloatSlot,
+            $useFloatSlot,
+            'ht'
+        );
+        $context->builder->branch($continueBlock);
 
         $context->builder->positionAtEnd($longBlock);
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
@@ -6504,6 +7665,9 @@ final class ArrayBuiltinHelper
         $afterLong = BasicBlockHelper::append($context, 'array_product_nv_after_long');
         $longBlock = BasicBlockHelper::append($context, 'array_product_nv_long');
         $doubleBlock = BasicBlockHelper::append($context, 'array_product_nv_double');
+        $afterDouble = BasicBlockHelper::append($context, 'array_product_nv_after_double');
+        $stringBlock = BasicBlockHelper::append($context, 'array_product_nv_string');
+        $invalidBlock = BasicBlockHelper::append($context, 'array_product_nv_invalid');
         $continueBlock = BasicBlockHelper::append($context, 'array_product_nv_continue');
         $doneBlock = BasicBlockHelper::append($context, 'array_product_nv_done');
         $context->builder->branch($head);
@@ -6531,7 +7695,29 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isLong, $longBlock, $afterLong);
 
         $context->builder->positionAtEnd($afterLong);
-        $context->builder->branchIf($isDouble, $doubleBlock, $continueBlock);
+        $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $invalidBlock);
+
+        $context->builder->positionAtEnd($invalidBlock);
+        self::arrayProductEmitInvalidElementType($context);
+
+        $context->builder->positionAtEnd($stringBlock);
+        self::arrayProductAccumulateStringEntry(
+            $context,
+            $entry,
+            $prodIntSlot,
+            $prodFloatSlot,
+            $useFloatSlot,
+            'nv'
+        );
+        $context->builder->branch($continueBlock);
 
         $context->builder->positionAtEnd($longBlock);
         $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
@@ -6602,18 +7788,20 @@ final class ArrayBuiltinHelper
     }
 
     /**
-     * array_unique() for arrays of scalar values (strict identity; subset of PHP).
+     * array_unique() for arrays of scalar values (ext/standard/array.c subset).
+     *
+     * @param int $flags SORT_REGULAR (identical) or SORT_STRING (string cast compare)
      */
-    public static function arrayUnique(Context $context, Variable $array): Value
+    public static function arrayUnique(Context $context, Variable $array, int $flags = 0): Value
     {
         if (self::isNativeArray($array->type)) {
-            return self::arrayUniqueHashTable($context, self::nativeListToHashTable($context, $array));
+            return self::arrayUniqueHashTable($context, self::nativeListToHashTable($context, $array), $flags);
         }
 
-        return self::arrayUniqueHashTable($context, self::loadHashTable($context, $array));
+        return self::arrayUniqueHashTable($context, self::loadHashTable($context, $array), $flags);
     }
 
-    private static function arrayUniqueHashTable(Context $context, Value $src): Value
+    private static function arrayUniqueHashTable(Context $context, Value $src, int $flags): Value
     {
         $dest = HashTableHelper::alloc($context);
         $map = $context->structFieldMap['__hashtable__'];
@@ -6651,7 +7839,7 @@ final class ArrayBuiltinHelper
 
         $context->builder->positionAtEnd($packedKeep);
         $valEntry = self::listEntryAt($context, $src, $idx);
-        $duplicate = self::destContainsPackedEntry($context, $dest, $valEntry);
+        $duplicate = self::destContainsPackedEntry($context, $dest, $valEntry, $flags);
         $context->builder->branchIf($duplicate, $packedSkip, $packedAdd);
 
         $context->builder->positionAtEnd($packedAdd);
@@ -6688,7 +7876,7 @@ final class ArrayBuiltinHelper
 
         $context->builder->positionAtEnd($strBody);
         $valEntry = $context->builder->structGep($node, $nodeMap['value']);
-        $duplicate = self::destContainsPackedEntry($context, $dest, $valEntry);
+        $duplicate = self::destContainsPackedEntry($context, $dest, $valEntry, $flags);
         $context->builder->branchIf($duplicate, $strSkip, $strAdd);
 
         $context->builder->positionAtEnd($strAdd);
@@ -6711,10 +7899,17 @@ final class ArrayBuiltinHelper
     }
 
     /**
-     * Strict duplicate check against a packed hashtable (reuses in_array lowering).
+     * Duplicate check against values already stored in $dest.
+     *
+     * @param int $flags SORT_REGULAR (identical) or SORT_STRING (string cast)
      */
-    private static function destContainsPackedEntry(Context $context, Value $dest, Value $entry): Value
+    private static function destContainsPackedEntry(Context $context, Value $dest, Value $entry, int $flags): Value
     {
+        $sortType = $flags & ~\PHPCompiler\ext\standard\StdlibConstants::SORT_FLAG_CASE;
+        if (\PHPCompiler\ext\standard\StdlibConstants::SORT_STRING === $sortType) {
+            return self::destContainsPackedEntryString($context, $dest, $entry);
+        }
+
         $valueMap = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($entry, $valueMap['type'])
@@ -6782,6 +7977,64 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($mergeBlock);
 
         return $context->builder->load($dupSlot);
+    }
+
+    /**
+     * SORT_STRING duplicate check: compare string casts (ext/standard string_compare_function).
+     */
+    private static function destContainsPackedEntryString(Context $context, Value $dest, Value $entry): Value
+    {
+        $strval = new strval();
+        $needleStr = $strval->valueToString($context, $entry);
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_unique_str_dup_idx');
+        $context->builder->store($zero, $idxSlot);
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $dest
+        );
+
+        $foundSlot = $context->builder->alloca(
+            $context->getTypeFromString('int1'),
+            1,
+            'array_unique_str_dup_found'
+        );
+        $context->builder->store($context->getTypeFromString('int1')->constInt(0, false), $foundSlot);
+
+        $done = BasicBlockHelper::append($context, 'array_unique_str_dup_done');
+        $head = BasicBlockHelper::append($context, 'array_unique_str_dup_head');
+        $body = BasicBlockHelper::append($context, 'array_unique_str_dup_body');
+        $foundBlock = BasicBlockHelper::append($context, 'array_unique_str_dup_found_block');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $num);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $candEntry = self::listEntryAt($context, $dest, $idx);
+        $candStr = $strval->valueToString($context, $candEntry);
+        $match = JitStringCompare::identical($context, $candStr, $needleStr);
+        $continueBlock = BasicBlockHelper::append($context, 'array_unique_str_dup_continue');
+        $context->builder->branchIf($match, $foundBlock, $continueBlock);
+
+        $context->builder->positionAtEnd($continueBlock);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($idx, $one),
+            $idxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($foundBlock);
+        $context->builder->store($context->getTypeFromString('int1')->constInt(1, false), $foundSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return $context->builder->load($foundSlot);
     }
 
     /**
@@ -7100,6 +8353,277 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($done);
 
         return $context->builder->load($foundSlot);
+    }
+
+    /**
+     * array_replace_recursive() — nested key merge (ext/standard/array.c parity; #3166).
+     */
+    public static function arrayReplaceRecursive(Context $context, Variable $first, Variable ...$others): Value
+    {
+        if (\count($others) < 1) {
+            throw new \LogicException('array_replace_recursive() requires at least two arguments');
+        }
+
+        $result = HashTableHelper::alloc($context);
+        self::overlayHashTable($context, $result, self::loadHashTable($context, $first));
+        foreach ($others as $other) {
+            $otherHt = self::loadHashTable($context, $other);
+            self::replaceRecursiveOverlayPackedIndices($context, $result, $otherHt);
+            self::replaceRecursiveMergeStringKeys($context, $result, $otherHt);
+            self::replaceRecursiveAddMissingStringKeys($context, $result, $otherHt);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Packed-index overlay for array_replace_recursive() (#3166).
+     */
+    private static function replaceRecursiveOverlayPackedIndices(
+        Context $context,
+        Value $dest,
+        Value $src
+    ): void {
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $valueMap = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $htType = Variable::TYPE_HASHTABLE;
+
+        $nextFree = $context->builder->load($context->builder->structGep($src, $map['nextFreeElement']));
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_replace_rec_packed_idx');
+        $context->builder->store($zero, $idxSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_replace_rec_packed_head');
+        $body = BasicBlockHelper::append($context, 'array_replace_rec_packed_body');
+        $set = BasicBlockHelper::append($context, 'array_replace_rec_packed_set');
+        $next = BasicBlockHelper::append($context, 'array_replace_rec_packed_next');
+        $done = BasicBlockHelper::append($context, 'array_replace_rec_packed_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $idx
+        );
+        $context->builder->branchIf($isSet, $set, $next);
+
+        $context->builder->positionAtEnd($set);
+        $destHas = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $dest,
+            $idx
+        );
+        $srcVal = self::listEntryAt($context, $src, $idx);
+        $srcIsHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($context->builder->structGep($srcVal, $valueMap['type'])),
+            $i8->constInt($htType, false)
+        );
+        $destVal = self::listEntryAt($context, $dest, $idx);
+        $destIsHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($context->builder->structGep($destVal, $valueMap['type'])),
+            $i8->constInt($htType, false)
+        );
+        $bothHt = $context->builder->and(
+            $destHas,
+            $context->builder->and($srcIsHt, $destIsHt)
+        );
+        $copy = BasicBlockHelper::append($context, 'array_replace_rec_packed_copy');
+        $merge = BasicBlockHelper::append($context, 'array_replace_rec_packed_merge');
+        $context->builder->branchIf($bothHt, $merge, $copy);
+
+        $context->builder->positionAtEnd($copy);
+        self::copyPackedListEntry($context, $src, $idx, $dest, $idx);
+        $context->builder->branch($next);
+
+        $context->builder->positionAtEnd($merge);
+        $existingHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $destVal
+        );
+        $overlayHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $srcVal
+        );
+        $merged = HashTableHelper::alloc($context);
+        self::overlayHashTable($context, $merged, $existingHt);
+        self::replaceRecursiveAddMissingStringKeys($context, $merged, $overlayHt);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setHashtableAt'),
+            $dest,
+            $idx,
+            $merged
+        );
+        $context->builder->branch($next);
+
+        $context->builder->positionAtEnd($next);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    /**
+     * Merge existing string keys when both values are hashtables (VM in-place parity; #3166).
+     */
+    private static function replaceRecursiveMergeStringKeys(
+        Context $context,
+        Value $dest,
+        Value $src
+    ): void {
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $valueMap = $context->structFieldMap['__value__'];
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+        $valuePtrType = $context->getTypeFromString('__value__*');
+        $i8 = $context->getTypeFromString('int8');
+        $htType = Variable::TYPE_HASHTABLE;
+
+        $strInit = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_init');
+        $strHead = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_head');
+        $context->builder->branch($strInit);
+
+        $context->builder->positionAtEnd($strInit);
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_replace_rec_merge_str_walk');
+        $head = $context->builder->load($context->builder->structGep($src, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+        $strBody = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_body');
+        $strSet = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_set');
+        $strNext = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_next');
+        $strDone = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_done');
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $strDone, $strBody);
+
+        $context->builder->positionAtEnd($strBody);
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $context->builder->branch($strSet);
+
+        $context->builder->positionAtEnd($strSet);
+        $existingPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__peekStringKeyValue'),
+            $dest,
+            $keyStr
+        );
+        $existingNull = $context->builder->icmp(Builder::INT_EQ, $existingPtr, $valuePtrType->constNull());
+        $skip = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_skip');
+        $replace = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_replace');
+        $context->builder->branchIf($existingNull, $skip, $replace);
+
+        $context->builder->positionAtEnd($replace);
+        $srcIsHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($context->builder->structGep($valEntry, $valueMap['type'])),
+            $i8->constInt($htType, false)
+        );
+        $existingIsHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($context->builder->structGep($existingPtr, $valueMap['type'])),
+            $i8->constInt($htType, false)
+        );
+        $bothHt = $context->builder->and($srcIsHt, $existingIsHt);
+        $scalarReplace = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_scalar');
+        $deepMerge = BasicBlockHelper::append($context, 'array_replace_rec_merge_str_deep');
+        $context->builder->branchIf($bothHt, $deepMerge, $scalarReplace);
+
+        $context->builder->positionAtEnd($scalarReplace);
+        self::storeValueEntryAtStringKey($context, $dest, $keyStr, $valEntry);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($deepMerge);
+        $existingHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $existingPtr
+        );
+        $overlayHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valEntry
+        );
+        self::replaceRecursiveAddMissingStringKeys($context, $existingHt, $overlayHt);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strNext);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strDone);
+    }
+
+    /**
+     * Add string keys from {@param $src} missing in {@param $dest} (#3166).
+     */
+    private static function replaceRecursiveAddMissingStringKeys(
+        Context $context,
+        Value $dest,
+        Value $src
+    ): void {
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+        $valuePtrType = $context->getTypeFromString('__value__*');
+
+        $strInit = BasicBlockHelper::append($context, 'array_replace_rec_add_str_init');
+        $strHead = BasicBlockHelper::append($context, 'array_replace_rec_add_str_head');
+        $context->builder->branch($strInit);
+
+        $context->builder->positionAtEnd($strInit);
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_replace_rec_add_str_walk');
+        $head = $context->builder->load($context->builder->structGep($src, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+        $strBody = BasicBlockHelper::append($context, 'array_replace_rec_add_str_body');
+        $strSet = BasicBlockHelper::append($context, 'array_replace_rec_add_str_set');
+        $strNext = BasicBlockHelper::append($context, 'array_replace_rec_add_str_next');
+        $strDone = BasicBlockHelper::append($context, 'array_replace_rec_add_str_done');
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $strDone, $strBody);
+
+        $context->builder->positionAtEnd($strBody);
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $context->builder->branch($strSet);
+
+        $context->builder->positionAtEnd($strSet);
+        $existingPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__peekStringKeyValue'),
+            $dest,
+            $keyStr
+        );
+        $existingNull = $context->builder->icmp(Builder::INT_EQ, $existingPtr, $valuePtrType->constNull());
+        $doSet = BasicBlockHelper::append($context, 'array_replace_rec_add_str_do_set');
+        $context->builder->branchIf($existingNull, $doSet, $strNext);
+
+        $context->builder->positionAtEnd($doSet);
+        self::storeValueEntryAtStringKey($context, $dest, $keyStr, $valEntry);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strNext);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strDone);
     }
 
     /**

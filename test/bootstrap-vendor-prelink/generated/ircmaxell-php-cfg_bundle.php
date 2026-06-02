@@ -83,10 +83,15 @@ require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/NsFu
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/NullsafeMethodCall.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/NullsafePropertyFetch.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php';
+require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/PostDec.php';
+require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/PostInc.php';
+require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/PreDec.php';
+require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/PreInc.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Print_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/PropertyFetch.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/StaticCall.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/StaticPropertyFetch.php';
+require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Throw_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/UnaryMinus.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/UnaryPlus.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/YieldFrom.php';
@@ -103,6 +108,7 @@ require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Clas
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Class_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Function_.php';
+require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/HaltCompiler.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Interface_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Jump.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/JumpIf.php';

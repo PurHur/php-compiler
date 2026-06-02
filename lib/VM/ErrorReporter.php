@@ -20,6 +20,17 @@ final class ErrorReporter
     public const E_USER_DEPRECATED = 16384;
     public const E_DEPRECATED = 8192;
 
+    /** Valid trigger_error() $error_level values (ext/standard/basic_functions.c). */
+    public static function isUserErrorLevel(int $level): bool
+    {
+        return \in_array($level, [
+            self::E_USER_ERROR,
+            self::E_USER_WARNING,
+            self::E_USER_NOTICE,
+            self::E_USER_DEPRECATED,
+        ], true);
+    }
+
     private int $errorReporting;
     private bool $displayErrors;
 
@@ -28,7 +39,7 @@ final class ErrorReporter
 
     private int $savedErrorReporting = 0;
 
-    /** @var list<array{0: ?string, 1: int}> */
+    /** @var list<array{0: Variable, 1: int}> */
     private array $handlerStack = [];
 
     /** @var array{type: int, message: string, file: string, line: int}|null */
@@ -136,10 +147,12 @@ final class ErrorReporter
         return $out;
     }
 
-    public function pushHandler(?string $callbackName, int $mask): ?string
+    public function pushHandler(Variable $callback, int $mask): ?Variable
     {
-        $previous = $this->activeHandlerName();
-        $this->handlerStack[] = [$callbackName, $mask];
+        $previous = $this->activeHandlerCopy();
+        $stored = new Variable();
+        $stored->copyFrom($callback->resolveIndirect());
+        $this->handlerStack[] = [$stored, $mask];
 
         return $previous;
     }
@@ -152,6 +165,19 @@ final class ErrorReporter
         array_pop($this->handlerStack);
 
         return true;
+    }
+
+    public function stringOffsetCastOccurred(
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        $this->emitWarning(
+            'String offset cast occurred',
+            $context,
+            $frame,
+            $file
+        );
     }
 
     public function uninitializedStringOffset(
@@ -188,9 +214,6 @@ final class ErrorReporter
         ?Frame $frame = null,
         ?string $file = null
     ): void {
-        if (0 === ($this->errorReporting & self::E_WARNING)) {
-            return;
-        }
         $this->emitWarning("Undefined variable \${$name}", $context, $frame, $file);
     }
 
@@ -200,34 +223,48 @@ final class ErrorReporter
         ?Frame $frame = null,
         ?string $file = null
     ): void {
-        if (0 === ($this->errorReporting & self::E_WARNING)) {
-            return;
-        }
         $key = $this->formatArrayKey($index);
         $message = "Undefined array key {$key}";
         $this->emitWarning($message, $context, $frame, $file);
+    }
+
+    /**
+     * Zend E_WARNING for language-level diagnostics (issue #4502).
+     */
+    public function languageWarning(
+        string $message,
+        ?string $file,
+        int $line,
+        ?Context $context = null,
+        ?Frame $frame = null
+    ): void {
+        $this->emitWarning($message, $context, $frame, $file, $line);
     }
 
     private function emitWarning(
         string $message,
         ?Context $context = null,
         ?Frame $frame = null,
-        ?string $file = null
+        ?string $file = null,
+        int $line = 0
     ): void {
+        $this->recordLastError(self::E_WARNING, $message, $file, $line);
         if (0 === ($this->errorReporting & self::E_WARNING)) {
             return;
         }
-        $this->recordLastError(self::E_WARNING, $message, $file, 0);
-        if ($this->dispatchUserHandler($context, $frame, self::E_WARNING, $message, $file, 0)) {
+        if ($this->dispatchUserHandler($context, $frame, self::E_WARNING, $message, $file, $line)) {
             return;
         }
-        $line = "Warning: {$message}";
+        $formatted = "Warning: {$message}";
         if (null !== $file && '' !== $file) {
-            $line .= " in {$file}";
+            $formatted .= " in {$file}";
+            if ($line > 0) {
+                $formatted .= " on line {$line}";
+            }
         }
-        $line .= "\n";
+        $formatted .= "\n";
         if ($this->displayErrors) {
-            fwrite(STDERR, $line);
+            fwrite(STDERR, $formatted);
         }
     }
 
@@ -243,10 +280,10 @@ final class ErrorReporter
             $className,
             $propertyName
         );
+        $this->recordLastError(self::E_DEPRECATED, $message, $file, 0);
         if (0 === ($this->errorReporting & self::E_DEPRECATED)) {
             return;
         }
-        $this->recordLastError(self::E_DEPRECATED, $message, $file, 0);
         if ($this->dispatchUserHandler($context, $frame, self::E_DEPRECATED, $message, $file, 0)) {
             return;
         }
@@ -265,13 +302,14 @@ final class ErrorReporter
         int $level,
         ?string $file = null,
         ?Context $context = null,
-        ?Frame $frame = null
+        ?Frame $frame = null,
+        int $line = 0
     ): void {
+        $this->recordLastError($level, $message, $file, $line);
         if (0 === ($this->errorReporting & $level)) {
             return;
         }
-        $this->recordLastError($level, $message, $file, 0);
-        if ($this->dispatchUserHandler($context, $frame, $level, $message, $file, 0)) {
+        if ($this->dispatchUserHandler($context, $frame, $level, $message, $file, $line)) {
             if (self::E_USER_ERROR === $level) {
                 throw new \LogicException("Fatal error: {$message}");
             }
@@ -286,26 +324,31 @@ final class ErrorReporter
             self::E_USER_DEPRECATED => 'Deprecated',
             default => 'Unknown error',
         };
-        $line = "{$prefix}: {$message}";
+        $formatted = "{$prefix}: {$message}";
         if (null !== $file && '' !== $file) {
-            $line .= " in {$file}";
+            $formatted .= " in {$file}";
+            if ($line > 0) {
+                $formatted .= " on line {$line}";
+            }
         }
-        $line .= "\n";
+        $formatted .= "\n";
         if ($this->displayErrors) {
-            fwrite(STDERR, $line);
+            fwrite(STDERR, $formatted);
         }
         if (self::E_USER_ERROR === $level) {
-            throw new \LogicException(rtrim($line));
+            throw new \LogicException(rtrim($formatted));
         }
     }
 
-    private function activeHandlerName(): ?string
+    private function activeHandlerCopy(): ?Variable
     {
         if ([] === $this->handlerStack) {
             return null;
         }
+        $out = new Variable();
+        $out->copyFrom($this->handlerStack[\count($this->handlerStack) - 1][0]);
 
-        return $this->handlerStack[\count($this->handlerStack) - 1][0];
+        return $out;
     }
 
     private function dispatchUserHandler(
@@ -319,8 +362,9 @@ final class ErrorReporter
         if (null === $context || null === $frame || [] === $this->handlerStack) {
             return false;
         }
-        [$callbackName, $mask] = $this->handlerStack[\count($this->handlerStack) - 1];
-        if (null === $callbackName) {
+        [$callback, $mask] = $this->handlerStack[\count($this->handlerStack) - 1];
+        $callback = $callback->resolveIndirect();
+        if (Variable::TYPE_NULL === $callback->type) {
             return false;
         }
         if (0 === ($mask & $errno)) {
@@ -330,7 +374,7 @@ final class ErrorReporter
         return VmErrorHandler::invokeHandler(
             $context,
             $frame,
-            $callbackName,
+            $callback,
             $errno,
             $errstr,
             $errfile,

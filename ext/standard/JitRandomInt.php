@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringRandomBytes;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -13,6 +14,25 @@ use PHPLLVM\Value;
 /** LLVM JIT helpers for random_int() (issue #2330). */
 final class JitRandomInt
 {
+    private const RANGE_ERROR = 'random_int(): Argument #1 ($min) must be less than or equal to argument #2 ($max)';
+
+    /**
+     * Runtime guard when $min > $max (php-src ext/standard/random.c php_random_int).
+     */
+    public static function emitRuntimeRangeGuard(Context $context, Value $min, Value $max): void
+    {
+        $invalid = $context->builder->icmp(Builder::INT_SGT, $min, $max);
+        $okBlock = BasicBlockHelper::append($context, 'random_int_range_ok');
+        $errBlock = BasicBlockHelper::append($context, 'random_int_range_err');
+        $context->builder->branchIf($invalid, $errBlock, $okBlock);
+        $context->builder->positionAtEnd($errBlock);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, self::RANGE_ERROR);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->positionAtEnd($okBlock);
+    }
+
     public static function call(Context $context, Value $min, Value $max): Value
     {
         StringRandomBytes::implement($context);

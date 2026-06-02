@@ -21,8 +21,8 @@ use PHPLLVM\Value;
 /**
  * iterator_to_array() — copy Traversable (array or Generator) into an array (#3100).
  *
- * VM only; JIT/AOT defer until generator IR lands (#3074).
- * Generator preserve_keys uses yielded keys when set (#3085); string yield keys still auto-indexed on VM.
+ * VM: {@see VM::iteratorToArray()}; JIT: {@see JitIteratorToArray}.
+ * Default preserve_keys=true matches Zend/php-src (ext/spl/iterator.c).
  *
  * php-src: ext/spl/iterator.c — PHP_FUNCTION(iterator_to_array)
  */
@@ -46,7 +46,7 @@ final class iterator_to_array extends Internal
             throw new \LogicException('iterator_to_array() requires VM context in this compiler build');
         }
         $iterator = $frame->calledArgs[0]->resolveIndirect();
-        $preserveKeys = false;
+        $preserveKeys = true;
         if (2 === $argc) {
             $flag = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_BOOLEAN !== $flag->type) {
@@ -60,6 +60,20 @@ final class iterator_to_array extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('iterator_to_array() is not implemented for JIT in this compiler build');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('iterator_to_array() requires one or two arguments in this compiler build');
+        }
+        $preserveKeys = true;
+        if (2 === $argc) {
+            if (JITVariable::TYPE_NATIVE_BOOL !== $args[1]->type || !($args[1]->isConstant ?? false)) {
+                throw new \LogicException(
+                    'iterator_to_array() second argument must be a compile-time bool in this compiler build'
+                );
+            }
+            $preserveKeys = (bool) $args[1]->value;
+        }
+
+        return JitIteratorToArray::invoke($context, $args[0], $preserveKeys);
     }
 }

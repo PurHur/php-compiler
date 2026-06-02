@@ -7,7 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ScriptMagic;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\OpCode;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -40,13 +42,28 @@ final class trigger_error_ extends Internal
                 throw new \LogicException('trigger_error() error type must be an integer');
             }
             $level = $levelVar->toInt();
+            if (!ErrorReporter::isUserErrorLevel($level)) {
+                throw new \ValueError('trigger_error(): Argument #2 ($error_level) must be one of E_USER_ERROR, E_USER_WARNING, E_USER_NOTICE, or E_USER_DEPRECATED');
+            }
+        }
+        $file = null;
+        $line = 0;
+        $caller = $frame->parent;
+        if (null !== $caller) {
+            if ('' !== $caller->scriptPath) {
+                $file = $caller->scriptPath;
+            }
+            $line = $caller->callSiteLine;
+        } elseif ('' !== $frame->scriptPath) {
+            $file = $frame->scriptPath;
         }
         $frame->vmContext->errors->triggerError(
             $messageVar->toString(),
             $level,
-            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $file,
             $frame->vmContext,
-            $frame
+            $frame,
+            $line
         );
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
@@ -68,28 +85,46 @@ final class trigger_error_ extends Internal
         }
         $level = ErrorReporter::E_USER_NOTICE;
         if (2 === $argc) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-                throw new \LogicException('trigger_error() error type must be a compile-time integer in this compiler build');
-            }
-            $lib = $context->llvm->lib;
-            if (null === $lib->LLVMIsAConstantInt($args[1]->value->value)) {
-                throw new \LogicException('trigger_error() error type must be a compile-time integer in this compiler build');
-            }
-            $level = (int) $lib->LLVMConstIntGetSExtValue($args[1]->value->value);
+            $level = self::jitResolveErrorLevel($context, $args[1]);
         }
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $i32 = $context->getTypeFromString('int32');
         $msgPtr = $context->builder->pointerCast($context->constantFromString($literal), $i8p);
         $msgLen = $sizeT->constInt(\strlen($literal), false);
+        $filePath = '';
+        if (null !== $context->jitEnclosingBlock) {
+            $filePath = ScriptMagic::stringForBlock($context->jitEnclosingBlock, OpCode::SCRIPT_MAGIC_FILE);
+        }
+        $filePtr = $context->builder->pointerCast($context->constantFromString($filePath), $i8p);
         $context->builder->call(
             $context->lookupFunction('__compiler_trigger_error'),
             $msgPtr,
             $msgLen,
-            $i32->constInt($level, false)
+            $i32->constInt($level, false),
+            $filePtr,
+            $i32->constInt($context->callSiteLine, false)
         );
         $i1 = $context->getTypeFromString('int1');
 
         return $i1->constInt(1, false);
+    }
+
+    private static function jitResolveErrorLevel(Context $context, JITVariable $arg): int
+    {
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($arg->value->value)) {
+                return (int) $lib->LLVMConstIntGetSExtValue($arg->value->value);
+            }
+        }
+        if (null !== $arg->compileTimeConstantName) {
+            $errorInt = \PHPCompiler\VM\Context::errorReportingConstant($arg->compileTimeConstantName);
+            if (null !== $errorInt) {
+                return $errorInt;
+            }
+        }
+
+        throw new \LogicException('trigger_error() error type must be a compile-time integer in this compiler build');
     }
 }

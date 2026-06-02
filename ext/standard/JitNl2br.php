@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * JIT lowering for nl2br() → __string__nl2br (byte-for-byte parity with VmString::nl2br).
+ * JIT lowering for nl2br() → __compiler_nl2br (C runtime; php-src string.c parity).
  */
 
 namespace PHPCompiler\ext\standard;
@@ -17,7 +17,7 @@ final class JitNl2br
     public static function nl2br(Context $context, Value $strPtr, Value $useXhtmlI8): Value
     {
         return $context->builder->call(
-            $context->lookupFunction('__string__nl2br'),
+            $context->lookupFunction('__compiler_nl2br'),
             $strPtr,
             $useXhtmlI8
         );

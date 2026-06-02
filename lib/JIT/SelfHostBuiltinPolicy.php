@@ -33,6 +33,8 @@ final class SelfHostBuiltinPolicy
         'is_string' => 'numeric',
         'is_array' => 'numeric',
         'is_countable' => 'numeric',
+        'is_iterable' => 'numeric',
+        'iterator_count' => 'numeric',
         'is_null' => 'numeric',
         'is_numeric' => 'numeric',
         'time' => 'numeric',
@@ -42,7 +44,11 @@ final class SelfHostBuiltinPolicy
         'getdate' => 'numeric',
         'uniqid' => 'numeric',
         'getmypid' => 'numeric',
+        'getmygrgid' => 'numeric',
+        'getmyinode' => 'numeric',
         'getrusage' => 'numeric',
+        'memory_get_peak_usage' => 'numeric',
+        'memory_get_usage' => 'numeric',
         'pi' => 'numeric',
     ];
 
@@ -55,7 +61,8 @@ final class SelfHostBuiltinPolicy
         + self::CATEGORY_JSON
         + self::CATEGORY_NUMERIC
         + self::CATEGORY_PASSWORD
-        + self::CATEGORY_PROCESS;
+        + self::CATEGORY_PROCESS
+        + self::CATEGORY_SESSION;
 
     /** @var array<string, string>|null */
     private static ?array $vmOnlyDeferredCache = null;
@@ -63,9 +70,10 @@ final class SelfHostBuiltinPolicy
     /** @var array<string, string> */
     private const CATEGORY_OUTPUT = [
         'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_get_flush' => 'output',
-        'ob_end_flush' => 'output', 'ob_get_level' => 'output', 'flush' => 'output',
-        'getallheaders' => 'output', 'header_list' => 'output',
-        'headers_sent' => 'output', 'register_shutdown_function' => 'output',
+        'ob_end_flush' => 'output', 'ob_get_level' => 'output', 'ob_implicit_flush' => 'output', 'flush' => 'output',
+        'getallheaders' => 'output', 'header_list' => 'output', 'headers_list' => 'output',
+        'headers_sent' => 'output', 'header_register_callback' => 'output',
+        'register_shutdown_function' => 'output',
         'set_error_handler' => 'error', 'restore_error_handler' => 'error',
     ];
 
@@ -79,9 +87,23 @@ final class SelfHostBuiltinPolicy
         'flush' => true,
     ];
 
+    /** Session builtins for AOT user scripts under PHP_COMPILER_SELFHOST_AOT (#1891, #1967). */
+    private const CATEGORY_SESSION = [
+        'session_start' => 'session',
+        'session_id' => 'session',
+        'session_name' => 'session',
+        'session_write_close' => 'session',
+        'session_destroy' => 'session',
+        'session_regenerate_id' => 'session',
+    ];
+
     /** @var array<string, string> */
     private const CATEGORY_PASSWORD = [
-        'password_hash' => 'password', 'password_verify' => 'password',
+        'password_hash' => 'password',
+        'password_verify' => 'password',
+        'password_get_info' => 'password',
+        'password_needs_rehash' => 'password',
+        'crypt' => 'password',
     ];
 
     /** @var array<string, string> */
@@ -91,22 +113,36 @@ final class SelfHostBuiltinPolicy
         'clearstatcache' => 'filesystem',
         'stat' => 'filesystem',
         'lstat' => 'filesystem',
+        'fstat' => 'filesystem',
         'is_file' => 'filesystem', 'is_dir' => 'filesystem', 'is_readable' => 'filesystem',
         'is_writable' => 'filesystem', 'file_get_contents' => 'filesystem', 'file_put_contents' => 'filesystem',
-        'filemtime' => 'filesystem', 'fileperms' => 'filesystem', 'filesize' => 'filesystem', 'filetype' => 'filesystem',
+        'filemtime' => 'filesystem',
+        'fileatime' => 'filesystem',
+        'filectime' => 'filesystem',
+        'fileinode' => 'filesystem',
+        'fileowner' => 'filesystem',
+        'filegroup' => 'filesystem',
+        'fileperms' => 'filesystem',
+        'filesize' => 'filesystem',
+        'filetype' => 'filesystem',
         'mkdir' => 'filesystem', 'unlink' => 'filesystem', 'rmdir' => 'filesystem', 'realpath' => 'filesystem',
-        'chmod' => 'filesystem', 'umask' => 'filesystem',
+        'chmod' => 'filesystem', 'chown' => 'filesystem', 'lchown' => 'filesystem', 'chgrp' => 'filesystem', 'lchgrp' => 'filesystem', 'umask' => 'filesystem',
         'glob' => 'filesystem', 'scandir' => 'filesystem', 'fnmatch' => 'filesystem',
+        'opendir' => 'filesystem', 'readdir' => 'filesystem', 'closedir' => 'filesystem', 'rewinddir' => 'filesystem',
         'fopen' => 'filesystem', 'fread' => 'filesystem', 'fwrite' => 'filesystem', 'fgetc' => 'filesystem', 'fgets' => 'filesystem',
         'fgetcsv' => 'filesystem',
         'fputcsv' => 'filesystem',
         'ftell' => 'filesystem', 'fseek' => 'filesystem', 'fclose' => 'filesystem', 'flock' => 'filesystem',
         'is_resource' => 'filesystem',
-        'feof' => 'filesystem', 'fflush' => 'filesystem', 'rewind' => 'filesystem', 'fpassthru' => 'filesystem',
-        'pathinfo' => 'filesystem', 'readfile' => 'filesystem', 'readlink' => 'filesystem', 'rename' => 'filesystem',
+        'get_resource_type' => 'filesystem',
+        'get_resource_id' => 'filesystem',
+        'stream_get_contents' => 'filesystem',
+        'feof' => 'filesystem', 'fflush' => 'filesystem', 'ftruncate' => 'filesystem', 'rewind' => 'filesystem', 'fpassthru' => 'filesystem',
+        'pathinfo' => 'filesystem', 'readfile' => 'filesystem', 'readlink' => 'filesystem', 'link' => 'filesystem', 'symlink' => 'filesystem', 'rename' => 'filesystem',
         'is_uploaded_file' => 'filesystem', 'move_uploaded_file' => 'filesystem', 'touch' => 'filesystem',
-        'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem', 'tempnam' => 'filesystem',
+        'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem', 'tempnam' => 'filesystem', 'tmpfile' => 'filesystem',
         'getcwd' => 'filesystem', 'chdir' => 'filesystem', 'gethostname' => 'filesystem',
+        'gethostbynamel' => 'filesystem',
         'stream_context_create' => 'filesystem',
     ];
 
@@ -122,23 +158,36 @@ final class SelfHostBuiltinPolicy
     /** @var array<string, string> */
     private const CATEGORY_STRING = [
         'addslashes' => 'string',
+        'addcslashes' => 'string',
+        'stripslashes' => 'string',
+        'stripcslashes' => 'string',
+        'substr_replace' => 'string',
         'bin2hex' => 'string',
         'chr' => 'string',
         'chunk_split' => 'string',
+        'convert_uudecode' => 'string', 'convert_uuencode' => 'string',
+        'utf8_decode' => 'string', 'utf8_encode' => 'string',
         'pack' => 'string',
         'unpack' => 'string',
         'strtolower' => 'string', 'strtoupper' => 'string', 'strcmp' => 'string', 'strncmp' => 'string', 'substr_compare' => 'string', 'strtok' => 'string',
+        'wordwrap' => 'string', 'nl2br' => 'string',
         'strcasecmp' => 'string', 'strncasecmp' => 'string', 'strlen' => 'string', 'count' => 'string',
         'sizeof' => 'string', 'gettype' => 'string', 'get_debug_type' => 'string', 'var_export' => 'string',
         'str_replace' => 'string', 'str_ireplace' => 'string', 'strtr' => 'string', 'str_rot13' => 'string',
         'str_increment' => 'string', 'str_decrement' => 'string', 'strval' => 'string',
-        'strip_tags' => 'string',         'sprintf' => 'string', 'chr' => 'string', 'number_format' => 'string',
+        'strip_tags' => 'string',         'sprintf' => 'string', 'printf' => 'string', 'vsprintf' => 'string', 'vprintf' => 'string', 'vfprintf' => 'string', 'sscanf' => 'long',
+        'chr' => 'string', 'number_format' => 'string',
         'phpversion' => 'string', 'php_sapi_name' => 'string', 'php_uname' => 'string',
         'version_compare' => 'string', 'extension_loaded' => 'string', 'get_loaded_extensions' => 'array',
         'soundex' => 'string',
         'base64_encode' => 'string', 'base64_decode' => 'string',
-        'htmlspecialchars' => 'string', 'htmlspecialchars_decode' => 'string', 'header' => 'string', 'http_response_code' => 'string',
-        'headers_sent' => 'string', 'register_shutdown_function' => 'string',
+        'quoted_printable_encode' => 'string', 'quoted_printable_decode' => 'string',
+        'htmlspecialchars' => 'string', 'htmlspecialchars_decode' => 'string',
+        'htmlentities' => 'string', 'html_entity_decode' => 'string',
+        'get_html_translation_table' => 'string',
+        'header' => 'string', 'http_response_code' => 'string',
+        'headers_sent' => 'string', 'header_register_callback' => 'string',
+        'register_shutdown_function' => 'string',
         'substr' => 'string', 'trim' => 'string', 'ltrim' => 'string', 'rtrim' => 'string',
         'urlencode' => 'string', 'rawurlencode' => 'string', 'http_build_query' => 'string',
         'parse_str' => 'string',
@@ -146,26 +195,31 @@ final class SelfHostBuiltinPolicy
 
     /** @var array<string, string> */
     private const CATEGORY_ARRAY = [
-        'array_merge' => 'array', 'array_keys' => 'array', 'array_values' => 'array',
+        'array_merge' => 'array', 'array_merge_recursive' => 'array', 'array_keys' => 'array', 'array_values' => 'array',
         'in_array' => 'array', 'array_search' => 'array', 'array_fill' => 'array', 'array_slice' => 'array', 'array_splice' => 'array',
         'array_key_exists' => 'array', 'array_key_first' => 'array', 'array_key_last' => 'array',
+        'array_first' => 'array', 'array_last' => 'array',
         'array_is_list' => 'array', 'array_map' => 'array', 'array_count' => 'array',
+        'iterator_apply' => 'array',
         // array_map: null + string builtins + closure/arrow (#142); [class,method] deferred (#1154)
         'array_push' => 'array', 'array_pop' => 'array', 'array_shift' => 'array', 'array_unshift' => 'array',
         'array_reverse' => 'array', 'array_filter' => 'array', 'array_walk' => 'array',
         'array_walk_recursive' => 'array', 'array_reduce' => 'array', 'array_combine' => 'array', 'array_fill_keys' => 'array', 'array_pad' => 'array', 'array_flip' => 'array', 'array_change_key_case' => 'array',
         'array_chunk' => 'array', 'array_column' => 'array',
         'array_product' => 'array', 'array_unique' => 'array', 'array_diff' => 'array', 'array_intersect' => 'array',
-        'array_replace' => 'array', 'array_sum' => 'array', 'sort' => 'array', 'rsort' => 'array',
+        'array_replace' => 'array', 'array_replace_recursive' => 'array', 'array_sum' => 'array', 'sort' => 'array', 'rsort' => 'array',
         'ksort' => 'array', 'krsort' => 'array', 'asort' => 'array', 'arsort' => 'array',
         'array_multisort' => 'array',
         'usort' => 'array', 'uasort' => 'array', 'uksort' => 'array',
         'compact' => 'array', 'extract' => 'array', 'defined' => 'array', 'define' => 'array', 'constant' => 'array',
         'get_defined_constants' => 'array', 'get_defined_vars' => 'array', 'get_declared_interfaces' => 'array',
+        'get_declared_classes' => 'array', 'get_declared_traits' => 'array', 'get_declared_functions' => 'array', 'get_defined_functions' => 'array',
         'get_loaded_extensions' => 'array',
-        'class_exists' => 'array', 'enum_exists' => 'array', 'get_declared_enums' => 'array', 'function_exists' => 'array', 'method_exists' => 'array',
+        'class_exists' => 'array', 'interface_exists' => 'array', 'trait_exists' => 'array',
+        'enum_exists' => 'array', 'get_declared_enums' => 'array', 'function_exists' => 'array', 'method_exists' => 'array',
         'property_exists' => 'array',
         'get_object_vars' => 'array',
+        'get_object_id' => 'array',
         'get_class' => 'array', 'get_class_methods' => 'array', 'get_class_vars' => 'array', 'get_parent_class' => 'array', 'is_a' => 'array', 'is_subclass_of' => 'array',
         'class_implements' => 'array', 'class_parents' => 'array',
         'assert' => 'array',

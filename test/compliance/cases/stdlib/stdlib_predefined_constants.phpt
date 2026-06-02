@@ -11,6 +11,8 @@ echo isset($constants['Core']['CASE_LOWER']) && $constants['Core']['CASE_LOWER']
 echo isset($constants['Core']['CASE_UPPER']) && $constants['Core']['CASE_UPPER'] === 1 ? "case_up_ok\n" : "case_up_bad\n";
 echo isset($constants['Core']['PATHINFO_EXTENSION']) && $constants['Core']['PATHINFO_EXTENSION'] === 4 ? "pathinfo_ext_ok\n" : "pathinfo_ext_bad\n";
 echo isset($constants['Core']['PATHINFO_ALL']) && $constants['Core']['PATHINFO_ALL'] === 15 ? "pathinfo_all_ok\n" : "pathinfo_all_bad\n";
+echo isset($constants['Core']['SORT_NATURAL']) && $constants['Core']['SORT_NATURAL'] === 6 ? "sort_nat_ok\n" : "sort_nat_bad\n";
+echo isset($constants['Core']['EXTR_SKIP']) && $constants['Core']['EXTR_SKIP'] === 1 ? "extr_skip_ok\n" : "extr_skip_bad\n";
 $hi = array_change_key_case(array('Ab' => 1), CASE_UPPER);
 echo $hi['AB'], "\n";
 echo defined('M_PI') && defined('M_E') && defined('M_LOG2E') ? "math_defined_ok\n" : "math_defined_bad\n";
@@ -27,6 +29,8 @@ case_lo_ok
 case_up_ok
 pathinfo_ext_ok
 pathinfo_all_ok
+sort_nat_ok
+extr_skip_ok
 1
 math_defined_ok
 pi_ok

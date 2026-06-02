@@ -169,6 +169,89 @@ ERR;
         $this->assertLessThan($entryPos, $configPos, 'entry is last');
     }
 
+    public function testResolveJitOutputPathDefaultsToBinaryDotJit(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $project = $repoRoot.'/examples/003-MiniWebApp';
+        $output = PhpcBuild::resolveJitOutputPath($project);
+        $this->assertNotNull($output);
+        $this->assertStringEndsWith('.phpc/bin/app.jit', $output);
+    }
+
+    public function testResolveJitExecContextUsesPublicDirForMiniWebApp(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $project = $repoRoot.'/examples/003-MiniWebApp';
+        $entry = $project.'/public/index.php';
+        $context = PhpcBuild::resolveJitExecContext($project, $entry);
+        $this->assertSame('index.php', $context['entry_arg']);
+        $this->assertStringEndsWith('/public', $context['exec_cwd']);
+    }
+
+    public function testRenderJitLauncherScriptReferencesJitBinAndPublicCwd(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $project = $repoRoot.'/examples/003-MiniWebApp';
+        $entry = $project.'/public/index.php';
+        $script = PhpcBuild::renderJitLauncherScript($repoRoot, $project, $entry);
+        $this->assertStringStartsWith('#!/bin/bash', $script);
+        $this->assertStringContainsString('/bin/jit.php', $script);
+        $this->assertStringContainsString("ENTRY_SCRIPT='index.php'", $script);
+        $this->assertStringContainsString('/public', $script);
+        $this->assertStringContainsString('script/php-env.sh', $script);
+    }
+
+    public function testBuildProjectJitWritesExecutableLauncher(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $project = $repoRoot.'/examples/003-MiniWebApp';
+        $output = sys_get_temp_dir().'/phpc-build-jit-'.getmypid().'.jit';
+        @unlink($output);
+        $result = PhpcBuild::buildProjectJit($repoRoot, $project, $output, false);
+        try {
+            $this->assertSame(0, $result['exit'], $result['stderr']);
+            $this->assertFileExists($output);
+            $this->assertTrue(is_executable($output));
+            $body = file_get_contents($output);
+            $this->assertIsString($body);
+            $this->assertStringContainsString('bin/jit.php', $body);
+            $this->assertStringContainsString('Wrote JIT launcher', $result['stdout']);
+            $this->assertStringContainsString('JIT launcher', $result['stderr']);
+        } finally {
+            @unlink($output);
+        }
+    }
+
+    public function testPhpcBuildProjectJitCliWritesLauncher(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $output = sys_get_temp_dir().'/phpc-cli-jit-'.getmypid().'.jit';
+        @unlink($output);
+        $result = $this->runPhpcBuild(
+            ['--project', $repoRoot.'/examples/003-MiniWebApp', '--jit', '-o', $output],
+            $repoRoot
+        );
+        try {
+            $this->assertSame(0, $result['exit'], $result['stderr'].$result['stdout']);
+            $this->assertFileExists($output);
+            $this->assertTrue(is_executable($output));
+            $this->assertStringContainsString('Wrote JIT launcher', $result['stdout']);
+        } finally {
+            @unlink($output);
+        }
+    }
+
+    public function testPhpcBuildProjectJitAndProbeAreMutuallyExclusive(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $result = $this->runPhpcBuild(
+            ['--project', $repoRoot.'/examples/003-MiniWebApp', '--jit', '--probe'],
+            $repoRoot
+        );
+        $this->assertSame(1, $result['exit']);
+        $this->assertStringContainsString('mutually exclusive', $result['stderr']);
+    }
+
     public function testVerboseMiniWebAppBuildPrintsCompileUnitGraph(): void
     {
         $repoRoot = dirname(__DIR__, 2);

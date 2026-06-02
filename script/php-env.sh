@@ -54,4 +54,5 @@ unset _PHP_LOADED_MODULES
 if [[ -f "$(dirname "${BASH_SOURCE[0]}")/ci-memory-env.sh" ]]; then
   # shellcheck source=ci-memory-env.sh
   source "$(dirname "${BASH_SOURCE[0]}")/ci-memory-env.sh"
+  ci_ensure_vendor_patches
 fi

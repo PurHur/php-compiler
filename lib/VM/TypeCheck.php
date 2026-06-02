@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Block;
 use PHPCompiler\GenericArrayTypeSpec;
 
 /**
@@ -11,6 +12,47 @@ use PHPCompiler\GenericArrayTypeSpec;
  */
 final class TypeCheck
 {
+    public static function variadicSlotNeedsElementChecks(Block $block, int $slot): bool
+    {
+        return isset($block->paramVariadicElementTypeConstraints[$slot])
+            || isset($block->paramVariadicElementGenericArrayTypeSpecs[$slot])
+            || isset($block->paramVariadicElementIntersectionConstraints[$slot])
+            || isset($block->paramVariadicElementDnfConstraints[$slot]);
+    }
+
+    /**
+     * Zend zend_verify_variadic_arg_type(): declared type applies to each trailing arg (#4185).
+     *
+     * @param list<Variable> $elements
+     * @param list<string>|null $intersection
+     * @param list<list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>>|null $dnfArms
+     */
+    public static function verifyVariadicElements(
+        array $elements,
+        bool $strict,
+        ?int $typeConstraint,
+        ?GenericArrayTypeSpec $arraySpec,
+        ?array $intersection,
+        ?array $dnfArms,
+        Context $context
+    ): void {
+        foreach ($elements as $element) {
+            $probe = new Variable();
+            $probe->copyFrom($element);
+            $resolved = $probe->resolveIndirect();
+            if (null !== $typeConstraint) {
+                $resolved->typeConstraint = $typeConstraint;
+            }
+            self::coerceParameter($probe, $strict, $arraySpec);
+            if (null !== $intersection) {
+                self::assertParamIntersection($probe, $intersection, $context);
+            }
+            if (null !== $dnfArms) {
+                DnfCheck::assertMatches($probe, $dnfArms, $context);
+            }
+        }
+    }
+
     public static function coerceParameter(Variable $dest, bool $strict, ?GenericArrayTypeSpec $arraySpec = null): void
     {
         self::coerceTypedSlot($dest, $strict, 'Argument');
@@ -33,6 +75,9 @@ final class TypeCheck
     public static function coercePropertyWrite(Variable $dest, bool $strict): void
     {
         $target = $dest->resolveIndirect();
+        if (null !== $target->dnfArms) {
+            return;
+        }
         if (null !== $target->unionTypeConstraints) {
             self::coerceUnionPropertyWrite($target, $strict);
 
@@ -48,6 +93,32 @@ final class TypeCheck
     public static function coerceReturn(Variable $value, bool $strict, int $constraint): void
     {
         self::coerceTypedSlot($value, $strict, 'Return value', $constraint);
+    }
+
+    /**
+     * PHP 8.3 typed class constants: strict match; int literal allowed for float (zend_compile.c, #4541).
+     */
+    public static function assertClassConstantValue(
+        Variable $value,
+        int $constraint,
+        ?string $constName = null
+    ): void {
+        $target = $value->resolveIndirect();
+        if (self::isExactType($target, $constraint)) {
+            return;
+        }
+        if (Variable::TYPE_FLOAT === $constraint && Variable::TYPE_INTEGER === $target->type) {
+            $target->float((float) $target->toInt());
+
+            return;
+        }
+        $expected = self::typeName($constraint);
+        $given = self::typeName($target->type);
+        if (null !== $constName && '' !== $constName) {
+            throw new \TypeError("Cannot assign {$given} to class constant {$constName} of type {$expected}");
+        }
+
+        throw new \TypeError("Cannot assign {$given} to class constant of type {$expected}");
     }
 
     public static function assertVoidReturn(?Variable $value): void
@@ -136,6 +207,16 @@ final class TypeCheck
         } catch (\TypeError $e) {
             throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite);
         }
+    }
+
+    public static function parameterMatchesType(Variable $value, int $constraint): bool
+    {
+        return self::isExactType($value->resolveIndirect(), $constraint);
+    }
+
+    public static function typeNameForConstraint(int $type): string
+    {
+        return self::typeName($type);
     }
 
     private static function isExactType(Variable $value, int $constraint): bool

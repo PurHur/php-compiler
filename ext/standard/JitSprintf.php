@@ -87,7 +87,7 @@ final class JitSprintf
         return $result;
     }
 
-    private static function writeArg(Context $context, Value $slot, JITVariable $arg): void
+    public static function writeArg(Context $context, Value $slot, JITVariable $arg): void
     {
         $ptr = JitValueBox::pointer($context, $slot);
         switch ($arg->type) {

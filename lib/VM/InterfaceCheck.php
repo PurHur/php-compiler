@@ -82,6 +82,12 @@ final class InterfaceCheck
             if ($lc === $classLc) {
                 return true;
             }
+            if (in_array($classLc, $current->interfaces, true)) {
+                return true;
+            }
+            if ($current->isInterface && $lc === $classLc) {
+                return true;
+            }
             if (null === $current->parentLc) {
                 break;
             }

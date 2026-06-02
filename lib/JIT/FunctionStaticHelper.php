@@ -42,6 +42,39 @@ final class FunctionStaticHelper
         $context->builder->positionAtEnd($doneBlock);
     }
 
+    public static function isInitializedCondition(Context $context, string $key): Value
+    {
+        if (!isset(self::$initFlags[$key])) {
+            $i8 = $context->getTypeFromString('int8');
+            $flagName = 'phpc_fn_static_init_'.substr(hash('sha256', $key), 0, 16);
+            $flag = $context->module->addGlobal($i8, $flagName);
+            $flag->setInitializer($i8->constInt(0, false));
+            self::$initFlags[$key] = $flag;
+        }
+        $i8 = $context->getTypeFromString('int8');
+        $loaded = $context->builder->load(self::$initFlags[$key]);
+
+        return $context->builder->icmp(
+            Builder::INT_NE,
+            $loaded,
+            $i8->constInt(0, false)
+        );
+    }
+
+    public static function emitRuntimeInitStore(Context $context, string $key, Variable $storage, Variable $value): void
+    {
+        self::writeDefault($context, $storage, $value);
+        if (!isset(self::$initFlags[$key])) {
+            $i8 = $context->getTypeFromString('int8');
+            $flagName = 'phpc_fn_static_init_'.substr(hash('sha256', $key), 0, 16);
+            $flag = $context->module->addGlobal($i8, $flagName);
+            $flag->setInitializer($i8->constInt(0, false));
+            self::$initFlags[$key] = $flag;
+        }
+        $i8 = $context->getTypeFromString('int8');
+        $context->builder->store($i8->constInt(1, false), self::$initFlags[$key]);
+    }
+
     public static function writeDefault(Context $context, Variable $storage, Variable $default): void
     {
         $destPtr = self::storageValuePtr($context, $storage);
@@ -75,12 +108,15 @@ final class FunctionStaticHelper
                 );
                 break;
             case Variable::TYPE_VALUE:
-                if ($storage->functionStaticGlobal) {
-                    throw new \LogicException(
-                        'Boxed function static default on global storage not supported yet (#3778)'
-                    );
-                }
                 $srcPtr = $context->helper->loadValue($default);
+                if ($storage->functionStaticGlobal) {
+                    $destPtr = JitValueBox::normalizeValuePtr(
+                        $context,
+                        $context->builder->load($storage->value)
+                    );
+                    JitValueBox::copyFromPointer($context, $destPtr, $srcPtr);
+                    break;
+                }
                 JitValueBox::copyFromPointer($context, $storage->value, $srcPtr);
                 break;
             default:

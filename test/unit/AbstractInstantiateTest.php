@@ -37,7 +37,7 @@ abstract class A {}
 $c = 'A';
 new $c();
 PHP;
-        $this->expectException(\LogicException::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot instantiate abstract class A');
         $runtime->run($runtime->parseAndCompile($code, 'abstract_instantiate_dynamic.php'));
     }

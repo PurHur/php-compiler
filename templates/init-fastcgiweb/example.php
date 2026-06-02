@@ -22,11 +22,9 @@ $pathInfo = $_SERVER['PATH_INFO'] ?? '';
 header('Content-Type: text/plain; charset=UTF-8');
 
 if ($pathInfo !== '') {
-    $requestUri = $_SERVER['REQUEST_URI'] ?? '/';
-    $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/example.php';
-    echo 'REQUEST_URI=', $requestUri, "\n";
-    echo 'SCRIPT_NAME=', $scriptName, "\n";
-    echo 'PATH_INFO=', $pathInfo, "\n";
+    echo 'REQUEST_URI='.($_SERVER['REQUEST_URI'] ?? '/')."\n"
+        .'SCRIPT_NAME='.($_SERVER['SCRIPT_NAME'] ?? '/example.php')."\n"
+        .'PATH_INFO='.$pathInfo."\n";
 } else {
     echo "ok\n";
 }

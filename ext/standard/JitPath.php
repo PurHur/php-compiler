@@ -100,6 +100,42 @@ final class JitPath
         return $phi;
     }
 
+    public static function dirnameWithLevels(Context $context, Value $path, Value $levels): Value
+    {
+        JitDirname::emitRuntimeLevelsGuard($context, $levels);
+
+        $id = (string) (++self::$blockSerial);
+        $i64 = JitStringIndex::i64($context);
+        $one = $i64->constInt(1, false);
+        $zero = JitStringIndex::zero($context);
+
+        $resultSlot = $context->builder->alloca($path->typeOf(), 1, 'dirname_levels_result');
+        $context->builder->store($path, $resultSlot);
+        $counterSlot = $context->builder->alloca($i64, 1, 'dirname_levels_counter');
+        $context->builder->store($levels, $counterSlot);
+
+        $head = self::block($context, 'dirname_levels_head_'.$id);
+        $body = self::block($context, 'dirname_levels_body_'.$id);
+        $done = self::block($context, 'dirname_levels_done_'.$id);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $counter = $context->builder->load($counterSlot);
+        $stop = $context->builder->icmp(Builder::INT_SLE, $counter, $zero);
+        $context->builder->branchIf($stop, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $current = $context->builder->load($resultSlot);
+        $next = self::dirname($context, $current);
+        $context->builder->store($next, $resultSlot);
+        $context->builder->store($context->builder->sub($counter, $one), $counterSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+
+        return $context->builder->load($resultSlot);
+    }
+
     public static function basename(Context $context, Value $str): Value
     {
         $id = (string) (++self::$blockSerial);

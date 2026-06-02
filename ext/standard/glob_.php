@@ -63,10 +63,6 @@ final class glob_ extends Internal
         $i32 = $context->getTypeFromString('int32');
         $flags = $i32->constInt(0, false);
         if (2 === $argc) {
-            if (JITVariable::TYPE_INTEGER !== $args[1]->type
-                && JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-                throw new \LogicException('glob() flags must be an integer in this compiler build');
-            }
             $flags = $context->builder->truncOrBitCast(
                 JitLongArg::lower($context, $args[1], 'glob() flags'),
                 $i32

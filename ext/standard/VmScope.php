@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
@@ -13,8 +14,8 @@ use PHPCompiler\Web\Superglobals;
  */
 final class VmScope
 {
-    /** PHP EXTR_SKIP — do not overwrite variables that already hold a value. */
-    public const EXTR_SKIP = 6;
+    /** PHP EXTR_SKIP — do not overwrite variables that already hold a value (php_array.h). */
+    public const EXTR_SKIP = StdlibConstants::EXTR_SKIP;
 
     public static function requireCaller(Frame $frame): Frame
     {
@@ -23,6 +24,18 @@ final class VmScope
         }
 
         return $frame->parent;
+    }
+
+    /**
+     * One-arg parse_str() may only populate the global symbol table ({main}), not function locals (#4034).
+     *
+     * php-src: ext/standard/basic_functions.c — php_parse_str without result array
+     */
+    public static function requireMainScriptForParseStrOneArg(Frame $caller): void
+    {
+        if (null === $caller->block || !$caller->block->isMainScript()) {
+            throw new \ArgumentCountError('parse_str() expects exactly 2 arguments, 1 given');
+        }
     }
 
     public static function slotForName(Frame $caller, string $name): ?int
@@ -79,23 +92,91 @@ final class VmScope
     {
         $caller = self::requireCaller($frame);
         $result = new HashTable();
-        foreach ($frame->calledArgs as $arg) {
-            $nameVar = $arg->resolveIndirect();
-            if (Variable::TYPE_STRING !== $nameVar->type) {
-                throw new \LogicException('compact() arguments must be string variable names in this compiler build');
+        foreach ($frame->calledArgs as $argIndex => $arg) {
+            foreach (self::collectCompactNames($frame, (int) $argIndex + 1, $arg->resolveIndirect()) as $name) {
+                $slot = self::slotForName($caller, $name);
+                if (null === $slot) {
+                    self::compactUndefinedVariableWarning($frame, $name);
+                    continue;
+                }
+                $value = $caller->scope[$slot];
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $result->add($name, $copy);
             }
-            $name = $nameVar->toString();
-            $slot = self::slotForName($caller, $name);
-            if (null === $slot) {
-                continue;
-            }
-            $value = $caller->scope[$slot];
-            $copy = new Variable();
-            $copy->copyFrom($value);
-            $result->add($name, $copy);
         }
 
         return $result;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function collectCompactNames(Frame $frame, int $argNum, Variable $var): array
+    {
+        if (Variable::TYPE_STRING === $var->type) {
+            return [$var->toString()];
+        }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            $names = [];
+            foreach ($var->toArray()->iterateKeyed(true) as [, $valueVar]) {
+                $names = array_merge(
+                    $names,
+                    self::collectCompactNames($frame, $argNum, $valueVar->resolveIndirect())
+                );
+            }
+
+            return $names;
+        }
+
+        self::compactInvalidArgumentWarning($frame, $argNum, $var);
+
+        return [];
+    }
+
+    private static function compactInvalidArgumentWarning(Frame $frame, int $argNum, Variable $var): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $typeName = self::compactInvalidArgTypeName($var);
+        $file = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+        $frame->vmContext->errors->triggerError(
+            "compact(): Argument #{$argNum} must be string or array of strings, {$typeName} given",
+            ErrorReporter::E_WARNING,
+            $file,
+            $frame->vmContext,
+            $frame
+        );
+    }
+
+    private static function compactInvalidArgTypeName(Variable $var): string
+    {
+        return match ($var->type) {
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            default => 'unknown type',
+        };
+    }
+
+    private static function compactUndefinedVariableWarning(Frame $frame, string $name): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $file = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+        $frame->vmContext->errors->triggerError(
+            "compact(): Undefined variable \${$name}",
+            ErrorReporter::E_WARNING,
+            $file,
+            $frame->vmContext,
+            $frame
+        );
     }
 
     private static function callerVarIsSet(Variable $var): bool

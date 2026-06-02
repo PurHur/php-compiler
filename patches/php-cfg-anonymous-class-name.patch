@@ -1,0 +1,30 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -55,6 +55,9 @@ class Parser
+ 
+     protected $anonId = 0;
+ 
++    /** @var AstVisitor\MagicStringResolver */
++    protected $magicStringResolver;
++
+     public function __construct(AstParser $astParser, AstTraverser $astTraverser = null)
+     {
+         $this->astParser = $astParser;
+@@ -66,7 +69,8 @@ class Parser
+         $this->astTraverser = $astTraverser;
+         $this->astTraverser->addVisitor(new AstVisitor\NameResolver());
+         $this->astTraverser->addVisitor(new AstVisitor\LoopResolver());
+-        $this->astTraverser->addVisitor(new AstVisitor\MagicStringResolver());
++        $this->magicStringResolver = new AstVisitor\MagicStringResolver();
++        $this->astTraverser->addVisitor($this->magicStringResolver);
+     }
+ 
+     /**
+@@ -86,6 +90,7 @@ class Parser
+     public function parseAst($ast, $fileName): Script
+     {
+         $this->fileName = $fileName;
++        $this->magicStringResolver->beginCompilationUnit($fileName);
+         $ast = $this->astTraverser->traverse($ast);
+ 
+         $this->script = $script = new Script();

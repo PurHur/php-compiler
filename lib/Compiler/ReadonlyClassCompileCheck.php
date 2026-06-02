@@ -10,10 +10,11 @@ use PHPCfg\Script;
 use PHPCompiler\VM\ClassReadonly;
 
 /**
- * Compile-time checks for readonly class inheritance and property defaults (#3551).
+ * Compile-time checks for readonly class inheritance and property defaults (#3551, #3149).
  *
  * php-src: Zend/zend_compile.c — zend_compile_class_decl;
- * Zend/zend_inheritance.c — readonly parent/child checks
+ * Zend/zend_inheritance.c — readonly parent/child checks;
+ * per-property MODIFIER_READONLY cannot have default initializer
  */
 final class ReadonlyClassCompileCheck
 {
@@ -44,9 +45,8 @@ final class ReadonlyClassCompileCheck
         }
         $readonly = ClassReadonly::fromClassFlags($class->flags);
         $display = $this->operandDisplayName($class->name, $lc);
-        if ($readonly) {
-            $this->verifyNoPropertyDefaults($class, $display);
-        }
+        $this->verifyNoPropertyDefaults($class, $display, $readonly);
+        $this->verifyNoStaticReadonlyProperties($class, $display);
         $parentLc = null;
         if (null !== $class->extends) {
             $parentLc = $this->operandLcName($class->extends);
@@ -58,10 +58,30 @@ final class ReadonlyClassCompileCheck
         ];
     }
 
-    private function verifyNoPropertyDefaults(Op\Stmt\Class_ $class, string $classDisplay): void
+    private function verifyNoStaticReadonlyProperties(Op\Stmt\Class_ $class, string $classDisplay): void
+    {
+        foreach ($class->stmts->children as $member) {
+            if (!$member instanceof Op\Stmt\Property || !$member->static) {
+                continue;
+            }
+            if (!$this->isCfgPropertyReadonly($member)) {
+                continue;
+            }
+            $propName = $this->propertyDisplayName($member->name);
+            throw new \CompileError(
+                "Static property {$classDisplay}::\${$propName} cannot be readonly"
+            );
+        }
+    }
+
+    private function verifyNoPropertyDefaults(Op\Stmt\Class_ $class, string $classDisplay, bool $classReadonly): void
     {
         foreach ($class->stmts->children as $member) {
             if (!$member instanceof Op\Stmt\Property) {
+                continue;
+            }
+            $propertyReadonly = $classReadonly || $this->isCfgPropertyReadonly($member);
+            if (!$propertyReadonly) {
                 continue;
             }
             if (null === $member->defaultVar && null === $member->defaultBlock) {
@@ -93,6 +113,19 @@ final class ReadonlyClassCompileCheck
                 );
             }
         }
+    }
+
+    private function isCfgPropertyReadonly(Op\Stmt\Property $member): bool
+    {
+        if (property_exists($member, 'readonly') && $member->readonly) {
+            return true;
+        }
+        if (property_exists($member, 'propertyFlags')
+            && ClassReadonly::fromClassFlags($member->propertyFlags)) {
+            return true;
+        }
+
+        return ClassReadonly::fromClassFlags($member->visibility);
     }
 
     private function propertyDisplayName(Operand $op): string

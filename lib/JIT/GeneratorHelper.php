@@ -93,27 +93,127 @@ final class GeneratorHelper
     /**
      * @return list<array{kind: string, op: OpCode, block: Block}>
      */
-    public static function collectResumePoints(Block $block): array
+    public static function collectResumePoints(Block $entry): array
     {
         $points = [];
-        foreach ($block->opCodes as $op) {
+        $visited = new \SplObjectStorage();
+        self::walkBlockForResumePoints($entry, $points, $visited);
+
+        return $points;
+    }
+
+    /**
+     * @param list<array{kind: string, op: OpCode, block: Block}> $points
+     */
+    private static function walkBlockForResumePoints(
+        Block $block,
+        array &$points,
+        \SplObjectStorage $visited
+    ): void {
+        if ($visited->contains($block)) {
+            return;
+        }
+        $visited->attach($block);
+        foreach ($block->opCodes as $i => $op) {
             if (OpCode::TYPE_YIELD === $op->type) {
                 $points[] = ['kind' => 'yield', 'op' => $op, 'block' => $block];
-            } elseif (OpCode::TYPE_YIELD_FROM === $op->type) {
+                continue;
+            }
+            if (OpCode::TYPE_YIELD_FROM === $op->type) {
                 $points[] = ['kind' => 'yield_from', 'op' => $op, 'block' => $block];
-            } elseif (OpCode::TYPE_RETURN === $op->type || OpCode::TYPE_RETURN_VOID === $op->type) {
-                break;
-            } elseif (
-                OpCode::TYPE_TRY === $op->type
-                || OpCode::TYPE_CATCH === $op->type
+                continue;
+            }
+            if (OpCode::TYPE_RETURN === $op->type || OpCode::TYPE_RETURN_VOID === $op->type) {
+                return;
+            }
+            if (OpCode::TYPE_TRY === $op->type) {
+                if (null !== $op->block1) {
+                    self::walkBlockForResumePoints($op->block1, $points, $visited);
+                }
+                self::collectCatchResumePoints($block, $i, $points, $visited);
+
+                continue;
+            }
+            if (
+                OpCode::TYPE_CATCH === $op->type
                 || OpCode::TYPE_FINALLY === $op->type
                 || OpCode::TYPE_THROW === $op->type
+                || OpCode::TYPE_RETHROW === $op->type
             ) {
-                throw new \LogicException('try/catch in generator JIT is not supported yet (issue #3074)');
+                continue;
+            }
+            if (OpCode::TYPE_JUMP === $op->type && null !== $op->block2) {
+                self::walkBlockForResumePoints($op->block2, $points, $visited);
+
+                return;
+            }
+        }
+    }
+
+    /**
+     * @param list<array{kind: string, op: OpCode, block: Block}> $points
+     */
+    private static function collectCatchResumePoints(
+        Block $handlerBlock,
+        int $afterTryIndex,
+        array &$points,
+        \SplObjectStorage $visited
+    ): void {
+        $n = $handlerBlock->nOpCodes;
+        for ($j = $afterTryIndex + 1; $j < $n; ++$j) {
+            $op = $handlerBlock->opCodes[$j];
+            if (OpCode::TYPE_JUMP === $op->type) {
+                continue;
+            }
+            if (OpCode::TYPE_CATCH !== $op->type) {
+                break;
+            }
+            if (null !== $op->block1) {
+                self::walkBlockForResumePoints($op->block1, $points, $visited);
+            }
+        }
+    }
+
+    private static function cfgBlockContains(Block $root, Block $needle): bool
+    {
+        if ($root === $needle) {
+            return true;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $current = array_pop($stack);
+            if (!$current instanceof Block || $seen->contains($current)) {
+                continue;
+            }
+            $seen->attach($current);
+            if ($current === $needle) {
+                return true;
+            }
+            foreach ($current->opCodes as $op) {
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof Block) {
+                        $stack[] = $sub;
+                    }
+                }
             }
         }
 
-        return $points;
+        return false;
+    }
+
+    /**
+     * @return array{0: Block, 1: OpCode, 2: int}|null
+     */
+    private static function findTrySetupForYieldBlock(Block $entry, Block $yieldBlock): ?array
+    {
+        foreach ($entry->opCodes as $i => $op) {
+            if (OpCode::TYPE_TRY === $op->type && self::cfgBlockContains($op->block1, $yieldBlock)) {
+                return [$entry, $op, $i];
+            }
+        }
+
+        return null;
     }
 
     private static function opcodeIndex(Block $block, OpCode $target): int
@@ -130,14 +230,18 @@ final class GeneratorHelper
     /**
      * @param list<array{kind: string, op: OpCode, block: Block}> $points
      */
-    private static function resumePrefixStart(Block $block, array $points, int $pointIndex): int
+    private static function resumePrefixStart(array $points, int $pointIndex): int
     {
         if (0 === $pointIndex) {
             return 0;
         }
-        $prevOp = $points[$pointIndex - 1]['op'];
+        $prev = $points[$pointIndex - 1];
+        $curr = $points[$pointIndex];
+        if ($prev['block'] !== $curr['block']) {
+            return 0;
+        }
 
-        return self::opcodeIndex($block, $prevOp) + 1;
+        return self::opcodeIndex($curr['block'], $prev['op']) + 1;
     }
 
     private static function compileYieldPrefix(
@@ -146,7 +250,7 @@ final class GeneratorHelper
         Block $block,
         int $startIndex,
         int $yieldIdx,
-        \PHPLLVM\BasicBlock $caseBlock
+        \PHPLLVM\BasicBlock $entryBlock
     ): void {
         if ($startIndex >= $yieldIdx) {
             return;
@@ -154,9 +258,66 @@ final class GeneratorHelper
         $context = $jit->context;
         $savedStorage = $context->scope->blockStorage;
         $context->scope->blockStorage = new \SplObjectStorage();
-        $exit = $jit->compileGeneratorResumePrefix($func, $block, $startIndex, $yieldIdx, $caseBlock);
+        $exit = $jit->compileGeneratorResumePrefix($func, $block, $startIndex, $yieldIdx, $entryBlock);
         $context->builder->positionAtEnd($exit);
         $context->scope->blockStorage = $savedStorage;
+    }
+
+    /**
+     * @param array{kind: string, op: OpCode, block: Block} $firstPoint
+     */
+    private static function compileEntryLeadIn(
+        \PHPCompiler\JIT $jit,
+        \PHPLLVM\Value\Function_ $func,
+        Block $entry,
+        array $firstPoint,
+        \PHPLLVM\BasicBlock $caseBlock
+    ): \PHPLLVM\BasicBlock {
+        $trySetup = self::findTrySetupForYieldBlock($entry, $firstPoint['block']);
+        if (null === $trySetup) {
+            return $caseBlock;
+        }
+        [$handlerBlock, $tryOp, $tryIndex] = $trySetup;
+        $context = $jit->context;
+        $tryBodyBb = $func->appendBasicBlock('gen_try_body_entry');
+        $context->builder->positionAtEnd($caseBlock);
+        TryCatchHelper::beginTryGeneratorResume(
+            $jit,
+            $func,
+            $context,
+            $handlerBlock,
+            $tryOp,
+            $tryIndex,
+            [],
+            $caseBlock,
+            $tryBodyBb
+        );
+        $context->builder->positionAtEnd($tryBodyBb);
+
+        return $tryBodyBb;
+    }
+
+    /**
+     * @param array{kind: string, op: OpCode, block: Block} $prev
+     * @param array{kind: string, op: OpCode, block: Block} $curr
+     */
+    private static function compileCrossBlockResumePrefix(
+        \PHPCompiler\JIT $jit,
+        \PHPLLVM\Value\Function_ $func,
+        array $prev,
+        array $curr,
+        \PHPLLVM\BasicBlock $caseBlock
+    ): void {
+        $prevBlock = $prev['block'];
+        $prevAfter = self::opcodeIndex($prevBlock, $prev['op']) + 1;
+        if ($prevAfter < $prevBlock->nOpCodes) {
+            self::compileYieldPrefix($jit, $func, $prevBlock, $prevAfter, $prevBlock->nOpCodes, $caseBlock);
+        }
+        $currBlock = $curr['block'];
+        $currIdx = self::opcodeIndex($currBlock, $curr['op']);
+        if ($currIdx > 0) {
+            self::compileYieldPrefix($jit, $func, $currBlock, 0, $currIdx, $caseBlock);
+        }
     }
 
     public static function compileResumeFunction(
@@ -207,23 +368,64 @@ final class GeneratorHelper
             $caseBlocks[$i] = $caseBb;
         }
 
+        $context->generatorCatchDispatchEntry = [];
+        $trySetup = [] !== $points ? self::findTrySetupForYieldBlock($block, $points[0]['block']) : null;
+        if (null !== $trySetup) {
+            [$handlerBlock, , $tryIndex] = $trySetup;
+            $catchArms = TryCatchHelper::collectCatchOps($handlerBlock, $tryIndex);
+            foreach ($points as $i => $point) {
+                if (0 === $i) {
+                    continue;
+                }
+                foreach ($catchArms as $arm) {
+                    $catchBody = $arm['op']->block1;
+                    if ($catchBody instanceof Block && self::cfgBlockContains($catchBody, $point['block'])) {
+                        $context->generatorCatchDispatchEntry[spl_object_id($catchBody)] =
+                            $func->appendBasicBlock('gen_catch_resume_'.$i);
+                        break;
+                    }
+                }
+            }
+        }
+
         for ($i = 0; $i < $n; ++$i) {
             $context->builder->positionAtEnd($caseBlocks[$i]);
             $point = $points[$i];
             $pointBlock = $point['block'];
             $yieldIdx = self::opcodeIndex($pointBlock, $point['op']);
-            $prefixStart = self::resumePrefixStart($pointBlock, $points, $i);
+            $prefixEntry = $caseBlocks[$i];
+            if (0 === $i && $pointBlock !== $block) {
+                $prefixEntry = self::compileEntryLeadIn($jit, $func, $block, $point, $caseBlocks[$i]);
+            } elseif ($i > 0 && $points[$i - 1]['block'] !== $pointBlock) {
+                self::compileCrossBlockResumePrefix($jit, $func, $points[$i - 1], $point, $caseBlocks[$i]);
+            }
+            $catchDispatchBb = $context->generatorCatchDispatchEntry[spl_object_id($pointBlock)] ?? null;
+            $prefixStart = self::resumePrefixStart($points, $i);
             if ('yield' === $point['kind']) {
-                if ($prefixStart < $yieldIdx) {
+                $yieldBb = $catchDispatchBb ?? $prefixEntry;
+                if (null === $catchDispatchBb && $prefixStart < $yieldIdx) {
                     self::compileYieldPrefix(
                         $jit,
                         $func,
                         $pointBlock,
                         $prefixStart,
                         $yieldIdx,
-                        $caseBlocks[$i]
+                        $prefixEntry
                     );
+                } elseif (null !== $catchDispatchBb) {
+                    $context->builder->positionAtEnd($catchDispatchBb);
+                    if ($prefixStart < $yieldIdx) {
+                        self::compileYieldPrefix(
+                            $jit,
+                            $func,
+                            $pointBlock,
+                            $prefixStart,
+                            $yieldIdx,
+                            $catchDispatchBb
+                        );
+                    }
                 }
+                $context->builder->positionAtEnd($yieldBb);
                 self::emitYieldPoint($jit, $pointBlock, $point['op'], $stateParam, $i + 1);
             } else {
                 self::emitYieldFromPoint(
@@ -245,6 +447,7 @@ final class GeneratorHelper
         $context->builder = $savedBuilder;
         $context->compilingGeneratorResume = false;
         $context->generatorStateParam = null;
+        $context->generatorCatchDispatchEntry = [];
 
         $context->functions[$lc] = $func;
         $context->functionReturnType[$lc] = 'int64';
@@ -310,7 +513,15 @@ final class GeneratorHelper
 
     public static function prefixOpcodesSafeForYieldFromInit(Block $block, int $yieldFromIndex): bool
     {
-        for ($i = 0; $i < $yieldFromIndex; ++$i) {
+        return self::prefixSegmentSafeForYieldFromInit($block, 0, $yieldFromIndex);
+    }
+
+    /**
+     * True when [$start, $end) contains no yield / yield from (safe to compile for container setup).
+     */
+    public static function prefixSegmentSafeForYieldFromInit(Block $block, int $start, int $end): bool
+    {
+        for ($i = $start; $i < $end; ++$i) {
             $type = $block->opCodes[$i]->type;
             if (OpCode::TYPE_YIELD === $type || OpCode::TYPE_YIELD_FROM === $type) {
                 return false;
@@ -378,13 +589,21 @@ final class GeneratorHelper
 
         $initBb = $fn->appendBasicBlock('gen_yf_init');
         $dispatchBb = $fn->appendBasicBlock('gen_yf_dispatch');
-        $arrayInitBb = $fn->appendBasicBlock('gen_yf_init_array');
         $arrayIterBb = $fn->appendBasicBlock('gen_yf_iter_array');
         $genIterBb = $fn->appendBasicBlock('gen_yf_iter_gen');
         $context->builder->branchIf($active, $dispatchBb, $initBb);
 
         $context->builder->positionAtEnd($initBb);
-        $containerVar = $jit->compileGeneratorYieldFromSetup($fn, $block, $initBb, $op, $innerResumeName);
+        $points = self::collectResumePoints($block);
+        $prefixStart = self::resumePrefixStart($points, $resumeIp);
+        $containerVar = $jit->compileGeneratorYieldFromSetup(
+            $fn,
+            $block,
+            $initBb,
+            $op,
+            $innerResumeName,
+            $prefixStart
+        );
         $effectiveResumeName = $innerResumeName ?? $containerVar->generatorResumeName;
         if (
             null !== $effectiveResumeName
@@ -405,8 +624,6 @@ final class GeneratorHelper
             || Variable::TYPE_HASHTABLE === $containerVar->type
             || Variable::TYPE_VALUE === $containerVar->type
         ) {
-            $context->builder->branch($arrayInitBb);
-            $context->builder->positionAtEnd($arrayInitBb);
             if ($containerVar->type & Variable::IS_NATIVE_ARRAY) {
                 $htPtr = HashTableHelper::materializeNativeArrayForCall($context, $containerVar);
             } elseif (Variable::TYPE_HASHTABLE === $containerVar->type) {
@@ -696,30 +913,36 @@ final class GeneratorHelper
         $state = $gen->generatorStatePtr;
         $map = $context->structFieldMap['__generator_state__'];
         $i1 = $context->getTypeFromString('int1');
-        $done = $context->builder->load($context->builder->structGep($state, $map['done']));
+        $i64 = $context->getTypeFromString('int64');
+        $doneField = $context->builder->structGep($state, $map['done']);
         $fn = $context->builder->getInsertBlock()->getParent();
-        $early = $fn->appendBasicBlock('gen_iter_done');
-        $body = $fn->appendBasicBlock('gen_iter_resume');
-        $merge = $fn->appendBasicBlock('gen_iter_merge');
-        $context->builder->branchIf($done, $early, $body);
-        $context->builder->positionAtEnd($early);
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($body);
+        $doneBb = $fn->appendBasicBlock('gen_iter_done');
+        $resumeBb = $fn->appendBasicBlock('gen_iter_resume');
+        $mergeBb = $fn->appendBasicBlock('gen_iter_merge');
         $resumeFn = $context->functions[strtolower($gen->generatorResumeName)] ?? null;
         if (!$resumeFn instanceof \PHPLLVM\Value\Function_) {
             throw new \LogicException('Generator resume function missing from JIT context');
         }
+
+        $context->builder->branchIf($context->builder->load($doneField), $doneBb, $resumeBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($resumeBb);
+        $loopHead = $resumeBb;
         $yielded = $context->builder->call($resumeFn, $state);
-        $has = $context->builder->icmp(
-            Builder::INT_NE,
-            $yielded,
-            $context->getTypeFromString('int64')->constInt(0, false)
-        );
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($merge);
+        $hasYield = $context->builder->icmp(Builder::INT_NE, $yielded, $i64->constInt(0, false));
+        $afterResume = $fn->appendBasicBlock('gen_iter_after_resume');
+        $context->builder->branchIf($hasYield, $mergeBb, $afterResume);
+
+        $context->builder->positionAtEnd($afterResume);
+        $context->builder->branchIf($context->builder->load($doneField), $doneBb, $loopHead);
+
+        $context->builder->positionAtEnd($mergeBb);
         $phi = $context->builder->phi($i1);
-        $phi->addIncoming($i1->constInt(0, false), $early);
-        $phi->addIncoming($has, $body);
+        $phi->addIncoming($i1->constInt(0, false), $doneBb);
+        $phi->addIncoming($i1->constInt(1, false), $resumeBb);
 
         return $phi;
     }

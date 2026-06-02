@@ -8,6 +8,8 @@
 #include <fcntl.h>
 #include <fnmatch.h>
 #include <glob.h>
+#include <grp.h>
+#include <pwd.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,11 +20,27 @@
 
 typedef struct __hashtable__ __hashtable__;
 typedef struct __string__ __string__;
+typedef struct __value__ {
+    int8_t type;
+    int8_t value[8];
+} __value__;
+
+#define PHPC_TYPE_NATIVE_LONG 1
+#define PHPC_TYPE_STRING 4
+
+extern long long __value__readLong(__value__ *v);
+extern __string__ *__value__readString(__value__ *v);
+
 extern __hashtable__ *__hashtable__alloc(void);
 extern void __hashtable__setStringAt(__hashtable__ *ht, size_t index, __string__ *val);
 extern void __hashtable__setStringKeyLong(__hashtable__ *ht, __string__ *key, long long val);
 extern void __hashtable__setLongAt(__hashtable__ *ht, size_t index, long long val);
 extern __string__ *__string__init(long long size, const char *value);
+
+/* PHP GLOB_ONLYDIR (ext/standard/dir.c; Linux php-src registers 8192). */
+#ifndef PHP_GLOB_ONLYDIR
+#define PHP_GLOB_ONLYDIR 8192
+#endif
 
 static size_t phpc_strlen(__string__ *s)
 {
@@ -287,9 +305,10 @@ int __phpc_fnmatch(__string__ *pattern, __string__ *filename, int flags)
 /** Collect glob matches; returns count (>= 0) or -1 on error. Caller frees with __phpc_strvec_free. */
 int __phpc_glob_vec(__string__ *pattern, int flags, char ***out_items)
 {
-    const char *pat; glob_t g; int rc; size_t i; size_t count;
+    const char *pat; glob_t g; int rc; size_t i; size_t count; size_t kept; int onlydir;
     if (NULL == out_items) return -1; *out_items = NULL;
     if (NULL == pattern) return -1;
+    onlydir = (0 != (flags & PHP_GLOB_ONLYDIR));
     pat = phpc_strdata(pattern); memset(&g, 0, sizeof(g));
     rc = glob(pat, flags, NULL, &g);
     if (GLOB_NOMATCH == rc) return 0;
@@ -297,13 +316,30 @@ int __phpc_glob_vec(__string__ *pattern, int flags, char ***out_items)
     count = g.gl_pathc; if (0 == count) { globfree(&g); return 0; }
     *out_items = (char **) malloc(count * sizeof(char *));
     if (NULL == *out_items) { globfree(&g); return -1; }
+    kept = 0;
     for (i = 0; i < count; i++) {
-        (*out_items)[i] = strdup(g.gl_pathv[i]);
-        if (NULL == (*out_items)[i]) {
-            __phpc_strvec_free(*out_items, (int) i); *out_items = NULL; globfree(&g); return -1;
+        if (onlydir && !phpc_path_is_dir(g.gl_pathv[i])) {
+            continue;
+        }
+        (*out_items)[kept] = strdup(g.gl_pathv[i]);
+        if (NULL == (*out_items)[kept]) {
+            __phpc_strvec_free(*out_items, (int) kept); *out_items = NULL; globfree(&g); return -1;
+        }
+        kept++;
+    }
+    globfree(&g);
+    if (0 == kept) {
+        free(*out_items);
+        *out_items = NULL;
+        return 0;
+    }
+    if (kept < count) {
+        char **shrunk = (char **) realloc(*out_items, kept * sizeof(char *));
+        if (NULL != shrunk) {
+            *out_items = shrunk;
         }
     }
-    globfree(&g); return (int) count;
+    return (int) kept;
 }
 
 int __phpc_scandir_vec(__string__ *path, int sorting_order, char ***out_items)
@@ -333,6 +369,99 @@ int __phpc_scandir_vec(__string__ *path, int sorting_order, char ***out_items)
     free(namelist); return n;
 }
 
+/** file() flags (ext/standard/file.c). */
+#define PHP_FILE_IGNORE_NEW_LINES 2
+#define PHP_FILE_SKIP_EMPTY_LINES 4
+
+static char *phpc_file_dup_line(const char *line, size_t len, int ignore_nl)
+{
+    size_t end = len;
+    char *copy;
+
+    while (end > 0 && ignore_nl && ('\n' == line[end - 1] || '\r' == line[end - 1])) {
+        end--;
+    }
+    copy = (char *) malloc(end + 1);
+    if (NULL == copy) {
+        return NULL;
+    }
+    if (end > 0) {
+        memcpy(copy, line, end);
+    }
+    copy[end] = '\0';
+
+    return copy;
+}
+
+/** Collect file() lines; returns count (>= 0) or -1 on error. Caller frees with __phpc_strvec_free. */
+int __phpc_file_vec(__string__ *path, int flags, char ***out_items)
+{
+    const char *pathstr;
+    FILE *fp;
+    char *line = NULL;
+    size_t cap = 0;
+    ssize_t nread;
+    char **items = NULL;
+    size_t count = 0;
+    size_t cap_items = 0;
+    int ignore_nl = (0 != (flags & PHP_FILE_IGNORE_NEW_LINES));
+    int skip_empty = (0 != (flags & PHP_FILE_SKIP_EMPTY_LINES));
+
+    if (NULL == out_items) {
+        return -1;
+    }
+    *out_items = NULL;
+    if (NULL == path) {
+        return -1;
+    }
+    pathstr = phpc_strdata(path);
+    if (NULL == pathstr || '\0' == pathstr[0]) {
+        return -1;
+    }
+    fp = fopen(pathstr, "rb");
+    if (NULL == fp) {
+        return -1;
+    }
+    while ((nread = getline(&line, &cap, fp)) != -1) {
+        size_t len = (size_t) nread;
+        char *dup;
+
+        if (len > 0 && '\0' == line[len - 1]) {
+            len--;
+        }
+        dup = phpc_file_dup_line(line, len, ignore_nl);
+        if (NULL == dup) {
+            free(line);
+            fclose(fp);
+            __phpc_strvec_free(items, (int) count);
+            return -1;
+        }
+        if (skip_empty && '\0' == dup[0]) {
+            free(dup);
+            continue;
+        }
+        if (count >= cap_items) {
+            size_t new_cap = cap_items ? cap_items * 2 : 16;
+            char **grown = (char **) realloc(items, new_cap * sizeof(char *));
+            if (NULL == grown) {
+                free(dup);
+                free(line);
+                fclose(fp);
+                __phpc_strvec_free(items, (int) count);
+                return -1;
+            }
+            items = grown;
+            cap_items = new_cap;
+        }
+        items[count++] = dup;
+    }
+    free(line);
+    fclose(fp);
+    *out_items = items;
+
+    return (int) count;
+}
+
 void __phpc_strvec_free(char **items, int count)
 {
     int i; if (NULL == items) return;
@@ -346,10 +475,12 @@ __hashtable__ *__phpc_glob(__string__ *pattern, int flags)
     int rc;
     __hashtable__ *ht;
     size_t i;
+    int onlydir;
 
     if (NULL == pattern) {
         return NULL;
     }
+    onlydir = (0 != (flags & PHP_GLOB_ONLYDIR));
     pat = phpc_strdata(pattern);
     memset(&g, 0, sizeof(g));
     rc = glob(pat, flags, NULL, &g);
@@ -360,8 +491,15 @@ __hashtable__ *__phpc_glob(__string__ *pattern, int flags)
         return NULL;
     }
     ht = __hashtable__alloc();
-    for (i = 0; i < g.gl_pathc; i++) {
-        __hashtable__setStringAt(ht, i, cstr_to_string(g.gl_pathv[i]));
+    {
+        size_t at = 0;
+        for (i = 0; i < g.gl_pathc; i++) {
+            if (onlydir && !phpc_path_is_dir(g.gl_pathv[i])) {
+                continue;
+            }
+            __hashtable__setStringAt(ht, at, cstr_to_string(g.gl_pathv[i]));
+            at++;
+        }
     }
     globfree(&g);
 
@@ -487,4 +625,125 @@ __string__ *__compiler_tempnam(__string__ *directory, __string__ *prefix)
     close(fd);
 
     return cstr_to_string(template);
+}
+
+static int phpc_value_kind(const __value__ *v)
+{
+    if (NULL == v) {
+        return 0;
+    }
+
+    return (int) (v->type & 0x7f);
+}
+
+static gid_t phpc_resolve_gid(__value__ *group)
+{
+    int kind;
+    char *end;
+    long val;
+    struct group *gr;
+
+    if (NULL == group) {
+        return (gid_t) -1;
+    }
+    kind = phpc_value_kind(group);
+    if (PHPC_TYPE_NATIVE_LONG == kind) {
+        return (gid_t) __value__readLong(group);
+    }
+    if (PHPC_TYPE_STRING != kind) {
+        return (gid_t) -1;
+    }
+    {
+        const char *c = phpc_strdata(__value__readString(group));
+        val = strtol(c, &end, 10);
+        if ('\0' == *end && end != c) {
+            return (gid_t) val;
+        }
+        gr = getgrnam(c);
+        if (NULL != gr) {
+            return gr->gr_gid;
+        }
+    }
+
+    return (gid_t) -1;
+}
+
+/**
+ * chgrp()/lchgrp() runtime (issue #3311; php-src ext/standard/filestat.c).
+ * lchgrp_flag: 0 = chgrp(2), non-zero = lchgrp(2).
+ */
+int __compiler_chgrp(__string__ *path, __value__ *group, int lchgrp_flag)
+{
+    const char *p;
+    gid_t gid;
+
+    if (NULL == path || NULL == group) {
+        return 0;
+    }
+    p = phpc_strdata(path);
+    gid = phpc_resolve_gid(group);
+    if ((gid_t) -1 == gid) {
+        return 0;
+    }
+    if (lchgrp_flag) {
+        return fchownat(AT_FDCWD, p, (uid_t) -1, gid, AT_SYMLINK_NOFOLLOW) == 0 ? 1 : 0;
+    }
+
+    return chown(p, (uid_t) -1, gid) == 0 ? 1 : 0;
+}
+
+static uid_t phpc_resolve_uid(__value__ *user)
+{
+    int kind;
+    char *end;
+    long val;
+    struct passwd *pw;
+
+    if (NULL == user) {
+        return (uid_t) -1;
+    }
+    kind = phpc_value_kind(user);
+    if (PHPC_TYPE_NATIVE_LONG == kind) {
+        return (uid_t) __value__readLong(user);
+    }
+    if (PHPC_TYPE_STRING != kind) {
+        return (uid_t) -1;
+    }
+    {
+        const char *c = phpc_strdata(__value__readString(user));
+        val = strtol(c, &end, 10);
+        if ('\0' == *end && end != c) {
+            return (uid_t) val;
+        }
+        pw = getpwnam(c);
+        if (NULL != pw) {
+            return pw->pw_uid;
+        }
+    }
+
+    return (uid_t) -1;
+}
+
+/**
+ * chown()/lchown() runtime (issue #3241; php-src ext/standard/filestat.c).
+ * lchown_flag: 0 = chown(2), non-zero = lchown(2).
+ */
+int __compiler_chown(__string__ *path, __value__ *user, int lchown_flag)
+{
+    const char *p;
+    uid_t uid;
+
+    if (NULL == path || NULL == user) {
+        return 0;
+    }
+    p = phpc_strdata(path);
+    uid = phpc_resolve_uid(user);
+    if ((uid_t) -1 == uid) {
+        return 0;
+    }
+    if (lchown_flag) {
+        return fchownat(AT_FDCWD, p, uid, (gid_t) -1, AT_SYMLINK_NOFOLLOW) == 0 ? 1 : 0;
+    }
+
+    return chown(p, uid, (gid_t) -1) == 0 ? 1 : 0;
 }

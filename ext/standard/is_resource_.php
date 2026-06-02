@@ -49,6 +49,7 @@ final class is_resource_ extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('is_resource() requires exactly one argument');
         }
+        \PHPCompiler\JIT\Builtin\StringDir::ensureLinked($context);
         if (JITVariable::TYPE_NULL === $args[0]->type) {
             return $context->constantFromBool(false);
         }
@@ -64,10 +65,13 @@ final class is_resource_ extends Internal
 
     public static function isResource(Variable $v): bool
     {
-        if (!$v->isStreamResource()) {
-            return false;
+        if ($v->isStreamResource()) {
+            return VmFs::isValidHandle($v->toInt());
+        }
+        if ($v->isDirResource()) {
+            return VmDir::isValidHandle($v->toInt());
         }
 
-        return VmFs::isValidHandle($v->toInt());
+        return false;
     }
 }

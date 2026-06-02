@@ -39,4 +39,23 @@ PHP;
         $block = $rt->parseAndCompileEmitSmoke($src, 'property_hook_jit_compile.php');
         self::assertNotNull($block);
     }
+
+    public function testPropertyHookGetAndSetCompilesForJit(): void
+    {
+        $src = <<<'PHP'
+<?php
+class Box {
+    public string $label {
+        get => strtoupper($this->label);
+        set => $value = trim($value);
+    }
+}
+$b = new Box();
+$b->label = " hi ";
+echo $b->label, "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompileEmitSmoke($src, 'property_hooks_jit_compile.php');
+        self::assertNotNull($block);
+    }
 }

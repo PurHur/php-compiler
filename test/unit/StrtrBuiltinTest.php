@@ -16,9 +16,10 @@ echo strtr('abc', 'a', 'A'), "\n";
 echo strtr('baab', 'ab', '12'), "\n";
 echo strtr('hello', 'lo', '12'), "\n";
 echo strtr('same', '', 'x'), "\n";
+echo strtr('baab', ['a' => 'o']), "\n";
 PHP;
 
-    private const EXPECT = "Abc\n2112\nhe112\nsame\n";
+    private const EXPECT = "Abc\n2112\nhe112\nsame\nboob\n";
 
     public function testVmMatchesPhpSubset(): void
     {

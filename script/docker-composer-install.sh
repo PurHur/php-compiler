@@ -32,7 +32,7 @@ tar -cf - --exclude='.git' --exclude='.llvm' . | ci_docker_run -i -w /compiler "
   set -euo pipefail
   tar -xf -
   composer install --ignore-platform-reqs --no-ansi --no-interaction --no-progress
-  ./script/apply-patches.sh >/dev/null || true
+  ./script/apply-patches.sh >/dev/null
   tar -cf - vendor
 " | tar -xf -
 
