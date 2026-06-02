@@ -88,6 +88,7 @@ final class Linker
         __DIR__.'/runtime/preg_match.c',
         __DIR__.'/runtime/phpc_pack.c',
         __DIR__.'/runtime/phpc_unpack.c',
+        __DIR__.'/runtime/phpc_var_export.c',
         __DIR__.'/runtime/phpc_ini_set.c',
         __DIR__.'/runtime/phpc_error_handler.c',
         __DIR__.'/runtime/phpc_last_error.c',
