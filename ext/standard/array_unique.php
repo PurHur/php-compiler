@@ -32,16 +32,15 @@ final class array_unique extends Internal
             throw new \LogicException('array_unique() requires one or two arguments');
         }
         $array = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('array_unique() argument must be an array in this compiler build');
         }
         $flags = self::resolveVmFlags($frame, $argc);
+        $ht = $array->toArray();
         $out = new HashTable();
         $seen = [];
-        foreach ($array->toArray()->iterateKeyed(true) as [$key, $value]) {
+        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
+            self::assertUniqueElement($frame, $value);
             if (self::isDuplicate($value, $seen, $flags)) {
                 continue;
             }
@@ -55,6 +54,9 @@ final class array_unique extends Internal
             } else {
                 $out->add($key->toString(), $stored);
             }
+        }
+        if (null === $frame->returnVar) {
+            return;
         }
         $frame->returnVar->array($out);
     }
@@ -70,6 +72,23 @@ final class array_unique extends Internal
         }
 
         return self::normalizeFlags($flagsArg->toInt());
+    }
+
+    /**
+     * Objects without __toString must throw (ext/standard/array.c php_array_unique, #4698).
+     */
+    private static function assertUniqueElement(Frame $frame, Variable $value): void
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $value->type) {
+            return;
+        }
+        if (null === $frame->vmContext || null === $frame->vmContext->runtime->vm) {
+            throw new \Error(
+                'Object of class '.$value->toObject()->class->name.' could not be converted to string'
+            );
+        }
+        $frame->vmContext->runtime->vm->castObjectToString($value->toObject());
     }
 
     private static function normalizeFlags(int $flags): int
