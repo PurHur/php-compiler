@@ -981,6 +981,16 @@ class Compiler {
                         // Lowered by compileExpr Empty_ via TYPE_ISSET + TYPE_BOOLEAN_NOT (#3298).
                         break;
                     } else {
+                        if (
+                            $child instanceof Op\Expr\ArrayDimFetch
+                            && $this->isListDestructGroupStart($ops, $i)
+                        ) {
+                            $block->addOpCode(new OpCode(
+                                OpCode::TYPE_LIST_UNPACK_CHECK,
+                                null,
+                                $this->compileOperand($child->var, $block, true),
+                            ));
+                        }
                         if ($this->needsCfgSplitBeforeStringDimFetch($child, $block, $ops, $i)) {
                             $block = $this->splitCfgBlockAfterStringKeyedArray($block);
                         }
@@ -1037,10 +1047,90 @@ class Compiler {
         if (!$ops[$index] instanceof Op\Expr\ArrayDimFetch) {
             return false;
         }
+        /** @var Op\Expr\ArrayDimFetch $fetch */
+        $fetch = $ops[$index];
+        if (!$fetch->dim instanceof Literal || !is_string($fetch->dim->value)) {
+            return false;
+        }
         /** @var Op\Expr\Assign $assign */
         $assign = $ops[$index + 1];
 
-        return $assign->expr === $ops[$index]->result;
+        return $assign->expr === $fetch->result;
+    }
+
+    /**
+     * php-cfg lowers `list($a, …) = $rhs` to integer-key dim fetches (#4298).
+     *
+     * @param Op[] $ops
+     */
+    private function isListDestructGroupStart(array $ops, int $index): bool
+    {
+        if (!$this->isPlainListDestructDimFetch($ops, $index)) {
+            return false;
+        }
+        /** @var Op\Expr\ArrayDimFetch $cur */
+        $cur = $ops[$index];
+        $p = $index - 1;
+        while ($p >= 0) {
+            $op = $ops[$p];
+            if ($op instanceof Op\Expr\Assign || $op instanceof Op\Expr\AssignRef) {
+                --$p;
+                continue;
+            }
+            if (
+                $op instanceof Op\Expr\ArrayDimFetch
+                && $this->isPlainListDestructDimFetch($ops, $p)
+                && $op->var === $cur->var
+            ) {
+                return false;
+            }
+
+            break;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    private function isPlainListDestructDimFetch(array $ops, int $index): bool
+    {
+        if (!$ops[$index] instanceof Op\Expr\ArrayDimFetch) {
+            return false;
+        }
+        if ($this->isKeyedListDestructDimFetch($ops, $index)) {
+            return false;
+        }
+        /** @var Op\Expr\ArrayDimFetch $fetch */
+        $fetch = $ops[$index];
+        if (!$fetch->dim instanceof Operand\Literal || !is_int($fetch->dim->value)) {
+            return false;
+        }
+
+        return $this->isListDestructDimFetchConsumer($ops, $index);
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    private function isListDestructDimFetchConsumer(array $ops, int $index): bool
+    {
+        if ($index + 1 >= count($ops)) {
+            return false;
+        }
+        $fetch = $ops[$index];
+        $next = $ops[$index + 1];
+        if (
+            ($next instanceof Op\Expr\Assign || $next instanceof Op\Expr\AssignRef)
+            && $next->expr === $fetch->result
+        ) {
+            return true;
+        }
+
+        return $next instanceof Op\Expr\ArrayDimFetch
+            && $next->var === $fetch->result
+            && $this->isPlainListDestructDimFetch($ops, $index + 1);
     }
 
     private function splitCfgBlockAfterStringKeyedArray(Block $block): Block
