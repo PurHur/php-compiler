@@ -4956,6 +4956,20 @@ class JIT {
                 case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:
                     $forWrite = OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type;
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    if (
+                        $forWrite
+                        && null !== $value->magicGetOverloadedClass
+                        && null !== $value->magicGetOverloadedName
+                    ) {
+                        JIT\MagicMethodDispatch::emitMagicGetIndirectModifyError(
+                            $this->context,
+                            $value->magicGetOverloadedClass,
+                            $value->magicGetOverloadedName
+                        );
+                        $this->context->builder->returnVoid();
+                        $this->context->builder->clearInsertionPosition();
+                        break;
+                    }
                     $resultOp = $block->getOperand($op->arg1);
                     $forceBranchMerge = $this->context->coalesceAssignTargets->contains($resultOp);
                     if (null === $op->arg3) {
@@ -6746,6 +6760,9 @@ class JIT {
                             );
                             if (null !== $magicFetched) {
                                 $this->assignOperandValue($result, $magicFetched);
+                                $magicVar = $this->context->getVariableFromOp($result);
+                                $magicVar->magicGetOverloadedClass = $declaringClass;
+                                $magicVar->magicGetOverloadedName = $name->value;
                                 break;
                             }
                         }

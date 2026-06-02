@@ -88,6 +88,11 @@ final class Variable {
 
     public ?string $magicSetName = null;
 
+    /** Temporary from __get; []= / dim-write must throw (#4673, zend_object_handlers.c). */
+    public ?ObjectEntry $magicGetOverloadedTarget = null;
+
+    public ?string $magicGetOverloadedName = null;
+
     public function __construct(int $type = self::TYPE_NULL) {
         $this->type = $type;
     }
