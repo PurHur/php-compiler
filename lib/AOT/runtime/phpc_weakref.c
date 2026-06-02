@@ -81,6 +81,25 @@ void phpc_weakref_register_map(void *target, void *ht, const char *key)
     snprintf(entry->key, sizeof(entry->key), "%s", key);
 }
 
+void phpc_weakref_unregister_map(void *target, void *ht, const char *key)
+{
+    int i;
+
+    if (NULL == target || NULL == ht || NULL == key) {
+        return;
+    }
+    for (i = 0; i < phpc_wr_map_count; ++i) {
+        if (phpc_wr_maps[i].target == target
+            && phpc_wr_maps[i].ht == (__hashtable__ *) ht
+            && 0 == strcmp(phpc_wr_maps[i].key, key)) {
+            phpc_wr_maps[i].target = NULL;
+            phpc_wr_maps[i].ht = NULL;
+            phpc_wr_maps[i].key[0] = '\0';
+            return;
+        }
+    }
+}
+
 void phpc_weakref_format_object_key(void *obj, char *buf, size_t buflen)
 {
     if (NULL == buf || 0 == buflen) {

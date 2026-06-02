@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\JitThrow;
 use PHPCompiler\OpCode;
 use PHPLLVM\BasicBlock;
@@ -108,6 +109,57 @@ final class TryCatchHelper
         $builder->branch($tryEntry);
     }
 
+    /**
+     * Register try/catch dispatch for generator resume segments (#4069).
+     *
+     * Try body opcodes are compiled by {@see GeneratorHelper::compileYieldPrefix}; this only
+     * wires merge/dispatch blocks and branches into the try-body LLVM entry.
+     */
+    public static function beginTryGeneratorResume(
+        \PHPCompiler\JIT $jit,
+        Function_ $func,
+        Context $context,
+        Block $handlerBlock,
+        OpCode $tryOp,
+        int $tryOpcodeIndex,
+        array $args,
+        BasicBlock $branchBlock,
+        BasicBlock $tryBodyEntryBb
+    ): void {
+        JitThrow::registerDeclarations($context);
+        JitThrow::ensureLinked($context);
+        $mergeBlock = $tryOp->block2;
+        if (null === $mergeBlock) {
+            throw new \LogicException('TYPE_TRY requires merge block (block2)');
+        }
+        $arms = self::collectCatchOps($handlerBlock, $tryOpcodeIndex);
+        $handler = new TryCatchHandler($mergeBlock, $arms);
+        $handler->postTryOpcodesRemaining = self::countPostTryOpcodes($handlerBlock, $tryOpcodeIndex);
+        $context->tryCatch->handlerStack[] = $handler;
+        $context->tryCatch->mergeHandlers[spl_object_id($mergeBlock)] = $handler;
+
+        $builder = $context->builder;
+        $context->scope->blockStorage[$handlerBlock] = $branchBlock;
+        $builder->positionAtEnd($branchBlock);
+        $mergeBb = $context->scope->blockStorage[$mergeBlock] ?? null;
+        if (null === $mergeBb) {
+            $mergeBb = self::appendBlock($func, 'try_merge_'.self::blockSuffix($handler));
+        }
+        if (!$handler->mergeBodyCompiled) {
+            if (!$context->compilingGeneratorResume) {
+                $jit->compileIncludedAtEntry($func, $handler->mergeBlock, $mergeBb);
+            }
+            $handler->mergeBodyCompiled = true;
+        }
+        $handler->dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, $args);
+        self::emitMergeEntryCheck($jit, $func, $context, $mergeBlock, $mergeBb, $args);
+        if (null !== $tryOp->block1) {
+            $context->scope->blockStorage[$tryOp->block1] = $tryBodyEntryBb;
+        }
+        $builder->positionAtEnd($branchBlock);
+        $builder->branch($tryBodyEntryBb);
+    }
+
     public static function emitMergeEntryCheck(
         \PHPCompiler\JIT $jit,
         Function_ $func,
@@ -142,6 +194,43 @@ final class TryCatchHelper
         if (null !== $saved) {
             $builder->positionAtEnd($saved);
         }
+    }
+
+    /**
+     * Raise a catchable Error inside an active try block (asymmetric visibility #4029).
+     */
+    public static function emitCatchableErrorMessage(
+        Context $context,
+        \PHPCompiler\JIT $jit,
+        string $message
+    ): void {
+        JitThrow::registerDeclarations($context);
+        JitThrow::ensureLinked($context);
+        $handler = $context->tryCatch->handlerStack[array_key_last($context->tryCatch->handlerStack)] ?? null;
+        if (null === $handler) {
+            ErrorRaise::emitRaise($context, $message);
+
+            return;
+        }
+        $func = $context->builder->getInsertBlock()->getParent();
+        assert($func instanceof Function_);
+        $dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, []);
+
+        $object = $context->type->object;
+        $classId = $object->lookup('Error');
+        $obj = $object->allocate($classId);
+        $object->markObjectConstructed($obj);
+        $msgStr = $context->builder->load($context->constantStringFromString($message));
+        $msgVar = new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $msgStr
+        );
+        $object->storeInstanceProperty($obj, 'Error', 'message', $msgVar);
+
+        $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
+        $context->builder->branch($dispatchBb);
     }
 
     public static function emitThrow(
@@ -287,6 +376,16 @@ final class TryCatchHelper
                     $operand = $catchOp->block1->getOperand((int) $catchOp->arg3);
                     $caughtVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
                     $jit->assignOperandForced($operand, $caughtVar);
+                }
+                if ($context->compilingGeneratorResume && null !== $catchOp->block1) {
+                    $catchResume = $context->generatorCatchDispatchEntry[spl_object_id($catchOp->block1)] ?? null;
+                    if (null !== $catchResume) {
+                        $builder->branch($catchResume);
+                        $nextCatch = $noMatchBb;
+                        $builder->positionAtEnd($nextCatch);
+
+                        continue;
+                    }
                 }
                 $jit->compileCatchArmAtEntry($func, $catchOp->block1, $catchBodyBb, ...$args);
                 $catchTail = $context->builder->getInsertBlock();

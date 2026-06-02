@@ -37,11 +37,17 @@ class ObjectEntry {
     /** Anonymous function / closure body (issue #72). */
     public ?ClosureState $closureState = null;
 
+    /** Closure target for ReflectionFunction instances (#4123). */
+    public ?ClosureState $reflectionClosureState = null;
+
     /** Initializer for lazy proxy objects (#3317). */
     public ?ClosureState $lazyInitializer = null;
 
     /** True until first property access or method call runs the lazy initializer. */
     public bool $lazyPending = false;
+
+    /** True for ghost lazy objects (in-place init); false for proxy strategy (#4026). */
+    public bool $lazyGhost = false;
 
     /** True for backed/unit enum case singleton objects (#3518). */
     public bool $isEnumCase = false;
@@ -95,6 +101,7 @@ class ObjectEntry {
         $this->closureState = null;
         $this->lazyInitializer = null;
         $this->lazyPending = false;
+        $this->lazyGhost = false;
         $this->fiberState = null;
     }
 
@@ -234,6 +241,7 @@ class ObjectEntry {
         $clone->closureState = $this->closureState;
         $clone->lazyInitializer = $this->lazyInitializer;
         $clone->lazyPending = $this->lazyPending;
+        $clone->lazyGhost = $this->lazyGhost;
 
         return $clone;
     }

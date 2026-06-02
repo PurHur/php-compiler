@@ -1124,8 +1124,13 @@ class JIT {
             )
         );
 
+        $cfgParamCount = null !== $block->func ? count($block->func->params) : 0;
         foreach ($args as $idx => $arg) {
-            $argVars[] = new Variable($this->context, Variable::getTypeFromType($rawTypes[$idx]), Variable::KIND_VALUE, $func->getParam($idx));
+            $varType = Variable::getTypeFromType($rawTypes[$idx]);
+            if ($idx < $cfgParamCount && $block->func->params[$idx]->variadic) {
+                $varType = Variable::TYPE_HASHTABLE;
+            }
+            $argVars[] = new Variable($this->context, $varType, Variable::KIND_VALUE, $func->getParam($idx));
         }
 
         $lcname = strtolower($logicalName ?? $internalName);
@@ -4610,7 +4615,8 @@ class JIT {
             if (str_contains($methodLc, '::')) {
                 $methodLc = substr($methodLc, strrpos($methodLc, '::') + 2);
             }
-            $this->context->jitPropertyHookRawProperty = SourcePreprocessor\PropertyHooks::propertyNameFromSetHookMethod($methodLc);
+            $this->context->jitPropertyHookRawProperty = SourcePreprocessor\PropertyHooks::propertyNameFromSetHookMethod($methodLc)
+                ?? SourcePreprocessor\PropertyHooks::propertyNameFromGetHookMethod($methodLc);
         }
         if ([] !== $args) {
             if ($this->instanceMethodUsesThis($block)) {
@@ -4729,16 +4735,28 @@ class JIT {
                         $aliasVar = $this->context->getVariableFromOp($aliasOp);
                         $srcVar = $this->context->getVariableFromOp($block->getOperand($op->arg3));
                         if ($aliasVar === $srcVar) {
-                            if ([] !== $destOp->usages || $this->context->scope->variables->contains($destOp)) {
+                            if ([] !== $destOp->usages || $forceAssign) {
                                 $this->assignOperand($destOp, $value, $forceAssign);
                             }
                             break;
                         }
                     }
                     $this->assignOperand($aliasOp, $value, $forceAssign);
-                    $this->assignOperand($destOp, $value, $forceAssign);
+                    $destUsed = [] !== $destOp->usages;
+                    if ($destUsed || $forceAssign) {
+                        $this->assignOperand($destOp, $value, $forceAssign);
+                    }
+                    $srcOp = $block->getOperand($op->arg3);
+                    if ($op->arg2 !== $op->arg3) {
+                        $this->jitClearAssignTempOperand($srcOp);
+                    }
+                    if ($op->arg1 !== $op->arg2 && $op->arg1 !== $op->arg3) {
+                        $this->jitClearAssignTempOperand($destOp);
+                    }
                     $this->maybeBindNamedVariable($aliasOp);
-                    $this->maybeBindNamedVariable($destOp);
+                    if ($op->arg1 === $op->arg2) {
+                        $this->maybeBindNamedVariable($destOp);
+                    }
                     foreach ([$block->getOperand($op->arg2), $destOp] as $destOperand) {
                         if (!$this->context->hasVariableOp($destOperand)) {
                             continue;
@@ -5078,7 +5096,8 @@ class JIT {
                         $value = JIT\IteratorHelper::compileValueByRef(
                             $this->context,
                             $array,
-                            self::foreachContainerUserType($arrayOp)
+                            self::foreachContainerUserType($arrayOp),
+                            $this
                         );
                         $this->context->setVariableOp($block->getOperand($op->arg1), $value);
                         break;
@@ -5213,24 +5232,32 @@ class JIT {
                 case OpCode::TYPE_CLASS_CONST_FETCH:
                     $classOp = $block->getOperand($op->arg2);
                     $nameOp = $block->getOperand($op->arg3);
-                    $classId = $this->context->type->object->resolveClassId($classOp);
-                    if ($nameOp instanceof Operand\Literal) {
-                        if ('class' === strtolower($nameOp->value)) {
-                            if ($classOp instanceof Operand\Literal) {
-                                $className = $this->resolveClassNameForPseudoConst($block, $classOp);
-                                $lit = new Operand\Literal($className);
-                                $lit->type = Type::string();
-                                $this->assignOperand(
-                                    $block->getOperand($op->arg1),
-                                    JIT\Variable::fromLiteral($this->context, $lit)
-                                );
-                                break;
-                            }
-                            $objectVar = $this->context->getVariableFromOp($classOp);
-                            $classNameVal = JIT\ReflectionBuiltinHelper::getClassName($this->context, $objectVar);
-                            $this->assignOperandValue($block->getOperand($op->arg1), $classNameVal);
+                    if ($nameOp instanceof Operand\Literal && 'class' === strtolower($nameOp->value)) {
+                        if ($classOp instanceof Operand\Literal) {
+                            $className = $this->resolveClassNameForPseudoConst($block, $classOp);
+                            $lit = new Operand\Literal($className);
+                            $lit->type = Type::string();
+                            $this->assignOperand(
+                                $block->getOperand($op->arg1),
+                                JIT\Variable::fromLiteral($this->context, $lit)
+                            );
                             break;
                         }
+                        $classVar = $this->context->getVariableFromOp($classOp);
+                        if (JIT\Variable::TYPE_OBJECT === $classVar->type) {
+                            $classNameVal = JIT\ReflectionBuiltinHelper::getClassName($this->context, $classVar);
+                        } else {
+                            $classNameVal = JIT\ClassConstFetchHelper::emitClassPseudoConstStringValue(
+                                $this->context->type->object,
+                                $block,
+                                $classVar
+                            );
+                        }
+                        $this->assignOperandValue($block->getOperand($op->arg1), $classNameVal);
+                        break;
+                    }
+                    $classId = $this->context->type->object->resolveClassId($classOp);
+                    if ($nameOp instanceof Operand\Literal) {
                         if ('native_type_map' === strtolower($nameOp->value) || 'type_map' === strtolower($nameOp->value)) {
                             $classLabel = $classOp instanceof Operand\Literal
                                 ? strtolower($classOp->value)
@@ -5293,7 +5320,27 @@ class JIT {
                     break;
                 case OpCode::TYPE_UNSET:
                     if (null === $op->arg3) {
-                        $targetOp = $block->getOperand($op->arg2);
+                        $targetOp = null !== $op->arg2
+                            ? ($block->operandForScopeSlot($op->arg2) ?? $block->getOperand($op->arg2))
+                            : null;
+                        if (null === $targetOp) {
+                            break;
+                        }
+                        $this->context->aliasVariableOpFromSlot($block, $targetOp);
+                        $unsetName = JIT\OperandName::resolve($targetOp);
+                        if (null !== $unsetName && '' !== $unsetName) {
+                            $resolvedUnset = $this->context->resolveRefAliasName($unsetName);
+                            if (isset($this->context->namedVariableBindings[$resolvedUnset])) {
+                                $bound = $this->context->namedVariableBindings[$resolvedUnset];
+                                if (
+                                    Variable::KIND_VARIABLE === $bound->kind
+                                    && Variable::TYPE_VALUE === $bound->type
+                                ) {
+                                    $this->jitWriteNullForUnset($bound->value);
+                                    break;
+                                }
+                            }
+                        }
                         if (
                             !$this->context->hasVariableOp($targetOp)
                             && null === JIT\OperandName::resolve($targetOp)
@@ -5314,8 +5361,14 @@ class JIT {
                                 );
                                 break;
                             }
-                        }
-                        if ($this->context->hasVariableOp($targetOp)) {
+                            if (
+                                Variable::KIND_VARIABLE === $target->kind
+                                && Variable::TYPE_VALUE === $target->type
+                            ) {
+                                $this->jitWriteNullForUnset($target->value);
+                                break;
+                            }
+                            $target->free();
                             $this->context->setVariableOp($targetOp, $this->jitNullVariable());
                         }
                     } else {
@@ -5784,6 +5837,7 @@ class JIT {
                     $returnBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($returnBlock);
                     $this->markJitThisConstructedIfLeavingConstruct($block);
+                    $this->releaseJitFunctionLocalsAtReturn($block);
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                         $this->context->freeDeadVariables($func, $returnBlock, $block);
                     }
@@ -6218,10 +6272,17 @@ class JIT {
                     $this->context->pushScope();
                     $this->context->scope->classId = $this->context->type->object->declareEnum($nameOp);
                     $this->context->scope->className = strtolower($nameOp->value);
+                    if (null !== $op->arg2 && isset($block->constants[$op->arg2])) {
+                        $this->context->type->object->setEnumBackedType(
+                            $this->context->scope->classId,
+                            $block->constants[$op->arg2]->toString()
+                        );
+                    }
                     if (null !== $this->context->runtime->vmContext) {
                         $this->context->runtime->vmContext->enums[strtolower($nameOp->value)] = true;
                     }
                     $this->compileClass($op->block1, $this->context->scope->classId);
+                    $this->context->type->object->finishEnumClass($this->context->scope->classId);
                     $this->context->popScope();
                     break;
                 case OpCode::TYPE_DECLARE_CLASS:
@@ -7007,6 +7068,16 @@ class JIT {
         if ($toCall instanceof JIT\Call\Native || $toCall instanceof JIT\Call\Vararg) {
             return isset($this->context->functionReturnsRef[strtolower($toCall->name)]);
         }
+        if ($toCall instanceof JIT\Call\RuntimeIndirectInstanceMethodCall) {
+            foreach ($toCall->candidatesByClassId as $candidate) {
+                if (
+                    $candidate instanceof JIT\Call\Native
+                    && isset($this->context->functionReturnsRef[strtolower($candidate->name)])
+                ) {
+                    return true;
+                }
+            }
+        }
 
         return false;
     }
@@ -7027,6 +7098,9 @@ class JIT {
             Variable::KIND_VALUE,
             $llvmResult
         );
+        if ('__value__*' === $this->context->getStringFromType($llvmResult->typeOf())) {
+            $refVar->valueBoxAliasPtr = JIT\JitValueBox::normalizeValuePtr($this->context, $llvmResult);
+        }
         $refVar->addref();
         if (!$this->context->hasVariableOp($result)) {
             $this->context->setVariableOp($result, $refVar);
@@ -7225,10 +7299,25 @@ class JIT {
                         );
                     }
                     $this->context->type->object->defineProperty($classId, $name->value, $jitType);
+                    if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
+                        $proto = $block->constants[$op->arg3];
+                        if (null !== $proto->dnfArms) {
+                            $this->context->type->object->definePropertyDnfArms(
+                                $classId,
+                                $name->value,
+                                $proto->dnfArms
+                            );
+                        }
+                    }
                     $this->context->type->object->definePropertyVisibility(
                         $classId,
                         $name->value,
                         \PHPCompiler\MethodVisibility::mask($op->propertyVisibility)
+                    );
+                    $this->context->type->object->definePropertySetVisibility(
+                        $classId,
+                        $name->value,
+                        (int) ($op->propertySetVisibility ?? 0)
                     );
                     if ($op->propertyReadonly || $this->context->scope->classIsReadonly) {
                         $this->context->type->object->markPropertyReadonly($classId, $name->value);
@@ -7247,6 +7336,23 @@ class JIT {
                             $pendingPropertyNewClassName
                         );
                         $pendingPropertyNewClassName = null;
+                    }
+                    if ([] !== $op->attributeNames) {
+                        $classLc = '' !== $this->context->scope->className
+                            ? strtolower(ltrim($this->context->scope->className, '\\'))
+                            : strtolower(ltrim($this->context->type->object->classNameForId($this->context->scope->classId), '\\'));
+                        if ('' !== $classLc) {
+                            $attrNames = [];
+                            foreach ($op->attributeNames as $n) {
+                                $attrNames[] = ltrim($n, '\\');
+                            }
+                            AttributeRegistry::emitRegisterMethod(
+                                $this->context,
+                                $classLc,
+                                strtolower($name->value),
+                                $attrNames
+                            );
+                        }
                     }
                     break;
                 case OpCode::TYPE_CONST_FETCH:
@@ -7339,10 +7445,22 @@ class JIT {
                         }
                         $vm = new VM($this->context->runtime->vmContext);
                         $vmVar = VM\ClassConstMaterializer::materializeSlot($vm, $block, $op->arg2);
+                        if ($this->context->type->object->isEnumClassId($classId)) {
+                            $this->context->type->object->defineEnumCaseConst($classId, $name->value, $vmVar);
+                            break;
+                        }
                         $this->context->type->object->defineClassConst(
                             $classId,
                             $name->value,
                             $vmVar
+                        );
+                        break;
+                    }
+                    if ($this->context->type->object->isEnumClassId($classId)) {
+                        $this->context->type->object->defineEnumCaseConst(
+                            $classId,
+                            $name->value,
+                            $block->constants[$op->arg2]
                         );
                         break;
                     }
@@ -7351,6 +7469,23 @@ class JIT {
                         $name->value,
                         $block->constants[$op->arg2]
                     );
+                    if ([] !== $op->attributeNames) {
+                        $classLc = '' !== $this->context->scope->className
+                            ? strtolower(ltrim($this->context->scope->className, '\\'))
+                            : strtolower(ltrim($this->context->type->object->classNameForId($this->context->scope->classId), '\\'));
+                        if ('' !== $classLc) {
+                            $attrNames = [];
+                            foreach ($op->attributeNames as $n) {
+                                $attrNames[] = ltrim($n, '\\');
+                            }
+                            AttributeRegistry::emitRegisterMethod(
+                                $this->context,
+                                $classLc,
+                                strtolower($name->value),
+                                $attrNames
+                            );
+                        }
+                    }
                     break;
                 case OpCode::TYPE_USE_TRAIT:
                     if ($this->shouldSkipExternalClassBodyLowering($classId)) {
@@ -7732,6 +7867,14 @@ class JIT {
                 $result,
                 $this->context->jitEnclosingBlock
             );
+            if (JIT\AsymmetricVisibilityGuard::emitBeforePropertyStore(
+                $this->context,
+                $this,
+                $result,
+                $this->context->jitEnclosingBlock
+            )) {
+                return;
+            }
             if (JIT\PropertyHookDispatch::emitSetHookIfNeeded(
                 $this->context,
                 $result,
@@ -7740,7 +7883,13 @@ class JIT {
             )) {
                 return;
             }
-            // Property DNF checks: defer to VM path until LLVM lowering is stable (#4008).
+            if (null !== $result->objectPropertyDnfArms) {
+                JIT\DnfParamCheck::enforcePropertyWrite(
+                    $this->context,
+                    $value,
+                    $result->objectPropertyDnfArms
+                );
+            }
             $this->context->type->object->propertyStore(
                 $result->objectPropertySlot,
                 $value,
@@ -8455,6 +8604,7 @@ class JIT {
             $dest->objectPropertyReceiver = null;
             $dest->objectPropertyName = null;
             $dest->objectPropertyClassName = null;
+            $dest->objectPropertyDnfArms = null;
         } else {
             $this->copyObjectPropertyBacking($dest, $src);
         }
@@ -8479,6 +8629,7 @@ class JIT {
         $dest->objectPropertyReceiver = $src->objectPropertyReceiver;
         $dest->objectPropertyName = $src->objectPropertyName;
         $dest->objectPropertyClassName = $src->objectPropertyClassName;
+        $dest->objectPropertyDnfArms = $src->objectPropertyDnfArms;
         $dest->closureCall = $src->closureCall;
         $dest->generatorStatePtr = $src->generatorStatePtr;
         $dest->generatorResumeName = $src->generatorResumeName;
@@ -8761,6 +8912,21 @@ class JIT {
             $dest,
             $this->context->jitEnclosingBlock
         );
+        if (JIT\AsymmetricVisibilityGuard::emitBeforePropertyStore(
+            $this->context,
+            $this,
+            $dest,
+            $this->context->jitEnclosingBlock
+        )) {
+            return;
+        }
+        if (null !== $dest->objectPropertyDnfArms) {
+            JIT\DnfParamCheck::enforcePropertyWrite(
+                $this->context,
+                $newVal,
+                $dest->objectPropertyDnfArms
+            );
+        }
         $this->context->type->object->propertyStore(
             $dest->objectPropertySlot,
             $newVal,
@@ -8832,6 +8998,14 @@ class JIT {
             $read,
             $this->context->jitEnclosingBlock
         );
+        if (JIT\AsymmetricVisibilityGuard::emitBeforePropertyStore(
+            $this->context,
+            $this,
+            $read,
+            $this->context->jitEnclosingBlock
+        )) {
+            return;
+        }
         $this->context->type->object->propertyStore(
             $read->objectPropertySlot,
             $newVal,
@@ -8906,19 +9080,50 @@ class JIT {
         if (null === $keyArg) {
             return null;
         }
-        if (isset($block->constants[$keyArg])) {
-            $const = $block->constants[$keyArg];
-            if (VM\Variable::TYPE_INTEGER === $const->type) {
-                return new Variable(
-                    $this->context,
-                    Variable::TYPE_NATIVE_LONG,
-                    Variable::KIND_VALUE,
-                    $this->context->constantFromInteger($const->toInt(), 'int64')
-                );
-            }
+        $intKey = $this->tryCompileTimeArrayLiteralIntKey($block, $keyArg);
+        if (null !== $intKey) {
+            return new Variable(
+                $this->context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $this->context->constantFromInteger($intKey, 'int64')
+            );
         }
 
         return $this->context->getVariableFromOp($block->getOperand($keyArg));
+    }
+
+    /**
+     * Zend array-literal key: int keys and canonical numeric strings share one slot (#4151).
+     */
+    private function tryCompileTimeArrayLiteralIntKey(Block $block, int $keyArg): ?int
+    {
+        if (isset($block->constants[$keyArg])) {
+            $const = $block->constants[$keyArg];
+            if (VM\Variable::TYPE_INTEGER === $const->type) {
+                return $const->toInt();
+            }
+            if (VM\Variable::TYPE_STRING === $const->type) {
+                return VM\HashTable::tryIntFromNumericString($const->toString());
+            }
+            if (VM\Variable::TYPE_FLOAT === $const->type) {
+                return $const->toInt();
+            }
+        }
+        $op = $block->getOperand($keyArg);
+        if ($op instanceof Operand\Literal) {
+            if (is_int($op->value)) {
+                return $op->value;
+            }
+            if (is_string($op->value)) {
+                return VM\HashTable::tryIntFromNumericString($op->value);
+            }
+            if (is_float($op->value)) {
+                return (int) $op->value;
+            }
+        }
+
+        return null;
     }
 
     private function bumpNativeArrayNextFreeForExplicitIntKey(
@@ -9318,6 +9523,11 @@ class JIT {
         );
         $proxyName = $this->resolveJitStaticMethodProxyName($declaringClassLc, $methodLc);
         if (!$this->context->functionIsRegistered($proxyName)) {
+            if ($this->context->type->object->isEnumClassLc($declaringClassLc) && 'cases' === $methodLc) {
+                $this->context->type->object->finishEnumClass($declaringClassId);
+            }
+        }
+        if (!$this->context->functionIsRegistered($proxyName)) {
             if ($this->context->type->object->isExternalOnlyClass($declaringClassId)) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
                 $this->context->scope->args = [];
@@ -9573,10 +9783,20 @@ class JIT {
             if (OpCode::TYPE_ARG_RECV !== $op->type) {
                 continue;
             }
-            if (!isset($block->paramTypeConstraints[$op->arg1])) {
+            $slot = (int) $op->arg1;
+            $paramIdx = (int) $op->arg2;
+            $isVariadic = null !== $block->variadicParamIndex && $paramIdx === $block->variadicParamIndex;
+            if ($isVariadic) {
+                if (!isset($block->paramVariadicElementTypeConstraints[$slot])) {
+                    continue;
+                }
+                $constraints[$paramIdx + $offset] = $block->paramVariadicElementTypeConstraints[$slot];
                 continue;
             }
-            $constraints[(int) $op->arg2 + $offset] = $block->paramTypeConstraints[$op->arg1];
+            if (!isset($block->paramTypeConstraints[$slot])) {
+                continue;
+            }
+            $constraints[$paramIdx + $offset] = $block->paramTypeConstraints[$slot];
         }
 
         return $constraints;
@@ -9593,10 +9813,20 @@ class JIT {
             if (OpCode::TYPE_ARG_RECV !== $op->type) {
                 continue;
             }
-            if (!isset($block->paramIntersectionConstraints[$op->arg1])) {
+            $slot = (int) $op->arg1;
+            $paramIdx = (int) $op->arg2;
+            $isVariadic = null !== $block->variadicParamIndex && $paramIdx === $block->variadicParamIndex;
+            if ($isVariadic) {
+                if (!isset($block->paramVariadicElementIntersectionConstraints[$slot])) {
+                    continue;
+                }
+                $constraints[$paramIdx + $offset] = $block->paramVariadicElementIntersectionConstraints[$slot];
                 continue;
             }
-            $constraints[(int) $op->arg2 + $offset] = $block->paramIntersectionConstraints[$op->arg1];
+            if (!isset($block->paramIntersectionConstraints[$slot])) {
+                continue;
+            }
+            $constraints[$paramIdx + $offset] = $block->paramIntersectionConstraints[$slot];
         }
 
         return $constraints;
@@ -9613,10 +9843,20 @@ class JIT {
             if (OpCode::TYPE_ARG_RECV !== $op->type) {
                 continue;
             }
-            if (!isset($block->paramDnfConstraints[$op->arg1])) {
+            $slot = (int) $op->arg1;
+            $paramIdx = (int) $op->arg2;
+            $isVariadic = null !== $block->variadicParamIndex && $paramIdx === $block->variadicParamIndex;
+            if ($isVariadic) {
+                if (!isset($block->paramVariadicElementDnfConstraints[$slot])) {
+                    continue;
+                }
+                $constraints[$paramIdx + $offset] = $block->paramVariadicElementDnfConstraints[$slot];
                 continue;
             }
-            $constraints[(int) $op->arg2 + $offset] = $block->paramDnfConstraints[$op->arg1];
+            if (!isset($block->paramDnfConstraints[$slot])) {
+                continue;
+            }
+            $constraints[$paramIdx + $offset] = $block->paramDnfConstraints[$slot];
         }
 
         return $constraints;
@@ -9967,6 +10207,99 @@ class JIT {
         return null;
     }
 
+    /** Release boxed locals before user function return (Zend end of scope; #4096). */
+    private function releaseJitFunctionLocalsAtReturn(Block $block): void
+    {
+        if (null === $block->func) {
+            return;
+        }
+        $fnName = $block->func->name;
+        if ('{main}' === $fnName || str_ends_with($fnName, '::__destruct')) {
+            return;
+        }
+        $writeNull = $this->context->lookupFunction('__value__writeNull');
+        foreach ($block->eachNamedScopeSlot() as [$name, $slotIdx]) {
+            if ('this' === $name) {
+                continue;
+            }
+            $scopedOp = $block->operandForScopeSlot($slotIdx);
+            if (null === $scopedOp || !$this->context->hasVariableOp($scopedOp)) {
+                continue;
+            }
+            $var = $this->context->getVariableFromOp($scopedOp);
+            if (Variable::KIND_VARIABLE !== $var->kind || Variable::TYPE_VALUE !== $var->type) {
+                continue;
+            }
+            $this->context->builder->call($writeNull, $var->value);
+        }
+    }
+
+    /**
+     * unset($var) on boxed locals: run __destruct before nulling when {main} defers delref destroy (#4096).
+     */
+    private function jitWriteNullForUnset(\PHPLLVM\Value $valueBoxPtr): void
+    {
+        if ($this->context->type->object->hasUserDestructors()) {
+            \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
+            \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
+            $map = $this->context->structFieldMap['__value__'];
+            $i8 = $this->context->getTypeFromString('int8');
+            $typeByte = $this->context->builder->load(
+                $this->context->builder->structGep($valueBoxPtr, $map['type'])
+            );
+            $isObject = $this->context->builder->icmp(
+                \PHPLLVM\Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_OBJECT, false)
+            );
+            $invokeBlock = JIT\BasicBlockHelper::append($this->context, 'unset_destruct_invoke');
+            $doneBlock = JIT\BasicBlockHelper::append($this->context, 'unset_destruct_done');
+            $this->context->builder->branchIf($isObject, $invokeBlock, $doneBlock);
+            $this->context->builder->positionAtEnd($invokeBlock);
+            $obj = $this->context->builder->call(
+                $this->context->lookupFunction('__value__readObject'),
+                $valueBoxPtr
+            );
+            $this->context->builder->call(
+                $this->context->lookupFunction('phpc_destruct_try_invoke'),
+                $this->context->builder->pointerCast($obj, $this->context->getTypeFromString('int8*'))
+            );
+            $this->context->builder->branch($doneBlock);
+            $this->context->builder->positionAtEnd($doneBlock);
+        }
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeNull'),
+            $valueBoxPtr
+        );
+    }
+
+    /** Drop assign RHS / result temps so block-end dead-operand free cannot re-delref (#4096). */
+    private function jitClearAssignTempOperand(Operand $op): void
+    {
+        $this->jitWriteNullOperand($op);
+        if ($this->context->scope->variables->contains($op)) {
+            $this->context->scope->variables->detach($op);
+        }
+    }
+
+    /** Mirror VM assign: clear dead assign-result / RHS temps (#4096). */
+    private function jitWriteNullOperand(Operand $op): void
+    {
+        if (!$this->context->hasVariableOp($op)) {
+            return;
+        }
+        $var = $this->context->getVariableFromOp($op);
+        if (Variable::KIND_VARIABLE === $var->kind && Variable::TYPE_VALUE === $var->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeNull'),
+                $var->value
+            );
+
+            return;
+        }
+        $var->free();
+    }
+
     private function maybeBindNamedVariable(Operand $op): void
     {
         if (!$this->context->hasVariableOp($op)) {
@@ -10062,6 +10395,8 @@ class JIT {
         if (!isset($this->context->jitGlobalVariables[$name])) {
             if ('argv' === $name && null !== JIT\CliArgvGlobalInit::$global) {
                 $this->context->jitGlobalVariables[$name] = JIT\CliArgvGlobalInit::load($this->context);
+            } elseif ('argc' === $name && null !== JIT\CliArgvGlobalInit::$argcGlobal) {
+                $this->context->jitGlobalVariables[$name] = JIT\CliArgvGlobalInit::loadArgc($this->context);
             } else {
                 $slot = JIT\JitValueBox::alloc($this->context);
                 $this->context->jitGlobalVariables[$name] = new Variable(

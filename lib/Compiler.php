@@ -79,6 +79,12 @@ class Compiler {
     /** Class being compiled while lowering static property declarations (#3814). */
     private ?string $currentClassStaticPropertyCompile = null;
 
+    /** @var array<string, true> lowercase user function names declared `: never` (#4117). */
+    private array $neverFunctionNames = [];
+
+    /** Script declares DNF-typed instance properties — MCJIT needs a try region (#4111). */
+    private bool $scriptHasDnfTypedProperties = false;
+
     private ClassCompileRegistry $classCompileRegistry;
 
     public function setBareRethrowLines(array $lines): void
@@ -281,6 +287,8 @@ class Compiler {
         $this->haltCompilerRemaining = null;
         $this->compiledClassStaticProperties = [];
         $this->currentClassStaticPropertyCompile = null;
+        $this->neverFunctionNames = [];
+        $this->scriptHasDnfTypedProperties = false;
         $this->classCompileRegistry = new ClassCompileRegistry();
         $this->seen = new SplObjectStorage;
         $this->ternaryMergeVarSlots = new SplObjectStorage;
@@ -306,6 +314,10 @@ class Compiler {
         }
 
         $this->seen = null;
+
+        if ($this->scriptHasDnfTypedProperties) {
+            $this->appendMcjitDnfPropertyTryEpilogue($main);
+        }
 
         InterfaceImplementationCheck::validate($script);
         TraitCollisionCheck::validate($script);
@@ -815,6 +827,8 @@ class Compiler {
                     } elseif ($this->isLoweredByFollowingThrow($child, $ops, $i)) {
                         break;
                     } elseif ($this->isUnreachableAfterThrow($child, $ops, $i)) {
+                        break;
+                    } elseif ($this->isUnreachableAfterNeverCall($child, $ops, $i)) {
                         break;
                     } elseif (
                         $child instanceof Op\Expr\PropertyFetch
@@ -1774,6 +1788,43 @@ class Compiler {
      * True when declared type uses union/intersection/nullable DNF shape (#3094).
      * Plain scalars like `int` stay on paramTypeConstraints / typeConstraint paths.
      */
+    /**
+     * MCJIT execute for DNF typed property scripts needs at least one try/catch region
+     * (empty body is enough — see compliance dnf_property* vs dnf_new_empty_try).
+     */
+    private function appendMcjitDnfPropertyTryEpilogue(Block $main): void
+    {
+        $merge = new Block($main->orig);
+        $merge->func = $main->func;
+        $merge->inheritUndefinedLocals = true;
+        $merge->addOpCode(new OpCode(OpCode::TYPE_RETURN_VOID));
+
+        $tryBody = new Block($main->orig);
+        $tryBody->func = $main->func;
+        $tryBody->inheritUndefinedLocals = true;
+        $tryJump = new OpCode(OpCode::TYPE_JUMP);
+        $tryJump->block1 = $merge;
+        $tryBody->addOpCode($tryJump);
+
+        $catchBody = new Block($main->orig);
+        $catchBody->func = $main->func;
+        $catchBody->inheritUndefinedLocals = true;
+        $catchJump = new OpCode(OpCode::TYPE_JUMP);
+        $catchJump->block1 = $merge;
+        $catchBody->addOpCode($catchJump);
+
+        $tryOp = new OpCode(OpCode::TYPE_TRY);
+        $tryOp->block1 = $tryBody;
+        $tryOp->block2 = $merge;
+        $main->addOpCode($tryOp);
+
+        $catchOp = new OpCode(OpCode::TYPE_CATCH);
+        $catchOp->block1 = $catchBody;
+        $catchOp->block2 = $merge;
+        $catchOp->catchTypes = 'throwable';
+        $main->addOpCode($catchOp);
+    }
+
     protected function cfgTypeUsesDnfShape(?Op\Type $declared): bool
     {
         if (null === $declared) {
@@ -1831,7 +1882,7 @@ class Compiler {
         return null;
     }
 
-    protected function applyParamDeclaredType(Op\Expr\Param $param, Block $block, int $slot): void
+    protected function applyParamDeclaredType(Op\Expr\Param $param, Block $block, int $slot, bool $variadicElement = false): void
     {
         $declared = $param->declaredType;
         if ($declared instanceof Op\Type\Never_) {
@@ -1844,15 +1895,25 @@ class Compiler {
             $block->paramDeclaredTypes[$slot] = $declared;
         }
         if ($declared instanceof Op\Type\Intersection) {
-            $block->paramTypeConstraints[$slot] = Variable::TYPE_OBJECT;
-            $block->paramIntersectionConstraints[$slot] = $this->intersectionNamesFromCfgType($declared);
+            if ($variadicElement) {
+                $block->paramVariadicElementTypeConstraints[$slot] = Variable::TYPE_OBJECT;
+                $block->paramVariadicElementIntersectionConstraints[$slot] = $this->intersectionNamesFromCfgType($declared);
+            } else {
+                $block->paramTypeConstraints[$slot] = Variable::TYPE_OBJECT;
+                $block->paramIntersectionConstraints[$slot] = $this->intersectionNamesFromCfgType($declared);
+            }
 
             return;
         }
         $arraySpec = $this->genericArraySpecFromCfgType($declared);
         if (null !== $arraySpec) {
-            $block->paramTypeConstraints[$slot] = Variable::TYPE_ARRAY;
-            $block->paramGenericArrayTypeSpecs[$slot] = $arraySpec;
+            if ($variadicElement) {
+                $block->paramVariadicElementTypeConstraints[$slot] = Variable::TYPE_ARRAY;
+                $block->paramVariadicElementGenericArrayTypeSpecs[$slot] = $arraySpec;
+            } else {
+                $block->paramTypeConstraints[$slot] = Variable::TYPE_ARRAY;
+                $block->paramGenericArrayTypeSpecs[$slot] = $arraySpec;
+            }
 
             return;
         }
@@ -1863,7 +1924,11 @@ class Compiler {
                 fn (Op\Type\Intersection $t) => $this->intersectionDisplayFromCfgType($t)
             );
             if (DnfType::hasConstraints($dnfArms)) {
-                $block->paramDnfConstraints[$slot] = $dnfArms;
+                if ($variadicElement) {
+                    $block->paramVariadicElementDnfConstraints[$slot] = $dnfArms;
+                } else {
+                    $block->paramDnfConstraints[$slot] = $dnfArms;
+                }
 
                 return;
             }
@@ -1874,7 +1939,11 @@ class Compiler {
                 $rawType = Type::fromDecl($declared->name);
                 $mapped = Variable::mapFromType($rawType);
                 if ($mapped !== Variable::TYPE_UNDEFINED) {
-                    $block->paramTypeConstraints[$slot] = $mapped;
+                    if ($variadicElement) {
+                        $block->paramVariadicElementTypeConstraints[$slot] = $mapped;
+                    } else {
+                        $block->paramTypeConstraints[$slot] = $mapped;
+                    }
                 }
             }
         }
@@ -1921,7 +1990,6 @@ class Compiler {
                     $declared = null !== $propertyDeclName
                         ? Type::fromDecl($propertyDeclName)
                         : $this->typeFromPropertyDecl($child);
-                    AttributeNames::assertNoDuplicates(AttributeNames::fromOp($child));
                     if ($child->static && null !== $this->currentClassStaticPropertyCompile) {
                         $staticPropName = $this->staticNameFromOperand($child->name);
                         if (null !== $staticPropName) {
@@ -1955,15 +2023,23 @@ class Compiler {
                             }
                         }
                     }
+                    $typeSlot = $this->compileTypeConstrainedVariable(
+                        $result,
+                        $declared,
+                        null !== $propertyDeclName ? $propertyDeclName : $child->declaredType
+                    );
+                    if (
+                        !$child->static
+                        && isset($result->constants[$typeSlot])
+                        && null !== $result->constants[$typeSlot]->dnfArms
+                    ) {
+                        $this->scriptHasDnfTypedProperties = true;
+                    }
                     $declare = new OpCode(
                         $declareType,
                         $this->compileOperand($child->name, $result, true),
                         $defaultSlot,
-                        $this->compileTypeConstrainedVariable(
-                            $result,
-                            $declared,
-                            null !== $propertyDeclName ? $propertyDeclName : $child->declaredType
-                        )
+                        $typeSlot
                     );
                     if (!$child->static) {
                         $declare->propertyReadonly = (property_exists($child, 'readonly') && $child->readonly)
@@ -1972,6 +2048,9 @@ class Compiler {
                         $declare->propertyVisibility = MethodVisibility::mask($child->visibility);
                         $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($child);
                     }
+                    $declare->attributeNames = AttributeNames::fromOp($child);
+                    $this->assignAttributeMetadata($declare, $child);
+                    AttributeNames::assertNoDuplicates($declare->attributeNames);
                     $result->addOpCode($declare);
                     break;
                 case Op\Stmt\ClassMethod::class:
@@ -2158,11 +2237,15 @@ class Compiler {
         $declared = $this->typeFromParamDecl($param);
         $propName = new Operand\Literal($param->name->value);
         $propName->type = Type::string();
+        $typeSlot = $this->compileTypeConstrainedVariable($result, $declared, $param->declaredType);
+        if (isset($result->constants[$typeSlot]) && null !== $result->constants[$typeSlot]->dnfArms) {
+            $this->scriptHasDnfTypedProperties = true;
+        }
         $declare = new OpCode(
             OpCode::TYPE_DECLARE_PROPERTY,
             $this->compileOperand($propName, $result, true),
             $defaultSlot,
-            $this->compileTypeConstrainedVariable($result, $declared, $param->declaredType)
+            $typeSlot
         );
         $declare->propertyReadonly = $this->isPromotedParamReadonly($param);
         $declare->propertyVisibility = MethodVisibility::mask($param->promotionFlags);
@@ -2649,7 +2732,7 @@ class Compiler {
         if (AttributeNames::isSensitiveParameter(AttributeNames::fromOp($param))) {
             $block->paramSensitive[$paramIdx] = true;
         }
-        $this->applyParamDeclaredType($param, $block, $slot);
+        $this->applyParamDeclaredType($param, $block, $slot, $param->variadic);
 
         return new OpCode(
             OpCode::TYPE_ARG_RECV,
@@ -2664,6 +2747,9 @@ class Compiler {
         // php-cfg may DCE unreachable yield after return; :Generator still implies generator (#3350).
         if ($this->funcDeclReturnTypeIsGenerator($function->func)) {
             $this->markFunctionGenerator($funcBlock);
+        }
+        if ($this->funcDeclReturnTypeIsNever($function->func)) {
+            $this->neverFunctionNames[strtolower($function->func->name)] = true;
         }
         $operand = new Operand\Literal($function->func->name);
         $operand->type = Type::string();
@@ -3473,6 +3559,54 @@ class Compiler {
             return $decl instanceof Operand\Literal
                 && is_string($decl->value)
                 && 'Generator' === $decl->value;
+        }
+
+        return false;
+    }
+
+    protected function funcDeclReturnTypeIsNever(CfgFunc $func): bool
+    {
+        $returnType = $func->returnType;
+        if ($returnType instanceof Op\Type\Never_) {
+            return true;
+        }
+        if ($returnType instanceof Op\Type\Literal && 'never' === strtolower($returnType->name)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function isNeverFunctionCallOp(Op $op): bool
+    {
+        if ($op instanceof Op\Expr\FuncCall) {
+            $name = $this->staticNameFromOperand($op->name);
+        } elseif ($op instanceof Op\Expr\NsFuncCall) {
+            $name = $this->staticNameFromOperand($op->nsName);
+        } else {
+            return false;
+        }
+        if (null === $name) {
+            return false;
+        }
+
+        return isset($this->neverFunctionNames[strtolower($name)]);
+    }
+
+    /**
+     * Ops after a call to a `: never` function in the same CFG block are unreachable (#4117).
+     *
+     * @param Op[] $ops
+     */
+    private function isUnreachableAfterNeverCall(Op $op, array $ops, int $index): bool
+    {
+        for ($j = $index - 1; $j >= 0; --$j) {
+            if ($this->isNeverFunctionCallOp($ops[$j])) {
+                return true;
+            }
+            if (!$ops[$j] instanceof Op\Expr) {
+                return false;
+            }
         }
 
         return false;
@@ -4725,8 +4859,9 @@ class Compiler {
                     ];
                 }
             }
+            $canonical = $this->unwrapVariableOperand($expr);
 
-            return [$this->compileOperand($expr, $block, true), null];
+            return [$this->compileOperand(null !== $canonical ? $canonical : $expr, $block, true), null];
         }
 
         $this->throwCompileLogic('Unsupported isset target: ' . (is_object($expr) ? $expr->getType() : gettype($expr)));

@@ -76,6 +76,19 @@ final class JitValueBox
         if (null !== $var->valueBoxAliasPtr) {
             return self::normalizeValuePtr($context, $var->valueBoxAliasPtr);
         }
+        // Return-by-ref from `$this->prop` must alias the heap property slot, not the
+        // stack copy materialized by propertyFetch (issue #4054, Zend ZEND_RETURN_BY_REF).
+        if (
+            null !== $var->objectPropertySlot
+            && Variable::TYPE_VALUE === $var->objectPropertyType
+        ) {
+            $heapPtr = $context->builder->pointerCast(
+                $context->builder->load($var->objectPropertySlot),
+                $context->getTypeFromString('__value__*')
+            );
+
+            return self::normalizeValuePtr($context, $heapPtr);
+        }
         if (self::isValueOperand($var) && Variable::TYPE_VALUE !== $var->type) {
             $valueType = $context->getTypeFromString('__value__');
             $storage = BasicBlockHelper::entryAlloca($context, $valueType);

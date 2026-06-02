@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -23,16 +24,29 @@ use PHPLLVM\Value;
 
 /**
  * intval() for scalar arguments (subset of PHP standard library).
+ *
+ * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(intval)
  */
 final class intval extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('intval() requires exactly one argument');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('intval() requires between 1 and 2 arguments');
+        }
+        $base = 10;
+        if (2 === $argc) {
+            $base = self::parseBase($frame->calledArgs[1]->resolveIndirect());
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
+            return;
+        }
+        if (Variable::TYPE_STRING === $v->type && 10 !== $base) {
+            $result = VmMath::baseToZval($v->toString(), $base);
+            $frame->returnVar->int((int) $result);
+
             return;
         }
         if (Variable::TYPE_INTEGER === $v->type) {
@@ -68,11 +82,15 @@ final class intval extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('intval() requires exactly one argument');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('intval() requires between 1 and 2 arguments');
         }
-        $v = $context->helper->loadValue($args[0]);
         $i64 = $context->getTypeFromString('int64');
+        $baseVal = 2 === $argc
+            ? $this->parseBaseJit($context, $args[1])
+            : $i64->constInt(10, false);
+        $v = $context->helper->loadValue($args[0]);
         switch ($args[0]->type) {
             case JITVariable::TYPE_NATIVE_LONG:
                 return $v;
@@ -81,17 +99,80 @@ final class intval extends Internal
             case JITVariable::TYPE_NATIVE_BOOL:
                 return $context->builder->zExt($v, $i64);
             case JITVariable::TYPE_STRING:
-                return $this->stringToInt($context, $this->jitString($context, $args[0], 'intval() argument #1'));
+                return $this->stringToIntWithBase(
+                    $context,
+                    $this->jitString($context, $args[0], 'intval() argument #1'),
+                    $baseVal
+                );
             case JITVariable::TYPE_NULL:
                 return $i64->constInt(0, false);
             case JITVariable::TYPE_VALUE:
-                return $this->valueToInt($context, $args[0]);
+                return $this->valueToInt($context, $args[0], $baseVal);
             default:
                 throw new \LogicException('intval() only supports integers, floats, booleans, strings, and null in this compiler build');
         }
     }
 
-    private function valueToInt(Context $context, JITVariable $arg): Value
+    private static function parseBase(Variable $v): int
+    {
+        if (Variable::TYPE_INTEGER === $v->type) {
+            return $v->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $v->type) {
+            return (int) $v->toFloat();
+        }
+        if (Variable::TYPE_BOOLEAN === $v->type) {
+            return $v->toBool() ? 1 : 0;
+        }
+        if (Variable::TYPE_NULL === $v->type) {
+            return 0;
+        }
+        if (Variable::TYPE_STRING === $v->type) {
+            $s = $v->toString();
+            if ('' === $s || !is_numeric($s)) {
+                throw new \TypeError('intval(): Argument #2 ($base) must be of type int, string given');
+            }
+
+            return (int) $s;
+        }
+        throw new \TypeError('intval(): Argument #2 ($base) must be of type int, '.self::zendTypeName($v->type).' given');
+    }
+
+    private static function zendTypeName(int $type): string
+    {
+        return match ($type) {
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            Variable::TYPE_RESOURCE => 'resource',
+            default => 'unknown type',
+        };
+    }
+
+    private function parseBaseJit(Context $context, JITVariable $arg): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        switch ($arg->type) {
+            case JITVariable::TYPE_NATIVE_LONG:
+                return $context->helper->loadValue($arg);
+            case JITVariable::TYPE_NATIVE_DOUBLE:
+                return $context->builder->fpToSi($context->helper->loadValue($arg), $i64);
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return $context->builder->zExt($context->helper->loadValue($arg), $i64);
+            case JITVariable::TYPE_NULL:
+                return $i64->constInt(0, false);
+            case JITVariable::TYPE_STRING:
+                return $this->stringToInt(
+                    $context,
+                    $this->jitString($context, $arg, 'intval() argument #2')
+                );
+            case JITVariable::TYPE_VALUE:
+                return $this->valueToInt($context, $arg, $i64->constInt(10, false));
+            default:
+                throw new \LogicException('intval() argument #2 ($base) must be an integer in this compiler build');
+        }
+    }
+
+    private function valueToInt(Context $context, JITVariable $arg, Value $baseVal): Value
     {
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
         $map = $context->structFieldMap['__value__'];
@@ -169,7 +250,7 @@ final class intval extends Internal
 
         $context->builder->positionAtEnd($stringBlock);
         $stringVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
-        $stringInt = $this->stringToInt($context, $stringVal);
+        $stringInt = $this->stringToIntWithBase($context, $stringVal, $baseVal);
         $stringEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
@@ -190,9 +271,16 @@ final class intval extends Internal
 
     private function stringToInt(Context $context, Value $strPtr): Value
     {
+        $i64 = $context->getTypeFromString('int64');
+
+        return $this->stringToIntWithBase($context, $strPtr, $i64->constInt(10, false));
+    }
+
+    private function stringToIntWithBase(Context $context, Value $strPtr, Value $baseVal): Value
+    {
         $ptr = $this->stringDataPtr($context, $strPtr);
         $endPtr = $context->getTypeFromString('int8**')->constNull();
-        $base = $context->getTypeFromString('int32')->constInt(10, false);
+        $base = $context->builder->trunc($baseVal, $context->getTypeFromString('int32'));
         $raw = $context->builder->call($context->lookupFunction('strtol'), $ptr, $endPtr, $base);
         $i64 = $context->getTypeFromString('int64');
 

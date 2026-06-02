@@ -154,6 +154,19 @@ final class ErrorReporter
         return true;
     }
 
+    public function stringOffsetCastOccurred(
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        $this->emitWarning(
+            'String offset cast occurred',
+            $context,
+            $frame,
+            $file
+        );
+    }
+
     public function uninitializedStringOffset(
         int $offset,
         ?Context $context = null,

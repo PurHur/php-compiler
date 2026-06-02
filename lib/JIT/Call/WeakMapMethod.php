@@ -28,6 +28,7 @@ final class WeakMapMethod implements Call
             'offsetset' => $this->callOffsetSet($context, ...$args),
             'offsetget' => $this->callOffsetGet($context, ...$args),
             'offsetexists' => $this->callOffsetExists($context, ...$args),
+            'offsetunset' => $this->callOffsetUnset($context, ...$args),
             'count' => $this->callCount($context, ...$args),
             default => throw new \LogicException(
                 'WeakMap JIT lowering is not implemented for '.$this->method.'()'
@@ -85,6 +86,29 @@ final class WeakMapMethod implements Call
             $ht,
             $keyStr
         );
+    }
+
+    private function callOffsetUnset(Context $context, Variable ...$args): Value
+    {
+        if (count($args) < 2) {
+            throw new \LogicException('WeakMap::offsetUnset() expects map and key');
+        }
+        WeakRefRuntime::ensureLinked($context);
+        WeakRefNative::registerDeclarations($context);
+
+        $ht = self::backingHashtable($context, $args[0]);
+        $keyObj = WeakRefSetup::loadObjectFromArg($context, $args[1]);
+        [$keyStr, $keyBuf] = self::buildObjectKey($context, $keyObj);
+        HashTableHelper::unsetStringKey($context, $ht, $keyStr);
+        $i8p = $context->getTypeFromString('int8*');
+        $context->builder->call(
+            $context->lookupFunction('phpc_weakref_unregister_map'),
+            $context->builder->pointerCast($keyObj, $i8p),
+            $context->builder->pointerCast($ht, $i8p),
+            $keyBuf
+        );
+
+        return self::voidResult($context);
     }
 
     private function callCount(Context $context, Variable ...$args): Value

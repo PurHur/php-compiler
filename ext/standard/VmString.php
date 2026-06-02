@@ -570,11 +570,6 @@ final class VmString
     ): int {
         $len1 = self::byteLength($string1);
         $len2 = self::byteLength($string2);
-        if ($len1 > 255 || $len2 > 255) {
-            throw new \ValueError(
-                'levenshtein(): Argument #1 ($string1) or #2 ($string2) must be less than 256 characters'
-            );
-        }
         if ($insertionCost < 1 || $replacementCost < 1 || $deletionCost < 1) {
             throw new \ValueError(
                 'levenshtein(): insertion, replacement, and deletion costs must be larger than zero'
@@ -802,15 +797,12 @@ final class VmString
 
     public static function strspn(string $str, string $mask, int $offset = 0, ?int $length = null): int
     {
-        if ('' === $mask) {
-            throw new \ValueError('strspn(): Argument #2 ($characters) must not be empty');
-        }
         $slen = self::byteLength($str);
-        $mlen = self::byteLength($mask);
         [$start, $len] = self::normalizeSpnBounds($slen, $offset, $length);
-        if (0 === $len) {
+        if ('' === $mask || 0 === $len) {
             return 0;
         }
+        $mlen = self::byteLength($mask);
         $count = 0;
         for ($i = $start; $i < $start + $len; ++$i) {
             if (!self::byteInSet($str[$i], $mask, $mlen)) {
@@ -824,15 +816,15 @@ final class VmString
 
     public static function strcspn(string $str, string $mask, int $offset = 0, ?int $length = null): int
     {
-        if ('' === $mask) {
-            throw new \ValueError('strcspn(): Argument #2 ($characters) must not be empty');
-        }
         $slen = self::byteLength($str);
-        $mlen = self::byteLength($mask);
         [$start, $len] = self::normalizeSpnBounds($slen, $offset, $length);
         if (0 === $len) {
             return 0;
         }
+        if ('' === $mask) {
+            return $len;
+        }
+        $mlen = self::byteLength($mask);
         $count = 0;
         for ($i = $start; $i < $start + $len; ++$i) {
             if (self::byteInSet($str[$i], $mask, $mlen)) {
@@ -2982,9 +2974,11 @@ final class VmString
         if ('' === $needle) {
             throw new \LogicException('strpos(): Argument #2 ($needle) cannot be empty');
         }
-        if ($offset < 0) {
-            $offset = 0;
-        }
+        $offset = self::normalizeContainedStringOffset(
+            self::byteLength($haystack),
+            $offset,
+            'strpos'
+        );
         $pos = self::findSubstring($haystack, $needle, $offset);
 
         return false === $pos ? false : $pos;
@@ -3153,22 +3147,26 @@ final class VmString
         }
         $hayLen = self::byteLength($haystack);
         $needleLen = self::byteLength($needle);
-        if ($offset < 0) {
-            $offset = 0;
+        $searchLen = $hayLen;
+        if (0 !== $offset) {
+            if ($offset < 0) {
+                $offset += $hayLen;
+            }
+            if ($offset < 0 || $offset > $hayLen) {
+                throw new \ValueError('substr_count(): Argument #3 ($offset) must be contained in argument #1 ($haystack)');
+            }
+            $searchLen = $hayLen - $offset;
         }
-        if ($offset >= $hayLen) {
-            return 0;
-        }
-        $end = $hayLen;
         if (null !== $length) {
             if ($length < 0) {
-                return 0;
+                $length += $searchLen;
             }
-            $end = $offset + $length;
-            if ($end > $hayLen) {
-                $end = $hayLen;
+            if ($length < 0 || $length > $searchLen) {
+                throw new \ValueError('substr_count(): Argument #4 ($length) must be contained in argument #1 ($haystack)');
             }
+            $searchLen = $length;
         }
+        $end = $offset + $searchLen;
         $limit = $end - $needleLen;
         if ($limit < $offset) {
             return 0;
@@ -3234,9 +3232,11 @@ final class VmString
         if ('' === $needle) {
             throw new \LogicException('stripos(): Argument #2 ($needle) cannot be empty');
         }
-        if ($offset < 0) {
-            $offset = 0;
-        }
+        $offset = self::normalizeContainedStringOffset(
+            self::byteLength($haystack),
+            $offset,
+            'stripos'
+        );
         $pos = self::findSubstringCaseInsensitive($haystack, $needle, $offset);
 
         return false === $pos ? false : $pos;
@@ -3250,10 +3250,21 @@ final class VmString
         if ('' === $needle) {
             throw new \LogicException('strrpos(): Argument #2 ($needle) cannot be empty');
         }
-        if ($offset < 0) {
-            $offset = 0;
+        $hayLen = self::byteLength($haystack);
+        $minStart = 0;
+        $maxStart = null;
+        $suffixEnd = $hayLen + $offset;
+        if ($suffixEnd < $hayLen) {
+            if ($suffixEnd < 0) {
+                throw new \ValueError(sprintf(
+                    'strrpos(): Argument #3 ($offset) must be contained in argument #1 ($haystack)'
+                ));
+            }
+            $maxStart = $suffixEnd;
+        } else {
+            $minStart = $offset;
         }
-        $pos = self::findRSubstring($haystack, $needle, $offset);
+        $pos = self::findRSubstring($haystack, $needle, $minStart, $maxStart);
 
         return false === $pos ? false : $pos;
     }
@@ -3331,6 +3342,31 @@ final class VmString
     }
 
     /**
+     * PHP 8+ strpos/stripos offset: negative counts from end; must lie in [-hayLen, hayLen].
+     *
+     * @see php/php-src ext/standard/string.c php_strpos()
+     */
+    private static function normalizeContainedStringOffset(
+        int $hayLen,
+        int $offset,
+        string $functionName,
+        int $argNum = 3
+    ): int {
+        if ($offset < 0) {
+            $offset += $hayLen;
+        }
+        if ($offset < 0 || $offset > $hayLen) {
+            throw new \ValueError(sprintf(
+                '%s(): Argument #%d ($offset) must be contained in argument #1 ($haystack)',
+                $functionName,
+                $argNum
+            ));
+        }
+
+        return $offset;
+    }
+
+    /**
      * @return int|false
      */
     private static function findSubstring(string $haystack, string $needle, int $offset)
@@ -3379,8 +3415,12 @@ final class VmString
     /**
      * @return int|false
      */
-    private static function findRSubstring(string $haystack, string $needle, int $offset)
-    {
+    private static function findRSubstring(
+        string $haystack,
+        string $needle,
+        int $offset,
+        ?int $maxStart = null
+    ) {
         $hayLen = self::byteLength($haystack);
         $needleLen = self::byteLength($needle);
         if (0 === $needleLen) {
@@ -3390,6 +3430,12 @@ final class VmString
             return false;
         }
         $limit = $hayLen - $needleLen;
+        if (null !== $maxStart && $maxStart < $limit) {
+            $limit = $maxStart;
+        }
+        if ($limit < $offset) {
+            return false;
+        }
         $last = false;
         for ($i = $offset; $i <= $limit; ++$i) {
             if (self::compareBytes($haystack, $needle, $needleLen, $i)) {
@@ -3420,7 +3466,20 @@ final class VmString
         return $out;
     }
 
-    public static function dirname(string $path): string
+    public static function dirname(string $path, int $levels = 1): string
+    {
+        if ($levels < 1) {
+            throw new \ValueError('dirname(): Argument #2 ($levels) must be greater than or equal to 1');
+        }
+        $result = $path;
+        for ($i = 0; $i < $levels; ++$i) {
+            $result = self::dirnameOnce($result);
+        }
+
+        return $result;
+    }
+
+    private static function dirnameOnce(string $path): string
     {
         $len = self::byteLength($path);
         if (0 === $len) {
@@ -3572,6 +3631,21 @@ final class VmString
 
         if (1 === \count($parts)) {
             return reset($parts);
+        }
+
+        // php-src php_pathinfo(): multiple bits (not PATHINFO_ALL) → single string by priority.
+        if (15 !== $mask) {
+            if ($mask & 1) {
+                return $dirname;
+            }
+            if ($mask & 2) {
+                return $basename;
+            }
+            if ($mask & 4) {
+                return $extension;
+            }
+
+            return $filename;
         }
 
         return $parts;

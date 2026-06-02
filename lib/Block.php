@@ -64,11 +64,20 @@ class Block {
     /** @var array<int, int> scope slot index => Variable::TYPE_* for typed parameters */
     public array $paramTypeConstraints = [];
 
+    /** @var array<int, int> typed variadic element constraints — not applied to the packed array local (#4185) */
+    public array $paramVariadicElementTypeConstraints = [];
+
     /** @var array<int, GenericArrayTypeSpec> generic list/array parameter types (#3705) */
     public array $paramGenericArrayTypeSpecs = [];
 
+    /** @var array<int, GenericArrayTypeSpec> typed variadic element array specs (#4185) */
+    public array $paramVariadicElementGenericArrayTypeSpecs = [];
+
     /** @var array<int, list<string>> */
     public array $paramIntersectionConstraints = [];
+
+    /** @var array<int, list<string>> typed variadic element intersection constraints (#4185) */
+    public array $paramVariadicElementIntersectionConstraints = [];
 
     /** @var array<int, Op\Type> declared parameter types for reflection (#3355). */
     public array $paramDeclaredTypes = [];
@@ -78,6 +87,9 @@ class Block {
 
     /** @var array<int, list<array{kind: string, interfaces?: list<string>, name?: string}>> */
     public array $paramDnfConstraints = [];
+
+    /** @var array<int, list<array{kind: string, interfaces?: list<string>, name?: string}>> typed variadic element DNF (#4185) */
+    public array $paramVariadicElementDnfConstraints = [];
 
     /** DNF return type arms (#3094), or null when untyped / non-DNF. */
     public ?array $returnDnfConstraints = null;
@@ -1268,6 +1280,20 @@ class Block {
     /** Script or nested closure uses Fiber::suspend() (#4019). */
     public static function containsFiberSuspendOpcodes(?self $root): bool
     {
+        return self::walkFiberSuspendOpcodes($root, false);
+    }
+
+    /**
+     * Top-level script scope only (skips nested TYPE_FUNCDEF bodies; issue #4097).
+     * Fiber callbacks compile to MCJIT resume functions like generator bodies (#3074).
+     */
+    public static function containsFiberSuspendOpcodesInScriptScope(?self $root): bool
+    {
+        return self::walkFiberSuspendOpcodes($root, true);
+    }
+
+    private static function walkFiberSuspendOpcodes(?self $root, bool $skipFuncDefs): bool
+    {
         if (null === $root) {
             return false;
         }
@@ -1294,6 +1320,15 @@ class Block {
                 }
                 foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
                     if ($sub instanceof self) {
+                        if ($skipFuncDefs && $sub === $op->block1) {
+                            if (
+                                OpCode::TYPE_FUNCDEF === $op->type
+                                || OpCode::TYPE_DECLARE_METHOD === $op->type
+                                || OpCode::TYPE_CLOSURE === $op->type
+                            ) {
+                                continue;
+                            }
+                        }
                         $stack[] = $sub;
                     }
                 }

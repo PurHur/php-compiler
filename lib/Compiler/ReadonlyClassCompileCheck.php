@@ -63,8 +63,7 @@ final class ReadonlyClassCompileCheck
             if (!$member instanceof Op\Stmt\Property) {
                 continue;
             }
-            $propertyReadonly = $classReadonly
-                || ClassReadonly::fromClassFlags($member->propertyFlags ?? 0);
+            $propertyReadonly = $classReadonly || $this->isCfgPropertyReadonly($member);
             if (!$propertyReadonly) {
                 continue;
             }
@@ -97,6 +96,19 @@ final class ReadonlyClassCompileCheck
                 );
             }
         }
+    }
+
+    private function isCfgPropertyReadonly(Op\Stmt\Property $member): bool
+    {
+        if (property_exists($member, 'readonly') && $member->readonly) {
+            return true;
+        }
+        if (property_exists($member, 'propertyFlags')
+            && ClassReadonly::fromClassFlags($member->propertyFlags)) {
+            return true;
+        }
+
+        return ClassReadonly::fromClassFlags($member->visibility);
     }
 
     private function propertyDisplayName(Operand $op): string

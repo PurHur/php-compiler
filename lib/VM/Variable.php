@@ -50,6 +50,8 @@ final class Variable {
     private Variable $stringOffsetParent;
     private int $stringOffsetIndex;
     private ?ErrorReporter $stringOffsetReporter = null;
+    private ?Context $stringOffsetContext = null;
+    private ?\PHPCompiler\Frame $stringOffsetFrame = null;
     private ?string $stringOffsetFile = null;
     private ArrayAccessDimension $arrayAccessDimension;
 
@@ -544,6 +546,8 @@ final class Variable {
         unset($this->stringOffsetParent);
         unset($this->stringOffsetIndex);
         unset($this->stringOffsetReporter);
+        unset($this->stringOffsetContext);
+        unset($this->stringOffsetFrame);
         unset($this->stringOffsetFile);
         unset($this->arrayAccessDimension);
     }
@@ -570,10 +574,34 @@ final class Variable {
         return $this->arrayAccessDimension->read()->resolveIndirect();
     }
 
+    /**
+     * Zend string offset index: float emits "String offset cast occurred" then truncates.
+     */
+    public static function stringOffsetIndexFromDim(
+        self $dim,
+        ?ErrorReporter $reporter = null,
+        ?Context $context = null,
+        ?\PHPCompiler\Frame $frame = null,
+        ?string $file = null
+    ): int {
+        $dim = $dim->resolveIndirect();
+        if (self::TYPE_FLOAT === $dim->type) {
+            if (null !== $reporter) {
+                $reporter->stringOffsetCastOccurred($context, $frame, $file);
+            }
+
+            return (int) $dim->float;
+        }
+
+        return $dim->toInt();
+    }
+
     public function stringOffset(
         Variable $parent,
         int $index,
         ?ErrorReporter $reporter = null,
+        ?Context $context = null,
+        ?\PHPCompiler\Frame $frame = null,
         ?string $file = null
     ): void {
         $this->reset();
@@ -581,6 +609,8 @@ final class Variable {
         $this->stringOffsetParent = $parent;
         $this->stringOffsetIndex = $index;
         $this->stringOffsetReporter = $reporter;
+        $this->stringOffsetContext = $context;
+        $this->stringOffsetFrame = $frame;
         $this->stringOffsetFile = $file;
     }
 
@@ -652,6 +682,9 @@ final class Variable {
                 break;
             case self::TYPE_STRING:
                 $this->string($var->string);
+                break;
+            case self::TYPE_STRING_OFFSET:
+                $this->string($var->toString());
                 break;
             case self::TYPE_INTEGER:
                 $this->int($var->integer);
@@ -1430,8 +1463,8 @@ restart:
             if (null !== $this->stringOffsetReporter) {
                 $this->stringOffsetReporter->uninitializedStringOffset(
                     $rawIndex,
-                    null,
-                    null,
+                    $this->stringOffsetContext,
+                    $this->stringOffsetFrame,
                     $this->stringOffsetFile
                 );
             }
@@ -1456,8 +1489,8 @@ restart:
             if (null !== $this->stringOffsetReporter) {
                 $this->stringOffsetReporter->illegalStringOffset(
                     $rawIndex,
-                    null,
-                    null,
+                    $this->stringOffsetContext,
+                    $this->stringOffsetFrame,
                     $this->stringOffsetFile
                 );
             }

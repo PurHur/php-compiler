@@ -15,14 +15,17 @@ use PHPCompiler\Block;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\ClassConstFetchHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\EnumCasesHelper;
 use PHPCompiler\JIT\FiberHelper;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\Builtin\Refcount;
 use PHPCompiler\JIT\Builtin\Type;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNativeString;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\MagicMethodDispatch;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM;
@@ -32,6 +35,20 @@ class Object_ extends Type {
     private array $classes = [];
     /** @var array<string, true> lowercase enum name => registered (#1373, #1356) */
     private array $enums = [];
+
+    /** @var array<int, list<string>> */
+    private array $enumCaseOrder = [];
+
+    /** @var array<int, array<string, string>> */
+    private array $enumCaseCanonicalNames = [];
+
+    /** @var array<int, ?string> */
+    private array $enumBackedType = [];
+
+    private const ENUM_CASE_SLOT_NAME = 0;
+
+    private const ENUM_CASE_SLOT_VALUE = 1;
+
     /** @var array<int, string> class id => canonical name */
     private array $classIdToName = [];
     /** @var array<string, string> alias lc => canonical class lc (#3178) */
@@ -58,6 +75,12 @@ class Object_ extends Type {
     private array $methodVisibility = [];
     /** @var array<int, array<string, int>> class id => property lc => visibility flags (#3159) */
     private array $propertyVisibility = [];
+
+    /** @var array<int, array<string, int>> class id => property lc => asymmetric set visibility (#3165) */
+    private array $propertySetVisibility = [];
+
+    /** @var array<int, array<string, list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>>> */
+    private array $propertyDnfArms = [];
     /** @var array<int, array<string, string>> class id => method lc => declared casing (#3118) */
     private array $methodDisplayNames = [];
     /** @var array<int, Block> class id => __destruct CFG block (#4013) */
@@ -120,6 +143,8 @@ class Object_ extends Type {
         \PHPCompiler\JIT\Builtin\ReadonlyRaise::ensureLinked($this->context);
         \PHPCompiler\JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
         \PHPCompiler\JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
+        \PHPCompiler\JIT\Builtin\ErrorRaise::registerDeclarations($this->context);
+        \PHPCompiler\JIT\Builtin\ErrorRaise::ensureLinked($this->context);
         // JitThrow linked on demand when compiling try/catch (#1056).
 
         $this->registerFn('__object__load_value_slot', 'void', ['void**', '__value__*']);
@@ -413,6 +438,15 @@ class Object_ extends Type {
         $ptrField = $this->context->builder->structGep($value, $map['value']);
         $objSlot = $this->context->builder->pointerCast($ptrField, $objPtr->pointerType(0));
         $this->context->builder->store($object, $objSlot);
+        // Zend zval object assignment retains the value (#4096); temp RHS delref must not drop last ref.
+        $refVirtual = $this->context->builder->pointerCast(
+            $object,
+            $this->context->getTypeFromString('__ref__virtual*')
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__ref__addref'),
+            $refVirtual
+        );
         $this->context->builder->returnVoid();
         $this->context->builder->clearInsertionPosition();
     }
@@ -460,6 +494,7 @@ class Object_ extends Type {
             $this->initPropertyDefaults($obj, $classId);
             $this->initRuntimePropertyNewDefaults($obj, $classId);
             $this->initEmptyHashtableProperties($obj, $classId);
+            $this->initEmptyValueProperties($obj, $classId);
         }
 
         if ($this->isSplObjectStorageClass($classId)) {
@@ -528,6 +563,7 @@ class Object_ extends Type {
             $this->initPropertyDefaults($obj, $classId);
             $this->initRuntimePropertyNewDefaults($obj, $classId);
             $this->initEmptyHashtableProperties($obj, $classId);
+            $this->initEmptyValueProperties($obj, $classId);
         }
 
         return $obj;
@@ -585,6 +621,7 @@ class Object_ extends Type {
             $this->initPropertyDefaults($obj, $classId);
             $this->initRuntimePropertyNewDefaults($obj, $classId);
             $this->initEmptyHashtableProperties($obj, $classId);
+            $this->initEmptyValueProperties($obj, $classId);
         }
 
         return $obj;
@@ -724,6 +761,55 @@ class Object_ extends Type {
             $voidPtr = $this->context->getTypeFromString('void*');
             $this->context->builder->store(
                 $this->context->builder->pointerCast($ht, $voidPtr),
+                $slot
+            );
+            $this->context->builder->branch($doneBlock);
+            $this->context->builder->positionAtEnd($doneBlock);
+        }
+    }
+
+    /** Uninitialized {@see __value__} property slots start as boxed null (#4111, Zend typed properties). */
+    private function initEmptyValueProperties(PHPLLVM\Value $obj, int $classId): void
+    {
+        if (!isset($this->properties[$classId])) {
+            return;
+        }
+        $initialized = $this->propertyDefaults[$classId] ?? [];
+        $valueType = $this->context->getTypeFromString('__value__');
+        $voidPtr = $this->context->getTypeFromString('void*');
+        $valueMap = $this->context->structFieldMap['__value__'];
+        foreach ($this->properties[$classId] as $propset) {
+            if (Variable::TYPE_VALUE !== $propset[2]) {
+                continue;
+            }
+            if (isset($initialized[$propset[3]])) {
+                continue;
+            }
+            $slot = $this->propertySlotPtr($obj, $propset[3]);
+            $loaded = $this->context->builder->load($slot);
+            $nullPtr = $loaded->typeOf()->getElementType()->constNull();
+            $isEmpty = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $loaded,
+                $nullPtr
+            );
+            $fn = $this->context->builder->getInsertBlock()->getParent();
+            assert($fn instanceof PHPLLVM\Value\Function_);
+            $initBlock = $fn->appendBasicBlock('prop_value_init_'.$classId.'_'.$propset[3]);
+            $doneBlock = $fn->appendBasicBlock('prop_value_done_'.$classId.'_'.$propset[3]);
+            $this->context->builder->branchIf($isEmpty, $initBlock, $doneBlock);
+            $this->context->builder->positionAtEnd($initBlock);
+            $heapVal = $this->context->memory->malloc($valueType);
+            $heapPtr = $this->context->builder->pointerCast(
+                $heapVal,
+                $this->context->getTypeFromString('__value__*')
+            );
+            $this->context->builder->store(
+                $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+                $this->context->builder->structGep($heapVal, $valueMap['type'])
+            );
+            $this->context->builder->store(
+                $this->context->builder->pointerCast($heapPtr, $voidPtr),
                 $slot
             );
             $this->context->builder->branch($doneBlock);
@@ -1051,6 +1137,130 @@ class Object_ extends Type {
         $this->enums[strtolower($name->value)] = true;
 
         return $this->declareClass($name);
+    }
+
+    public function setEnumBackedType(int $classId, ?string $backedType): void
+    {
+        $this->enumBackedType[$classId] = $backedType;
+    }
+
+    public function isEnumClassId(int $classId): bool
+    {
+        $lc = $this->classLcForId($classId);
+
+        return null !== $lc && isset($this->enums[$lc]);
+    }
+
+    public function isEnumClassLc(string $classLc): bool
+    {
+        return isset($this->enums[strtolower(ltrim($classLc, '\\'))]);
+    }
+
+    /** @return list<string> */
+    public function enumCaseOrderForClass(int $classId): array
+    {
+        return $this->enumCaseOrder[$classId] ?? [];
+    }
+
+    public function enumCaseCanonicalName(int $classId, string $caseKey): string
+    {
+        return $this->enumCaseCanonicalNames[$classId][$caseKey] ?? $caseKey;
+    }
+
+    public function finishEnumClass(int $classId): void
+    {
+        if ($this->isEnumClassId($classId)) {
+            EnumCasesHelper::registerCasesMethod($this->context, $this, $classId);
+        }
+    }
+
+    public function defineEnumCaseConst(int $classId, string $caseName, VMVariable $backing): void
+    {
+        if (!$this->isEnumClassId($classId)) {
+            throw new \LogicException('defineEnumCaseConst requires an enum class id');
+        }
+        $key = strtolower($caseName);
+        $this->enumCaseOrder[$classId][] = $key;
+        $this->enumCaseCanonicalNames[$classId][$key] = $caseName;
+        $this->classConstants[$classId][$key] = [
+            'type' => Variable::fromVMVariable($backing->type),
+            'value' => $this->compileTimeValueFromVm($backing),
+        ];
+    }
+
+    public function jitEnumCaseFromBacking(int $classId, string $caseKey): Variable
+    {
+        if (!isset($this->classConstants[$classId][$caseKey])) {
+            throw new \LogicException("Unknown enum case: {$caseKey}");
+        }
+
+        return $this->allocEnumCaseSingletonIr(
+            $classId,
+            $this->enumCaseCanonicalName($classId, $caseKey),
+            $this->jitConstantFromEntry($this->classConstants[$classId][$caseKey])
+        );
+    }
+
+    public function allocEnumCaseSingletonIr(int $classId, string $caseName, Variable $backingJit): Variable
+    {
+        $objType = $this->context->getTypeFromString('__object__');
+        $obj = $this->context->memory->mallocWithExtra(
+            $objType,
+            $this->context->constantFromInteger(16, 'size_t')
+        );
+        $map = $this->context->structFieldMap['__object__'];
+        $this->context->builder->store(
+            $this->context->constantFromInteger($classId, 'int64'),
+            $this->context->builder->structGep($obj, $map['class_id'])
+        );
+        $this->context->builder->store(
+            $this->context->getTypeFromString('int8')->constInt(1, false),
+            $this->context->builder->structGep($obj, $map['constructed'])
+        );
+        $typeinfo = $this->context->getTypeFromString('int32')->constInt(
+            Refcount::TYPE_INFO_TYPE_OBJECT | Refcount::TYPE_INFO_REFCOUNTED,
+            false
+        );
+        $ref = $this->context->builder->pointerCast(
+            $obj,
+            $this->context->getTypeFromString('__ref__virtual*')
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__ref__init'),
+            $typeinfo,
+            $ref
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__ref__addref'),
+            $ref
+        );
+        $voidPtr = $this->context->getTypeFromString('void*');
+        $nameStr = $this->context->builder->load(
+            $this->context->constantStringFromString($caseName)
+        );
+        $this->context->builder->store(
+            $this->context->builder->pointerCast($nameStr, $voidPtr),
+            $this->propertySlotPtr($obj, self::ENUM_CASE_SLOT_NAME)
+        );
+        $this->propertyStore(
+            $this->propertySlotPtr($obj, self::ENUM_CASE_SLOT_VALUE),
+            $backingJit,
+            Variable::TYPE_VALUE
+        );
+        \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
+        \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
+        $this->context->builder->call(
+            $this->context->lookupFunction('phpc_gc_register'),
+            $this->context->builder->pointerCast($obj, $this->context->getTypeFromString('int8*')),
+            $this->context->constantFromInteger(0, 'int32')
+        );
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $obj
+        );
     }
 
     public function hasDeclaredClass(string $name): bool
@@ -1642,6 +1852,14 @@ class Object_ extends Type {
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);
             $this->defineProperty($id, 'method', Variable::TYPE_STRING);
         }
+        if ('reflectionproperty' === $lcname) {
+            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
+            $this->defineProperty($id, 'property', Variable::TYPE_STRING);
+        }
+        if ('reflectionconstant' === $lcname) {
+            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
+            $this->defineProperty($id, 'constant', Variable::TYPE_STRING);
+        }
         if ('phpcompiler\vm\context' === $lcname) {
             $this->defineProperty($id, 'runtime', Variable::TYPE_OBJECT);
             $this->defineProperty($id, 'errors', Variable::TYPE_OBJECT);
@@ -1678,6 +1896,8 @@ class Object_ extends Type {
             // Invoke metadata for indirect holders (array elements, properties; issue #72).
             $this->defineProperty($id, '__closure_target', Variable::TYPE_STRING);
             $this->defineProperty($id, FiberHelper::TARGET_PROPERTY, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\JIT\ClosureBindHelper::BOUND_THIS_PROPERTY, Variable::TYPE_VALUE);
+            $this->defineProperty($id, \PHPCompiler\JIT\ClosureBindHelper::BOUND_SCOPE_PROPERTY, Variable::TYPE_STRING);
         }
         if ('fiber' === $lcname) {
             $this->defineProperty($id, FiberHelper::TARGET_PROPERTY, Variable::TYPE_STRING);
@@ -1698,6 +1918,7 @@ class Object_ extends Type {
         if ('weakmap' === $lcname) {
             $this->weakMapClassId = $id;
             $this->defineProperty($id, '__weak_map', Variable::TYPE_HASHTABLE);
+            $this->setClassInterfaces($displayName, ['arrayaccess', 'countable']);
         }
         if ('phpcompiler\\vm\\variable' === $lcname) {
             foreach ([
@@ -1962,9 +2183,21 @@ class Object_ extends Type {
         $this->propertyVisibility[$classId][strtolower($name)] = $visibilityFlags;
     }
 
+    public function definePropertySetVisibility(int $classId, string $name, int $setVisibilityFlags): void
+    {
+        if (0 !== $setVisibilityFlags) {
+            $this->propertySetVisibility[$classId][strtolower($name)] = $setVisibilityFlags;
+        }
+    }
+
     public function propertyVisibility(int $classId, string $name): int
     {
         return $this->propertyVisibility[$classId][strtolower($name)] ?? \PHPCfg\Func::FLAG_PUBLIC;
+    }
+
+    public function propertySetVisibility(int $classId, string $name): int
+    {
+        return $this->propertySetVisibility[$classId][strtolower($name)] ?? 0;
     }
 
     public function methodVisibility(int $classId, string $methodLc): int
@@ -2019,6 +2252,25 @@ class Object_ extends Type {
         $this->properties[$classId][] = [
             $this->propNameMap[$name], $name, $type, count($this->properties[$classId]),
         ];
+    }
+
+    /**
+     * @param list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}> $arms
+     */
+    public function definePropertyDnfArms(int $classId, string $name, array $arms): void
+    {
+        if ([] === $arms) {
+            return;
+        }
+        $this->propertyDnfArms[$classId][strtolower($name)] = $arms;
+    }
+
+    /**
+     * @return list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>|null
+     */
+    public function dnfArmsForProperty(int $classId, string $name): ?array
+    {
+        return $this->propertyDnfArms[$classId][strtolower($name)] ?? null;
     }
 
     public function definePropertyRuntimeNewDefault(int $classId, string $name, string $newClassName): void
@@ -2779,10 +3031,53 @@ class Object_ extends Type {
         throw new \LogicException('Property slot not found: '.$class.'::$'.$name);
     }
 
+    private function enumCasePropertyFetch(PHPLLVM\Value $obj, int $classId, string $nameLc): Variable
+    {
+        if ('value' === $nameLc && null === ($this->enumBackedType[$classId] ?? null)) {
+            \PHPCompiler\JIT\Builtin\ErrorRaise::emitRaise(
+                $this->context,
+                'Attempt to read property "value" on unit enum case '.$this->classNameForId($classId)
+            );
+        }
+        $slot = $this->propertySlotPtr(
+            $obj,
+            'name' === $nameLc ? self::ENUM_CASE_SLOT_NAME : self::ENUM_CASE_SLOT_VALUE
+        );
+        $loaded = $this->context->builder->load($slot);
+        if ('name' === $nameLc) {
+            return new Variable(
+                $this->context,
+                Variable::TYPE_STRING,
+                Variable::KIND_VALUE,
+                $this->context->builder->pointerCast(
+                    $loaded,
+                    $this->context->getTypeFromString('__string__*')
+                )
+            );
+        }
+        $storage = BasicBlockHelper::entryAlloca($this->context, $this->context->getTypeFromString('__value__'));
+        $valueMap = $this->context->structFieldMap['__value__'];
+        $this->context->builder->store(
+            $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+            $this->context->builder->structGep($storage, $valueMap['type'])
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__object__load_value_slot'),
+            $slot,
+            $storage
+        );
+
+        return new Variable($this->context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $storage);
+    }
+
     public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name): Variable
     {
         $classId = $this->lookup('' !== $class ? $class : 'stdclass');
         $className = $this->classNameForId($classId);
+        $nameLc = strtolower($name);
+        if ($this->isEnumClassId($classId) && ('name' === $nameLc || 'value' === $nameLc)) {
+            return $this->enumCasePropertyFetch($obj, $classId, $nameLc);
+        }
         $nameId = $this->propNameMap[$name] ?? null;
         $hasProp = false;
         if (null !== $nameId) {
@@ -2825,6 +3120,7 @@ class Object_ extends Type {
                     $var->objectPropertyReceiver = $obj;
                     $var->objectPropertyName = $propset[1];
                     $var->objectPropertyClassName = $className;
+                    $var->objectPropertyDnfArms = $this->dnfArmsForProperty($classId, $propset[1]);
                     $this->slotReceivers[spl_object_id($slot)] = $obj;
 
                     return $var;
@@ -2845,6 +3141,7 @@ class Object_ extends Type {
                     $var->objectPropertyReceiver = $obj;
                     $var->objectPropertyName = $propset[1];
                     $var->objectPropertyClassName = $className;
+                    $var->objectPropertyDnfArms = $this->dnfArmsForProperty($classId, $propset[1]);
                     $this->slotReceivers[spl_object_id($slot)] = $obj;
 
                     return $var;
@@ -2865,6 +3162,7 @@ class Object_ extends Type {
                 $var->objectPropertyReceiver = $obj;
                 $var->objectPropertyName = $propset[1];
                 $var->objectPropertyClassName = $className;
+                $var->objectPropertyDnfArms = $this->dnfArmsForProperty($classId, $propset[1]);
                 $this->slotReceivers[spl_object_id($slot)] = $obj;
 
                 return $var;
@@ -2939,11 +3237,7 @@ class Object_ extends Type {
             throw new \LogicException('Dynamic property fetch requires at least one declared property on '.$class);
         }
 
-        $nameStr = JitNativeString::coerce($this->context, $nameVar);
-        if (Variable::TYPE_STRING !== $nameStr->type) {
-            throw new \LogicException('Dynamic property name must coerce to string');
-        }
-        $runtimeName = $this->context->helper->loadValue($nameStr);
+        $runtimeName = JitStringArg::lowerDominating($this->context, $nameVar, 'dynamic property name');
 
         $fn = BasicBlockHelper::parentFunction($this->context);
         $entry = $this->context->builder->getInsertBlock();
@@ -2969,7 +3263,20 @@ class Object_ extends Type {
             $checkBlock = $nextCheck;
         }
         $this->context->builder->positionAtEnd($fallback);
-        $this->context->builder->call($this->context->lookupFunction('abort'));
+        $magicRaw = MagicMethodDispatch::tryEmitMagicGetDynamic(
+            $this->context,
+            $obj,
+            $class,
+            $runtimeName,
+            null
+        );
+        if (null !== $magicRaw) {
+            $valuePtr = JitValueBox::coerceToValuePtrForStore($this->context, $magicRaw);
+            JitValueBox::copyFromPointer($this->context, $destSlot, $valuePtr);
+            $this->context->builder->branch($done);
+        } else {
+            $this->context->builder->call($this->context->lookupFunction('abort'));
+        }
         $this->context->builder->positionAtEnd($done);
         $this->context->builder->branch($exit);
         $this->context->builder->positionAtEnd($exit);

@@ -12,7 +12,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * stripos() for two strings (subset of PHP; ASCII case fold, non-empty needle, no offset in JIT).
+ * stripos() for two strings (subset of PHP; ASCII case fold, non-empty needle, Zend offset window).
  */
 final class stripos extends Internal
 {

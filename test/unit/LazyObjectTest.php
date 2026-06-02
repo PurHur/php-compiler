@@ -32,4 +32,27 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'lazy_object_proxy.php'));
         $this->assertSame("before\ninit\nx\nx\n", ob_get_clean());
     }
+
+    public function testNewLazyGhostDefersConstructor(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Svc {
+    public function __construct(public string $id = '') {
+        echo "init\n";
+    }
+}
+$ref = new ReflectionClass(Svc::class);
+$lazy = $ref->newLazyGhost(function (Svc $object) {
+    $object->__construct('x');
+});
+echo "before\n";
+echo $lazy->id, "\n";
+echo $lazy->id, "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'lazy_object_ghost.php'));
+        $this->assertSame("before\ninit\nx\nx\n", ob_get_clean());
+    }
 }

@@ -11,6 +11,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\Block;
+use PHPCompiler\OpCode;
 use PHPCfg\Operand;
 use PHPTypes\Type;
 use PHPCompiler\VM\Variable as VMVariable;
@@ -125,6 +126,13 @@ final class Variable {
 
     /** Declaring class name for readonly diagnostics (#1360). */
     public ?string $objectPropertyClassName = null;
+
+    /**
+     * DNF declared-type arms for property writes (#4111).
+     *
+     * @var list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>|null
+     */
+    public ?array $objectPropertyDnfArms = null;
 
     /** __set dispatch when the property slot does not exist (#146, #4022). */
     public ?\PHPLLVM\Value $magicSetReceiver = null;
@@ -307,6 +315,14 @@ final class Variable {
         Block $block,
         Operand $op
     ): Variable {
+        if (self::isVariadicParamOperand($block, $op)) {
+            return new Variable(
+                $context,
+                self::TYPE_HASHTABLE,
+                self::KIND_VARIABLE,
+                BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__hashtable__*'))
+            );
+        }
         $type = self::getTypeFromType($op->type);
         if ($type === self::TYPE_NULL) {
             $slot = JitValueBox::alloc($context);
@@ -339,6 +355,27 @@ final class Variable {
             self::KIND_VARIABLE,
             BasicBlockHelper::entryAlloca($context, $context->getTypeFromString($stringType))
         );
+    }
+
+    private static function isVariadicParamOperand(Block $block, Operand $op): bool
+    {
+        if (null === $block->variadicParamIndex) {
+            return false;
+        }
+        $slot = $block->slotForOperand($op);
+        if (null === $slot) {
+            return false;
+        }
+        foreach ($block->opCodes as $recv) {
+            if (OpCode::TYPE_ARG_RECV !== $recv->type) {
+                continue;
+            }
+            if ((int) $recv->arg1 === $slot && (int) $recv->arg2 === $block->variadicParamIndex) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -594,7 +631,16 @@ final class Variable {
                 return;
         }
         if ($this->type === self::TYPE_VALUE || $this->type === self::TYPE_NULL) {
-            // TODO: free owned resources
+            if (
+                self::KIND_VARIABLE === $this->kind
+                && null === $this->objectPropertySlot
+            ) {
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__valueDelref'),
+                    $this->value
+                );
+            }
+
             return;
         }
         if ($this->type & self::IS_NATIVE_ARRAY) {

@@ -97,4 +97,60 @@ final class ReflectionSetup
             $context->builder->zExt($len, $context->getTypeFromString('size_t'))
         );
     }
+
+    public static function emitSetStringPropertyFromVar(
+        Context $context,
+        Value $obj,
+        string $className,
+        string $propName,
+        Variable $nameVar
+    ): void {
+        $nameVar = JitNativeString::coerce($context, $nameVar);
+        $strPtr = $context->helper->loadValue($nameVar);
+        $i8p = $context->getTypeFromString('int8*');
+        $raw = $context->builder->pointerCast($strPtr, $i8p);
+        $lenPtr = $context->builder->pointerCast(
+            $context->builder->gep($raw, $context->constantFromInteger(8, 'size_t')),
+            $context->getTypeFromString('int64*')
+        );
+        $len = $context->builder->load($lenPtr);
+        $data = $context->builder->gep($raw, $context->constantFromInteger(16, 'size_t'));
+        self::emitSetStringPropertyFromCstr(
+            $context,
+            $obj,
+            $className,
+            $propName,
+            $context->builder->pointerCast($data, $i8p),
+            $context->builder->zExt($len, $context->getTypeFromString('size_t'))
+        );
+    }
+
+    /**
+     * @return array{0: Value, 1: Value} cstr pointer and byte length (size_t)
+     */
+    public static function stringPropertyAsCstr(
+        Context $context,
+        Value $obj,
+        string $className,
+        string $propName
+    ): array {
+        $propVar = $context->type->object->propertyFetch($obj, $className, $propName);
+        $propVar = JitNativeString::coerce($context, $propVar);
+        $strPtr = $context->helper->loadValue($propVar);
+        $i8p = $context->getTypeFromString('int8*');
+        $raw = $context->builder->pointerCast($strPtr, $i8p);
+        $lenPtr = $context->builder->pointerCast(
+            $context->builder->gep($raw, $context->constantFromInteger(8, 'size_t')),
+            $context->getTypeFromString('int64*')
+        );
+        $len = $context->builder->load($lenPtr);
+        $data = $context->builder->gep($raw, $context->constantFromInteger(16, 'size_t'));
+        $sizeT = $context->getTypeFromString('size_t');
+        $empty = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $data, $data->typeOf()->constNull());
+        $safe = $context->builder->select($isNull, $empty, $context->builder->pointerCast($data, $i8p));
+        $lenSafe = $context->builder->select($isNull, $sizeT->constInt(0, false), $context->builder->zExt($len, $sizeT));
+
+        return [$safe, $lenSafe];
+    }
 }

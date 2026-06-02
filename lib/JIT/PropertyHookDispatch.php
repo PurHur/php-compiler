@@ -108,16 +108,28 @@ final class PropertyHookDispatch
         if (null !== $rawFromMethod && $rawFromMethod === $propertyName) {
             return true;
         }
+        $rawFromGet = PropertyHooks::propertyNameFromGetHookMethod($funcName);
+        if (null !== $rawFromGet && $rawFromGet === $propertyName) {
+            return true;
+        }
         $wantSet = strtolower(PropertyHooks::setHookMethodName($propertyName));
         if ($funcName === $wantSet) {
+            return true;
+        }
+        $wantGet = strtolower(PropertyHooks::getHookMethodName($propertyName));
+        if ($funcName === $wantGet) {
             return true;
         }
         if (null !== $block->func->class) {
             $classVal = $block->func->class->value ?? null;
             if (is_string($classVal) && '' !== $classVal) {
-                $qualified = strtolower($classVal.'::'.$wantSet);
+                $qualifiedSet = strtolower($classVal.'::'.$wantSet);
+                if ($funcName === $qualifiedSet || strtolower($block->func->name) === $qualifiedSet) {
+                    return true;
+                }
+                $qualifiedGet = strtolower($classVal.'::'.$wantGet);
 
-                return $funcName === $qualified || strtolower($block->func->name) === $qualified;
+                return $funcName === $qualifiedGet || strtolower($block->func->name) === $qualifiedGet;
             }
         }
 

@@ -76,13 +76,12 @@ int64_t phpc_strspn_ex(
         mask = "";
         mlen = 0;
     }
-    if (0 == mlen) {
-        return -1;
-    }
-
     phpc_spn_normalize(slen, &start, &len, len_is_null);
     if (len <= 0) {
         return 0;
+    }
+    if (0 == mlen) {
+        return is_strspn ? 0 : len;
     }
 
     for (i = (size_t) start; i < (size_t) start + (size_t) len; ++i) {

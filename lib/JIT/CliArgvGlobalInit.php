@@ -13,6 +13,7 @@ use PHPLLVM\Value;
 final class CliArgvGlobalInit
 {
     public static ?Value $global = null;
+    public static ?Value $argcGlobal = null;
 
     public static function initialize(Context $context): void
     {
@@ -23,6 +24,8 @@ final class CliArgvGlobalInit
         $valueTy = $context->getTypeFromString('__value__');
         self::$global = $context->module->addGlobal($valueTy, 'jit_global_argv');
         self::$global->setInitializer($valueTy->constNull());
+        self::$argcGlobal = $context->module->addGlobal($valueTy, 'jit_global_argc');
+        self::$argcGlobal->setInitializer($valueTy->constNull());
     }
 
     public static function emitRefreshAfterStoreArgv(Context $context): void
@@ -37,6 +40,16 @@ final class CliArgvGlobalInit
                 $context->getTypeFromString('__value__*')
             )
         );
+        if (null !== self::$argcGlobal) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeLong'),
+                $context->builder->pointerCast(
+                    self::$argcGlobal,
+                    $context->getTypeFromString('__value__*')
+                ),
+                $context->builder->call($context->lookupFunction('__phpc_cli_argc'))
+            );
+        }
     }
 
     public static function load(Context $context): Variable
@@ -54,6 +67,22 @@ final class CliArgvGlobalInit
             Variable::TYPE_VALUE,
             Variable::KIND_VARIABLE,
             self::$global
+        );
+    }
+
+    public static function loadArgc(Context $context): Variable
+    {
+        if (null === self::$argcGlobal) {
+            throw new \LogicException('CLI argc global not initialized for JIT');
+        }
+        // Keep behavior consistent with argv: ensure globals are refreshed on first access.
+        self::emitRefreshAfterStoreArgv($context);
+
+        return new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            self::$argcGlobal
         );
     }
 }

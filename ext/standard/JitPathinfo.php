@@ -74,7 +74,23 @@ final class JitPathinfo
             );
         }
 
-        return self::buildPartialArray($context, $pathVal, $mask);
+        return self::highestPriorityComponent($context, $pathVal, $mask);
+    }
+
+    /** php-src priority: dirname → basename → extension → filename. */
+    private static function highestPriorityComponent(Context $context, Value $pathVal, int $mask): Value
+    {
+        if ($mask & 1) {
+            return JitPath::dirname($context, $pathVal);
+        }
+        if ($mask & 2) {
+            return JitPath::basename($context, $pathVal);
+        }
+        if ($mask & 4) {
+            return self::extension($context, $pathVal);
+        }
+
+        return self::filename($context, $pathVal);
     }
 
     private static function popcountMask(int $mask): int
@@ -87,36 +103,6 @@ final class JitPathinfo
         }
 
         return $count;
-    }
-
-    private static function buildPartialArray(Context $context, Value $pathVal, int $mask): Value
-    {
-        $ht = HashTableHelper::alloc($context);
-        if ($mask & 1) {
-            self::setArrayStringKey($context, $ht, 'dirname', JitPath::dirname($context, $pathVal));
-        }
-        if ($mask & 2) {
-            self::setArrayStringKey($context, $ht, 'basename', JitPath::basename($context, $pathVal));
-        }
-        if ($mask & 4) {
-            self::setArrayStringKey($context, $ht, 'extension', self::extension($context, $pathVal));
-        }
-        if ($mask & 8) {
-            self::setArrayStringKey($context, $ht, 'filename', self::filename($context, $pathVal));
-        }
-
-        return $ht;
-    }
-
-    private static function setArrayStringKey(Context $context, Value $ht, string $key, Value $value): void
-    {
-        $keyStr = $context->builder->load($context->constantStringFromString($key));
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setStringKeyString'),
-            $ht,
-            $keyStr,
-            $value
-        );
     }
 
     /**

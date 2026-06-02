@@ -25,6 +25,8 @@ final class ReflectionSupport
 
     public const REFLECTION_ATTRIBUTE = 'reflectionattribute';
 
+    public const REFLECTION_ENUM = 'reflectionenum';
+
     public const REFLECTION_ENUM_UNIT_CASE = 'reflectionenumunitcase';
 
     public const REFLECTION_PARAMETER = 'reflectionparameter';
@@ -356,6 +358,20 @@ final class ReflectionSupport
         return $obj;
     }
 
+    public static function requireReflectionEnum(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('ReflectionEnum method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (strtolower($obj->class->name) !== self::REFLECTION_ENUM) {
+            throw new \LogicException('Expected ReflectionEnum instance');
+        }
+
+        return $obj;
+    }
+
     public static function requireReflectionEnumUnitCase(Frame $frame, Variable $receiver): ObjectEntry
     {
         $receiver = $receiver->resolveIndirect();
@@ -463,6 +479,26 @@ final class ReflectionSupport
         }
 
         return $nameVar->toString();
+    }
+
+    public static function isReflectionFunctionAnonymous(ObjectEntry $reflection): bool
+    {
+        $state = $reflection->reflectionClosureState;
+
+        return null !== $state && $state->isUserClosure();
+    }
+
+    /**
+     * @return \PHPCompiler\Func\PHP
+     */
+    public static function resolveFunctionFromReflection(Context $ctx, ObjectEntry $reflection): \PHPCompiler\Func\PHP
+    {
+        $closure = $reflection->reflectionClosureState;
+        if (null !== $closure) {
+            return $closure->func;
+        }
+
+        return self::resolveUserFunction($ctx, self::functionNameFromReflection($reflection));
     }
 
     public static function constantNameFromReflection(ObjectEntry $reflection): string

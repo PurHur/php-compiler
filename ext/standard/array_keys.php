@@ -15,8 +15,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -29,14 +29,11 @@ final class array_keys extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('array_keys() requires exactly one argument');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
+        $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_keys');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_keys() argument must be an array in this compiler build');
-        }
-        $frame->returnVar->array($array->toArray()->keysCopy());
+        $frame->returnVar->array($ht->keysCopy());
     }
 
     public Context $context;
@@ -47,11 +44,18 @@ final class array_keys extends Internal
             throw new \LogicException('array_keys() requires exactly one argument');
         }
 
-        foreach ($args as $i => $arg) {
-            if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
-                $this->jitString($context, $arg, 'array_keys() argument #'.((int) $i + 1));
-            }
+        if (JITVariable::TYPE_HASHTABLE === $args[0]->type
+            || ($args[0]->type & JITVariable::IS_NATIVE_ARRAY)
+        ) {
+            return ArrayBuiltinHelper::buildKeysArrayFromVariable($context, $args[0]);
         }
-        return ArrayBuiltinHelper::buildKeysArrayFromVariable($context, $args[0]);
+        if (JITVariable::TYPE_VALUE === $args[0]->type) {
+            JitArrayElem::requireArrayArg($context, $args[0], 'array_keys');
+
+            return ArrayBuiltinHelper::buildKeysArrayFromVariable($context, $args[0]);
+        }
+        JitArrayElem::requireArrayArg($context, $args[0], 'array_keys');
+
+        return ArrayBuiltinHelper::buildKeysArray($context, HashTableHelper::alloc($context));
     }
 }

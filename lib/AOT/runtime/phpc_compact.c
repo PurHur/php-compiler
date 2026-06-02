@@ -46,6 +46,7 @@ extern __string__ *__value__readString(__value__ *v);
 extern __hashtable__ *__value__readHashtable(__value__ *v);
 extern void __hashtable__setStringKeyString(__hashtable__ *ht, __string__ *key, __string__ *val);
 extern void __hashtable__setStringKeyLong(__hashtable__ *ht, __string__ *key, long long val);
+extern void __hashtable__setStringKeyDouble(__hashtable__ *ht, __string__ *key, double val);
 extern void __hashtable__setStringKeyBool(__hashtable__ *ht, __string__ *key, int val);
 extern void __hashtable__setStringKeyHashtable(__hashtable__ *ht, __string__ *key, __hashtable__ *child);
 extern __string__ *__string__init(long long size, const char *value);
@@ -88,7 +89,7 @@ static void phpc_compact_store_slot(
             );
             break;
         case PHPC_TYPE_NATIVE_DOUBLE:
-            __hashtable__setStringKeyLong(result, key, (long long) __value__readDouble(slot));
+            __hashtable__setStringKeyDouble(result, key, __value__readDouble(slot));
             break;
         case PHPC_TYPE_STRING:
             __hashtable__setStringKeyString(

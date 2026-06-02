@@ -115,12 +115,12 @@ class Refcount extends Builtin {
                     $test = $current <= 0;
                     if ($test) {
                         $allow = phpc_destruct_delref_allowed();
-                        if (!$allow) {
-                            return;
-                        }
                         $objMask = (int32) self::TYPE_INFO_TYPE_OBJECT;
                         if (($typeinfo & $objMask) != 0) {
                             phpc_destruct_try_invoke((int8*) $refVirtual);
+                        }
+                        if (!$allow) {
+                            return;
                         }
                         phpc_weakref_clear_object_typed((__object__*) $refVirtual, $typeinfo);
                         phpc_gc_unregister((__object__*) $refVirtual);

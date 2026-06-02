@@ -826,16 +826,20 @@ restart:
                         goto restart;
                     }
                     if (null !== ($msg = $this->asymmetricPropertyWriteMessage($arg2, $frame))) {
-                        $thrown = $this->logicExceptionVariable($msg);
-                        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+                        $catchFrame = $this->dispatchVmError($msg, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
                         }
-                        $this->raiseUncaughtException($thrown);
                     }
                     $arg2->copyFrom($arg3);
                     $arg1->copyFrom($arg3);
+                    if ($op->arg2 !== $op->arg3) {
+                        $arg3->resolveIndirect()->null();
+                    }
+                    if ($op->arg1 !== $op->arg2 && $op->arg1 !== $op->arg3) {
+                        $arg1->resolveIndirect()->null();
+                    }
                     $strict = null !== $frame->parent
                         ? $frame->parent->block->strictTypes
                         : $frame->block->strictTypes;
@@ -882,13 +886,11 @@ restart:
                         goto restart;
                     }
                     if (null !== ($msg = $this->asymmetricPropertyWriteMessage($lhs, $frame))) {
-                        $thrown = $this->logicExceptionVariable($msg);
-                        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+                        $catchFrame = $this->dispatchVmError($msg, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
                         }
-                        $this->raiseUncaughtException($thrown);
                     }
                     $rhs = $frame->scope[$op->arg2]->resolveIndirect();
                     $lhs->indirect($rhs);
@@ -982,14 +984,37 @@ restart:
                     }
                     $arg3 = $frame->scope[$op->arg3];
                     if ($container->type === Variable::TYPE_STRING) {
-                        $offset = new Variable(Variable::TYPE_STRING_OFFSET);
-                        $offset->stringOffset(
-                            $container,
-                            $arg3->toInt(),
+                        $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+                        $byteIndex = Variable::stringOffsetIndexFromDim(
+                            $arg3,
                             $this->context->errors,
-                            '' !== $frame->scriptPath ? $frame->scriptPath : null
+                            $this->context,
+                            $frame,
+                            $scriptFile
                         );
-                        $arg1->indirect($offset);
+                        if ($forWrite) {
+                            $offset = new Variable(Variable::TYPE_STRING_OFFSET);
+                            $offset->stringOffset(
+                                $container,
+                                $byteIndex,
+                                $this->context->errors,
+                                $this->context,
+                                $frame,
+                                $scriptFile
+                            );
+                            $arg1->indirect($offset);
+                            break;
+                        }
+                        $readShell = new Variable(Variable::TYPE_STRING_OFFSET);
+                        $readShell->stringOffset(
+                            $container,
+                            $byteIndex,
+                            $this->context->errors,
+                            $this->context,
+                            $frame,
+                            $scriptFile
+                        );
+                        $arg1->string($readShell->toString());
                     } elseif ($container->type === Variable::TYPE_ARRAY) {
                         if ($this->context->isGlobalsTable($container)) {
                             if (!$forWrite && Variable::TYPE_STRING === $arg3->type
@@ -1764,15 +1789,44 @@ restart:
                     $isVariadicSlot = null !== $frame->block->variadicParamIndex
                         && $frame->block->variadicParamIndex === (int) $op->arg2;
                     if ($isVariadicSlot) {
-                        $arg1->newArray();
-                        $packed = $arg1->toArray();
+                        $variadicSlot = (int) $op->arg1;
+                        $strict = null !== $frame->parent
+                            ? $frame->parent->block->strictTypes
+                            : $frame->block->strictTypes;
                         $n = count($frame->calledArgs);
-                        for ($i = $recvIdx; $i < $n; ++$i) {
-                            $copy = new Variable();
-                            $copy->copyFrom($frame->calledArgs[$i]);
-                            $packed->append($copy);
+                        try {
+                            if (TypeCheck::variadicSlotNeedsElementChecks($frame->block, $variadicSlot)) {
+                                $trailing = [];
+                                for ($i = $recvIdx; $i < $n; ++$i) {
+                                    $trailing[] = $frame->calledArgs[$i];
+                                }
+                                TypeCheck::verifyVariadicElements(
+                                    $trailing,
+                                    $strict,
+                                    $frame->block->paramVariadicElementTypeConstraints[$variadicSlot] ?? null,
+                                    $frame->block->paramVariadicElementGenericArrayTypeSpecs[$variadicSlot] ?? null,
+                                    $frame->block->paramVariadicElementIntersectionConstraints[$variadicSlot] ?? null,
+                                    $frame->block->paramVariadicElementDnfConstraints[$variadicSlot] ?? null,
+                                    $this->context
+                                );
+                            }
+                            $arg1->newArray();
+                            $packed = $arg1->toArray();
+                            for ($i = $recvIdx; $i < $n; ++$i) {
+                                $copy = new Variable();
+                                $copy->copyFrom($frame->calledArgs[$i]);
+                                $packed->append($copy);
+                            }
+                        } catch (\TypeError $e) {
+                            $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
                         }
-                    } elseif (array_key_exists($recvIdx, $frame->calledArgs)) {
+                        break;
+                    }
+                    if (array_key_exists($recvIdx, $frame->calledArgs)) {
                         if (isset($frame->block->paramByRef[(int) $op->arg2])) {
                             $arg1->indirect($frame->calledArgs[$recvIdx]);
                         } else {
@@ -1990,7 +2044,14 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
+                    $forWrite = $frame->pos < $frame->block->nOpCodes
+                        && OpCode::TYPE_ASSIGN === $frame->block->opCodes[$frame->pos]->type
+                        && (int) $frame->block->opCodes[$frame->pos]->arg2 === (int) $op->arg1;
                     if ($propertyObject->hasProperty($name)) {
+                        if ($forWrite) {
+                            $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
+                            break;
+                        }
                         $hookValue = $this->fetchPropertyWithHooks($propertyObject, $name, $frame);
                         if (null !== $hookValue) {
                             $result->copyFrom($hookValue);
@@ -1999,9 +2060,6 @@ restart:
                         }
                         break;
                     }
-                    $forWrite = $frame->pos < $frame->block->nOpCodes
-                        && OpCode::TYPE_ASSIGN === $frame->block->opCodes[$frame->pos]->type
-                        && (int) $frame->block->opCodes[$frame->pos]->arg2 === (int) $op->arg1;
                     if ($forWrite) {
                         $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
                         break;
@@ -2031,10 +2089,11 @@ restart:
                         break;
                     }
                     $key = $frame->scope[$op->arg3]->resolveIndirect();
+                    $value = $frame->scope[$op->arg2];
                     if ($key->is(Variable::TYPE_INTEGER) || $key->is(Variable::TYPE_FLOAT)) {
-                        $ht->addIndex($key->toInt(), $frame->scope[$op->arg2]);
+                        $ht->updateIndex($key->toInt(), $value);
                     } else {
-                        $ht->add($key->toString(), $frame->scope[$op->arg2]);
+                        $ht->update($key->toString(), $value);
                     }
                     break;
                 case OpCode::TYPE_ARRAY_SPREAD:
@@ -2334,9 +2393,15 @@ restart:
                     $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
                     if ($this->isForeachObjectIteratorSlot((int) $op->arg2)) {
                         if ((bool) $op->arg3) {
-                            throw new \LogicException(
-                                'foreach by-reference over Iterator objects is not supported in this compiler build'
+                            $catchFrame = $this->dispatchVmError(
+                                'An iterator cannot be used with foreach by reference',
+                                $frame
                             );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
                         }
                         $value = $this->invokeForeachInstanceMethod($frame, $container, 'current');
                         $frame->scope[$op->arg1]->copyFrom($value);
@@ -2880,10 +2945,17 @@ restart:
                 $catchFrame->scope[$op->arg3]->copyFrom($caught);
             }
             $catchFrame->activeCatchException = $caught;
+            $gen = $this->findGeneratorState($handler);
+            if (null !== $gen) {
+                $catchFrame->generatorState = $gen;
+            }
             $mergeFrame = null;
             if (null !== $op->block2) {
                 $mergeFrame = $op->block2->getFrame($this->context, $handler);
                 $mergeFrame->parent = $handler->parent;
+                if (null !== $gen) {
+                    $mergeFrame->generatorState = $gen;
+                }
             }
             $this->skipTryCatchHandlerTail($handler);
             if (null !== $mergeFrame) {
@@ -3242,13 +3314,12 @@ restart:
             return false;
         }
         $meta = $this->classPropertyMeta($owner, $propName);
-        if (null === $meta || null === $meta->setHookMethodLc) {
+        $setLc = $meta?->setHookMethodLc
+            ?? strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($propName));
+        if (!isset($owner->class->methods[$setLc])) {
             return false;
         }
-        if (!isset($owner->class->methods[$meta->setHookMethodLc])) {
-            return false;
-        }
-        $func = $owner->class->methods[$meta->setHookMethodLc];
+        $func = $owner->class->methods[$setLc];
         if (!$func instanceof Func\PHP) {
             return false;
         }
@@ -3269,13 +3340,12 @@ restart:
             return null;
         }
         $meta = $this->classPropertyMeta($object, $name);
-        if (null === $meta || null === $meta->getHookMethodLc) {
+        $getLc = $meta?->getHookMethodLc
+            ?? strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($name));
+        if (!isset($object->class->methods[$getLc])) {
             return null;
         }
-        if (!isset($object->class->methods[$meta->getHookMethodLc])) {
-            return null;
-        }
-        $func = $object->class->methods[$meta->getHookMethodLc];
+        $func = $object->class->methods[$getLc];
         if (!$func instanceof Func\PHP) {
             return null;
         }
@@ -3289,7 +3359,7 @@ restart:
     {
         $savedStack = $this->context->swapRunStack(null);
         try {
-            $child = $func->getFrame($this->context, $parentFrame);
+            $child = $func->getFrame($this->context, null);
             $child->propertyHookRawProperty = $rawProperty;
             $child->calledArgs = $args;
             if (
@@ -4635,6 +4705,7 @@ restart:
                     $pendingTraits = [];
                     $name = $frame->scope[$op->arg1];
                     $default = is_null($op->arg2) ? null : $frame->scope[$op->arg2];
+                    $propLc = strtolower($name->toString());
                     $entry->properties[] = new VM\ClassProperty(
                         $name->toString(),
                         $default,
@@ -4644,6 +4715,12 @@ restart:
                         strtolower($entry->name),
                         (int) ($op->propertySetVisibility ?? 0)
                     );
+                    if ([] !== $op->attributeNames) {
+                        $entry->propertyAttributeNames[$propLc] = $op->attributeNames;
+                    }
+                    if ([] !== $op->attributeEntries) {
+                        $entry->propertyAttributeEntries[$propLc] = $op->attributeEntries;
+                    }
                     break;
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:
                     $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
@@ -4731,6 +4808,12 @@ restart:
                         }
                     }
                     $entry->constants[$name] = $value;
+                    if ([] !== $op->attributeNames) {
+                        $entry->constAttributeNames[$name] = $op->attributeNames;
+                    }
+                    if ([] !== $op->attributeEntries) {
+                        $entry->constAttributeEntries[$name] = $op->attributeEntries;
+                    }
                     if (null !== $op->deprecatedMetadata) {
                         $entry->constDeprecated[$name] = $op->deprecatedMetadata;
                     }

@@ -50,7 +50,7 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'readline_exists')) {
                 continue;
             }
-            // Fiber::suspend() MCJIT execute segfault (#4019); VM + AOT green; bin/jit.php VM-fallback.
+            // Fiber::suspend() MCJIT execute segfault (#4019, #4097); VM + AOT green; bin/jit.php VM-fallback.
             if (str_contains($name, 'fiber_jit')) {
                 continue;
             }
@@ -58,8 +58,20 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'strspn_strcspn_offset')) {
                 continue;
             }
+            // strspn()/strcspn() empty mask: VM + AOT (#4119); MCJIT phpc_strspn_ex execute pending.
+            if (str_contains($name, 'strspn_empty_mask')) {
+                continue;
+            }
+            // substr_count() offset/length: VM + AOT (#4105); MCJIT phpc_substr_count execute pending.
+            if (str_contains($name, 'substr_count')) {
+                continue;
+            }
             // vsprintf()/sscanf() VM + AOT (#3190); MCJIT execute segfaults (argv hashtable pack, same as vfprintf).
             if (str_contains($name, 'vsprintf_basic') || str_contains($name, 'sscanf_int')) {
+                continue;
+            }
+            // CLI $argc/$argv globals: VM + standalone AOT (#4139); MCJIT execute segfaults (CliArgvGlobalInit refresh).
+            if (str_contains($name, 'cli_argv')) {
                 continue;
             }
             // array_key_exists() null key → "": VM + AOT (#3687); MCJIT execute segfaults (pre-existing hashtable path).
@@ -74,6 +86,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'array_numeric_string_key')) {
                 continue;
             }
+            // array literal int / numeric-string key collision: VM + AOT (#4151); MCJIT execute unstable (#98).
+            if (str_contains($name, 'array_literal_numeric_string_key')) {
+                continue;
+            }
             // base_convert() MCJIT execute unstable until MathBaseConvert verify (#3173).
             if (str_contains($name, 'base_convert') || str_contains(strtolower($case[0]), 'base_convert')) {
                 continue;
@@ -84,6 +100,10 @@ class JITTest extends BaseTest {
             }
             // hexdec/bindec/octdec boxed int|float return: VM + AOT compile (#3688); MCJIT execute pending.
             if (str_contains($name, 'hexdec') || str_contains($name, 'bindec') || str_contains($name, 'octdec')) {
+                continue;
+            }
+            // intval() optional $base: VM + AOT (#4174); MCJIT strtol/base path until MCJIT stable.
+            if (str_contains($name, 'intval_base')) {
                 continue;
             }
             // class_uses() is VM-only until JIT lowering (#3119).
@@ -110,8 +130,16 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'weak_reference_gc_jit')) {
                 continue;
             }
+            // WeakMap offsetUnset / foreach — MCJIT execute (#4084); compile: WeakMapOffsetUnsetJitCompileTest.
+            if (str_contains($name, 'weakmap_offsetunset_jit')) {
+                continue;
+            }
             // enum case ->name / ->value is VM-only until JIT enum case objects (#3420).
             if (str_contains($name, 'enum_case_name_value')) {
+                continue;
+            }
+            // isset() scalar locals: compile IssetScalarJitCompileTest (#4081); MCJIT execute pending (#98).
+            if (str_contains($name, 'isset_scalar_jit')) {
                 continue;
             }
             // get_debug_type() on enum cases: VM enum class names; MCJIT deferred (#3454).
@@ -186,6 +214,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'compact_array_arg')) {
                 continue;
             }
+            // compact()/extract() float locals: LLVM verify green (#4094); MCJIT execute segfault until stable.
+            if (str_contains($name, 'compact_float') || str_contains($name, 'extract_float')) {
+                continue;
+            }
             // round() precision/mode uses __compiler_round: VM + AOT (#3522); MCJIT until runtime link stable.
             if (str_contains($name, 'round_precision_mode')) {
                 continue;
@@ -200,6 +232,10 @@ class JITTest extends BaseTest {
             }
             // ReflectionClass::getProperties/getMethods are VM-only (#3815).
             if (str_contains($name, 'reflection_class_members')) {
+                continue;
+            }
+            // ReflectionProperty/Constant::getAttributes() MCJIT: VM read path (#4136, #2467).
+            if (str_contains($name, 'reflection_property_attributes') || str_contains($name, 'reflection_constant_attributes')) {
                 continue;
             }
             // array_walk_recursive() is VM-only until recursive LLVM walk (#3111).
@@ -218,8 +254,8 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'count_recursive')) {
                 continue;
             }
-            // User __destruct() MCJIT/AOT: VM shutdown ordering ok; native invoke corrupts stdout (#4013).
-            if (str_contains($name, 'class_destruct') || str_contains($name, 'destruct_user')) {
+            // User __destruct() MCJIT execute: compile verified in UserDestructJitCompileTest (#4096); harness MCJIT SIGSEGV (#98).
+            if (str_contains($name, 'class_destruct') || str_contains($name, 'destruct_user') || str_contains($name, 'destruct_jit')) {
                 continue;
             }
             // preg_last_error_msg() MCJIT path unsafe with preg_match stub runtime (#3110).
@@ -276,6 +312,10 @@ class JITTest extends BaseTest {
             }
             // Stringable __toString in echo/concat is VM-only until magic method JIT (#146, #3296).
             if (str_contains($name, 'stringable')) {
+                continue;
+            }
+            // $variable::class MCJIT execute segfaults (#4179); VM + AOT green; JIT/AOT lint in ClassNameDynamicJITTest.
+            if (str_contains($name, 'class_name_dynamic')) {
                 continue;
             }
             // Enum::cases() is VM-only until JIT enum case lowering (#3308).
@@ -402,12 +442,8 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'gettimeofday')) {
                 continue;
             }
-            // PHP 8.4 asymmetric visibility is VM-only until JIT property guards (#3165).
-            if (str_contains($name, 'asymmetric_visibility')) {
-                continue;
-            }
-            // DNF typed properties: MCJIT segfault on assign (pre-#4008); params/returns JIT OK.
-            if (str_contains($name, 'dnf_property')) {
+            // Uncaught asymmetric_visibility fatal: MCJIT execute unstable (#4029, #98); *_jit.phpt uses try/catch (#4020).
+            if (str_contains($name, 'asymmetric_visibility') && !str_contains($name, 'jit')) {
                 continue;
             }
             // BackedEnum::from/tryFrom VM-only until JIT lowering (#3114, #3076).

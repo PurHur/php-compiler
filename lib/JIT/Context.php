@@ -78,6 +78,13 @@ class Context {
     /** @var array<string, string> user func lc => resume LLVM symbol */
     public array $generatorCreators = [];
 
+    /**
+     * Catch-body CFG block id => LLVM entry for generator try/catch dispatch (#4069).
+     *
+     * @var array<int, \PHPLLVM\BasicBlock>
+     */
+    public array $generatorCatchDispatchEntry = [];
+
     /** CFG block currently being lowered (get_defined_vars snapshot, #3135). */
     public ?Block $jitCurrentBlock = null;
 
@@ -536,16 +543,23 @@ class Context {
         $this->functionProxies['weakmap::offsetset'] = new Call\WeakMapMethod('offsetset');
         $this->functionProxies['weakmap::offsetget'] = new Call\WeakMapMethod('offsetget');
         $this->functionProxies['weakmap::offsetexists'] = new Call\WeakMapMethod('offsetexists');
+        $this->functionProxies['weakmap::offsetunset'] = new Call\WeakMapMethod('offsetunset');
         $this->functionProxies['weakmap::count'] = new Call\WeakMapMethod('count');
 
         $this->functionProxies['reflectionclass::__construct'] = new Call\ReflectionClassConstruct();
         $this->functionProxies['reflectionclass::getname'] = new Call\ReflectionClassGetName();
         $this->functionProxies['reflectionclass::getattributes'] = new Call\ReflectionClassGetAttributes();
         $this->functionProxies['reflectionclass::getmethod'] = new Call\ReflectionClassGetMethod();
+        $this->functionProxies['reflectionclass::getreflectionconstant'] = new Call\ReflectionClassGetReflectionConstant();
+        $this->functionProxies['reflectionproperty::__construct'] = new Call\ReflectionPropertyConstruct();
+        $this->functionProxies['reflectionproperty::getattributes'] = new Call\ReflectionPropertyGetAttributes();
+        $this->functionProxies['reflectionconstant::__construct'] = new Call\ReflectionConstantConstruct();
+        $this->functionProxies['reflectionconstant::getattributes'] = new Call\ReflectionConstantGetAttributes();
         $this->functionProxies['reflectionmethod::getattributes'] = new Call\ReflectionMethodGetAttributes();
         $this->functionProxies['reflectionattribute::getname'] = new Call\ReflectionAttributeGetName();
 
         FiberHelper::registerJitMethods($this);
+        ClosureBindHelper::registerJitMethods($this);
     }
 
     public function compileToFile(string $file) {
@@ -611,6 +625,7 @@ class Context {
                 $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending'));
                 Builtin\ReadonlyRaise::emitClearForStandaloneMain($this);
                 Builtin\TypeErrorRaise::emitClearForStandaloneMain($this);
+                Builtin\ErrorRaise::emitClearForStandaloneMain($this);
             }
             $this->builder->call(
                 $this->lookupFunction('__phpc_progress_note'),
@@ -630,6 +645,7 @@ class Context {
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
                 Builtin\ReadonlyRaise::emitAbortIfPendingForStandaloneMain($this);
                 Builtin\TypeErrorRaise::emitAbortIfPendingForStandaloneMain($this);
+                Builtin\ErrorRaise::emitAbortIfPendingForStandaloneMain($this);
                 Builtin\PendingHeaders::emitFlushForStandalone($this);
                 Builtin\ObOutput::emitEndAllForStandalone($this);
             }
@@ -701,6 +717,7 @@ class Context {
             );
             Builtin\ReadonlyRaise::bindJitEngine($engine);
             Builtin\TypeErrorRaise::bindJitEngine($engine);
+            Builtin\ErrorRaise::bindJitEngine($engine);
             Builtin\JitThrow::bindJitEngine($engine);
             foreach ($this->exports as $export) {
                 $export[2]->handler = $this->result->getHandler($export[0], $export[1]);
@@ -723,6 +740,7 @@ class Context {
         );
         Builtin\ReadonlyRaise::bindJitEngine($engine);
         Builtin\TypeErrorRaise::bindJitEngine($engine);
+        Builtin\ErrorRaise::bindJitEngine($engine);
         Builtin\JitThrow::bindJitEngine($engine);
         foreach ($this->exports as $export) {
             $export[2]->handler = $this->result->getHandler($export[0], $export[1]);
@@ -1018,7 +1036,7 @@ class Context {
     }
 
     public function constantFromInteger(int $value, ?string $type = null): PHPLLVM\Value {
-        return $this->getTypeFromString($type === null ? 'long long' : $type)->constInt($value, false);
+        return $this->getTypeFromString($type === null ? 'long long' : $type)->constInt($value, $value < 0);
     }
 
     public function constantFromFloat(float $value, ?string $type = null): PHPLLVM\Value {
