@@ -46,4 +46,22 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'override_valid.php'));
         $this->assertSame("ok\n", ob_get_clean());
     }
+
+    public function testOverrideSignatureMismatchFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Base {
+    public function foo(int $x): void {}
+}
+class Child extends Base {
+    #[\Override]
+    public function foo(string $x): void {}
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Declaration of Child::foo(string $x): void must be compatible with Base::foo(int $x): void');
+        $runtime->parseAndCompile($code, 'override_signature_mismatch.php');
+    }
 }

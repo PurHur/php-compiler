@@ -50,6 +50,23 @@ final class OverrideValidator
                     $child->func->name
                 ));
             }
+            $childLc = strtolower(ltrim($className, '\\'));
+            $childSig = MethodSig::fromFunc($child->func, $childLc);
+            $parent = $registry->findOverriddenMethod($parentLc, $interfaceLcs, $methodLc);
+            if (null !== $parent) {
+                $msg = InheritanceVariance::methodCompatibilityError(
+                    ltrim($className, '\\'),
+                    $methodLc,
+                    $childSig,
+                    $parent['ownerDisplay'],
+                    $parent['sig'],
+                    fn (string $subtype, string $supertype): bool => $registry->isClassSubtypeOf($subtype, $supertype),
+                    fn (string $classLc, string $interfaceLc): bool => $registry->classImplementsInterface($classLc, $interfaceLc)
+                );
+                if (null !== $msg) {
+                    throw new \CompileError($msg);
+                }
+            }
         }
     }
 }
