@@ -2694,7 +2694,8 @@ restart:
 
                     if ($once && $this->context->isCompileUnitLoaded($resolved)) {
                         if (null !== $op->arg2 && isset($frame->scope[$op->arg2])) {
-                            $frame->scope[$op->arg2]->int(1);
+                            // Zend: include_once/require_once return bool(true) when the file was already included.
+                            $frame->scope[$op->arg2]->bool(true);
                         }
                         break;
                     }
@@ -2705,11 +2706,13 @@ restart:
                     $parsed = $this->context->runtime->parseAndCompileFile($resolved);
                     $new = $parsed->getFrame($this->context, $frame);
                     $new->ephemeral = true;
-                    $new->parent = $frame;
+                    // Resume the caller via the run stack (like a call); keep $frame as a scope donor only.
+                    $new->parent = null;
                     if (null !== $op->arg2) {
                         $new->returnVar = $frame->scope[$op->arg2];
                         $new->returnVar->int(1);
                     }
+                    $this->context->push($frame);
                     $frame = $new;
                     goto restart;
                 case OpCode::TYPE_YIELD:
@@ -3079,6 +3082,9 @@ restart:
         return self::SUCCESS;
 
         return_void_complete:
+        if ($frame->ephemeral) {
+            $this->context->scriptStack->pop();
+        }
         try {
             $this->enforceReturnType($frame, null);
         } catch (\TypeError $e) {
@@ -3107,6 +3113,9 @@ restart:
         goto nextframe;
 
         return_value_complete:
+        if ($frame->ephemeral) {
+            $this->context->scriptStack->pop();
+        }
         try {
             $this->enforceReturnType($frame, $returnValue);
         } catch (\TypeError $e) {
@@ -3241,6 +3250,9 @@ restart:
 
         // 2) Relative to the current script directory (Zend-like common path)
         $current = '' !== $frame->scriptPath ? $frame->scriptPath : $this->context->scriptStack->current();
+        if (!is_string($current) || '' === $current || '-' === $current) {
+            $current = '';
+        }
         if ('' !== $current) {
             $fromDir = dirname($current);
             $cand = VM\ScriptStack::normalize($fromDir.'/'.$file);
