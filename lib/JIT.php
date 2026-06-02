@@ -9591,6 +9591,21 @@ class JIT {
 
                 return;
             }
+            // ?-> fetch blocks compile against a null-typed receiver slot; at runtime the
+            // branch is only taken when the receiver is a real object (zend_compile.c).
+            $methodLcEarly = strtolower($methodName);
+            $runtimeCandidates = $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLcEarly);
+            if ([] !== $runtimeCandidates) {
+                $receiverVar = $this->context->getVariableFromOp($receiverOp);
+                $this->context->scope->toCall = new JIT\Call\RuntimeIndirectInstanceMethodCall(
+                    $receiverVar,
+                    $methodLcEarly,
+                    $runtimeCandidates
+                );
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
         }
 
         $className = $receiverOp->type?->userType
