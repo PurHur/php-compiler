@@ -1351,7 +1351,8 @@ final class HashTable {
             if ($key->is(Variable::TYPE_INTEGER)) {
                 $this->append($copy);
             } else {
-                $this->add($key->toString(), $copy);
+                // Zend array spread overwrites string keys from later operands.
+                $this->update($key->toString(), $copy);
             }
         }
     }

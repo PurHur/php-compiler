@@ -2398,11 +2398,15 @@ restart:
                     $result = $frame->scope[$op->arg1];
                     $source = $frame->scope[$op->arg2]->resolveIndirect();
                     if (Variable::TYPE_ARRAY !== $source->type) {
-                        throw new \LogicException(
-                            Variable::TYPE_NULL === $source->type
-                                ? 'Cannot spread null'
-                                : 'Only arrays can be spread'
+                        $catchFrame = $this->dispatchVmTypeError(
+                            new \TypeError('Only arrays and Traversables can be unpacked'),
+                            $frame
                         );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
                     }
                     $result->toArray()->spreadFrom($source->toArray());
                     break;
