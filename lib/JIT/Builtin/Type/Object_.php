@@ -2028,6 +2028,9 @@ class Object_ extends Type {
             $this->splObjectStorageClassId = $id;
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
         }
+        if ('sensitiveparametervalue' === $lcname) {
+            // Empty marker class for #[\SensitiveParameter] trace redaction (#3351, #4621).
+        }
         if ('weakreference' === $lcname) {
             $this->weakReferenceClassId = $id;
             $this->defineProperty($id, '__weak_target', Variable::TYPE_VALUE);

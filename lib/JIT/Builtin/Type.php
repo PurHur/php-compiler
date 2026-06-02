@@ -673,7 +673,7 @@ class Type extends Builtin {
         $fntypeWordwrap = $this->context->context->functionType($strPtr, false, $strPtr, $i64, $strPtr, $i8);
         $fnWordwrap = $this->context->module->addFunction('__compiler_wordwrap', $fntypeWordwrap);
         $this->context->registerFunction('__compiler_wordwrap', $fnWordwrap);
-        $i1 = $this->context->getTypeFromString('int1');
+        $i32 = $this->context->getTypeFromString('int32');
         $fntypeDebugBacktrace = $this->context->context->functionType(
             $htPtr,
             false,
@@ -681,7 +681,7 @@ class Type extends Builtin {
             $strPtr,
             $strPtr,
             $strPtr,
-            $i1
+            $i32
         );
         $fnDebugBacktrace = $this->context->module->addFunction(
             '__compiler_jit_debug_backtrace',
