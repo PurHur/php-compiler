@@ -8,3 +8,4 @@
 +        'gc_enabled' => ['bool'],
          'gd_info' => ['array'],
          'GearmanClient::addOptions' => ['bool', 'options' => 'int'],
+         'GearmanClient::addServer' => ['bool', 'host=' => 'string', 'port=' => 'int'],
