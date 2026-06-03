@@ -45,6 +45,11 @@ final class VmString
         if (Variable::TYPE_ARRAY === $var->type) {
             throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'array'));
         }
+        if (Variable::TYPE_ENUM_CASE === $var->type) {
+            throw new \TypeError(
+                self::stringBuiltinTypeError($function, $argIndex, $paramName, $var->toEnumCase()->enumClass->name)
+            );
+        }
         if (Variable::TYPE_OBJECT === $var->type) {
             $vm = VM::running();
             $object = $var->toObject();

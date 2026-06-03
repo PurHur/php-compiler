@@ -54,8 +54,9 @@ class strlen extends Internal {
 
             return;
         }
+        $string = VmString::coerceStringBuiltinArg($var, 'strlen', 0, 'string');
         if (!is_null($frame->returnVar)) {
-            $frame->returnVar->int(VmString::byteLength(VmString::coerceOperand($var)));
+            $frame->returnVar->int(VmString::byteLength($string));
         }
     }
 
@@ -72,15 +73,15 @@ class strlen extends Internal {
         if (Variable::TYPE_VALUE === $arg->type) {
             return self::strlenFromValueBox($context, $arg);
         }
-        $argValue = JitStringArg::lower($context, $arg, 'strlen() string');
-        $offset = $context->structFieldIndex($argValue, 'length');
+        $argValue = JitStrlen::lowerStringOperand($context, $arg);
+        $offset = $context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['length'];
 
         return $context->builder->load(
             $context->builder->structGep($argValue, $offset)
         );
     }
 
-    /** @return Value int32 length */
+    /** @return Value int64 length */
     private static function strlenFromValueBox(Context $context, Variable $arg): Value
     {
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
@@ -89,6 +90,7 @@ class strlen extends Internal {
             $context->builder->structGep($valuePtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
+        $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $i64 = $context->getTypeFromString('int64');
         $nullBlock = BasicBlockHelper::append($context, 'strlen_null_deprec');
         $okBlock = BasicBlockHelper::append($context, 'strlen_value_ok');
@@ -96,7 +98,7 @@ class strlen extends Internal {
         $context->builder->branchIf(
             $context->builder->icmp(
                 Builder::INT_EQ,
-                $typeByte,
+                $typeKind,
                 $i8->constInt(VmVariable::TYPE_NULL, false)
             ),
             $nullBlock,
@@ -106,16 +108,35 @@ class strlen extends Internal {
         self::emitNullDeprecation($context);
         $context->builder->branch($mergeBlock);
         $context->builder->positionAtEnd($okBlock);
+        $arrayTy = $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false);
+        $objectTy = $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false);
+        $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
+        $arrayBlock = BasicBlockHelper::append($context, 'strlen_value_array');
+        $objectBlock = BasicBlockHelper::append($context, 'strlen_value_object');
+        $coerceBlock = BasicBlockHelper::append($context, 'strlen_value_coerce');
+        $checkBlock = BasicBlockHelper::append($context, 'strlen_value_check');
+        $isArray = $context->builder->icmp(Builder::INT_EQ, $typeKind, $arrayTy);
+        $context->builder->branchIf($isArray, $arrayBlock, $checkBlock);
+        $context->builder->positionAtEnd($arrayBlock);
+        JitStrlen::emitTypeErrorAndAbort($context, 'array');
+        $context->builder->positionAtEnd($checkBlock);
+        $isObject = $context->builder->icmp(Builder::INT_EQ, $typeKind, $objectTy);
+        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeKind, $enumCaseTy);
+        $isObjOrEnum = $context->builder->or($isObject, $isEnumCase);
+        $context->builder->branchIf($isObjOrEnum, $objectBlock, $coerceBlock);
+        $context->builder->positionAtEnd($objectBlock);
+        JitStrlen::emitTypeErrorAndAbort($context, 'object');
+        $context->builder->positionAtEnd($coerceBlock);
         $argValue = JitStringArg::lower($context, $arg, 'strlen() string');
-        $offset = $context->structFieldIndex($argValue, 'length');
+        $offset = $context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['length'];
         $len = $context->builder->load(
             $context->builder->structGep($argValue, $offset)
         );
         $context->builder->branch($mergeBlock);
         $context->builder->positionAtEnd($mergeBlock);
         $phi = $context->builder->phi($i64);
-        $context->builder->addIncomingToPhi($phi, $i64->constInt(0, false), $nullBlock);
-        $context->builder->addIncomingToPhi($phi, $len, $okBlock);
+        $phi->addIncoming($i64->constInt(0, false), $nullBlock);
+        $phi->addIncoming($len, $coerceBlock);
 
         return $phi;
     }
