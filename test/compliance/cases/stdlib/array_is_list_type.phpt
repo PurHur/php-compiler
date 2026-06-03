@@ -1,5 +1,5 @@
 --TEST--
-stdlib array_is_list() — TypeError/ArgumentCountError parity (#4389, ext/standard/array.c)
+stdlib array_is_list() — TypeError/ArgumentCountError parity (#4753, ext/standard/array.c)
 --FILE--
 <?php
 var_dump(array_is_list([]));

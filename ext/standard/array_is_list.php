@@ -39,6 +39,9 @@ final class array_is_list extends Internal
         }
 
         JitArrayKey::requireArrayArg($context, $args[0], 'array_is_list');
+        if (!JitArrayIsList::canLowerOperand($args[0])) {
+            return JitArrayIsList::unreachableBool($context);
+        }
 
         return JitArrayIsList::invoke($context, $args[0]);
     }
