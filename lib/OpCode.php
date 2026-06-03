@@ -259,6 +259,8 @@ class OpCode {
     public bool $classConstFetchOnObject = false;
     /** TYPE_DECLARE_CLASS_CONST: PHPCfg visibility flags (#4651). */
     public int $classConstVisibilityFlags = 0;
+    /** TYPE_DECLARE_CLASS_CONST: `case` in enum body vs user `const` (#5054, zend_enum.c). */
+    public bool $isEnumCaseDeclare = false;
 
     /** TYPE_INCLUDE: include/require + once/non-once semantics (issue #4426). */
     public int $includeKind = self::INCLUDE_KIND_INCLUDE_ONCE;

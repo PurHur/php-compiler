@@ -7975,7 +7975,7 @@ class JIT {
                         }
                         $vm = new VM($this->context->runtime->vmContext);
                         $vmVar = VM\ClassConstMaterializer::materializeSlot($vm, $block, $op->arg2);
-                        if ($this->context->type->object->isEnumClassId($classId)) {
+                        if ($this->context->type->object->isEnumClassId($classId) && $op->isEnumCaseDeclare) {
                             $this->context->type->object->defineEnumCaseConst($classId, $name->value, $vmVar);
                             break;
                         }
@@ -7996,7 +7996,7 @@ class JIT {
                         );
                         break;
                     }
-                    if ($this->context->type->object->isEnumClassId($classId)) {
+                    if ($this->context->type->object->isEnumClassId($classId) && $op->isEnumCaseDeclare) {
                         $this->context->type->object->defineEnumCaseConst(
                             $classId,
                             $name->value,
