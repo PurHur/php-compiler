@@ -1710,7 +1710,7 @@ class Block {
     }
 
     /**
-     * Global {@code const NAME = [...]} literals: MCJIT execute unstable until #4904.
+     * Global {@code const NAME = [...]} literals (MCJIT uses module globals — #4904, #4941).
      */
     public static function containsGlobalConstArrayLiteralOpcodes(?self $root): bool
     {
@@ -1753,7 +1753,6 @@ class Block {
             || self::containsReadonlyClassOpcodes($root)
             || self::containsDynamicPropertyDeprecationOpcodes($root)
             || self::containsFiberSuspendOpcodes($root)
-            || self::containsTraitConstructorOpcodes($root)
-            || self::containsGlobalConstArrayLiteralOpcodes($root);
+            || self::containsTraitConstructorOpcodes($root);
     }
 }

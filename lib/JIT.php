@@ -6609,6 +6609,10 @@ class JIT {
                         if ($this->shouldUseSelfHostJitStubs()) {
                             break;
                         }
+                        // Re-compile passes (jitCompileBlock + runQueue) may revisit DECLARE_GLOBAL_CONST (#4941).
+                        if (null !== $this->context->runtime->vmContext->constantFetch($nameOp->value)) {
+                            break;
+                        }
                         throw new \LogicException("Cannot redefine constant {$nameOp->value}");
                     }
                     if (VM\Variable::TYPE_ARRAY === $constValue->type) {
