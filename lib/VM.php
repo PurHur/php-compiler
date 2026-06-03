@@ -1602,7 +1602,7 @@ restart:
                 case OpCode::TYPE_UNARY_PLUS:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
-                    $arg1->unaryOp($op->type, $arg2);
+                    $arg1->unaryOp($op->type, $arg2, $this, $frame);
                     break;
                 case OpCode::TYPE_CONCAT:
                     $arg1 = $frame->scope[$op->arg1];
