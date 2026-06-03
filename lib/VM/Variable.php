@@ -1922,9 +1922,10 @@ restart:
                     return;
                 }
                 if ($expr->type === self::TYPE_FLOAT) {
-                    $this->int(~(int) $expr->float);
-
-                    return;
+                    throw new \TypeError(sprintf(
+                        'Unsupported operand types: %s',
+                        self::operandZendTypeName($expr)
+                    ));
                 }
                 if ($expr->type === self::TYPE_STRING) {
                     $bytes = $expr->string;

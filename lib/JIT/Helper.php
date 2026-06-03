@@ -113,6 +113,31 @@ class Helper {
                         $result = $this->context->builder->negate($long);
                         goto return_long;
                     case OpCode::TYPE_BITWISE_NOT:
+                        if (JitValueBox::isValueOperand($var)) {
+                            $valuePtr = JitValueBox::valuePtrFromVariable($this->context, $var);
+                            $map = $this->context->structFieldMap['__value__'];
+                            $typeByte = $this->context->builder->load(
+                                $this->context->builder->structGep($valuePtr, $map['type'])
+                            );
+                            $i8 = $this->context->getTypeFromString('int8');
+                            $isDouble = $this->context->builder->icmp(
+                                Builder::INT_EQ,
+                                $typeByte,
+                                $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+                            );
+                            $doubleBlock = BasicBlockHelper::append($this->context, 'bitwise_not_vbox_double');
+                            $longBlock = BasicBlockHelper::append($this->context, 'bitwise_not_vbox_long');
+                            $this->context->builder->branchIf($isDouble, $doubleBlock, $longBlock);
+                            $this->context->builder->positionAtEnd($doubleBlock);
+                            $this->emitBitwiseNotFloatTypeError();
+                            $this->context->builder->positionAtEnd($longBlock);
+                            $long = $this->context->builder->call(
+                                $this->context->lookupFunction('__value__readLong'),
+                                $valuePtr
+                            );
+                            $result = $this->context->builder->not($long);
+                            goto return_long;
+                        }
                         $long = JitLongArg::lower($this->context, $var, 'bitwise not operand');
                         $result = $this->context->builder->not($long);
                         goto return_long;
@@ -123,6 +148,8 @@ class Helper {
                     case OpCode::TYPE_UNARY_MINUS:
                         $result = $this->context->builder->fNegate($varValue);
                         goto return_double;
+                    case OpCode::TYPE_BITWISE_NOT:
+                        return $this->emitBitwiseNotFloatTypeError();
                 }
                 break;
             case Variable::TYPE_STRING:
@@ -1694,6 +1721,21 @@ return_bool:
             OpCode::TYPE_SHIFT_RIGHT => $leftInt >> $rightInt,
             default => null,
         };
+    }
+
+    private function emitBitwiseNotFloatTypeError(): Variable
+    {
+        TypeErrorRaise::registerDeclarations($this->context);
+        TypeErrorRaise::ensureLinked($this->context);
+        TypeErrorRaise::emitRaise($this->context, 'Unsupported operand types: float');
+        $this->context->builder->call($this->context->lookupFunction('abort'));
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $this->context->getTypeFromString('int64')->constInt(0, false)
+        );
     }
 
     private function emitShiftFloatOperandTypeError(OpCode $opcode, int $leftType, int $rightType): Variable
