@@ -343,9 +343,6 @@ class Type extends Builtin {
         $fntypeGetResources = $this->context->context->functionType($htPtr, false, $strPtr);
         $fnGetResources = $this->context->module->addFunction('__compiler_get_resources', $fntypeGetResources);
         $this->context->registerFunction('__compiler_get_resources', $fnGetResources);
-        $fntypeGettype = $this->context->context->functionType($strPtr, false, $valuePtr);
-        $fnGettype = $this->context->module->addFunction('__compiler_gettype', $fntypeGettype);
-        $this->context->registerFunction('__compiler_gettype', $fnGettype);
         $objPtr = $this->context->getTypeFromString('__object__*');
         $fntypeObjectIdFromObject = $this->context->context->functionType($i64, false, $objPtr);
         $fnObjectIdFromObject = $this->context->module->addFunction(

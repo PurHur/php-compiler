@@ -374,7 +374,7 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'spaceship_int_nonnumeric')) {
                 continue;
             }
-            // gettype() object/resource is VM-only until __compiler_gettype JIT path is stable (#3618).
+            // gettype() object/resource is VM-only until MCJIT execute path is stable (#3618); boxed JIT uses JitGettype (#5235).
             if (str_contains($name, 'gettype_object_resource')) {
                 continue;
             }
