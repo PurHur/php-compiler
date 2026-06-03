@@ -29,7 +29,7 @@ class Module extends ModuleAbstract
             'DEBUG_BACKTRACE_PROVIDE_OBJECT' => VmDebugBacktrace::PROVIDE_OBJECT,
             'DEBUG_BACKTRACE_IGNORE_ARGS' => VmDebugBacktrace::IGNORE_ARGS,
             'DEBUG_BACKTRACE_IGNORE_STATIC_ARGS' => VmDebugBacktrace::IGNORE_STATIC_ARGS,
-        ] as $name => $value) {
+        ] + VmStreamSupports::constants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
@@ -394,6 +394,7 @@ class Module extends ModuleAbstract
             new stream_set_timeout_(),
             new stream_set_write_buffer_(),
             new stream_set_read_buffer_(),
+            new stream_supports(),
             new fopen(),
             new fread(),
             new stream_get_contents(),

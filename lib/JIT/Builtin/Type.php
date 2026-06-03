@@ -400,6 +400,9 @@ class Type extends Builtin {
         $fntypeStreamSetReadBuffer = $this->context->context->functionType($i64, false, $i64, $i64);
         $fnStreamSetReadBuffer = $this->context->module->addFunction('__compiler_stream_set_read_buffer', $fntypeStreamSetReadBuffer);
         $this->context->registerFunction('__compiler_stream_set_read_buffer', $fnStreamSetReadBuffer);
+        $fntypeStreamSupports = $this->context->context->functionType($i32, false, $i64, $i64);
+        $fnStreamSupports = $this->context->module->addFunction('__compiler_stream_supports', $fntypeStreamSupports);
+        $this->context->registerFunction('__compiler_stream_supports', $fnStreamSupports);
         $fntypeFtruncate = $this->context->context->functionType($i32, false, $i64, $i64);
         $fnFtruncate = $this->context->module->addFunction('__compiler_ftruncate', $fntypeFtruncate);
         $this->context->registerFunction('__compiler_ftruncate', $fnFtruncate);
