@@ -218,6 +218,7 @@ require_once __DIR__.'/../../../ext/standard/JitObGetLevel.php';
 require_once __DIR__.'/../../../ext/standard/JitObGetClean.php';
 require_once __DIR__.'/../../../ext/standard/JitObEndFlush.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObOutput.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/PowIntRuntime.php';
 require_once __DIR__.'/../../../ext/standard/JitDeployPath.php';
 require_once __DIR__.'/../../../ext/standard/JitEnumExists.php';
 require_once __DIR__.'/../../../ext/standard/JitEnv.php';

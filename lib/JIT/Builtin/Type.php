@@ -188,6 +188,7 @@ class Type extends Builtin {
         SessionId::implement($this->context);
         SessionName::implement($this->context);
         ObOutput::registerExternals($this->context);
+        PowIntRuntime::ensureLinked($this->context);
         ErrorHandlerOutput::registerExternals($this->context);
         StreamContextOutput::registerExternals($this->context);
         CallArgv::implement($this->context);
