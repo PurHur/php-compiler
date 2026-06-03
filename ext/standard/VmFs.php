@@ -410,25 +410,7 @@ final class VmFs
         if (false === $fp) {
             return false;
         }
-        $total = 0;
-        while (!feof($fp)) {
-            $chunk = @fread($fp, 8192);
-            if (false === $chunk) {
-                @fclose($fp);
-
-                return false;
-            }
-            if ('' === $chunk) {
-                break;
-            }
-            $written = @fwrite(\STDOUT, $chunk);
-            if (false === $written) {
-                @fclose($fp);
-
-                return false;
-            }
-            $total += $written;
-        }
+        $total = self::passthruStreamToStdout($fp);
         @fclose($fp);
 
         return $total;
@@ -490,6 +472,18 @@ final class VmFs
         if (null === $fp) {
             return false;
         }
+
+        return self::passthruStreamToStdout($fp);
+    }
+
+    /**
+     * Stream remaining bytes from an open file handle to STDOUT (php_stream_passthru parity).
+     *
+     * @param resource $fp
+     *
+     * @return int|false Bytes read from $fp, or false on I/O failure
+     */
+    private static function passthruStreamToStdout($fp) {
         $total = 0;
         while (!feof($fp)) {
             $chunk = @fread($fp, 8192);
@@ -499,11 +493,12 @@ final class VmFs
             if ('' === $chunk) {
                 break;
             }
+            $readLen = \strlen($chunk);
             $written = @fwrite(\STDOUT, $chunk);
-            if (false === $written) {
+            if (false === $written || $written !== $readLen) {
                 return false;
             }
-            $total += $written;
+            $total += $readLen;
         }
 
         return $total;
