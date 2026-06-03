@@ -5239,10 +5239,7 @@ class JIT {
                         );
                     }
                     $spreadDestVar = $this->context->getVariableFromOp($spreadDestOp);
-                    if (
-                        Variable::TYPE_VALUE !== $spreadDestVar->type
-                        || 0 !== ($spreadDestVar->type & Variable::IS_NATIVE_ARRAY)
-                    ) {
+                    if (0 !== ($spreadDestVar->type & Variable::IS_NATIVE_ARRAY)) {
                         $spreadBox = JIT\JitValueBox::alloc($this->context);
                         $this->context->setVariableOp(
                             $spreadDestOp,
@@ -5253,14 +5250,14 @@ class JIT {
                                 $spreadBox
                             )
                         );
-                        $spreadDestVar = $this->context->getVariableFromOp($spreadDestOp);
                     }
-                    $this->context->builder->call(
-                        $this->context->lookupFunction('__value__writeHashtable'),
-                        JIT\JitValueBox::pointer($this->context, $spreadDestVar->value),
+                    $spreadTailVar = new Variable(
+                        $this->context,
+                        Variable::TYPE_HASHTABLE,
+                        Variable::KIND_VALUE,
                         $spreadTailHt
                     );
-                    $spreadDestVar->valueBoxHashtable = true;
+                    $this->assignOperand($spreadDestOp, $spreadTailVar);
                     break;
                 case OpCode::TYPE_TYPE_ASSERT:
                     $this->assignOperand(
