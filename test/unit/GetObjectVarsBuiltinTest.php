@@ -18,7 +18,11 @@ final class GetObjectVarsBuiltinTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
-        foreach (['get_object_vars.phpt', 'get_object_vars_jit.phpt'] as $file) {
+        foreach ([
+            'get_object_vars.phpt',
+            'get_object_vars_jit.phpt',
+            'get_object_vars_type_error.phpt',
+        ] as $file) {
             $path = __DIR__.'/../compliance/cases/stdlib/'.$file;
             yield $file => self::parsePHPT($path, $file);
         }
