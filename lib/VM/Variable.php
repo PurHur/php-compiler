@@ -1193,9 +1193,116 @@ restart:
                         $this->int(1);
                     }
                 } else {
-                    $this->int($this->_spaceship($left->toNumeric(), $right->toNumeric()));
+                    $this->int(self::spaceshipMixedScalars($left, $right));
                 }
         }
+    }
+
+    /**
+     * Zend compare_function / spaceship for unlike scalar types (zend_operators.c, #4681).
+     */
+    private static function spaceshipMixedScalars(Variable $left, Variable $right): int
+    {
+        $left = $left->resolveIndirect();
+        $right = $right->resolveIndirect();
+
+        if (self::TYPE_BOOLEAN === $left->type && self::TYPE_STRING === $right->type) {
+            return self::spaceshipValues((int) $left->bool, (int) $right->toBool());
+        }
+        if (self::TYPE_STRING === $left->type && self::TYPE_BOOLEAN === $right->type) {
+            return self::spaceshipValues((int) $left->toBool(), (int) $right->bool);
+        }
+
+        if (self::TYPE_NULL === $left->type && self::TYPE_STRING === $right->type) {
+            if ('' === $right->string) {
+                return 0;
+            }
+
+            return self::spaceshipNumberString(0, $right->string, true);
+        }
+        if (self::TYPE_STRING === $left->type && self::TYPE_NULL === $right->type) {
+            if ('' === $left->string) {
+                return 0;
+            }
+
+            return -self::spaceshipNumberString(0, $left->string, true);
+        }
+
+        if (self::TYPE_INTEGER === $left->type && self::TYPE_STRING === $right->type) {
+            return self::spaceshipNumberString($left->integer, $right->string, true);
+        }
+        if (self::TYPE_STRING === $left->type && self::TYPE_INTEGER === $right->type) {
+            return -self::spaceshipNumberString($right->integer, $left->string, true);
+        }
+        if (self::TYPE_FLOAT === $left->type && self::TYPE_STRING === $right->type) {
+            return self::spaceshipNumberString($left->float, $right->string, true);
+        }
+        if (self::TYPE_STRING === $left->type && self::TYPE_FLOAT === $right->type) {
+            return -self::spaceshipNumberString($right->float, $left->string, true);
+        }
+
+        if (self::TYPE_BOOLEAN === $left->type
+            && (self::TYPE_INTEGER === $right->type || self::TYPE_FLOAT === $right->type || self::TYPE_NULL === $right->type)
+        ) {
+            $rightNum = self::TYPE_NULL === $right->type ? 0 : $right->toNumeric();
+
+            return self::spaceshipValues((int) $left->bool, $rightNum);
+        }
+        if (self::TYPE_BOOLEAN === $right->type
+            && (self::TYPE_INTEGER === $left->type || self::TYPE_FLOAT === $left->type || self::TYPE_NULL === $left->type)
+        ) {
+            $leftNum = self::TYPE_NULL === $left->type ? 0 : $left->toNumeric();
+
+            return self::spaceshipValues($leftNum, (int) $right->bool);
+        }
+
+        if (self::TYPE_NULL === $left->type
+            && (self::TYPE_INTEGER === $right->type || self::TYPE_FLOAT === $right->type)
+        ) {
+            return self::spaceshipValues(0, $right->toNumeric());
+        }
+        if (self::TYPE_NULL === $right->type
+            && (self::TYPE_INTEGER === $left->type || self::TYPE_FLOAT === $left->type)
+        ) {
+            return self::spaceshipValues($left->toNumeric(), 0);
+        }
+
+        if (self::TYPE_INTEGER === $left->type && self::TYPE_FLOAT === $right->type) {
+            return self::spaceshipValues($left->integer, $right->float);
+        }
+        if (self::TYPE_FLOAT === $left->type && self::TYPE_INTEGER === $right->type) {
+            return self::spaceshipValues($left->float, $right->integer);
+        }
+
+        return self::spaceshipValues($left->toNumeric(), $right->toNumeric());
+    }
+
+    /** @param int|float $num */
+    private static function spaceshipNumberString(int|float $num, string $str, bool $numOnLeft): int
+    {
+        if ('' === $str) {
+            return $numOnLeft ? 1 : -1;
+        }
+        if (is_numeric($str)) {
+            $cmp = self::spaceshipValues($num, self::looseNumericFromString($str));
+
+            return $numOnLeft ? $cmp : -$cmp;
+        }
+
+        return $numOnLeft ? -1 : 1;
+    }
+
+    /** @param int|float $left */
+    private static function spaceshipValues(int|float $left, int|float $right): int
+    {
+        if ($left < $right) {
+            return -1;
+        }
+        if ($left > $right) {
+            return 1;
+        }
+
+        return 0;
     }
 
     private static function isEnumCaseOperand(Variable $var): bool

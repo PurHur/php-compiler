@@ -390,6 +390,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'spaceship_array')) {
                 continue;
             }
+            // int <=> non-numeric string: MCJIT lowering landed (#4681); execute gated like spaceship_operator_jit.
+            if (str_contains($name, 'spaceship_int_nonnumeric')) {
+                continue;
+            }
             // gettype() object/resource is VM-only until __compiler_gettype JIT path is stable (#3618).
             if (str_contains($name, 'gettype_object_resource')) {
                 continue;
