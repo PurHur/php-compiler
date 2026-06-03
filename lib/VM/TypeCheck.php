@@ -231,6 +231,23 @@ final class TypeCheck
         return self::typeName($type);
     }
 
+    /**
+     * Zend 8+ dim fetch on null/bool/int/float (#4713, zend_operators.c).
+     */
+    public static function cannotUseBracketOn(Variable $value): ?string
+    {
+        $resolved = $value->resolveIndirect();
+        switch ($resolved->type) {
+            case Variable::TYPE_NULL:
+            case Variable::TYPE_BOOLEAN:
+            case Variable::TYPE_INTEGER:
+            case Variable::TYPE_FLOAT:
+                return 'Cannot use [] on ' . self::typeNameForConstraint($resolved->type);
+            default:
+                return null;
+        }
+    }
+
     private static function isExactType(Variable $value, int $constraint): bool
     {
         return $value->type === $constraint;

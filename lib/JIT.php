@@ -4974,6 +4974,16 @@ class JIT {
                     $resultOp = $block->getOperand($op->arg1);
                     $forceBranchMerge = $this->context->coalesceAssignTargets->contains($resultOp);
                     if (null === $op->arg3) {
+                        $bracketLabel = Variable::cannotUseBracketLabel($value->type);
+                        if (null !== $bracketLabel) {
+                            JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
+                            JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
+                            JIT\Builtin\TypeErrorRaise::emitRaise(
+                                $this->context,
+                                'Cannot use [] on ' . $bracketLabel
+                            );
+                            break;
+                        }
                         if (Variable::TYPE_STRING === $value->type) {
                             throw new \LogicException('[] is only supported for arrays');
                         }
@@ -5051,13 +5061,25 @@ class JIT {
                         }
                         break;
                     }
+                    $bracketLabel = Variable::cannotUseBracketLabel($value->type);
+                    if (null !== $bracketLabel && !$this->context->listUnpackSkipAssignPath) {
+                        JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
+                        JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
+                        JIT\Builtin\TypeErrorRaise::emitRaise(
+                            $this->context,
+                            'Cannot use [] on ' . $bracketLabel
+                        );
+                        break;
+                    }
                     if (
                         $this->context->listUnpackSkipAssignPath
-                        || Variable::TYPE_NULL === $value->type
-                        || Variable::TYPE_NATIVE_BOOL === $value->type
-                        || Variable::TYPE_NATIVE_LONG === $value->type
-                        || Variable::TYPE_NATIVE_DOUBLE === $value->type
-                        || Variable::TYPE_STRING === $value->type
+                        && (
+                            Variable::TYPE_NULL === $value->type
+                            || Variable::TYPE_NATIVE_BOOL === $value->type
+                            || Variable::TYPE_NATIVE_LONG === $value->type
+                            || Variable::TYPE_NATIVE_DOUBLE === $value->type
+                            || Variable::TYPE_STRING === $value->type
+                        )
                     ) {
                         // Guarded list destruct compiles dim fetches on non-array RHS (#4325, #4308); unreachable at run time.
                         $boxed = new Variable(
