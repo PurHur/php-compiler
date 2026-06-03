@@ -6778,7 +6778,7 @@ class JIT {
                             );
                         }
                     }
-                    if ([] !== $op->attributeNames) {
+                    if ([] !== $op->attributeNames || [] !== $op->attributeEntries) {
                         $attrNames = [];
                         foreach ($op->attributeNames as $n) {
                             $attrNames[] = ltrim($n, '\\');
@@ -6792,7 +6792,7 @@ class JIT {
                         AttributeRegistry::emitRegisterClass(
                             $this->context,
                             strtolower(ltrim($nameOp->value, '\\')),
-                            $attrNames
+                            [] !== $op->attributeEntries ? $op->attributeEntries : $attrNames
                         );
                     }
                     $this->compileClass($op->block1, $this->context->scope->classId);
@@ -7675,6 +7675,9 @@ class JIT {
 
     private function assignCallResultOperand(Operand $result, PHPLLVM\Value $llvmResult, bool $returnsByRef): void
     {
+        if ('void' === $this->context->getStringFromType($llvmResult->typeOf())) {
+            return;
+        }
         if (!$returnsByRef) {
             $this->assignOperandValue($result, $llvmResult);
 
@@ -7874,12 +7877,16 @@ class JIT {
                     $declaredJitType = Variable::getTypeFromType($block->getOperand($op->arg3)->type);
                     if (Variable::TYPE_HASHTABLE === $declaredJitType || Variable::TYPE_STRING === $declaredJitType) {
                         $jitType = $declaredJitType;
-                        if (Variable::TYPE_HASHTABLE === $declaredJitType) {
-                            $lcClass = strtolower(str_replace('/', '\\', ltrim($className, '\\')));
-                            if (
-                                !str_starts_with($lcClass, 'phpcfg\\')
-                                && !str_starts_with($lcClass, 'phpcompiler\\')
-                            ) {
+                        $lcClass = strtolower(str_replace('/', '\\', ltrim($className, '\\')));
+                        if (
+                            !str_starts_with($lcClass, 'phpcfg\\')
+                            && !str_starts_with($lcClass, 'phpcompiler\\')
+                        ) {
+                            if (Variable::TYPE_HASHTABLE === $declaredJitType) {
+                                $jitType = Variable::TYPE_VALUE;
+                            }
+                            // User string properties: boxed __value__ slots (fetch/store parity, #4598).
+                            if (Variable::TYPE_STRING === $declaredJitType) {
                                 $jitType = Variable::TYPE_VALUE;
                             }
                         }
@@ -10154,6 +10161,9 @@ class JIT {
 
         if ('object' === $declaringClassLc) {
             if ('getname' === $methodLc && $this->context->functionIsRegistered('reflectionattribute::getname')) {
+                $className = 'ReflectionAttribute';
+                $declaringClassLc = 'reflectionattribute';
+            } elseif ('newinstance' === $methodLc && $this->context->functionIsRegistered('reflectionattribute::newinstance')) {
                 $className = 'ReflectionAttribute';
                 $declaringClassLc = 'reflectionattribute';
             } elseif ('getattributes' === $methodLc && $this->context->functionIsRegistered('reflectionmethod::getattributes')) {

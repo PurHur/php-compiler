@@ -26,10 +26,13 @@ final class ReflectionNative
                 ['phpc_reflect_get_method_name', $i8p, [$i8p, $sizeTPtr]],
                 ['phpc_reflect_set_attr_name', $void, [$i8p, $i8p, $sizeT]],
                 ['phpc_reflect_get_attr_name', $i8p, [$i8p, $sizeTPtr]],
+                ['phpc_reflect_set_attr_owner', $void, [$i8p, $i8p, $sizeT]],
+                ['phpc_reflect_get_attr_owner', $i8p, [$i8p, $sizeTPtr]],
                 ['phpc_attr_class_count', $sizeT, [$i8p]],
                 ['phpc_attr_class_name_at', $i8p, [$i8p, $sizeT]],
                 ['phpc_attr_method_count', $sizeT, [$i8p, $i8p]],
                 ['phpc_attr_method_name_at', $i8p, [$i8p, $i8p, $sizeT]],
+                ['phpc_attr_class_args_hashtable', $context->getTypeFromString('__hashtable__*'), [$i8p, $sizeT]],
             ] as [$name, $ret, $params]
         ) {
             $existing = $context->module->getNamedFunction($name);
