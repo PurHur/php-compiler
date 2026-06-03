@@ -5058,10 +5058,12 @@ class Compiler {
             if (null === $keyVm) {
                 return null;
             }
-            if ($keyVm->is(Variable::TYPE_INTEGER)) {
-                $ht->addIndex($keyVm->toInt(), $valueVm);
+            if ($keyVm->is(Variable::TYPE_INTEGER) || $keyVm->is(Variable::TYPE_FLOAT)) {
+                $ht->updateIndex($keyVm->toInt(), $valueVm);
             } elseif ($keyVm->is(Variable::TYPE_STRING)) {
-                $ht->add($keyVm->toString(), $valueVm);
+                $ht->update($keyVm->toString(), $valueVm);
+            } elseif ($keyVm->is(Variable::TYPE_BOOLEAN)) {
+                $ht->updateIndex($keyVm->toBool() ? 1 : 0, $valueVm);
             } else {
                 return null;
             }

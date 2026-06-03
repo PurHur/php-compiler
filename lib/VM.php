@@ -6187,10 +6187,18 @@ restart:
                     break;
                 }
                 $key = $frame->scope[$op->arg3]->resolveIndirect();
+                $value = $frame->scope[$op->arg2];
+                if ($key->is(Variable::TYPE_OBJECT) || $key->is(Variable::TYPE_ARRAY)) {
+                    throw new \TypeError('Illegal offset type');
+                }
                 if ($key->is(Variable::TYPE_INTEGER) || $key->is(Variable::TYPE_FLOAT)) {
-                    $ht->addIndex($key->toInt(), $frame->scope[$op->arg2]);
+                    $ht->updateIndex($key->toInt(), $value);
+                } elseif ($key->is(Variable::TYPE_STRING)) {
+                    $ht->update($key->toString(), $value);
+                } elseif ($key->is(Variable::TYPE_BOOLEAN)) {
+                    $ht->updateIndex($key->toBool() ? 1 : 0, $value);
                 } else {
-                    $ht->add($key->toString(), $frame->scope[$op->arg2]);
+                    throw new \TypeError('Illegal offset type');
                 }
                 break;
             case OpCode::TYPE_ARRAY_SPREAD:
