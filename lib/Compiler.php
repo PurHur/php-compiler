@@ -82,6 +82,9 @@ class Compiler {
     /** @var array<string, true> instance property names declared in the current class body (#4286) */
     private array $compilingClassInstancePropertyNames = [];
 
+    /** @var array<string, true> lowercase method names declared in the current class/interface/enum body (#5218) */
+    private array $compilingClassMethodNames = [];
+
     /** @var array<string, array<string, Variable>> compile-time class constants by lc name */
     private array $compileTimeClassConsts = [];
 
@@ -505,6 +508,16 @@ class Compiler {
         }
     }
 
+    /**
+     * @param list<Op\Expr\Param> $params
+     */
+    protected function assertNoDuplicateParameterAttributes(array $params): void
+    {
+        foreach ($params as $param) {
+            AttributeNames::assertNoDuplicates(AttributeNames::fromOp($param));
+        }
+    }
+
     protected function compileCfgBlock(CfgBlock $block, array $params = [], ?CfgFunc $func = null): Block {
         if (null === $this->seen) {
             $this->seen = new SplObjectStorage;
@@ -518,6 +531,7 @@ class Compiler {
             }
             if ([] !== $params) {
                 $this->assertNoDuplicateParameterNames($params);
+                $this->assertNoDuplicateParameterAttributes($params);
             }
             $paramIdx = 0;
             foreach ($params as $param) {
@@ -2053,14 +2067,30 @@ class Compiler {
                 $this->abstractEnums[$lc] = true;
             }
         }
-        $return->block1 = $this->compileEnumBody($enum->stmts);
+        $enumName = $this->staticNameFromOperand($enum->name);
+        $return->block1 = $this->compileEnumBody($enum->stmts, $enumName);
 
         return $return;
     }
 
-    protected function compileEnumBody(CfgBlock $block): Block
+    protected function compileEnumBody(CfgBlock $block, ?string $enumName = null): Block
     {
         $result = new Block($block);
+        $prevClassLc = $this->compilingClassLc;
+        $prevClassDisplayName = $this->compilingClassDisplayName;
+        $prevInstancePropertyNames = $this->compilingClassInstancePropertyNames;
+        $prevMethodNames = $this->compilingClassMethodNames;
+        $this->compilingClassInstancePropertyNames = [];
+        $this->compilingClassMethodNames = [];
+        if (null !== $enumName) {
+            $this->compilingClassLc = strtolower(ltrim($enumName, '\\'));
+            $this->compilingClassDisplayName = ltrim($enumName, '\\');
+            if (!isset($this->compileTimeClassConsts[$this->compilingClassLc])) {
+                $this->compileTimeClassConsts[$this->compilingClassLc] = [];
+            }
+        } else {
+            $this->compilingClassDisplayName = null;
+        }
         foreach ($block->children as $child) {
             if ($child instanceof Op\Terminal\Const_) {
                 $this->compileClassConstDeclaration($child, $result);
@@ -2073,12 +2103,17 @@ class Compiler {
             }
             $this->throwCompileLogic('Unsupported enum body element: '.get_class($child));
         }
+        $this->compilingClassLc = $prevClassLc;
+        $this->compilingClassDisplayName = $prevClassDisplayName;
+        $this->compilingClassInstancePropertyNames = $prevInstancePropertyNames;
+        $this->compilingClassMethodNames = $prevMethodNames;
 
         return $result;
     }
 
     protected function compileClassMethodDeclaration(Op\Stmt\ClassMethod $child, Block $result): void
     {
+        $this->registerMethodDeclaration($child->func->name);
         if ('__construct' === $child->func->name) {
             foreach ($child->func->params as $param) {
                 if ($this->isPromotedParam($param)) {
@@ -2188,6 +2223,7 @@ class Compiler {
             VM\StringableSupport::assertConcreteClassImplements($class, $className);
         }
         $this->assignAttributeMetadata($return, $class);
+        AttributeNames::assertNoDuplicates($return->attributeNames);
         $this->applySealedMetadataFromOp($class, $return);
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($class->flags);
         if ($return->classIsAbstract) {
@@ -2571,7 +2607,9 @@ class Compiler {
         $prevClassLc = $this->compilingClassLc;
         $prevClassDisplayName = $this->compilingClassDisplayName;
         $prevInstancePropertyNames = $this->compilingClassInstancePropertyNames;
+        $prevMethodNames = $this->compilingClassMethodNames;
         $this->compilingClassInstancePropertyNames = [];
+        $this->compilingClassMethodNames = [];
         if (null !== $className) {
             $this->compilingClassLc = strtolower(ltrim($className, '\\'));
             $this->compilingClassDisplayName = ltrim($className, '\\');
@@ -2718,8 +2756,19 @@ class Compiler {
         $this->compilingClassLc = $prevClassLc;
         $this->compilingClassDisplayName = $prevClassDisplayName;
         $this->compilingClassInstancePropertyNames = $prevInstancePropertyNames;
+        $this->compilingClassMethodNames = $prevMethodNames;
 
         return $result;
+    }
+
+    protected function registerMethodDeclaration(string $methodName): void
+    {
+        $lc = strtolower($methodName);
+        if (isset($this->compilingClassMethodNames[$lc])) {
+            $class = $this->compilingClassDisplayName ?? 'class';
+            $this->throwCompileError(sprintf('Cannot redeclare %s::%s()', $class, $methodName));
+        }
+        $this->compilingClassMethodNames[$lc] = true;
     }
 
     protected function registerInstancePropertyDeclaration(string $propName): void
@@ -2752,6 +2801,7 @@ class Compiler {
             && null !== $child->declaredType
             && $child->declaredType instanceof Op\Type\Literal
         ) {
+            $this->rejectTypedTraitConstantIfUnsupported($child->name);
             $declared = Type::fromDecl($child->declaredType->name);
             if (Variable::TYPE_UNDEFINED !== Variable::mapFromType($declared)) {
                 $typeSlot = $this->compileTypeConstrainedVariable($result, $declared);
@@ -2816,6 +2866,26 @@ class Compiler {
         } catch (\TypeError $e) {
             $this->throwCompileError($e->getMessage());
         }
+    }
+
+    /**
+     * Zend 8.2 rejects typed trait constants at parse time; enable at 8.3+ (#5212).
+     */
+    protected function rejectTypedTraitConstantIfUnsupported(Operand $nameOp): void
+    {
+        if (CompilerVersion::supportsTypedTraitConstants()) {
+            return;
+        }
+        if (
+            null === $this->compilingClassLc
+            || !$this->classCompileRegistry->isTrait($this->compilingClassLc)
+        ) {
+            return;
+        }
+        $constName = $this->staticNameFromOperand($nameOp) ?? 'constant';
+        $this->throwCompileError(
+            sprintf('syntax error, unexpected identifier "%s", expecting "="', $constName)
+        );
     }
 
     /**
@@ -3764,10 +3834,12 @@ class Compiler {
 
             return [$opcode];
         } elseif ($expr instanceof Op\Expr\Cast) {
+            $line = $expr->getLine();
             return [new OpCode(
                 $this->getOpCodeTypeFromCastOp($expr),
                 $this->compileOperand($expr->result, $block, false),
                 $this->compileOperand($expr->expr, $block, true),
+                $line > 0 ? $line : null,
             )];
         }
         switch (get_class($expr)) {
@@ -5294,12 +5366,13 @@ class Compiler {
                 return null;
             }
             $keyOp = $expr->keys[$i] ?? null;
-            if (
-                null === $keyOp
-                || $keyOp instanceof Operand\NullOperand
-                || ($keyOp instanceof Operand\Literal && null === $keyOp->value)
-            ) {
+            if (null === $keyOp) {
                 $ht->append($valueVm);
+                continue;
+            }
+            if ($keyOp instanceof Operand\NullOperand
+                || ($keyOp instanceof Operand\Literal && null === $keyOp->value)) {
+                $ht->update('', $valueVm);
                 continue;
             }
             $keyVm = $this->vmVariableFromCfgLiteralOperand($keyOp);
@@ -5312,6 +5385,8 @@ class Compiler {
                 $ht->update($keyVm->toString(), $valueVm);
             } elseif ($keyVm->is(Variable::TYPE_BOOLEAN)) {
                 $ht->updateIndex($keyVm->toBool() ? 1 : 0, $valueVm);
+            } elseif ($keyVm->is(Variable::TYPE_NULL)) {
+                $ht->update('', $valueVm);
             } else {
                 return null;
             }

@@ -291,7 +291,10 @@ function syntaxRowDefinitions(): array
             'construct' => 'PHP 8.3 typed class constants (`const array X = [1,2];`, `const string S = \'a\';`)',
             'opcodes' => ['TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH', 'TYPE_ARRAY_DIM_FETCH'],
             'issue' => 3592,
-            'notes' => ['Compile-time literal fold for array/scalar const values; typed mismatch is compile-time TypeError; JIT lowers immutable array constants (#3592)'],
+            'notes' => [
+                'Compile-time literal fold for array/scalar const values; typed mismatch is compile-time TypeError; JIT lowers immutable array constants (#3592)',
+                'Typed trait constants rejected on 8.2 target (Zend parse error parity, #5212); enable via CompilerVersion 8.3+',
+            ],
             'probe' => 'class C { public const array X = [1, 2]; } echo C::X[0];',
         ],
         [

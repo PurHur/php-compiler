@@ -532,11 +532,7 @@ final class VmReflection
         $result = new Variable();
         $result->newArray();
         $ht = $result->toArray();
-        $classLc = strtolower($entry->name);
         foreach ($entry->properties as $prop) {
-            if ($prop->declaringClassLc !== $classLc) {
-                continue;
-            }
             if (!MethodVisibility::isPublic($prop->visibility)) {
                 continue;
             }

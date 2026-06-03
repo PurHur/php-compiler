@@ -24,14 +24,8 @@ final class strspn extends Internal
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('strspn() requires two to four arguments in this compiler build');
         }
-        $str = $frame->calledArgs[0]->resolveIndirect();
-        $mask = $frame->calledArgs[1]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
-        if (Variable::TYPE_STRING !== $str->type || Variable::TYPE_STRING !== $mask->type) {
-            throw new \LogicException('strspn() requires two strings in this compiler build');
-        }
+        $str = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strspn', 0, 'string');
+        $mask = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strspn', 1, 'characters');
         $offset = 0;
         if ($argc >= 3) {
             $offVar = $frame->calledArgs[2]->resolveIndirect();
@@ -48,8 +42,11 @@ final class strspn extends Internal
             }
             $length = $lenVar->toInt();
         }
+        if (null === $frame->returnVar) {
+            return;
+        }
         $frame->returnVar->int(
-            VmString::strspn($str->toString(), $mask->toString(), $offset, $length)
+            VmString::strspn($str, $mask, $offset, $length)
         );
     }
 

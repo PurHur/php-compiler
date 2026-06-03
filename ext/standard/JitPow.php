@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\PowIntRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -35,6 +36,7 @@ final class JitPow
         $slotPtr = JitValueBox::pointer($context, $slot);
 
         if (self::preferIntegerPowPath(...$args)) {
+            PowIntRuntime::ensureLinked($context);
             $baseL = JitLongArg::lower($context, $args[0], 'pow() base');
             $expL = JitLongArg::lower($context, $args[1], 'pow() exponent');
             $context->builder->call(

@@ -28,8 +28,8 @@ trait SpnJitExtended
 
         StringStrspn::ensureLinked($context);
         $map = $context->structFieldMap['__string__'];
-        $strVal = $this->jitString($context, $args[0], "{$name}() argument #1");
-        $maskVal = $this->jitString($context, $args[1], "{$name}() argument #2");
+        $strVal = JitQuotPrint::lowerStringSubject($context, $args[0], $name, 1, 'string');
+        $maskVal = JitQuotPrint::lowerStringSubject($context, $args[1], $name, 2, 'characters');
         $strLen = $context->builder->load($context->builder->structGep($strVal, $map['length']));
         $maskLen = $context->builder->load($context->builder->structGep($maskVal, $map['length']));
         $strData = $this->stringDataPtr($context, $strVal);

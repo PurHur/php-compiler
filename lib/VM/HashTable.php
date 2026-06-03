@@ -169,6 +169,156 @@ final class HashTable {
     }
 
     /**
+     * Zend array internal pointer — key() (ext/standard/array.c; #4967).
+     */
+    public function pointerKey(): ?Variable
+    {
+        if (!$this->pointerIsValid()) {
+            return null;
+        }
+
+        return $this->iterCurrentKey();
+    }
+
+    /**
+     * Zend array internal pointer — current()/pos() (ext/standard/array.c; #4967).
+     */
+    public function pointerCurrent(): ?Variable
+    {
+        if (!$this->pointerIsValid()) {
+            return null;
+        }
+
+        return $this->iterCurrentValue();
+    }
+
+    /**
+     * Zend array internal pointer — next() (ext/standard/array.c; #4967).
+     */
+    public function pointerNext(): ?Variable
+    {
+        if (0 === $this->numElements) {
+            $this->internalPointer = self::INVALID_INDEX;
+
+            return null;
+        }
+        if ($this->internalPointer >= $this->numUsed) {
+            return null;
+        }
+        $start = self::INVALID_INDEX === $this->internalPointer
+            ? 0
+            : ($this->pointerIsValid() ? $this->internalPointer + 1 : $this->internalPointer + 1);
+        $idx = $this->nextUsedBucketIndex($start);
+        if (self::INVALID_INDEX === $idx) {
+            $this->internalPointer = $this->numUsed;
+
+            return null;
+        }
+        $this->internalPointer = $idx;
+
+        return $this->iterCurrentValue();
+    }
+
+    /**
+     * Zend array internal pointer — prev() (ext/standard/array.c; #4967).
+     */
+    public function pointerPrev(): ?Variable
+    {
+        if (0 === $this->numElements) {
+            $this->internalPointer = self::INVALID_INDEX;
+
+            return null;
+        }
+        if ($this->internalPointer >= $this->numUsed) {
+            $idx = $this->prevUsedBucketIndex($this->numUsed - 1);
+            if (self::INVALID_INDEX === $idx) {
+                $this->internalPointer = self::INVALID_INDEX;
+
+                return null;
+            }
+            $this->internalPointer = $idx;
+
+            return $this->iterCurrentValue();
+        }
+        if (self::INVALID_INDEX === $this->internalPointer) {
+            return null;
+        }
+        $before = $this->pointerIsValid() ? $this->internalPointer - 1 : $this->internalPointer - 1;
+        $idx = $this->prevUsedBucketIndex($before);
+        if (self::INVALID_INDEX === $idx) {
+            $this->internalPointer = self::INVALID_INDEX;
+
+            return null;
+        }
+        $this->internalPointer = $idx;
+
+        return $this->iterCurrentValue();
+    }
+
+    /**
+     * Zend array internal pointer — reset() (ext/standard/array.c; #4967).
+     */
+    public function pointerReset(): ?Variable
+    {
+        $idx = $this->nextUsedBucketIndex(0);
+        if (self::INVALID_INDEX === $idx) {
+            $this->internalPointer = self::INVALID_INDEX;
+
+            return null;
+        }
+        $this->internalPointer = $idx;
+
+        return $this->iterCurrentValue();
+    }
+
+    /**
+     * Zend array internal pointer — end() (ext/standard/array.c; #4967).
+     */
+    public function pointerEnd(): ?Variable
+    {
+        $idx = $this->prevUsedBucketIndex($this->numUsed - 1);
+        if (self::INVALID_INDEX === $idx) {
+            $this->internalPointer = self::INVALID_INDEX;
+
+            return null;
+        }
+        $this->internalPointer = $idx;
+
+        return $this->iterCurrentValue();
+    }
+
+    private function pointerIsValid(): bool
+    {
+        if ($this->internalPointer < 0 || $this->internalPointer >= $this->numUsed) {
+            return false;
+        }
+
+        return !$this->buckets->read($this->internalPointer)->value->isUndefined();
+    }
+
+    private function nextUsedBucketIndex(int $start): int
+    {
+        for ($i = $start; $i < $this->numUsed; ++$i) {
+            if (!$this->buckets->read($i)->value->isUndefined()) {
+                return $i;
+            }
+        }
+
+        return self::INVALID_INDEX;
+    }
+
+    private function prevUsedBucketIndex(int $start): int
+    {
+        for ($i = $start; $i >= 0; --$i) {
+            if (!$this->buckets->read($i)->value->isUndefined()) {
+                return $i;
+            }
+        }
+
+        return self::INVALID_INDEX;
+    }
+
+    /**
      * Zend zend_hash numeric-string key coercion (zend_hash.c; issue #3679).
      * Canonical decimal strings (e.g. "1", "-2") map to int keys; "01" and "foo" do not.
      */
@@ -185,11 +335,27 @@ final class HashTable {
         return $int;
     }
 
-    public function keyExists(Variable $index): bool
+    /**
+     * php-src: null array keys coerce to empty string (zend_hash.c; #5269).
+     */
+    public static function normalizeIndexKey(Variable $index): Variable
     {
         if (Variable::TYPE_INDIRECT === $index->type) {
             $index = $index->resolveIndirect();
         }
+        if (Variable::TYPE_NULL === $index->type) {
+            $empty = new Variable();
+            $empty->string('');
+
+            return $empty;
+        }
+
+        return $index;
+    }
+
+    public function keyExists(Variable $index): bool
+    {
+        $index = self::normalizeIndexKey($index);
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
                 return null !== $this->findIndex($index->toInt());
@@ -203,9 +369,7 @@ final class HashTable {
     }
 
     public function findVariable(Variable $index, bool $forWrite): ?Variable {
-        if (Variable::TYPE_INDIRECT === $index->type) {
-            $index = $index->resolveIndirect();
-        }
+        $index = self::normalizeIndexKey($index);
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
                 $result = $this->findIndex($index->toInt());
@@ -1288,6 +1452,7 @@ final class HashTable {
     public function hasKey(Variable $index): bool
     {
         $this->assertConsistent();
+        $index = self::normalizeIndexKey($index);
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
                 $value = $this->findIndex($index->toInt());
@@ -1310,9 +1475,7 @@ final class HashTable {
      */
     public function offsetIsSet(Variable $index): bool
     {
-        if (Variable::TYPE_INDIRECT === $index->type) {
-            $index = $index->resolveIndirect();
-        }
+        $index = self::normalizeIndexKey($index);
         $stored = null;
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
@@ -1343,9 +1506,7 @@ final class HashTable {
         }
         $this->refcount->assertSeparated();
         $bucket = null;
-        if (Variable::TYPE_INDIRECT === $index->type) {
-            $index = $index->resolveIndirect();
-        }
+        $index = self::normalizeIndexKey($index);
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
                 $bucket = $this->findBucket($index->toInt(), null);

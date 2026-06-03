@@ -250,11 +250,11 @@ class VM {
     }
 
     /** Coerce a VM value to string, invoking __toString on objects when defined (issue #3296). */
-    public function coerceVariableToString(Variable $var): string
+    public function coerceVariableToString(Variable $var, ?Frame $frame = null): string
     {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $var->type) {
-            return $var->toString();
+            return $var->toString($this, $frame);
         }
         $object = $var->toObject();
         if (EnumCaseSupport::isEnumCase($object)) {
@@ -270,7 +270,7 @@ class VM {
             $this->context->coercingObjectToString = false;
         }
 
-        return $result->toString();
+        return $result->toString($this, $frame);
     }
 
     /** Invoke a user instance method from VM internals (e.g. __debugInfo, #3259). */
@@ -427,11 +427,11 @@ class VM {
      *
      * php-src: Zend/zend_operators.c — cast to string via __toString when defined.
      */
-    public function valueToPrintString(Variable $var): string
+    public function valueToPrintString(Variable $var, ?Frame $frame = null): string
     {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $var->type) {
-            return $var->toString();
+            return $var->toString($this, $frame);
         }
         $object = $var->toObject();
         if (EnumCaseSupport::isEnumCase($object)) {
@@ -447,7 +447,7 @@ class VM {
             $this->context->coercingObjectToString = false;
         }
 
-        return $result->toString();
+        return $result->toString($this, $frame);
     }
 
     /**
@@ -1096,7 +1096,9 @@ restart:
                     }
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
-                    $arg3 = $frame->scope[$op->arg3];
+                    $arg3 = isset($frame->block->constants[$op->arg3])
+                        ? $frame->block->constants[$op->arg3]
+                        : $frame->scope[$op->arg3];
                     if ($this->dispatchPropertySetHookAssign($arg2, $arg3, $frame)) {
                         $arg1->copyFrom($arg3);
                         break;
@@ -1135,10 +1137,14 @@ restart:
                     }
                     $arg2->copyFrom($arg3);
                     $arg1->copyFrom($arg3);
-                    if ($op->arg2 !== $op->arg3) {
+                    if ($op->arg2 !== $op->arg3 && !isset($frame->block->constants[$op->arg3])) {
                         $arg3->null();
                     }
-                    if ($op->arg1 !== $op->arg2 && $op->arg1 !== $op->arg3) {
+                    if (
+                        $op->arg1 !== $op->arg2
+                        && $op->arg1 !== $op->arg3
+                        && !isset($frame->block->constants[$op->arg1])
+                    ) {
                         $arg1->null();
                     }
                     $strict = null !== $frame->parent
@@ -1198,7 +1204,14 @@ restart:
                             goto restart;
                         }
                     }
-                    $rhs = $frame->scope[$op->arg2]->resolveIndirect();
+                    $rhsSlot = $frame->scope[$op->arg2];
+                    $rhs = $rhsSlot->resolveIndirect();
+                    // Iterator_Value(byRef) and object property slots are already live storage
+                    // (Zend FE_FETCH_R); re-wrapping breaks multi-element foreach (&$v) (#5245).
+                    if ($rhsSlot->isIndirect() || null !== $rhs->objectPropertyOwner) {
+                        $lhs->indirect($rhs);
+                        break;
+                    }
                     if (Variable::TYPE_INDIRECT !== $rhs->type) {
                         $ref = new Variable();
                         $ref->copyFrom($rhs);
@@ -1531,9 +1544,14 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_CAST_STRING:
+                    $savedCallSiteLine = $frame->callSiteLine;
+                    if (null !== $op->arg3 && $op->arg3 > 0) {
+                        $frame->callSiteLine = $op->arg3;
+                    }
                     try {
-                        $frame->scope[$op->arg1]->castFrom(Variable::TYPE_STRING, $frame->scope[$op->arg2], $this);
+                        $frame->scope[$op->arg1]->castFrom(Variable::TYPE_STRING, $frame->scope[$op->arg2], $this, $frame);
                     } catch (\Error $e) {
+                        $frame->callSiteLine = $savedCallSiteLine;
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
@@ -1541,6 +1559,7 @@ restart:
                         }
                         break;
                     } catch (\TypeError $e) {
+                        $frame->callSiteLine = $savedCallSiteLine;
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
@@ -1548,10 +1567,12 @@ restart:
                         }
                         break;
                     } catch (VM\MagicMethodInvocationAborted) {
+                        $frame->callSiteLine = $savedCallSiteLine;
                         $this->clearTryCatchUnwindState();
                         ++$frame->pos;
                         break;
                     }
+                    $frame->callSiteLine = $savedCallSiteLine;
                     break;
                 case OpCode::TYPE_CAST_ARRAY:
                     $frame->scope[$op->arg1]->copyFrom(
@@ -1767,8 +1788,8 @@ restart:
                         goto restart;
                     }
                     try {
-                        $arg2 = $this->coerceVariableToString($frame->scope[$op->arg2]);
-                        $arg3 = $this->coerceVariableToString($frame->scope[$op->arg3]);
+                        $arg2 = $this->coerceVariableToString($frame->scope[$op->arg2], $frame);
+                        $arg3 = $this->coerceVariableToString($frame->scope[$op->arg3], $frame);
                         $arg1->string($arg2 . $arg3);
                     } catch (\Error $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
@@ -1800,7 +1821,7 @@ restart:
                         if (!VM\SapiOutput::headersSent()) {
                             VM\HeaderCallbackQueue::runBeforeOutput($this->context);
                         }
-                        VM\OutputBuffer::append($this->valueToPrintString($frame->scope[$op->arg1]));
+                        VM\OutputBuffer::append($this->valueToPrintString($frame->scope[$op->arg1], $frame));
                     } catch (\Error $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                         if (null !== $catchFrame) {
@@ -1824,7 +1845,7 @@ restart:
                         if (!VM\SapiOutput::headersSent()) {
                             VM\HeaderCallbackQueue::runBeforeOutput($this->context);
                         }
-                        VM\OutputBuffer::append($this->valueToPrintString($frame->scope[$op->arg2]));
+                        VM\OutputBuffer::append($this->valueToPrintString($frame->scope[$op->arg2], $frame));
                         $frame->scope[$op->arg1]->int(1);
                     } catch (\Error $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
@@ -1869,9 +1890,9 @@ restart:
                     );
                     goto restart;
                 case OpCode::TYPE_NULLSAFE:
-                    $receiver = $frame->scope[$op->arg2]->resolveIndirect();
+                    $receiver = $frame->scope[$op->arg2];
                     $frame = (
-                        Variable::TYPE_NULL === $receiver->type
+                        VM\TypedPropertyCheck::nullsafeShortCircuitReceiver($receiver)
                             ? $op->block1
                             : $op->block2
                     )->getFrame($this->context, $frame);
@@ -2922,8 +2943,33 @@ restart:
                         $result->copyFrom($prop);
                         break;
                     }
-                    if ($var->type !== Variable::TYPE_OBJECT) {
-                        throw new \LogicException("Unsupported property fetch on non-object");
+                    if (TypeCheck::isNonObjectPropertyFetchReceiver($var)) {
+                        $resolved = $var->resolveIndirect();
+                        $typeName = TypeCheck::typeNameForConstraint($resolved->type);
+                        $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+                        $forWrite = $frame->pos < $frame->block->nOpCodes
+                            && OpCode::TYPE_ASSIGN === $frame->block->opCodes[$frame->pos]->type
+                            && (int) $frame->block->opCodes[$frame->pos]->arg2 === (int) $op->arg1;
+                        if ($forWrite) {
+                            $catchFrame = $this->dispatchVmError(
+                                sprintf('Attempt to assign property "%s" on %s', $name, $typeName),
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
+                        $this->context->errors->propertyReadOnNonObject(
+                            $name,
+                            $typeName,
+                            $this->context,
+                            $frame,
+                            $scriptFile
+                        );
+                        $result->null();
+                        break;
                     }
                     $propertyObject = $var->toObject();
                     VM\LazyObjectSupport::ensureInitialized($this, $propertyObject);
@@ -3006,6 +3052,8 @@ restart:
                             $ht->update($key->toString(), $value);
                         } elseif ($key->is(Variable::TYPE_BOOLEAN)) {
                             $ht->updateIndex($key->toBool() ? 1 : 0, $value);
+                        } elseif ($key->is(Variable::TYPE_NULL)) {
+                            $ht->update('', $value);
                         } else {
                             throw new \TypeError('Illegal offset type');
                         }
@@ -6998,6 +7046,8 @@ restart:
                     $ht->update($key->toString(), $value);
                 } elseif ($key->is(Variable::TYPE_BOOLEAN)) {
                     $ht->updateIndex($key->toBool() ? 1 : 0, $value);
+                } elseif ($key->is(Variable::TYPE_NULL)) {
+                    $ht->update('', $value);
                 } else {
                     throw new \TypeError('Illegal offset type');
                 }

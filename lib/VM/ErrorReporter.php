@@ -247,6 +247,24 @@ final class ErrorReporter
     }
 
     /**
+     * Zend E_WARNING for property read on non-object (zend_execute.c, #5276).
+     */
+    public function propertyReadOnNonObject(
+        string $propertyName,
+        string $typeName,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        $this->emitWarning(
+            sprintf('Attempt to read property "%s" on %s', $propertyName, $typeName),
+            $context,
+            $frame,
+            $file
+        );
+    }
+
+    /**
      * Zend E_WARNING for language-level diagnostics (issue #4502).
      */
     public function languageWarning(

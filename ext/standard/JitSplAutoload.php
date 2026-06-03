@@ -14,7 +14,7 @@ use PHPCompiler\JIT\SplAutoloadCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering helpers for spl_autoload_register() (#1776, #2441). */
+/** LLVM lowering helpers for spl_autoload_register() (#1776, #2441, #5300). */
 final class JitSplAutoload
 {
     /** @var array<string, Value> per-module autoload shims */

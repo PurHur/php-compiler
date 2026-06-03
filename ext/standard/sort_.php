@@ -38,9 +38,7 @@ final class sort_ extends Internal
             throw new \LogicException('sort() requires one or two arguments');
         }
         $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('sort() argument must be an array in this compiler build');
-        }
+        $ht = VmArray::requireArray($frame->calledArgs[0], 'sort');
         $flags = StdlibConstants::SORT_REGULAR;
         if (2 === $argc) {
             $flagsArg = $frame->calledArgs[1]->resolveIndirect();
@@ -49,7 +47,6 @@ final class sort_ extends Internal
             }
             $flags = $flagsArg->toInt();
         }
-        $ht = $array->toArray();
         if ($ht->getNumElements() < 2) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(true);
@@ -110,6 +107,7 @@ final class sort_ extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('sort() requires one or two arguments');
         }
+        JitArrayKey::requireArrayArg($context, $args[0], 'sort');
         if (1 === $argc) {
             ArrayBuiltinHelper::sortPacked($context, $args[0]);
         } else {

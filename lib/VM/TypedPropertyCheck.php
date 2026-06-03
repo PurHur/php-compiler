@@ -81,4 +81,68 @@ final class TypedPropertyCheck
         }
         throw new TypedPropertyReadSignal($vm->makeEngineError(self::errorMessage($var)));
     }
+
+    /**
+     * Nullable typed property (`?T`, `T|null`, `mixed`) — Zend nullsafe short-circuit (#5220).
+     */
+    public static function propertyAllowsNull(Variable $var): bool
+    {
+        $target = $var->resolveIndirect();
+        $label = $target->declaredTypeLabel;
+        if (null !== $label) {
+            if ('mixed' === $label || 'null' === $label) {
+                return true;
+            }
+            if (str_contains($label, '|null')) {
+                return true;
+            }
+        }
+        if (null !== $target->dnfArms) {
+            foreach ($target->dnfArms as $arm) {
+                if (($arm['kind'] ?? '') === 'literal' && 'null' === strtolower((string) ($arm['name'] ?? ''))) {
+                    return true;
+                }
+            }
+        }
+        if (null !== $target->objectPropertyOwner && null !== $target->objectPropertyName) {
+            return self::classPropertyAllowsNull($target->objectPropertyOwner, $target->objectPropertyName);
+        }
+        if (null !== $target->staticPropertyClassLc && null !== $target->objectPropertyName) {
+            $vm = \PHPCompiler\VM::running();
+            if (null !== $vm && isset($vm->context->classes[$target->staticPropertyClassLc])) {
+                $entry = $vm->context->classes[$target->staticPropertyClassLc];
+                if (isset($entry->staticProperties[strtolower($target->objectPropertyName)])) {
+                    return self::propertyAllowsNull($entry->staticProperties[strtolower($target->objectPropertyName)]);
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * ?-> receiver short-circuit: PHP null or uninitialized nullable typed slot (zend_execute.c ZEND_NULLSAFE).
+     */
+    public static function nullsafeShortCircuitReceiver(Variable $receiver): bool
+    {
+        $resolved = $receiver->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return true;
+        }
+
+        return self::isUninitialized($receiver) && self::propertyAllowsNull($receiver);
+    }
+
+    private static function classPropertyAllowsNull(ObjectEntry $owner, string $name): bool
+    {
+        foreach ($owner->class->properties as $property) {
+            if ($property->name !== $name) {
+                continue;
+            }
+
+            return self::propertyAllowsNull($property->prototype);
+        }
+
+        return false;
+    }
 }

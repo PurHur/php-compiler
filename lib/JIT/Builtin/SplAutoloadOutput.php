@@ -4,22 +4,31 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPLLVM\Builder;
+use PHPLLVM\LLVMAbstract\Builder as LLVMBuilderImpl;
+use PHPLLVM\Value;
+use llvm\LLVMValueRef_ptr;
 
 /**
- * JIT MCJIT bodies for spl_autoload_* — link shared AOT runtime (issues #1776, #2441).
+ * JIT/AOT spl_autoload_register() callback stack — PHP LLVM lowering (#1776, #2441, #5300).
  *
- * Links {@see lib/AOT/runtime/phpc_spl_autoload.c}.
+ * Replaces {@see lib/AOT/runtime/phpc_spl_autoload.c}; stack semantics match
+ * {@see \PHPCompiler\ext\standard\VmSplAutoload} prepend/append order.
  */
 final class SplAutoloadOutput
 {
-    private const RUNTIME_SOURCE = __DIR__.'/../../AOT/runtime/phpc_spl_autoload.c';
+    public const MAX = 32;
 
-    private const RUNTIME_SYMBOLS = [
-        '__phpc_spl_autoload_register_apply',
-        '__phpc_spl_autoload_dispatch',
-    ];
+    public const GLOBAL_STACK = '__phpc_spl_autoload_stack';
+
+    public const GLOBAL_DEPTH = '__phpc_spl_autoload_depth';
+
+    /** @var Value|null */
+    public static $stackGlobal = null;
+
+    /** @var Value|null */
+    public static $depthGlobal = null;
 
     public static function ensureLinked(Context $context): void
     {
@@ -28,156 +37,223 @@ final class SplAutoloadOutput
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__phpc_spl_autoload_register_apply');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
             return;
         }
 
-        $bitcode = self::ensureBitcode();
-        $data = file_get_contents($bitcode);
-        if (false === $data || '' === $data) {
-            throw new \LogicException('Failed to read spl_autoload JIT bitcode: '.$bitcode);
-        }
-        $buffer = $context->llvm->createMemoryBufferWithString($data, 'phpc_spl_autoload.bc');
-        $runtimeModule = $buffer->parseBitcode($context->context);
-        if (!$context->module->link($runtimeModule)) {
-            throw new \LogicException('Failed to link spl_autoload JIT runtime bitcode');
-        }
+        $resumeBlock = $context->builder->getInsertBlock();
 
-        self::registerLinkedRuntime($context);
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $void = $context->context->voidType();
+        $cbFnTy = $context->context->functionType($i32, false, $i8p, $sizeT);
+        $cbPtrTy = $cbFnTy->pointerType(0);
+
+        $stackTy = $i8p->arrayType(self::MAX);
+        self::$stackGlobal = $context->module->addGlobal($stackTy, self::GLOBAL_STACK);
+        self::$depthGlobal = $context->module->addGlobal($i32, self::GLOBAL_DEPTH);
+        self::$depthGlobal->setInitializer($i32->constInt(0, false));
+
+        self::emitRegisterApply($context, $i32, $i8p, $cbPtrTy, $void);
+        self::emitDispatch($context, $i32, $i8p, $sizeT, $cbFnTy, $cbPtrTy);
+
+        if (null !== $resumeBlock) {
+            $context->builder->positionAtEnd($resumeBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
-    private static function registerLinkedRuntime(Context $context): void
-    {
-        foreach (self::RUNTIME_SYMBOLS as $name) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn) {
-                throw new \LogicException("{$name} missing after phpc_spl_autoload bitcode link");
-            }
-            $context->registerFunction($name, $fn);
-        }
+    private static function emitRegisterApply(
+        Context $context,
+        $i32,
+        $i8p,
+        $cbPtrTy,
+        $void
+    ): void {
+        $fn = $context->module->addFunction(
+            '__phpc_spl_autoload_register_apply',
+            $context->context->functionType($void, false, $i8p, $i32)
+        );
+        $context->registerFunction('__phpc_spl_autoload_register_apply', $fn);
+
+        $entry = $fn->appendBasicBlock('spl_reg_entry');
+        $bbDone = $fn->appendBasicBlock('spl_reg_done');
+        $bbAppend = $fn->appendBasicBlock('spl_reg_append');
+        $bbPrependCheck = $fn->appendBasicBlock('spl_reg_prepend_check');
+        $bbPrependShiftInit = $fn->appendBasicBlock('spl_reg_prepend_shift_init');
+        $bbPrependShiftHead = $fn->appendBasicBlock('spl_reg_prepend_shift_head');
+        $bbPrependShiftBody = $fn->appendBasicBlock('spl_reg_prepend_shift_body');
+        $bbPrependStore = $fn->appendBasicBlock('spl_reg_prepend_store');
+
+        $context->builder->positionAtEnd($entry);
+        $fnOpaque = $fn->getParam(0);
+        $prepend = $fn->getParam(1);
+
+        $depth = $context->builder->load(self::$depthGlobal);
+        $maxDepth = $context->builder->icmp(
+            Builder::INT_SGE,
+            $depth,
+            $i32->constInt(self::MAX, false)
+        );
+        $fnNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $fnOpaque,
+            $i8p->constNull()
+        );
+        $skip = $context->builder->or($maxDepth, $fnNull);
+        $context->builder->branchIf($skip, $bbDone, $bbPrependCheck);
+
+        $context->builder->positionAtEnd($bbPrependCheck);
+        $wantPrepend = $context->builder->icmp(Builder::INT_NE, $prepend, $i32->constInt(0, false));
+        $depthPos = $context->builder->icmp(Builder::INT_SGT, $depth, $i32->constInt(0, false));
+        $doPrepend = $context->builder->and($wantPrepend, $depthPos);
+        $context->builder->branchIf($doPrepend, $bbPrependShiftInit, $bbAppend);
+
+        $zeroI32 = $i32->constInt(0, false);
+        $oneI32 = $i32->constInt(1, false);
+
+        $context->builder->positionAtEnd($bbAppend);
+        self::storeStackEntry($context, $i32, $depth, $fnOpaque);
+        $context->builder->store($context->builder->add($depth, $oneI32), self::$depthGlobal);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbPrependShiftInit);
+        $iSlot = $context->builder->alloca($i32, 1, 'spl_i');
+        $context->builder->store($depth, $iSlot);
+        $context->builder->branch($bbPrependShiftHead);
+
+        $context->builder->positionAtEnd($bbPrependShiftHead);
+        $iVal = $context->builder->load($iSlot);
+        $iGtZero = $context->builder->icmp(Builder::INT_SGT, $iVal, $zeroI32);
+        $context->builder->branchIf($iGtZero, $bbPrependShiftBody, $bbPrependStore);
+
+        $context->builder->positionAtEnd($bbPrependShiftBody);
+        $prevIdx = $context->builder->sub($iVal, $oneI32);
+        $curEntry = self::stackEntryPtr($context, $i32, $iVal);
+        $prevEntry = self::stackEntryPtr($context, $i32, $prevIdx);
+        $context->builder->store($context->builder->load($prevEntry), $curEntry);
+        $context->builder->store($prevIdx, $iSlot);
+        $context->builder->branch($bbPrependShiftHead);
+
+        $context->builder->positionAtEnd($bbPrependStore);
+        self::storeStackEntry($context, $i32, $zeroI32, $fnOpaque);
+        $context->builder->store($context->builder->add($depth, $oneI32), self::$depthGlobal);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+        $context->builder->returnVoid();
     }
 
-    private static function ensureBitcode(): string
-    {
-        $source = realpath(self::RUNTIME_SOURCE);
-        if (false === $source || !is_file($source)) {
-            throw new \LogicException('phpc_spl_autoload runtime source not found: '.self::RUNTIME_SOURCE);
-        }
+    private static function emitDispatch(
+        Context $context,
+        $i32,
+        $i8p,
+        $sizeT,
+        $cbFnTy,
+        $cbPtrTy
+    ): void {
+        $fn = $context->module->addFunction(
+            '__phpc_spl_autoload_dispatch',
+            $context->context->functionType($i32, false, $i8p, $sizeT)
+        );
+        $context->registerFunction('__phpc_spl_autoload_dispatch', $fn);
 
-        $compiler = self::resolveCompiler();
-        $cacheDir = sys_get_temp_dir().'/phpc-jit-runtime';
-        if (!is_dir($cacheDir) && !mkdir($cacheDir, 0777, true) && !is_dir($cacheDir)) {
-            throw new \LogicException('Cannot create JIT runtime cache: '.$cacheDir);
-        }
+        $entry = $fn->appendBasicBlock('spl_disp_entry');
+        $bbLoopHead = $fn->appendBasicBlock('spl_disp_loop_head');
+        $bbLoopBody = $fn->appendBasicBlock('spl_disp_loop_body');
+        $bbCall = $fn->appendBasicBlock('spl_disp_call');
+        $bbNext = $fn->appendBasicBlock('spl_disp_next');
+        $bbRetZero = $fn->appendBasicBlock('spl_disp_ret_zero');
+        $bbRetOne = $fn->appendBasicBlock('spl_disp_ret_one');
 
-        $cache = $cacheDir.'/phpc_spl_autoload-'.substr(sha1($source.filemtime($source).$compiler), 0, 16).'.bc';
-        if (is_file($cache) && filemtime($cache) >= filemtime($source)) {
-            return $cache;
-        }
+        $context->builder->positionAtEnd($entry);
+        $classPtr = $fn->getParam(0);
+        $classLen = $fn->getParam(1);
 
-        $includes = self::hostLibcIncludeFlags();
-        $cmd = escapeshellarg($compiler)
-            .' -emit-llvm -c -fPIC -O2'.$includes.' '
-            .escapeshellarg($source).' -o '.escapeshellarg($cache).' 2>&1';
-        $output = shell_exec($cmd);
-        if (!is_file($cache)) {
-            throw new \LogicException(
-                'Failed to compile phpc_spl_autoload JIT bitcode: '.trim((string) $output)
-            );
-        }
+        $badName = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $classPtr, $i8p->constNull()),
+            $context->builder->icmp(Builder::INT_EQ, $classLen, $sizeT->constInt(0, false))
+        );
+        $context->builder->branchIf($badName, $bbRetZero, $bbLoopHead);
 
-        return $cache;
+        $iSlot = $context->builder->alloca($i32, 1, 'spl_disp_i');
+        $context->builder->store($i32->constInt(0, false), $iSlot);
+        $context->builder->branch($bbLoopHead);
+
+        $context->builder->positionAtEnd($bbLoopHead);
+        $iVal = $context->builder->load($iSlot);
+        $depth = $context->builder->load(self::$depthGlobal);
+        $inRange = $context->builder->icmp(Builder::INT_SLT, $iVal, $depth);
+        $context->builder->branchIf($inRange, $bbLoopBody, $bbRetZero);
+
+        $context->builder->positionAtEnd($bbLoopBody);
+        $entryPtr = self::stackEntryPtr($context, $i32, $iVal);
+        $fnOpaque = $context->builder->load($entryPtr);
+        $fnNull = $context->builder->icmp(Builder::INT_EQ, $fnOpaque, $i8p->constNull());
+        $context->builder->branchIf($fnNull, $bbNext, $bbCall);
+
+        $context->builder->positionAtEnd($bbCall);
+        $cb = $context->builder->pointerCast($fnOpaque, $cbPtrTy);
+        $ret = self::emitIndirectCall($context, $cbFnTy, $cb, $classPtr, $classLen);
+        $ok = $context->builder->icmp(Builder::INT_NE, $ret, $i32->constInt(0, false));
+        $context->builder->branchIf($ok, $bbRetOne, $bbNext);
+
+        $context->builder->positionAtEnd($bbNext);
+        $context->builder->store(
+            $context->builder->add($iVal, $i32->constInt(1, false)),
+            $iSlot
+        );
+        $context->builder->branch($bbLoopHead);
+
+        $context->builder->positionAtEnd($bbRetZero);
+        $context->builder->returnValue($i32->constInt(0, false));
+
+        $context->builder->positionAtEnd($bbRetOne);
+        $context->builder->returnValue($i32->constInt(1, false));
     }
 
-    private static function resolveCompiler(): string
+    private static function stackEntryPtr(Context $context, $i32, Value $index): Value
     {
-        $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
-        if (false !== $llvmDir && '' !== $llvmDir) {
-            foreach (['clang-9', 'clang'] as $name) {
-                $candidate = $llvmDir.'/'.$name;
-                if (is_executable($candidate)) {
-                    return $candidate;
-                }
-            }
-        }
-
-        foreach (['clang-9', 'clang', 'gcc', 'cc'] as $name) {
-            $path = trim((string) shell_exec('command -v '.escapeshellarg($name).' 2>/dev/null'));
-            if ('' !== $path) {
-                return $path;
-            }
-        }
-
-        throw new \LogicException('No C compiler found for phpc_spl_autoload JIT runtime bitcode');
+        return $context->builder->inBoundsGEP(
+            self::$stackGlobal,
+            $i32->constInt(0, false),
+            $index
+        );
     }
 
-    private static function hostLibcIncludeFlags(): string
-    {
-        $flags = '';
-        foreach (self::discoverSystemIncludeDirs() as $dir) {
-            $flags .= ' -isystem '.escapeshellarg($dir);
-        }
-        if ('' === $flags && is_file('/usr/include/stdio.h')) {
-            $flags = ' -isystem /usr/include';
-        }
-
-        return $flags;
+    private static function storeStackEntry(
+        Context $context,
+        $i32,
+        Value $index,
+        Value $fnOpaque
+    ): void {
+        $context->builder->store($fnOpaque, self::stackEntryPtr($context, $i32, $index));
     }
 
-    /**
-     * @return list<string>
-     */
-    private static function discoverSystemIncludeDirs(): array
+    private static function emitIndirectCall(Context $context, $fnTy, Value $fnPtr, Value ...$args): Value
     {
-        $dirs = [];
-        foreach (['gcc', 'cc', 'clang'] as $compiler) {
-            $path = trim((string) shell_exec('command -v '.escapeshellarg($compiler).' 2>/dev/null'));
-            if ('' === $path) {
-                continue;
-            }
-            $verbose = shell_exec(
-                escapeshellarg($path).' -E -Wp,-v -xc /dev/null 2>&1'
-            );
-            if (!is_string($verbose)) {
-                continue;
-            }
-            $capture = false;
-            foreach (explode("\n", $verbose) as $line) {
-                if (str_contains($line, '#include <...> search starts here:')) {
-                    $capture = true;
-
-                    continue;
-                }
-                if ($capture) {
-                    if (str_contains($line, 'End of search list')) {
-                        break;
-                    }
-                    $dir = trim($line);
-                    if ('' !== $dir && is_dir($dir)) {
-                        $dirs[$dir] = true;
-                    }
-                }
-            }
-            if ([] !== $dirs) {
-                break;
-            }
+        $b = $context->builder;
+        if (!$b instanceof LLVMBuilderImpl) {
+            throw new \LogicException('LLVM builder required for spl_autoload indirect call');
         }
+        $valueWrapper = $b->llvm->lib->makeArray(
+            LLVMValueRef_ptr::class,
+            array_map(static fn (Value $value) => $value->value, $args)
+        );
 
-        if ([] === $dirs) {
-            foreach (['/usr/include', '/usr/include/x86_64-linux-gnu'] as $fallback) {
-                if (is_dir($fallback)) {
-                    $dirs[$fallback] = true;
-                }
-            }
-        }
-
-        return array_keys($dirs);
+        return $b->llvm->factory->value(
+            $context->context,
+            $b->llvm->lib->LLVMBuildCall2(
+                $b->builder,
+                $fnTy->type,
+                $fnPtr->value,
+                $valueWrapper,
+                \count($args),
+                ''
+            )
+        );
     }
 }

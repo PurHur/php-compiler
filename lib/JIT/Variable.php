@@ -265,6 +265,23 @@ final class Variable {
         }
     }
 
+    /** Zend property fetch on non-object receivers (#5276). */
+    public static function propertyFetchNonObjectTypeLabel(int $type): ?string
+    {
+        $label = self::cannotUseBracketLabel($type);
+        if (null !== $label) {
+            return $label;
+        }
+        switch ($type) {
+            case self::TYPE_STRING:
+                return 'string';
+            case self::TYPE_HASHTABLE:
+                return 'array';
+            default:
+                return null;
+        }
+    }
+
     public static function getTypeFromType(?Type $type): int {
         if (null === $type) {
             return self::TYPE_VALUE;

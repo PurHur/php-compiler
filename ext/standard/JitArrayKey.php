@@ -119,7 +119,7 @@ final class JitArrayKey
         $isInt = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
-            $i8->constInt(Variable::TYPE_LONG, false)
+            $i8->constInt(Variable::TYPE_INTEGER, false)
         );
         $context->builder->branchIf($isInt, $intBlock, $afterInt);
         $context->builder->positionAtEnd($intBlock);
@@ -129,7 +129,7 @@ final class JitArrayKey
         $isFloat = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
-            $i8->constInt(Variable::TYPE_DOUBLE, false)
+            $i8->constInt(Variable::TYPE_FLOAT, false)
         );
         $context->builder->branchIf($isFloat, $floatBlock, $afterFloat);
         $context->builder->positionAtEnd($floatBlock);
@@ -139,7 +139,7 @@ final class JitArrayKey
         $isBool = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
-            $i8->constInt(Variable::TYPE_BOOL, false)
+            $i8->constInt(Variable::TYPE_BOOLEAN, false)
         );
         $context->builder->branchIf($isBool, $boolBlock, $mixedBlock);
         $context->builder->positionAtEnd($boolBlock);

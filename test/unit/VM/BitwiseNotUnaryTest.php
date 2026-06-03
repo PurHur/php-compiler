@@ -8,7 +8,7 @@ use PHPCompiler\OpCode;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** Zend zend_operators.c unary ~ (#4998). */
+/** Zend zend_operators.c unary ~ (#4998, #5270). */
 final class BitwiseNotUnaryTest extends TestCase
 {
     public function testIntegerOperand(): void
@@ -44,14 +44,14 @@ final class BitwiseNotUnaryTest extends TestCase
         $result->unaryOp(OpCode::TYPE_BITWISE_NOT, $src);
     }
 
-    public function testFloatOperandThrowsTypeError(): void
+    public function testFloatOperandTruncatesToInt(): void
     {
         $src = new Variable(Variable::TYPE_FLOAT);
         $src->float(1.5);
         $result = new Variable();
-
-        $this->expectException(\TypeError::class);
-        $this->expectExceptionMessage('Unsupported operand types: float');
         $result->unaryOp(OpCode::TYPE_BITWISE_NOT, $src);
+
+        self::assertSame(Variable::TYPE_INTEGER, $result->type);
+        self::assertSame(-2, $result->toInt());
     }
 }

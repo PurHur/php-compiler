@@ -420,9 +420,32 @@ final class Variable {
                 return '<<';
             case OpCode::TYPE_SHIFT_RIGHT:
                 return '>>';
+            case OpCode::TYPE_BITWISE_AND:
+                return '&';
+            case OpCode::TYPE_BITWISE_OR:
+                return '|';
+            case OpCode::TYPE_BITWISE_XOR:
+                return '^';
             default:
                 return '?';
         }
+    }
+
+    private static function operandsValidForBitwiseOp(Variable $left, Variable $right): bool
+    {
+        if (self::TYPE_ARRAY === $left->type || self::TYPE_ARRAY === $right->type) {
+            return false;
+        }
+        if (self::TYPE_STRING_OFFSET === $left->type
+            || self::TYPE_STRING_OFFSET === $right->type
+            || self::TYPE_UNDEFINED === $left->type
+            || self::TYPE_UNDEFINED === $right->type
+            || self::isEnumCaseOperand($left)
+            || self::isEnumCaseOperand($right)) {
+            return false;
+        }
+
+        return true;
     }
 
     private static function throwUnsupportedOperandTypes(int $opCode, Variable $left, Variable $right): void
@@ -500,7 +523,7 @@ final class Variable {
         $this->string = $value;
     }
 
-    public function toString(): string {
+    public function toString(?\PHPCompiler\VM $vm = null, ?\PHPCompiler\Frame $frame = null): string {
         $var = $this->resolveIndirect();
         TypedPropertyCheck::assertReadable($var);
         switch ($var->type) {
@@ -524,7 +547,7 @@ final class Variable {
             case self::TYPE_UNDEFINED:
                 return '';
             case self::TYPE_ARRAY:
-                // todo: raise notice
+                self::emitArrayToStringWarning($vm, $frame);
                 return 'Array';
             case self::TYPE_OBJECT:
                 if (EnumCaseSupport::isEnumCase($var->object)) {
@@ -714,10 +737,10 @@ final class Variable {
         $this->stringOffsetFile = $file;
     }
 
-    public function castFrom(int $type, self $var, ?\PHPCompiler\VM $vm = null) {
+    public function castFrom(int $type, self $var, ?\PHPCompiler\VM $vm = null, ?\PHPCompiler\Frame $frame = null) {
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();
-            $result->castFrom($type, $var, $vm);
+            $result->castFrom($type, $var, $vm, $frame);
             $this->indirect->copyFrom($result);
 
             return;
@@ -747,7 +770,7 @@ final class Variable {
                 if (self::TYPE_OBJECT === $src->type && null !== $vm) {
                     $this->string = $vm->castObjectToString($src->toObject());
                 } else {
-                    $this->string = $var->toString();
+                    $this->string = $var->toString($vm, $frame);
                 }
                 break;
             default:
@@ -990,6 +1013,24 @@ restart:
             'Unsupported operand types: %s',
             self::operandZendTypeName($expr)
         ));
+    }
+
+    /**
+     * Zend _convert_to_string() array branch (zend_operators.c, issue #5266).
+     */
+    private static function emitArrayToStringWarning(?\PHPCompiler\VM $vm, ?\PHPCompiler\Frame $frame): void
+    {
+        $context = $vm?->context ?? $frame?->vmContext;
+        if (null === $context) {
+            return;
+        }
+        $context->errors->languageWarning(
+            'Array to string conversion',
+            null,
+            0,
+            $context,
+            $frame
+        );
     }
 
     private static function warnNonNumericValue(?\PHPCompiler\VM $vm, ?\PHPCompiler\Frame $frame): void
@@ -1578,9 +1619,6 @@ restart:
             goto restart;
         }
         if (OpCode::TYPE_SHIFT_LEFT === $opCode || OpCode::TYPE_SHIFT_RIGHT === $opCode) {
-            if (self::TYPE_FLOAT === $left->type || self::TYPE_FLOAT === $right->type) {
-                self::throwUnsupportedOperandTypes($opCode, $left, $right);
-            }
             $this->int($this->_bitwiseOp($opCode, $left->toNumeric(), $right->toNumeric()));
 
             return;
@@ -1600,6 +1638,9 @@ restart:
         } elseif ($pair === TYPE_PAIR_FLOAT_FLOAT) {
             $this->float($this->_bitwiseOp($opCode, $left->float, $right->float));
         } else {
+            if (!self::operandsValidForBitwiseOp($left, $right)) {
+                self::throwUnsupportedOperandTypes($opCode, $left, $right);
+            }
             $this->string($this->_bitwiseOp($opCode, $left->toString(), $right->toString()));
         }
     }
@@ -1960,10 +2001,9 @@ restart:
                     return;
                 }
                 if ($expr->type === self::TYPE_FLOAT) {
-                    throw new \TypeError(sprintf(
-                        'Unsupported operand types: %s',
-                        self::operandZendTypeName($expr)
-                    ));
+                    $this->int(~(int) $expr->float);
+
+                    return;
                 }
                 if ($expr->type === self::TYPE_STRING) {
                     $bytes = $expr->string;
