@@ -39,6 +39,7 @@ use PHPCompiler\Compiler\FinalClassConstCheck;
 use PHPCompiler\Compiler\FinalClassExtensionCheck;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
 use PHPCompiler\Compiler\ParameterMetadata;
+use PHPCompiler\Compiler\GeneratorStaticMethodCompileCheck;
 use PHPCompiler\Compiler\ReadonlyClassCompileCheck;
 use PHPCompiler\Compiler\TraitCollisionCheck;
 use PHPCompiler\Compiler\ClassCompileRegistry;
@@ -337,6 +338,7 @@ class Compiler {
         MagicMethodReturnTypeCheck::validate($script);
         EnumMagicMethodCheck::validate($script);
         ReadonlyClassCompileCheck::validate($script);
+        GeneratorStaticMethodCompileCheck::validate($script);
 
         return $main;
     }
