@@ -927,13 +927,24 @@ final class VmString
         return $out;
     }
 
-    /** Decode a hex string to binary (PHP hex2bin subset; false on invalid input). */
-    public static function hex2bin(string $data) {
+    /**
+     * Decode a hex string to binary (PHP hex2bin subset).
+     *
+     * @return string|false decoded bytes, or false when input is invalid (non-strict)
+     *
+     * @throws \ValueError when $strict is true and input has odd length or invalid hex
+     */
+    public static function hex2bin(string $data, bool $strict = false)
+    {
         $len = self::byteLength($data);
         if (0 === $len) {
             return '';
         }
         if (0 !== ($len & 1)) {
+            if ($strict) {
+                throw new \ValueError('Hexadecimal input string must have an even length');
+            }
+
             return false;
         }
         $out = '';
@@ -941,6 +952,10 @@ final class VmString
             $hi = self::hexDigit(self::byteOrd($data[$i]));
             $lo = self::hexDigit(self::byteOrd($data[$i + 1]));
             if (null === $hi || null === $lo) {
+                if ($strict) {
+                    throw new \ValueError('Input string must be hexadecimal string');
+                }
+
                 return false;
             }
             $out .= \chr(($hi << 4) | $lo);

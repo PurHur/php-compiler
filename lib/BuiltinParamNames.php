@@ -52,6 +52,8 @@ final class BuiltinParamNames
                 return ['categorize'];
             case 'intdiv':
                 return ['num1', 'num2'];
+            case 'hex2bin':
+                return ['data', 'strict'];
         }
 
         return null;
