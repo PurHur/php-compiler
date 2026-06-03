@@ -36,53 +36,53 @@ final class ReflectionAttributeNewInstance implements Call
         $null = $context->getTypeFromString('__value__*')->constNull();
         $i64 = $context->getTypeFromString('int64');
 
-        $candidates = [];
+        $isMissing = $context->builder->icmp(Builder::INT_SLT, $classId, $i64->constInt(0, true));
+        $ok = BasicBlockHelper::append($context, 'attr_newinstance_ok_'.$tag);
+        $context->builder->branchIf($isMissing, $missing, $ok);
+
+        $context->builder->positionAtEnd($ok);
+        $obj = $context->type->object->allocateForRuntimeClassId($classId);
+        $thisVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
+        $thisVar->addref();
+        $ctorArg = AttributeNewInstanceHelper::emitReadCtorArgFromAttrOwner($context, $attrObj);
+
+        $ctorDone = BasicBlockHelper::append($context, 'attr_newinstance_ctor_done_'.$tag);
+        $userIds = [];
         foreach ($context->type->object->allClassNamesById() as $id => $displayName) {
             if (!$context->type->object->hasUserDeclaredClass($displayName)) {
                 continue;
             }
-            $candidates[(int) $id] = strtolower(ltrim($displayName, '\\'));
+            $userIds[(int) $id] = strtolower(ltrim($displayName, '\\'));
         }
-        $ids = array_keys($candidates);
-        $n = count($ids);
-        if (0 === $n) {
-            AttributeNewInstanceHelper::emitMissingClassError($context);
-            $context->builder->store($null, $resultSlot);
-            $context->builder->branch($merge);
-            $context->builder->positionAtEnd($merge);
-
-            return $context->builder->load($resultSlot);
-        }
-
-        $checkBlocks = [];
-        for ($i = 0; $i < $n; ++$i) {
-            $checkBlocks[$i] = 0 === $i
-                ? $context->builder->getInsertBlock()
-                : BasicBlockHelper::append($context, 'attr_newinstance_check_'.$tag.'_'.$i);
-        }
-
-        foreach ($ids as $i => $id) {
-            $context->builder->positionAtEnd($checkBlocks[$i]);
-            $expected = $context->constantFromInteger($id, 'int64');
-            $isMatch = $context->builder->icmp(Builder::INT_EQ, $classId, $expected);
-            $onMatch = BasicBlockHelper::append($context, 'attr_newinstance_match_'.$tag.'_'.$i);
-            $onMiss = ($i < $n - 1) ? $checkBlocks[$i + 1] : $missing;
-            $context->builder->branchIf($isMatch, $onMatch, $onMiss);
-
-            $context->builder->positionAtEnd($onMatch);
-            $obj = $context->type->object->allocate($id);
-            $thisVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
-            $thisVar->addref();
-            $argsProp = $context->type->object->propertyFetch($attrObj, 'ReflectionAttribute', 'args');
-            $ctorArg = AttributeNewInstanceHelper::readFirstPositionalArg($context, $argsProp);
-            $proxyName = $candidates[$id].'::__construct';
-            if ($context->functionIsRegistered($proxyName)) {
-                $context->resolveFunctionProxy($proxyName)->call($context, $thisVar, $ctorArg);
+        $ctorIds = array_keys($userIds);
+        $ctorN = count($ctorIds);
+        if ($ctorN > 0) {
+            $ctorChecks = [];
+            for ($i = 0; $i < $ctorN; ++$i) {
+                $ctorChecks[$i] = 0 === $i
+                    ? $context->builder->getInsertBlock()
+                    : BasicBlockHelper::append($context, 'attr_newinstance_ctor_chk_'.$tag.'_'.$i);
             }
-            ReflectionSetup::markConstructed($context, $obj);
-            $context->builder->store(AttributeNewInstanceHelper::boxObject($context, $obj), $resultSlot);
-            $context->builder->branch($merge);
+            foreach ($ctorIds as $i => $id) {
+                $context->builder->positionAtEnd($ctorChecks[$i]);
+                $expected = $context->constantFromInteger($id, 'int64');
+                $isMatch = $context->builder->icmp(Builder::INT_EQ, $classId, $expected);
+                $onMatch = BasicBlockHelper::append($context, 'attr_newinstance_ctor_'.$tag.'_'.$id);
+                $onMiss = ($i < $ctorN - 1) ? $ctorChecks[$i + 1] : $ctorDone;
+                $context->builder->branchIf($isMatch, $onMatch, $onMiss);
+                $context->builder->positionAtEnd($onMatch);
+                $proxyName = $userIds[$id].'::__construct';
+                if ($context->functionIsRegistered($proxyName)) {
+                    $context->resolveFunctionProxy($proxyName)->call($context, $thisVar, $ctorArg);
+                }
+                AttributeNewInstanceHelper::emitApplyConstructorPropertyArgs($context, $obj, $id, $ctorArg);
+                $context->builder->branch($ctorDone);
+            }
         }
+        $context->builder->positionAtEnd($ctorDone);
+        ReflectionSetup::markConstructed($context, $obj);
+        $context->builder->store(AttributeNewInstanceHelper::boxObject($context, $obj), $resultSlot);
+        $context->builder->branch($merge);
 
         $context->builder->positionAtEnd($missing);
         AttributeNewInstanceHelper::emitMissingClassError($context);

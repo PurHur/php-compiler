@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\ClosureHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\LateStaticBindingHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
