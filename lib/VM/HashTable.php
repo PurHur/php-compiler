@@ -1372,6 +1372,27 @@ final class HashTable {
     }
 
     /**
+     * Merge one spread operand key into a literal/array-unpack destination (Zend array_merge / #5072).
+     *
+     * Integer keys and numeric-string keys renumber (append). Non-numeric string keys overwrite.
+     */
+    public static function spreadMergeKey(HashTable $dest, Variable $key, Variable $value): void
+    {
+        if ($key->is(Variable::TYPE_INTEGER)) {
+            $dest->append($value);
+
+            return;
+        }
+        $keyStr = $key->toString();
+        if (null !== self::tryIntFromNumericString($keyStr)) {
+            $dest->append($value);
+
+            return;
+        }
+        $dest->update($keyStr, $value);
+    }
+
+    /**
      * Array-literal spread: int keys append; string keys preserve key (issue #141).
      */
     public function spreadFrom(HashTable $source): void
@@ -1379,12 +1400,7 @@ final class HashTable {
         foreach ($source->iterateKeyed(true) as [$key, $value]) {
             $copy = new Variable();
             $copy->copyFrom($value);
-            if ($key->is(Variable::TYPE_INTEGER)) {
-                $this->append($copy);
-            } else {
-                // Zend array spread overwrites string keys from later operands.
-                $this->update($key->toString(), $copy);
-            }
+            self::spreadMergeKey($this, $key, $copy);
         }
     }
 

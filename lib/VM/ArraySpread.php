@@ -81,10 +81,6 @@ final class ArraySpread
     {
         $copy = new Variable();
         $copy->copyFrom($value);
-        if ($key->is(Variable::TYPE_INTEGER)) {
-            $dest->append($copy);
-        } else {
-            $dest->update($key->toString(), $copy);
-        }
+        HashTable::spreadMergeKey($dest, $key, $copy);
     }
 }

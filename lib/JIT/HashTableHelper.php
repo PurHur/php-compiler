@@ -1308,6 +1308,80 @@ final class HashTableHelper
         $context->builder->store($ht, $result->value);
     }
 
+    /**
+     * Spread merge for string keys: numeric strings append; other strings overwrite (#5072).
+     */
+    public static function spreadAddElement(
+        Context $context,
+        Variable $array,
+        Variable $element,
+        Variable $key
+    ): void {
+        if ($array->type & Variable::IS_NATIVE_ARRAY) {
+            self::addNativeElement($context, $array, $element, $key);
+
+            return;
+        }
+        $ht = self::loadHashtablePointer($context, $array);
+        if (Variable::TYPE_STRING !== $key->type) {
+            if (Variable::TYPE_OBJECT === $key->type || Variable::TYPE_HASHTABLE === $key->type) {
+                self::emitIllegalOffsetType($context);
+
+                return;
+            }
+            $index = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+            ++$array->nextFreeElement;
+            self::setAtIndex($context, $ht, $index, $element);
+
+            return;
+        }
+        $keyPtr = $context->helper->loadValue($key);
+        $map = $context->structFieldMap['__string__'];
+        $len = $context->builder->load($context->builder->structGep($keyPtr, $map['length']));
+        $charPtr = $context->builder->structGep($keyPtr, $map['value']);
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $zeroLen = $len->typeOf()->constInt(0, false);
+        $tag = (string) self::nextSeq();
+        $useStr = BasicBlockHelper::append($context, 'ht_spread_add_str_'.$tag);
+        $tryInt = BasicBlockHelper::append($context, 'ht_spread_add_try_'.$tag);
+        $append = BasicBlockHelper::append($context, 'ht_spread_add_append_'.$tag);
+        $done = BasicBlockHelper::append($context, 'ht_spread_add_done_'.$tag);
+
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $zeroLen);
+        $context->builder->branchIf($isEmpty, $useStr, $tryInt);
+
+        $context->builder->positionAtEnd($tryInt);
+        $endPtrSlot = $context->builder->alloca($i8p, 1, 'ht_spread_add_end');
+        $context->builder->store($i8p->constNull(), $endPtrSlot);
+        $parsed = $context->builder->call(
+            $context->lookupFunction('strtol'),
+            $charPtr,
+            $endPtrSlot,
+            $context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $endPtr = $context->builder->load($endPtrSlot);
+        $endOffset = $context->builder->sub(
+            $context->builder->ptrToInt($endPtr, $i64),
+            $context->builder->ptrToInt($charPtr, $i64)
+        );
+        $consumedAll = $context->builder->icmp(Builder::INT_EQ, $endOffset, $len);
+        $context->builder->branchIf($consumedAll, $append, $useStr);
+
+        $context->builder->positionAtEnd($append);
+        $index = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+        ++$array->nextFreeElement;
+        self::setAtIndex($context, $ht, $index, $element);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($useStr);
+        self::setAtStringKey($context, $ht, $keyPtr, $element);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
     public static function addElement(
         Context $context,
         Variable $array,
@@ -2283,7 +2357,7 @@ final class HashTableHelper
         );
         $valField = $context->builder->structGep($node, $nodeMap['value']);
         $elem = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $valField);
-        self::addElement($context, $dest, $elem, $keyVar);
+        self::spreadAddElement($context, $dest, $elem, $keyVar);
         $context->builder->branch($advance);
 
         $context->builder->positionAtEnd($advance);
