@@ -312,33 +312,22 @@ restart:
                     case OpCode::TYPE_SHIFT_RIGHT:
                         break;
                     case OpCode::TYPE_GREATER_OR_EQUAL:
-                        $result = $this->context->builder->fcmp(Builder::REAL_OGE, $leftValue, $rightValue);
-                        goto return_bool;
                     case OpCode::TYPE_SMALLER_OR_EQUAL:
-                        $result = $this->context->builder->fcmp(Builder::REAL_OLE, $leftValue, $rightValue);
-                        goto return_bool;
                     case OpCode::TYPE_GREATER:
-                        $result = $this->context->builder->fcmp(Builder::REAL_OGT, $leftValue, $rightValue);
-                        goto return_bool;
                     case OpCode::TYPE_SMALLER:
-                        $result = $this->context->builder->fcmp(Builder::REAL_OLT, $leftValue, $rightValue);
-                        goto return_bool;
                     case OpCode::TYPE_IDENTICAL:
                     case OpCode::TYPE_EQUAL:
-                        $result = $this->context->builder->fcmp(Builder::REAL_OEQ, $leftValue, $rightValue);
-                        goto return_bool;
                     case OpCode::TYPE_NOT_IDENTICAL:
                     case OpCode::TYPE_NOT_EQUAL:
-                        $result = $this->context->builder->fcmp(Builder::REAL_ONE, $leftValue, $rightValue);
+                        $result = JitFloatCompare::relationalCompare(
+                            $this->context,
+                            $opcode->type,
+                            $leftValue,
+                            $rightValue
+                        );
                         goto return_bool;
                     case OpCode::TYPE_SPACESHIP:
-                        $lt = $this->context->builder->fcmp(Builder::REAL_OLT, $leftValue, $rightValue);
-                        $gt = $this->context->builder->fcmp(Builder::REAL_OGT, $leftValue, $rightValue);
-                        $ty = $leftValue->typeOf();
-                        $negOne = $ty->constInt(-1, true);
-                        $one = $ty->constInt(1, true);
-                        $zero = $ty->constInt(0, false);
-                        $result = $this->context->builder->select($gt, $one, $this->context->builder->select($lt, $negOne, $zero));
+                        $result = JitFloatCompare::spaceship($this->context, $leftValue, $rightValue);
                         goto return_long;
                 }
                 break;
