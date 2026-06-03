@@ -19,7 +19,7 @@ final class GeneratorRewind extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $gen = self::requireGenerator($frame);
-        if (null !== $gen->frame) {
+        if ($gen->started) {
             throw new \Exception('Cannot rewind a generator that was already run');
         }
         $gen->vm->resumeGenerator($gen);

@@ -56,7 +56,7 @@ final class GeneratorGetReturn extends VmClassMethod
      */
     public static function ensureStarted(GeneratorState $gen): void
     {
-        if ($gen->done || $gen->hasCurrent || null !== $gen->frame || $gen->hasReturned) {
+        if ($gen->done || $gen->hasCurrent || $gen->started || $gen->hasReturned) {
             return;
         }
 
