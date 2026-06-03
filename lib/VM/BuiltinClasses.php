@@ -462,6 +462,79 @@ final class BuiltinClasses
             ExceptionSupport::CLASS_LOGIC_EXCEPTION,
             ExceptionSupport::CLASS_EXCEPTION
         );
+        // ext/spl/spl_exceptions.c — SPL Exception hierarchy (#5237).
+        self::registerThrowableClass(
+            $ctx,
+            'BadFunctionCallException',
+            ExceptionSupport::CLASS_BAD_FUNCTION_CALL_EXCEPTION,
+            ExceptionSupport::CLASS_LOGIC_EXCEPTION
+        );
+        self::registerThrowableClass(
+            $ctx,
+            'BadMethodCallException',
+            ExceptionSupport::CLASS_BAD_METHOD_CALL_EXCEPTION,
+            ExceptionSupport::CLASS_BAD_FUNCTION_CALL_EXCEPTION
+        );
+        self::registerThrowableClass(
+            $ctx,
+            'DomainException',
+            ExceptionSupport::CLASS_DOMAIN_EXCEPTION,
+            ExceptionSupport::CLASS_LOGIC_EXCEPTION
+        );
+        self::registerThrowableClass(
+            $ctx,
+            'InvalidArgumentException',
+            ExceptionSupport::CLASS_INVALID_ARGUMENT_EXCEPTION,
+            ExceptionSupport::CLASS_LOGIC_EXCEPTION
+        );
+        self::registerThrowableClass(
+            $ctx,
+            'LengthException',
+            ExceptionSupport::CLASS_LENGTH_EXCEPTION,
+            ExceptionSupport::CLASS_LOGIC_EXCEPTION
+        );
+        self::registerThrowableClass(
+            $ctx,
+            'OutOfRangeException',
+            ExceptionSupport::CLASS_OUT_OF_RANGE_EXCEPTION,
+            ExceptionSupport::CLASS_LOGIC_EXCEPTION
+        );
+        self::registerThrowableClass(
+            $ctx,
+            'RuntimeException',
+            ExceptionSupport::CLASS_RUNTIME_EXCEPTION,
+            ExceptionSupport::CLASS_EXCEPTION
+        );
+        self::registerThrowableClass(
+            $ctx,
+            'OutOfBoundsException',
+            ExceptionSupport::CLASS_OUT_OF_BOUNDS_EXCEPTION,
+            ExceptionSupport::CLASS_RUNTIME_EXCEPTION
+        );
+        self::registerThrowableClass(
+            $ctx,
+            'OverflowException',
+            ExceptionSupport::CLASS_OVERFLOW_EXCEPTION,
+            ExceptionSupport::CLASS_RUNTIME_EXCEPTION
+        );
+        self::registerThrowableClass(
+            $ctx,
+            'RangeException',
+            ExceptionSupport::CLASS_RANGE_EXCEPTION,
+            ExceptionSupport::CLASS_RUNTIME_EXCEPTION
+        );
+        self::registerThrowableClass(
+            $ctx,
+            'UnderflowException',
+            ExceptionSupport::CLASS_UNDERFLOW_EXCEPTION,
+            ExceptionSupport::CLASS_RUNTIME_EXCEPTION
+        );
+        self::registerThrowableClass(
+            $ctx,
+            'UnexpectedValueException',
+            ExceptionSupport::CLASS_UNEXPECTED_VALUE_EXCEPTION,
+            ExceptionSupport::CLASS_RUNTIME_EXCEPTION
+        );
         self::registerThrowableClass($ctx, 'Error', ExceptionSupport::CLASS_ERROR);
         self::registerThrowableClass($ctx, 'TypeError', ExceptionSupport::CLASS_TYPE_ERROR, ExceptionSupport::CLASS_ERROR);
         self::registerThrowableClass($ctx, 'ValueError', ExceptionSupport::CLASS_VALUE_ERROR, ExceptionSupport::CLASS_ERROR);
