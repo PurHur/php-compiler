@@ -884,14 +884,14 @@ restart:
                 goto return_bool;
             }
             if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                $identical = JitValueCompare::identicalValueToValue($this->context, $left, $right);
+                $equal = JitValueCompare::looseEqualOperands($this->context, $left, $right);
                 if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
                     $result = $this->context->builder->xor(
-                        $identical,
+                        $equal,
                         $this->context->getTypeFromString('int1')->constInt(1, false)
                     );
                 } else {
-                    $result = $identical;
+                    $result = $equal;
                 }
                 goto return_bool;
             }
@@ -1105,6 +1105,18 @@ restart:
                 );
                 goto return_long;
             }
+            if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $equal = JitValueCompare::looseEqualObjectPair($this->context, $leftValue, $rightValue);
+                if (OpCode::TYPE_EQUAL === $opcode->type) {
+                    $result = $equal;
+                } else {
+                    $result = $this->context->builder->xor(
+                        $equal,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                }
+                goto return_bool;
+            }
             $voidp = $this->context->getTypeFromString('void')->pointerType(0);
             $leftNorm = $this->context->builder->pointerCast($leftValue, $voidp);
             $rightNorm = $this->context->builder->pointerCast($rightValue, $voidp);
@@ -1117,6 +1129,44 @@ restart:
             }
             if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
                 $result = $this->context->builder->icmp(Builder::INT_NE, $leftPtr, $rightPtr);
+                goto return_bool;
+            }
+        }
+        if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+            if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_OBJECT === $rightType) {
+                $readFn = $this->context->lookupFunction('__value__readObject');
+                $leftObj = $this->context->builder->call(
+                    $readFn,
+                    $this->context->builder->pointerCast(
+                        JitValueCompare::runtimeValuePtr($this->context, $left),
+                        $readFn->getParam(0)->typeOf()
+                    )
+                );
+                $equal = JitValueCompare::looseEqualObjectPair($this->context, $leftObj, $rightValue);
+                $result = OpCode::TYPE_EQUAL === $opcode->type
+                    ? $equal
+                    : $this->context->builder->xor(
+                        $equal,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                goto return_bool;
+            }
+            if (Variable::TYPE_OBJECT === $leftType && Variable::TYPE_VALUE === $rightType) {
+                $readFn = $this->context->lookupFunction('__value__readObject');
+                $rightObj = $this->context->builder->call(
+                    $readFn,
+                    $this->context->builder->pointerCast(
+                        JitValueCompare::runtimeValuePtr($this->context, $right),
+                        $readFn->getParam(0)->typeOf()
+                    )
+                );
+                $equal = JitValueCompare::looseEqualObjectPair($this->context, $leftValue, $rightObj);
+                $result = OpCode::TYPE_EQUAL === $opcode->type
+                    ? $equal
+                    : $this->context->builder->xor(
+                        $equal,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
                 goto return_bool;
             }
         }
