@@ -414,6 +414,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'magic_const_trait')) {
                 continue;
             }
+            // Unary +: LLVM verify in UnaryPlusJitCompileTest (#4820); MCJIT execute gated by jit-runtime-probe (#98).
+            if (str_contains($name, 'unary_plus')) {
+                continue;
+            }
             // pre/post inc/dec VM-only until JIT lowering (#3552).
             if (str_contains($name, 'pre_post_inc')) {
                 continue;

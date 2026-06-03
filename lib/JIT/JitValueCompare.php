@@ -692,7 +692,7 @@ final class JitValueCompare
         return $context->builder->or($identical, $numericMatch);
     }
 
-    private static function stringIsNumeric(Context $context, Value $strPtr): Value
+    public static function stringIsNumeric(Context $context, Value $strPtr): Value
     {
         $structName = $strPtr->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
