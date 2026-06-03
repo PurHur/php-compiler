@@ -2764,6 +2764,7 @@ class Compiler {
             && null !== $child->declaredType
             && $child->declaredType instanceof Op\Type\Literal
         ) {
+            $this->rejectTypedTraitConstantIfUnsupported($child->name);
             $declared = Type::fromDecl($child->declaredType->name);
             if (Variable::TYPE_UNDEFINED !== Variable::mapFromType($declared)) {
                 $typeSlot = $this->compileTypeConstrainedVariable($result, $declared);
@@ -2828,6 +2829,26 @@ class Compiler {
         } catch (\TypeError $e) {
             $this->throwCompileError($e->getMessage());
         }
+    }
+
+    /**
+     * Zend 8.2 rejects typed trait constants at parse time; enable at 8.3+ (#5212).
+     */
+    protected function rejectTypedTraitConstantIfUnsupported(Operand $nameOp): void
+    {
+        if (CompilerVersion::supportsTypedTraitConstants()) {
+            return;
+        }
+        if (
+            null === $this->compilingClassLc
+            || !$this->classCompileRegistry->isTrait($this->compilingClassLc)
+        ) {
+            return;
+        }
+        $constName = $this->staticNameFromOperand($nameOp) ?? 'constant';
+        $this->throwCompileError(
+            sprintf('syntax error, unexpected identifier "%s", expecting "="', $constName)
+        );
     }
 
     /**
