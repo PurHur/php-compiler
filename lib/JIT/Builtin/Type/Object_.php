@@ -983,7 +983,7 @@ class Object_ extends Type {
             }
             $slot = $this->propertySlotPtr($obj, $propset[3]);
             $loaded = $this->context->builder->load($slot);
-            $nullPtr = $loaded->typeOf()->getElementType()->constNull();
+            $nullPtr = $this->context->getTypeFromString('void*')->constNull();
             $isEmpty = $this->context->builder->icmp(
                 PHPLLVM\Builder::INT_EQ,
                 $loaded,
@@ -1025,7 +1025,7 @@ class Object_ extends Type {
             }
             $slot = $this->propertySlotPtr($obj, $propset[3]);
             $loaded = $this->context->builder->load($slot);
-            $nullPtr = $loaded->typeOf()->getElementType()->constNull();
+            $nullPtr = $this->context->getTypeFromString('void*')->constNull();
             $isEmpty = $this->context->builder->icmp(
                 PHPLLVM\Builder::INT_EQ,
                 $loaded,
