@@ -65,6 +65,9 @@ class Block {
     /** @var array<int, int> scope slot index => Variable::TYPE_* for typed parameters */
     public array $paramTypeConstraints = [];
 
+    /** @var array<int, 'true'|'false'> standalone bool literal parameter types (#4784) */
+    public array $paramLiteralBoolTypes = [];
+
     /** @var array<int, int> typed variadic element constraints — not applied to the packed array local (#4185) */
     public array $paramVariadicElementTypeConstraints = [];
 
@@ -97,6 +100,9 @@ class Block {
 
     /** Declared scalar return type for this function (issue #205), or null when untyped. */
     public ?int $returnTypeConstraint = null;
+
+    /** Standalone `: true` / `: false` return type (#4784), or null. */
+    public ?string $returnLiteralBoolType = null;
 
     /** Declared `: void` return — non-null returns are rejected. */
     public bool $returnTypeVoid = false;
@@ -445,6 +451,8 @@ class Block {
             $this->returnDeclaredType = $parent->returnDeclaredType;
             $this->paramDeclaredTypes = $parent->paramDeclaredTypes;
             $this->paramTypeConstraints = $parent->paramTypeConstraints;
+            $this->paramLiteralBoolTypes = $parent->paramLiteralBoolTypes;
+            $this->returnLiteralBoolType = $parent->returnLiteralBoolType;
             $this->paramIntersectionConstraints = $parent->paramIntersectionConstraints;
             $this->paramDnfConstraints = $parent->paramDnfConstraints;
             $this->paramNames = $parent->paramNames;
@@ -777,6 +785,9 @@ class Block {
             if (isset($block->paramTypeConstraints[$slot])) {
                 $local->resolveIndirect()->typeConstraint = $block->paramTypeConstraints[$slot];
             }
+            if (isset($block->paramLiteralBoolTypes[$slot])) {
+                $local->resolveIndirect()->literalBoolType = $block->paramLiteralBoolTypes[$slot];
+            }
             if (isset($block->paramGenericArrayTypeSpecs[$slot])) {
                 $local->resolveIndirect()->genericArrayTypeSpec = $block->paramGenericArrayTypeSpecs[$slot];
             }
@@ -806,6 +817,9 @@ class Block {
         $var = new Variable(Variable::TYPE_NULL);
         if (isset($block->paramTypeConstraints[$slot])) {
             $var->typeConstraint = $block->paramTypeConstraints[$slot];
+        }
+        if (isset($block->paramLiteralBoolTypes[$slot])) {
+            $var->literalBoolType = $block->paramLiteralBoolTypes[$slot];
         }
         if (isset($block->paramGenericArrayTypeSpecs[$slot])) {
             $var->genericArrayTypeSpec = $block->paramGenericArrayTypeSpecs[$slot];

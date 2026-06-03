@@ -2275,7 +2275,8 @@ restart:
                                 ) {
                                     continue;
                                 }
-                                if (!TypeCheck::parameterMatchesType($arg, $constraint)) {
+                                $literalBool = $calleeBlock->paramLiteralBoolTypes[$slot] ?? null;
+                                if (!TypeCheck::parameterMatchesType($arg, $constraint, $literalBool)) {
                                     $paramName = $calleeBlock->paramNames[$paramIdx] ?? 'param'.$paramIdx;
                                     throw VM\ParamTypeError::forUserCall(
                                         $frame->call->getName(),
@@ -2284,7 +2285,8 @@ restart:
                                         $constraint,
                                         $arg,
                                         $frame->scriptPath,
-                                        $callSiteLine
+                                        $callSiteLine,
+                                        $literalBool
                                     );
                                 }
                             }
@@ -6518,7 +6520,12 @@ restart:
             return;
         }
         $strict = $block->strictTypes;
-        TypeCheck::coerceReturn($value, $strict, $block->returnTypeConstraint);
+        TypeCheck::coerceReturn(
+            $value,
+            $strict,
+            $block->returnTypeConstraint,
+            $block->returnLiteralBoolType
+        );
     }
 
     private function emitCallDeprecationNotice(Frame $frame): void

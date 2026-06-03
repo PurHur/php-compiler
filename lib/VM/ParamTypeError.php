@@ -16,7 +16,8 @@ final class ParamTypeError
         int $expectedConstraint,
         Variable $argument,
         string $scriptPath,
-        int $callSiteLine
+        int $callSiteLine,
+        ?string $literalBoolType = null
     ): \TypeError {
         $value = $argument->resolveIndirect();
         $message = sprintf(
@@ -24,7 +25,7 @@ final class ParamTypeError
             $function,
             $paramIndex + 1,
             $paramName,
-            TypeCheck::typeNameForConstraint($expectedConstraint),
+            TypeCheck::typeNameForConstraint($expectedConstraint, $literalBoolType),
             TypeCheck::typeNameForConstraint($value->type)
         );
         if ($callSiteLine > 0 && '' !== $scriptPath) {

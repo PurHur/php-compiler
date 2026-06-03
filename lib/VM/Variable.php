@@ -67,6 +67,9 @@ final class Variable {
     /** Display label for property TypeError messages, e.g. `int|string`. */
     public ?string $declaredTypeLabel = null;
 
+    /** Standalone `true`/`false` type hint — reject non-bool scalars (PHP 8.2+, issue #4784). */
+    public ?string $literalBoolType = null;
+
     /** list&lt;T&gt; / array&lt;K,V&gt; shape when declaration used generic array syntax (#3705). */
     public ?GenericArrayTypeSpec $genericArrayTypeSpec = null;
 
