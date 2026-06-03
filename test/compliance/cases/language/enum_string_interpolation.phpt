@@ -1,5 +1,5 @@
 --TEST--
-Language: backed enum in double-quoted strings — Error (zend_enum.c, #4785)
+Language: backed enum in double-quoted strings — Error (zend_enum.c, #4819)
 --FILE--
 <?php
 enum Color: string { case Red = 'r'; }

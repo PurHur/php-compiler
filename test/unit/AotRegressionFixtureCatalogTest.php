@@ -94,6 +94,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
     {
         return [
             'enum_instanceof.php' => ['enum_instanceof.php'],
+            'enum_string_interpolation.php' => ['enum_string_interpolation.php'],
             'loose_numeric_string_eq.php' => ['loose_numeric_string_eq.php'],
             'loose_scientific_string_eq.php' => ['loose_scientific_string_eq.php'],
             'bool_increment.php' => ['bool_increment.php'],
