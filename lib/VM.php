@@ -1869,9 +1869,9 @@ restart:
                     );
                     goto restart;
                 case OpCode::TYPE_NULLSAFE:
-                    $receiver = $frame->scope[$op->arg2]->resolveIndirect();
+                    $receiver = $frame->scope[$op->arg2];
                     $frame = (
-                        Variable::TYPE_NULL === $receiver->type
+                        VM\TypedPropertyCheck::nullsafeShortCircuitReceiver($receiver)
                             ? $op->block1
                             : $op->block2
                     )->getFrame($this->context, $frame);
