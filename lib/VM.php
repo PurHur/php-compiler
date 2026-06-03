@@ -2103,6 +2103,14 @@ restart:
                         $container->toArray()->offsetUnset($key);
                         break;
                     }
+                    $unsetDimMsg = Variable::TYPE_STRING === $container->type
+                        ? 'Cannot unset string offsets'
+                        : 'Cannot unset offset in a non-array variable';
+                    $catchFrame = $this->dispatchUnsetDimNonContainerError($frame, $unsetDimMsg);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     break;
                 case OpCode::TYPE_CLOSURE:
                     if (null === $op->block1) {
@@ -4545,6 +4553,23 @@ restart:
         } finally {
             $this->context->swapRunStack($savedStack);
         }
+    }
+
+    /**
+     * Reject unset($scalar[$key]) — Zend ZEND_UNSET_DIM on non-array/string (#4880, zend_execute.c).
+     *
+     * @return Frame|null catch frame when try/catch (Error) handles the throw
+     */
+    private function dispatchUnsetDimNonContainerError(Frame $frame, string $message): ?Frame
+    {
+        $thrown = VM\BuiltinExceptionSupport::materializeError($this->context, $message);
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
     }
 
     /** Reject unset() on readonly properties; returns catch frame or throws when uncaught. */

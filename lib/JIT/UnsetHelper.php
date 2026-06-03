@@ -12,10 +12,17 @@ use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPTypes\Type;
 use PHPCompiler\Block;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\OpCode;
+use PHPCompiler\VM\Variable as VmVariable;
+use PHPLLVM\Builder;
 
 final class UnsetHelper
 {
+    private const ERROR_NON_ARRAY = 'Cannot unset offset in a non-array variable';
+
+    private const ERROR_STRING_OFFSET = 'Cannot unset string offsets';
+
     public static function compileOffset(
         Context $context,
         Block $block,
@@ -33,12 +40,124 @@ final class UnsetHelper
 
             return;
         }
-        if (Variable::TYPE_HASHTABLE === $container->type || Variable::TYPE_VALUE === $container->type) {
+        if (Variable::TYPE_HASHTABLE === $container->type) {
             HashTableHelper::offsetUnset($context, $container, $dim);
 
             return;
         }
+        if (self::isDefinitelyScalarContainerAtCompileTime($container)) {
+            self::emitScalarUnsetDimError($context, $container);
+
+            return;
+        }
+        if (Variable::TYPE_VALUE === $container->type) {
+            self::compileValueBoxOffsetUnset($context, $block, $containerOp, $dimOp, $container, $dim);
+
+            return;
+        }
         throw new \LogicException('unset() offset only supports arrays and objects in this compiler build');
+    }
+
+    private static function isDefinitelyScalarContainerAtCompileTime(Variable $container): bool
+    {
+        return Variable::TYPE_STRING === $container->type
+            || Variable::TYPE_NULL === $container->type
+            || Variable::TYPE_NATIVE_BOOL === $container->type
+            || Variable::TYPE_NATIVE_LONG === $container->type
+            || Variable::TYPE_NATIVE_DOUBLE === $container->type;
+    }
+
+    private static function emitScalarUnsetDimError(Context $context, Variable $container): void
+    {
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        $message = Variable::TYPE_STRING === $container->type
+            ? self::ERROR_STRING_OFFSET
+            : self::ERROR_NON_ARRAY;
+        ErrorRaise::emitRaise($context, $message);
+    }
+
+    private static function compileValueBoxOffsetUnset(
+        Context $context,
+        Block $block,
+        Operand $containerOp,
+        Operand $dimOp,
+        Variable $container,
+        Variable $dim
+    ): void {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $container);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $tag = 'u'.(string) spl_object_id($context);
+
+        $arrayBb = BasicBlockHelper::append($context, 'unset_dim_vb_array_'.$tag);
+        $objectBb = BasicBlockHelper::append($context, 'unset_dim_vb_object_'.$tag);
+        $stringBb = BasicBlockHelper::append($context, 'unset_dim_vb_string_'.$tag);
+        $scalarBb = BasicBlockHelper::append($context, 'unset_dim_vb_scalar_'.$tag);
+        $afterArray = BasicBlockHelper::append($context, 'unset_dim_vb_after_array_'.$tag);
+        $afterObject = BasicBlockHelper::append($context, 'unset_dim_vb_after_object_'.$tag);
+        $afterString = BasicBlockHelper::append($context, 'unset_dim_vb_after_string_'.$tag);
+
+        $isArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_ARRAY, false)
+        );
+        $context->builder->branchIf($isArray, $arrayBb, $afterArray);
+
+        $context->builder->positionAtEnd($arrayBb);
+        HashTableHelper::offsetUnset($context, $container, $dim);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($afterArray);
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_OBJECT, false)
+        );
+        $context->builder->branchIf($isObject, $objectBb, $afterObject);
+
+        $context->builder->positionAtEnd($objectBb);
+        $objVar = new Variable(
+            $context,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $context->getTypeFromString('__object__*')->constNull()
+        );
+        $objVar->value = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        if (ArrayAccessHelper::tryCompileOffsetUnset($context, $objVar, $dim, $containerOp)) {
+            $context->builder->returnVoid();
+        } else {
+            self::compilePropertyUnset($context, $block, $containerOp, $dimOp);
+            $context->builder->returnVoid();
+        }
+
+        $context->builder->positionAtEnd($afterObject);
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_STRING, false)
+        );
+        $context->builder->branchIf($isString, $stringBb, $afterString);
+
+        $context->builder->positionAtEnd($stringBb);
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise($context, self::ERROR_STRING_OFFSET);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($afterString);
+        $context->builder->branch($scalarBb);
+
+        $context->builder->positionAtEnd($scalarBb);
+        ErrorRaise::emitRaise($context, self::ERROR_NON_ARRAY);
+        $context->builder->returnVoid();
     }
 
     private static function compilePropertyUnset(
@@ -47,8 +166,9 @@ final class UnsetHelper
         Operand $containerOp,
         Operand $dimOp
     ): void {
-        assert($containerOp->type->type === Type::TYPE_OBJECT);
-        $declaringClass = $containerOp->type->userType;
+        $declaringClass = Type::TYPE_OBJECT === $containerOp->type->type
+            ? $containerOp->type->userType
+            : null;
         if (null === $declaringClass && null !== $block->func && null !== $block->func->class) {
             $declaringClass = $block->func->class->value;
         }
