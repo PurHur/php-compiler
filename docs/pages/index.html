@@ -47,7 +47,7 @@
   <div id="top" class="hero">
     <div>
       <span class="badge badge--live">v1.0 stable</span>
-      <span class="badge">30 May 2026</span>
+      <span class="badge">3 Jun 2026</span>
       <span class="badge">LLVM 9</span>
       <h1>A compiler for PHP in PHP that compiles itself</h1>
       <p class="lead">
@@ -68,7 +68,7 @@
         <span class="badge badge--live">VM + JIT + AOT</span>
         <span class="badge badge--live">Closures · try/catch</span>
         <span class="badge badge--live">321 builtins</span>
-        <span class="badge badge--live">Spine 1253/1259</span>
+        <span class="badge badge--live">Spine 1257/1322</span>
         <span class="badge badge--live">M3 inventory emit</span>
         <span class="badge badge--wip">MCJIT execute</span>
       </div>
@@ -362,22 +362,21 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
       <div class="overall-progress">
         <div class="overall-progress__label">
           <span>Toward full self-host (M5)</span>
-          <span class="overall-progress__pct">~85%</span>
+          <span class="overall-progress__pct">~95%</span>
         </div>
-        <div class="progress-track" role="progressbar" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100" aria-label="Self-host progress approximately 85 percent">
-          <div class="progress-fill" data-width="85" style="width: 0"></div>
+        <div class="progress-track" role="progressbar" aria-valuenow="95" aria-valuemin="0" aria-valuemax="100" aria-label="Self-host progress approximately 95 percent">
+          <div class="progress-fill" data-width="95" style="width: 0"></div>
         </div>
         <p class="overall-progress__note">
-          <code>master</code> @ <a href="https://github.com/PurHur/php-compiler/commit/c33f10ef">c33f10ef</a> (30 May 2026, LLVM 9).
-          Verified on a clean clone: <code>make bootstrap-selfhost-link</code> → <code>compiler_minimal bundle OK</code>
-          (Docker + prelinked gen-0 driver).
-          Spine SSOT: <code>php script/bootstrap-spine-count.php</code> → <strong>822/973</strong> literal
-          <code>require_once</code> units toward full inventory (M2 in progress).
-          CI/harness targets report gen-2→gen-3 and inventory emit green when patches + LLVM are fully wired;
-          fresh trees may need <code>./script/docker-exec.sh</code> and <code>script/apply-patches.sh</code> before M4 presenters.
-          Next: production <code>bin/compile.php</code> inventory emit without thin TU
-          (<a href="https://github.com/PurHur/php-compiler/issues/3024">#3024</a>).
-          Presenter: <code>make north-star4-verify</code> (partial OK) · <code>make north-star5-verify</code>.
+          <code>master</code> @ <a href="https://github.com/PurHur/php-compiler/commit/cbc7e80c">cbc7e80c</a> (3 Jun 2026, LLVM 9).
+          M0: <code>make bootstrap-selfhost-link</code> → <code>compiler_minimal bundle OK</code> ✅ (Docker + prelinked gen-0).
+          Spine SSOT: <code>php script/bootstrap-spine-count.php</code> → <strong>1257/1322</strong> literal
+          <code>require_once</code> toward Phase A inventory (M2 in progress).
+          M4 gen-2→gen-3 <strong>full-spine recompile</strong> still 🚧 on many hosts — native <code>bin-compile-aot</code> when wired,
+          <code>emit_path=zend partial</code> Zend fallback when native compile is blocked.
+          Recent: union-type php-cfg overlays (<a href="https://github.com/PurHur/php-compiler/pull/5096">#5096</a>);
+          JIT try/catch/finally (<a href="https://github.com/PurHur/php-compiler/pull/4264">#4264</a>).
+          Next: production <code>bin/compile.php</code> inventory emit (<a href="https://github.com/PurHur/php-compiler/issues/3024">#3024</a>).
         </p>
       </div>
     </section>
@@ -395,13 +394,12 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
           <h4>M0–M1</h4>
           <p>Minimal + compiler-shaped bundles; compile-smoke AOT echo.</p>
         </li>
-        <li class="is-done">
-          <span class="ladder__marker" aria-hidden="true">✓</span>
+        <li class="is-wip">
+          <span class="ladder__marker" aria-hidden="true">2</span>
           <h4>M2</h4>
-          <p>Spine <strong>822/973</strong> literal <code>require_once</code> toward full inventory; native link smoke
-            for the bundled spine when LLVM + patches are green
-            (<a href="https://github.com/PurHur/php-compiler/issues/2868">#2868</a>,
-            <a href="https://github.com/PurHur/php-compiler/issues/2652">#2652</a>).</p>
+          <p>Spine <strong>1257/1322</strong> literal <code>require_once</code> toward Phase A inventory; native
+            <strong>link</strong> smoke ✅ when LLVM + patches are green; full-spine lint still 🚧
+            (<a href="https://github.com/PurHur/php-compiler/issues/2868">#2868</a>).</p>
         </li>
         <li class="is-wip">
           <span class="ladder__marker" aria-hidden="true">3</span>
@@ -411,12 +409,13 @@ make examples-web-smoke # phpc serve + HTTP curls</pre>
             production <code>bin/compile.php</code> inventory path 🚧
             (<a href="https://github.com/PurHur/php-compiler/issues/3024">#3024</a>).</p>
         </li>
-        <li class="is-done">
-          <span class="ladder__marker" aria-hidden="true">✓</span>
+        <li class="is-wip">
+          <span class="ladder__marker" aria-hidden="true">4</span>
           <h4>M4</h4>
-          <p>Gen-2→gen-3 recompile + full revision probe — green on maintained Docker CI;
-            <code>make north-star4-verify</code> exits 0 with documented partial blockers on some fresh clones
-            (<a href="https://github.com/PurHur/php-compiler/pull/3058">#3058</a>).</p>
+          <p>Gen-1 link + revision probe partial; <strong>gen-2→gen-3 full-spine recompile</strong> still 🚧 —
+            native inventory driver when ready, Zend fallback when blocked
+            (<a href="https://github.com/PurHur/php-compiler/pull/2697">#2697</a>,
+            <a href="https://github.com/PurHur/php-compiler/pull/3058">#3058</a>).</p>
         </li>
         <li class="is-wip">
           <span class="ladder__marker" aria-hidden="true">5</span>
@@ -476,7 +475,7 @@ make test</code></pre>
       <a href="capability-comparison.html">PHP compare</a> ·
       <a href="https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md">Getting started</a>
     </p>
-    <p class="footer-meta">Site: docs/pages/ · Updated 30 May 2026 · <code>master</code> @ c33f10ef · M0 smoke verified on clean clone</p>
+    <p class="footer-meta">Site: docs/pages/ · Updated 3 Jun 2026 · <code>master</code> @ cbc7e80c · Spine 1257/1322 · M0 smoke ✅</p>
   </footer>
 
   <script src="js/main.js" defer></script>
