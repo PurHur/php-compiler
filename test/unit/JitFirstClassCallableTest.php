@@ -61,7 +61,7 @@ PHP;
         self::assertStringNotContainsString('Variable function calls not yet supported', $stderr);
     }
 
-    public function testCompilerFoldsAssignChainToLiteralCallee(): void
+    public function testCompilerLowersFirstClassCallableToFromCallableOpcode(): void
     {
         $code = <<<'PHP'
 <?php
@@ -70,17 +70,13 @@ $fn('x');
 PHP;
         $rt = new PHPCompiler\Runtime();
         $block = $rt->parseAndCompile($code, 'fcc_fold.php');
-        $foundLiteral = false;
+        $foundFromCallable = false;
         foreach ($block->opCodes as $op) {
-            if (PHPCompiler\OpCode::TYPE_FUNCCALL_INIT !== $op->type) {
-                continue;
-            }
-            $nameOp = $block->getOperand($op->arg1);
-            if ($nameOp instanceof \PHPCfg\Operand\Literal && 'strlen' === $nameOp->value) {
-                $foundLiteral = true;
+            if (PHPCompiler\OpCode::TYPE_FROM_CALLABLE === $op->type) {
+                $foundFromCallable = true;
             }
         }
-        self::assertTrue($foundLiteral, 'expected FUNCCALL_INIT to fold to literal strlen');
+        self::assertTrue($foundFromCallable, 'expected TYPE_FROM_CALLABLE for strlen(...)');
     }
 
     private function skipUnlessLlvmReady(): void

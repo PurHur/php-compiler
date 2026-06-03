@@ -6226,7 +6226,7 @@ class Compiler {
     }
 
     /**
-     * Lower PHP 8.1 first-class callables to VM/JIT callable representations (#1230).
+     * Lower PHP 8.1 first-class callables to Closure objects via TYPE_FROM_CALLABLE (#1230, #4810).
      *
      * @return OpCode[]
      */
@@ -6235,21 +6235,27 @@ class Compiler {
         $result = $this->compileOperand($expr->result, $block, false);
         // Numeric kinds: avoid php-cfg class const fetch during self-host bundle JIT (#1056).
         if (3 === $expr->kind) {
+            $callableSlot = $this->compileOperand($expr->result, $block, false);
             $receiver = $this->compileOperand($expr->var, $block, true);
             $method = $this->compileOperand($expr->name, $block, true);
 
             return [
                 new OpCode(
                     OpCode::TYPE_INIT_ARRAY,
-                    $result,
+                    $callableSlot,
                     $receiver,
                     $this->compileIntegerLiteralSlot(0, $block)
                 ),
                 new OpCode(
                     OpCode::TYPE_ADD_ARRAY_ELEMENT,
-                    $result,
+                    $callableSlot,
                     $method,
                     $this->compileIntegerLiteralSlot(1, $block)
+                ),
+                new OpCode(
+                    OpCode::TYPE_FROM_CALLABLE,
+                    $result,
+                    $callableSlot
                 ),
             ];
         }
@@ -6263,8 +6269,7 @@ class Compiler {
         }
 
         return [new OpCode(
-            OpCode::TYPE_ASSIGN,
-            $result,
+            OpCode::TYPE_FROM_CALLABLE,
             $result,
             $callableSlot
         )];
@@ -6344,8 +6349,7 @@ class Compiler {
 
     protected function operandIsInvokableReceiver(Operand $operand, Block $block): bool
     {
-        // First-class callables are represented as string/array callables (not Closure objects) in the VM;
-        // don't lower `$x(...)` to `$x->__invoke(...)` when `$x` originates from `foo(...)` / `C::m(...)`.
+        // First-class callables are Closure objects; use FUNC_CALL dispatch, not `$x->__invoke(...)`.
         if (null !== $block->orig) {
             $root = $this->unwrapOperandChain($operand);
             foreach ($block->orig->children as $child) {

@@ -2159,6 +2159,17 @@ restart:
                         goto restart;
                     }
                     break;
+                case OpCode::TYPE_FROM_CALLABLE:
+                    if (isset($frame->scope[$op->arg2])) {
+                        $callable = $frame->scope[$op->arg2]->resolveIndirect();
+                    } elseif (isset($frame->block->constants[$op->arg2])) {
+                        $callable = $frame->block->constants[$op->arg2];
+                    } else {
+                        throw new \LogicException('TYPE_FROM_CALLABLE missing callable slot');
+                    }
+                    $entry = VM\ClosureSupport::fromCallable($this->context, $frame, $callable);
+                    $frame->scope[$op->arg1]->object($entry);
+                    break;
                 case OpCode::TYPE_CLOSURE:
                     if (null === $op->block1) {
                         $frame->scope[$op->arg1]->null();
