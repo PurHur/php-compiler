@@ -3149,6 +3149,7 @@ restart:
                     throw new \TypeError('Can only use yield from on Traversable|array');
                 case OpCode::TYPE_ITER_RESET:
                     $container = $frame->scope[$op->arg1]->resolveIndirect();
+                    unset($this->context->foreachInvalidSlots[$op->arg1]);
                     if ($this->variableIsGenerator($container)) {
                         unset($this->context->foreachObjectAdvance[$op->arg1]);
                         unset($this->context->objectPropertyIterators[$op->arg1]);
@@ -3187,8 +3188,18 @@ restart:
                             break;
                         }
                     }
-                    throw new \TypeError('foreach() argument must be of type array|object');
+                    $this->warnForeachNonTraversable($container, $frame);
+                    unset($this->context->foreachObjectAdvance[$op->arg1]);
+                    unset($this->context->objectPropertyIterators[$op->arg1]);
+                    unset($this->context->foreachIterators[$op->arg1]);
+                    unset($frame->iterators[$op->arg1]);
+                    $this->context->foreachInvalidSlots[$op->arg1] = true;
+                    break;
                 case OpCode::TYPE_ITER_VALID:
+                    if ($this->isForeachInvalidSlot((int) $op->arg2)) {
+                        $frame->scope[$op->arg1]->bool(false);
+                        break;
+                    }
                     $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
                     if ($this->isForeachObjectIteratorSlot((int) $op->arg2)) {
                         if ($this->context->foreachObjectAdvance[$op->arg2]) {
@@ -3222,6 +3233,9 @@ restart:
                     $frame->scope[$op->arg1]->bool($container->toArray()->iterValid());
                     break;
                 case OpCode::TYPE_ITER_KEY:
+                    if ($this->isForeachInvalidSlot((int) $op->arg2)) {
+                        break;
+                    }
                     $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
                     if ($this->isForeachObjectIteratorSlot((int) $op->arg2)) {
                         $key = $this->invokeForeachInstanceMethod($frame, $container, 'key');
@@ -3246,6 +3260,9 @@ restart:
                     $frame->scope[$op->arg1]->copyFrom($container->toArray()->iterCurrentKey());
                     break;
                 case OpCode::TYPE_ITER_VALUE:
+                    if ($this->isForeachInvalidSlot((int) $op->arg2)) {
+                        break;
+                    }
                     $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
                     if ($this->isForeachObjectIteratorSlot((int) $op->arg2)) {
                         if ((bool) $op->arg3) {
@@ -4980,6 +4997,27 @@ restart:
     private function isForeachObjectIteratorSlot(int $slot): bool
     {
         return array_key_exists($slot, $this->context->foreachObjectAdvance);
+    }
+
+    private function isForeachInvalidSlot(int $slot): bool
+    {
+        return isset($this->context->foreachInvalidSlots[$slot]);
+    }
+
+    /**
+     * Zend ZEND_FE_RESET_R invalid operand (zend_vm_def.h, #4879).
+     */
+    private function warnForeachNonTraversable(Variable $container, Frame $frame): void
+    {
+        $resolved = $container->resolveIndirect();
+        $this->context->errors->triggerError(
+            'foreach() argument must be of type array|object, '
+            .TypeCheck::typeNameForConstraint($resolved->type).' given',
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $this->context,
+            $frame
+        );
     }
 
     private function findGeneratorState(Frame $frame): ?GeneratorState
