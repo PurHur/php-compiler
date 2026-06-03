@@ -31,10 +31,8 @@ final class ksort_ extends Internal
             throw new \LogicException('ksort() requires exactly one argument');
         }
         $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('ksort() argument must be an array in this compiler build');
-        }
-        $array->array(VmArray::ksortCopy($array->toArray()));
+        $ht = VmArray::requireArray($frame->calledArgs[0], 'ksort');
+        $array->array(VmArray::ksortCopy($ht));
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }
@@ -45,6 +43,7 @@ final class ksort_ extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('ksort() requires exactly one argument');
         }
+        JitArrayKey::requireArrayArg($context, $args[0], 'ksort');
         ArrayBuiltinHelper::ksortByKey($context, $args[0]);
 
         return $context->getTypeFromString('int1')->constInt(1, false);

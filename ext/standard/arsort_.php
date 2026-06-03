@@ -31,10 +31,7 @@ final class arsort_ extends Internal
             throw new \LogicException('arsort() requires exactly one argument');
         }
         $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('arsort() argument must be an array in this compiler build');
-        }
-        $ht = $array->toArray();
+        $ht = VmArray::requireArray($frame->calledArgs[0], 'arsort');
         if ($ht->getNumElements() < 2) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(true);
@@ -95,6 +92,7 @@ final class arsort_ extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('arsort() requires exactly one argument');
         }
+        JitArrayKey::requireArrayArg($context, $args[0], 'arsort');
         ArrayBuiltinHelper::arsortByValue($context, $args[0]);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
