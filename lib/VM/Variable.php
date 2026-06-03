@@ -1333,6 +1333,12 @@ restart:
             case TYPE_PAIR_NULL_NULL:
                 $this->bool($this->_compareOp($opCode, null, null));
                 break;
+            case TYPE_PAIR_ARRAY_ARRAY:
+                $this->bool($this->_compareFromSpaceship(
+                    $opCode,
+                    $left->array->compareSpaceship($right->array)
+                ));
+                break;
             case TYPE_PAIR_OBJECT_OBJECT:
                 self::throwObjectNumericCompareError($left);
             default:
@@ -1374,6 +1380,23 @@ restart:
                 return $left <= $right;
             default:
                 throw new \LogicException("Non-implemented numeric comparison operation $opCode");
+        }
+    }
+
+    /** Zend compare_function relational ops from zend_compare_arrays spaceship result (#5295). */
+    private function _compareFromSpaceship(int $opCode, int $cmp): bool
+    {
+        switch ($opCode) {
+            case OpCode::TYPE_GREATER:
+                return $cmp > 0;
+            case OpCode::TYPE_SMALLER:
+                return $cmp < 0;
+            case OpCode::TYPE_GREATER_OR_EQUAL:
+                return $cmp >= 0;
+            case OpCode::TYPE_SMALLER_OR_EQUAL:
+                return $cmp <= 0;
+            default:
+                throw new \LogicException("Non-implemented array comparison operation $opCode");
         }
     }
 
