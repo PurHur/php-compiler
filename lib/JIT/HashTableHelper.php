@@ -2174,7 +2174,17 @@ final class HashTableHelper
                 self::spreadInto($context, $destVar, $entry['unpack']);
                 continue;
             }
-            $value = \is_array($entry) ? $entry['v'] : $entry;
+            if (\is_array($entry) && isset($entry['named'])) {
+                $nameVar = new Variable(
+                    $context,
+                    Variable::TYPE_STRING,
+                    Variable::KIND_VALUE,
+                    $context->constantFromString((string) $entry['named'])
+                );
+                self::addElement($context, $destVar, $entry['value'], $nameVar);
+                continue;
+            }
+            $value = \is_array($entry) ? ($entry['v'] ?? $entry['value'] ?? null) : $entry;
             self::addElement($context, $destVar, $value, null);
         }
 
