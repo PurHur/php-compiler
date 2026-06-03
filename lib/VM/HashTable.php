@@ -1305,6 +1305,9 @@ final class HashTable {
      */
     public function offsetIsSet(Variable $index): bool
     {
+        if (Variable::TYPE_INDIRECT === $index->type) {
+            $index = $index->resolveIndirect();
+        }
         $stored = null;
         switch ($index->type) {
             case Variable::TYPE_INTEGER:

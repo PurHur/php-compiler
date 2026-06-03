@@ -5491,7 +5491,8 @@ class JIT {
                         $container,
                         $dim,
                         $dimOp,
-                        $containerOp
+                        $containerOp,
+                        $op->issetOnProperty
                     );
                     $this->assignOperandValue($block->getOperand($op->arg1), $issetResult);
                     break;
