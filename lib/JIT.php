@@ -7093,8 +7093,30 @@ class JIT {
                     $result = $block->getOperand($op->arg1);
                     $obj = $block->getOperand($op->arg2);
                     $name = $block->getOperand($op->arg3);
-                    assert($obj->type->type === Type::TYPE_OBJECT);
                     $propName = $name instanceof Operand\Literal ? $name->value : null;
+                    $nonObjectLabel = Variable::propertyFetchNonObjectTypeLabel(
+                        Variable::getTypeFromType($obj->type)
+                    );
+                    if (null !== $nonObjectLabel && null !== $propName) {
+                        $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
+                        if ($forWrite) {
+                            JIT\Builtin\ErrorRaise::emitRaise(
+                                $this->context,
+                                sprintf('Attempt to assign property "%s" on %s', $propName, $nonObjectLabel)
+                            );
+                            $this->context->builder->returnVoid();
+                            $this->context->builder->clearInsertionPosition();
+                            break;
+                        }
+                        JIT\NonObjectPropertyFetchHelper::lowerNonObjectPropertyRead(
+                            $this->context,
+                            $result,
+                            $propName,
+                            $nonObjectLabel
+                        );
+                        break;
+                    }
+                    assert($obj->type->type === Type::TYPE_OBJECT);
                     $declaringClass = $this->resolvePropertyDeclaringClass($obj, $block, $propName);
                     $receiver = $this->loadPropertyFetchReceiver($obj);
                     $forceBranchMerge = $this->context->coalesceAssignTargets->contains($result);

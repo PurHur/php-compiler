@@ -282,6 +282,19 @@ final class TypeCheck
     }
 
     /**
+     * Property fetch on values that are not objects (zend_execute.c, #5276).
+     */
+    public static function isNonObjectPropertyFetchReceiver(Variable $value): bool
+    {
+        $resolved = $value->resolveIndirect();
+
+        return !\in_array($resolved->type, [
+            Variable::TYPE_OBJECT,
+            Variable::TYPE_ENUM_CASE,
+        ], true);
+    }
+
+    /**
      * Zend write/append [] on scalars — TypeError "Cannot use [] on …" (zend_operators.c, #4713).
      */
     public static function cannotUseBracketOn(Variable $value): ?string
