@@ -344,9 +344,13 @@ final class Variable {
         ));
     }
 
-    /** Zend zend_operators.c type name for operand TypeError messages (#3695). */
+    /** Zend zend_operators.c type name for operand TypeError messages (#3695, #4811). */
     private static function operandZendTypeName(Variable $var): string
     {
+        $enumName = self::operandEnumClassName($var);
+        if (null !== $enumName) {
+            return $enumName;
+        }
         switch ($var->type) {
             case self::TYPE_INTEGER:
                 return 'int';
@@ -361,11 +365,24 @@ final class Variable {
             case self::TYPE_ARRAY:
                 return 'array';
             case self::TYPE_OBJECT:
-            case self::TYPE_ENUM_CASE:
                 return 'object';
             default:
                 return 'mixed';
         }
+    }
+
+    /** Enum case operands use the enum type name in unsupported-op messages (zend_operators.c). */
+    private static function operandEnumClassName(Variable $var): ?string
+    {
+        $var = $var->resolveIndirect();
+        if (self::TYPE_ENUM_CASE === $var->type) {
+            return $var->enumCase->enumClass->name;
+        }
+        if (self::TYPE_OBJECT === $var->type && EnumCaseSupport::isEnumCase($var->object)) {
+            return $var->object->class->name;
+        }
+
+        return null;
     }
 
     private static function numericOpOperatorSymbol(int $opCode): string
@@ -413,8 +430,8 @@ final class Variable {
             || self::TYPE_STRING_OFFSET === $right->type
             || self::TYPE_UNDEFINED === $left->type
             || self::TYPE_UNDEFINED === $right->type
-            || self::TYPE_ENUM_CASE === $left->type
-            || self::TYPE_ENUM_CASE === $right->type) {
+            || self::isEnumCaseOperand($left)
+            || self::isEnumCaseOperand($right)) {
             return false;
         }
 
