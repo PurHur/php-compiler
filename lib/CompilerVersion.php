@@ -12,4 +12,10 @@ final class CompilerVersion
 
     /** SAPI name for CLI entrypoints (bin/vm.php, AOT binaries). */
     public const SAPI = 'cli';
+
+    /** PHP 8.3+ typed class constants in traits (Zend/zend_compile.c, issue #5212). */
+    public static function supportsTypedTraitConstants(): bool
+    {
+        return version_compare(self::VERSION, '8.3.0', '>=');
+    }
 }
