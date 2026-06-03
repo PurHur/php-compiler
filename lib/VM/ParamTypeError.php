@@ -34,4 +34,28 @@ final class ParamTypeError
 
         return new \TypeError($message);
     }
+
+    public static function forUserCallWithExpectedType(
+        string $function,
+        int $paramIndex,
+        string $paramName,
+        string $expectedType,
+        Variable $argument,
+        string $scriptPath,
+        int $callSiteLine
+    ): \TypeError {
+        $message = sprintf(
+            '%s(): Argument #%d ($%s) must be of type %s, %s given',
+            $function,
+            $paramIndex + 1,
+            $paramName,
+            $expectedType,
+            IterableCheck::valueTypeName($argument)
+        );
+        if ($callSiteLine > 0 && '' !== $scriptPath) {
+            $message .= sprintf(', called in %s on line %d', $scriptPath, $callSiteLine);
+        }
+
+        return new \TypeError($message);
+    }
 }

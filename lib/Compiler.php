@@ -2396,6 +2396,11 @@ class Compiler {
 
                 return;
             }
+            if ('iterable' === $declName) {
+                $block->paramIterableSlots[$slot] = true;
+
+                return;
+            }
             if ('mixed' !== $declName) {
                 $rawType = Type::fromDecl($declared->name);
                 $mapped = Variable::mapFromType($rawType);

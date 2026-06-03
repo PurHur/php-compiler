@@ -65,6 +65,9 @@ class Block {
     /** @var array<int, int> scope slot index => Variable::TYPE_* for typed parameters */
     public array $paramTypeConstraints = [];
 
+    /** Parameter scope slots declared `iterable` (array|Traversable union, #4829). */
+    public array $paramIterableSlots = [];
+
     /** @var array<int, 'true'|'false'> standalone bool literal parameter types (#4784) */
     public array $paramLiteralBoolTypes = [];
 
@@ -451,6 +454,7 @@ class Block {
             $this->returnDeclaredType = $parent->returnDeclaredType;
             $this->paramDeclaredTypes = $parent->paramDeclaredTypes;
             $this->paramTypeConstraints = $parent->paramTypeConstraints;
+            $this->paramIterableSlots = $parent->paramIterableSlots;
             $this->paramLiteralBoolTypes = $parent->paramLiteralBoolTypes;
             $this->returnLiteralBoolType = $parent->returnLiteralBoolType;
             $this->paramIntersectionConstraints = $parent->paramIntersectionConstraints;
