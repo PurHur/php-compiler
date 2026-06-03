@@ -118,7 +118,7 @@ final class ClassConstFetchHelper
             $isId = $context->builder->icmp(Builder::INT_EQ, $classIdVal, $expectedId);
             $context->builder->branchIf($isId, $matchBlock, $nextCheck);
             $context->builder->positionAtEnd($matchBlock);
-            if ($objectType->isTraitClass(strtolower(ltrim($objectType->classNameForId($id), '\\'))) {
+            if ($objectType->isTraitClass(strtolower(ltrim($objectType->classNameForId($id), '\\')))) {
                 $classLabel = $objectType->classNameForId($id);
                 ErrorRaise::ensureLinked($context);
                 ErrorRaise::emitRaise(
@@ -307,7 +307,7 @@ final class ClassConstFetchHelper
                 $context->builder->branchIf($isMatch, $matchBlock, $nextCheck);
 
                 $context->builder->positionAtEnd($matchBlock);
-                if ($objectType->isTraitClass(strtolower(ltrim($objectType->classNameForId($id), '\\'))) {
+                if ($objectType->isTraitClass(strtolower(ltrim($objectType->classNameForId($id), '\\')))) {
                     $classLabel = $objectType->classNameForId($id);
                     ErrorRaise::ensureLinked($context);
                     ErrorRaise::emitRaise(
