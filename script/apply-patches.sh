@@ -755,7 +755,8 @@ apply_php_cfg_enum_class_method_parser_fix() {
   apply_patch "$PATCH_DIR/php-cfg-enum-class-method.patch"
 }
 
-apply_php_cfg_enum_class_const_parser_fix() {
+apply_php_cfg_enum_class_const_overlay() {
+  local const_file="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php"
   local parser="${1:-$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php}"
   if patch_already_applied "$PATCH_DIR/php-cfg-enum-class-const.patch"; then
     return 0
@@ -764,7 +765,68 @@ apply_php_cfg_enum_class_const_parser_fix() {
     echo "Skip php-cfg-enum-class-const.patch (parseStmt_Enum missing)" >&2
     return 1
   fi
-  apply_patch "$PATCH_DIR/php-cfg-enum-class-const.patch"
+  python3 - "$const_file" "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+const_path = Path(sys.argv[1])
+parser_path = Path(sys.argv[2])
+const_text = const_path.read_text()
+if "isEnumCase" not in const_text:
+    old = "    public int $flags = 0;\n\n    public function __construct"
+    new = (
+        "    public int $flags = 0;\n\n"
+        "    /** True for `case Name = value` in enums; false for `const` in enum/class bodies (#5054). */\n"
+        "    public bool $isEnumCase = false;\n\n"
+        "    public function __construct"
+    )
+    if old not in const_text:
+        sys.stderr.write("php-cfg-enum-class-const: Const_.php anchor not found\n")
+        raise SystemExit(1)
+    const_path.write_text(const_text.replace(old, new, 1))
+
+text = parser_path.read_text()
+enum_loop_old = """            } elseif ($stmt instanceof Stmt\\ClassMethod) {
+                $this->parseStmt_ClassMethod($stmt);
+            }
+        }
+        $this->block = $savedBlock;"""
+enum_loop_new = """            } elseif ($stmt instanceof Stmt\\ClassMethod) {
+                $this->parseStmt_ClassMethod($stmt);
+            } elseif ($stmt instanceof Stmt\\ClassConst) {
+                $this->parseStmt_ClassConst($stmt);
+            }
+        }
+        $this->block = $savedBlock;"""
+if "Stmt\\ClassConst" not in text.split("function parseStmt_Enum", 1)[-1].split("function parseEnumCase", 1)[0]:
+    if enum_loop_old not in text:
+        sys.stderr.write("php-cfg-enum-class-const: parseStmt_Enum loop anchor not found\n")
+        raise SystemExit(1)
+    text = text.replace(enum_loop_old, enum_loop_new, 1)
+
+case_old = """        $this->block->children[] = new Op\\Terminal\\Const_(
+            $this->parseExprNode($node->name),
+            $value,
+            $valueBlock,
+            $this->mapAttributes($node)
+        );"""
+case_new = """        $constOp = new Op\\Terminal\\Const_(
+            $this->parseExprNode($node->name),
+            $value,
+            $valueBlock,
+            $this->mapAttributes($node)
+        );
+        $constOp->isEnumCase = true;
+        $this->block->children[] = $constOp;"""
+if case_old in text:
+    text = text.replace(case_old, case_new, 1)
+parser_path.write_text(text)
+PY
+  echo "Applied php-cfg-enum-class-const.patch (overlay)"
+}
+
+apply_php_cfg_enum_class_const_parser_fix() {
+  apply_php_cfg_enum_class_const_overlay
 }
 
 apply_php_cfg_enum_overlay() {
@@ -2485,6 +2547,10 @@ apply_patch() {
   fi
   if [[ "$(basename "$patch")" == "php-cfg-enum-abstract.patch" ]]; then
     apply_php_cfg_enum_abstract_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-enum-class-const.patch" ]]; then
+    apply_php_cfg_enum_class_const_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-cfg-intersection-type.patch" ]]; then
