@@ -1392,6 +1392,33 @@ restart:
                             $arg1->copyFrom($this->invokeArrayAccessOffsetGet($object, $arg3));
                         }
                     } else {
+                        $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+                        if (!$forWrite && TypeCheck::isScalarNonContainerDimRead($container)) {
+                            $resolved = $container->resolveIndirect();
+                            $this->context->errors->arrayOffsetOnNonContainer(
+                                TypeCheck::typeNameForConstraint($resolved->type),
+                                $this->context,
+                                $frame,
+                                $scriptFile
+                            );
+                            $arg1->null();
+                            break;
+                        }
+                        if (
+                            Variable::TYPE_OBJECT === $container->type
+                            && !$this->objectImplementsArrayAccess($container->toObject())
+                        ) {
+                            $className = $container->toObject()->class->name;
+                            $catchFrame = $this->dispatchVmError(
+                                'Cannot use object of type ' . $className . ' as array',
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
                         $bracketMsg = TypeCheck::cannotUseBracketOn($container);
                         if (null !== $bracketMsg) {
                             $catchFrame = $this->dispatchVmTypeError(new \TypeError($bracketMsg), $frame);
