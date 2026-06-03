@@ -17,12 +17,27 @@ final class ScriptExit
     public static function emit(Context $context, Variable $arg): void
     {
         switch ($arg->type) {
+            case Variable::TYPE_NULL:
+                self::callLibcExit($context, $context->getTypeFromString('int64')->constInt(0, false));
+                break;
             case Variable::TYPE_STRING:
                 self::echoString($context, $context->helper->loadValue($arg));
                 self::callLibcExit($context, $context->getTypeFromString('int64')->constInt(0, false));
                 break;
             case Variable::TYPE_NATIVE_LONG:
                 self::callLibcExit($context, $context->helper->loadValue($arg));
+                break;
+            case Variable::TYPE_NATIVE_DOUBLE:
+                $doubleVal = $context->helper->loadValue($arg);
+                $context->builder->call(
+                    $context->lookupFunction('__phpc_ob_echo_double'),
+                    $doubleVal
+                );
+                self::callLibcExit($context, $context->getTypeFromString('int64')->constInt(0, false));
+                break;
+            case Variable::TYPE_NATIVE_BOOL:
+                self::emitNativeBool($context, $context->helper->loadValue($arg));
+                self::callLibcExit($context, $context->getTypeFromString('int64')->constInt(0, false));
                 break;
             case Variable::TYPE_VALUE:
                 self::emitBoxed($context, $context->helper->loadValue($arg));
@@ -42,21 +57,30 @@ final class ScriptExit
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
 
+        $nullBlock = BasicBlockHelper::append($context, 'exit_boxed_null');
         $stringBlock = BasicBlockHelper::append($context, 'exit_boxed_string');
         $longBlock = BasicBlockHelper::append($context, 'exit_boxed_long');
+        $boolBlock = BasicBlockHelper::append($context, 'exit_boxed_bool');
+        $doubleBlock = BasicBlockHelper::append($context, 'exit_boxed_double');
         $badBlock = BasicBlockHelper::append($context, 'exit_boxed_bad');
 
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $afterNull = BasicBlockHelper::append($context, 'exit_boxed_after_null');
+        $context->builder->branchIf($isNull, $nullBlock, $afterNull);
+
+        $context->builder->positionAtEnd($nullBlock);
+        self::callLibcExit($context, $i64->constInt(0, false));
+
+        $context->builder->positionAtEnd($afterNull);
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
             $i8->constInt(Variable::TYPE_STRING, false)
         );
-        $isLong = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
-        );
-
         $afterStringProbe = BasicBlockHelper::append($context, 'exit_boxed_after_string');
         $context->builder->branchIf($isString, $stringBlock, $afterStringProbe);
 
@@ -66,10 +90,16 @@ final class ScriptExit
             $boxedPtr
         );
         self::echoString($context, $strPtr);
-        self::callLibcExit($context, $context->getTypeFromString('int64')->constInt(0, false));
+        self::callLibcExit($context, $i64->constInt(0, false));
 
         $context->builder->positionAtEnd($afterStringProbe);
-        $context->builder->branchIf($isLong, $longBlock, $badBlock);
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $afterLong = BasicBlockHelper::append($context, 'exit_boxed_after_long');
+        $context->builder->branchIf($isLong, $longBlock, $afterLong);
 
         $context->builder->positionAtEnd($longBlock);
         $longVal = $context->builder->call(
@@ -78,11 +108,69 @@ final class ScriptExit
         );
         self::callLibcExit($context, $longVal);
 
+        $context->builder->positionAtEnd($afterLong);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $afterBool = BasicBlockHelper::append($context, 'exit_boxed_after_bool');
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $boolVal = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $boxedPtr
+        );
+        self::emitNativeBool($context, $boolVal);
+        self::callLibcExit($context, $i64->constInt(0, false));
+
+        $context->builder->positionAtEnd($afterBool);
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $context->builder->branchIf($isDouble, $doubleBlock, $badBlock);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $doubleVal = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            $boxedPtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__phpc_ob_echo_double'),
+            $doubleVal
+        );
+        self::callLibcExit($context, $i64->constInt(0, false));
+
         $context->builder->positionAtEnd($badBlock);
         $context->builder->call(
             $context->lookupFunction('exit'),
             $i32->constInt(1, false)
         );
+    }
+
+    private static function emitNativeBool(Context $context, Value $boolVal): void
+    {
+        $isTrue = $context->builder->icmp(
+            Builder::INT_NE,
+            $boolVal,
+            $boolVal->typeOf()->constInt(0, false)
+        );
+        $trueBlock = BasicBlockHelper::append($context, 'exit_native_bool_true');
+        $doneBlock = BasicBlockHelper::append($context, 'exit_native_bool_done');
+        $context->builder->branchIf($isTrue, $trueBlock, $doneBlock);
+
+        $context->builder->positionAtEnd($trueBlock);
+        $charPtr = $context->getTypeFromString('char*');
+        $context->builder->call(
+            $context->lookupFunction('__phpc_ob_echo_cstr'),
+            $context->builder->pointerCast($context->constantFromString('1'), $charPtr)
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
     }
 
     private static function echoString(Context $context, Value $strPtr): void

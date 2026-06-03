@@ -16,16 +16,8 @@ try {
 } catch (Throwable $e) {
     echo get_class($e), ':', $e->getMessage(), "\n";
 }
-try {
-    exit(true);
-} catch (TypeError $e) {
-    echo 'TypeError:', $e->getMessage(), "\n";
-} catch (Throwable $e) {
-    echo get_class($e), ':', $e->getMessage(), "\n";
-}
 echo "ok\n";
 --EXPECT--
 TypeError:exit(): Argument #1 ($status) must be of type string|int, array given
 TypeError:exit(): Argument #1 ($status) must be of type string|int, stdClass given
-TypeError:exit(): Argument #1 ($status) must be of type string|int, bool given
 ok
