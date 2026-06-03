@@ -6073,7 +6073,7 @@ class JIT {
                     $returnBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($returnBlock);
                     $this->markJitThisConstructedIfLeavingConstruct($block);
-                    if ($this->context->inlineIncludeDepth > 0) {
+                        if ($this->context->inlineIncludeDepth > 0) {
                         if ([] !== $this->context->inlineIncludeReturnOperands) {
                             $holderOp = $this->context->inlineIncludeReturnOperands[
                                 array_key_last($this->context->inlineIncludeReturnOperands)
@@ -6351,6 +6351,7 @@ class JIT {
                     }
                     $prevStrict = $this->context->callerStrictTypes;
                     $this->context->callerStrictTypes = $block->strictTypes;
+                    $this->emitJitLateStaticCallSiteBinding($callArgs);
                     $this->context->scope->toCall->call($this->context, ...$callArgs);
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
                     $this->context->callerStrictTypes = $prevStrict;
@@ -6453,6 +6454,7 @@ class JIT {
                     }
                     $prevStrict = $this->context->callerStrictTypes;
                     $this->context->callerStrictTypes = $block->strictTypes;
+                    $this->emitJitLateStaticCallSiteBinding($callArgs);
                     $result = $this->context->scope->toCall->call($this->context, ...$callArgs);
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
                     $this->context->callerStrictTypes = $prevStrict;
@@ -6645,38 +6647,66 @@ class JIT {
                         $this->context->scope->toCall = null;
                         $this->context->scope->args = [];
                     } else {
-                        $classId = $this->context->type->object->resolveClassId($classOp);
-                        $resolvedName = $this->context->type->object->classNameForId($classId);
-                        if (!$this->context->type->object->hasUserDeclaredClass($resolvedName)) {
-                            \PHPCompiler\ext\standard\JitSplAutoload::dispatchLiteral(
-                                $this->context,
-                                $resolvedName
+                        if (JIT\LateStaticBindingHelper::operandNeedsRuntimeClassResolution(
+                            $classOp,
+                            $this->context
+                        )) {
+                            $classVar = $this->context->getVariableFromOp($classOp);
+                            $classIdVal = JIT\ClassConstFetchHelper::emitResolveClassId(
+                                $this->context->type->object,
+                                $block,
+                                $classVar,
+                                $classOp
                             );
-                        }
-                        $obj = new Variable(
-                            $this->context,
-                            Variable::TYPE_OBJECT,
-                            Variable::KIND_VALUE,
-                            $this->context->type->object->allocate($classId)
-                        );
-                        $resultOp = $block->getOperand($op->arg1);
-                        $this->assignOperand($resultOp, $obj, true);
-                        $resultOp->type = new Type(Type::TYPE_OBJECT, [], $resolvedName);
-                        if ($classOp instanceof Operand\Literal
-                            && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'ReflectionClass')
-                        ) {
-                            $this->context->scope->toCall = $this->context->resolveFunctionProxy('reflectionclass::__construct');
-                            $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
-                        } elseif ($this->context->type->object->hasConstructor($classId)) {
-                            $proxyName = strtolower($resolvedName).'::'.'__construct';
-                            $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
-                            $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
-                        } else {
+                            $objVal = $this->context->type->object->allocateForRuntimeClassId($classIdVal);
+                            $obj = new Variable(
+                                $this->context,
+                                Variable::TYPE_OBJECT,
+                                Variable::KIND_VALUE,
+                                $objVal
+                            );
+                            $resultOp = $block->getOperand($op->arg1);
+                            $this->assignOperand($resultOp, $obj, true);
+                            $resultOp->type = new Type(Type::TYPE_OBJECT);
                             $this->context->type->object->markObjectConstructed(
                                 $this->context->helper->loadValue($obj)
                             );
                             $this->context->scope->toCall = null;
                             $this->context->scope->args = [];
+                        } else {
+                            $classId = $this->context->type->object->resolveClassId($classOp);
+                            $resolvedName = $this->context->type->object->classNameForId($classId);
+                            if (!$this->context->type->object->hasUserDeclaredClass($resolvedName)) {
+                                \PHPCompiler\ext\standard\JitSplAutoload::dispatchLiteral(
+                                    $this->context,
+                                    $resolvedName
+                                );
+                            }
+                            $obj = new Variable(
+                                $this->context,
+                                Variable::TYPE_OBJECT,
+                                Variable::KIND_VALUE,
+                                $this->context->type->object->allocate($classId)
+                            );
+                            $resultOp = $block->getOperand($op->arg1);
+                            $this->assignOperand($resultOp, $obj, true);
+                            $resultOp->type = new Type(Type::TYPE_OBJECT, [], $resolvedName);
+                            if ($classOp instanceof Operand\Literal
+                                && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'ReflectionClass')
+                            ) {
+                                $this->context->scope->toCall = $this->context->resolveFunctionProxy('reflectionclass::__construct');
+                                $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
+                            } elseif ($this->context->type->object->hasConstructor($classId)) {
+                                $proxyName = strtolower($resolvedName).'::'.'__construct';
+                                $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+                                $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
+                            } else {
+                                $this->context->type->object->markObjectConstructed(
+                                    $this->context->helper->loadValue($obj)
+                                );
+                                $this->context->scope->toCall = null;
+                                $this->context->scope->args = [];
+                            }
                         }
                     }
                     break;
@@ -9885,6 +9915,12 @@ class JIT {
             $className,
             $methodName
         );
+        if (
+            null !== $receiverUserType
+            && 'object' !== strtolower(ltrim((string) $receiverUserType, '\\'))
+        ) {
+            $this->context->scope->lateStaticCallClassId = $this->context->type->object->lookup($receiverUserType);
+        }
         $this->context->scope->toCall = $staticProxy;
         $this->context->scope->args = [$receiverVar];
     }
@@ -9945,23 +9981,32 @@ class JIT {
     private function resolveJitStaticMethodProxyName(string $classLc, string $methodLc): string
     {
         $methodLc = strtolower($methodLc);
-        $classLc = strtolower(ltrim($classLc, '\\'));
-        $proxy = $classLc.'::'.$methodLc;
-        if ($this->context->functionIsRegistered($proxy)) {
-            return $proxy;
-        }
-        if ($this->context->type->object->hasDeclaredClass($classLc)) {
-            $classId = $this->context->type->object->lookup($classLc);
-            $traitLc = $this->context->type->object->traitMethodSource($classId, $methodLc);
-            if (null !== $traitLc) {
-                $traitProxy = $traitLc.'::'.$methodLc;
-                if ($this->context->functionIsRegistered($traitProxy)) {
-                    return $traitProxy;
+        $visited = [];
+        $current = strtolower(ltrim($classLc, '\\'));
+        while (!isset($visited[$current])) {
+            $visited[$current] = true;
+            $proxy = $current.'::'.$methodLc;
+            if ($this->context->functionIsRegistered($proxy)) {
+                return $proxy;
+            }
+            if ($this->context->type->object->hasDeclaredClass($current)) {
+                $classId = $this->context->type->object->lookup($current);
+                $traitLc = $this->context->type->object->traitMethodSource($classId, $methodLc);
+                if (null !== $traitLc) {
+                    $traitProxy = $traitLc.'::'.$methodLc;
+                    if ($this->context->functionIsRegistered($traitProxy)) {
+                        return $traitProxy;
+                    }
                 }
             }
+            $parentLc = $this->context->type->object->parentClassLc($current);
+            if (null === $parentLc) {
+                break;
+            }
+            $current = $parentLc;
         }
 
-        return $classLc.'::'.$methodLc;
+        return strtolower(ltrim($classLc, '\\')).'::'.$methodLc;
     }
 
     private function initJitStaticCall(Block $block, int $classOpIdx, int $nameOpIdx): void
@@ -10048,8 +10093,49 @@ class JIT {
             }
             throw new \LogicException("Call to undefined static method {$className}::{$nameOp->value}()");
         }
+        $this->context->scope->lateStaticCallClassId = $declaringClassId;
         $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
         $this->context->scope->args = [];
+    }
+
+    /**
+     * @param list<Variable> $callArgs
+     */
+    private function emitJitLateStaticCallSiteBinding(array $callArgs): void
+    {
+        if (!JIT\LateStaticBindingHelper::useRuntimeLateStatic($this->context)) {
+            return;
+        }
+        $toCall = $this->context->scope->toCall;
+        if (
+            $toCall instanceof CoreFunc\Internal
+            || $toCall instanceof JIT\Call\Native
+            || $toCall instanceof JIT\Call\ExternalMethod
+            || $toCall instanceof JIT\Call\RuntimeIndirectInstanceMethodCall
+        ) {
+            return;
+        }
+        if (null !== $this->context->scope->lateStaticCallClassId) {
+            JIT\LateStaticBindingHelper::emitStoreClassId(
+                $this->context,
+                $this->context->constantFromInteger($this->context->scope->lateStaticCallClassId, 'int64')
+            );
+            $this->context->scope->lateStaticCallClassId = null;
+
+            return;
+        }
+        if ([] === $callArgs) {
+            return;
+        }
+        $receiver = $callArgs[0];
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            return;
+        }
+        $objMap = $this->context->structFieldMap['__object__'];
+        $classId = $this->context->builder->load(
+            $this->context->builder->structGep($receiver->value, $objMap['class_id'])
+        );
+        JIT\LateStaticBindingHelper::emitStoreClassId($this->context, $classId);
     }
 
     /**

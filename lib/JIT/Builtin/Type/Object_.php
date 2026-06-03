@@ -526,6 +526,103 @@ class Object_ extends Type {
     }
 
     /**
+     * `new static()` / runtime class operand — dispatch allocate by class_id (#4792).
+     */
+    public function allocateForRuntimeClassId(PHPLLVM\Value $classIdVal): PHPLLVM\Value
+    {
+        $fn = \PHPCompiler\JIT\BasicBlockHelper::parentFunction($this->context);
+        $entry = $this->context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock('new_runtime_class_done');
+        $fail = $fn->appendBasicBlock('new_runtime_class_fail');
+        $resultSlot = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca(
+            $this->context,
+            $this->context->getTypeFromString('__object__*')
+        );
+        $nullObj = $this->context->getTypeFromString('__object__*')->constNull();
+        $this->context->builder->store($nullObj, $resultSlot);
+        $checkBlock = $entry;
+        $hasCase = false;
+        foreach (array_keys($this->allClassNamesById()) as $id) {
+            $hasCase = true;
+            $caseBlock = $fn->appendBasicBlock('new_runtime_class_case_'.$id);
+            $nextCheck = $fn->appendBasicBlock('new_runtime_class_try_'.$id);
+            $this->context->builder->positionAtEnd($checkBlock);
+            $expected = $this->context->constantFromInteger($id, 'int64');
+            $isId = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $classIdVal, $expected);
+            $this->context->builder->branchIf($isId, $caseBlock, $nextCheck);
+            $this->context->builder->positionAtEnd($caseBlock);
+            $obj = $this->allocate($id);
+            $this->context->builder->store($obj, $resultSlot);
+            $this->context->builder->branch($done);
+            $checkBlock = $nextCheck;
+        }
+        if (!$hasCase) {
+            $this->context->builder->branch($fail);
+        } else {
+            $this->context->builder->positionAtEnd($checkBlock);
+            $this->context->builder->branch($fail);
+        }
+        $this->context->builder->positionAtEnd($fail);
+        \PHPCompiler\JIT\Builtin\ErrorRaise::ensureLinked($this->context);
+        \PHPCompiler\JIT\Builtin\ErrorRaise::emitRaise($this->context, 'Class not found');
+        $this->context->builder->call($this->context->lookupFunction('abort'));
+        $this->context->builder->positionAtEnd($done);
+
+        return $this->context->builder->load($resultSlot);
+    }
+
+    /**
+     * `: static` return — return object's class_id must be called class or a subclass (#4792).
+     */
+    public function emitClassIdMatchesLateStaticReturn(
+        PHPLLVM\Value $actualClassId,
+        PHPLLVM\Value $expectedClassId
+    ): PHPLLVM\Value {
+        $i1 = $this->context->getTypeFromString('int1');
+        $acc = $i1->constInt(0, false);
+        foreach ($this->allClassNamesById() as $actualId => $_) {
+            foreach ($this->allClassNamesById() as $expectedId => $_) {
+                if (!$this->compileTimeClassIsSubclassOrEqual($actualId, $expectedId)) {
+                    continue;
+                }
+                $isExpected = $this->context->builder->icmp(
+                    PHPLLVM\Builder::INT_EQ,
+                    $expectedClassId,
+                    $this->context->constantFromInteger($expectedId, 'int64')
+                );
+                $isActual = $this->context->builder->icmp(
+                    PHPLLVM\Builder::INT_EQ,
+                    $actualClassId,
+                    $this->context->constantFromInteger($actualId, 'int64')
+                );
+                $acc = $this->context->builder->or($acc, $this->context->builder->and($isExpected, $isActual));
+            }
+        }
+
+        return $acc;
+    }
+
+    public function compileTimeClassIsSubclassOrEqual(int $childId, int $ancestorId): bool
+    {
+        if ($childId === $ancestorId) {
+            return true;
+        }
+        $childLc = strtolower(ltrim($this->classNameForId($childId), '\\'));
+        $ancestorLc = strtolower(ltrim($this->classNameForId($ancestorId), '\\'));
+        $current = $childLc;
+        while (true) {
+            $parent = $this->parentClassLc($current);
+            if (null === $parent) {
+                return false;
+            }
+            if ($parent === $ancestorLc) {
+                return true;
+            }
+            $current = $parent;
+        }
+    }
+
+    /**
      * Object shell for M3 emit-helper TU — slots + defaults/ht, no vendor ctor (#2540, #2550).
      */
     public function allocateEmitTuShell(int $classId): PHPLLVM\Value

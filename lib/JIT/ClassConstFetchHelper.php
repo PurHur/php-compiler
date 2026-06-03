@@ -199,6 +199,28 @@ final class ClassConstFetchHelper
         }
         $literal = JitStringArg::compileTimeLiteral($classVar);
         if (null !== $literal) {
+            $lcLiteral = strtolower(ltrim($literal, '\\'));
+            if (
+                LateStaticBindingHelper::useRuntimeLateStatic($objectType->jitContext())
+                && \in_array($lcLiteral, ['self', 'static', 'parent'], true)
+            ) {
+                $context = $objectType->jitContext();
+                $nameStr = $context->builder->load(
+                    $context->constantStringFromString($literal)
+                );
+                if ('static' === $lcLiteral) {
+                    $scopeClass = self::jitScopeClassName($objectType, $block) ?? '';
+                    $resolvedStr = LateStaticBindingHelper::emitLateStaticResolvedNameString(
+                        $objectType,
+                        $block,
+                        $scopeClass
+                    );
+                } else {
+                    $resolvedStr = self::emitScopeResolveClassNameString($objectType, $block, $nameStr);
+                }
+
+                return self::emitResolveClassIdFromNameString($objectType, $resolvedStr);
+            }
             $resolved = self::resolveJitClassNameString($objectType, $block, $literal);
             $id = $objectType->lookup($resolved);
 
@@ -309,6 +331,19 @@ final class ClassConstFetchHelper
         $lit->type = \PHPTypes\Type::string();
 
         return Variable::fromLiteral($context, $lit);
+    }
+
+    public static function resolveJitScopeClassNameForBlock(Object_ $objectType, Block $block): ?string
+    {
+        return self::jitScopeClassName($objectType, $block);
+    }
+
+    /**
+     * @return Value {@see __string__*}
+     */
+    public static function emitClassNameStringFromClassId(Object_ $objectType, Value $classId): Value
+    {
+        return self::classNameStringFromId($objectType, $classId);
     }
 
     private static function resolveJitClassNameString(Object_ $objectType, Block $block, string $className): string
@@ -459,7 +494,7 @@ final class ClassConstFetchHelper
 
         $context->builder->positionAtEnd($fail);
         ErrorRaise::emitRaise($context, 'Class not found');
-        $context->builder->returnVoid();
+        $context->builder->call($context->lookupFunction('abort'));
 
         $context->builder->positionAtEnd($ok);
         $context->builder->branch($merge);
