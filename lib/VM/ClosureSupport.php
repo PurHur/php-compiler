@@ -152,12 +152,17 @@ final class ClosureSupport
         $methodLc = strtolower($methodName);
         [$class, $methodLc] = self::resolveStaticMethod($ctx, $lcClass, $methodLc);
         $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        $callerClassLc = self::callerClassLc($frame);
+        $callerDisplay = self::classDisplayName($ctx, $callerClassLc);
         MethodVisibility::assertCallable(
             $vis,
-            self::callerClassLc($frame),
-            $lcClass,
+            $callerClassLc,
+            strtolower($class->name),
             $class->name,
-            $methodName
+            $class->methodNames[$methodLc] ?? $methodName,
+            false,
+            fn (string $classLc, string $ancestorLc): bool => self::isClassSameOrSubclassOf($ctx, $classLc, $ancestorLc),
+            $callerDisplay
         );
 
         return ClosureState::fromWrappedFunc($class->methods[$methodLc]);
@@ -202,22 +207,23 @@ final class ClosureSupport
         $object = $receiver->toObject();
         $methodLc = strtolower($methodName);
         $class = $object->class;
-        if (!isset($class->methods[$methodLc])) {
-            throw new \LogicException(
-                "Closure::fromCallable(): Method {$class->name}::{$methodName}() not found"
-            );
-        }
-        $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        [$declaringClass, $methodLc] = self::resolveStaticMethod($ctx, strtolower($class->name), $methodLc);
+        $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        $callerClassLc = self::callerClassLc($frame);
+        $callerDisplay = self::classDisplayName($ctx, $callerClassLc);
         MethodVisibility::assertCallable(
             $vis,
-            self::callerClassLc($frame),
-            strtolower($class->name),
-            $class->name,
-            $methodName
+            $callerClassLc,
+            strtolower($declaringClass->name),
+            $declaringClass->name,
+            $declaringClass->methodNames[$methodLc] ?? $methodName,
+            false,
+            fn (string $classLc, string $ancestorLc): bool => self::isClassSameOrSubclassOf($ctx, $classLc, $ancestorLc),
+            $callerDisplay
         );
         $boundThis = new Variable();
         $boundThis->copyFrom($receiver);
-        $state = ClosureState::fromMethodCallable($class->methods[$methodLc], $boundThis, $methodName);
+        $state = ClosureState::fromMethodCallable($declaringClass->methods[$methodLc], $boundThis, $methodName);
         $state->boundScopeClass = $class->name;
 
         return $state;
@@ -341,5 +347,32 @@ final class ClosureSupport
         }
 
         throw new \LogicException("Call to undefined static method {$lcClass}::{$methodLc}()");
+    }
+
+    private static function classDisplayName(Context $ctx, ?string $classLc): ?string
+    {
+        if (null === $classLc || !isset($ctx->classes[$classLc])) {
+            return null;
+        }
+
+        return $ctx->classes[$classLc]->name;
+    }
+
+    private static function isClassSameOrSubclassOf(Context $ctx, string $classLc, string $ancestorLc): bool
+    {
+        $current = $classLc;
+        while (true) {
+            if ($current === $ancestorLc) {
+                return true;
+            }
+            if (!isset($ctx->classes[$current])) {
+                return false;
+            }
+            $parentLc = $ctx->classes[$current]->parentLc;
+            if (null === $parentLc) {
+                return false;
+            }
+            $current = $parentLc;
+        }
     }
 }
