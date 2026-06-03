@@ -15,7 +15,7 @@ use PHPLLVM\Value;
 /**
  * gethostbynamel() — IPv4 address list for hostname (ext/standard/dns.c parity, #3707).
  *
- * VM: native getaddrinfo via VmDns (libc FFI, #4928). JIT/AOT: __compiler_gethostbynamel.
+ * VM: VmDns (libc FFI, #4928). JIT/AOT: GethostbynamelRuntime LLVM (mirrors VmDns getaddrinfo path, #5299).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/dns.c PHP_FUNCTION(gethostbynamel)
  */

@@ -5,20 +5,20 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\StringGethostbynamel;
+use PHPCompiler\JIT\Builtin\GethostbynamelRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for gethostbynamel() via __compiler_gethostbynamel (JIT/AOT, issue #3707). */
+/** LLVM lowering for gethostbynamel() via GethostbynamelRuntime (JIT/AOT, #3707, #5299). */
 final class JitGethostbynamel
 {
     private static int $blockSerial = 0;
 
     public static function invoke(Context $context, Value $hostname): Value
     {
-        StringGethostbynamel::ensureLinked($context);
+        GethostbynamelRuntime::ensureLinked($context);
 
         $list = $context->builder->call(
             $context->lookupFunction('__compiler_gethostbynamel'),

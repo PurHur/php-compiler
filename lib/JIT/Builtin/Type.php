@@ -189,6 +189,7 @@ class Type extends Builtin {
         SessionName::implement($this->context);
         ObOutput::registerExternals($this->context);
         PowIntRuntime::ensureLinked($this->context);
+        GethostbynamelRuntime::ensureLinked($this->context);
         ErrorHandlerOutput::registerExternals($this->context);
         StreamContextOutput::registerExternals($this->context);
         CallArgv::implement($this->context);
@@ -1008,12 +1009,6 @@ class Type extends Builtin {
         $fntypeGethostname = $this->context->context->functionType($strPtr, false);
         $fnGethostname = $this->context->module->addFunction('__compiler_gethostname', $fntypeGethostname);
         $this->context->registerFunction('__compiler_gethostname', $fnGethostname);
-        $fntypeGethostbynamel = $this->context->context->functionType($htPtr, false, $strPtr);
-        $fnGethostbynamel = $this->context->module->addFunction(
-            '__compiler_gethostbynamel',
-            $fntypeGethostbynamel
-        );
-        $this->context->registerFunction('__compiler_gethostbynamel', $fnGethostbynamel);
         $i64 = $this->context->getTypeFromString('int64');
         $fntypeGetprotobynumber = $this->context->context->functionType($strPtr, false, $i64);
         $fnGetprotobynumber = $this->context->module->addFunction(
