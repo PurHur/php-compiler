@@ -1881,21 +1881,36 @@ restart:
                     $frame->scope[$op->arg1]->copyFrom($value);
                     break;
                 case OpCode::TYPE_STATICCALL_INIT:
+                    $instanceScopeCall = false;
+                    $scopeClassName = null;
+                    $staticCallMethodName = '';
                     try {
                         $classOperand = $frame->scope[$op->arg1]->resolveIndirect();
-                        $methodName = $frame->scope[$op->arg2]->toString();
+                        $staticCallMethodName = $frame->scope[$op->arg2]->toString();
                         $parentKeywordScope = false;
                         if (Variable::TYPE_OBJECT === $classOperand->type) {
-                            $classEntry = $classOperand->toObject()->class;
-                            $callableName = $classEntry->name.'::'.$methodName;
+                            $instanceScopeCall = true;
+                            $scopeClassName = $classOperand->toObject()->class->name;
+                            $callableName = $scopeClassName.'::'.$staticCallMethodName;
                         } else {
                             $className = $classOperand->toString();
                             $parentKeywordScope = 'parent' === strtolower($className);
                             $lcClass = $this->resolveClassScopeName($className, $frame);
-                            $callableName = $this->context->classes[$lcClass]->name.'::'.$methodName;
+                            $callableName = $this->context->classes[$lcClass]->name.'::'.$staticCallMethodName;
                         }
                         $this->initStaticCallable($frame, $callableName, $parentKeywordScope);
                     } catch (\LogicException $e) {
+                        if ($instanceScopeCall && str_starts_with($e->getMessage(), 'Call to undefined static method ')) {
+                            $catchFrame = $this->dispatchVmError(
+                                "Call to undefined method {$scopeClassName}::{$staticCallMethodName}()",
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            return self::EXCEPTION;
+                        }
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
