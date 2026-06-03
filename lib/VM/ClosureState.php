@@ -157,6 +157,8 @@ final class ClosureState
         $entry->methodVisibility['bind'] = $pub;
         $entry->methods['bindto'] = new Builtin\ClosureBindTo();
         $entry->methodVisibility['bindto'] = $pub;
+        $entry->methods['call'] = new Builtin\ClosureCall();
+        $entry->methodVisibility['call'] = $pub;
         $ctx->classes['closure'] = $entry;
     }
 
