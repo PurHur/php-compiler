@@ -240,6 +240,8 @@ function opcode_type_name(int $type): string
             return 'TYPE_LIST_SPREAD_ASSIGN';
         case 125:
             return 'TYPE_FROM_CALLABLE';
+        case 126:
+            return 'TYPE_EMPTY_OBJECT_PROPERTY';
         default:
             return 'unknown opcode';
     }

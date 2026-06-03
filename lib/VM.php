@@ -389,8 +389,46 @@ class VM {
     }
 
     /**
-     * unset($obj->prop) — Zend zend_std_unset_property / __unset parity (#3298).
+     * empty($obj->prop) — typed declared slots use read semantics (throw when uninitialized);
+     * dynamic / __isset-only properties keep isset semantics (#4912, #3298, zend_object_handlers.c).
      */
+    public function emptyObjectProperty(ObjectEntry $object, string $propName, Frame $frame, Variable $dst): ?Frame
+    {
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null === $meta || !$meta->prototype->isUndefined()) {
+            $dst->bool(!$this->objectPropertyIsSet($object, $propName, $frame));
+
+            return null;
+        }
+        $catchFrame = $this->enforcePropertyVisibilityRead($object, $propName, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        if ($object->hasProperty($propName)) {
+            $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
+            if (null !== $hookValue) {
+                $dst->bool(!ext\standard\boolval::isTruthy($hookValue));
+
+                return null;
+            }
+            $slot = $object->getProperty($propName);
+            $dst->bool(!ext\standard\boolval::isTruthy($slot));
+
+            return null;
+        }
+        if ($this->propertyReadUsesMagicGet($object, $propName, $frame)) {
+            $read = new Variable();
+            $this->deliverMagicGetRead($read, $object, $propName);
+            $dst->bool(!ext\standard\boolval::isTruthy($read));
+
+            return null;
+        }
+        $dst->bool(true);
+
+        return null;
+    }
+
+    /**
     public function unsetObjectProperty(ObjectEntry $object, string $propName): void
     {
         $props = $object->getRawProperties();
@@ -3471,6 +3509,26 @@ restart:
                     }
                     $v = $frame->scope[$op->arg2]->resolveIndirect();
                     $frame->scope[$op->arg1]->bool(!ext\standard\boolval::isTruthy($v));
+                    break;
+                case OpCode::TYPE_EMPTY_OBJECT_PROPERTY:
+                    $dst = $frame->scope[$op->arg1];
+                    $container = $frame->scope[$op->arg2]->resolveIndirect();
+                    if (Variable::TYPE_OBJECT !== $container->type) {
+                        $dst->bool(true);
+                        break;
+                    }
+                    $propName = $frame->scope[$op->arg3]->toString();
+                    VM\LazyObjectSupport::ensureInitialized($this, $container->toObject());
+                    $catchFrame = $this->emptyObjectProperty(
+                        $container->toObject(),
+                        $propName,
+                        $frame,
+                        $dst
+                    );
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     break;
                 case OpCode::TYPE_ISSET:
                     $dst = $frame->scope[$op->arg1];

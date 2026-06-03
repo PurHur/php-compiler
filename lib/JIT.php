@@ -5483,6 +5483,20 @@ class JIT {
                         $this->context->builder->not($truthy)
                     );
                     break;
+                case OpCode::TYPE_EMPTY_OBJECT_PROPERTY:
+                    $containerOp = $block->getOperand($op->arg2);
+                    $dimOp = $block->getOperand($op->arg3);
+                    $container = $this->context->getVariableFromOp($containerOp);
+                    $dim = $this->context->getVariableFromOp($dimOp);
+                    $emptyResult = JIT\EmptyObjectPropertyHelper::compile(
+                        $this->context,
+                        $container,
+                        $dim,
+                        $dimOp,
+                        $containerOp
+                    );
+                    $this->assignOperandValue($block->getOperand($op->arg1), $emptyResult);
+                    break;
                 case OpCode::TYPE_EVAL:
                     JIT\EvalHelper::compile($this, $func, $block, $op);
                     break;
