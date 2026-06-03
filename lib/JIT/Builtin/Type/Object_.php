@@ -117,6 +117,8 @@ class Object_ extends Type {
 
     private ?int $weakMapClassId = null;
 
+    private bool $traversableInterfacesSeeded = false;
+
     /** @var array<int, true> class ids declared readonly (issue #1360) */
     private array $readonlyClassIds = [];
 
@@ -1191,6 +1193,7 @@ class Object_ extends Type {
      */
     public function classIdsInstanceOf(string $className): array
     {
+        $this->ensureTraversableBuiltinInterfaces();
         $wantLc = strtolower(ltrim($className, '\\'));
         $ids = [];
         foreach ($this->classIdToName as $id => $name) {
@@ -1236,6 +1239,7 @@ class Object_ extends Type {
      */
     public function setClassInterfaces(string $className, array $interfaceLcs): void
     {
+        $this->ensureTraversableBuiltinInterfaces();
         $lc = strtolower(ltrim($className, '\\'));
         $expanded = [];
         foreach ($interfaceLcs as $iface) {
@@ -1304,6 +1308,23 @@ class Object_ extends Type {
         }
 
         return array_values(array_unique($out));
+    }
+
+    /** Zend traversable/iterator/iteratoraggregate hierarchy for instanceof (#4754, #4771). */
+    private function ensureTraversableBuiltinInterfaces(): void
+    {
+        if ($this->traversableInterfacesSeeded) {
+            return;
+        }
+        $this->traversableInterfacesSeeded = true;
+        $this->lookup('Traversable');
+        $this->markInterfaceClass('Traversable');
+        $this->lookup('Iterator');
+        $this->markInterfaceClass('Iterator');
+        $this->setInterfaceExtends('Iterator', ['Traversable']);
+        $this->lookup('IteratorAggregate');
+        $this->markInterfaceClass('IteratorAggregate');
+        $this->setInterfaceExtends('IteratorAggregate', ['Traversable']);
     }
 
     public function classLcForId(int $classId): ?string
@@ -2140,6 +2161,8 @@ class Object_ extends Type {
         if ('generator' === $lcname) {
             $this->defineProperty($id, GeneratorHelper::TARGET_PROPERTY, Variable::TYPE_STRING);
             $this->defineProperty($id, GeneratorHelper::STATE_PROPERTY, Variable::TYPE_NATIVE_LONG);
+            $this->ensureTraversableBuiltinInterfaces();
+            $this->setClassInterfaces($displayName, ['Iterator']);
         }
         if ('splobjectstorage' === $lcname) {
             $this->splObjectStorageClassId = $id;
