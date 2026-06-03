@@ -1773,9 +1773,18 @@ restart:
             case OpCode::TYPE_MUL:
                 return $left * $right;
             case OpCode::TYPE_DIV:
+                if (0 === $right || 0.0 === $right) {
+                    throw new \DivisionByZeroError('Division by zero');
+                }
+
                 return $left / $right;
             case OpCode::TYPE_MODULO:
-                return self::numericToZendLong($left) % self::numericToZendLong($right);
+                $rightLong = self::numericToZendLong($right);
+                if (0 === $rightLong) {
+                    throw new \DivisionByZeroError('Modulo by zero');
+                }
+
+                return self::numericToZendLong($left) % $rightLong;
             case OpCode::TYPE_POW:
                 if (is_int($left) && is_int($right)) {
                     return $left ** $right;
