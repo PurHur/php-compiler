@@ -665,6 +665,9 @@ class VM {
 
             return $proxy;
         }
+        if ($this->instanceMethodReturnsByRef($object, '__get')) {
+            return $this->invokeMagicGet($object, $name);
+        }
         if (!$object->class->allowsDynamicProperties) {
             $scriptPath = $frame->scriptPath;
             $this->context->errors->deprecatedDynamicProperty(
@@ -7083,6 +7086,23 @@ restart:
 
         return null !== $func
             && (($func->flags ?? 0) & \PHPCfg\Func::FLAG_RETURNS_REF) !== 0;
+    }
+
+    protected function instanceMethodReturnsByRef(ObjectEntry $object, string $methodName): bool
+    {
+        $methodLc = strtolower($methodName);
+        if (!$this->hasInstanceMethod($object->class, $methodLc)) {
+            return false;
+        }
+        [$declaring] = $this->resolveInstanceMethod($object->class, $methodLc);
+        $func = $declaring->methods[$methodLc];
+        if (!$func instanceof Func\PHP) {
+            return false;
+        }
+        $decl = $func->block->func;
+
+        return null !== $decl
+            && (($decl->flags ?? 0) & \PHPCfg\Func::FLAG_RETURNS_REF) !== 0;
     }
 
     private function enforceReturnType(Frame $frame, ?Variable $value): void
