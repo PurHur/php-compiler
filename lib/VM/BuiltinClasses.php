@@ -91,6 +91,7 @@ final class BuiltinClasses
 {
     public static function register(Context $ctx): void
     {
+        $before = array_keys($ctx->classes);
         StringableSupport::register($ctx);
         self::registerStdClass($ctx);
         self::registerCountable($ctx);
@@ -105,6 +106,9 @@ final class BuiltinClasses
         self::registerFiber($ctx);
         GeneratorState::register($ctx);
         ClosureState::register($ctx);
+        foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
+            $ctx->classes[$lc]->isInternal = true;
+        }
     }
 
     /** Zend: Traversable/Iterator interfaces for instanceof and foreach parity. */

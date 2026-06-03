@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\PseudoClassScope;
+use PHPCompiler\VM\ErrorReporter;
 
 /**
  * Closure::fromCallable / bind / bindTo helpers (issue #3266, #3673, Zend zend_closures.c).
@@ -98,7 +99,8 @@ final class ClosureSupport
         ClosureState $state,
         Variable $newThis,
         ?Variable $newScope,
-        string $context = 'Closure::bindTo()'
+        string $context = 'Closure::bindTo()',
+        ?Frame $frame = null
     ): ?ObjectEntry {
         $newThis = $newThis->resolveIndirect();
         if (Variable::TYPE_NULL !== $newThis->type && Variable::TYPE_OBJECT !== $newThis->type) {
@@ -121,9 +123,46 @@ final class ClosureSupport
             $bound->boundThis = $newThis;
         }
         $scopeClass = self::resolveScopeClass($newScope, $newThis, $context);
+        if (null !== $scopeClass && self::isInternalScopeClass($ctx, $scopeClass)) {
+            self::warnCannotBindInternalScope($ctx, $frame, $scopeClass);
+
+            return null;
+        }
         $bound->boundScopeClass = $scopeClass;
 
         return self::wrapState($ctx, $bound);
+    }
+
+    private static function isInternalScopeClass(Context $ctx, string $scopeClass): bool
+    {
+        $lc = strtolower($scopeClass);
+        if (!isset($ctx->classes[$lc])) {
+            $ctx->autoloadClass($scopeClass);
+        }
+        if (!isset($ctx->classes[$lc])) {
+            return false;
+        }
+
+        return $ctx->classes[$lc]->isInternal;
+    }
+
+    private static function warnCannotBindInternalScope(
+        Context $ctx,
+        ?Frame $frame,
+        string $scopeClass
+    ): void {
+        $display = $scopeClass;
+        $lc = strtolower($scopeClass);
+        if (isset($ctx->classes[$lc])) {
+            $display = $ctx->classes[$lc]->name;
+        }
+        $ctx->errors->triggerError(
+            "Cannot bind closure to scope of internal class {$display}",
+            ErrorReporter::E_WARNING,
+            null,
+            $ctx,
+            $frame
+        );
     }
 
     private static function fromFunctionName(Context $ctx, string $name): ClosureState
