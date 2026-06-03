@@ -30,6 +30,7 @@ use PHPCompiler\VM\ClassReadonly;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
+use PHPCompiler\Compiler\EnumMagicMethodCheck;
 use PHPCompiler\Compiler\MagicMethodReturnTypeCheck;
 use PHPCompiler\Compiler\AttributeMetadata;
 use PHPCompiler\Compiler\AttributeNames;
@@ -334,6 +335,7 @@ class Compiler {
         FinalClassConstCheck::validate($script);
         AbstractMethodVisibilityCheck::validate($script);
         MagicMethodReturnTypeCheck::validate($script);
+        EnumMagicMethodCheck::validate($script);
         ReadonlyClassCompileCheck::validate($script);
 
         return $main;
