@@ -1107,7 +1107,7 @@ apply_php_cfg_union_type_overlay() {
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local printer="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php"
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Union_.php"
-  if [[ -f "$op" ]] && grep -q 'UnionType' "$parser" 2>/dev/null; then
+  if [[ -f "$op" ]] && awk '/protected function parseTypeNode\(/,/throw new \\LogicException\('"'"'Unknown type node:/' "$parser" 2>/dev/null | grep -q 'Node\\UnionType'; then
     echo "Skip php-cfg-union-type.patch (already applied)"
     return 0
   fi
