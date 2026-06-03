@@ -8,7 +8,7 @@ use PHPCompiler\Block;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #4685 */
+/** @covers issue #4685, #4823 */
 final class LazyObjectVmLoweringTest extends TestCase
 {
     public function testRequiresVmLoweringForLazyProxyScript(): void
