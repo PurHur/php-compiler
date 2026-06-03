@@ -35,6 +35,7 @@ use PHPCompiler\Compiler\MagicMethodReturnTypeCheck;
 use PHPCompiler\Compiler\AttributeMetadata;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\DeprecatedMetadata;
+use PHPCompiler\Compiler\NoDiscardMetadata;
 use PHPCompiler\Compiler\FinalClassConstCheck;
 use PHPCompiler\Compiler\FinalClassExtensionCheck;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
@@ -2100,6 +2101,7 @@ class Compiler {
         );
         if (null !== $child->func->cfg) {
             $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params, $child->func);
+            NoDiscardMetadata::applyToBlock($methodBlock, $child);
             $declare->block1 = $methodBlock;
         }
         $this->assignAttributeMetadata($declare, $child);
@@ -3415,6 +3417,7 @@ class Compiler {
 
     protected function compileFunction(Op\Stmt\Function_ $function, Block $block): OpCode {
         $funcBlock = $this->compileCfgBlock($function->func->cfg, $function->func->params, $function->func);
+        NoDiscardMetadata::applyToBlock($funcBlock, $function);
         // php-cfg may DCE unreachable yield after return; :Generator still implies generator (#3350).
         if ($this->funcDeclReturnTypeIsGenerator($function->func)) {
             $this->markFunctionGenerator($funcBlock);
