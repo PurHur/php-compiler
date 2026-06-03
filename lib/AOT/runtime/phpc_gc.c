@@ -47,7 +47,7 @@ static unsigned char phpc_gc_marked[PHPC_GC_MAX_OBJECTS];
 static int phpc_gc_inbound[PHPC_GC_MAX_OBJECTS];
 static unsigned char phpc_destruct_invoked[PHPC_GC_MAX_OBJECTS];
 static int phpc_gc_count;
-static int phpc_gc_enabled = 1;
+int phpc_gc_enabled = 1;
 /** 0 = defer refcount-zero destroy until {@see phpc_gc_run_shutdown_destructors} (#4013). */
 static int phpc_destruct_allow_delref = 1;
 
@@ -61,6 +61,21 @@ void phpc_destruct_set_allow_delref(int allow)
 int phpc_destruct_delref_allowed(void)
 {
     return phpc_destruct_allow_delref;
+}
+
+void phpc_gc_enable(void)
+{
+    phpc_gc_enabled = 1;
+}
+
+void phpc_gc_disable(void)
+{
+    phpc_gc_enabled = 0;
+}
+
+int phpc_gc_is_enabled(void)
+{
+    return phpc_gc_enabled != 0;
 }
 
 static int phpc_gc_index_of(void *obj)

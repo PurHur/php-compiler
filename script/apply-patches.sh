@@ -137,6 +137,9 @@ patch_already_applied() {
     php-types-link-bool.patch)
       grep -q "'link' => \['bool'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
+    php-types-gc-enabled-bool.patch)
+      grep -q "'gc_enabled' => \['bool'\]" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
+      ;;
     php-llvm-builder-xor.patch)
       grep -q 'function xor(' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
       ;;
@@ -2567,6 +2570,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-gettimeofday-float.patch"
   apply_patch "$PATCH_DIR/php-types-round-float.patch"
   apply_patch "$PATCH_DIR/php-types-link-bool.patch"
+  apply_patch "$PATCH_DIR/php-types-gc-enabled-bool.patch"
   apply_patch "$PATCH_DIR/php-types-dollars-brace.patch"
   apply_patch "$PATCH_DIR/php-types-missing-parent-no-echo.patch"
   apply_patch "$PATCH_DIR/php-types-mixed-reserved.patch"

@@ -50,6 +50,9 @@ final class GcCollectCyclesRuntime
                 'phpc_destruct_delref_allowed',
                 'phpc_destruct_try_invoke',
                 'phpc_gc_run_shutdown_destructors',
+                'phpc_gc_enable',
+                'phpc_gc_disable',
+                'phpc_gc_is_enabled',
                 '__compiler_gc_collect_cycles',
             ] as $fnName
         ) {
