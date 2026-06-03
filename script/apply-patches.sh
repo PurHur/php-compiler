@@ -559,7 +559,6 @@ raise SystemExit(1)
 PY
     echo "Applied php-cfg-asymmetric-visibility.patch (Param overlay)"
   fi
-  apply_php_cfg_asymmetric_set_visibility_parser_overlay
   return 0
 }
 
@@ -593,19 +592,17 @@ text = text.replace(anchor, insert + anchor, 1)
 
 param_needle = "            $p->promotionReadonly = 0 !== ($param->flags & Stmt\\Class_::MODIFIER_READONLY);\n"
 param_insert = param_needle + "            $p->promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($p->getAttributes());\n"
-if param_needle not in text:
-    sys.stderr.write("php-cfg-asymmetric-set-visibility: Param promotionReadonly anchor missing\n")
-    raise SystemExit(1)
-if 'promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text:
+if param_needle in text and 'promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text:
     text = text.replace(param_needle, param_insert, 1)
 
 prop_needle = "            $property->readonly = 0 !== ($node->flags & Node\\Stmt\\Class_::MODIFIER_READONLY);\n"
 prop_insert = prop_needle + "            $property->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($property->getAttributes());\n"
-if prop_needle not in text:
-    sys.stderr.write("php-cfg-asymmetric-set-visibility: Property readonly anchor missing\n")
-    raise SystemExit(1)
-if 'property->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text:
+if prop_needle in text and 'property->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text:
     text = text.replace(prop_needle, prop_insert, 1)
+
+if 'promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text and 'property->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text:
+    sys.stderr.write("php-cfg-asymmetric-set-visibility: Parser promotion/readonly anchors missing (apply after ctor-promotion)\n")
+    raise SystemExit(1)
 
 parser_path.write_text(text)
 PY
@@ -787,17 +784,23 @@ const_path = Path(sys.argv[1])
 parser_path = Path(sys.argv[2])
 const_text = const_path.read_text()
 if "isEnumCase" not in const_text:
-    old = "    public int $flags = 0;\n\n    public function __construct"
-    new = (
-        "    public int $flags = 0;\n\n"
+    insert = (
         "    /** True for `case Name = value` in enums; false for `const` in enum/class bodies (#5054). */\n"
         "    public bool $isEnumCase = false;\n\n"
-        "    public function __construct"
     )
-    if old not in const_text:
+    for old in (
+        "    public int $flags = 0;\n\n    public function __construct",
+        "    public ?Type $declaredType = null;\n\n    public function __construct",
+        "    public $valueBlock;\n\n    public function __construct",
+    ):
+        if old in const_text:
+            const_path.write_text(
+                const_text.replace(old, old.replace("\n\n    public function __construct", "\n\n" + insert + "    public function __construct", 1), 1)
+            )
+            break
+    else:
         sys.stderr.write("php-cfg-enum-class-const: Const_.php anchor not found\n")
         raise SystemExit(1)
-    const_path.write_text(const_text.replace(old, new, 1))
 
 text = parser_path.read_text()
 enum_loop_old = """            } elseif ($stmt instanceof Stmt\\ClassMethod) {
@@ -1270,11 +1273,16 @@ PY
   echo "Applied php-types-intersection-type.patch (overlay)"
 }
 
-apply_php_types_union_type_reconstructor_overlay() {
+repair_php_types_union_type_reconstructor_if_needed() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
-  if grep -q 'instanceof Op\\Type\\Union_' "$target" 2>/dev/null; then
+  [[ -f "$target" ]] || return 0
+  if ! grep -q 'instanceof Op\\Type\\Union_' "$target" 2>/dev/null; then
     return 0
   fi
+  if php -l "$target" >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "apply-patches: repairing malformed php-types-union-type in TypeReconstructor.php (#4229)" >&2
   python3 - "$target" <<'PY'
 import sys
 from pathlib import Path
@@ -1288,8 +1296,73 @@ union_block = """        } elseif ($type instanceof Op\\Type\\Union_) {
             }
 
             return (new Type(Type::TYPE_UNION, $subs))->simplify();
+        }
+
 """
-if union_block.strip() in text:
+never_tail = """        } elseif ($type instanceof Op\\Type\\Never_) {
+            return Type::never();
+        }
+
+        throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
+never_union_tail = """        } elseif ($type instanceof Op\\Type\\Never_) {
+            return Type::never();
+        }
+""" + union_block + """
+        throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
+
+import re
+# Drop any partial Union_/Never_ tail before the resolveOpType throw.
+text = re.sub(
+    r"\n        \} elseif \(\$type instanceof Op\\Type\\Never_\) \{.*?"
+    r"throw new \\LogicException\('Unknown Op\\\\Type provided:",
+    "\n" + never_union_tail,
+    text,
+    count=1,
+    flags=re.S,
+)
+if "instanceof Op\\Type\\Union_" not in text:
+    if "        } elseif ($type instanceof Op\\Type\\Intersection) {" in text:
+        text = text.replace(
+            "        } elseif ($type instanceof Op\\Type\\Intersection) {",
+            union_block + "        } elseif ($type instanceof Op\\Type\\Intersection) {",
+            1,
+        )
+    elif never_tail in text:
+        text = text.replace(never_tail, never_union_tail, 1)
+path.write_text(text)
+PY
+}
+
+apply_php_types_union_type_reconstructor_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  repair_php_types_union_type_reconstructor_if_needed
+  if grep -q 'instanceof Op\\Type\\Union_' "$target" 2>/dev/null && php -l "$target" >/dev/null 2>&1; then
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+union_body = """            $subs = [];
+            foreach ($type->types as $sub) {
+                $subs[] = $this->resolveOpType($sub);
+            }
+
+            return (new Type(Type::TYPE_UNION, $subs))->simplify();
+"""
+union_before_intersection = (
+    "        } elseif ($type instanceof Op\\Type\\Union_) {\n"
+    + union_body
+    + "        }\n"
+)
+union_after_never = (
+    "        } elseif ($type instanceof Op\\Type\\Union_) {\n"
+    + union_body
+    + "        }\n"
+)
+if "instanceof Op\\Type\\Union_" in text:
     raise SystemExit(0)
 
 intersection_anchor = """        } elseif ($type instanceof Op\\Type\\Intersection) {"""
@@ -1300,14 +1373,14 @@ never_throw_anchor = """        } elseif ($type instanceof Op\\Type\\Never_) {
         throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
 
 if intersection_anchor in text:
-    text = text.replace(intersection_anchor, union_block + intersection_anchor, 1)
+    text = text.replace(intersection_anchor, union_before_intersection + intersection_anchor, 1)
 elif never_throw_anchor in text:
     text = text.replace(
         never_throw_anchor,
         """        } elseif ($type instanceof Op\\Type\\Never_) {
             return Type::never();
-        }"""
-        + union_block
+        """
+        + union_after_never
         + """
         throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));""",
         1,
@@ -1329,10 +1402,12 @@ apply_php_types_union_type_overlay() {
   local need_type=1
   local need_recon=1
 
+  repair_php_types_union_type_reconstructor_if_needed
+
   if grep -q 'instanceof CfgType\\Union_' "$type_php" 2>/dev/null; then
     need_type=0
   fi
-  if grep -q 'instanceof Op\\Type\\Union_' "$recon" 2>/dev/null; then
+  if grep -q 'instanceof Op\\Type\\Union_' "$recon" 2>/dev/null && php -l "$recon" >/dev/null 2>&1; then
     need_recon=0
   fi
 
@@ -1845,10 +1920,18 @@ path = Path(sys.argv[1])
 text = path.read_text()
 old = "        if (preg_match('/^(list|array)\\s*</i', trim($decl))) {\n            return new self(self::TYPE_ARRAY);\n        }\n"
 new = "        if (preg_match('/^(list|array|iterable)\\s*</i', trim($decl))) {\n            return new self(self::TYPE_ARRAY);\n        }\n"
-if old not in text:
-    sys.stderr.write("php-types-iterable-generic: list|array generic anchor not found\n")
-    raise SystemExit(1)
-path.write_text(text.replace(old, new, 1))
+if old in text:
+    path.write_text(text.replace(old, new, 1))
+    raise SystemExit(0)
+if "preg_match('/^(list|array|iterable)" in text:
+    raise SystemExit(0)
+needle = "        if (preg_match('/^(positive|negative|non-zero)-int$/', $pseudo)) {\n            return new self(self::TYPE_LONG);\n        }\n"
+insert = needle + new
+if needle in text:
+    path.write_text(text.replace(needle, insert, 1))
+    raise SystemExit(0)
+sys.stderr.write("php-types-iterable-generic: list|array generic anchor not found\n")
+raise SystemExit(1)
 PY
   echo "Applied php-types-iterable-generic.patch (overlay)"
 }
@@ -2828,6 +2911,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-ctor-promotion.patch"
   apply_patch "$PATCH_DIR/php-cfg-ctor-promotion-readonly.patch"
   apply_patch "$PATCH_DIR/php-cfg-property-readonly.patch"
+  apply_php_cfg_asymmetric_set_visibility_parser_overlay || true
   apply_patch "$PATCH_DIR/php-cfg-attribute-groups.patch"
   apply_patch "$PATCH_DIR/php-cfg-trait-use.patch"
   apply_patch "$PATCH_DIR/php-cfg-throw-expr.patch"
@@ -2868,10 +2952,10 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-fromvalue-null.patch"
   apply_patch "$PATCH_DIR/php-types-doc-comment-string.patch"
   apply_patch "$PATCH_DIR/php-types-docblock-first-token.patch"
-  apply_patch "$PATCH_DIR/php-types-iterable-generic.patch"
   apply_patch "$PATCH_DIR/php-types-array-shape.patch"
   apply_patch "$PATCH_DIR/php-types-generics-fallback.patch"
   apply_patch "$PATCH_DIR/php-types-generics-list-array.patch"
+  apply_patch "$PATCH_DIR/php-types-iterable-generic.patch"
   apply_patch "$PATCH_DIR/php-types-docblock-trailing-text.patch"
   apply_patch "$PATCH_DIR/php-types-generic-null-tail.patch"
   apply_patch "$PATCH_DIR/php-types-fromdecl-junk-fragments.patch"
@@ -2913,6 +2997,8 @@ verify_critical_language_patches() {
   fi
   if ! grep -q 'instanceof Op\\Type\\Union_' "$recon" 2>/dev/null; then
     missing+=("php-types-union-type")
+  elif ! php -l "$recon" >/dev/null 2>&1; then
+    missing+=("php-types-union-type-syntax")
   fi
   if ! grep -qE 'public \$readonly|propertyFlags' "$prop" 2>/dev/null; then
     missing+=("php-cfg-property-readonly-Property")
