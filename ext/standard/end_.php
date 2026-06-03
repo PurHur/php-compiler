@@ -1,0 +1,34 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Value;
+
+/** end() — move internal pointer to last element (ext/standard/array.c; #4967). */
+final class end_ extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('end');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (1 !== \count($frame->calledArgs)) {
+            throw new \ArgumentCountError('end() expects exactly 1 argument, '.\count($frame->calledArgs).' given');
+        }
+        $ht = VmArrayPointer::requireByRefArray($frame->calledArgs[0], 'end');
+        VmArrayPointer::returnValue($frame, $ht->pointerEnd());
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        return JitArrayPointer::unsupported($context, 'end');
+    }
+}
