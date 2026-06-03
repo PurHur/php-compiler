@@ -37,6 +37,14 @@ final class VmExit
         if (Variable::TYPE_INTEGER === $v->type) {
             return $v->toInt();
         }
+        if (Variable::TYPE_NULL === $v->type) {
+            return 0;
+        }
+        if (Variable::TYPE_FLOAT === $v->type || Variable::TYPE_BOOLEAN === $v->type) {
+            echo $v->toString();
+
+            return 0;
+        }
 
         throw self::typeErrorForStatus($v);
     }

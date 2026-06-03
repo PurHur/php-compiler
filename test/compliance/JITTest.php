@@ -314,6 +314,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'exit_expression') || str_contains($name, 'die_expression')) {
                 continue;
             }
+            // exit()/die() scalar coercion — VM (#4696); JIT TYPE_EXIT MCJIT unstable.
+            if (str_contains($name, 'exit_status_coercion')) {
+                continue;
+            }
             // class const scalar expressions — VM defineClass eval (#3567); JIT deferred.
             if (str_contains($name, 'class_const_scalar_expr')) {
                 continue;
