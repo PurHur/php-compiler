@@ -1140,7 +1140,15 @@ parser_path = Path(sys.argv[1])
 printer_path = Path(sys.argv[2])
 
 parser = parser_path.read_text()
-if 'Node\\UnionType' not in parser:
+import re
+
+parse_type = re.search(
+    r'protected function parseTypeNode\(.*?throw new \\LogicException\(\'Unknown type node:',
+    parser,
+    re.S,
+)
+parse_type_body = parse_type.group(0) if parse_type else ''
+if 'Node\\UnionType' not in parse_type_body:
     anchor = "        throw new \\LogicException('Unknown type node: '.$node->getType());"
     insert = """        if ($node instanceof Node\\UnionType) {
             $types = [];
