@@ -126,7 +126,7 @@ final class JitClassParents
         $lc = strtolower(ltrim($className, '\\'));
         $object = $context->type->object;
         if ($object->isInterfaceClassLc($lc)) {
-            return self::returnFalse($context);
+            return self::returnEmptyArray($context);
         }
         if ($object->hasUserDeclaredClass($className)) {
             return self::buildParentsFromObjectRegistry($context, $className);
@@ -136,7 +136,7 @@ final class JitClassParents
         if (null !== $vm && isset($vm->classes[$lc])) {
             $entry = $vm->classes[$lc];
             if ($entry->isTrait || $entry->isInterface || $entry->isEnum) {
-                return self::returnFalse($context);
+                return self::returnEmptyArray($context);
             }
 
             return self::buildParentsFromNames(
@@ -208,5 +208,10 @@ final class JitClassParents
         );
 
         return $ptr;
+    }
+
+    private static function returnEmptyArray(Context $context): Value
+    {
+        return self::buildParentsFromNames($context, []);
     }
 }

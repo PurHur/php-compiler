@@ -449,6 +449,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'class_parents_autoload')) {
                 continue;
             }
+            // class_parents() on interface: VM (#5249); MCJIT execute unstable (#3159).
+            if (str_contains($name, 'class_parents_interface')) {
+                continue;
+            }
             // __callStatic is VM-only until JIT static magic dispatch (#3273).
             if (str_contains($name, 'magic_call_static')) {
                 continue;

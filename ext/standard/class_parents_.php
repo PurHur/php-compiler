@@ -42,12 +42,7 @@ final class class_parents_ extends Internal
             $autoload = $flag->toBool();
         }
         $entry = VmReflection::resolveClassForClassImplements($ctx, $frame->calledArgs[0], $autoload);
-        if (null === $entry || $entry->isTrait || $entry->isEnum) {
-            $frame->returnVar->bool(false);
-
-            return;
-        }
-        if ($entry->isInterface) {
+        if (null === $entry) {
             $frame->returnVar->bool(false);
 
             return;
