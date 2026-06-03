@@ -245,6 +245,23 @@ final class Variable {
         return 'unknown(type='.$type.')';
     }
 
+    /** Zend 8+ dim fetch on scalar containers (#4713). */
+    public static function cannotUseBracketLabel(int $type): ?string
+    {
+        switch ($type) {
+            case self::TYPE_NULL:
+                return 'null';
+            case self::TYPE_NATIVE_BOOL:
+                return 'bool';
+            case self::TYPE_NATIVE_LONG:
+                return 'int';
+            case self::TYPE_NATIVE_DOUBLE:
+                return 'float';
+            default:
+                return null;
+        }
+    }
+
     public static function getTypeFromType(?Type $type): int {
         if (null === $type) {
             return self::TYPE_VALUE;

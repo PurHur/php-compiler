@@ -1285,6 +1285,14 @@ restart:
                         $container = $containerSlot->resolveIndirect();
                     }
                     if (is_null($op->arg3)) {
+                        $bracketMsg = TypeCheck::cannotUseBracketOn($container);
+                        if (null !== $bracketMsg) {
+                            $catchFrame = $this->dispatchVmTypeError(new \TypeError($bracketMsg), $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                        }
                         if ($container->type !== Variable::TYPE_ARRAY) {
                             throw new \LogicException('[] is only supported for arrays');
                         }
@@ -1361,6 +1369,14 @@ restart:
                             $arg1->copyFrom($this->invokeArrayAccessOffsetGet($object, $arg3));
                         }
                     } else {
+                        $bracketMsg = TypeCheck::cannotUseBracketOn($container);
+                        if (null !== $bracketMsg) {
+                            $catchFrame = $this->dispatchVmTypeError(new \TypeError($bracketMsg), $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                        }
                         throw new \LogicException('Illegal offset');
                     }
                     break;
