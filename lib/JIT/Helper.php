@@ -289,8 +289,11 @@ restart:
                         $result = $this->context->builder->fdiv($leftValue, $rightValue);
                         goto return_double;
                     case OpCode::TYPE_MODULO:
-                        $result = $this->context->builder->frem($leftValue, $rightValue);
-                        goto return_double;
+                        $i64 = $this->context->getTypeFromString('int64');
+                        $leftLong = $this->context->builder->fpToSi($leftValue, $i64);
+                        $rightLong = $this->context->builder->fpToSi($rightValue, $i64);
+                        $result = $this->context->builder->signedRem($leftLong, $rightLong);
+                        goto return_long;
                     case OpCode::TYPE_BITWISE_AND:
                     case OpCode::TYPE_BITWISE_OR:
                     case OpCode::TYPE_BITWISE_XOR:

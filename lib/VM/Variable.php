@@ -1500,6 +1500,13 @@ restart:
             } else {
                 $this->float($result);
             }
+        } elseif (OpCode::TYPE_MODULO === $opCode
+            && ($pair === TYPE_PAIR_INTEGER_FLOAT
+                || $pair === TYPE_PAIR_FLOAT_INTEGER
+                || $pair === TYPE_PAIR_FLOAT_FLOAT)) {
+            $leftNum = TYPE_PAIR_INTEGER_FLOAT === $pair ? $left->integer : $left->float;
+            $rightNum = TYPE_PAIR_FLOAT_INTEGER === $pair ? $right->integer : $right->float;
+            $this->int($this->_numericOp($opCode, $leftNum, $rightNum));
         } elseif ($pair === TYPE_PAIR_INTEGER_FLOAT) {
             $this->float($this->_numericOp($opCode, $left->integer, $right->float));
         } elseif ($pair === TYPE_PAIR_FLOAT_INTEGER) {
@@ -1607,6 +1614,23 @@ restart:
         }
     }
 
+    /**
+     * Zend mod_function(): float operands truncate toward zero to zend_long before %.
+     *
+     * @see php-src Zend/zend_operators.c mod_function()
+     */
+    private static function numericToZendLong(int|float $value): int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+        if ($value >= 0.0) {
+            return (int) floor($value);
+        }
+
+        return (int) ceil($value);
+    }
+
     private function _numericOp(int $opCode, $left, $right) {
         switch ($opCode) {
             case OpCode::TYPE_PLUS:
@@ -1618,7 +1642,7 @@ restart:
             case OpCode::TYPE_DIV:
                 return $left / $right;
             case OpCode::TYPE_MODULO:
-                return $left % $right;
+                return self::numericToZendLong($left) % self::numericToZendLong($right);
             case OpCode::TYPE_POW:
                 if (is_int($left) && is_int($right)) {
                     return $left ** $right;
