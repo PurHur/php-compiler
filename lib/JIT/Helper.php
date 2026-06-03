@@ -1681,6 +1681,9 @@ restart:
                 goto return_bool;
             }
         }
+        if (OpCode::TYPE_PLUS === $opcode->type && $leftIsArray && $rightIsArray) {
+            return ArrayBuiltinHelper::arrayUnion($this->context, $left, $right);
+        }
         if (ArrayBuiltinHelper::isNativeArray($leftType) && $leftType === $rightType) {
             $trueVal = $this->context->getTypeFromString('int1')->constInt(1, false);
             if (OpCode::TYPE_EQUAL === $opcode->type) {
