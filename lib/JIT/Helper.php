@@ -127,15 +127,25 @@ class Helper {
                             );
                             $doubleBlock = BasicBlockHelper::append($this->context, 'bitwise_not_vbox_double');
                             $longBlock = BasicBlockHelper::append($this->context, 'bitwise_not_vbox_long');
+                            $doneBlock = BasicBlockHelper::append($this->context, 'bitwise_not_vbox_done');
                             $this->context->builder->branchIf($isDouble, $doubleBlock, $longBlock);
                             $this->context->builder->positionAtEnd($doubleBlock);
-                            $this->emitBitwiseNotFloatTypeError();
+                            $doubleVal = $this->context->builder->call(
+                                $this->context->lookupFunction('__value__readDouble'),
+                                $valuePtr
+                            );
+                            $i64 = $this->context->getTypeFromString('int64');
+                            $long = $this->context->builder->fpToSi($doubleVal, $i64);
+                            $result = $this->context->builder->not($long);
+                            $this->context->builder->branch($doneBlock);
                             $this->context->builder->positionAtEnd($longBlock);
                             $long = $this->context->builder->call(
                                 $this->context->lookupFunction('__value__readLong'),
                                 $valuePtr
                             );
                             $result = $this->context->builder->not($long);
+                            $this->context->builder->branch($doneBlock);
+                            $this->context->builder->positionAtEnd($doneBlock);
                             goto return_long;
                         }
                         $long = JitLongArg::lower($this->context, $var, 'bitwise not operand');
@@ -149,7 +159,10 @@ class Helper {
                         $result = $this->context->builder->fNegate($varValue);
                         goto return_double;
                     case OpCode::TYPE_BITWISE_NOT:
-                        return $this->emitBitwiseNotFloatTypeError();
+                        $i64 = $this->context->getTypeFromString('int64');
+                        $long = $this->context->builder->fpToSi($varValue, $i64);
+                        $result = $this->context->builder->not($long);
+                        goto return_long;
                 }
                 break;
             case Variable::TYPE_STRING:
@@ -195,7 +208,8 @@ return_string:
         $rightType = $this->operandJitType($right);
         if (OpCode::TYPE_SHIFT_LEFT === $opcode->type || OpCode::TYPE_SHIFT_RIGHT === $opcode->type) {
             if (Variable::TYPE_NATIVE_DOUBLE === $leftType || Variable::TYPE_NATIVE_DOUBLE === $rightType) {
-                return $this->emitShiftFloatOperandTypeError($opcode, $leftType, $rightType);
+                $result = $this->emitShiftWithFloatOperands($opcode, $leftValue, $rightValue, $leftType, $rightType);
+                goto return_long;
             }
             if (Variable::TYPE_NATIVE_BOOL === $leftType || Variable::TYPE_NATIVE_BOOL === $rightType) {
                 $result = $this->emitShiftWithBoolOperands($opcode, $leftValue, $rightValue, $leftType, $rightType);
@@ -1888,21 +1902,6 @@ return_bool:
         };
     }
 
-    private function emitBitwiseNotFloatTypeError(): Variable
-    {
-        TypeErrorRaise::registerDeclarations($this->context);
-        TypeErrorRaise::ensureLinked($this->context);
-        TypeErrorRaise::emitRaise($this->context, 'Unsupported operand types: float');
-        $this->context->builder->call($this->context->lookupFunction('abort'));
-
-        return new Variable(
-            $this->context,
-            Variable::TYPE_NATIVE_LONG,
-            Variable::KIND_VALUE,
-            $this->context->getTypeFromString('int64')->constInt(0, false)
-        );
-    }
-
     /** Zend shift_left/right_function: bool operands promote to int (false→0, true→1). */
     private function emitShiftWithBoolOperands(
         OpCode $opcode,
@@ -1930,38 +1929,31 @@ return_bool:
         return $this->context->builder->aShr($leftLong, $rightLong);
     }
 
-    private function emitShiftFloatOperandTypeError(OpCode $opcode, int $leftType, int $rightType): Variable
-    {
-        $opSym = OpCode::TYPE_SHIFT_LEFT === $opcode->type ? '<<' : '>>';
-        $message = sprintf(
-            'Unsupported operand types: %s %s %s',
-            $this->shiftOperandJitTypeName($leftType),
-            $opSym,
-            $this->shiftOperandJitTypeName($rightType)
-        );
-        TypeErrorRaise::registerDeclarations($this->context);
-        TypeErrorRaise::ensureLinked($this->context);
-        TypeErrorRaise::emitRaise($this->context, $message);
-        $this->context->builder->call($this->context->lookupFunction('abort'));
+    /** Zend shift_left/right_function: float operands truncate to int before shift (#5270). */
+    private function emitShiftWithFloatOperands(
+        OpCode $opcode,
+        $leftValue,
+        $rightValue,
+        int $leftType,
+        int $rightType
+    ) {
+        $i64 = $this->context->getTypeFromString('int64');
+        if (Variable::TYPE_NATIVE_DOUBLE === $leftType) {
+            $leftLong = $this->context->builder->fpToSi($leftValue, $i64);
+        } else {
+            $leftLong = $this->context->builder->intCast($leftValue, $i64);
+        }
+        if (Variable::TYPE_NATIVE_DOUBLE === $rightType) {
+            $rightLong = $this->context->builder->fpToSi($rightValue, $i64);
+        } else {
+            $rightLong = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
+        }
 
-        return new Variable(
-            $this->context,
-            Variable::TYPE_NATIVE_LONG,
-            Variable::KIND_VALUE,
-            $this->context->getTypeFromString('int64')->constInt(0, false)
-        );
-    }
+        if (OpCode::TYPE_SHIFT_LEFT === $opcode->type) {
+            return $this->context->builder->shl($leftLong, $rightLong);
+        }
 
-    private function shiftOperandJitTypeName(int $jitType): string
-    {
-        return match ($jitType) {
-            Variable::TYPE_NATIVE_LONG => 'int',
-            Variable::TYPE_NATIVE_DOUBLE => 'float',
-            Variable::TYPE_NATIVE_BOOL => 'bool',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_VALUE => 'mixed',
-            default => 'mixed',
-        };
+        return $this->context->builder->aShr($leftLong, $rightLong);
     }
 
     private function tryResolveCoreIntConstant(Variable $var): ?int

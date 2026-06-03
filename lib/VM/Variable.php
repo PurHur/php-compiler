@@ -1596,9 +1596,6 @@ restart:
             goto restart;
         }
         if (OpCode::TYPE_SHIFT_LEFT === $opCode || OpCode::TYPE_SHIFT_RIGHT === $opCode) {
-            if (self::TYPE_FLOAT === $left->type || self::TYPE_FLOAT === $right->type) {
-                self::throwUnsupportedOperandTypes($opCode, $left, $right);
-            }
             $this->int($this->_bitwiseOp($opCode, $left->toNumeric(), $right->toNumeric()));
 
             return;
@@ -1978,10 +1975,9 @@ restart:
                     return;
                 }
                 if ($expr->type === self::TYPE_FLOAT) {
-                    throw new \TypeError(sprintf(
-                        'Unsupported operand types: %s',
-                        self::operandZendTypeName($expr)
-                    ));
+                    $this->int(~(int) $expr->float);
+
+                    return;
                 }
                 if ($expr->type === self::TYPE_STRING) {
                     $bytes = $expr->string;
