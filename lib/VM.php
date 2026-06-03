@@ -3160,6 +3160,22 @@ restart:
                             $dst->bool($this->objectPropertyIsSet($object, $propName, $frame));
                             break;
                         }
+                        if (Variable::TYPE_STRING === $container->type) {
+                            if ($op->issetOnProperty) {
+                                $dst->bool(false);
+                                break;
+                            }
+                            $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+                            $dst->bool(Variable::stringOffsetIsSetFromDim(
+                                $container,
+                                $frame->scope[$op->arg3],
+                                $this->context->errors,
+                                $this->context,
+                                $frame,
+                                $scriptFile
+                            ));
+                            break;
+                        }
                         $dst->bool(false);
                         break;
                     }

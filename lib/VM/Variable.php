@@ -723,6 +723,31 @@ final class Variable {
         return $dim->toInt();
     }
 
+    /**
+     * isset()/empty() on string offsets: in-bounds true, OOB false, no uninitialized warning (#5307).
+     */
+    public static function stringOffsetIsSetFromDim(
+        self $container,
+        self $dim,
+        ?ErrorReporter $reporter = null,
+        ?Context $context = null,
+        ?\PHPCompiler\Frame $frame = null,
+        ?string $file = null
+    ): bool {
+        $container = $container->resolveIndirect();
+        if (self::TYPE_STRING !== $container->type) {
+            return false;
+        }
+        $rawIndex = self::stringOffsetIndexFromDim($dim, $reporter, $context, $frame, $file);
+        $len = strlen($container->string);
+        $index = $rawIndex;
+        if ($index < 0) {
+            $index += $len;
+        }
+
+        return $index >= 0 && $index < $len;
+    }
+
     public function stringOffset(
         Variable $parent,
         int $index,
