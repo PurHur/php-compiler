@@ -460,6 +460,8 @@ class Block {
             $this->paramIntersectionConstraints = $parent->paramIntersectionConstraints;
             $this->paramDnfConstraints = $parent->paramDnfConstraints;
             $this->paramNames = $parent->paramNames;
+            $this->paramByRef = $parent->paramByRef;
+            $this->paramSensitive = $parent->paramSensitive;
             $this->paramImplicitNullable = $parent->paramImplicitNullable;
         }
     }
