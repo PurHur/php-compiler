@@ -1,5 +1,11 @@
 --TEST--
-Language: ReflectionClass::newLazyGhost defers constructor (#4026)
+Language: ReflectionClass::newLazyGhost defers constructor (#4026, #4823)
+--SKIPIF--
+<?php
+if (PHP_VERSION_ID < 80400) {
+    die('skip ReflectionClass::newLazyGhost requires PHP 8.4+');
+}
+?>
 --FILE--
 <?php
 class Svc {
