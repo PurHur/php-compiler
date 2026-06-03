@@ -20,5 +20,7 @@ final class DebugInfoMagicMethodTest extends BaseTest
     {
         $path = __DIR__.'/../compliance/cases/language/debug_info.phpt';
         yield 'debug_info.phpt' => self::parsePHPT($path, 'debug_info.phpt');
+        $path = __DIR__.'/../compliance/cases/language/debug_info_type_error.phpt';
+        yield 'debug_info_type_error.phpt' => self::parsePHPT($path, 'debug_info_type_error.phpt');
     }
 }
