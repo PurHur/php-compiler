@@ -1981,7 +1981,12 @@ restart:
                             $frame
                         );
                     } catch (\LogicException $e) {
-                        return $this->raise($e->getMessage(), $frame);
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        return self::EXCEPTION;
                     }
                     $className = $frame->scope[$op->arg2]->resolveIndirect()->toString();
                     if (!isset($this->context->classes[$lcClass])) {
@@ -5517,15 +5522,15 @@ restart:
     {
         $lcClass = strtolower($className);
         if ('self' === $lcClass) {
-            return $this->declaringClassLc($frame);
+            return $this->declaringClassLc($frame, 'self');
         }
         if ('static' === $lcClass) {
             return $this->lateStaticClassLc($frame);
         }
         if ('parent' === $lcClass) {
-            $declaring = $this->declaringClassLc($frame);
+            $declaring = $this->declaringClassLc($frame, 'parent');
             if (!isset($this->context->classes[$declaring])) {
-                throw new \LogicException('parent:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('parent');
             }
             $parentLc = $this->context->classes[$declaring]->parentLc;
             if (null === $parentLc) {
@@ -5538,7 +5543,7 @@ restart:
         return $lcClass;
     }
 
-    protected function declaringClassLc(Frame $frame): string
+    protected function declaringClassLc(Frame $frame, string $scopeKeyword = 'self'): string
     {
         if (null !== $frame->block->func && null !== $frame->block->func->class) {
             return strtolower($frame->block->func->class->value);
@@ -5548,7 +5553,7 @@ restart:
             return strtolower($frame->calledClass);
         }
 
-        throw new \LogicException('self:: used outside of class scope');
+        PseudoClassScope::fatalInGlobalScope($scopeKeyword);
     }
 
     protected function lateStaticClassLc(Frame $frame): string
@@ -5557,7 +5562,7 @@ restart:
             return strtolower($frame->calledClass);
         }
 
-        return $this->declaringClassLc($frame);
+        return $this->declaringClassLc($frame, 'static');
     }
 
     protected function inferCalledClass(Frame $frame): ?string

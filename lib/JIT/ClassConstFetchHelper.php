@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
+use PHPCompiler\PseudoClassScope;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\ReadonlyRaise;
@@ -372,7 +373,7 @@ final class ClassConstFetchHelper
         if ('self' === $lc) {
             $scope = self::jitScopeClassName($objectType, $block);
             if (null === $scope) {
-                throw new \LogicException('self:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('self');
             }
 
             return $scope;
@@ -380,7 +381,7 @@ final class ClassConstFetchHelper
         if ('static' === $lc) {
             $scope = self::jitLateStaticClassName($objectType, $block);
             if (null === $scope) {
-                throw new \LogicException('static:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('static');
             }
 
             return $scope;
@@ -388,7 +389,7 @@ final class ClassConstFetchHelper
         if ('parent' === $lc) {
             $scope = self::jitScopeClassName($objectType, $block);
             if (null === $scope) {
-                throw new \LogicException('parent:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('parent');
             }
             $parent = $objectType->parentClassDisplayName($scope);
             if (null === $parent) {

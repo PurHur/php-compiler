@@ -9930,7 +9930,7 @@ class JIT {
         $lc = strtolower($classOp->value);
         if ('self' === $lc) {
             if (null === $block->func || null === $block->func->class) {
-                throw new \LogicException('self:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('self');
             }
 
             return $block->func->class->value;
@@ -9942,11 +9942,11 @@ class JIT {
             if (null !== $block->func && null !== $block->func->class) {
                 return $block->func->class->value;
             }
-            throw new \LogicException('static:: used outside of class scope');
+            PseudoClassScope::fatalInGlobalScope('static');
         }
         if ('parent' === $lc) {
             if (null === $block->func || null === $block->func->class) {
-                throw new \LogicException('parent:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('parent');
             }
             $parentLc = $this->context->type->object->parentClassLc($block->func->class->value);
             if (null === $parentLc) {
