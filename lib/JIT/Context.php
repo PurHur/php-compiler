@@ -137,7 +137,6 @@ class Context {
     private array $arrayConstantMap = [];
 
     /** @var array<string, \PHPCompiler\VM\HashTable> */
-    private array $arrayConstantPendingInit = [];
 
     private array $modules = [];
 
@@ -1118,7 +1117,7 @@ class Context {
     }
 
     /**
-     * Module global for a compile-time constant array (lazy-init in main — #4904).
+     * Module global for a compile-time constant array (eager __init__ — #4904, #4941).
      */
     public function constantArrayFromVmHashTable(string $cacheKey, \PHPCompiler\VM\HashTable $table): PHPLLVM\Value
     {
@@ -1127,32 +1126,24 @@ class Context {
             $global = $this->module->addGlobal($ptrTy, 'array_const_' . \count($this->arrayConstantMap));
             $global->setInitializer($ptrTy->constNull());
             $this->arrayConstantMap[$cacheKey] = $global;
-            $this->arrayConstantPendingInit[$cacheKey] = $table;
+            $this->emitConstantArrayInitInInitBlock($global, $table);
         }
 
         return $this->arrayConstantMap[$cacheKey];
     }
 
+    /** @deprecated Inline lazy-init removed; arrays initialize in __init__ (#4941). */
     public function ensureConstantArrayLazyInit(string $cacheKey): void
     {
-        if (!isset($this->arrayConstantPendingInit[$cacheKey])) {
-            return;
-        }
-        $table = $this->arrayConstantPendingInit[$cacheKey];
-        unset($this->arrayConstantPendingInit[$cacheKey]);
-        $global = $this->arrayConstantMap[$cacheKey];
-        $ptrTy = $this->getTypeFromString('__value__*');
-        $loaded = $this->builder->load($global);
-        $isNull = $this->builder->icmp(
-            PHPLLVM\Builder::INT_EQ,
-            $loaded,
-            $ptrTy->constNull()
-        );
-        $initBlock = BasicBlockHelper::append($this, 'global_const_array_init');
-        $doneBlock = BasicBlockHelper::append($this, 'global_const_array_done');
-        $this->builder->branchIf($isNull, $initBlock, $doneBlock);
-        $this->builder->positionAtEnd($initBlock);
-        $ht = $this->materializeVmHashTableForConstInit($table);
+    }
+
+    private function emitConstantArrayInitInInitBlock(PHPLLVM\Value $global, \PHPCompiler\VM\HashTable $table): void
+    {
+        $oldBuilder = $this->builder;
+        $this->builder = $this->context->builderCreate();
+        $this->builder->positionAtEnd($this->initBlock);
+        $htVar = HashTableHelper::variableFromVmHashTable($this, $table);
+        $ht = HashTableHelper::loadHashtablePointer($this, $htVar);
         $this->refcount->addref($ht);
         $valueType = $this->getTypeFromString('__value__');
         $heapVal = $this->memory->malloc($valueType);
@@ -1166,8 +1157,7 @@ class Context {
             $ht
         );
         $this->builder->store($heapPtr, $global);
-        $this->builder->branch($doneBlock);
-        $this->builder->positionAtEnd($doneBlock);
+        $this->builder = $oldBuilder;
     }
 
     private function materializeVmHashTableForConstInit(\PHPCompiler\VM\HashTable $table): PHPLLVM\Value
@@ -1617,7 +1607,6 @@ class Context {
                     break;
                 case VMVariable::TYPE_ARRAY:
                     $global = $this->constantArrayFromVmHashTable($name, $phpVar->toArray());
-                    $this->ensureConstantArrayLazyInit($name);
                     $this->constants[$name] = [Variable::TYPE_VALUE, $global];
                     break;
                 default:

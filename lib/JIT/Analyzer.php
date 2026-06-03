@@ -77,8 +77,8 @@ class Analyzer
                 || $usage instanceof Op\Terminal\StaticVar) {
                 continue;
             } elseif ($usage instanceof Op\Terminal\Const_) {
-                // Global const array literals stay on __hashtable__ / module globals (#4904).
-                return true;
+                // Immutable global const arrays use module globals in __init__ (#4904, #4941).
+                continue;
             } else {
                 throw new \LogicException('Not implemented escape operand '.get_class($usage));
             }
