@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for get_object_id() via phpc_object_id.c (#3537). */
+/** LLVM lowering for get_object_id() — object handle as ptrToInt (#3537, #5291). */
 final class JitGetObjectId
 {
     private const TYPE_ERROR = 'get_object_id(): Argument #1 ($object) must be of type object, %s given';
@@ -21,10 +21,7 @@ final class JitGetObjectId
     public static function invoke(Context $context, JITVariable $arg): Value
     {
         if (JITVariable::TYPE_OBJECT === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('phpc_get_object_id_from_object'),
-                $context->helper->loadValue($arg)
-            );
+            return self::objectHandle($context, $context->helper->loadValue($arg));
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
             return self::boxed($context, $arg);
@@ -56,10 +53,22 @@ final class JitGetObjectId
         self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'mixed'));
 
         $context->builder->positionAtEnd($okBlock);
-
-        return $context->builder->call(
-            $context->lookupFunction('phpc_get_object_id_from_value'),
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
             $loaded
+        );
+
+        return self::objectHandle($context, $obj);
+    }
+
+    private static function objectHandle(Context $context, Value $obj): Value
+    {
+        $voidp = $context->getTypeFromString('void')->pointerType(0);
+        $i64 = $context->getTypeFromString('int64');
+
+        return $context->builder->ptrToInt(
+            $context->builder->pointerCast($obj, $voidp),
+            $i64
         );
     }
 
