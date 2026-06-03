@@ -1275,61 +1275,32 @@ PY
 
 repair_php_types_union_type_reconstructor_if_needed() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  local ssot="${ROOT}/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
   [[ -f "$target" ]] || return 0
-  if ! grep -q 'instanceof Op\\Type\\Union_' "$target" 2>/dev/null; then
-    return 0
-  fi
   if php -l "$target" >/dev/null 2>&1; then
     return 0
   fi
   echo "apply-patches: repairing malformed php-types-union-type in TypeReconstructor.php (#4229)" >&2
-  python3 - "$target" <<'PY'
+  if [[ ! -f "$ssot" ]]; then
+    echo "apply-patches: missing SSOT ${ssot} for TypeReconstructor repair" >&2
+    return 1
+  fi
+  python3 - "$target" "$ssot" <<'PY'
 import sys
 from pathlib import Path
 
 path = Path(sys.argv[1])
+ssot = Path(sys.argv[2])
 text = path.read_text()
-union_block = """        } elseif ($type instanceof Op\\Type\\Union_) {
-            $subs = [];
-            foreach ($type->types as $sub) {
-                $subs[] = $this->resolveOpType($sub);
-            }
-
-            return (new Type(Type::TYPE_UNION, $subs))->simplify();
-        }
-
-"""
-never_tail = """        } elseif ($type instanceof Op\\Type\\Never_) {
-            return Type::never();
-        }
-
-        throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
-never_union_tail = """        } elseif ($type instanceof Op\\Type\\Never_) {
-            return Type::never();
-        }
-""" + union_block + """
-        throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
-
-import re
-# Drop any partial Union_/Never_ tail before the resolveOpType throw.
-text = re.sub(
-    r"\n        \} elseif \(\$type instanceof Op\\Type\\Never_\) \{.*?"
-    r"throw new \\LogicException\('Unknown Op\\\\Type provided:",
-    "\n" + never_union_tail,
-    text,
-    count=1,
-    flags=re.S,
-)
-if "instanceof Op\\Type\\Union_" not in text:
-    if "        } elseif ($type instanceof Op\\Type\\Intersection) {" in text:
-        text = text.replace(
-            "        } elseif ($type instanceof Op\\Type\\Intersection) {",
-            union_block + "        } elseif ($type instanceof Op\\Type\\Intersection) {",
-            1,
-        )
-    elif never_tail in text:
-        text = text.replace(never_tail, never_union_tail, 1)
-path.write_text(text)
+ssot_text = ssot.read_text()
+start = text.find("    private function resolveOpType(Op\\Type $type): Type")
+end = text.find("    private function resolveMethodCall", start)
+ssot_start = ssot_text.find("    private function resolveOpType(Op\\Type $type): Type")
+ssot_end = ssot_text.find("    private function resolveMethodCall", ssot_start)
+if -1 in (start, end, ssot_start, ssot_end) or end <= start or ssot_end <= ssot_start:
+    sys.stderr.write("php-types-union-type-repair: resolveOpType anchors not found\n")
+    raise SystemExit(1)
+path.write_text(text[:start] + ssot_text[ssot_start:ssot_end] + text[end:])
 PY
 }
 
@@ -1352,16 +1323,12 @@ union_body = """            $subs = [];
 
             return (new Type(Type::TYPE_UNION, $subs))->simplify();
 """
-union_before_intersection = (
+union_branch = (
     "        } elseif ($type instanceof Op\\Type\\Union_) {\n"
     + union_body
     + "        }\n"
 )
-union_after_never = (
-    "        } elseif ($type instanceof Op\\Type\\Union_) {\n"
-    + union_body
-    + "        }\n"
-)
+union_before_intersection = union_branch
 if "instanceof Op\\Type\\Union_" in text:
     raise SystemExit(0)
 
@@ -1371,24 +1338,44 @@ never_throw_anchor = """        } elseif ($type instanceof Op\\Type\\Never_) {
         }
 
         throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
+literal_throw_anchor = """        } elseif ($type instanceof Op\\Type\\Literal) {
+            return Type::fromDecl($type->name);
+        }
+
+        throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
+never_union_tail = (
+    """        } elseif ($type instanceof Op\\Type\\Never_) {
+            return Type::never();
+        } elseif ($type instanceof Op\\Type\\Union_) {
+"""
+    + union_body
+    + """        }
+
+        throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
+)
+literal_union_tail = (
+    """        } elseif ($type instanceof Op\\Type\\Literal) {
+            return Type::fromDecl($type->name);
+        } elseif ($type instanceof Op\\Type\\Never_) {
+            return Type::never();
+        } elseif ($type instanceof Op\\Type\\Union_) {
+"""
+    + union_body
+    + """        }
+
+        throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
+)
 
 if intersection_anchor in text:
     text = text.replace(intersection_anchor, union_before_intersection + intersection_anchor, 1)
 elif never_throw_anchor in text:
-    text = text.replace(
-        never_throw_anchor,
-        """        } elseif ($type instanceof Op\\Type\\Never_) {
-            return Type::never();
-        """
-        + union_after_never
-        + """
-        throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));""",
-        1,
-    )
+    text = text.replace(never_throw_anchor, never_union_tail, 1)
+elif literal_throw_anchor in text:
+    text = text.replace(literal_throw_anchor, literal_union_tail, 1)
 else:
     sys.stderr.write(
         "php-types-union-type: TypeReconstructor anchor not found "
-        "(expected Intersection handler or Never_/throw tail)\n"
+        "(expected Intersection handler, Never_/throw tail, or Literal/throw tail)\n"
     )
     raise SystemExit(1)
 path.write_text(text)
@@ -2010,6 +1997,62 @@ if idx < 0:
 path.write_text(text[:idx] + block + text[idx:])
 PY
   echo "Applied php-types-anonymous-class-type.patch (overlay)"
+}
+
+apply_php_types_ns_func_call_overlay() {
+  apply_php_types_ns_func_call_overlay_to_target() {
+    local target="$1"
+    if grep -q 'function resolveOp_Expr_NsFuncCall' "$target" 2>/dev/null; then
+      echo "Skip php-types-ns-func-call.patch (already applied): ${target}"
+      return 0
+    fi
+    python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+ns_func_block = """    protected function resolveOp_Expr_NsFuncCall(Operand $var, Op\\Expr\\NsFuncCall $op, SplObjectStorage $resolved)
+    {
+        if ($op->nsName instanceof Operand\\Literal) {
+            $name = strtolower($op->nsName->value);
+            if (isset($this->state->functionLookup[$name])) {
+                $result = [];
+                foreach ($this->state->functionLookup[$name] as $func) {
+                    if ($func->returnType) {
+                        $result[] = Type::fromTypeDecl($func->returnType);
+                    } else {
+                        $result[] = Type::extractTypeFromComment('return', $func->getAttribute('doccomment'));
+                    }
+                }
+
+                return $result;
+            }
+            if (isset($this->state->internalTypeInfo->functions[$name])) {
+                $type = $this->state->internalTypeInfo->functions[$name];
+                if (empty($type['return'])) {
+                    return false;
+                }
+
+                return [Type::fromDecl($type['return'])];
+            }
+        }
+
+        return false;
+    }
+
+"""
+anchor = "    protected function resolveOp_Expr_New(Operand $var, Op\\Expr\\New_ $op, SplObjectStorage $resolved)"
+if anchor not in text:
+    sys.stderr.write("php-types-ns-func-call: resolveOp_Expr_New anchor not found\\n")
+    raise SystemExit(1)
+path.write_text(text.replace(anchor, ns_func_block + anchor, 1))
+PY
+    echo "Applied php-types-ns-func-call.patch (overlay): ${target}"
+  }
+
+  apply_php_types_ns_func_call_overlay_to_target "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  apply_php_types_ns_func_call_overlay_to_target "$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
 }
 
 apply_php_types_fromdecl_junk_fragments_overlay() {
@@ -2708,6 +2751,10 @@ apply_patch() {
   fi
   if [[ "$(basename "$patch")" == "php-types-anonymous-class-type.patch" ]]; then
     apply_php_types_anonymous_class_type_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-types-ns-func-call.patch" ]]; then
+    apply_php_types_ns_func_call_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-types-fromdecl-junk-fragments.patch" ]]; then
