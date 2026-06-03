@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\MethodVisibility;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
@@ -18,11 +19,12 @@ use PHPLLVM\Value;
 /** LLVM lowering for get_object_vars() (issue #1370). */
 final class JitGetObjectVars
 {
-    private const TYPE_ERROR = 'get_object_vars(): Argument #1 ($object) must be of type object, %s given';
+    private const TYPE_ERROR = '%s(): Argument #1 ($object) must be of type object, %s given';
 
-    public static function invoke(Context $context, JITVariable $objectArg): Value
+    public static function invoke(Context $context, JITVariable $objectArg, bool $mangledKeys = false): Value
     {
-        $obj = self::resolveObject($context, $objectArg);
+        $function = $mangledKeys ? 'get_mangled_object_vars' : 'get_object_vars';
+        $obj = self::resolveObject($context, $objectArg, $function);
         $objMap = $context->structFieldMap['__object__'];
         $classId = $context->builder->load(
             $context->builder->structGep($obj, $objMap['class_id'])
@@ -40,7 +42,7 @@ final class JitGetObjectVars
             $nextClass = BasicBlockHelper::append($context, 'gov_next_class_'.$id);
             $context->builder->branchIf($isClass, $classBlock, $nextClass);
             $context->builder->positionAtEnd($classBlock);
-            self::appendInstanceProperties($context, $object, $obj, $className, $id, $ht);
+            self::appendInstanceProperties($context, $object, $obj, $className, $id, $ht, $mangledKeys);
             $context->builder->branch($nextClass);
             $context->builder->positionAtEnd($nextClass);
         }
@@ -56,21 +58,21 @@ final class JitGetObjectVars
         return $ptr;
     }
 
-    private static function resolveObject(Context $context, JITVariable $objectArg): Value
+    private static function resolveObject(Context $context, JITVariable $objectArg, string $function): Value
     {
         if (JITVariable::TYPE_OBJECT === $objectArg->type) {
             return $context->helper->loadValue($objectArg);
         }
         if (JITVariable::TYPE_VALUE === $objectArg->type) {
-            return self::resolveBoxedObject($context, $objectArg);
+            return self::resolveBoxedObject($context, $objectArg, $function);
         }
 
-        self::emitTypeErrorAndAbort($context, self::scalarTypeError($objectArg->type));
+        self::emitTypeErrorAndAbort($context, self::scalarTypeError($objectArg->type, $function));
 
         return $context->getTypeFromString('__object__*')->constNull();
     }
 
-    private static function resolveBoxedObject(Context $context, JITVariable $objectArg): Value
+    private static function resolveBoxedObject(Context $context, JITVariable $objectArg, string $function): Value
     {
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $objectArg);
         $typeField = $context->structFieldMap['__value__']['type'];
@@ -88,7 +90,7 @@ final class JitGetObjectVars
         $context->builder->branchIf($isObject, $okBlock, $errBlock);
 
         $context->builder->positionAtEnd($errBlock);
-        self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'mixed'));
+        self::emitTypeErrorAndAbort($context, self::formatTypeError($function, 'mixed'));
 
         $context->builder->positionAtEnd($okBlock);
         $obj = $context->builder->call(
@@ -107,22 +109,27 @@ final class JitGetObjectVars
         $context->builder->call($context->lookupFunction('abort'));
     }
 
-    private static function scalarTypeError(int $type): string
+    private static function scalarTypeError(int $type, string $function): string
     {
         switch ($type) {
             case JITVariable::TYPE_NATIVE_LONG:
-                return \sprintf(self::TYPE_ERROR, 'int');
+                return self::formatTypeError($function, 'int');
             case JITVariable::TYPE_NATIVE_DOUBLE:
-                return \sprintf(self::TYPE_ERROR, 'float');
+                return self::formatTypeError($function, 'float');
             case JITVariable::TYPE_NATIVE_BOOL:
-                return \sprintf(self::TYPE_ERROR, 'bool');
+                return self::formatTypeError($function, 'bool');
             case JITVariable::TYPE_STRING:
-                return \sprintf(self::TYPE_ERROR, 'string');
+                return self::formatTypeError($function, 'string');
             case JITVariable::TYPE_NULL:
-                return \sprintf(self::TYPE_ERROR, 'null');
+                return self::formatTypeError($function, 'null');
             default:
-                return \sprintf(self::TYPE_ERROR, 'mixed');
+                return self::formatTypeError($function, 'mixed');
         }
+    }
+
+    private static function formatTypeError(string $function, string $given): string
+    {
+        return \sprintf(self::TYPE_ERROR, $function, $given);
     }
 
     private static function appendInstanceProperties(
@@ -131,13 +138,17 @@ final class JitGetObjectVars
         Value $obj,
         string $className,
         int $classId,
-        Value $ht
+        Value $ht,
+        bool $mangledKeys = false
     ): void {
         foreach ($object->instancePropertySets($classId) as $i => $propset) {
             $propName = $propset[1];
             $propType = $propset[2];
             $fetched = $object->propertyFetch($obj, $className, $propName);
-            $keyStr = $context->builder->load($context->constantStringFromString($propName));
+            $key = $mangledKeys
+                ? self::manglePropertyKey($propName, $object->propertyVisibility($classId, $propName), $className)
+                : $propName;
+            $keyStr = $context->builder->load($context->constantStringFromString($key));
             if (JITVariable::TYPE_VALUE !== $propType) {
                 self::storePropertyAtStringKey($context, $ht, $keyStr, $fetched, $propType);
 
@@ -207,5 +218,20 @@ final class JitGetObjectVars
             return;
         }
         HashTableHelper::setAtStringKey($context, $ht, $keyStr, $fetched);
+    }
+
+    /**
+     * Zend property hash key for ZEND_PROP_PURPOSE_DEBUG (php-src zend_mangle_property_name).
+     */
+    private static function manglePropertyKey(string $propName, int $visibility, string $declaringClassName): string
+    {
+        if (MethodVisibility::isPublic($visibility)) {
+            return $propName;
+        }
+        if (($visibility & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+            return "\0*\0".$propName;
+        }
+
+        return "\0".$declaringClassName."\0".$propName;
     }
 }
