@@ -43,6 +43,78 @@ bootstrap_gen0_seed_prelinked_m3_sidecars() {
   fi
   cp -f "${minimal_seed}" "${minimal_blob}"
   chmod +x "${blob}" "${minimal_blob}"
+  local compiler_lib_seed="${root}/prelinked/bootstrap-gen0/compiler_lib_aot_blob"
+  if [[ -f "${compiler_lib_seed}" && -s "${compiler_lib_seed}" ]]; then
+    cp -f "${compiler_lib_seed}" "${root}/build/.m3_compiler_lib_aot_blob"
+    chmod +x "${root}/build/.m3_compiler_lib_aot_blob"
+    if [[ -f "${root}/prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha" ]]; then
+      cp -f "${root}/prelinked/bootstrap-gen0/.m3_compiler_lib_sidecar.sha" \
+        "${root}/build/.m3_compiler_lib_sidecar.sha"
+    fi
+  fi
+  return 0
+}
+
+# SHA-1 of M2 compiler_lib_spine_smoke entry (sidecar + inventory argv driver must match).
+bootstrap_compiler_lib_spine_entry_sha() {
+  local root="${ROOT:-}"
+  local entry="${root}/test/selfhost/compiler_lib_spine_smoke/main.php"
+  if [[ -z "${root}" || ! -f "${entry}" ]]; then
+    return 1
+  fi
+  sha1sum "${entry}" | awk '{print $1}'
+}
+
+# Ensure build/.m3_compiler_lib_aot_blob matches current spine entry (#3012, #2967).
+bootstrap_ensure_m3_compiler_lib_sidecar() {
+  local root="${ROOT:-}"
+  local entry="${root}/test/selfhost/compiler_lib_spine_smoke/main.php"
+  local blob="${root}/build/.m3_compiler_lib_aot_blob"
+  local stamp="${root}/build/.m3_compiler_lib_sidecar.sha"
+  if [[ -z "${root}" || ! -f "${entry}" ]]; then
+    echo "bootstrap-ensure-m3-compiler-lib-sidecar: missing spine entry ${entry}" >&2
+    return 1
+  fi
+  local want_sha
+  want_sha="$(bootstrap_compiler_lib_spine_entry_sha)" || return 1
+  if [[ -f "${blob}" && -s "${blob}" && -f "${stamp}" && "$(cat "${stamp}" 2>/dev/null)" == "${want_sha}" ]]; then
+    return 0
+  fi
+  bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
+  if [[ -f "${blob}" && -s "${blob}" && -f "${stamp}" && "$(cat "${stamp}" 2>/dev/null)" == "${want_sha}" ]]; then
+    return 0
+  fi
+  if [[ "${BOOTSTRAP_SKIP_COMPILER_LIB_SIDECAR_REGEN:-0}" == "1" ]]; then
+    echo "bootstrap-ensure-m3-compiler-lib-sidecar: stale/missing ${blob} (BOOTSTRAP_SKIP_COMPILER_LIB_SIDECAR_REGEN=1)" >&2
+    return 1
+  fi
+  if ! command -v php >/dev/null 2>&1; then
+    echo "bootstrap-ensure-m3-compiler-lib-sidecar: php required to host-compile ${entry}" >&2
+    return 1
+  fi
+  echo "bootstrap-ensure-m3-compiler-lib-sidecar: host-compile spine entry -> ${blob} (#3012)" >&2
+  mkdir -p "${root}/build"
+  rm -f "${blob}"
+  local regen_log regen_code=0
+  set +e
+  regen_log="$(
+    env PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD=1 \
+      PHP_COMPILER_SELFHOST_AOT=1 \
+      PHP_COMPILER_CLI_SPINE_BUNDLE=1 \
+      PHP_COMPILER_MEMORY_LIMIT="${PHP_COMPILER_MEMORY_LIMIT:-4096M}" \
+      php -d "memory_limit=${PHP_COMPILER_MEMORY_LIMIT:-4096M}" \
+      "${root}/bin/compile.php" -o "${blob}" "${entry}" 2>&1
+  )"
+  regen_code=$?
+  set -e
+  if [[ "${regen_code}" -ne 0 || ! -f "${blob}" || ! -s "${blob}" ]]; then
+    printf '%s\n' "${regen_log}" >&2
+    echo "bootstrap-ensure-m3-compiler-lib-sidecar: host-compile failed (exit ${regen_code}); inventory argv driver may return parseAndCompile null (#2967)" >&2
+    echo "bootstrap-ensure-m3-compiler-lib-sidecar: hint: refresh prelinked/bootstrap-gen0 after spine entry changes, or fix Zend spine AOT (VM/JIT)" >&2
+    return 1
+  fi
+  chmod +x "${blob}"
+  printf '%s' "${want_sha}" >"${stamp}"
   return 0
 }
 
