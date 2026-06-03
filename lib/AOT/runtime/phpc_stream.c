@@ -345,6 +345,80 @@ int64_t __compiler_stream_set_chunk_size(int64_t handle, int64_t chunk_size)
     return (int64_t) previous;
 }
 
+/* stream_supports() feature codes — php-src main/php_streams.h + issue #5062 */
+#define PHPC_STREAM_META_TOUCH 1
+#define PHPC_STREAM_META_OWNER_NAME 2
+#define PHPC_STREAM_META_OWNER 3
+#define PHPC_STREAM_META_GROUP_NAME 4
+#define PHPC_STREAM_META_GROUP 5
+#define PHPC_STREAM_META_ACCESS 6
+#define PHPC_STREAM_LOCK 7
+#define PHPC_STREAM_FILTER 8
+
+static int phpc_stream_supports_lock(FILE *fp, const char *path)
+{
+    int fd;
+
+    if (NULL == fp || NULL == path) {
+        return 0;
+    }
+    if (0 == strncmp(path, "php://", 6)) {
+        return 0;
+    }
+    fd = fileno(fp);
+#if defined(_WIN32)
+    (void) fd;
+
+    return 0;
+#else
+
+    return fd >= 0;
+#endif
+}
+
+static int phpc_stream_supports_metadata(const char *path)
+{
+    if (NULL == path) {
+        return 0;
+    }
+    if (0 == strncmp(path, "php://", 6)) {
+        return 0;
+    }
+
+    return 1;
+}
+
+int __compiler_stream_supports(int64_t handle, int64_t feature)
+{
+    FILE *fp;
+    const char *path;
+
+    if (handle <= 0 || handle >= PHPC_MAX_STREAM_HANDLES || NULL == phpc_stream_handles[handle]) {
+        return 0;
+    }
+    fp = phpc_stream_handles[handle];
+    path = phpc_stream_paths[handle];
+    switch ((int) feature) {
+        case PHPC_STREAM_LOCK:
+            return phpc_stream_supports_lock(fp, path);
+        case PHPC_STREAM_FILTER:
+            if (NULL != path && 0 == strncmp(path, "php://", 6)) {
+                return 0;
+            }
+
+            return 1;
+        case PHPC_STREAM_META_TOUCH:
+        case PHPC_STREAM_META_OWNER_NAME:
+        case PHPC_STREAM_META_OWNER:
+        case PHPC_STREAM_META_GROUP_NAME:
+        case PHPC_STREAM_META_GROUP:
+        case PHPC_STREAM_META_ACCESS:
+            return phpc_stream_supports_metadata(path);
+        default:
+            return 0;
+    }
+}
+
 int __compiler_stream_set_timeout(int64_t handle, int64_t seconds, int64_t microseconds)
 {
     if (handle <= 0 || handle >= PHPC_MAX_STREAM_HANDLES || NULL == phpc_stream_handles[handle]) {

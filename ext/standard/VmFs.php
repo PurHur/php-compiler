@@ -617,6 +617,63 @@ final class VmFs
     }
 
     /**
+     * stream_supports() — capability probe (php-src php_stream_* option API, issue #5062).
+     */
+    public static function streamSupports(int $handle, int $feature): bool
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        switch ($feature) {
+            case VmStreamSupports::STREAM_LOCK:
+                return \stream_supports_lock($fp);
+            case VmStreamSupports::STREAM_FILTER:
+                return self::streamSupportsFilter($fp);
+            case VmStreamSupports::STREAM_META_TOUCH:
+            case VmStreamSupports::STREAM_META_OWNER_NAME:
+            case VmStreamSupports::STREAM_META_OWNER:
+            case VmStreamSupports::STREAM_META_GROUP_NAME:
+            case VmStreamSupports::STREAM_META_GROUP:
+            case VmStreamSupports::STREAM_META_ACCESS:
+                return self::streamSupportsMetadata($fp);
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * @param resource $fp
+     */
+    private static function streamSupportsFilter($fp): bool
+    {
+        $meta = @\stream_get_meta_data($fp);
+        if (!\is_array($meta)) {
+            return false;
+        }
+        $uri = (string) ($meta['uri'] ?? '');
+        if ('php://input' === $uri || 'php://output' === $uri || 'php://stdin' === $uri) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param resource $fp
+     */
+    private static function streamSupportsMetadata($fp): bool
+    {
+        $meta = @\stream_get_meta_data($fp);
+        if (!\is_array($meta)) {
+            return false;
+        }
+        $wrapper = \strtolower((string) ($meta['wrapper_type'] ?? ''));
+
+        return \in_array($wrapper, ['file', 'plainfile'], true);
+    }
+
+    /**
      * stream_set_timeout() — php-src ext/standard/streams.c (issue #3754).
      */
     public static function streamSetTimeout(int $handle, int $seconds, int $microseconds = 0): bool
