@@ -31,4 +31,21 @@ PHP;
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
         self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $x', preg_replace('/\s+/', ' ', $rewritten));
     }
+
+    public function testRewriteConstructorPromotedPrivateSet(): void
+    {
+        $source = <<<'PHP'
+<?php
+class User {
+    public function __construct(
+        public private(set) string $name,
+    ) {}
+}
+PHP;
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:private*/ public string $name',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
+    }
 }

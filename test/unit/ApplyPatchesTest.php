@@ -267,6 +267,21 @@ PHP;
         self::assertStringContainsString('apply_php_cfg_asymmetric_visibility_overlay', $script);
     }
 
+    public function testPhpCfgParserExtractsPromotedAsymmetricSetVisibility(): void
+    {
+        $parserFile = dirname(__DIR__, 2).'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        self::assertFileExists($parserFile);
+        self::assertStringContainsString(
+            'extractAsymmetricSetVisibilityFromAttributes',
+            (string) file_get_contents($parserFile),
+            'Parser must recover phpc-asymmetric-set markers (#4690)'
+        );
+        self::assertStringContainsString(
+            'promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes',
+            (string) file_get_contents($parserFile)
+        );
+    }
+
     public function testPhpCfgAsymmetricVisibilityFieldsPresentAfterApplyPatches(): void
     {
         $prop = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php';

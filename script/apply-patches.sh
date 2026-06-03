@@ -536,7 +536,57 @@ raise SystemExit(1)
 PY
     echo "Applied php-cfg-asymmetric-visibility.patch (Param overlay)"
   fi
+  apply_php_cfg_asymmetric_set_visibility_parser_overlay
   return 0
+}
+
+apply_php_cfg_asymmetric_set_visibility_parser_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg/asymmetric-set-visibility-parser-methods.php"
+  if [[ ! -f "$parser" || ! -f "$overlay" ]]; then
+    return 0
+  fi
+  if grep -q 'function extractAsymmetricSetVisibilityFromAttributes' "$parser" 2>/dev/null; then
+    return 0
+  fi
+  python3 - "$parser" "$overlay" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+text = parser_path.read_text()
+if 'function extractAsymmetricSetVisibilityFromAttributes' in text:
+    raise SystemExit(0)
+
+anchor = """    protected function parseExpr_Yield(Expr\\Yield_ $expr)
+    {"""
+if anchor not in text:
+    sys.stderr.write("php-cfg-asymmetric-set-visibility: parseExpr_Yield anchor not found in Parser.php\n")
+    raise SystemExit(1)
+
+insert = method_path.read_text().rstrip("\n") + "\n\n"
+text = text.replace(anchor, insert + anchor, 1)
+
+param_needle = "            $p->promotionReadonly = 0 !== ($param->flags & Stmt\\Class_::MODIFIER_READONLY);\n"
+param_insert = param_needle + "            $p->promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($p->getAttributes());\n"
+if param_needle not in text:
+    sys.stderr.write("php-cfg-asymmetric-set-visibility: Param promotionReadonly anchor missing\n")
+    raise SystemExit(1)
+if 'promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text:
+    text = text.replace(param_needle, param_insert, 1)
+
+prop_needle = "            $property->readonly = 0 !== ($node->flags & Node\\Stmt\\Class_::MODIFIER_READONLY);\n"
+prop_insert = prop_needle + "            $property->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($property->getAttributes());\n"
+if prop_needle not in text:
+    sys.stderr.write("php-cfg-asymmetric-set-visibility: Property readonly anchor missing\n")
+    raise SystemExit(1)
+if 'property->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text:
+    text = text.replace(prop_needle, prop_insert, 1)
+
+parser_path.write_text(text)
+PY
+  echo "Applied php-cfg asymmetric set-visibility Parser overlay (#4690)"
 }
 
 apply_php_cfg_incdec_expr_overlay() {
