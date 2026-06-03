@@ -1849,6 +1849,93 @@ apply_php_cfg_in_operator_overlay() {
   echo "Applied php-cfg-in-operator overlay (In_.php)"
 }
 
+apply_php_cfg_list_spread_overlay() {
+  local assign="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assign.php"
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if grep -q 'listSpreadRhs' "$assign" 2>/dev/null \
+    && grep -q '\$item->unpack' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-list-spread.patch (already applied)"
+    return 0
+  fi
+  python3 - "$assign" "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+assign_path = Path(sys.argv[1])
+parser_path = Path(sys.argv[2])
+assign = assign_path.read_text()
+if 'listSpreadRhs' not in assign:
+    needle = "    public $expr;\n\n    protected $writeVariables"
+    insert = (
+        "    public $expr;\n\n"
+        "    /** `[$a, ...$rest] = $rhs` tail: full list RHS (#4835). */\n"
+        "    public $listSpreadRhs = null;\n\n"
+        "    /** Zero-based index of first element merged into the spread target (#4835). */\n"
+        "    public $listSpreadFromIndex = null;\n\n"
+        "    protected $writeVariables"
+    )
+    if needle not in assign:
+        sys.stderr.write("php-cfg-list-spread: Assign.php anchor not found\n")
+        raise SystemExit(1)
+    assign_path.write_text(assign.replace(needle, insert, 1))
+
+parser = parser_path.read_text()
+if '$item->unpack' in parser:
+    raise SystemExit(0)
+
+old = """        $attributes = $this->mapAttributes($expr);
+        foreach ($expr->items as $i => $item) {
+            if (null === $item) {
+                continue;
+            }
+
+            if ($item->key === null) {
+                $key = new Operand\\Literal($i);
+            } else {
+                $key = $this->readVariable($this->parseExprNode($item->key));
+            }
+
+            $var = $item->value;
+            $fetch = new Op\\Expr\\ArrayDimFetch($rhs, $key, $attributes);"""
+
+new = """        $attributes = $this->mapAttributes($expr);
+        $logicalIndex = 0;
+        foreach ($expr->items as $i => $item) {
+            if (null === $item) {
+                continue;
+            }
+
+            if ($item->key === null) {
+                $key = new Operand\\Literal($logicalIndex);
+            } else {
+                $key = $this->readVariable($this->parseExprNode($item->key));
+            }
+
+            $var = $item->value;
+            if ($item->unpack) {
+                $target = $this->writeVariable($this->parseExprNode($var));
+                $assign = new Op\\Expr\\Assign($target, $rhs, $attributes);
+                $assign->listSpreadRhs = $rhs;
+                $assign->listSpreadFromIndex = $logicalIndex;
+                $this->block->children[] = $assign;
+
+                continue;
+            }
+
+            if ($item->key === null) {
+                ++$logicalIndex;
+            }
+
+            $fetch = new Op\\Expr\\ArrayDimFetch($rhs, $key, $attributes);"""
+
+if old not in parser:
+    sys.stderr.write("php-cfg-list-spread: Parser.php anchor not found\n")
+    raise SystemExit(1)
+parser_path.write_text(parser.replace(old, new, 1))
+PY
+  echo "Applied php-cfg-list-spread.patch (overlay)"
+}
+
 apply_php_cfg_magic_script_const_overlay() {
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MagicScriptConst.php"
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
@@ -2427,6 +2514,10 @@ apply_patch() {
     apply_php_types_union_type_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-list-spread.patch" ]]; then
+    apply_php_cfg_list_spread_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-match.patch" ]]; then
     apply_php_cfg_match_overlay
     return $?
@@ -2547,6 +2638,8 @@ apply_patch "$PATCH_DIR/php-llvm-x86-posix-fallback.patch"
 if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   # __TRAIT__ scope (traitStack overlay) must run before patches that can fail early (#3640).
   apply_php_cfg_magic_constants_overlay || true
+  # PHP 8.3 `in` operator CFG node must survive optional patch failures (#4682, #4850).
+  apply_php_cfg_in_operator_overlay || true
   apply_patch "$PATCH_DIR/php-cfg-dollars-brace.patch"
   apply_patch "$PATCH_DIR/php-cfg-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-cfg-nullsafe.patch"
@@ -2589,7 +2682,6 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-enum-implements.patch"
   apply_patch "$PATCH_DIR/php-cfg-enum-class-method.patch"
   apply_patch "$PATCH_DIR/php-cfg-enum-abstract.patch"
-  apply_php_cfg_in_operator_overlay || true
   apply_patch "$PATCH_DIR/php-cfg-named-args.patch"
   apply_patch "$PATCH_DIR/php-cfg-spread.patch"
   apply_patch "$PATCH_DIR/php-cfg-never-type.patch"
@@ -2689,6 +2781,9 @@ verify_critical_language_patches() {
   fi
   if ! grep -qE 'propertyFlags = \$node->flags|\$cfgProp->readonly =|\$prop->readonly =|\$property->readonly =|->readonly = 0 !== \\(\\$node->flags & .*MODIFIER_READONLY\\)' "$parser" 2>/dev/null; then
     missing+=("php-cfg-property-readonly-Parser")
+  fi
+  if [[ ! -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/In_.php" ]]; then
+    missing+=("php-cfg-in-operator-In_")
   fi
   if ((${#missing[@]} > 0)); then
     echo "apply-patches: critical language patch markers missing: ${missing[*]}" >&2

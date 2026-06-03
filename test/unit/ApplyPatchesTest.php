@@ -267,6 +267,56 @@ PHP;
         self::assertStringContainsString('apply_php_cfg_asymmetric_visibility_overlay', $script);
     }
 
+    public function testApplyPatchesInvokesInOperatorOverlayBeforeListSpread(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
+        self::assertMatchesRegularExpression(
+            '/apply_php_cfg_in_operator_overlay \|\| true[\s\S]*php-cfg-list-spread\.patch/s',
+            $script,
+            'In_ overlay must run before php-cfg-list-spread.patch (#4850)'
+        );
+    }
+
+    public function testPhpCfgInOperatorOverlayApplied(): void
+    {
+        $op = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/In_.php';
+        if (!is_dir(self::$root.'/vendor/ircmaxell/php-cfg')) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        self::assertFileIsReadable($op, 'php-cfg in-operator overlay must ship Op\\Expr\\In_ (#4682, #4850)');
+        $body = (string) file_get_contents($op);
+        self::assertStringContainsString('class In_ extends Expr', $body);
+    }
+
+    public function testPhpCfgInOperatorOverlayReappliesAfterPartialVendor(): void
+    {
+        $op = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/In_.php';
+        if (!is_readable($op)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $original = (string) file_get_contents($op);
+        unlink($op);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertSame(0, $exitCode, "apply-patches failed after removing In_.php:\n".$joined);
+            self::assertFileIsReadable($op, 'In_ overlay must restore Op\\Expr\\In_ (#4850)');
+        } finally {
+            if (!is_readable($op)) {
+                $dir = dirname($op);
+                if (!is_dir($dir)) {
+                    mkdir($dir, 0777, true);
+                }
+                file_put_contents($op, $original);
+            }
+        }
+    }
+
     public function testPhpCfgParserExtractsPromotedAsymmetricSetVisibility(): void
     {
         $parserFile = dirname(__DIR__, 2).'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
