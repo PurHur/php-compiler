@@ -1852,17 +1852,24 @@ restart:
                     try {
                         $classOperand = $frame->scope[$op->arg1]->resolveIndirect();
                         $methodName = $frame->scope[$op->arg2]->toString();
+                        $parentKeywordScope = false;
                         if (Variable::TYPE_OBJECT === $classOperand->type) {
                             $classEntry = $classOperand->toObject()->class;
                             $callableName = $classEntry->name.'::'.$methodName;
                         } else {
                             $className = $classOperand->toString();
+                            $parentKeywordScope = 'parent' === strtolower($className);
                             $lcClass = $this->resolveClassScopeName($className, $frame);
                             $callableName = $this->context->classes[$lcClass]->name.'::'.$methodName;
                         }
-                        $this->initStaticCallable($frame, $callableName);
+                        $this->initStaticCallable($frame, $callableName, $parentKeywordScope);
                     } catch (\LogicException $e) {
-                        return $this->raise($e->getMessage(), $frame);
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        return self::EXCEPTION;
                     }
                     break;
                 case OpCode::TYPE_CLASS_CONST_FETCH:
@@ -5357,7 +5364,9 @@ restart:
             return null;
         }
         $class = $object->class;
-        if (!isset($class->methods[$methodLc])) {
+        try {
+            [$declaringClass, $methodLc] = $this->resolveInstanceMethod($class, $methodLc);
+        } catch (\LogicException $e) {
             if (isset($class->methods['__call'])) {
                 $frame->magicCallMethodName = $methodName;
                 $frame->call = $class->methods['__call'];
@@ -5366,35 +5375,37 @@ restart:
 
                 return null;
             }
-            throw new \LogicException("Call to undefined method {$class->name}::{$methodLc}()");
+            throw $e;
         }
-        $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
-        $callerClassLc = null;
-        if (null !== $frame->block->func && null !== $frame->block->func->class) {
-            $callerClassLc = strtolower($frame->block->func->class->value);
+        $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        $callerClassLc = $this->callerClassLc($frame);
+        $callerDisplay = null;
+        if (null !== $callerClassLc && isset($this->context->classes[$callerClassLc])) {
+            $callerDisplay = $this->context->classes[$callerClassLc]->name;
         }
-        if (null === $callerClassLc && null !== $frame->calledClass && '' !== $frame->calledClass) {
-            $callerClassLc = strtolower($frame->calledClass);
-        }
+        $declaredName = $declaringClass->methodNames[$methodLc] ?? $methodName;
         try {
             MethodVisibility::assertCallable(
                 $vis,
                 $callerClassLc,
-                strtolower($class->name),
-                $class->name,
-                $methodName
+                strtolower($declaringClass->name),
+                $declaringClass->name,
+                $declaredName,
+                false,
+                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
+                $callerDisplay
             );
         } catch (\LogicException $e) {
             return $this->dispatchVmError($e->getMessage(), $frame);
         }
-        $frame->call = $class->methods[$methodLc];
+        $frame->call = $declaringClass->methods[$methodLc];
         $frame->callArgs = [$receiver];
         $frame->callArgEntries = [];
 
         return null;
     }
 
-    protected function initStaticCallable(Frame $frame, string $callableName): void
+    protected function initStaticCallable(Frame $frame, string $callableName, bool $parentKeywordScope = false): void
     {
         [$className, $methodName] = explode('::', $callableName, 2);
         $lcClass = $this->resolveClassScopeName($className, $frame);
@@ -5449,7 +5460,7 @@ restart:
             $callerClassLc = strtolower($frame->calledClass);
         }
         $parentScopeAllows = false;
-        if ($this->isParentClassDispatch($frame, $lcClass)) {
+        if ($parentKeywordScope) {
             $parentScopeAllows = MethodVisibility::parentScopeAllows(
                 $vis,
                 $callerClassLc,
@@ -5458,28 +5469,39 @@ restart:
                 fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc)
             );
         }
+        $declaredName = $class->methodNames[$methodLc] ?? $methodName;
+        $callerDisplay = null;
+        if (null !== $callerClassLc && isset($this->context->classes[$callerClassLc])) {
+            $callerDisplay = $this->context->classes[$callerClassLc]->name;
+        }
         MethodVisibility::assertCallable(
             $vis,
             $callerClassLc,
-            $lcClass,
+            strtolower($class->name),
             $class->name,
-            $methodName,
-            $parentScopeAllows
+            $declaredName,
+            $parentScopeAllows,
+            fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
+            $callerDisplay
         );
         $frame->call = $class->methods[$methodLc];
-        $frame->callArgs = $this->callArgsForStaticMethod($frame, $lcClass, $frame->call);
+        $frame->callArgs = $this->callArgsForStaticMethod($frame, $lcClass, $frame->call, $parentKeywordScope);
     }
 
     /**
      * @return list<Variable>
      */
-    protected function callArgsForStaticMethod(Frame $frame, string $resolvedLc, Func $call): array
-    {
+    protected function callArgsForStaticMethod(
+        Frame $frame,
+        string $resolvedLc,
+        Func $call,
+        bool $parentKeywordScope = false
+    ): array {
         $args = $this->implicitThisArgsForStaticInstanceCall($frame, $call);
         if ([] !== $args) {
             return $args;
         }
-        if ($this->isParentClassDispatch($frame, $resolvedLc)) {
+        if ($parentKeywordScope) {
             $thisVar = $this->resolveCallerThis($frame);
             if (null !== $thisVar) {
                 return [$thisVar];
@@ -5487,20 +5509,6 @@ restart:
         }
 
         return [];
-    }
-
-    protected function isParentClassDispatch(Frame $frame, string $resolvedLc): bool
-    {
-        if (null === $frame->block->func || null === $frame->block->func->class) {
-            return false;
-        }
-        $declaring = strtolower($frame->block->func->class->value);
-        if (!isset($this->context->classes[$declaring])) {
-            return false;
-        }
-        $parentLc = $this->context->classes[$declaring]->parentLc;
-
-        return null !== $parentLc && $resolvedLc === $parentLc;
     }
 
     protected function isClassSameOrSubclassOf(string $classLc, string $ancestorLc): bool
@@ -6021,8 +6029,13 @@ restart:
         }
         foreach ($parent->methods as $name => $method) {
             if (!isset($entry->methods[$name])) {
+                $vis = $parent->methodVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                // Private methods are not inherited into subclass tables (Zend zend_inheritance).
+                if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+                    continue;
+                }
                 $entry->methods[$name] = $method;
-                $entry->methodVisibility[$name] = $parent->methodVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                $entry->methodVisibility[$name] = $vis;
                 if (isset($parent->methodDeprecated[$name])) {
                     $entry->methodDeprecated[$name] = $parent->methodDeprecated[$name];
                 }
