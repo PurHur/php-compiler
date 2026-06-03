@@ -1027,6 +1027,11 @@ restart:
                     $arg1->copyFrom($arg2); 
                     break;
                 case OpCode::TYPE_ASSIGN:
+                    $catchFrame = $this->dispatchThisReassignFatalIfNeeded($frame, $op->arg2);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
@@ -1097,6 +1102,11 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_ASSIGN_REF:
+                    $catchFrame = $this->dispatchThisReassignFatalIfNeeded($frame, $op->arg1);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     if (null !== $op->arg3 && 0 !== (int) $op->arg3) {
                         $catchFrame = $this->dispatchVmError(
                             'Cannot assign reference to non referenceable value',
@@ -3467,12 +3477,31 @@ restart:
         return $target->getFrame($this->context, $frame);
     }
 
+    /** Zend compile-time fatal if $this is written; runtime guard when compile missed (#4865). */
+    private function dispatchThisReassignFatalIfNeeded(Frame $frame, int $writeSlot): ?Frame
+    {
+        $func = $frame->block->func;
+        if (null === $func || null === $func->class) {
+            return null;
+        }
+        $thisIdx = $frame->block->slotIndexForVariableName('this');
+        if (null === $thisIdx || $writeSlot !== $thisIdx) {
+            return null;
+        }
+
+        return $this->dispatchVmError('Cannot re-assign $this', $frame);
+    }
+
     /**
      * Pre/post increment/decrement with Zend bool→int coercion (#4727, #3552).
      * Rejects ++/-- on readonly properties after construction (#3149).
      */
     private function executeIncDec(Frame $frame, OpCode $op, bool $increment, bool $prefix): ?Frame
     {
+        $catchFrame = $this->dispatchThisReassignFatalIfNeeded($frame, $op->arg3);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
         $read = $frame->scope[$op->arg2];
         $write = $frame->scope[$op->arg3];
         $result = $frame->scope[$op->arg1];

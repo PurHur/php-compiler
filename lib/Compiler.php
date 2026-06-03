@@ -3594,6 +3594,8 @@ class Compiler {
 
     protected function compileIncDecExpr(Op\Expr $expr, Block $block, int $opcode): array
     {
+        $this->rejectThisReassignment($expr->write);
+
         return [new OpCode(
             $opcode,
             $this->compileOperand($expr->result, $block, false),
@@ -3668,6 +3670,9 @@ class Compiler {
                     $this->compileOperand($expr->expr, $block, true) 
                 )];
             case Op\Expr\Assign::class:
+                if (null === $expr->listSpreadRhs) {
+                    $this->rejectThisReassignment($expr->var);
+                }
                 if (null !== $expr->listSpreadRhs && null !== $expr->listSpreadFromIndex) {
                     $fromIndex = new Operand\Literal($expr->listSpreadFromIndex);
 
@@ -3999,6 +4004,7 @@ class Compiler {
             case Op\Expr\In_::class:
                 return $this->compileIn($expr, $block);
             case Op\Expr\AssignRef::class:
+                $this->rejectThisReassignment($expr->var);
                 $bindRefFlags = 0;
                 $dimFetch = $this->unwrapArrayDimFetch($expr->expr)
                     ?? $this->findArrayDimFetchForResult($expr->expr, $block);
@@ -6805,6 +6811,18 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /**
+     * Zend zend_compile.c: assignment to $this is a compile-time fatal (#4865).
+     *
+     * @return never
+     */
+    protected function rejectThisReassignment(Operand $var): void
+    {
+        if ('this' === $this->baseVariableName($var)) {
+            $this->throwCompileError('Cannot re-assign $this');
+        }
     }
 
 }
