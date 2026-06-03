@@ -3357,7 +3357,7 @@ restart:
     }
 
     /**
-     * Pre/post increment/decrement with Zend bool preservation (#3552).
+     * Pre/post increment/decrement with Zend bool→int coercion (#4727, #3552).
      * Rejects ++/-- on readonly properties after construction (#3149).
      */
     private function executeIncDec(Frame $frame, OpCode $op, bool $increment, bool $prefix): ?Frame
