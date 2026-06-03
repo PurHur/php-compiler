@@ -5720,14 +5720,37 @@ restart:
 
     private function callerClassLc(Frame $frame): ?string
     {
+        $classLc = null;
         if (null !== $frame->block->func && null !== $frame->block->func->class) {
-            return strtolower($frame->block->func->class->value);
+            $classLc = strtolower($frame->block->func->class->value);
+        } elseif (null !== $frame->calledClass && '' !== $frame->calledClass) {
+            $classLc = strtolower($frame->calledClass);
         }
-        if (null !== $frame->calledClass && '' !== $frame->calledClass) {
-            return strtolower($frame->calledClass);
+        if (null === $classLc) {
+            return null;
+        }
+        $traitLc = $this->traitScopeLcForFrameMethod($frame, $classLc);
+
+        return $traitLc ?? $classLc;
+    }
+
+    /** Trait-sourced methods use trait scope for private member access (#4834, zend_compile.c). */
+    private function traitScopeLcForFrameMethod(Frame $frame, string $classLc): ?string
+    {
+        if (!isset($this->context->classes[$classLc])) {
+            return null;
+        }
+        $func = $frame->block->func;
+        if (null === $func || !isset($func->name)) {
+            return null;
+        }
+        $methodLc = strtolower((string) $func->name);
+        $traitName = $this->context->classes[$classLc]->traitMethodSources[$methodLc] ?? null;
+        if (null === $traitName) {
+            return null;
         }
 
-        return null;
+        return strtolower(ltrim($traitName, '\\'));
     }
 
     private function readonlyPropertyDeclaringClass(ObjectEntry $object, string $propName): ?string
@@ -7065,13 +7088,16 @@ restart:
     {
         $prototype = clone $property->prototype;
         $default = null !== $property->default ? clone $property->default : null;
+        $declaringLc = '' !== $property->declaringClassLc
+            ? $property->declaringClassLc
+            : strtolower($entry->name);
         $cloned = new VM\ClassProperty(
             $property->name,
             $default,
             $prototype,
             $property->readonly,
             $property->visibility,
-            strtolower($entry->name),
+            $declaringLc,
             $property->setVisibility,
             $property->getVisibility
         );

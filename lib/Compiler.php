@@ -2904,20 +2904,19 @@ class Compiler {
         foreach ($block->children as $child) {
             switch (get_class($child)) {
                 case Op\Stmt\Property::class:
-                    if (OpCode::TYPE_DECLARE_CLASS !== $type) {
-                        if (OpCode::TYPE_DECLARE_TRAIT === $type) {
-                            if (!$child->static) {
-                                $this->throwCompileLogic('Traits cannot declare non-static properties');
-                            }
-                        } elseif (OpCode::TYPE_DECLARE_INTERFACE === $type) {
-                            if ($child->static) {
-                                $this->throwCompileLogic('Interfaces cannot declare static properties');
-                            }
-                            if (!is_null($child->defaultBlock) || null !== $child->defaultVar) {
-                                $this->throwCompileLogic('Interface properties cannot have default values');
-                            }
-                        } else {
-                            $this->throwCompileLogic('Properties are only supported on classes for now');
+                    if (
+                        OpCode::TYPE_DECLARE_CLASS !== $type
+                        && OpCode::TYPE_DECLARE_INTERFACE !== $type
+                        && OpCode::TYPE_DECLARE_TRAIT !== $type
+                    ) {
+                        $this->throwCompileLogic('Properties are only supported on classes, interfaces, and traits for now');
+                    }
+                    if (OpCode::TYPE_DECLARE_INTERFACE === $type) {
+                        if ($child->static) {
+                            $this->throwCompileLogic('Interfaces cannot declare static properties');
+                        }
+                        if (!is_null($child->defaultBlock) || null !== $child->defaultVar) {
+                            $this->throwCompileLogic('Interface properties cannot have default values');
                         }
                     }
                     if (

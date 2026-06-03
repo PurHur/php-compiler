@@ -26,15 +26,15 @@ final class PropertyHooks
         $offset = 0;
         $len = strlen($code);
         while ($offset < $len) {
-            $classPos = $this->findClassKeyword($code, $offset);
-            if (null === $classPos) {
+            $decl = $this->findNextDeclarable($code, $offset);
+            if (null === $decl) {
                 break;
             }
-            $braceOpen = strpos($code, '{', $classPos);
+            [$declPos, , $declName] = $decl;
+            $braceOpen = strpos($code, '{', $declPos);
             if (false === $braceOpen) {
                 break;
             }
-            $className = $this->extractClassName($code, $classPos);
             $span = $this->matchingBraceSpan($code, $braceOpen);
             if (null === $span) {
                 $offset = $braceOpen + 1;
@@ -42,7 +42,7 @@ final class PropertyHooks
             }
             [$bodyStart, $bodyEnd] = $span;
             $body = substr($code, $bodyStart + 1, $bodyEnd - $bodyStart - 1);
-            $processedBody = $this->processClassBody($body, strtolower($className));
+            $processedBody = $this->processClassBody($body, strtolower($declName));
             $code = substr($code, 0, $bodyStart + 1).$processedBody.substr($code, $bodyEnd);
             $offset = $bodyStart + 1 + strlen($processedBody);
         }
@@ -50,22 +50,27 @@ final class PropertyHooks
         return [$code, $this->registry];
     }
 
-    private function findClassKeyword(string $code, int $from): ?int
+    /**
+     * @return array{0: int, 1: string, 2: string}|null [position, kind, name]
+     */
+    private function findNextDeclarable(string $code, int $from): ?array
     {
-        if (preg_match('/\bclass\s+([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\b/', $code, $m, PREG_OFFSET_CAPTURE, $from)) {
-            return $m[0][1];
+        $best = null;
+        foreach ([
+            'class' => '/\bclass\s+([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\b/',
+            'interface' => '/\binterface\s+([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\b/',
+            'trait' => '/\btrait\s+([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\b/',
+        ] as $kind => $pattern) {
+            if (!preg_match($pattern, $code, $m, PREG_OFFSET_CAPTURE, $from)) {
+                continue;
+            }
+            $pos = $m[0][1];
+            if (null === $best || $pos < $best[0]) {
+                $best = [$pos, $kind, $m[1][0]];
+            }
         }
 
-        return null;
-    }
-
-    private function extractClassName(string $code, int $classPos): string
-    {
-        if (preg_match('/\bclass\s+([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\b/', $code, $m, 0, $classPos)) {
-            return $m[1];
-        }
-
-        return 'class';
+        return $best;
     }
 
     /**
@@ -158,6 +163,14 @@ final class PropertyHooks
         $usesBacking = false;
         $rest = trim($hookSource);
         while ('' !== $rest) {
+            if (preg_match('/^get\s*;/s', $rest)) {
+                $rest = preg_replace('/^get\s*;/', '', $rest, 1) ?? $rest;
+                continue;
+            }
+            if (preg_match('/^set\s*;/s', $rest)) {
+                $rest = preg_replace('/^set\s*;/', '', $rest, 1) ?? $rest;
+                continue;
+            }
             if (preg_match('/^get\s*=>\s*/s', $rest)) {
                 $rest = preg_replace('/^get\s*=>\s*/', '', $rest, 1) ?? $rest;
                 [$expr, $rest] = $this->takeUntilSemicolon($rest);
