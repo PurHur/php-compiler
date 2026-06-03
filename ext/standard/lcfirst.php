@@ -16,7 +16,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -30,14 +29,16 @@ final class lcfirst extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('lcfirst() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('lcfirst() only supports strings in this compiler build');
-        }
-        $frame->returnVar->string(VmString::asciiLcfirst($v->toString()));
+        $subject = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'lcfirst',
+            0,
+            'string'
+        );
+        $frame->returnVar->string(VmString::asciiLcfirst($subject));
     }
 
     public Context $context;
