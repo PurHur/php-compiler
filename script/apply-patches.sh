@@ -1872,6 +1872,8 @@ if 'listSpreadRhs' not in assign:
         "    public $listSpreadRhs = null;\n\n"
         "    /** Zero-based index of first element merged into the spread target (#4835). */\n"
         "    public $listSpreadFromIndex = null;\n\n"
+        "    /** String literal keys consumed before spread (`['k' => $v, ...$tail]`, #4889). */\n"
+        "    public $listSpreadExcludedKeys = [];\n\n"
         "    protected $writeVariables"
     )
     if needle not in assign:
@@ -1900,6 +1902,7 @@ old = """        $attributes = $this->mapAttributes($expr);
 
 new = """        $attributes = $this->mapAttributes($expr);
         $logicalIndex = 0;
+        $excludedKeys = [];
         foreach ($expr->items as $i => $item) {
             if (null === $item) {
                 continue;
@@ -1917,9 +1920,14 @@ new = """        $attributes = $this->mapAttributes($expr);
                 $assign = new Op\\Expr\\Assign($target, $rhs, $attributes);
                 $assign->listSpreadRhs = $rhs;
                 $assign->listSpreadFromIndex = $logicalIndex;
+                $assign->listSpreadExcludedKeys = $excludedKeys;
                 $this->block->children[] = $assign;
 
                 continue;
+            }
+
+            if (null !== $item->key && $item->key instanceof Node\\Scalar\\String_) {
+                $excludedKeys[] = $item->key->value;
             }
 
             if ($item->key === null) {

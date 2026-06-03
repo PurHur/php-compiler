@@ -1270,18 +1270,23 @@ restart:
                     }
                     $offset = $frame->block->constants[$op->arg3]->toInt();
                     $ht = $src->toArray();
-                    if (!\PHPCompiler\ext\standard\VmArray::isList($ht)) {
-                        $catchFrame = $this->dispatchVmTypeError(
-                            new \TypeError('Cannot unpack array with string keys'),
-                            $frame
-                        );
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
+                    $excludedKeys = $op->listSpreadExcludedKeys;
+                    if ([] !== $excludedKeys) {
+                        $tail = $ht->copyListSpreadTail($offset, $excludedKeys);
+                    } else {
+                        if (!\PHPCompiler\ext\standard\VmArray::isList($ht)) {
+                            $catchFrame = $this->dispatchVmTypeError(
+                                new \TypeError('Cannot unpack array with string keys'),
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
                         }
-                        break;
+                        $tail = $ht->sliceCopy($offset, null);
                     }
-                    $tail = $ht->sliceCopy($offset, null);
                     $dest->array($tail);
                     break;
                 case OpCode::TYPE_ARRAY_DIM_FETCH:

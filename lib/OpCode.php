@@ -189,6 +189,9 @@ class OpCode {
     /** `[$a, ...$rest] = $list` tail: arg1=dest, arg2=source array, arg3=from-index constant slot (#4835). */
     const TYPE_LIST_SPREAD_ASSIGN = 124;
 
+    /** `['k' => $v, ...$tail] = $arr` string keys already assigned; empty = numeric spread only (#4889). */
+    public array $listSpreadExcludedKeys = [];
+
     public int $type;
     public ?int $arg1;
     public ?int $arg2;
