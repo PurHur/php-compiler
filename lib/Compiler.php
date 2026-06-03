@@ -6327,6 +6327,8 @@ class Compiler {
      */
     protected function compileCallArgSends(array $args, Block $block): array
     {
+        $this->validateCallArgOrder($args);
+
         $sends = [];
         foreach ($args as $arg) {
             $valueSlot = $this->compileOperand($arg, $block, true);
@@ -6352,6 +6354,33 @@ class Compiler {
     private function callArgUnpack(Operand $arg): bool
     {
         return property_exists($arg, 'callArgUnpack') && true === $arg->callArgUnpack;
+    }
+
+    /**
+     * Zend zend_compile.c: unpack must not follow named args; positional must not follow unpack (#4663).
+     *
+     * @param list<Operand> $args
+     */
+    private function validateCallArgOrder(array $args): void
+    {
+        $hadNamed = false;
+        $hadUnpack = false;
+        foreach ($args as $arg) {
+            $isNamed = null !== $this->callArgName($arg);
+            $isUnpack = $this->callArgUnpack($arg);
+            if ($isUnpack && $hadNamed) {
+                $this->throwCompileError('Cannot use argument unpacking after named arguments');
+            }
+            if (!$isNamed && !$isUnpack && $hadUnpack) {
+                $this->throwCompileError('Cannot use positional argument after argument unpacking');
+            }
+            if ($isNamed) {
+                $hadNamed = true;
+            }
+            if ($isUnpack) {
+                $hadUnpack = true;
+            }
+        }
     }
 
     private function callArgName(Operand $arg): ?string

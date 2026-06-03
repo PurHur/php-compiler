@@ -50,14 +50,10 @@ final class NamedArgs
         /** @var array<int, Variable> $result */
         $result = [];
         $filled = [];
-        $hadNamed = false;
         $nextPositional = 0;
 
         foreach ($entries as $entry) {
             if ('p' === $entry[0]) {
-                if ($hadNamed) {
-                    throw new \LogicException('Cannot use positional argument after named argument');
-                }
                 /** @var Variable $value */
                 $value = $entry[1];
                 while ($nextPositional < $paramCount && isset($filled[$nextPositional])) {
@@ -77,7 +73,6 @@ final class NamedArgs
                 throw new \LogicException('Too many arguments to function call');
             }
 
-            $hadNamed = true;
             $name = strtolower((string) $entry[1]);
             /** @var Variable $value */
             $value = $entry[2];
