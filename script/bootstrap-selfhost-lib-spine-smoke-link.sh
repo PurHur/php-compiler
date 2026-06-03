@@ -100,6 +100,9 @@ fi
 
 INVENTORY_ARGV_DRIVER="${ROOT}/build/bin-compile-aot-inventory"
 
+# M3 compiler_lib spine sidecar must match test/selfhost/compiler_lib_spine_smoke/main.php (#3012).
+bootstrap_ensure_m3_compiler_lib_sidecar 2>/dev/null || true
+
 # Prefer the proven inventory argv driver path (same strategy as bootstrap-selfhost-full-revision-probe, #2968).
 if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
   SPINE_COMPILE_DRIVER=""
@@ -173,7 +176,8 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
       if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_GEN0_FALLBACK:-1}" == "1" ]] && command -v php >/dev/null 2>&1; then
         echo "bootstrap-selfhost-lib-spine-smoke-link: gen-0 Zend fallback (native argv driver blocked; #2967)" >&2
         rm -f "${OUT}"
-        php "${ROOT}/bin/compile.php" -o "${OUT}" "${ENTRY}" 2>&1 || true
+        env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_CLI_SPINE_BUNDLE=1 \
+          php "${ROOT}/bin/compile.php" -o "${OUT}" "${ENTRY}" 2>&1 || true
       fi
       if [[ ! -x "${OUT}" ]]; then
         echo "bootstrap-selfhost-lib-spine-smoke-link: compile failed (progress gate; see stderr above)" >&2
