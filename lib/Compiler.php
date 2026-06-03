@@ -4199,6 +4199,30 @@ class Compiler {
                     'byRef' => $useVar->byRef,
                 ];
             }
+        } elseif ($expr instanceof Op\Expr\ArrowFunction) {
+            // Zend auto-captures outer locals/parameters (zend_compile.c); nested fn-in-fn needs
+            // explicit closureCaptures so VM/JIT bind at creation time (#4944, #4952).
+            $seenCaptureSlots = [];
+            foreach ($funcBlock->args as $captureOperand) {
+                $slot = (int) $funcBlock->args[$captureOperand];
+                if (isset($seenCaptureSlots[$slot])) {
+                    continue;
+                }
+                $name = Block::resolveVariableName($captureOperand);
+                if (null === $name || '' === $name) {
+                    continue;
+                }
+                if (in_array($name, $funcBlock->paramNames, true)) {
+                    continue;
+                }
+                $seenCaptureSlots[$slot] = true;
+                $funcBlock->closureCaptureSlots[$slot] = true;
+                $op->closureCaptures[] = [
+                    'name' => $name,
+                    'slot' => $slot,
+                    'byRef' => false,
+                ];
+            }
         }
 
         return [$op];
