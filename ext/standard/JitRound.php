@@ -29,12 +29,7 @@ final class JitRound
             ? self::coerceInt64($context, $args[2], 'round() mode')
             : $context->getTypeFromString('int64')->constInt(StdlibConstants::PHP_ROUND_HALF_UP, false);
 
-        return $context->builder->call(
-            $context->lookupFunction('__compiler_round'),
-            $number,
-            $precision,
-            $mode
-        );
+        return JitRoundLowering::lower($context, $number, $precision, $mode);
     }
 
     private static function coerceDouble(Context $context, JITVariable $arg): Value
