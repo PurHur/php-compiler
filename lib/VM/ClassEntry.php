@@ -72,6 +72,8 @@ class ClassEntry {
     public array $sealedPermits = [];
     /** stdClass-style: create public properties on first read/write (#3117). */
     public bool $allowsDynamicProperties = false;
+    /** Zend CE_INTERNAL: VM builtin / extension class, not user-declared (#5011). */
+    public bool $isInternal = false;
     /** @var list<string> PHP 8 attribute names on this class (#1936). */
     public array $attributeNames = [];
     /** @var list<\PHPCompiler\Compiler\AttributeEntry> class attributes with ctor args (#3206). */

@@ -44,7 +44,8 @@ final class ClosureBind extends VmClassMethod
             $object->closureState,
             $frame->calledArgs[1],
             $newScope,
-            'Closure::bind()'
+            'Closure::bind()',
+            $frame
         );
         if (null === $frame->returnVar) {
             return;
