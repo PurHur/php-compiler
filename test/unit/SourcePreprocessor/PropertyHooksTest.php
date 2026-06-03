@@ -42,7 +42,25 @@ PHP;
         self::assertStringContainsString('function __phpc_property_get_label', $out);
         self::assertStringContainsString('return strtoupper($this->label);', $out);
         self::assertStringContainsString('function __phpc_property_set_label', $out);
-        self::assertStringContainsString('$value = trim($value);', $out);
-        self::assertStringContainsString('$this->label = $value;', $out);
+        self::assertStringContainsString('$this->label = ($value = trim($value));', $out);
+    }
+
+    public function testLowersStaticPropertyHooksAsStaticMethods(): void
+    {
+        $src = <<<'PHP'
+<?php
+class Box {
+    public static string $label {
+        get => 'static:' . self::$label;
+        set => strtoupper($value);
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('public static string $label;', $out);
+        self::assertStringContainsString('public static function __phpc_property_get_label', $out);
+        self::assertStringContainsString('public static function __phpc_property_set_label', $out);
+        self::assertStringContainsString("self::\$label = (strtoupper(\$value));", $out);
+        self::assertTrue($registry['box']['label']['static'] ?? false);
     }
 }

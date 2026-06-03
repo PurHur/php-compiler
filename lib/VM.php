@@ -1953,6 +1953,31 @@ restart:
                             $frame
                         );
                     }
+                    $forWrite = $frame->pos < $frame->block->nOpCodes
+                        && OpCode::TYPE_ASSIGN === $frame->block->opCodes[$frame->pos]->type
+                        && (int) $frame->block->opCodes[$frame->pos]->arg2 === (int) $op->arg1;
+                    $hooks = $this->resolveStaticPropertyHooks($lcClass, $propName);
+                    if (
+                        !$forWrite
+                        && null !== $hooks
+                        && isset($hooks['get'])
+                        && !$this->isPropertyHookRawWrite($frame, $propNameRaw)
+                    ) {
+                        $hookValue = $this->fetchStaticPropertyWithHooks($lcClass, $propNameRaw, $hooks['get'], $frame);
+                        $frame->scope[$op->arg1]->copyFrom($hookValue);
+                        break;
+                    }
+                    if (
+                        $forWrite
+                        && null !== $hooks
+                        && isset($hooks['set'])
+                        && !$this->isPropertyHookRawWrite($frame, $propNameRaw)
+                    ) {
+                        $frame->scope[$op->arg1]->indirect($storage);
+                        $storage->staticPropertyClassLc = $lcClass;
+                        $storage->objectPropertyName = $propNameRaw;
+                        break;
+                    }
                     $frame->scope[$op->arg1]->indirect($storage);
                     break;
                 case OpCode::TYPE_STATIC_PROPERTY_UNSET:
@@ -4163,9 +4188,109 @@ restart:
             return false;
         }
         $methodLc = strtolower((string) $func->name);
+        if (str_contains($methodLc, '::')) {
+            $methodLc = substr($methodLc, strrpos($methodLc, '::') + 2);
+        }
         $wantSet = strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($propName));
+        $wantGet = strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($propName));
 
-        return $methodLc === $wantSet || $methodLc === strtolower($className.'::'.$wantSet);
+        return $methodLc === $wantSet
+            || $methodLc === $wantGet
+            || $methodLc === strtolower($className.'::'.$wantSet)
+            || $methodLc === strtolower($className.'::'.$wantGet);
+    }
+
+    private function linkStaticPropertyHooks(ClassEntry $entry): void
+    {
+        foreach (array_keys($entry->staticProperties) as $propLc) {
+            $hooks = [];
+            $setLc = strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($propLc));
+            if (isset($entry->methods[$setLc]) && $this->methodIsStatic($entry->methods[$setLc])) {
+                $hooks['set'] = $setLc;
+            }
+            $getLc = strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($propLc));
+            if (isset($entry->methods[$getLc]) && $this->methodIsStatic($entry->methods[$getLc])) {
+                $hooks['get'] = $getLc;
+            }
+            if ([] !== $hooks) {
+                $entry->staticPropertyHooks[$propLc] = $hooks;
+            }
+        }
+    }
+
+    private function methodIsStatic(Func $func): bool
+    {
+        if (!$func instanceof Func\PHP) {
+            return false;
+        }
+        $decl = $func->block->func;
+
+        return null !== $decl && (($decl->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0;
+    }
+
+    /**
+     * @return array{get?: string, set?: string}|null
+     */
+    private function resolveStaticPropertyHooks(string $classLc, string $propLc): ?array
+    {
+        $currentLc = $classLc;
+        while (isset($this->context->classes[$currentLc])) {
+            $entry = $this->context->classes[$currentLc];
+            if (isset($entry->staticPropertyHooks[$propLc])) {
+                return $entry->staticPropertyHooks[$propLc];
+            }
+            if (isset($entry->staticProperties[$propLc])) {
+                return null;
+            }
+            $currentLc = $entry->parentLc;
+            if (null === $currentLc) {
+                break;
+            }
+        }
+
+        return null;
+    }
+
+    private function fetchStaticPropertyWithHooks(
+        string $classLc,
+        string $propName,
+        string $getMethodLc,
+        Frame $frame
+    ): Variable {
+        [$owner, $methodLc] = $this->resolveStaticMethod($classLc, $getMethodLc);
+        $func = $owner->methods[$methodLc];
+        if (!$func instanceof Func\PHP) {
+            throw new \LogicException('Static property get hook must be a user method');
+        }
+
+        return $this->invokeStaticPropertyHookRaw($func, $propName, $classLc, $frame);
+    }
+
+    private function invokeStaticPropertyHookRaw(
+        Func\PHP $func,
+        string $rawProperty,
+        string $classLc,
+        Frame $parentFrame,
+        Variable ...$args
+    ): Variable {
+        $savedStack = $this->context->swapRunStack(null);
+        try {
+            $child = $func->getFrame($this->context, null);
+            $child->propertyHookRawProperty = $rawProperty;
+            $child->calledClass = $classLc;
+            $child->calledArgs = $args;
+            $out = new Variable();
+            $child->returnVar = $out;
+            $this->context->push($child);
+            $result = $this->runFrames();
+            if (self::SUCCESS !== $result) {
+                throw new \LogicException('Static property hook invocation failed in this compiler build');
+            }
+
+            return $out->resolveIndirect();
+        } finally {
+            $this->context->swapRunStack($savedStack);
+        }
     }
 
     private function linkPropertyHooks(ClassEntry $entry, VM\ClassProperty $prop): void
@@ -4197,6 +4322,34 @@ restart:
     private function dispatchPropertySetHookAssign(Variable $lvalue, Variable $value, Frame $frame): bool
     {
         $target = $lvalue->resolveIndirect();
+        $classLc = $target->staticPropertyClassLc;
+        $staticPropName = $target->objectPropertyName;
+        if (
+            is_string($classLc)
+            && is_string($staticPropName)
+            && !$this->isPropertyHookRawWrite($frame, $staticPropName)
+        ) {
+            if (!isset($this->context->classes[$classLc])) {
+                return false;
+            }
+            $entry = $this->context->classes[$classLc];
+            $propLc = strtolower($staticPropName);
+            $setLc = $entry->staticPropertyHooks[$propLc]['set'] ?? null;
+            if (null === $setLc || !isset($entry->methods[$setLc])) {
+                return false;
+            }
+            $func = $entry->methods[$setLc];
+            if (!$func instanceof Func\PHP) {
+                return false;
+            }
+            $this->context->propertyHookSetAborted = false;
+            $this->invokeStaticPropertyHookRaw($func, $staticPropName, $classLc, $frame, $value->resolveIndirect());
+            if ($this->context->propertyHookSetAborted) {
+                return false;
+            }
+
+            return true;
+        }
         $owner = $target->objectPropertyOwner;
         $propName = $target->objectPropertyName;
         if (null === $owner || null === $propName || $this->isPropertyHookRawWrite($frame, $propName)) {
@@ -5985,6 +6138,7 @@ restart:
         foreach ($entry->properties as $prop) {
             $this->linkPropertyHooks($entry, $prop);
         }
+        $this->linkStaticPropertyHooks($entry);
     }
 
     private function resolveClassConstDefineValue(Frame $frame, Block $block, OpCode $op): Variable

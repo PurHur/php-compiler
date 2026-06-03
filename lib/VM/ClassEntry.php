@@ -60,6 +60,8 @@ class ClassEntry {
     public array $enumCases = [];
     /** @var array<string, Variable> static property name (lowercase) => shared storage */
     public array $staticProperties = [];
+    /** @var array<string, array{get?: string, set?: string}> static prop (lowercase) => hook method lc (#4751) */
+    public array $staticPropertyHooks = [];
     /** @var array<string, true> static props imported from a trait (per-class storage, #4670) */
     public array $traitStaticPropertyNames = [];
     /** Readonly class: instance properties cannot change after construction (issue #1360). */
