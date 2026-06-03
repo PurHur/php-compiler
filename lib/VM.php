@@ -5003,7 +5003,7 @@ restart:
             return $userArgs;
         }
 
-        return $frame->callArgs + $userArgs;
+        return array_merge($frame->callArgs, $userArgs);
     }
 
     /**
