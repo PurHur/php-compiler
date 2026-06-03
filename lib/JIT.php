@@ -64,6 +64,7 @@ class JIT {
 
     public function compile(Block $block): PHPLLVM\Value {
         JIT\Progress::noteFunction('jit_compile_begin');
+        $this->context->resetScriptLocalBindings();
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
             // Inventory emit-helper reuses thin TU spine (#3070); argv-only inventory keeps compile_driver {main}.
             $inventoryEmitHelper = $this->shouldUseM3InventoryEmitDriver()
@@ -8846,6 +8847,36 @@ class JIT {
             $result->value = $slot;
             $result->addref();
             $this->context->setVariableOp($resultOp, $result);
+            $resolved = JIT\OperandName::resolve($resultOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName($resolved, $result);
+            }
+
+            return;
+        }
+        if (
+            $branchMergeTarget
+            && null === $result->objectPropertySlot
+            && !$result->functionStaticGlobal
+        ) {
+            if (Variable::TYPE_VALUE !== $result->type) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $this->context->setVariableOp(
+                    $resultOp,
+                    new Variable(
+                        $this->context,
+                        Variable::TYPE_VALUE,
+                        Variable::KIND_VARIABLE,
+                        $slot
+                    )
+                );
+                $result = $this->context->getVariableFromOp($resultOp);
+            }
+            JIT\JitValueBox::assignToPointer(
+                $this->context,
+                JIT\JitValueBox::pointer($this->context, $result->value),
+                $value
+            );
             $resolved = JIT\OperandName::resolve($resultOp);
             if (null !== $resolved && '' !== $resolved) {
                 $this->context->bindVariableByName($resolved, $result);
