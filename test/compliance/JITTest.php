@@ -517,7 +517,7 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'list_destructure_string')) {
                 continue;
             }
-            // list spread `[$a, ...$rest] = $arr`: VM (#4835); MCJIT execute pending.
+            // list spread `[$a, ...$rest] = $arr`: VM (#4835); MCJIT IR in ListSpreadAssignJitCompileTest (#4885).
             if (str_contains($name, 'list_destructuring_spread')) {
                 continue;
             }
