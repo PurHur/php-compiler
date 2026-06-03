@@ -43,14 +43,11 @@ final class pow extends Internal
 
     public static function toJitDouble(Context $context, JITVariable $arg, $double): Value
     {
-        $v = JitLongArg::lower($context, $arg, 'pow() argument');
-        switch ($arg->type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                return $context->builder->siToFp($v, $double);
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                return $v;
-            default:
-                throw new \LogicException('pow() only supports integers and floats in this compiler build');
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
+            return $context->helper->loadValue($arg);
         }
+        $v = JitLongArg::lower($context, $arg, 'pow() argument');
+
+        return $context->builder->siToFp($v, $double);
     }
 }
