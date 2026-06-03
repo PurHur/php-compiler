@@ -8797,6 +8797,25 @@ class JIT {
             $result->addref();
 
             return;
+        } elseif (Variable::TYPE_NATIVE_BOOL === $result->type && Variable::TYPE_NATIVE_LONG === $value->type) {
+            // Bool ++/-- promotes to int in a value box (#4727).
+            $slot = JIT\JitValueBox::alloc($this->context);
+            JIT\JitValueBox::writeLong(
+                $this->context,
+                $slot,
+                $this->context->helper->loadValue($value)
+            );
+            $result->free();
+            $result->type = Variable::TYPE_VALUE;
+            $result->value = $slot;
+            $result->addref();
+            $this->context->setVariableOp($resultOp, $result);
+            $resolved = JIT\OperandName::resolve($resultOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName($resolved, $result);
+            }
+
+            return;
         }
         throw new \LogicException("Cannot assign operands of different types (yet): {$value->type}, {$result->type}");
     }
@@ -9246,8 +9265,34 @@ class JIT {
         }
 
         if (Variable::TYPE_NATIVE_BOOL === $read->type) {
-            $this->assignOperand($writeOp, $read, true);
-            $this->assignOperand($resultOp, $read, true);
+            if (!$prefix) {
+                $this->assignOperand($resultOp, $read, true);
+            }
+            if ($increment) {
+                $newVar = new Variable(
+                    $this->context,
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::KIND_VALUE,
+                    $this->context->constantFromInteger(1)
+                );
+            } else {
+                $boolVal = $this->context->helper->loadValue($read);
+                $i64 = $this->context->getTypeFromString('int64');
+                $one = $i64->constInt(1, false);
+                $zero = $i64->constInt(0, false);
+                $asLong = $this->context->builder->select($boolVal, $one, $zero);
+                $newLong = $this->context->builder->sub($asLong, $one);
+                $newVar = new Variable(
+                    $this->context,
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::KIND_VALUE,
+                    $newLong
+                );
+            }
+            $this->assignOperand($writeOp, $newVar, true);
+            if ($prefix) {
+                $this->assignOperand($resultOp, $newVar, true);
+            }
 
             return;
         }

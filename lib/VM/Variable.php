@@ -1470,6 +1470,16 @@ restart:
         }
         $left = $left->resolveIndirect();
         $right = $right->resolveIndirect();
+        if (self::TYPE_BOOLEAN === $left->type) {
+            $this->copyFrom($left);
+            if (OpCode::TYPE_PLUS === $opCode) {
+                $this->applyIncrement();
+            } else {
+                $this->applyDecrement();
+            }
+
+            return;
+        }
         $strVar = self::TYPE_STRING === $left->type ? $left : (self::TYPE_STRING === $right->type ? $right : null);
         if (null !== $strVar) {
             $this->applyStringIncDec($opCode, $strVar->toString());
@@ -1567,6 +1577,9 @@ restart:
         }
         switch ($this->type) {
             case self::TYPE_BOOLEAN:
+                // Zend future inc/dec: bool promoted to int (issue #4727, zend_operators.c).
+                $this->int(1);
+
                 return;
             case self::TYPE_NULL:
                 $this->int(1);
@@ -1602,6 +1615,9 @@ restart:
         }
         switch ($this->type) {
             case self::TYPE_BOOLEAN:
+                $this->int(($this->bool ? 1 : 0) - 1);
+
+                return;
             case self::TYPE_NULL:
                 return;
             case self::TYPE_INTEGER:

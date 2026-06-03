@@ -1,21 +1,21 @@
 --TEST--
-language bool pre/post increment (issue #3552)
+language bool pre/post increment (issue #3552, #4727)
 --FILE--
 <?php
 $b = true;
 $b++;
-var_dump($b);
+echo $b, "\n";
 $b = false;
 $b++;
-var_dump($b);
+echo $b, "\n";
 $b = true;
 $b--;
-var_dump($b);
+echo $b, "\n";
 $b = false;
 $b--;
-var_dump($b);
+echo $b, "\n";
 --EXPECT--
-bool(true)
-bool(false)
-bool(true)
-bool(false)
+1
+1
+0
+-1
