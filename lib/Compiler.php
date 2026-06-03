@@ -82,6 +82,9 @@ class Compiler {
     /** @var array<string, true> instance property names declared in the current class body (#4286) */
     private array $compilingClassInstancePropertyNames = [];
 
+    /** @var array<string, true> lowercase method names declared in the current class/interface/enum body (#5218) */
+    private array $compilingClassMethodNames = [];
+
     /** @var array<string, array<string, Variable>> compile-time class constants by lc name */
     private array $compileTimeClassConsts = [];
 
@@ -2064,14 +2067,30 @@ class Compiler {
                 $this->abstractEnums[$lc] = true;
             }
         }
-        $return->block1 = $this->compileEnumBody($enum->stmts);
+        $enumName = $this->staticNameFromOperand($enum->name);
+        $return->block1 = $this->compileEnumBody($enum->stmts, $enumName);
 
         return $return;
     }
 
-    protected function compileEnumBody(CfgBlock $block): Block
+    protected function compileEnumBody(CfgBlock $block, ?string $enumName = null): Block
     {
         $result = new Block($block);
+        $prevClassLc = $this->compilingClassLc;
+        $prevClassDisplayName = $this->compilingClassDisplayName;
+        $prevInstancePropertyNames = $this->compilingClassInstancePropertyNames;
+        $prevMethodNames = $this->compilingClassMethodNames;
+        $this->compilingClassInstancePropertyNames = [];
+        $this->compilingClassMethodNames = [];
+        if (null !== $enumName) {
+            $this->compilingClassLc = strtolower(ltrim($enumName, '\\'));
+            $this->compilingClassDisplayName = ltrim($enumName, '\\');
+            if (!isset($this->compileTimeClassConsts[$this->compilingClassLc])) {
+                $this->compileTimeClassConsts[$this->compilingClassLc] = [];
+            }
+        } else {
+            $this->compilingClassDisplayName = null;
+        }
         foreach ($block->children as $child) {
             if ($child instanceof Op\Terminal\Const_) {
                 $this->compileClassConstDeclaration($child, $result);
@@ -2084,12 +2103,17 @@ class Compiler {
             }
             $this->throwCompileLogic('Unsupported enum body element: '.get_class($child));
         }
+        $this->compilingClassLc = $prevClassLc;
+        $this->compilingClassDisplayName = $prevClassDisplayName;
+        $this->compilingClassInstancePropertyNames = $prevInstancePropertyNames;
+        $this->compilingClassMethodNames = $prevMethodNames;
 
         return $result;
     }
 
     protected function compileClassMethodDeclaration(Op\Stmt\ClassMethod $child, Block $result): void
     {
+        $this->registerMethodDeclaration($child->func->name);
         if ('__construct' === $child->func->name) {
             foreach ($child->func->params as $param) {
                 if ($this->isPromotedParam($param)) {
@@ -2583,7 +2607,9 @@ class Compiler {
         $prevClassLc = $this->compilingClassLc;
         $prevClassDisplayName = $this->compilingClassDisplayName;
         $prevInstancePropertyNames = $this->compilingClassInstancePropertyNames;
+        $prevMethodNames = $this->compilingClassMethodNames;
         $this->compilingClassInstancePropertyNames = [];
+        $this->compilingClassMethodNames = [];
         if (null !== $className) {
             $this->compilingClassLc = strtolower(ltrim($className, '\\'));
             $this->compilingClassDisplayName = ltrim($className, '\\');
@@ -2730,8 +2756,19 @@ class Compiler {
         $this->compilingClassLc = $prevClassLc;
         $this->compilingClassDisplayName = $prevClassDisplayName;
         $this->compilingClassInstancePropertyNames = $prevInstancePropertyNames;
+        $this->compilingClassMethodNames = $prevMethodNames;
 
         return $result;
+    }
+
+    protected function registerMethodDeclaration(string $methodName): void
+    {
+        $lc = strtolower($methodName);
+        if (isset($this->compilingClassMethodNames[$lc])) {
+            $class = $this->compilingClassDisplayName ?? 'class';
+            $this->throwCompileError(sprintf('Cannot redeclare %s::%s()', $class, $methodName));
+        }
+        $this->compilingClassMethodNames[$lc] = true;
     }
 
     protected function registerInstancePropertyDeclaration(string $propName): void
