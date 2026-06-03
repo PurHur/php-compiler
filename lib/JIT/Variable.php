@@ -115,6 +115,9 @@ final class Variable {
     /** Declared JIT type when {@see $staticPropertyGlobal} is set. */
     public ?int $staticPropertyType = null;
 
+    /** Declaring class lc for static property set-hook dispatch (#4807). */
+    public ?string $staticPropertyHookClassLc = null;
+
     /** Callee slot for a literal-include caller local; skip delref in unrelated assigns (#866). */
     public bool $includeBinding = false;
 
@@ -142,8 +145,16 @@ final class Variable {
 
     public ?string $magicSetName = null;
 
+    /** __get return value; dim-write must error (#4673). */
+    public ?string $magicGetOverloadedClass = null;
+
+    public ?string $magicGetOverloadedName = null;
+
     /** Native call proxy when this object is a JIT-lowered closure (#72). */
     public ?Call $closureCall = null;
+
+    /** Anonymous `static function` — cannot bind $this (Zend zend_closures.c, #4613). */
+    public bool $closureIsStatic = false;
 
     /** Heap {@see __generator_state__*} for JIT Generator objects (#3074). */
     public ?\PHPLLVM\Value $generatorStatePtr = null;
@@ -235,6 +246,23 @@ final class Variable {
         }
 
         return 'unknown(type='.$type.')';
+    }
+
+    /** Zend 8+ dim fetch on scalar containers (#4713). */
+    public static function cannotUseBracketLabel(int $type): ?string
+    {
+        switch ($type) {
+            case self::TYPE_NULL:
+                return 'null';
+            case self::TYPE_NATIVE_BOOL:
+                return 'bool';
+            case self::TYPE_NATIVE_LONG:
+                return 'int';
+            case self::TYPE_NATIVE_DOUBLE:
+                return 'float';
+            default:
+                return null;
+        }
     }
 
     public static function getTypeFromType(?Type $type): int {
@@ -398,6 +426,12 @@ final class Variable {
             $type = self::TYPE_STRING;
         } elseif ('__object__*' === $llvmType) {
             $type = self::TYPE_OBJECT;
+        } elseif ('double' === $llvmType) {
+            $type = self::TYPE_NATIVE_DOUBLE;
+        } elseif ('int64' === $llvmType) {
+            $type = self::TYPE_NATIVE_LONG;
+        } elseif ('int1' === $llvmType) {
+            $type = self::TYPE_NATIVE_BOOL;
         } else {
             $type = self::getTypeFromType($op->type);
         }

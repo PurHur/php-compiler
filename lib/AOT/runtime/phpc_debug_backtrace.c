@@ -1,5 +1,5 @@
 /*
- * debug_backtrace() JIT/AOT runtime — minimal compile-time frames (issues #1378, #1056).
+ * debug_backtrace() JIT/AOT runtime — minimal compile-time frames (issues #1378, #1056, #4621).
  */
 
 #include <stddef.h>
@@ -42,8 +42,8 @@ static __hashtable__ *phpc_debug_frame(__string__ *file, __string__ *function)
 }
 
 /*
- * Build a packed list: frame0 = internal call site, optional frame1 = enclosing user function.
- * Empty enclosing function skips the second frame (matches JitDebugBacktrace layout).
+ * Packed trace: frame0 = enclosing user function, frame1 = {main}.
+ * Skips the debug_backtrace() internal frame (Zend parity, issue #4621).
  */
 __hashtable__ *__compiler_jit_debug_backtrace(
     __string__ *frame0_file,
@@ -56,22 +56,28 @@ __hashtable__ *__compiler_jit_debug_backtrace(
     __hashtable__ *out = __hashtable__alloc();
     size_t index = 0;
 
-    __hashtable__setHashtableAt(
-        out,
-        index++,
-        phpc_debug_frame(frame0_file, frame0_function)
-    );
+    (void) frame0_file;
+    (void) frame0_function;
 
     if (0 != has_frame1) {
         __hashtable__setHashtableAt(
             out,
-            index,
+            index++,
             phpc_debug_frame(
                 NULL != frame1_file ? frame1_file : phpc_cstr_to_string(""),
                 frame1_function
             )
         );
     }
+
+    __hashtable__setHashtableAt(
+        out,
+        index,
+        phpc_debug_frame(
+            phpc_cstr_to_string(""),
+            phpc_cstr_to_string("{main}")
+        )
+    );
 
     return out;
 }

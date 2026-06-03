@@ -58,6 +58,20 @@ final class VmString
         return self::coerceOperand($var);
     }
 
+    /**
+     * Coerce disk_*_space() directory operand; null means default path (php-src filestat.c, #4915).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function coerceOptionalDirectoryArg(Variable $var, string $function): ?string
+    {
+        if (Variable::TYPE_NULL === $var->resolveIndirect()->type) {
+            return null;
+        }
+
+        return self::coerceStringBuiltinArg($var, $function, 0, 'directory');
+    }
+
     private static function stringBuiltinTypeError(
         string $function,
         int $argIndex,
@@ -355,7 +369,7 @@ final class VmString
             $ordA = self::byteOrd($a[$i]);
             $ordB = self::byteOrd($b[$i]);
             if ($ordA !== $ordB) {
-                return $ordA <=> $ordB;
+                return $ordA - $ordB;
             }
         }
 
@@ -512,7 +526,7 @@ final class VmString
             $ordA = self::byteOrd($a[$i]);
             $ordB = self::byteOrd($b[$i]);
             if ($ordA !== $ordB) {
-                return $ordA <=> $ordB;
+                return $ordA - $ordB;
             }
         }
 
@@ -528,7 +542,7 @@ final class VmString
             $ordA = self::byteOrd(self::asciiLowerByte($a[$i]));
             $ordB = self::byteOrd(self::asciiLowerByte($b[$i]));
             if ($ordA !== $ordB) {
-                return $ordA <=> $ordB;
+                return $ordA - $ordB;
             }
         }
 
@@ -553,7 +567,7 @@ final class VmString
             $ordA = self::byteOrd(self::asciiLowerByte($a[$i]));
             $ordB = self::byteOrd(self::asciiLowerByte($b[$i]));
             if ($ordA !== $ordB) {
-                return $ordA <=> $ordB;
+                return $ordA - $ordB;
             }
         }
 
@@ -810,7 +824,7 @@ final class VmString
             $ordA = self::byteOrd(self::asciiLowerByte($a[$i]));
             $ordB = self::byteOrd(self::asciiLowerByte($b[$i]));
             if ($ordA !== $ordB) {
-                return $ordA <=> $ordB;
+                return $ordA - $ordB;
             }
         }
 
@@ -927,13 +941,24 @@ final class VmString
         return $out;
     }
 
-    /** Decode a hex string to binary (PHP hex2bin subset; false on invalid input). */
-    public static function hex2bin(string $data) {
+    /**
+     * Decode a hex string to binary (PHP hex2bin subset).
+     *
+     * @return string|false decoded bytes, or false when input is invalid (non-strict)
+     *
+     * @throws \ValueError when $strict is true and input has odd length or invalid hex
+     */
+    public static function hex2bin(string $data, bool $strict = false)
+    {
         $len = self::byteLength($data);
         if (0 === $len) {
             return '';
         }
         if (0 !== ($len & 1)) {
+            if ($strict) {
+                throw new \ValueError('Hexadecimal input string must have an even length');
+            }
+
             return false;
         }
         $out = '';
@@ -941,6 +966,10 @@ final class VmString
             $hi = self::hexDigit(self::byteOrd($data[$i]));
             $lo = self::hexDigit(self::byteOrd($data[$i + 1]));
             if (null === $hi || null === $lo) {
+                if ($strict) {
+                    throw new \ValueError('Input string must be hexadecimal string');
+                }
+
                 return false;
             }
             $out .= \chr(($hi << 4) | $lo);

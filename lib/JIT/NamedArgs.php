@@ -55,9 +55,6 @@ final class NamedArgs
     {
         $out = [];
         foreach ($entries as $i => $entry) {
-            if (\is_array($entry) && isset($entry['unpack'])) {
-                throw new \LogicException('Named arguments cannot be combined with argument unpacking in JIT');
-            }
             if (\is_array($entry) && isset($entry['named'])) {
                 $out[] = [
                     'kind' => 'n',
@@ -95,14 +92,10 @@ final class NamedArgs
         /** @var array<int, Operand|null> $resultOperands */
         $resultOperands = [];
         $filled = [];
-        $hadNamed = false;
         $nextPositional = 0;
 
         foreach ($entries as $entry) {
             if ('p' === $entry['kind']) {
-                if ($hadNamed) {
-                    throw new \LogicException('Cannot use positional argument after named argument');
-                }
                 $value = $entry['value'];
                 while ($nextPositional < $paramCount && isset($filled[$nextPositional])) {
                     ++$nextPositional;
@@ -123,7 +116,6 @@ final class NamedArgs
                 throw new \LogicException('Too many arguments to function call');
             }
 
-            $hadNamed = true;
             $name = strtolower((string) $entry['name']);
             $value = $entry['value'];
             $idx = array_search($name, $lowerNames, true);
@@ -139,6 +131,9 @@ final class NamedArgs
             $result[$idx] = $value;
             $resultOperands[$idx] = $entry['operand'];
         }
+
+        ksort($result);
+        ksort($resultOperands);
 
         return [$result, $resultOperands];
     }

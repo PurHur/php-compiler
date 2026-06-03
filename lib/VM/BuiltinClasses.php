@@ -118,6 +118,11 @@ final class BuiltinClasses
         $iterator->isInterface = true;
         $iterator->interfaces = ['traversable'];
         $ctx->classes['iterator'] = $iterator;
+
+        $iteratorAggregate = new ClassEntry('IteratorAggregate');
+        $iteratorAggregate->isInterface = true;
+        $iteratorAggregate->interfaces = ['traversable'];
+        $ctx->classes['iteratoraggregate'] = $iteratorAggregate;
     }
 
     /** Zend zend_interfaces.c — Countable interface (#3364). */

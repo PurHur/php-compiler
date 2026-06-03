@@ -56,6 +56,12 @@ class Frame {
     /** Pending closure call: captures bound when the callee frame is entered (issue #72). */
     public ?VM\ClosureState $closureCall = null;
 
+    /** Scope slot of the callable operand for the pending FUNCCALL (issue #4872). */
+    public ?int $closureCallableSlot = null;
+
+    /** Closure pending __invoke / FUNCCALL (survives until callee entry; issue #4872). */
+    public ?VM\ClosureState $pendingClosureInvoke = null;
+
     /**
      * When set, writes to this instance property name use backing storage (inside a hook body, #3145).
      */

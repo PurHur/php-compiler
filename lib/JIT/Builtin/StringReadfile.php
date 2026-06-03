@@ -116,7 +116,11 @@ final class StringReadfile
             $chunkPtr,
             $nSizeT
         );
-        $writeFail = $context->builder->icmp(Builder::INT_SLT, $nWritten, $i64->constInt(0, false));
+        $nWrittenAsRead = $context->builder->truncOrBitCast($nWritten, $i64);
+        $writeFail = $context->builder->or(
+            $context->builder->icmp(Builder::INT_SLT, $nWritten, $i64->constInt(0, false)),
+            $context->builder->icmp(Builder::INT_NE, $nWrittenAsRead, $nRead)
+        );
         $writeFailBlock = BasicBlockHelper::append($context, 'rf_write_fail');
         $writeOkBlock = BasicBlockHelper::append($context, 'rf_write_ok');
         $context->builder->branchIf($writeFail, $writeFailBlock, $writeOkBlock);
@@ -131,7 +135,7 @@ final class StringReadfile
         $context->builder->positionAtEnd($writeOkBlock);
         $total = $context->builder->load($totalSlot);
         $context->builder->store(
-            $context->builder->add($total, $nWritten),
+            $context->builder->add($total, $nRead),
             $totalSlot
         );
         $context->builder->branch($loopHead);

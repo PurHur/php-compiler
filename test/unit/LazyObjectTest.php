@@ -8,7 +8,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #3317 */
+/** @covers issue #3317, #4823 */
 #[Group('LazyObject')]
 final class LazyObjectTest extends TestCase
 {

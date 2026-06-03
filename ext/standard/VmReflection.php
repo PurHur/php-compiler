@@ -348,7 +348,8 @@ final class VmReflection
         if (Variable::TYPE_OBJECT === $objectOrClass->type) {
             return self::propertyExistsOnClass($objectOrClass->toObject()->class, $property);
         }
-        throw new \LogicException('property_exists() expects an object or class name string in this compiler build');
+        throw new \TypeError('property_exists(): Argument #1 ($object_or_class) must be of type object|string, '
+            .self::propertyExistsInvalidTypeName($objectOrClass->type).' given');
     }
 
     /**
@@ -657,7 +658,10 @@ final class VmReflection
     {
         $object = $object->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $object->type) {
-            throw new \LogicException('get_object_vars() argument must be an object in this compiler build');
+            throw new \TypeError(\sprintf(
+                'get_object_vars(): Argument #1 ($object) must be of type object, %s given',
+                VmStreamArg::debugTypeName($object)
+            ));
         }
         $result = new Variable();
         $result->newArray();
@@ -1020,5 +1024,27 @@ final class VmReflection
         }
 
         return $result;
+    }
+
+    private static function propertyExistsInvalidTypeName(int $type): string
+    {
+        switch ($type) {
+            case Variable::TYPE_INTEGER:
+                return 'int';
+            case Variable::TYPE_FLOAT:
+                return 'float';
+            case Variable::TYPE_BOOLEAN:
+                return 'bool';
+            case Variable::TYPE_STRING:
+                return 'string';
+            case Variable::TYPE_NULL:
+                return 'null';
+            case Variable::TYPE_ARRAY:
+                return 'array';
+            case Variable::TYPE_OBJECT:
+                return 'object';
+            default:
+                return 'mixed';
+        }
     }
 }

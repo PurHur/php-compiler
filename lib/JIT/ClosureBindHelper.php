@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Call\ClosureWithBinding;
@@ -21,6 +22,8 @@ final class ClosureBindHelper
 
     public const BOUND_SCOPE_PROPERTY = '__closure_bound_scope';
 
+    public const IS_STATIC_PROPERTY = '__closure_is_static';
+
     public static function registerJitMethods(Context $context): void
     {
         $context->functionProxies['closure::bindto'] = new Call\ClosureBindTo();
@@ -36,6 +39,9 @@ final class ClosureBindHelper
         }
         if (!$objectType->hasProperty($classId, self::BOUND_SCOPE_PROPERTY)) {
             $objectType->defineProperty($classId, self::BOUND_SCOPE_PROPERTY, Variable::TYPE_STRING);
+        }
+        if (!$objectType->hasProperty($classId, self::IS_STATIC_PROPERTY)) {
+            $objectType->defineProperty($classId, self::IS_STATIC_PROPERTY, Variable::TYPE_NATIVE_BOOL);
         }
     }
 
@@ -56,6 +62,7 @@ final class ClosureBindHelper
         }
 
         $inner = self::resolveInnerCall($context, $closure);
+        self::assertNotBindingStaticClosureToObject($context, $closure, $inner, $newThis);
         if (null === $inner) {
             return self::nullResult($context);
         }
@@ -69,6 +76,7 @@ final class ClosureBindHelper
             $boundThis,
             $boundScope
         );
+        $result->closureIsStatic = $closure->closureIsStatic;
 
         return $result;
     }
@@ -231,8 +239,34 @@ final class ClosureBindHelper
             self::BOUND_SCOPE_PROPERTY,
             $boundScope
         );
+        $staticFlag = $context->type->object->propertyFetch(
+            $srcObj,
+            'Closure',
+            self::IS_STATIC_PROPERTY
+        );
+        $context->type->object->storeInstanceProperty(
+            $dest,
+            'Closure',
+            self::IS_STATIC_PROPERTY,
+            $staticFlag
+        );
 
         return $dest;
+    }
+
+    public static function storeStaticClosureFlag(Context $context, Value $closureObj): void
+    {
+        self::ensureClosureBindingProperties($context);
+        $i1 = $context->getTypeFromString('int1');
+        $trueLit = $context->builder->load($i1->constInt(1, false));
+        $trueVar = new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $trueLit);
+        $trueVar->addref();
+        $context->type->object->storeInstanceProperty(
+            $closureObj,
+            'Closure',
+            self::IS_STATIC_PROPERTY,
+            $trueVar
+        );
     }
 
     private static function loadClosureObject(Context $context, Variable $closure): Value
@@ -578,6 +612,104 @@ final class ClosureBindHelper
             Variable::TYPE_OBJECT => 'object',
             default => 'mixed',
         };
+    }
+
+    private static function assertNotBindingStaticClosureToObject(
+        Context $context,
+        Variable $closure,
+        ?Call $inner,
+        Variable $newThis
+    ): void {
+        if ($closure->closureIsStatic) {
+            self::assertNotBindingObjectToStaticClosure($context, $newThis);
+
+            return;
+        }
+        if (Variable::TYPE_OBJECT === $closure->type || Variable::TYPE_VALUE === $closure->type) {
+            self::emitClosureObjectStaticBindGuard($context, $closure, $newThis);
+        }
+    }
+
+    private static function assertNotBindingObjectToStaticClosure(Context $context, Variable $newThis): void
+    {
+        if (Variable::TYPE_NULL === $newThis->type || ($newThis->isNullConstant ?? false)) {
+            return;
+        }
+        if (Variable::TYPE_OBJECT === $newThis->type) {
+            self::raiseStaticBindError($context);
+
+            return;
+        }
+        if (Variable::TYPE_VALUE === $newThis->type) {
+            self::emitValueBoxStaticBindGuard($context, $newThis);
+        }
+    }
+
+    private static function emitClosureObjectStaticBindGuard(
+        Context $context,
+        Variable $closure,
+        Variable $newThis
+    ): void {
+        self::ensureClosureBindingProperties($context);
+        $obj = self::loadClosureObject($context, $closure);
+        $flag = $context->type->object->propertyFetch(
+            $obj,
+            'Closure',
+            self::IS_STATIC_PROPERTY
+        );
+        if (Variable::TYPE_NATIVE_BOOL !== $flag->type || Variable::KIND_VALUE !== $flag->kind) {
+            return;
+        }
+        $i1 = $context->getTypeFromString('int1');
+        $isStatic = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->helper->loadValue($flag),
+            $i1->constInt(0, false)
+        );
+        $skipBlock = BasicBlockHelper::append($context, 'closure_bind_not_static');
+        $checkBlock = BasicBlockHelper::append($context, 'closure_bind_static_check');
+        $context->builder->branchIf($isStatic, $checkBlock, $skipBlock);
+        $context->builder->positionAtEnd($checkBlock);
+        self::assertNotBindingObjectToStaticClosure($context, $newThis);
+        $context->builder->positionAtEnd($skipBlock);
+    }
+
+    private static function raiseStaticBindError(Context $context): void
+    {
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise($context, 'Cannot bind static closure to object');
+        $context->builder->call($context->lookupFunction('abort'));
+    }
+
+    private static function emitValueBoxStaticBindGuard(Context $context, Variable $newThis): void
+    {
+        $ptr = JitValueBox::valuePtrFromVariable($context, $newThis);
+        $typeByte = self::loadValueTypeByte($context, $ptr);
+        $i8 = $context->getTypeFromString('int8');
+        $nullBlock = BasicBlockHelper::append($context, 'closure_bind_static_null');
+        $objBlock = BasicBlockHelper::append($context, 'closure_bind_static_obj');
+        $mergeBlock = BasicBlockHelper::append($context, 'closure_bind_static_merge');
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $context->builder->branchIf($isNull, $nullBlock, $objBlock);
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->branch($mergeBlock);
+        $context->builder->positionAtEnd($objBlock);
+        $isObj = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_OBJECT, false)
+        );
+        $okBlock = BasicBlockHelper::append($context, 'closure_bind_static_ok');
+        $context->builder->branchIf($isObj, $okBlock, $mergeBlock);
+        $context->builder->positionAtEnd($okBlock);
+        self::raiseStaticBindError($context);
+        $context->builder->branch($mergeBlock);
+        $context->builder->positionAtEnd($mergeBlock);
     }
 
     private static function thisArgLabel(string $context): string

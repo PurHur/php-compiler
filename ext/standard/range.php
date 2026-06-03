@@ -13,6 +13,8 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\HashTableHelper;
@@ -27,6 +29,10 @@ use PHPLLVM\Value;
  */
 final class range extends Internal
 {
+    private const ZERO_STEP_ERROR = 'range(): Argument #3 ($step) must not exceed the specified range';
+
+    private static int $jitGuardSeq = 0;
+
     public function execute(Frame $frame): void
     {
         if (\count($frame->calledArgs) < 2 || \count($frame->calledArgs) > 3) {
@@ -34,9 +40,6 @@ final class range extends Internal
         }
         $startVar = $frame->calledArgs[0]->resolveIndirect();
         $endVar = $frame->calledArgs[1]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_INTEGER !== $startVar->type || Variable::TYPE_INTEGER !== $endVar->type) {
             throw new \LogicException('range() start and end must be integers in this compiler build');
         }
@@ -53,7 +56,10 @@ final class range extends Internal
             $step = -1;
         }
         if (0 === $step) {
-            throw new \LogicException('range() step must not be zero');
+            throw new \ValueError(self::ZERO_STEP_ERROR);
+        }
+        if (null === $frame->returnVar) {
+            return;
         }
         $ht = new HashTable();
         $index = 0;
@@ -101,6 +107,25 @@ final class range extends Internal
             $negOne = $i64->constInt(-1, false);
             $step = $context->builder->select($cmp, $negOne, $one);
         }
+        self::emitZeroStepGuard($context, $step);
+
         return HashTableHelper::buildIntegerRange($context, $start, $end, $step);
+    }
+
+    private static function emitZeroStepGuard(Context $context, Value $step): void
+    {
+        $tag = 'rs'.(string) ++self::$jitGuardSeq;
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $isZero = $context->builder->icmp(Builder::INT_EQ, $step, $zero);
+        $ok = BasicBlockHelper::append($context, 'range_step_ok_'.$tag);
+        $err = BasicBlockHelper::append($context, 'range_step_err_'.$tag);
+        $context->builder->branchIf($isZero, $err, $ok);
+        $context->builder->positionAtEnd($err);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitValueError($context, self::ZERO_STEP_ERROR);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->positionAtEnd($ok);
     }
 }

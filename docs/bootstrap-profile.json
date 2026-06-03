@@ -518,6 +518,7 @@
         "ext/standard/gethostbynamel.php",
         "ext/standard/gethostname.php",
         "ext/standard/getmygrgid.php",
+        "ext/standard/getlastmod.php",
         "ext/standard/getmyinode.php",
         "ext/standard/getmypid.php",
         "ext/standard/getprotobyname.php",

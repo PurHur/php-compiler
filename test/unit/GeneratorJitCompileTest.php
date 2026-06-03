@@ -257,5 +257,40 @@ PHP
         $this->assertArrayHasKey('gen', $context->generatorCreators);
         $this->addToAssertionCount(1);
     }
+
+    /**
+     * Generator::send/current/getReturn on MCJIT-created generators must compile (#4558).
+     *
+     * @runInSeparateProcess
+     */
+    public function testGeneratorSendThrowGetReturnScriptVerifies(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+function gen() {
+    $x = yield 1;
+    return $x ?? 99;
+}
+$g = gen();
+echo $g->current(), "\n";
+echo $g->send(7), "\n";
+echo $g->getReturn(), "\n";
+PHP
+            ,
+            'generator_jit_send.php'
+        );
+        $this->assertNotNull($block);
+        $this->assertFalse(Block::requiresVmLowering($block));
+        $runtime->jitCompileBlock($block);
+        $context = $runtime->loadJitContext();
+        $verify = new \ReflectionMethod($context, 'compileCommon');
+        $verify->setAccessible(true);
+        $verify->invoke($context);
+        $this->assertArrayHasKey('gen', $context->generatorCreators);
+        $this->assertTrue($context->functionIsRegistered('generator::send'));
+        $this->assertTrue($context->functionIsRegistered('generator::getreturn'));
+        $this->addToAssertionCount(1);
+    }
 }
 

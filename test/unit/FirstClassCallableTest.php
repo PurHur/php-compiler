@@ -9,6 +9,21 @@ use PHPUnit\Framework\TestCase;
 /** First-class callable syntax (issue #1230). */
 final class FirstClassCallableTest extends TestCase
 {
+    public function testVmFunctionFirstClassCallableIsClosureObject(): void
+    {
+        $code = <<<'PHP'
+<?php
+$fn = strlen(...);
+var_export(is_object($fn));
+var_export($fn instanceof Closure);
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('truetrue', ob_get_clean());
+    }
+
     public function testVmFunctionFirstClassCallable(): void
     {
         $code = <<<'PHP'

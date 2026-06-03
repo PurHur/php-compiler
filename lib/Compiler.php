@@ -30,6 +30,8 @@ use PHPCompiler\VM\ClassReadonly;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
+use PHPCompiler\Compiler\EnumMagicMethodCheck;
+use PHPCompiler\Compiler\MagicMethodReturnTypeCheck;
 use PHPCompiler\Compiler\AttributeMetadata;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\DeprecatedMetadata;
@@ -332,6 +334,8 @@ class Compiler {
         FinalClassExtensionCheck::validate($script);
         FinalClassConstCheck::validate($script);
         AbstractMethodVisibilityCheck::validate($script);
+        MagicMethodReturnTypeCheck::validate($script);
+        EnumMagicMethodCheck::validate($script);
         ReadonlyClassCompileCheck::validate($script);
 
         return $main;
@@ -398,6 +402,7 @@ class Compiler {
         if (null === $returnType) {
             return;
         }
+        $this->assertNeverIsStandaloneType($returnType);
         $block->returnDeclaredType = $returnType;
         if ($returnType instanceof Op\Type\Void_) {
             $block->returnTypeVoid = true;
@@ -446,6 +451,13 @@ class Compiler {
                 return;
             }
             if ('mixed' === strtolower($returnType->name)) {
+                return;
+            }
+            $returnLc = strtolower($returnType->name);
+            if ('true' === $returnLc || 'false' === $returnLc) {
+                $block->returnTypeConstraint = Variable::TYPE_BOOLEAN;
+                $block->returnLiteralBoolType = $returnLc;
+
                 return;
             }
             $mapped = Variable::mapFromType(Type::fromDecl($returnType->name));
@@ -1059,7 +1071,10 @@ class Compiler {
                         // Lowered by compileExpr Empty_ via TYPE_ISSET + TYPE_BOOLEAN_NOT (#3298, #4586).
                         break;
                     } elseif (
-                        $child instanceof Op\Expr\ArrayDimFetch
+                        (
+                            $child instanceof Op\Expr\ArrayDimFetch
+                            || $this->isListSpreadAssignOp($child)
+                        )
                         && $this->isListDestructGroupStart($ops, $i)
                     ) {
                         [$block, $i] = $this->compileListDestructGroup($ops, $i, $block);
@@ -1131,6 +1146,13 @@ class Compiler {
         return $assign->expr === $fetch->result;
     }
 
+    private function isListSpreadAssignOp(Op $op): bool
+    {
+        return $op instanceof Op\Expr\Assign
+            && null !== $op->listSpreadRhs
+            && null !== $op->listSpreadFromIndex;
+    }
+
     /**
      * php-cfg lowers `list($a, …) = $rhs` to integer-key dim fetches (#4298).
      *
@@ -1138,7 +1160,13 @@ class Compiler {
      */
     private function isListDestructGroupStart(array $ops, int $index): bool
     {
-        if (!$this->isPlainListDestructDimFetch($ops, $index)) {
+        if ($this->isListSpreadAssignOp($ops[$index])) {
+            return !$this->isListDestructSpreadTail($ops, $index);
+        }
+        if (
+            !$this->isPlainListDestructDimFetch($ops, $index)
+            && !$this->isKeyedListDestructDimFetch($ops, $index)
+        ) {
             return false;
         }
         /** @var Op\Expr\ArrayDimFetch $cur */
@@ -1152,7 +1180,7 @@ class Compiler {
             }
             if (
                 $op instanceof Op\Expr\ArrayDimFetch
-                && $this->isPlainListDestructDimFetch($ops, $p)
+                && ($this->isPlainListDestructDimFetch($ops, $p) || $this->isKeyedListDestructDimFetch($ops, $p))
                 && $op->var === $cur->var
             ) {
                 return false;
@@ -1162,6 +1190,28 @@ class Compiler {
         }
 
         return true;
+    }
+
+    /**
+     * Spread arm at the end of `[$a, ...$rest] = $rhs` — not a separate group start (#4835).
+     *
+     * @param Op[] $ops
+     */
+    private function isListDestructSpreadTail(array $ops, int $index): bool
+    {
+        if (!$this->isListSpreadAssignOp($ops[$index])) {
+            return false;
+        }
+        if ($index < 1) {
+            return false;
+        }
+        $p = $index - 1;
+        if ($ops[$p] instanceof Op\Expr\Assign || $ops[$p] instanceof Op\Expr\AssignRef) {
+            --$p;
+        }
+
+        return $p >= 0
+            && ($this->isPlainListDestructDimFetch($ops, $p) || $this->isKeyedListDestructDimFetch($ops, $p));
     }
 
     /**
@@ -1214,11 +1264,37 @@ class Compiler {
     private function listDestructGroupEndIndex(array $ops, int $start): int
     {
         $i = $start;
-        while ($i < count($ops) && $this->isPlainListDestructDimFetch($ops, $i)) {
+        if ($this->isListSpreadAssignOp($ops[$i])) {
+            return $i;
+        }
+        while (
+            $i < count($ops)
+            && ($this->isPlainListDestructDimFetch($ops, $i) || $this->isKeyedListDestructDimFetch($ops, $i))
+        ) {
             $i = $this->listDestructOpEndIndex($ops, $i);
+        }
+        if ($i < count($ops) && $this->isListSpreadAssignOp($ops[$i])) {
+            return $i;
         }
 
         return $i - 1;
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    private function listDestructRhsOperand(array $ops, int $start): Operand
+    {
+        if ($this->isListSpreadAssignOp($ops[$start])) {
+            /** @var Op\Expr\Assign $spread */
+            $spread = $ops[$start];
+
+            return $spread->listSpreadRhs;
+        }
+        /** @var Op\Expr\ArrayDimFetch $firstFetch */
+        $firstFetch = $ops[$start];
+
+        return $firstFetch->var;
     }
 
     /**
@@ -1246,7 +1322,7 @@ class Compiler {
     }
 
     /**
-     * Guard list destructuring: skip slot assignments when RHS is not a list array (#4325, #4298).
+     * Guard list destructuring: skip slot assignments when RHS is not an array (#4325); per-slot warnings for string keys (#4841).
      *
      * @param Op[] $ops
      *
@@ -1255,13 +1331,12 @@ class Compiler {
     private function compileListDestructGroup(array $ops, int $start, Block $block): array
     {
         $end = $this->listDestructGroupEndIndex($ops, $start);
-        /** @var Op\Expr\ArrayDimFetch $firstFetch */
-        $firstFetch = $ops[$start];
+        $rhs = $this->listDestructRhsOperand($ops, $start);
 
         $checkOp = new OpCode(
             OpCode::TYPE_LIST_UNPACK_CHECK,
             null,
-            $this->compileOperand($firstFetch->var, $block, true),
+            $this->compileOperand($rhs, $block, true),
         );
         $block->addOpCode($checkOp);
 
@@ -1935,11 +2010,16 @@ class Compiler {
             $this->compileOperand($trait->name, $block, true)
         );
         $this->assignAttributeMetadata($return, $trait);
+        $traitLc = strtolower(ltrim($name, '\\'));
+        $this->compiledClassStaticProperties[$traitLc] = $this->compiledClassStaticProperties[$traitLc] ?? [];
+        $prevClassStaticCompile = $this->currentClassStaticPropertyCompile;
+        $this->currentClassStaticPropertyCompile = $traitLc;
         $return->block1 = $this->compileClassBody(
             $trait->stmts,
             OpCode::TYPE_DECLARE_TRAIT,
             $this->staticNameFromOperand($trait->name)
         );
+        $this->currentClassStaticPropertyCompile = $prevClassStaticCompile;
 
         return $return;
     }
@@ -2115,6 +2195,7 @@ class Compiler {
             $className
         );
         $this->currentClassStaticPropertyCompile = $prevClassStaticCompile;
+        $this->mergeTraitStaticPropertiesIntoClass($class->stmts, $classLc);
         if ($class instanceof Op\Stmt\Class_ && null !== $class->extends && null !== $parentLc) {
             foreach ($this->compiledClassStaticProperties[$parentLc] ?? [] as $prop => $_) {
                 $this->compiledClassStaticProperties[$classLc][$prop] = true;
@@ -2123,6 +2204,25 @@ class Compiler {
         $this->classCompileRegistry->registerClass($className, $parentLc, $interfaceLcs, $class->stmts);
 
         return $return;
+    }
+
+    protected function mergeTraitStaticPropertiesIntoClass(CfgBlock $stmts, string $classLc): void
+    {
+        foreach ($stmts->children as $child) {
+            if (!$child instanceof Op\Stmt\TraitUse) {
+                continue;
+            }
+            foreach ($child->traits as $traitOperand) {
+                $traitName = $this->staticNameFromOperand($traitOperand);
+                if (null === $traitName) {
+                    continue;
+                }
+                $traitLc = strtolower(ltrim($traitName, '\\'));
+                foreach ($this->compiledClassStaticProperties[$traitLc] ?? [] as $prop => $_) {
+                    $this->compiledClassStaticProperties[$classLc][$prop] = true;
+                }
+            }
+        }
     }
 
     protected function applySealedMetadataFromOp(Op $op, OpCode $opcode): void
@@ -2259,6 +2359,64 @@ class Compiler {
         return false;
     }
 
+    protected function cfgTypeIsStandaloneNever(?Op\Type $type): bool
+    {
+        if (null === $type) {
+            return false;
+        }
+        if ($type instanceof Op\Type\Never_) {
+            return true;
+        }
+
+        return $type instanceof Op\Type\Literal && 'never' === strtolower($type->name);
+    }
+
+    protected function cfgTypeContainsNever(?Op\Type $type): bool
+    {
+        if (null === $type) {
+            return false;
+        }
+        if ($type instanceof Op\Type\Never_) {
+            return true;
+        }
+        if ($type instanceof Op\Type\Literal && 'never' === strtolower($type->name)) {
+            return true;
+        }
+        if ($type instanceof Op\Type\Union_) {
+            foreach ($type->types as $member) {
+                if ($this->cfgTypeContainsNever($member)) {
+                    return true;
+                }
+            }
+        }
+        if ($type instanceof Op\Type\Intersection) {
+            foreach ($type->types as $member) {
+                if ($this->cfgTypeContainsNever($member)) {
+                    return true;
+                }
+            }
+        }
+        if ($type instanceof Op\Type\Nullable) {
+            return $this->cfgTypeContainsNever($type->subtype);
+        }
+
+        return false;
+    }
+
+    /**
+     * Zend zend_handle_never_type — never must not appear in unions/intersections/DNF (#4970).
+     */
+    protected function assertNeverIsStandaloneType(?Op\Type $type): void
+    {
+        if (!$this->cfgTypeContainsNever($type)) {
+            return;
+        }
+        if ($this->cfgTypeIsStandaloneNever($type)) {
+            return;
+        }
+        $this->throwCompileError('never can only be used as a standalone type');
+    }
+
     protected function dnfTypeLabelFromCfgType(?Op\Type $declared): string
     {
         if (null === $declared) {
@@ -2304,12 +2462,10 @@ class Compiler {
     protected function applyParamDeclaredType(Op\Expr\Param $param, Block $block, int $slot, bool $variadicElement = false): void
     {
         $declared = $param->declaredType;
-        if ($declared instanceof Op\Type\Never_) {
+        if ($this->cfgTypeIsStandaloneNever($declared)) {
             $this->throwCompileError('never cannot be used as a parameter type');
         }
-        if ($declared instanceof Op\Type\Literal && 'never' === strtolower($declared->name)) {
-            $this->throwCompileError('never cannot be used as a parameter type');
-        }
+        $this->assertNeverIsStandaloneType($declared);
         if (null !== $declared) {
             $block->paramDeclaredTypes[$slot] = $declared;
         }
@@ -2354,6 +2510,21 @@ class Compiler {
         }
         if ($declared instanceof Op\Type\Literal) {
             $declName = strtolower($declared->name);
+            if ('true' === $declName || 'false' === $declName) {
+                if ($variadicElement) {
+                    $block->paramVariadicElementTypeConstraints[$slot] = Variable::TYPE_BOOLEAN;
+                } else {
+                    $block->paramTypeConstraints[$slot] = Variable::TYPE_BOOLEAN;
+                    $block->paramLiteralBoolTypes[$slot] = $declName;
+                }
+
+                return;
+            }
+            if ('iterable' === $declName) {
+                $block->paramIterableSlots[$slot] = true;
+
+                return;
+            }
             if ('mixed' !== $declName) {
                 $rawType = Type::fromDecl($declared->name);
                 $mapped = Variable::mapFromType($rawType);
@@ -2406,10 +2577,24 @@ class Compiler {
             switch (get_class($child)) {
                 case Op\Stmt\Property::class:
                     if (OpCode::TYPE_DECLARE_CLASS !== $type) {
-                        $this->throwCompileLogic('Properties are only supported on classes for now');
+                        if (OpCode::TYPE_DECLARE_TRAIT === $type) {
+                            if (!$child->static) {
+                                $this->throwCompileLogic('Traits cannot declare non-static properties');
+                            }
+                        } elseif (OpCode::TYPE_DECLARE_INTERFACE === $type) {
+                            if ($child->static) {
+                                $this->throwCompileLogic('Interfaces cannot declare static properties');
+                            }
+                            if (!is_null($child->defaultBlock) || null !== $child->defaultVar) {
+                                $this->throwCompileLogic('Interface properties cannot have default values');
+                            }
+                        } else {
+                            $this->throwCompileLogic('Properties are only supported on classes for now');
+                        }
                     }
                     if (
-                        !$child->static
+                        OpCode::TYPE_DECLARE_CLASS === $type
+                        && !$child->static
                         && $child->name instanceof Operand\Literal
                         && is_string($child->name->value)
                     ) {
@@ -2418,6 +2603,7 @@ class Compiler {
                     if (!is_null($child->defaultBlock)) {
                         $this->compileOps($child->defaultBlock->children, $result);
                     }
+                    $this->assertNeverIsStandaloneType($child->declaredType);
                     $propertyDeclName = $this->declNameFromCfgType($child->declaredType);
                     $declared = null !== $propertyDeclName
                         ? Type::fromDecl($propertyDeclName)
@@ -2499,8 +2685,11 @@ class Compiler {
                     $this->compileClassConstDeclaration($child, $result);
                     break;
                 case Op\Stmt\TraitUse::class:
-                    if (OpCode::TYPE_DECLARE_CLASS !== $type) {
-                        $this->throwCompileLogic('Trait use is only supported on classes for now');
+                    if (
+                        OpCode::TYPE_DECLARE_CLASS !== $type
+                        && OpCode::TYPE_DECLARE_TRAIT !== $type
+                    ) {
+                        $this->throwCompileLogic('Trait use is only supported on classes and traits for now');
                     }
                     foreach ($child->traits as $traitOperand) {
                         $result->addOpCode(new OpCode(
@@ -2561,6 +2750,10 @@ class Compiler {
             $valueSlot,
             $typeSlot
         );
+        $constOp->classConstVisibilityFlags = $child->flags;
+        if (property_exists($child, 'isEnumCase')) {
+            $constOp->isEnumCaseDeclare = $child->isEnumCase;
+        }
         $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $constOp->attributeNames = AttributeNames::fromOp($child);
         $this->assignAttributeMetadata($constOp, $child);
@@ -2774,6 +2967,19 @@ class Compiler {
             $var->typeConstraint = Variable::TYPE_ARRAY;
             $var->genericArrayTypeSpec = $arraySpec;
             $var->declaredTypeLabel = $declName;
+
+            return $return;
+        }
+        $literalBoolName = null;
+        if ($cfgType instanceof Op\Type\Literal) {
+            $literalBoolName = strtolower($cfgType->name);
+        } elseif (null !== $declName) {
+            $literalBoolName = strtolower($declName);
+        }
+        if ('true' === $literalBoolName || 'false' === $literalBoolName) {
+            $var->typeConstraint = Variable::TYPE_BOOLEAN;
+            $var->literalBoolType = $literalBoolName;
+            $var->declaredTypeLabel = $literalBoolName;
 
             return $return;
         }
@@ -3080,6 +3286,9 @@ class Compiler {
         if (null === $lcClass) {
             return null;
         }
+        if ($this->classCompileRegistry->isTrait($lcClass)) {
+            return null;
+        }
         $lcConst = strtolower($constName);
         if (isset($this->compileTimeClassConsts[$lcClass][$lcConst])) {
             $value = new Variable();
@@ -3116,6 +3325,19 @@ class Compiler {
         return $value;
     }
 
+    protected function pseudoClassInCompileScope(string $className, Block $block): bool
+    {
+        $lc = strtolower($className);
+        if (!in_array($lc, ['self', 'parent', 'static'], true)) {
+            return true;
+        }
+        if (null !== $this->compilingClassLc) {
+            return true;
+        }
+
+        return null !== $block->func && null !== $block->func->class;
+    }
+
     protected function resolveDefaultClassConstScope(string $className, Block $block): ?string
     {
         $lc = strtolower($className);
@@ -3138,6 +3360,25 @@ class Compiler {
         return strtolower(ltrim($className, '\\'));
     }
 
+    /**
+     * Non-nullable declared type with `= null` default (php-src implicit nullable, #4449).
+     */
+    protected function paramIsImplicitNullable(Op\Expr\Param $param, ?int $defaultSlot, Block $block): bool
+    {
+        if (null === $defaultSlot || null === $param->declaredType) {
+            return false;
+        }
+        if ($param->declaredType instanceof Op\Type\Nullable) {
+            return false;
+        }
+        if ($this->cfgTypeUsesDnfShape($param->declaredType)) {
+            return false;
+        }
+        $default = $block->constants[$defaultSlot] ?? null;
+
+        return null !== $default && Variable::TYPE_NULL === $default->type;
+    }
+
     protected function compileParam(Op\Expr\Param $param, Block $block, int $paramIdx): OpCode {
         if ($param->byRef) {
             $block->paramByRef[$paramIdx] = true;
@@ -3158,6 +3399,9 @@ class Compiler {
             $block->paramSensitive[$paramIdx] = true;
         }
         $this->applyParamDeclaredType($param, $block, $slot, $param->variadic);
+        if ($this->paramIsImplicitNullable($param, $defaultConst, $block)) {
+            $block->paramImplicitNullable[$slot] = true;
+        }
 
         return new OpCode(
             OpCode::TYPE_ARG_RECV,
@@ -3202,10 +3446,10 @@ class Compiler {
                     $emptySlot
                 ));
             } elseif (1 === $total) {
+                // Zend string context for a lone encapsed variable (#4785) — not a plain assign.
                 $part = $this->compileConcatListPart($op->list[0], $block);
                 $block->addOpCode(new OpCode(
-                    OpCode::TYPE_ASSIGN,
-                    $return,
+                    OpCode::TYPE_CAST_STRING,
                     $return,
                     $part
                 ));
@@ -3449,11 +3693,15 @@ class Compiler {
 
     protected function compileIncDecExpr(Op\Expr $expr, Block $block, int $opcode): array
     {
+        // php-cfg may clear write after SSA replace; read still names the lvalue (#4946).
+        $write = $expr->write ?? $expr->read;
+        $this->rejectThisReassignment($write);
+
         return [new OpCode(
             $opcode,
             $this->compileOperand($expr->result, $block, false),
             $this->compileOperand($expr->read, $block, true),
-            $this->compileOperand($expr->write, $block, false),
+            $this->compileOperand($write, $block, false),
         )];
     }
 
@@ -3523,6 +3771,21 @@ class Compiler {
                     $this->compileOperand($expr->expr, $block, true) 
                 )];
             case Op\Expr\Assign::class:
+                if (null === $expr->listSpreadRhs) {
+                    $this->rejectThisReassignment($expr->var);
+                }
+                if (null !== $expr->listSpreadRhs && null !== $expr->listSpreadFromIndex) {
+                    $fromIndex = new Operand\Literal($expr->listSpreadFromIndex);
+                    $spreadOp = new OpCode(
+                        OpCode::TYPE_LIST_SPREAD_ASSIGN,
+                        $this->compileOperand($expr->var, $block, false),
+                        $this->compileOperand($expr->listSpreadRhs, $block, true),
+                        $this->compileOperand($fromIndex, $block, true),
+                    );
+                    $spreadOp->listSpreadExcludedKeys = $expr->listSpreadExcludedKeys ?? [];
+
+                    return [$spreadOp];
+                }
                 $staticPropertyFetch = $this->unwrapStaticPropertyFetch($expr->var);
                 if (null !== $staticPropertyFetch) {
                     $fetchSlot = $this->compileOperand($staticPropertyFetch->result, $block, false);
@@ -3841,7 +4104,10 @@ class Compiler {
                 )];
             case Op\Expr\InstanceOf_::class:
                 return $this->compileInstanceOf($expr, $block);
+            case Op\Expr\In_::class:
+                return $this->compileIn($expr, $block);
             case Op\Expr\AssignRef::class:
+                $this->rejectThisReassignment($expr->var);
                 $bindRefFlags = 0;
                 $dimFetch = $this->unwrapArrayDimFetch($expr->expr)
                     ?? $this->findArrayDimFetchForResult($expr->expr, $block);
@@ -3936,6 +4202,30 @@ class Compiler {
                     'name' => $name,
                     'slot' => $slot,
                     'byRef' => $useVar->byRef,
+                ];
+            }
+        } elseif ($expr instanceof Op\Expr\ArrowFunction) {
+            // Zend auto-captures outer locals/parameters (zend_compile.c); nested fn-in-fn needs
+            // explicit closureCaptures so VM/JIT bind at creation time (#4944, #4952).
+            $seenCaptureSlots = [];
+            foreach ($funcBlock->args as $captureOperand) {
+                $slot = (int) $funcBlock->args[$captureOperand];
+                if (isset($seenCaptureSlots[$slot])) {
+                    continue;
+                }
+                $name = Block::resolveVariableName($captureOperand);
+                if (null === $name || '' === $name) {
+                    continue;
+                }
+                if (in_array($name, $funcBlock->paramNames, true)) {
+                    continue;
+                }
+                $seenCaptureSlots[$slot] = true;
+                $funcBlock->closureCaptureSlots[$slot] = true;
+                $op->closureCaptures[] = [
+                    'name' => $name,
+                    'slot' => $slot,
+                    'byRef' => false,
                 ];
             }
         }
@@ -4748,6 +5038,10 @@ class Compiler {
 
     protected function functionStaticStorageKey(\PHPCfg\Func $func, string $varName): string
     {
+        if (((int) ($func->flags ?? 0)) & \PHPCfg\Func::FLAG_CLOSURE) {
+            return $varName;
+        }
+
         return $this->resolveFuncDisplayName($func)."\0".$varName;
     }
 
@@ -5002,10 +5296,12 @@ class Compiler {
             if (null === $keyVm) {
                 return null;
             }
-            if ($keyVm->is(Variable::TYPE_INTEGER)) {
-                $ht->addIndex($keyVm->toInt(), $valueVm);
+            if ($keyVm->is(Variable::TYPE_INTEGER) || $keyVm->is(Variable::TYPE_FLOAT)) {
+                $ht->updateIndex($keyVm->toInt(), $valueVm);
             } elseif ($keyVm->is(Variable::TYPE_STRING)) {
-                $ht->add($keyVm->toString(), $valueVm);
+                $ht->update($keyVm->toString(), $valueVm);
+            } elseif ($keyVm->is(Variable::TYPE_BOOLEAN)) {
+                $ht->updateIndex($keyVm->toBool() ? 1 : 0, $valueVm);
             } else {
                 return null;
             }
@@ -5709,13 +6005,23 @@ class Compiler {
     {
         $literalName = $this->staticNameFromOperand($name);
         if (null !== $literalName) {
+            $lcProp = strtolower($literalName);
             $className = $this->literalScopeClassName($class);
             if (null !== $className) {
                 $lcClass = strtolower(ltrim($className, '\\'));
-                $lcProp = strtolower($literalName);
+                // self::/static::/parent:: with a literal member — property name, not a local (#4668).
+                if (in_array($lcClass, ['self', 'static', 'parent'], true)) {
+                    return $this->compileOperand($name, $block, true);
+                }
                 if (isset($this->compiledClassStaticProperties[$lcClass][$lcProp])) {
                     return $this->compileOperand($name, $block, true);
                 }
+            }
+            if (
+                null !== $this->compilingClassLc
+                && isset($this->compiledClassStaticProperties[$this->compilingClassLc][$lcProp])
+            ) {
+                return $this->compileOperand($name, $block, true);
             }
             $varOperand = new CfgVariable(new Literal($literalName));
 
@@ -5982,6 +6288,19 @@ class Compiler {
     }
 
     /**
+     * @return OpCode[]
+     */
+    protected function compileIn(Op\Expr\In_ $expr, Block $block): array
+    {
+        return [new OpCode(
+            OpCode::TYPE_IN,
+            $this->compileOperand($expr->result, $block, false),
+            $this->compileOperand($expr->expr, $block, true),
+            $this->compileOperand($expr->haystack, $block, true),
+        )];
+    }
+
+    /**
      * @return list<string>
      */
     private function instanceofUnionNamesFromCfgType(Op\Type\Union_ $union): array
@@ -6011,6 +6330,15 @@ class Compiler {
     protected function compileClassConstFetch(Op\Expr\ClassConstFetch $expr, Block $block): array
     {
         $constName = $this->staticNameFromOperand($expr->name);
+        $className = $this->staticNameFromOperand($expr->class);
+        if (null !== $constName
+            && 'class' === strtolower($constName)
+            && null !== $className
+            && !$this->pseudoClassInCompileScope($className, $block)) {
+            $this->throwCompileError(
+                'Cannot use "'.strtolower($className).'" in the global scope'
+            );
+        }
         $op = new OpCode(
             OpCode::TYPE_CLASS_CONST_FETCH,
             $this->compileOperand($expr->result, $block, false),
@@ -6027,7 +6355,7 @@ class Compiler {
     }
 
     /**
-     * Lower PHP 8.1 first-class callables to VM/JIT callable representations (#1230).
+     * Lower PHP 8.1 first-class callables to Closure objects via TYPE_FROM_CALLABLE (#1230, #4810).
      *
      * @return OpCode[]
      */
@@ -6036,21 +6364,27 @@ class Compiler {
         $result = $this->compileOperand($expr->result, $block, false);
         // Numeric kinds: avoid php-cfg class const fetch during self-host bundle JIT (#1056).
         if (3 === $expr->kind) {
+            $callableSlot = $this->compileOperand($expr->result, $block, false);
             $receiver = $this->compileOperand($expr->var, $block, true);
             $method = $this->compileOperand($expr->name, $block, true);
 
             return [
                 new OpCode(
                     OpCode::TYPE_INIT_ARRAY,
-                    $result,
+                    $callableSlot,
                     $receiver,
                     $this->compileIntegerLiteralSlot(0, $block)
                 ),
                 new OpCode(
                     OpCode::TYPE_ADD_ARRAY_ELEMENT,
-                    $result,
+                    $callableSlot,
                     $method,
                     $this->compileIntegerLiteralSlot(1, $block)
+                ),
+                new OpCode(
+                    OpCode::TYPE_FROM_CALLABLE,
+                    $result,
+                    $callableSlot
                 ),
             ];
         }
@@ -6064,8 +6398,7 @@ class Compiler {
         }
 
         return [new OpCode(
-            OpCode::TYPE_ASSIGN,
-            $result,
+            OpCode::TYPE_FROM_CALLABLE,
             $result,
             $callableSlot
         )];
@@ -6145,8 +6478,7 @@ class Compiler {
 
     protected function operandIsInvokableReceiver(Operand $operand, Block $block): bool
     {
-        // First-class callables are represented as string/array callables (not Closure objects) in the VM;
-        // don't lower `$x(...)` to `$x->__invoke(...)` when `$x` originates from `foo(...)` / `C::m(...)`.
+        // First-class callables are Closure objects; use FUNC_CALL dispatch, not `$x->__invoke(...)`.
         if (null !== $block->orig) {
             $root = $this->unwrapOperandChain($operand);
             foreach ($block->orig->children as $child) {
@@ -6246,9 +6578,14 @@ class Compiler {
      */
     protected function compileCallArgSends(array $args, Block $block): array
     {
+        $this->validateCallArgOrder($args);
+
         $sends = [];
         foreach ($args as $arg) {
             $valueSlot = $this->compileOperand($arg, $block, true);
+            if (null === $valueSlot && $arg instanceof Operand\NullOperand) {
+                $valueSlot = $this->registerNullConstantSlot($block, $arg);
+            }
             $nameSlot = null;
             $argName = $this->callArgName($arg);
             if (null !== $argName) {
@@ -6268,6 +6605,33 @@ class Compiler {
     private function callArgUnpack(Operand $arg): bool
     {
         return property_exists($arg, 'callArgUnpack') && true === $arg->callArgUnpack;
+    }
+
+    /**
+     * Zend zend_compile.c: unpack must not follow named args; positional must not follow unpack (#4663).
+     *
+     * @param list<Operand> $args
+     */
+    private function validateCallArgOrder(array $args): void
+    {
+        $hadNamed = false;
+        $hadUnpack = false;
+        foreach ($args as $arg) {
+            $isNamed = null !== $this->callArgName($arg);
+            $isUnpack = $this->callArgUnpack($arg);
+            if ($isUnpack && $hadNamed) {
+                $this->throwCompileError('Cannot use argument unpacking after named arguments');
+            }
+            if (!$isNamed && !$isUnpack && $hadUnpack) {
+                $this->throwCompileError('Cannot use positional argument after argument unpacking');
+            }
+            if ($isNamed) {
+                $hadNamed = true;
+            }
+            if ($isUnpack) {
+                $hadUnpack = true;
+            }
+        }
     }
 
     private function callArgName(Operand $arg): ?string
@@ -6591,6 +6955,21 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /**
+     * Zend zend_compile.c: assignment to $this is a compile-time fatal (#4865).
+     *
+     * @return never
+     */
+    protected function rejectThisReassignment(?Operand $var): void
+    {
+        if (null === $var) {
+            return;
+        }
+        if ('this' === $this->baseVariableName($var)) {
+            $this->throwCompileError('Cannot re-assign $this');
+        }
     }
 
 }

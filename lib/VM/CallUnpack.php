@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM;
 use PHPCompiler\ext\standard\VmArray;
 
-/** Call-time argument unpacking (`foo(...$x)`) for arrays and Traversables (Zend zend_API.c parity, #4452). */
+/** Call-time argument unpacking (`foo(...$x)`) for arrays and Traversables (Zend zend_API.c parity, #4452, #4669). */
 final class CallUnpack
 {
     public const NON_ARRAY_MESSAGE = 'Only arrays and Traversables can be unpacked';
@@ -16,23 +16,30 @@ final class CallUnpack
     public const STRING_KEYS_MESSAGE = 'Cannot unpack array with string keys';
 
     /**
-     * Materialize call-time ...$spread into positional call arguments.
+     * Expand call-time ...$spread into callArgEntries (positional / named) for NamedArgs::resolve().
      *
-     * @return list<Variable>
+     * @param list<string> $paramNames
      *
-     * @throws \TypeError
+     * @return list<array{0: string, 1?: mixed, 2?: Variable}>
+     *
+     * @throws \TypeError|\Error
      */
-    public static function materialize(VM $vm, Frame $frame, Variable $spread): array
-    {
+    public static function expandToEntries(
+        VM $vm,
+        Frame $frame,
+        Variable $spread,
+        array $paramNames,
+        ?int $variadicParamIndex
+    ): array {
         $spread = $spread->resolveIndirect();
 
         if (Variable::TYPE_ARRAY === $spread->type) {
-            return self::fromArray($spread);
+            return self::fromArray($spread, $paramNames, $variadicParamIndex);
         }
 
         if (Variable::TYPE_OBJECT === $spread->type) {
             if (null !== $spread->toObject()->generatorState) {
-                return self::fromGenerator($vm, $spread);
+                return self::fromGenerator($vm, $spread, $paramNames, $variadicParamIndex);
             }
             try {
                 $iterable = ForeachIterator::resolveTraversableObject($vm, $frame, $spread);
@@ -40,71 +47,157 @@ final class CallUnpack
                 throw new \TypeError(self::NON_ARRAY_MESSAGE);
             }
             if (null !== $iterable->toObject()->generatorState) {
-                return self::fromGenerator($vm, $iterable);
+                return self::fromGenerator($vm, $iterable, $paramNames, $variadicParamIndex);
             }
 
-            return self::fromIteratorObject($vm, $frame, $iterable);
+            return self::fromIteratorObject($vm, $frame, $iterable, $paramNames, $variadicParamIndex);
         }
 
         throw new \TypeError(self::NON_ARRAY_MESSAGE);
     }
 
-    /** @return list<Variable> */
-    private static function fromArray(Variable $array): array
+    /**
+     * @param list<string> $paramNames
+     *
+     * @return list<array{0: string, 1?: mixed, 2?: Variable}>
+     */
+    private static function fromArray(Variable $array, array $paramNames, ?int $variadicParamIndex): array
     {
-        if (!VmArray::isList($array->toArray())) {
-            throw new \TypeError(self::STRING_KEYS_MESSAGE);
-        }
-        $out = [];
-        foreach ($array->toArray()->iterate(true) as $element) {
-            $out[] = $element;
+        $ht = $array->toArray();
+        if (VmArray::isList($ht)) {
+            $out = [];
+            foreach ($ht->iterate(true) as $element) {
+                $out[] = ['p', $element];
+            }
+
+            return $out;
         }
 
-        return $out;
+        return self::entriesFromKeyedPairs($ht->iterateKeyed(true), $paramNames, $variadicParamIndex);
     }
 
-    /** @return list<Variable> */
-    private static function fromGenerator(VM $vm, Variable $genVar): array
-    {
+    /**
+     * @param list<string> $paramNames
+     *
+     * @return list<array{0: string, 1?: mixed, 2?: Variable}>
+     */
+    private static function fromGenerator(
+        VM $vm,
+        Variable $genVar,
+        array $paramNames,
+        ?int $variadicParamIndex
+    ): array {
         $gen = $genVar->toObject()->generatorState;
         $gen->rewind();
-        $out = [];
-        $expected = 0;
+        $pairs = [];
         while ($vm->resumeGenerator($gen)) {
-            self::assertPackedKey($gen->currentKey, $expected);
             $value = new Variable();
             $value->copyFrom($gen->currentValue);
-            $out[] = $value;
-            ++$expected;
+            $keyCopy = new Variable();
+            $keyCopy->copyFrom($gen->currentKey);
+            $pairs[] = [$keyCopy, $value];
         }
 
-        return $out;
+        return self::entriesFromKeyedPairs($pairs, $paramNames, $variadicParamIndex);
     }
 
-    /** @return list<Variable> */
-    private static function fromIteratorObject(VM $vm, Frame $frame, Variable $iterable): array
-    {
+    /**
+     * @param list<string> $paramNames
+     *
+     * @return list<array{0: string, 1?: mixed, 2?: Variable}>
+     */
+    private static function fromIteratorObject(
+        VM $vm,
+        Frame $frame,
+        Variable $iterable,
+        array $paramNames,
+        ?int $variadicParamIndex
+    ): array {
         $vm->invokeForeachInstanceMethod($frame, $iterable, 'rewind');
-        $out = [];
-        $expected = 0;
+        $pairs = [];
         while ($vm->invokeForeachInstanceMethod($frame, $iterable, 'valid')->toBool()) {
             $key = $vm->invokeForeachInstanceMethod($frame, $iterable, 'key');
-            self::assertPackedKey($key, $expected);
             $current = $vm->invokeForeachInstanceMethod($frame, $iterable, 'current');
             $value = new Variable();
             $value->copyFrom($current);
-            $out[] = $value;
+            $pairs[] = [$key, $value];
             $vm->invokeForeachInstanceMethod($frame, $iterable, 'next');
-            ++$expected;
         }
 
-        return $out;
+        return self::entriesFromKeyedPairs($pairs, $paramNames, $variadicParamIndex);
     }
 
-    private static function assertPackedKey(Variable $key, int $expected): void
-    {
-        if (Variable::TYPE_INTEGER !== $key->type || $key->toInt() !== $expected) {
-            throw new \TypeError(self::STRING_KEYS_MESSAGE);
+    /**
+     * @param iterable<int, array{0: Variable, 1: Variable}> $pairs
+     * @param list<string>                                   $paramNames
+     *
+     * @return list<array{0: string, 1?: mixed, 2?: Variable}>
+     */
+    private static function entriesFromKeyedPairs(
+        iterable $pairs,
+        array $paramNames,
+        ?int $variadicParamIndex
+    ): array {
+        $paramCount = \count($paramNames);
+        $lowerNames = array_map('strtolower', $paramNames);
+        $entries = [];
+        $hadNamed = false;
+        $nextPositional = 0;
+        $filled = [];
+
+        foreach ($pairs as $pair) {
+            $key = $pair[0]->resolveIndirect();
+            $value = $pair[1];
+            if (self::isPositionalUnpackKey($key)) {
+                if ($hadNamed) {
+                    throw new \Error('Cannot use positional argument after named argument during unpacking');
+                }
+                while ($nextPositional < $paramCount && isset($filled[$nextPositional])) {
+                    ++$nextPositional;
+                }
+                if ($nextPositional < $paramCount) {
+                    $filled[$nextPositional] = true;
+                    ++$nextPositional;
+                } elseif (null === $variadicParamIndex) {
+                    throw new \LogicException('Too many arguments to function call');
+                }
+                $entries[] = ['p', $value];
+                continue;
+            }
+            if (Variable::TYPE_STRING !== $key->type) {
+                throw new \TypeError(self::STRING_KEYS_MESSAGE);
+            }
+            $hadNamed = true;
+            $name = $key->toString();
+            $idx = array_search(strtolower($name), $lowerNames, true);
+            if (false === $idx) {
+                if (null !== $variadicParamIndex) {
+                    $entries[] = ['n', $name, $value];
+                    continue;
+                }
+                throw new \Error("Unknown named parameter \${$name}");
+            }
+            if (isset($filled[$idx])) {
+                throw new \Error("Named parameter \${$name} overwrites previous argument");
+            }
+            $filled[$idx] = true;
+            $entries[] = ['n', $name, $value];
         }
+
+        return $entries;
+    }
+
+    private static function isPositionalUnpackKey(Variable $key): bool
+    {
+        if (Variable::TYPE_INTEGER === $key->type) {
+            return true;
+        }
+        if (Variable::TYPE_STRING === $key->type) {
+            $s = $key->toString();
+
+            return '' !== $s && (string) (int) $s === $s && (int) $s >= 0;
+        }
+
+        return false;
     }
 }

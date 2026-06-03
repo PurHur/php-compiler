@@ -25,6 +25,7 @@ use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\FiberState;
 use PHPCompiler\VM\GeneratorState;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\IterableCheck;
 use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ObjectLifetime;
@@ -255,7 +256,7 @@ class VM {
         }
         $object = $var->toObject();
         if (EnumCaseSupport::isEnumCase($object)) {
-            return EnumCaseSupport::toString($object);
+            throw new \Error("Object of class {$object->class->name} could not be converted to string");
         }
         if (!$this->hasInstanceMethod($object->class, '__tostring')) {
             return 'Object';
@@ -424,7 +425,7 @@ class VM {
         }
         $object = $var->toObject();
         if (EnumCaseSupport::isEnumCase($object)) {
-            return EnumCaseSupport::toString($object);
+            throw new \Error("Object of class {$object->class->name} could not be converted to string");
         }
         if (!$this->hasInstanceMethod($object->class, '__tostring')) {
             throw new \Error("Object of class {$object->class->name} could not be converted to string");
@@ -467,8 +468,11 @@ class VM {
         if ($this->hasInstanceMethod($object->class, '__debuginfo')) {
             $result = $this->invokeInstanceMethod($object, '__debugInfo')->resolveIndirect();
             if (Variable::TYPE_ARRAY !== $result->type) {
-                throw new \LogicException(
-                    "{$object->class->name}::__debugInfo() must return an array in this compiler build"
+                $given = Variable::TYPE_OBJECT === $result->type
+                    ? $result->toObject()->class->name
+                    : TypeCheck::typeNameForConstraint($result->type);
+                throw new \TypeError(
+                    "{$object->class->name}::__debugInfo(): Return value must be of type array, {$given} returned"
                 );
             }
             $props = [];
@@ -485,6 +489,43 @@ class VM {
         }
 
         return $object->class->getProperties($object->getRawProperties(), ClassEntry::PROP_PURPOSE_DEBUG);
+    }
+
+    /**
+     * Zend zend_check_clone: private/protected __clone() rejects external-scope clone (#5077).
+     *
+     * @return null when clone is allowed, or a catch frame when Error was dispatched
+     */
+    protected function enforceCloneVisibility(ObjectEntry $object, Frame $frame): ?Frame
+    {
+        if (!$this->hasInstanceMethod($object->class, '__clone')) {
+            return null;
+        }
+        try {
+            [$declaringClass, $methodLc] = $this->resolveInstanceMethod($object->class, '__clone');
+            $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            $callerClassLc = $this->callerClassLc($frame);
+            $callerDisplay = null;
+            if (null !== $callerClassLc && isset($this->context->classes[$callerClassLc])) {
+                $callerDisplay = $this->context->classes[$callerClassLc]->name;
+            }
+            MethodVisibility::assertCallable(
+                $vis,
+                $callerClassLc,
+                strtolower($declaringClass->name),
+                $declaringClass->name,
+                '__clone',
+                false,
+                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
+                $callerDisplay
+            );
+        } catch (\LogicException $e) {
+            $message = 'Trying to clone an uncloneable object of class '.$object->class->name;
+
+            return $this->dispatchVmError($message, $frame);
+        }
+
+        return null;
     }
 
     /**
@@ -531,6 +572,68 @@ class VM {
     }
 
     /**
+     * True when zend_std_read_property must invoke __get (undeclared slot or inaccessible declared prop).
+     */
+    protected function propertyReadUsesMagicGet(ObjectEntry $object, string $name, Frame $frame): bool
+    {
+        if (!$this->hasInstanceMethod($object->class, '__get')) {
+            return false;
+        }
+        $meta = $this->classPropertyMeta($object, $name);
+        if (null === $meta) {
+            return true;
+        }
+        $declaringDisplay = $this->context->classes[$meta->declaringClassLc]->name
+            ?? $meta->declaringClassLc;
+        try {
+            PropertyVisibility::assertAccessible(
+                $meta->visibility,
+                $this->callerClassLc($frame),
+                $meta->declaringClassLc,
+                $declaringDisplay,
+                $name,
+                strtolower($object->class->name),
+                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc)
+            );
+
+            return false;
+        } catch (\LogicException $e) {
+            return true;
+        }
+    }
+
+    /**
+     * Copy __get return into $result and mark for indirect-modify detection (#4673).
+     */
+    protected function deliverMagicGetRead(Variable $result, ObjectEntry $object, string $name): void
+    {
+        $result->copyFrom($this->invokeMagicGet($object, $name));
+        $result->magicGetOverloadedTarget = $object;
+        $result->magicGetOverloadedName = $name;
+    }
+
+    /**
+     * Reject []= / dim-write on a value produced by __get (#4673).
+     */
+    protected function rejectMagicGetIndirectModify(Variable $containerSlot, bool $forWrite, Frame $frame): ?Frame
+    {
+        if (!$forWrite) {
+            return null;
+        }
+        if (null === $containerSlot->magicGetOverloadedTarget || null === $containerSlot->magicGetOverloadedName) {
+            return null;
+        }
+        $class = $containerSlot->magicGetOverloadedTarget->class->name;
+        $prop = $containerSlot->magicGetOverloadedName;
+
+        return $this->dispatchVmError(sprintf(
+            'Indirect modification of overloaded property %s::$%s has no effect',
+            $class,
+            $prop
+        ), $frame);
+    }
+
+    /**
      * Resolve an instance property write lvalue, including __set / dynamic properties (#146).
      */
     protected function fetchObjectPropertyWriteLvalue(ObjectEntry $object, string $name, Frame $frame): Variable
@@ -539,11 +642,11 @@ class VM {
             return $object->getProperty($name);
         }
         if ($object->class->readonly && !$this->hasInstanceMethod($object->class, '__set')) {
-            throw new \Error(sprintf(
-                'Cannot create dynamic property %s::$%s',
-                $object->class->name,
-                $name
-            ));
+            $thrown = VM\BuiltinExceptionSupport::materializeError(
+                $this->context,
+                sprintf('Cannot create dynamic property %s::$%s', $object->class->name, $name)
+            );
+            $this->raiseUncaughtException($thrown);
         }
         if ($this->hasInstanceMethod($object->class, '__set')) {
             $proxy = new Variable();
@@ -961,6 +1064,11 @@ restart:
                     $arg1->copyFrom($arg2); 
                     break;
                 case OpCode::TYPE_ASSIGN:
+                    $catchFrame = $this->dispatchThisReassignFatalIfNeeded($frame, $op->arg2);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
@@ -971,6 +1079,11 @@ restart:
                     if ($this->context->propertyHookSetAborted) {
                         $this->context->propertyHookSetAborted = false;
                         break;
+                    }
+                    $catchFrame = $this->enforceVirtualPropertyHookWrite($arg2, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
                     }
                     $writeTarget = $arg2->resolveIndirect();
                     if (null !== $writeTarget->magicSetTarget && null !== $writeTarget->magicSetName) {
@@ -1026,6 +1139,11 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_ASSIGN_REF:
+                    $catchFrame = $this->dispatchThisReassignFatalIfNeeded($frame, $op->arg1);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     if (null !== $op->arg3 && 0 !== (int) $op->arg3) {
                         $catchFrame = $this->dispatchVmError(
                             'Cannot assign reference to non referenceable value',
@@ -1133,11 +1251,11 @@ restart:
                         throw new \LogicException('Function static key must be a compile-time constant');
                     }
                     $storageKey = $frame->block->constants[$op->arg2]->toString();
-                    $storage = $this->context->ensureFunctionStatic($storageKey);
-                    if (!$this->context->isFunctionStaticInitialized($storageKey)) {
+                    $storage = $this->ensureFunctionStaticForFrame($frame, $storageKey);
+                    if (!$this->isFunctionStaticInitializedForFrame($frame, $storageKey)) {
                         if (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
                             $storage->copyFrom($frame->block->constants[$op->arg3]);
-                            $this->context->markFunctionStaticInitialized($storageKey);
+                            $this->markFunctionStaticInitializedForFrame($frame, $storageKey);
                         }
                     }
                     $frame->scope[$op->arg1]->indirect($storage);
@@ -1147,7 +1265,7 @@ restart:
                         throw new \LogicException('Function static key must be a compile-time constant');
                     }
                     $jumpKey = $frame->block->constants[$op->arg2]->toString();
-                    if ($this->context->isFunctionStaticInitialized($jumpKey)) {
+                    if ($this->isFunctionStaticInitializedForFrame($frame, $jumpKey)) {
                         $frame = $this->frameForBranch($frame, $op->block1);
                         goto restart;
                     }
@@ -1160,9 +1278,9 @@ restart:
                         throw new \LogicException('Function static init store requires a value slot');
                     }
                     $storeKey = $frame->block->constants[$op->arg2]->toString();
-                    $store = $this->context->ensureFunctionStatic($storeKey);
+                    $store = $this->ensureFunctionStaticForFrame($frame, $storeKey);
                     $store->copyFrom($frame->scope[$op->arg3]->resolveIndirect());
-                    $this->context->markFunctionStaticInitialized($storeKey);
+                    $this->markFunctionStaticInitializedForFrame($frame, $storeKey);
                     break;
                 case OpCode::TYPE_LIST_UNPACK_CHECK:
                     $unpack = $frame->scope[$op->arg2]->resolveIndirect();
@@ -1171,7 +1289,29 @@ restart:
                             $frame = $this->frameForBranch($frame, $op->block1);
                             goto restart;
                         }
-                        if (!\PHPCompiler\ext\standard\VmArray::isList($unpack->toArray())) {
+                        break;
+                    }
+                    break;
+                case OpCode::TYPE_LIST_SPREAD_ASSIGN:
+                    $dest = $frame->scope[$op->arg1];
+                    $src = $frame->scope[$op->arg2]->resolveIndirect();
+                    if (Variable::TYPE_ARRAY !== $src->type) {
+                        if (null !== $op->block1) {
+                            $frame = $this->frameForBranch($frame, $op->block1);
+                            goto restart;
+                        }
+                        break;
+                    }
+                    if (!isset($frame->block->constants[$op->arg3])) {
+                        throw new \LogicException('list spread assign requires compile-time offset');
+                    }
+                    $offset = $frame->block->constants[$op->arg3]->toInt();
+                    $ht = $src->toArray();
+                    $excludedKeys = $op->listSpreadExcludedKeys;
+                    if ([] !== $excludedKeys) {
+                        $tail = $ht->copyListSpreadTail($offset, $excludedKeys);
+                    } else {
+                        if (!\PHPCompiler\ext\standard\VmArray::isList($ht)) {
                             $catchFrame = $this->dispatchVmTypeError(
                                 new \TypeError('Cannot unpack array with string keys'),
                                 $frame
@@ -1180,21 +1320,11 @@ restart:
                                 $frame = $catchFrame;
                                 goto restart;
                             }
+                            break;
                         }
-                        break;
+                        $tail = $ht->sliceCopy($offset, null);
                     }
-                    if (Variable::TYPE_ARRAY === $unpack->type
-                        && !\PHPCompiler\ext\standard\VmArray::isList($unpack->toArray())
-                    ) {
-                        $catchFrame = $this->dispatchVmTypeError(
-                            new \TypeError('Cannot unpack array with string keys'),
-                            $frame
-                        );
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                    }
+                    $dest->array($tail);
                     break;
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
                 case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:
@@ -1202,6 +1332,11 @@ restart:
                     $containerSlot = $frame->scope[$op->arg2];
                     $container = $containerSlot->resolveIndirect();
                     $forWrite = OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type;
+                    $catchFrame = $this->rejectMagicGetIndirectModify($containerSlot, $forWrite, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     if ($container->isArrayAccessOffset()) {
                         if ($forWrite || is_null($op->arg3)) {
                             throw new \Error('Cannot indirectly modify an element of ArrayAccess');
@@ -1215,6 +1350,14 @@ restart:
                         $container = $containerSlot->resolveIndirect();
                     }
                     if (is_null($op->arg3)) {
+                        $bracketMsg = TypeCheck::cannotUseBracketOn($container);
+                        if (null !== $bracketMsg) {
+                            $catchFrame = $this->dispatchVmTypeError(new \TypeError($bracketMsg), $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                        }
                         if ($container->type !== Variable::TYPE_ARRAY) {
                             throw new \LogicException('[] is only supported for arrays');
                         }
@@ -1291,6 +1434,41 @@ restart:
                             $arg1->copyFrom($this->invokeArrayAccessOffsetGet($object, $arg3));
                         }
                     } else {
+                        $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+                        if (!$forWrite && TypeCheck::isScalarNonContainerDimRead($container)) {
+                            $resolved = $container->resolveIndirect();
+                            $this->context->errors->arrayOffsetOnNonContainer(
+                                TypeCheck::typeNameForConstraint($resolved->type),
+                                $this->context,
+                                $frame,
+                                $scriptFile
+                            );
+                            $arg1->null();
+                            break;
+                        }
+                        if (
+                            Variable::TYPE_OBJECT === $container->type
+                            && !$this->objectImplementsArrayAccess($container->toObject())
+                        ) {
+                            $className = $container->toObject()->class->name;
+                            $catchFrame = $this->dispatchVmError(
+                                'Cannot use object of type ' . $className . ' as array',
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
+                        $bracketMsg = TypeCheck::cannotUseBracketOn($container);
+                        if (null !== $bracketMsg) {
+                            $catchFrame = $this->dispatchVmTypeError(new \TypeError($bracketMsg), $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                        }
                         throw new \LogicException('Illegal offset');
                     }
                     break;
@@ -1497,7 +1675,7 @@ restart:
                         ) {
                             $arg1->incDecOp($op->type, $arg2, $arg3);
                         } else {
-                            $arg1->numericOp($op->type, $arg2, $arg3);
+                            $arg1->numericOp($op->type, $arg2, $arg3, $this, $frame);
                         }
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
@@ -1528,14 +1706,33 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
-                    $arg1->bitwiseOp($op->type, $arg2, $arg3);
+                    try {
+                        $arg1->bitwiseOp($op->type, $arg2, $arg3);
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     break;
 
                 case OpCode::TYPE_UNARY_MINUS:
                 case OpCode::TYPE_UNARY_PLUS:
+                case OpCode::TYPE_BITWISE_NOT:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
-                    $arg1->unaryOp($op->type, $arg2);
+                    try {
+                        $arg1->unaryOp($op->type, $arg2, $this, $frame);
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     break;
                 case OpCode::TYPE_CONCAT:
                     $arg1 = $frame->scope[$op->arg1];
@@ -1548,6 +1745,20 @@ restart:
                         $arg2 = $this->coerceVariableToString($frame->scope[$op->arg2]);
                         $arg3 = $this->coerceVariableToString($frame->scope[$op->arg3]);
                         $arg1->string($arg2 . $arg3);
+                    } catch (\Error $e) {
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
                     } catch (VM\MagicMethodInvocationAborted) {
                         $this->clearTryCatchUnwindState();
                         ++$frame->pos;
@@ -1651,7 +1862,15 @@ restart:
                     if (null !== $op->arg2) {
                         $exitArg = $frame->scope[$op->arg2];
                     }
-                    ext\standard\VmExit::terminate($exitArg);
+                    try {
+                        ext\standard\VmExit::terminate($exitArg);
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                    }
                     break;
                 case OpCode::TYPE_JUMP:
                     $this->markFinallyCompletedWhenLeavingFinallyBody($frame);
@@ -1718,20 +1937,42 @@ restart:
                     $frame->scope[$op->arg1]->copyFrom($value);
                     break;
                 case OpCode::TYPE_STATICCALL_INIT:
+                    $instanceScopeCall = false;
+                    $scopeClassName = null;
+                    $staticCallMethodName = '';
                     try {
                         $classOperand = $frame->scope[$op->arg1]->resolveIndirect();
-                        $methodName = $frame->scope[$op->arg2]->toString();
+                        $staticCallMethodName = $frame->scope[$op->arg2]->toString();
+                        $parentKeywordScope = false;
                         if (Variable::TYPE_OBJECT === $classOperand->type) {
-                            $classEntry = $classOperand->toObject()->class;
-                            $callableName = $classEntry->name.'::'.$methodName;
+                            $instanceScopeCall = true;
+                            $scopeClassName = $classOperand->toObject()->class->name;
+                            $callableName = $scopeClassName.'::'.$staticCallMethodName;
                         } else {
                             $className = $classOperand->toString();
+                            $parentKeywordScope = 'parent' === strtolower($className);
                             $lcClass = $this->resolveClassScopeName($className, $frame);
-                            $callableName = $this->context->classes[$lcClass]->name.'::'.$methodName;
+                            $callableName = $this->context->classes[$lcClass]->name.'::'.$staticCallMethodName;
                         }
-                        $this->initStaticCallable($frame, $callableName);
+                        $this->initStaticCallable($frame, $callableName, $parentKeywordScope);
                     } catch (\LogicException $e) {
-                        return $this->raise($e->getMessage(), $frame);
+                        if ($instanceScopeCall && str_starts_with($e->getMessage(), 'Call to undefined static method ')) {
+                            $catchFrame = $this->dispatchVmError(
+                                "Call to undefined method {$scopeClassName}::{$staticCallMethodName}()",
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            return self::EXCEPTION;
+                        }
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        return self::EXCEPTION;
                     }
                     break;
                 case OpCode::TYPE_CLASS_CONST_FETCH:
@@ -1757,6 +1998,19 @@ restart:
                     }
                     if (Variable::TYPE_OBJECT === $classOperand->type) {
                         $classEntry = $classOperand->toObject()->class;
+                        $traitConstFrame = $this->enforceDirectTraitConstAccess($classEntry, $memberNameRaw, $frame);
+                        if (null !== $traitConstFrame) {
+                            $frame = $traitConstFrame;
+                            goto restart;
+                        }
+                        $constLc = strtolower($memberNameRaw);
+                        if (isset($classEntry->constants[$constLc])) {
+                            $visFrame = $this->enforceClassConstVisibility($classEntry, $memberNameRaw, $frame);
+                            if (null !== $visFrame) {
+                                $frame = $visFrame;
+                                goto restart;
+                            }
+                        }
                         if (!$this->copyClassConstOrStaticPropertyByName(
                             $classEntry,
                             $memberNameRaw,
@@ -1782,7 +2036,12 @@ restart:
                             $frame
                         );
                     } catch (\LogicException $e) {
-                        return $this->raise($e->getMessage(), $frame);
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        return self::EXCEPTION;
                     }
                     $className = $frame->scope[$op->arg2]->resolveIndirect()->toString();
                     if (!isset($this->context->classes[$lcClass])) {
@@ -1794,6 +2053,19 @@ restart:
                         return $this->raise("Unknown class for constant fetch: {$className}", $frame);
                     }
                     $classEntry = $this->context->classes[$lcClass];
+                    $traitConstFrame = $this->enforceDirectTraitConstAccess($classEntry, $memberNameRaw, $frame);
+                    if (null !== $traitConstFrame) {
+                        $frame = $traitConstFrame;
+                        goto restart;
+                    }
+                    $constLc = strtolower($memberNameRaw);
+                    if (isset($classEntry->constants[$constLc])) {
+                        $visFrame = $this->enforceClassConstVisibility($classEntry, $memberNameRaw, $frame);
+                        if (null !== $visFrame) {
+                            $frame = $visFrame;
+                            goto restart;
+                        }
+                    }
                     if (!$this->copyClassConstOrStaticPropertyByName(
                         $classEntry,
                         $memberNameRaw,
@@ -1823,6 +2095,17 @@ restart:
                     }
                     $frame->scope[$op->arg1]->bool($matches);
                     break;
+                case OpCode::TYPE_IN:
+                    try {
+                        $found = VM\InOperator::contains(
+                            $frame->scope[$op->arg2],
+                            $frame->scope[$op->arg3]
+                        );
+                        $frame->scope[$op->arg1]->bool($found);
+                    } catch (\TypeError $e) {
+                        return $this->raise($e->getMessage(), $frame);
+                    }
+                    break;
                 case OpCode::TYPE_STATIC_PROPERTY_FETCH:
                     $rawClass = $frame->scope[$op->arg2]->toString();
                     $lcClass = $this->resolveStaticClassName(
@@ -1839,16 +2122,41 @@ restart:
                     }
                     $propNameRaw = $frame->scope[$op->arg3]->toString();
                     $propName = strtolower($propNameRaw);
-                    $classEntry = $this->context->classes[$lcClass];
-                    if (!isset($classEntry->staticProperties[$propName])) {
-                        $classLabel = $classEntry->name;
+                    $storage = $this->resolveStaticPropertyStorage($lcClass, $propName);
+                    if (null === $storage) {
+                        $classLabel = $this->context->classes[$lcClass]->name;
 
                         return $this->raise(
                             "Access to undeclared static property {$classLabel}::\${$propNameRaw}",
                             $frame
                         );
                     }
-                    $frame->scope[$op->arg1]->indirect($classEntry->staticProperties[$propName]);
+                    $forWrite = $frame->pos < $frame->block->nOpCodes
+                        && OpCode::TYPE_ASSIGN === $frame->block->opCodes[$frame->pos]->type
+                        && (int) $frame->block->opCodes[$frame->pos]->arg2 === (int) $op->arg1;
+                    $hooks = $this->resolveStaticPropertyHooks($lcClass, $propName);
+                    if (
+                        !$forWrite
+                        && null !== $hooks
+                        && isset($hooks['get'])
+                        && !$this->isPropertyHookRawWrite($frame, $propNameRaw)
+                    ) {
+                        $hookValue = $this->fetchStaticPropertyWithHooks($lcClass, $propNameRaw, $hooks['get'], $frame);
+                        $frame->scope[$op->arg1]->copyFrom($hookValue);
+                        break;
+                    }
+                    if (
+                        $forWrite
+                        && null !== $hooks
+                        && isset($hooks['set'])
+                        && !$this->isPropertyHookRawWrite($frame, $propNameRaw)
+                    ) {
+                        $frame->scope[$op->arg1]->indirect($storage);
+                        $storage->staticPropertyClassLc = $lcClass;
+                        $storage->objectPropertyName = $propNameRaw;
+                        break;
+                    }
+                    $frame->scope[$op->arg1]->indirect($storage);
                     break;
                 case OpCode::TYPE_STATIC_PROPERTY_UNSET:
                     $rawClass = $frame->scope[$op->arg2]->toString();
@@ -1863,16 +2171,15 @@ restart:
                     }
                     $propNameRaw = $frame->scope[$op->arg3]->toString();
                     $propName = strtolower($propNameRaw);
-                    $classEntry = $this->context->classes[$lcClass];
-                    if (!isset($classEntry->staticProperties[$propName])) {
-                        $classLabel = $classEntry->name;
+                    $storage = $this->resolveStaticPropertyStorage($lcClass, $propName);
+                    if (null === $storage) {
+                        $classLabel = $this->context->classes[$lcClass]->name;
 
                         return $this->raise(
                             "Access to undeclared static property {$classLabel}::\${$propNameRaw}",
                             $frame
                         );
                     }
-                    $storage = $classEntry->staticProperties[$propName];
                     $storage->reset();
                     $storage->type = Variable::TYPE_UNDEFINED;
                     break;
@@ -1880,13 +2187,10 @@ restart:
                     if (null === $op->arg3) {
                         if (null !== $op->arg2 && isset($frame->scope[$op->arg2])) {
                             $slot = $frame->scope[$op->arg2];
-                            if (Variable::TYPE_INDIRECT === $slot->type) {
-                                $target = $slot->resolveIndirect();
-                                $target->reset();
-                                $target->type = Variable::TYPE_UNDEFINED;
-                            } else {
-                                $slot->resolveIndirect()->null();
-                            }
+                            // Break the local/reference binding only — never destroy the shared
+                            // target (Zend unset on ref; foreach &$v cleanup #4997, #3517).
+                            $slot->reset();
+                            $slot->type = Variable::TYPE_UNDEFINED;
                         }
                         break;
                     }
@@ -1914,6 +2218,25 @@ restart:
                         $container->toArray()->offsetUnset($key);
                         break;
                     }
+                    $unsetDimMsg = Variable::TYPE_STRING === $container->type
+                        ? 'Cannot unset string offsets'
+                        : 'Cannot unset offset in a non-array variable';
+                    $catchFrame = $this->dispatchUnsetDimNonContainerError($frame, $unsetDimMsg);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
+                    break;
+                case OpCode::TYPE_FROM_CALLABLE:
+                    if (isset($frame->scope[$op->arg2])) {
+                        $callable = $frame->scope[$op->arg2]->resolveIndirect();
+                    } elseif (isset($frame->block->constants[$op->arg2])) {
+                        $callable = $frame->block->constants[$op->arg2];
+                    } else {
+                        throw new \LogicException('TYPE_FROM_CALLABLE missing callable slot');
+                    }
+                    $entry = VM\ClosureSupport::fromCallable($this->context, $frame, $callable);
+                    $frame->scope[$op->arg1]->object($entry);
                     break;
                 case OpCode::TYPE_CLOSURE:
                     if (null === $op->block1) {
@@ -1992,6 +2315,7 @@ restart:
                         $closureState = $callee->toObject()->closureState;
                         if (null !== $closureState) {
                             $this->initClosureCall($frame, $closureState);
+                            $frame->closureCallableSlot = $op->arg1;
                             break;
                         }
                         $catchFrame = $this->initMethodCall($frame, $callee, '__invoke');
@@ -2023,32 +2347,23 @@ restart:
                     if ($receiver->type !== Variable::TYPE_OBJECT) {
                         throw new \LogicException('Method call on non-object');
                     }
-                    $catchFrame = $this->initMethodCall(
-                        $frame,
-                        $receiver,
-                        $frame->scope[$op->arg2]->toString()
-                    );
+                    $methodName = $frame->scope[$op->arg2]->toString();
+                    $catchFrame = $this->initMethodCall($frame, $receiver, $methodName);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
                         goto restart;
+                    }
+                    if (
+                        '__invoke' === strtolower($methodName)
+                        && null !== $receiver->toObject()->closureState
+                    ) {
+                        $frame->closureCallableSlot = $op->arg1;
                     }
                     break;
                 case OpCode::TYPE_ARG_SEND:
                     $value = $frame->scope[$op->arg1];
                     if (null !== $op->arg3) {
-                        try {
-                            $elements = VM\CallUnpack::materialize($this, $frame, $value);
-                        } catch (\TypeError $e) {
-                            $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            break;
-                        }
-                        foreach ($elements as $element) {
-                            $frame->callArgEntries[] = ['p', $element];
-                        }
+                        $frame->callArgEntries[] = ['u', $value];
                         break;
                     }
                     if (null !== $op->arg2 && isset($frame->block->constants[$op->arg2])) {
@@ -2075,6 +2390,13 @@ restart:
                     if ($frame->call instanceof Func\PHP && $frame->call->block->isGenerator) {
                         try {
                             $calledArgs = $this->resolveOutgoingCallArgs($frame);
+                        } catch (\TypeError $e) {
+                            $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
                         } catch (\Error $e) {
                             $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                             if (null !== $catchFrame) {
@@ -2116,12 +2438,37 @@ restart:
                                     continue;
                                 }
                                 $slot = (int) $recv->arg1;
+                                $arg = $calledArgs[$paramIdx];
+                                if (
+                                    TypeCheck::skipParameterTypeCheckForImplicitNullable(
+                                        $calleeBlock,
+                                        $slot,
+                                        $arg
+                                    )
+                                ) {
+                                    continue;
+                                }
+                                if (isset($calleeBlock->paramIterableSlots[$slot])) {
+                                    if (!IterableCheck::isIterable($arg, $this->context)) {
+                                        $paramName = $calleeBlock->paramNames[$paramIdx] ?? 'param'.$paramIdx;
+                                        throw VM\ParamTypeError::forUserCallWithExpectedType(
+                                            $frame->call->getName(),
+                                            $paramIdx,
+                                            $paramName,
+                                            IterableCheck::TYPE_LABEL,
+                                            $arg,
+                                            $frame->scriptPath,
+                                            $callSiteLine
+                                        );
+                                    }
+                                    continue;
+                                }
                                 $constraint = $calleeBlock->paramTypeConstraints[$slot] ?? null;
                                 if (null === $constraint) {
                                     continue;
                                 }
-                                $arg = $calledArgs[$paramIdx];
-                                if (!TypeCheck::parameterMatchesType($arg, $constraint)) {
+                                $literalBool = $calleeBlock->paramLiteralBoolTypes[$slot] ?? null;
+                                if (!TypeCheck::parameterMatchesType($arg, $constraint, $literalBool)) {
                                     $paramName = $calleeBlock->paramNames[$paramIdx] ?? 'param'.$paramIdx;
                                     throw VM\ParamTypeError::forUserCall(
                                         $frame->call->getName(),
@@ -2130,7 +2477,8 @@ restart:
                                         $constraint,
                                         $arg,
                                         $frame->scriptPath,
-                                        $callSiteLine
+                                        $callSiteLine,
+                                        $literalBool
                                     );
                                 }
                             }
@@ -2156,8 +2504,11 @@ restart:
                         $this->context,
                         $frame
                     );
-                    $this->applyClosureBinding($new, $frame->closureCall);
+                    $closureState = $this->resolvePendingClosureState($frame);
+                    $frame->closureCallableSlot = null;
                     $frame->closureCall = null;
+                    $frame->pendingClosureInvoke = null;
+                    $this->applyClosureBinding($new, $closureState);
                     if (null !== $new->block && null !== $new->block->func && (int) ($new->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) {
                         $thisIdx = $new->block->slotIndexForVariableName('this');
                         if (null !== $thisIdx) {
@@ -2234,8 +2585,22 @@ restart:
                                     $frame->block->paramVariadicElementGenericArrayTypeSpecs[$variadicSlot] ?? null,
                                     $frame->block->paramVariadicElementIntersectionConstraints[$variadicSlot] ?? null,
                                     $frame->block->paramVariadicElementDnfConstraints[$variadicSlot] ?? null,
-                                    $this->context
+                                    $this->context,
+                                    isset($frame->block->paramIterableSlots[$variadicSlot])
                                 );
+                            }
+                            if (
+                                1 === $n - $recvIdx
+                                && isset($frame->calledArgs[$recvIdx])
+                            ) {
+                                $sole = $frame->calledArgs[$recvIdx]->resolveIndirect();
+                                if (
+                                    Variable::TYPE_ARRAY === $sole->type
+                                    && !$sole->toArray()->isPackedList()
+                                ) {
+                                    $arg1->copyFrom($sole);
+                                    break;
+                                }
                             }
                             $arg1->newArray();
                             $packed = $arg1->toArray();
@@ -2269,7 +2634,19 @@ restart:
                         : $frame->block->strictTypes;
                     $arraySpec = $frame->block->paramGenericArrayTypeSpecs[$op->arg1] ?? null;
                     try {
-                        TypeCheck::coerceParameter($arg1, $strict, $arraySpec);
+                        if (
+                            !TypeCheck::skipParameterTypeCheckForImplicitNullable(
+                                $frame->block,
+                                (int) $op->arg1,
+                                $arg1
+                            )
+                        ) {
+                            if (isset($frame->block->paramIterableSlots[$op->arg1])) {
+                                IterableCheck::assertParameter($arg1, $this->context);
+                            } else {
+                                TypeCheck::coerceParameter($arg1, $strict, $arraySpec);
+                            }
+                        }
                         if (isset($frame->block->paramIntersectionConstraints[$op->arg1])) {
                             TypeCheck::assertParamIntersection(
                                 $arg1,
@@ -2425,7 +2802,7 @@ restart:
                         break;
                     }
                     $class = $this->context->classes[$lcname];
-                    if ($class->isAbstract) {
+                    if ($class->isEnum || $class->isAbstract) {
                         $msg = $class->isEnum
                             ? "Cannot instantiate enum {$class->name}"
                             : "Cannot instantiate abstract class {$class->name}";
@@ -2495,15 +2872,19 @@ restart:
                         $result->copyFrom(EnumCaseSupport::getProperty($propertyObject, $name));
                         break;
                     }
-                    $catchFrame = $this->enforcePropertyVisibilityRead($propertyObject, $name, $frame);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
                     $forWrite = $frame->pos < $frame->block->nOpCodes
                         && OpCode::TYPE_ASSIGN === $frame->block->opCodes[$frame->pos]->type
                         && (int) $frame->block->opCodes[$frame->pos]->arg2 === (int) $op->arg1;
-                    if ($propertyObject->hasProperty($name)) {
+                    $magicGetForRead = !$forWrite
+                        && $this->propertyReadUsesMagicGet($propertyObject, $name, $frame);
+                    if (!$magicGetForRead) {
+                        $catchFrame = $this->enforcePropertyVisibilityRead($propertyObject, $name, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                    }
+                    if ($propertyObject->hasProperty($name) && !$magicGetForRead) {
                         if ($forWrite) {
                             $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
                             break;
@@ -2517,11 +2898,16 @@ restart:
                         break;
                     }
                     if ($forWrite) {
+                        $catchFrame = $this->enforceReadonlyDynamicPropertyCreate($propertyObject, $name, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                         $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
                         break;
                     }
-                    if ($this->hasInstanceMethod($propertyObject->class, '__get')) {
-                        $result->copyFrom($this->invokeMagicGet($propertyObject, $name));
+                    if ($magicGetForRead) {
+                        $this->deliverMagicGetRead($result, $propertyObject, $name);
                         break;
                     }
                     if ($propertyObject->class->allowsDynamicProperties) {
@@ -2540,6 +2926,11 @@ restart:
                 case OpCode::TYPE_ADD_ARRAY_ELEMENT:
                     try {
                         $result = $frame->scope[$op->arg1];
+                        $catchFrame = $this->rejectMagicGetIndirectModify($result, true, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                         $ht = $result->toArray();
                         if (is_null($op->arg3)) {
                             $ht->append($frame->scope[$op->arg2]);
@@ -2597,7 +2988,13 @@ restart:
                     if (Variable::TYPE_OBJECT !== $src->type) {
                         throw new \LogicException('clone requires an object');
                     }
-                    $cloned = $src->toObject()->cloneShallow();
+                    $srcObject = $src->toObject();
+                    $catchFrame = $this->enforceCloneVisibility($srcObject, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
+                    $cloned = $srcObject->cloneShallow();
                     $result->object($cloned);
                     $this->invokeCloneMagicMethod($cloned);
                     break;
@@ -2744,13 +3141,25 @@ restart:
                     if (null === $gen) {
                         throw new \LogicException('yield outside generator function');
                     }
-                    if (null !== $op->arg2 && isset($frame->scope[$op->arg2])) {
-                        $gen->currentValue->copyFrom($frame->scope[$op->arg2]->resolveIndirect());
+                    if (null !== $op->arg2) {
+                        if (isset($frame->scope[$op->arg2])) {
+                            $gen->currentValue->copyFrom($frame->scope[$op->arg2]->resolveIndirect());
+                        } elseif (isset($frame->block->constants[$op->arg2])) {
+                            $gen->currentValue->copyFrom($frame->block->constants[$op->arg2]);
+                        } else {
+                            $gen->currentValue->null();
+                        }
                     } else {
                         $gen->currentValue->null();
                     }
-                    if (null !== $op->arg3 && isset($frame->scope[$op->arg3])) {
-                        $gen->currentKey->copyFrom($frame->scope[$op->arg3]->resolveIndirect());
+                    if (null !== $op->arg3) {
+                        if (isset($frame->scope[$op->arg3])) {
+                            $gen->currentKey->copyFrom($frame->scope[$op->arg3]->resolveIndirect());
+                        } elseif (isset($frame->block->constants[$op->arg3])) {
+                            $gen->currentKey->copyFrom($frame->block->constants[$op->arg3]);
+                        } else {
+                            $gen->currentKey->int($gen->autoKey++);
+                        }
                     } else {
                         $gen->currentKey->int($gen->autoKey++);
                     }
@@ -2788,7 +3197,7 @@ restart:
                                 $this->invokeForeachInstanceMethod($frame, $iterable, 'rewind');
                             }
                         } else {
-                            throw new \TypeError('Can only use yield from on Traversable|array');
+                            $this->throwYieldFromInvalidContainer($container);
                         }
                     }
                     $container = $gen->yieldFromContainer->resolveIndirect();
@@ -2844,9 +3253,10 @@ restart:
                         $gen->yieldFromIteratorAdvance = false;
                         break;
                     }
-                    throw new \TypeError('Can only use yield from on Traversable|array');
+                    $this->throwYieldFromInvalidContainer($container);
                 case OpCode::TYPE_ITER_RESET:
                     $container = $frame->scope[$op->arg1]->resolveIndirect();
+                    unset($this->context->foreachInvalidSlots[$op->arg1]);
                     if ($this->variableIsGenerator($container)) {
                         unset($this->context->foreachObjectAdvance[$op->arg1]);
                         unset($this->context->objectPropertyIterators[$op->arg1]);
@@ -2885,8 +3295,18 @@ restart:
                             break;
                         }
                     }
-                    throw new \TypeError('foreach() argument must be of type array|object');
+                    $this->warnForeachNonTraversable($container, $frame);
+                    unset($this->context->foreachObjectAdvance[$op->arg1]);
+                    unset($this->context->objectPropertyIterators[$op->arg1]);
+                    unset($this->context->foreachIterators[$op->arg1]);
+                    unset($frame->iterators[$op->arg1]);
+                    $this->context->foreachInvalidSlots[$op->arg1] = true;
+                    break;
                 case OpCode::TYPE_ITER_VALID:
+                    if ($this->isForeachInvalidSlot((int) $op->arg2)) {
+                        $frame->scope[$op->arg1]->bool(false);
+                        break;
+                    }
                     $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
                     if ($this->isForeachObjectIteratorSlot((int) $op->arg2)) {
                         if ($this->context->foreachObjectAdvance[$op->arg2]) {
@@ -2920,6 +3340,9 @@ restart:
                     $frame->scope[$op->arg1]->bool($container->toArray()->iterValid());
                     break;
                 case OpCode::TYPE_ITER_KEY:
+                    if ($this->isForeachInvalidSlot((int) $op->arg2)) {
+                        break;
+                    }
                     $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
                     if ($this->isForeachObjectIteratorSlot((int) $op->arg2)) {
                         $key = $this->invokeForeachInstanceMethod($frame, $container, 'key');
@@ -2944,6 +3367,9 @@ restart:
                     $frame->scope[$op->arg1]->copyFrom($container->toArray()->iterCurrentKey());
                     break;
                 case OpCode::TYPE_ITER_VALUE:
+                    if ($this->isForeachInvalidSlot((int) $op->arg2)) {
+                        break;
+                    }
                     $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
                     if ($this->isForeachObjectIteratorSlot((int) $op->arg2)) {
                         if ((bool) $op->arg3) {
@@ -3222,12 +3648,31 @@ restart:
         return $target->getFrame($this->context, $frame);
     }
 
+    /** Zend compile-time fatal if $this is written; runtime guard when compile missed (#4865). */
+    private function dispatchThisReassignFatalIfNeeded(Frame $frame, int $writeSlot): ?Frame
+    {
+        $func = $frame->block->func;
+        if (null === $func || null === $func->class) {
+            return null;
+        }
+        $thisIdx = $frame->block->slotIndexForVariableName('this');
+        if (null === $thisIdx || $writeSlot !== $thisIdx) {
+            return null;
+        }
+
+        return $this->dispatchVmError('Cannot re-assign $this', $frame);
+    }
+
     /**
-     * Pre/post increment/decrement with Zend bool preservation (#3552).
+     * Pre/post increment/decrement with Zend bool→int coercion (#4727, #3552).
      * Rejects ++/-- on readonly properties after construction (#3149).
      */
     private function executeIncDec(Frame $frame, OpCode $op, bool $increment, bool $prefix): ?Frame
     {
+        $catchFrame = $this->dispatchThisReassignFatalIfNeeded($frame, $op->arg3);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
         $read = $frame->scope[$op->arg2];
         $write = $frame->scope[$op->arg3];
         $result = $frame->scope[$op->arg1];
@@ -4013,9 +4458,123 @@ restart:
             return false;
         }
         $methodLc = strtolower((string) $func->name);
+        if (str_contains($methodLc, '::')) {
+            $methodLc = substr($methodLc, strrpos($methodLc, '::') + 2);
+        }
         $wantSet = strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($propName));
+        $wantGet = strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($propName));
 
-        return $methodLc === $wantSet || $methodLc === strtolower($className.'::'.$wantSet);
+        return $methodLc === $wantSet
+            || $methodLc === $wantGet
+            || $methodLc === strtolower($className.'::'.$wantSet)
+            || $methodLc === strtolower($className.'::'.$wantGet);
+    }
+
+    private function linkStaticTypedPropertySlot(Variable $storage, ClassEntry $entry, string $propDisplayName): void
+    {
+        if (!$storage->hasDeclaredTypeConstraint()) {
+            return;
+        }
+        $storage->staticPropertyClassLc = strtolower($entry->name);
+        $storage->objectPropertyName = $propDisplayName;
+    }
+
+    private function linkStaticPropertyHooks(ClassEntry $entry): void
+    {
+        foreach (array_keys($entry->staticProperties) as $propLc) {
+            $hooks = [];
+            $setLc = strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($propLc));
+            if (isset($entry->methods[$setLc]) && $this->methodIsStatic($entry->methods[$setLc])) {
+                $hooks['set'] = $setLc;
+            }
+            $getLc = strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($propLc));
+            if (isset($entry->methods[$getLc]) && $this->methodIsStatic($entry->methods[$getLc])) {
+                $hooks['get'] = $getLc;
+            }
+            if ([] !== $hooks) {
+                $lcClass = strtolower($entry->name);
+                $propMeta = $this->context->propertyHookRegistry[$lcClass][$propLc] ?? null;
+                if (is_array($propMeta) && !empty($propMeta['virtual'])) {
+                    $hooks['virtual'] = true;
+                }
+                $entry->staticPropertyHooks[$propLc] = $hooks;
+            }
+        }
+    }
+
+    private function methodIsStatic(Func $func): bool
+    {
+        if (!$func instanceof Func\PHP) {
+            return false;
+        }
+        $decl = $func->block->func;
+
+        return null !== $decl && (($decl->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0;
+    }
+
+    /**
+     * @return array{get?: string, set?: string}|null
+     */
+    private function resolveStaticPropertyHooks(string $classLc, string $propLc): ?array
+    {
+        $currentLc = $classLc;
+        while (isset($this->context->classes[$currentLc])) {
+            $entry = $this->context->classes[$currentLc];
+            if (isset($entry->staticPropertyHooks[$propLc])) {
+                return $entry->staticPropertyHooks[$propLc];
+            }
+            if (isset($entry->staticProperties[$propLc])) {
+                return null;
+            }
+            $currentLc = $entry->parentLc;
+            if (null === $currentLc) {
+                break;
+            }
+        }
+
+        return null;
+    }
+
+    private function fetchStaticPropertyWithHooks(
+        string $classLc,
+        string $propName,
+        string $getMethodLc,
+        Frame $frame
+    ): Variable {
+        [$owner, $methodLc] = $this->resolveStaticMethod($classLc, $getMethodLc);
+        $func = $owner->methods[$methodLc];
+        if (!$func instanceof Func\PHP) {
+            throw new \LogicException('Static property get hook must be a user method');
+        }
+
+        return $this->invokeStaticPropertyHookRaw($func, $propName, $classLc, $frame);
+    }
+
+    private function invokeStaticPropertyHookRaw(
+        Func\PHP $func,
+        string $rawProperty,
+        string $classLc,
+        Frame $parentFrame,
+        Variable ...$args
+    ): Variable {
+        $savedStack = $this->context->swapRunStack(null);
+        try {
+            $child = $func->getFrame($this->context, null);
+            $child->propertyHookRawProperty = $rawProperty;
+            $child->calledClass = $classLc;
+            $child->calledArgs = $args;
+            $out = new Variable();
+            $child->returnVar = $out;
+            $this->context->push($child);
+            $result = $this->runFrames();
+            if (self::SUCCESS !== $result) {
+                throw new \LogicException('Static property hook invocation failed in this compiler build');
+            }
+
+            return $out->resolveIndirect();
+        } finally {
+            $this->context->swapRunStack($savedStack);
+        }
     }
 
     private function linkPropertyHooks(ClassEntry $entry, VM\ClassProperty $prop): void
@@ -4027,6 +4586,13 @@ restart:
         $getLc = strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($prop->name));
         if (isset($entry->methods[$getLc])) {
             $prop->getHookMethodLc = $getLc;
+        }
+        $lcClass = strtolower($entry->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$prop->name]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($prop->name)]
+            ?? null;
+        if (is_array($propMeta) && !empty($propMeta['virtual'])) {
+            $prop->propertyHookVirtual = true;
         }
     }
 
@@ -4047,6 +4613,35 @@ restart:
     private function dispatchPropertySetHookAssign(Variable $lvalue, Variable $value, Frame $frame): bool
     {
         $target = $lvalue->resolveIndirect();
+        $classLc = $target->staticPropertyClassLc;
+        $staticPropName = $target->objectPropertyName;
+        if (
+            is_string($classLc)
+            && is_string($staticPropName)
+            && !$this->isPropertyHookRawWrite($frame, $staticPropName)
+        ) {
+            if (!isset($this->context->classes[$classLc])) {
+                return false;
+            }
+            $entry = $this->context->classes[$classLc];
+            $propLc = strtolower($staticPropName);
+            $hooks = $entry->staticPropertyHooks[$propLc] ?? [];
+            $setLc = $hooks['set'] ?? null;
+            if (null === $setLc || !isset($entry->methods[$setLc])) {
+                return false;
+            }
+            $func = $entry->methods[$setLc];
+            if (!$func instanceof Func\PHP) {
+                return false;
+            }
+            $this->context->propertyHookSetAborted = false;
+            $this->invokeStaticPropertyHookRaw($func, $staticPropName, $classLc, $frame, $value->resolveIndirect());
+            if ($this->context->propertyHookSetAborted) {
+                return false;
+            }
+
+            return true;
+        }
         $owner = $target->objectPropertyOwner;
         $propName = $target->objectPropertyName;
         if (null === $owner || null === $propName || $this->isPropertyHookRawWrite($frame, $propName)) {
@@ -4125,6 +4720,23 @@ restart:
         }
     }
 
+    /**
+     * Reject unset($scalar[$key]) — Zend ZEND_UNSET_DIM on non-array/string (#4880, zend_execute.c).
+     *
+     * @return Frame|null catch frame when try/catch (Error) handles the throw
+     */
+    private function dispatchUnsetDimNonContainerError(Frame $frame, string $message): ?Frame
+    {
+        $thrown = VM\BuiltinExceptionSupport::materializeError($this->context, $message);
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
     /** Reject unset() on readonly properties; returns catch frame or throws when uncaught. */
     private function enforceReadonlyPropertyUnset(ObjectEntry $object, string $propName, Frame $frame): ?Frame
     {
@@ -4157,6 +4769,84 @@ restart:
         }
 
         return $this->enforceReadonlyPropertyWrite($lvalue, $frame);
+    }
+
+    /**
+     * Reject writes to get-only virtual hooked properties (#4687, Zend zend_object_handlers.c).
+     */
+    private function enforceVirtualPropertyHookWrite(Variable $lvalue, Frame $frame): ?Frame
+    {
+        $target = $lvalue->resolveIndirect();
+        $propName = $target->objectPropertyName;
+        if (null === $propName || $this->isPropertyHookRawWrite($frame, $propName)) {
+            return null;
+        }
+        $className = null;
+        $virtual = false;
+        $hasSetHook = false;
+        $classLc = $target->staticPropertyClassLc;
+        if (is_string($classLc) && isset($this->context->classes[$classLc])) {
+            $entry = $this->context->classes[$classLc];
+            $hooks = $entry->staticPropertyHooks[strtolower($propName)] ?? [];
+            $virtual = !empty($hooks['virtual']);
+            $hasSetHook = !empty($hooks['set']);
+            $className = $entry->name;
+        } else {
+            $owner = $target->objectPropertyOwner;
+            if (null === $owner) {
+                return null;
+            }
+            $meta = $this->classPropertyMeta($owner, $propName);
+            if (null === $meta) {
+                return null;
+            }
+            $virtual = $meta->propertyHookVirtual;
+            $hasSetHook = null !== $meta->setHookMethodLc;
+            $className = $owner->class->name;
+        }
+        if (!$virtual || $hasSetHook) {
+            return null;
+        }
+
+        $thrown = VM\BuiltinExceptionSupport::materializeError(
+            $this->context,
+            sprintf('Property %s::$%s is read-only', $className, $propName)
+        );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /**
+     * Reject dynamic property creation on readonly classes (Zend zend_objects.c).
+     * Returns catch frame or raises uncaught Error (#4799).
+     *
+     * @return ?Frame catch frame when handled; null when no violation or after uncaught raise
+     */
+    private function enforceReadonlyDynamicPropertyCreate(ObjectEntry $object, string $name, Frame $frame): ?Frame
+    {
+        if (!$object->class->readonly || $this->hasInstanceMethod($object->class, '__set')) {
+            return null;
+        }
+        if ($object->hasProperty($name)) {
+            return null;
+        }
+
+        $thrown = VM\BuiltinExceptionSupport::materializeError(
+            $this->context,
+            sprintf('Cannot create dynamic property %s::$%s', $object->class->name, $name)
+        );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
     }
 
     /** Reject readonly property writes; returns catch frame or throws when uncaught. */
@@ -4218,6 +4908,41 @@ restart:
                 $declaringDisplay,
                 $propName,
                 strtolower($object->class->name),
+                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc)
+            );
+        } catch (\LogicException $e) {
+            return $this->dispatchVmError($e->getMessage(), $frame);
+        }
+
+        return null;
+    }
+
+    private function enforceDirectTraitConstAccess(ClassEntry $classEntry, string $constName, Frame $frame): ?Frame
+    {
+        if (!$classEntry->isTrait || 'class' === strtolower($constName)) {
+            return null;
+        }
+
+        return $this->dispatchVmError(
+            "Cannot access trait constant {$classEntry->name}::{$constName} directly",
+            $frame
+        );
+    }
+
+    private function enforceClassConstVisibility(ClassEntry $classEntry, string $constName, Frame $frame): ?Frame
+    {
+        $constLc = strtolower($constName);
+        $vis = $classEntry->constVisibility[$constLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        if (MethodVisibility::isPublic($vis)) {
+            return null;
+        }
+        try {
+            ClassConstVisibility::assertAccessible(
+                $vis,
+                $this->callerClassLc($frame),
+                strtolower($classEntry->name),
+                $classEntry->name,
+                $constName,
                 fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc)
             );
         } catch (\LogicException $e) {
@@ -4402,6 +5127,39 @@ restart:
         return array_key_exists($slot, $this->context->foreachObjectAdvance);
     }
 
+    private function isForeachInvalidSlot(int $slot): bool
+    {
+        return isset($this->context->foreachInvalidSlots[$slot]);
+    }
+
+    /**
+     * Zend ZEND_FE_RESET_R invalid operand (zend_vm_def.h, #4879).
+     */
+    private function warnForeachNonTraversable(Variable $container, Frame $frame): void
+    {
+        $resolved = $container->resolveIndirect();
+        $this->context->errors->triggerError(
+            'foreach() argument must be of type array|object, '
+            .TypeCheck::typeNameForConstraint($resolved->type).' given',
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $this->context,
+            $frame
+        );
+    }
+
+    /**
+     * @throws \Error|\TypeError zend_generators.c yield-from container validation (#4909)
+     */
+    private function throwYieldFromInvalidContainer(VM\Variable $container): void
+    {
+        if (VM\Variable::TYPE_STRING === $container->type) {
+            throw new \Error('Can use "yield from" only with arrays and Traversables');
+        }
+
+        throw new \TypeError('Can only use yield from on Traversable|array');
+    }
+
     private function findGeneratorState(Frame $frame): ?GeneratorState
     {
         while (null !== $frame) {
@@ -4529,8 +5287,10 @@ restart:
             $this->context->push($gen->frame);
             try {
                 $result = $this->runFrames();
-            } catch (\TypeError $e) {
-                $thrown = VM\BuiltinExceptionSupport::materializeTypeError($this->context, $e->getMessage());
+            } catch (\TypeError|\Error $e) {
+                $thrown = $e instanceof \TypeError
+                    ? VM\BuiltinExceptionSupport::materializeTypeError($this->context, $e->getMessage())
+                    : VM\BuiltinExceptionSupport::materializeError($this->context, $e->getMessage());
                 $catchFrame = $this->findCatchFrameForGeneratorThrow($gen, $thrown);
                 if (null !== $catchFrame) {
                     $catchFrame->generatorState = $gen;
@@ -4571,9 +5331,7 @@ restart:
             $methodName = $frame->magicCallMethodName;
             $frame->magicCallMethodName = null;
             [$paramNames, $variadicIndex] = $this->calleeParamMetadata($frame->call);
-            $userArgs = [] === $frame->callArgEntries
-                ? []
-                : NamedArgs::resolve($frame->callArgEntries, $paramNames, $variadicIndex);
+            $userArgs = $this->resolveUserCallArgs($frame, $paramNames, $variadicIndex);
             $nameVar = new Variable(Variable::TYPE_STRING);
             $nameVar->string($methodName);
             $argsVar = new Variable();
@@ -4589,15 +5347,46 @@ restart:
         }
 
         [$paramNames, $variadicIndex] = $this->calleeParamMetadata($frame->call);
-        $userArgs = [] === $frame->callArgEntries
-            ? []
-            : NamedArgs::resolve($frame->callArgEntries, $paramNames, $variadicIndex);
 
+        $userArgs = $this->resolveUserCallArgs($frame, $paramNames, $variadicIndex);
         if ([] === $frame->callArgs) {
             return $userArgs;
         }
 
         return array_merge($frame->callArgs, $userArgs);
+    }
+
+    /**
+     * @param list<string> $paramNames
+     *
+     * @return list<Variable>
+     */
+    private function resolveUserCallArgs(Frame $frame, array $paramNames, ?int $variadicIndex): array
+    {
+        if ([] === $frame->callArgEntries) {
+            return [];
+        }
+
+        $entries = [];
+        foreach ($frame->callArgEntries as $entry) {
+            if ('u' === $entry[0]) {
+                foreach (
+                    VM\CallUnpack::expandToEntries(
+                        $this,
+                        $frame,
+                        $entry[1],
+                        $paramNames,
+                        $variadicIndex
+                    ) as $expanded
+                ) {
+                    $entries[] = $expanded;
+                }
+                continue;
+            }
+            $entries[] = $entry;
+        }
+
+        return NamedArgs::resolve($entries, $paramNames, $variadicIndex);
     }
 
     /**
@@ -4652,6 +5441,57 @@ restart:
         return $captures;
     }
 
+    protected function resolvePendingClosureState(Frame $frame): ?ClosureState
+    {
+        if (null !== $frame->pendingClosureInvoke) {
+            return $frame->pendingClosureInvoke;
+        }
+        if (null !== $frame->closureCall) {
+            return $frame->closureCall;
+        }
+        if (null !== $frame->closureCallableSlot && isset($frame->scope[$frame->closureCallableSlot])) {
+            $callable = $frame->scope[$frame->closureCallableSlot]->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $callable->type) {
+                return $callable->toObject()->closureState;
+            }
+        }
+
+        return null;
+    }
+
+    protected function frameUsesClosureStaticStorage(Frame $frame): bool
+    {
+        return null !== $frame->closureCall;
+    }
+
+    protected function ensureFunctionStaticForFrame(Frame $frame, string $storageKey): Variable
+    {
+        if ($this->frameUsesClosureStaticStorage($frame)) {
+            return $frame->closureCall->ensureStatic($storageKey);
+        }
+
+        return $this->context->ensureFunctionStatic($storageKey);
+    }
+
+    protected function isFunctionStaticInitializedForFrame(Frame $frame, string $storageKey): bool
+    {
+        if ($this->frameUsesClosureStaticStorage($frame)) {
+            return $frame->closureCall->isStaticInitialized($storageKey);
+        }
+
+        return $this->context->isFunctionStaticInitialized($storageKey);
+    }
+
+    protected function markFunctionStaticInitializedForFrame(Frame $frame, string $storageKey): void
+    {
+        if ($this->frameUsesClosureStaticStorage($frame)) {
+            $frame->closureCall->markStaticInitialized($storageKey);
+
+            return;
+        }
+        $this->context->markFunctionStaticInitialized($storageKey);
+    }
+
     protected function bindClosureCallCaptures(Frame $callee, ?ClosureState $closureState): void
     {
         if (null === $closureState || [] === $closureState->captures) {
@@ -4688,6 +5528,7 @@ restart:
         }
         $frame->call = $state->func;
         $frame->closureCall = $state;
+        $frame->pendingClosureInvoke = $state;
         $frame->callArgs = [];
         $frame->callArgEntries = [];
     }
@@ -4698,6 +5539,7 @@ restart:
         if (null === $closureState) {
             return;
         }
+        $callee->closureCall = $closureState;
         if (null !== $closureState->boundThis) {
             $thisIdx = $closureState->func->block->slotIndexForVariableName('this');
             if (null !== $thisIdx) {
@@ -4714,19 +5556,39 @@ restart:
         return $this->resolveClassScopeName($className, $frame);
     }
 
+    /**
+     * Static property storage for $class::$prop, walking ancestors (Zend inheritance; #4668).
+     */
+    protected function resolveStaticPropertyStorage(string $classLc, string $propLc): ?Variable
+    {
+        $currentLc = $classLc;
+        while (isset($this->context->classes[$currentLc])) {
+            $entry = $this->context->classes[$currentLc];
+            if (isset($entry->staticProperties[$propLc])) {
+                return $entry->staticProperties[$propLc];
+            }
+            if (null === $entry->parentLc) {
+                break;
+            }
+            $currentLc = $entry->parentLc;
+        }
+
+        return null;
+    }
+
     protected function resolveClassScopeName(string $className, Frame $frame): string
     {
         $lcClass = strtolower($className);
         if ('self' === $lcClass) {
-            return $this->declaringClassLc($frame);
+            return $this->declaringClassLc($frame, 'self');
         }
         if ('static' === $lcClass) {
             return $this->lateStaticClassLc($frame);
         }
         if ('parent' === $lcClass) {
-            $declaring = $this->declaringClassLc($frame);
+            $declaring = $this->declaringClassLc($frame, 'parent');
             if (!isset($this->context->classes[$declaring])) {
-                throw new \LogicException('parent:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('parent');
             }
             $parentLc = $this->context->classes[$declaring]->parentLc;
             if (null === $parentLc) {
@@ -4739,7 +5601,7 @@ restart:
         return $lcClass;
     }
 
-    protected function declaringClassLc(Frame $frame): string
+    protected function declaringClassLc(Frame $frame, string $scopeKeyword = 'self'): string
     {
         if (null !== $frame->block->func && null !== $frame->block->func->class) {
             return strtolower($frame->block->func->class->value);
@@ -4749,7 +5611,7 @@ restart:
             return strtolower($frame->calledClass);
         }
 
-        throw new \LogicException('self:: used outside of class scope');
+        PseudoClassScope::fatalInGlobalScope($scopeKeyword);
     }
 
     protected function lateStaticClassLc(Frame $frame): string
@@ -4758,7 +5620,7 @@ restart:
             return strtolower($frame->calledClass);
         }
 
-        return $this->declaringClassLc($frame);
+        return $this->declaringClassLc($frame, 'static');
     }
 
     protected function inferCalledClass(Frame $frame): ?string
@@ -4792,7 +5654,9 @@ restart:
             return null;
         }
         $class = $object->class;
-        if (!isset($class->methods[$methodLc])) {
+        try {
+            [$declaringClass, $methodLc] = $this->resolveInstanceMethod($class, $methodLc);
+        } catch (\LogicException $e) {
             if (isset($class->methods['__call'])) {
                 $frame->magicCallMethodName = $methodName;
                 $frame->call = $class->methods['__call'];
@@ -4801,35 +5665,37 @@ restart:
 
                 return null;
             }
-            throw new \LogicException("Call to undefined method {$class->name}::{$methodLc}()");
+            throw $e;
         }
-        $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
-        $callerClassLc = null;
-        if (null !== $frame->block->func && null !== $frame->block->func->class) {
-            $callerClassLc = strtolower($frame->block->func->class->value);
+        $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        $callerClassLc = $this->callerClassLc($frame);
+        $callerDisplay = null;
+        if (null !== $callerClassLc && isset($this->context->classes[$callerClassLc])) {
+            $callerDisplay = $this->context->classes[$callerClassLc]->name;
         }
-        if (null === $callerClassLc && null !== $frame->calledClass && '' !== $frame->calledClass) {
-            $callerClassLc = strtolower($frame->calledClass);
-        }
+        $declaredName = $declaringClass->methodNames[$methodLc] ?? $methodName;
         try {
             MethodVisibility::assertCallable(
                 $vis,
                 $callerClassLc,
-                strtolower($class->name),
-                $class->name,
-                $methodName
+                strtolower($declaringClass->name),
+                $declaringClass->name,
+                $declaredName,
+                false,
+                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
+                $callerDisplay
             );
         } catch (\LogicException $e) {
             return $this->dispatchVmError($e->getMessage(), $frame);
         }
-        $frame->call = $class->methods[$methodLc];
+        $frame->call = $declaringClass->methods[$methodLc];
         $frame->callArgs = [$receiver];
         $frame->callArgEntries = [];
 
         return null;
     }
 
-    protected function initStaticCallable(Frame $frame, string $callableName): void
+    protected function initStaticCallable(Frame $frame, string $callableName, bool $parentKeywordScope = false): void
     {
         [$className, $methodName] = explode('::', $callableName, 2);
         $lcClass = $this->resolveClassScopeName($className, $frame);
@@ -4884,7 +5750,7 @@ restart:
             $callerClassLc = strtolower($frame->calledClass);
         }
         $parentScopeAllows = false;
-        if ($this->isParentClassDispatch($frame, $lcClass)) {
+        if ($parentKeywordScope) {
             $parentScopeAllows = MethodVisibility::parentScopeAllows(
                 $vis,
                 $callerClassLc,
@@ -4893,28 +5759,39 @@ restart:
                 fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc)
             );
         }
+        $declaredName = $class->methodNames[$methodLc] ?? $methodName;
+        $callerDisplay = null;
+        if (null !== $callerClassLc && isset($this->context->classes[$callerClassLc])) {
+            $callerDisplay = $this->context->classes[$callerClassLc]->name;
+        }
         MethodVisibility::assertCallable(
             $vis,
             $callerClassLc,
-            $lcClass,
+            strtolower($class->name),
             $class->name,
-            $methodName,
-            $parentScopeAllows
+            $declaredName,
+            $parentScopeAllows,
+            fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
+            $callerDisplay
         );
         $frame->call = $class->methods[$methodLc];
-        $frame->callArgs = $this->callArgsForStaticMethod($frame, $lcClass, $frame->call);
+        $frame->callArgs = $this->callArgsForStaticMethod($frame, $lcClass, $frame->call, $parentKeywordScope);
     }
 
     /**
      * @return list<Variable>
      */
-    protected function callArgsForStaticMethod(Frame $frame, string $resolvedLc, Func $call): array
-    {
+    protected function callArgsForStaticMethod(
+        Frame $frame,
+        string $resolvedLc,
+        Func $call,
+        bool $parentKeywordScope = false
+    ): array {
         $args = $this->implicitThisArgsForStaticInstanceCall($frame, $call);
         if ([] !== $args) {
             return $args;
         }
-        if ($this->isParentClassDispatch($frame, $resolvedLc)) {
+        if ($parentKeywordScope) {
             $thisVar = $this->resolveCallerThis($frame);
             if (null !== $thisVar) {
                 return [$thisVar];
@@ -4922,20 +5799,6 @@ restart:
         }
 
         return [];
-    }
-
-    protected function isParentClassDispatch(Frame $frame, string $resolvedLc): bool
-    {
-        if (null === $frame->block->func || null === $frame->block->func->class) {
-            return false;
-        }
-        $declaring = strtolower($frame->block->func->class->value);
-        if (!isset($this->context->classes[$declaring])) {
-            return false;
-        }
-        $parentLc = $this->context->classes[$declaring]->parentLc;
-
-        return null !== $parentLc && $resolvedLc === $parentLc;
     }
 
     protected function isClassSameOrSubclassOf(string $classLc, string $ancestorLc): bool
@@ -5099,17 +5962,30 @@ restart:
                 }
             }
             foreach ($trait->staticProperties as $name => $storage) {
-                if (!isset($entry->staticProperties[$name])) {
-                    $entry->staticProperties[$name] = $storage;
+                if (isset($entry->staticProperties[$name])) {
+                    throw new \LogicException(
+                        "Trait property {$trait->name}::\${$name} conflicts with a property declared in another trait"
+                    );
                 }
+                $entry->staticProperties[$name] = $this->cloneStaticPropertyStorage($storage);
+                $entry->traitStaticPropertyNames[$name] = true;
             }
+            $this->inheritTraitInstanceProperties($entry, $trait, $trait->name);
             foreach ($trait->constants as $name => $value) {
                 if (isset($entry->constants[$name])) {
+                    if ($this->classConstValuesIdentical($entry->constants[$name], $value)) {
+                        continue;
+                    }
+                    $prevTrait = $entry->traitConstSources[$name] ?? $entry->name;
                     throw new \LogicException(
-                        "Trait constant {$trait->name}::{$name} conflicts with an existing class constant"
+                        "Trait constant {$trait->name}::{$name} conflicts with {$prevTrait}::{$name}"
                     );
                 }
                 $entry->constants[$name] = $value;
+                $entry->traitConstSources[$name] = $trait->name;
+                if (isset($trait->constVisibility[$name])) {
+                    $entry->constVisibility[$name] = $trait->constVisibility[$name];
+                }
                 if (isset($trait->constDeprecated[$name])) {
                     $entry->constDeprecated[$name] = $trait->constDeprecated[$name];
                 }
@@ -5292,7 +6168,53 @@ restart:
             if (null !== $data['parameterMetadata']) {
                 $entry->methodParameterMetadata[$methodLc] = $data['parameterMetadata'];
             }
+            if ('__construct' === $methodLc && null === $entry->constructor) {
+                $entry->constructor = $data['method'];
+            }
         }
+    }
+
+    protected function inheritTraitInstanceProperties(ClassEntry $entry, ClassEntry $trait, string $traitName): void
+    {
+        foreach ($trait->properties as $property) {
+            $propLc = strtolower($property->name);
+            foreach ($entry->properties as $existing) {
+                if (strtolower($existing->name) === $propLc) {
+                    throw new \LogicException(
+                        "Trait property {$traitName}::\${$property->name} conflicts with a property declared in another trait"
+                    );
+                }
+            }
+            $entry->properties[] = $this->cloneClassPropertyForEntry($property, $entry);
+            if (isset($trait->propertyAttributeNames[$propLc])) {
+                $entry->propertyAttributeNames[$propLc] = $trait->propertyAttributeNames[$propLc];
+            }
+            if (isset($trait->propertyAttributeEntries[$propLc])) {
+                $entry->propertyAttributeEntries[$propLc] = $trait->propertyAttributeEntries[$propLc];
+            }
+        }
+    }
+
+    private function cloneClassPropertyForEntry(VM\ClassProperty $property, ClassEntry $entry): VM\ClassProperty
+    {
+        $prototype = clone $property->prototype;
+        $default = null !== $property->default ? clone $property->default : null;
+        $cloned = new VM\ClassProperty(
+            $property->name,
+            $default,
+            $prototype,
+            $property->readonly,
+            $property->visibility,
+            strtolower($entry->name),
+            $property->setVisibility
+        );
+        $cloned->getHookMethodLc = $property->getHookMethodLc;
+        $cloned->setHookMethodLc = $property->setHookMethodLc;
+        $cloned->propertyHookVirtual = $property->propertyHookVirtual;
+        $cloned->defaultInitBlock = $property->defaultInitBlock;
+        $cloned->defaultInitResultSlot = $property->defaultInitResultSlot;
+
+        return $cloned;
     }
 
     /**
@@ -5314,10 +6236,38 @@ restart:
                 continue;
             }
             $iface = $this->context->classes[$ifaceLc];
+            $this->inheritInterfacePropertyRules($entry, $iface);
             foreach ($iface->constants as $name => $value) {
                 if (!isset($entry->constants[$name])) {
                     $entry->constants[$name] = $value;
+                    if (isset($iface->constVisibility[$name])) {
+                        $entry->constVisibility[$name] = $iface->constVisibility[$name];
+                    }
                 }
+            }
+        }
+    }
+
+    /**
+     * Merge asymmetric set visibility and parent-interface property declares (#4876).
+     */
+    protected function inheritInterfacePropertyRules(ClassEntry $entry, ClassEntry $iface): void
+    {
+        foreach ($iface->properties as $ifaceProp) {
+            $propLc = strtolower($ifaceProp->name);
+            $matched = false;
+            foreach ($entry->properties as $classProp) {
+                if (strtolower($classProp->name) !== $propLc) {
+                    continue;
+                }
+                $matched = true;
+                if (0 !== $ifaceProp->setVisibility) {
+                    $classProp->setVisibility = $ifaceProp->setVisibility;
+                }
+                break;
+            }
+            if (!$matched && $entry->isInterface) {
+                $entry->properties[] = $this->cloneClassPropertyForEntry($ifaceProp, $entry);
             }
         }
     }
@@ -5373,6 +6323,14 @@ restart:
         }
     }
 
+    private function cloneStaticPropertyStorage(Variable $source): Variable
+    {
+        $clone = new Variable();
+        $clone->copyFrom($source->resolveIndirect());
+
+        return $clone;
+    }
+
     protected function inheritFromParent(ClassEntry $entry): void
     {
         if (null === $entry->parentLc || !isset($this->context->classes[$entry->parentLc])) {
@@ -5386,8 +6344,13 @@ restart:
         }
         foreach ($parent->methods as $name => $method) {
             if (!isset($entry->methods[$name])) {
+                $vis = $parent->methodVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                // Private methods are not inherited into subclass tables (Zend zend_inheritance).
+                if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+                    continue;
+                }
                 $entry->methods[$name] = $method;
-                $entry->methodVisibility[$name] = $parent->methodVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                $entry->methodVisibility[$name] = $vis;
                 if (isset($parent->methodDeprecated[$name])) {
                     $entry->methodDeprecated[$name] = $parent->methodDeprecated[$name];
                 }
@@ -5396,12 +6359,21 @@ restart:
         }
         foreach ($parent->staticProperties as $name => $storage) {
             if (!isset($entry->staticProperties[$name])) {
-                $entry->staticProperties[$name] = $storage;
+                if (isset($parent->traitStaticPropertyNames[$name])) {
+                    $entry->staticProperties[$name] = $this->cloneStaticPropertyStorage($storage);
+                    $entry->traitStaticPropertyNames[$name] = true;
+                } else {
+                    // Class-declared inherited statics share one slot (Zend; #4668).
+                    $entry->staticProperties[$name] = $storage;
+                }
             }
         }
         foreach ($parent->constants as $name => $value) {
             if (!isset($entry->constants[$name])) {
                 $entry->constants[$name] = $value;
+                if (isset($parent->constVisibility[$name])) {
+                    $entry->constVisibility[$name] = $parent->constVisibility[$name];
+                }
                 if (isset($parent->constDeprecated[$name])) {
                     $entry->constDeprecated[$name] = $parent->constDeprecated[$name];
                 }
@@ -5579,6 +6551,11 @@ restart:
                     if (!is_null($op->arg2)) {
                         $storage->copyFrom($frame->scope[$op->arg2]);
                     }
+                    $this->linkStaticTypedPropertySlot(
+                        $storage,
+                        $entry,
+                        $frame->scope[$op->arg1]->toString()
+                    );
                     $entry->staticProperties[$name] = $storage;
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
@@ -5625,7 +6602,7 @@ restart:
                     $pendingTraits = [];
                     $canonical = $frame->scope[$op->arg1]->toString();
                     $name = strtolower($canonical);
-                    if ($entry->isEnum) {
+                    if ($entry->isEnum && $op->isEnumCaseDeclare) {
                         if (!isset($block->constants[$op->arg2])) {
                             throw new \LogicException('Class constant value must be a compile-time constant');
                         }
@@ -5658,6 +6635,8 @@ restart:
                         }
                     }
                     $entry->constants[$name] = $value;
+                    $entry->constVisibility[$name] = ClassConstVisibility::mask($op->classConstVisibilityFlags);
+                    unset($entry->traitConstSources[$name]);
                     if ([] !== $op->attributeNames) {
                         $entry->constAttributeNames[$name] = $op->attributeNames;
                     }
@@ -5683,6 +6662,7 @@ restart:
         foreach ($entry->properties as $prop) {
             $this->linkPropertyHooks($entry, $prop);
         }
+        $this->linkStaticPropertyHooks($entry);
     }
 
     private function resolveClassConstDefineValue(Frame $frame, Block $block, OpCode $op): Variable
@@ -5728,6 +6708,11 @@ restart:
             $name = strtolower($frame->scope[$declareOp->arg1]->toString());
             $storage = clone $frame->scope[$declareOp->arg3];
             $storage->copyFrom($value);
+            $this->linkStaticTypedPropertySlot(
+                $storage,
+                $entry,
+                $frame->scope[$declareOp->arg1]->toString()
+            );
             $entry->staticProperties[$name] = $storage;
 
             return;
@@ -5831,6 +6816,9 @@ restart:
                     throw new \Error($this->classNotFoundMessage($name));
                 }
                 $class = $this->context->classes[$lcname];
+                if ($class->isEnum) {
+                    throw new \Error("Cannot instantiate enum {$class->name}");
+                }
                 $object = new VM\ObjectEntry($class);
                 $result->object($object);
                 $frame->call = $object->constructor;
@@ -5898,10 +6886,18 @@ restart:
                     break;
                 }
                 $key = $frame->scope[$op->arg3]->resolveIndirect();
+                $value = $frame->scope[$op->arg2];
+                if ($key->is(Variable::TYPE_OBJECT) || $key->is(Variable::TYPE_ARRAY)) {
+                    throw new \TypeError('Illegal offset type');
+                }
                 if ($key->is(Variable::TYPE_INTEGER) || $key->is(Variable::TYPE_FLOAT)) {
-                    $ht->addIndex($key->toInt(), $frame->scope[$op->arg2]);
+                    $ht->updateIndex($key->toInt(), $value);
+                } elseif ($key->is(Variable::TYPE_STRING)) {
+                    $ht->update($key->toString(), $value);
+                } elseif ($key->is(Variable::TYPE_BOOLEAN)) {
+                    $ht->updateIndex($key->toBool() ? 1 : 0, $value);
                 } else {
-                    $ht->add($key->toString(), $frame->scope[$op->arg2]);
+                    throw new \TypeError('Illegal offset type');
                 }
                 break;
             case OpCode::TYPE_ARRAY_SPREAD:
@@ -5966,7 +6962,12 @@ restart:
             return;
         }
         $strict = $block->strictTypes;
-        TypeCheck::coerceReturn($value, $strict, $block->returnTypeConstraint);
+        TypeCheck::coerceReturn(
+            $value,
+            $strict,
+            $block->returnTypeConstraint,
+            $block->returnLiteralBoolType
+        );
     }
 
     private function emitCallDeprecationNotice(Frame $frame): void
@@ -6003,6 +7004,16 @@ restart:
      * ClassConstFetch with a runtime member name (php-parser: Class::{$var}).
      * Zend resolves constants first; when no constant exists, fall back to static property (#3788).
      */
+    private function classConstValuesIdentical(Variable $left, Variable $right): bool
+    {
+        $a = new Variable();
+        $a->copyFrom($left);
+        $b = new Variable();
+        $b->copyFrom($right);
+
+        return $a->identicalTo($b);
+    }
+
     private function copyClassConstOrStaticPropertyByName(
         ClassEntry $classEntry,
         string $memberNameRaw,

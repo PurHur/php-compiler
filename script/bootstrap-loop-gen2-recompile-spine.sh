@@ -67,11 +67,20 @@ print_segfault_context() {
   echo "bootstrap-loop-gen2-recompile-spine: segfault rerun log: ${log}" >&2
 }
 
+# Prefer committed prelinked gen-0 when unset — avoids Zend inventory emit SIGSEGV on bin/compile.php (#2930).
+PRELINKED_GEN0="${ROOT}/prelinked/bootstrap-gen0/bin-compile-aot"
+if [[ "${BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT:-}" == "" && -x "${PRELINKED_GEN0}" ]]; then
+  BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT=1
+fi
+
 # Always (re)build the emit-helper compile driver (argv `-o OUT SOURCE.php`) explicitly.
 # Do not route through bootstrap-selfhost-helloworld-compile-bin.sh here: it may produce
 # a different `build/bin-compile-aot` (inventory bin/compile.php) which can segfault on
 # spine-scale sources (#2930).
-if [[ "${BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT:-0}" != "1" ]]; then
+if [[ "${BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT:-0}" == "1" && -x "${PRELINKED_GEN0}" ]]; then
+  cp -f "${PRELINKED_GEN0}" "${DRIVER}"
+  chmod +x "${DRIVER}"
+elif [[ "${BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT:-0}" != "1" ]]; then
   EMIT_ENTRY="${ROOT}/test/selfhost/compiler_helloworld_smoke/compile_driver.php"
   rm -f "${DRIVER}"
   _driver_debug_env=()

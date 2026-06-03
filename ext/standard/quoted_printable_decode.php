@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringQuotPrint;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** quoted_printable_decode() — MIME quoted-printable (php-src ext/standard/quot_print.c). */
@@ -25,14 +24,16 @@ final class quoted_printable_decode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('quoted_printable_decode() requires exactly one argument in this compiler build');
         }
+        $data = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'quoted_printable_decode',
+            0,
+            'string'
+        );
         if (null === $frame->returnVar) {
             return;
         }
-        $data = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $data->type) {
-            throw new \LogicException('quoted_printable_decode() only supports strings in this compiler build');
-        }
-        $frame->returnVar->string(VmString::quoted_printable_decode($data->toString()));
+        $frame->returnVar->string(VmString::quoted_printable_decode($data));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -44,7 +45,7 @@ final class quoted_printable_decode extends Internal
 
         return JitQuotedPrintableDecode::decode(
             $context,
-            $this->jitString($context, $args[0], 'quoted_printable_decode() argument #1')
+            JitQuotPrint::lowerStringSubject($context, $args[0], 'quoted_printable_decode')
         );
     }
 }

@@ -40,11 +40,7 @@ final class nl2br extends Internal
         }
         $useXhtml = true;
         if (2 === $argc) {
-            $flag = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $flag->type) {
-                throw new \LogicException('nl2br() second argument must be a boolean in this compiler build');
-            }
-            $useXhtml = $flag->toBool();
+            $useXhtml = self::resolveUseXhtmlBool($frame, 1);
         }
         $frame->returnVar->string(VmString::nl2br($v->toString(), $useXhtml));
     }
@@ -56,10 +52,16 @@ final class nl2br extends Internal
             throw new \LogicException('nl2br() requires one or two arguments');
         }
 
-        $literal = JitStringArg::compileTimeLiteral($args[0]);
-        if (null !== $literal && 1 === $argc) {
+        $strLit = JitStringArg::compileTimeLiteral($args[0]);
+        $flagLit = 2 === $argc ? JitStringArg::compileTimeLiteral($args[1]) : null;
+        if (null !== $strLit && (1 === $argc || null !== $flagLit)) {
+            $useXhtml = true;
+            if (null !== $flagLit) {
+                $useXhtml = self::coerceUseXhtmlStringLiteral($flagLit);
+            }
+
             return $context->builder->load(
-                $context->constantStringFromString(VmString::nl2br($literal, true))
+                $context->constantStringFromString(VmString::nl2br($strLit, $useXhtml))
             );
         }
 
@@ -67,17 +69,76 @@ final class nl2br extends Internal
         $i8 = $context->getTypeFromString('int8');
         $useXhtmlI8 = $i8->constInt(1, false);
         if (2 === $argc) {
-            $flagVar = $args[1];
-            if (JITVariable::TYPE_NATIVE_BOOL !== $flagVar->type) {
-                throw new \LogicException('nl2br() second argument must be a boolean in this compiler build');
-            }
-            $bv = $context->helper->loadValue($flagVar);
-            $useXhtmlI8 = $context->builder->zExt($bv, $i8);
+            $useXhtmlI8 = $context->builder->zExt(
+                $this->jitBool($context, $args[1], 'nl2br(): Argument #2 ($use_xhtml)'),
+                $i8
+            );
         }
 
         StringNl2brRuntime::ensureLinked($context);
 
         return JitNl2br::nl2br($context, $str, $useXhtmlI8);
+    }
+
+    private static function resolveUseXhtmlBool(Frame $frame, int $argIndex): bool
+    {
+        $flag = $frame->calledArgs[$argIndex]->resolveIndirect();
+
+        return self::coerceUseXhtmlOperand($flag, $argIndex);
+    }
+
+    /**
+     * php-src Z_PARAM_BOOL coercion for nl2br() use_xhtml (#5056).
+     */
+    private static function coerceUseXhtmlOperand(Variable $flag, int $argIndex): bool
+    {
+        $label = sprintf('nl2br(): Argument #%d ($use_xhtml)', $argIndex + 1);
+        switch ($flag->type) {
+            case Variable::TYPE_BOOLEAN:
+                return $flag->toBool();
+            case Variable::TYPE_INTEGER:
+                return 0 !== $flag->toInt();
+            case Variable::TYPE_FLOAT:
+                return 0.0 !== $flag->toFloat();
+            case Variable::TYPE_STRING:
+                return self::coerceUseXhtmlStringLiteral($flag->toString());
+            case Variable::TYPE_ARRAY:
+                throw new \TypeError($label.' must be of type bool, array given');
+            case Variable::TYPE_OBJECT:
+                throw new \TypeError($label.' must be of type bool, '.self::vmTypeName($flag->type).' given');
+            case Variable::TYPE_NULL:
+                throw new \TypeError($label.' must be of type bool, null given');
+            default:
+                throw new \TypeError($label.' must be of type bool, '.self::vmTypeName($flag->type).' given');
+        }
+    }
+
+    private static function coerceUseXhtmlStringLiteral(string $literal): bool
+    {
+        $lower = strtolower($literal);
+        if (\in_array($lower, ['1', 'true', 'on', 'yes'], true)) {
+            return true;
+        }
+        if (\in_array($lower, ['0', 'false', 'off', 'no', ''], true)) {
+            return false;
+        }
+
+        throw new \TypeError('nl2br(): Argument #2 ($use_xhtml) must be of type bool, string given');
+    }
+
+    private static function vmTypeName(int $type): string
+    {
+        return match ($type) {
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            Variable::TYPE_RESOURCE => 'resource',
+            default => 'mixed',
+        };
     }
 
 }

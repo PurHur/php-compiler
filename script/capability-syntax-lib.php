@@ -49,7 +49,7 @@ function syntaxRowDefinitions(): array
             'issue' => 1356,
             'aot' => true,
             'notes' => [
-                'Backed enum case objects with `->name` / `->value`; string context coerces to backed scalar (#3518)',
+                'Backed enum case objects with `->name` / `->value`; `echo $case` throws Error (#4891); double-quoted `"$case"` throws Error (#4785)',
                 '`Foo::Bar` singleton fetch; `enum_exists` registry; `implements` interface list + instance methods + `instanceof` (#3373)',
                 'static methods (#2299); `Enum::cases()` JIT (#3308, #4068); AOT fixture enum_backed.phpt (#3076)',
                 '`BackedEnum::from()` / `tryFrom()` VM lookup with Zend-parity ValueError (#3114); JIT deferred',
@@ -189,6 +189,17 @@ function syntaxRowDefinitions(): array
             'probe' => 'interface A {} interface B {} class C implements A, B {} echo ((new C) instanceof (A|B)) ? "1" : "0";',
         ],
         [
+            'id' => 'in_operator',
+            'construct' => 'PHP 8.3+ `in` operator (`$needle in $haystack`)',
+            'opcodes' => ['TYPE_IN'],
+            'issue' => 4682,
+            'notes' => [
+                'Ast\\InOperatorDesugar + InOperatorResolver (#4682); VM InOperator::contains (===)',
+                'JIT TYPE_IN via ArrayBuiltinHelper::inArray strict (#4716); EnumInOperatorJitCompileTest',
+            ],
+            'probe' => 'enum E: string { case A = "a"; case B = "b"; } echo (E::A in [E::A, E::B]) ? "yes" : "no";',
+        ],
+        [
             'id' => 'match_expr',
             'construct' => '`match` expression',
             'opcodes' => ['TYPE_IDENTICAL', 'TYPE_JUMPIF', 'TYPE_ASSIGN'],
@@ -211,7 +222,7 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'VM ClosureState + __invoke; Closure::bind/bindTo (#3266, #3673); JIT bindTo/bind + bound invoke via ClosureBindHelper (#4192)',
                 'use() by-value and by-ref (#3081, #3108); array_map/filter/usort callbacks (#3086)',
-                'JIT ClosureHelper: TYPE_CLOSURE + use() value/ref IR (#3092, #3108); use ($x) MCJIT snapshot via aliasVariableOpFromSlot (#2483); use (&$x) bin/jit.php VM-fallback until MCJIT execute stable (#72, #2483); indirect $arr[0]() via __closure_target (#3089, #3092)',
+                'JIT ClosureHelper: TYPE_CLOSURE + use() value/ref IR (#3092, #3108); use ($x) MCJIT snapshot via aliasVariableOpFromSlot (#2483); use (&$x) MCJIT via valueBoxAliasPtr (#72, #4625); indirect $arr[0]() via __closure_target (#3089, #3092)',
                 'AOT user scripts: real ClosureHelper lowering via PHP_COMPILER_AOT_USER_SCRIPT (#3725); use (&$x) AOT fixture closure_use_byref.phpt (#2483); bootstrap spine still stubs null',
                 'bin/jit.php MCJIT execute still probe-dependent (#98)',
             ],
@@ -420,7 +431,7 @@ function syntaxRowDefinitions(): array
             'construct' => 'Static property `Class::$prop`',
             'opcodes' => ['TYPE_STATIC_PROPERTY_FETCH', 'TYPE_DECLARE_STATIC_PROPERTY'],
             'issue' => 1225,
-            'notes' => ['Class-scoped storage; `self::` / `static::`; literal property names in JIT'],
+            'notes' => ['Class-scoped storage; `self::` / `static::`; runtime property name on JIT/AOT (#4597)'],
             'probe' => 'class C { public static int $n = 1; } echo C::$n;',
         ],
         [
@@ -529,7 +540,7 @@ function syntaxRowDefinitions(): array
             'opcodes' => ['TYPE_ASSIGN', 'TYPE_FUNCCALL_INIT'],
             'issue' => 1363,
             'notes' => [
-                'php-cfg Expr_FirstClassCallable (#1230); VM stores string or [obj, method] array',
+                'php-cfg Expr_FirstClassCallable (#1230); VM/JIT TYPE_FROM_CALLABLE → Closure (#4810)',
                 'Instance method $obj->m(...) VM + JIT bound [object, method] array callable (#3566, #4040)',
                 'JIT folds strlen(...) / Class::m(...) via compileTimeString assign chains (#1363)',
                 'php-types TypeReconstructor patch for Expr_FirstClassCallable (#2315)',
@@ -739,6 +750,7 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'SourcePreprocessor lowers hooks to __phpc_property_* methods (#3145)',
                 'VM dispatches set/get on property access; JIT PropertyHookDispatch (#3723)',
+                'Static property hooks (PHP 8.4): VM dispatch via TYPE_STATIC_PROPERTY_FETCH (#4751); JIT/AOT defer to VM',
                 'AOT: user-class hook methods lower under PHP_COMPILER_SELFHOST_AOT; set-hook smoke in property_hook_set.phpt',
                 'JIT: raw backing access in hook bodies via jitPropertyHookRawProperty (set + get methods, #4025, #4205)',
             ],
@@ -962,6 +974,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'dynamic_property_fetch' => '/->\$/',
         'native_user_class' => '/\b(?:class\s+\w+|new\s+\w+)/',
         'instanceof' => '/\binstanceof\b/',
+        'in_operator' => '/(?<![\w\$])in(?![\w\$])/',
         'match_expr' => '/\bmatch\s*\(/',
         'closures' => '/function\s*\([^)]*\)\s*(?:use\s*\([^)]*\)\s*)?\{/',
         'arrow_functions' => '/\bfn\s*\(/',

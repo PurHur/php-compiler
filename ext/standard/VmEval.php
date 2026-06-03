@@ -87,7 +87,7 @@ final class VmEval
      * Zend parses eval strings as inline PHP; our PHPCfg pipeline expects a script TU (#3358).
      * Trailing expressions without a semicolon are wrapped in return (zend_eval_string parity).
      */
-    private static function wrapEvalCode(string $code): string
+    public static function wrapEvalCode(string $code): string
     {
         $trimmed = rtrim($code);
         if ('' === $trimmed) {

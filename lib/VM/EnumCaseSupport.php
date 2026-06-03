@@ -76,4 +76,89 @@ final class EnumCaseSupport
                 throw new \Error("Object of class {$className} could not be converted to string");
         }
     }
+
+    /**
+     * Zend {@see zend_compare_enum()} (#4554).
+     *
+     * Identical case singleton: 0. Different cases (same enum): 1. Different enums: 1.
+     */
+    public static function compareSpaceship(ObjectEntry $left, ObjectEntry $right): int
+    {
+        if (!$left->isEnumCase || !$right->isEnumCase) {
+            throw new \LogicException('compareSpaceship requires enum case objects');
+        }
+        if ($left === $right) {
+            return 0;
+        }
+        if ($left->class !== $right->class) {
+            return 1;
+        }
+        if (0 === strcasecmp($left->enumCaseName ?? '', $right->enumCaseName ?? '')) {
+            return 0;
+        }
+
+        return 1;
+    }
+
+    /** @see EnumCaseEntry spaceship for TYPE_ENUM_CASE operands (#4554). */
+    public static function compareEnumCaseEntrySpaceship(EnumCaseEntry $left, EnumCaseEntry $right): int
+    {
+        if ($left->enumClass !== $right->enumClass) {
+            return 1;
+        }
+        if ($left->caseName === $right->caseName) {
+            return 0;
+        }
+
+        return 1;
+    }
+
+    /**
+     * Zend {@see zend_compare()} for enum case objects (#4700).
+     *
+     * Same enum + same declared case name: equal. Different cases or enums: not equal.
+     */
+    public static function compareEquals(ObjectEntry $left, ObjectEntry $right): bool
+    {
+        if (!$left->isEnumCase || !$right->isEnumCase) {
+            throw new \LogicException('compareEquals requires enum case objects');
+        }
+        if ($left->class !== $right->class) {
+            return false;
+        }
+
+        return ($left->enumCaseName ?? '') === ($right->enumCaseName ?? '');
+    }
+
+    /** Loose/identical == for TYPE_OBJECT / TYPE_ENUM_CASE enum operands (#4700). */
+    public static function enumCaseVariablesEqual(Variable $left, Variable $right): bool
+    {
+        [$leftClass, $leftName] = self::resolveEnumCaseIdentity($left);
+        [$rightClass, $rightName] = self::resolveEnumCaseIdentity($right);
+        if (null === $leftClass || null === $rightClass) {
+            return false;
+        }
+
+        return $leftClass === $rightClass && $leftName === $rightName;
+    }
+
+    /**
+     * @return array{0: ?ClassEntry, 1: string}
+     */
+    private static function resolveEnumCaseIdentity(Variable $var): array
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_ENUM_CASE === $var->type) {
+            $entry = $var->toEnumCase();
+
+            return [$entry->enumClass, $entry->caseName];
+        }
+        if (Variable::TYPE_OBJECT === $var->type && self::isEnumCase($var->toObject())) {
+            $object = $var->toObject();
+
+            return [$object->class, $object->enumCaseName ?? ''];
+        }
+
+        return [null, ''];
+    }
 }

@@ -43,6 +43,9 @@ class Context {
     public array $constants = [];
     public array $functions = [];
     public array $functionProxies = [];
+
+    /** @var array<int, Call> lazy initializer proxies for phpc_lazy registry (#4940) */
+    public array $lazyInitProxies = [];
     /** @var array<string, true> JIT stubs registered for external Class::method (issue #579). */
     public array $externalMethodStubs = [];
     public array $functionReturnType = [];
@@ -85,6 +88,9 @@ class Context {
      */
     public array $generatorCatchDispatchEntry = [];
 
+    /** @var array<int, \PHPLLVM\BasicBlock> catch CFG block id => resume entry BB (#4624) */
+    public array $fiberCatchDispatchEntry = [];
+
     /** CFG block currently being lowered (get_defined_vars snapshot, #3135). */
     public ?Block $jitCurrentBlock = null;
 
@@ -126,6 +132,12 @@ class Context {
     private array $stringConstant = [];
     private array $builtins;
     private array $stringConstantMap = [];
+
+    /** @var array<string, PHPLLVM\Value> */
+    private array $arrayConstantMap = [];
+
+    /** @var array<string, \PHPCompiler\VM\HashTable> */
+
     private array $modules = [];
 
     /** @var array<string, true>|null */
@@ -220,6 +232,13 @@ class Context {
     /** Rebound foreach by-ref value variables keyed by source name (#1222). */
     /** @var array<string, Variable> */
     public array $namedVariableBindings = [];
+
+    /** Clear per-script local name/ref bindings before lowering a new {main} TU (#4763). */
+    public function resetScriptLocalBindings(): void
+    {
+        $this->namedVariableBindings = [];
+        $this->refAliasNames = [];
+    }
 
     public function bindVariableByName(string $name, Variable $var): void
     {
@@ -559,6 +578,8 @@ class Context {
         $this->functionProxies['reflectionclass::getattributes'] = new Call\ReflectionClassGetAttributes();
         $this->functionProxies['reflectionclass::getmethod'] = new Call\ReflectionClassGetMethod();
         $this->functionProxies['reflectionclass::getreflectionconstant'] = new Call\ReflectionClassGetReflectionConstant();
+        $this->functionProxies['reflectionclass::newlazyproxy'] = new Call\ReflectionClassNewLazyProxy();
+        $this->functionProxies['reflectionclass::newlazyghost'] = new Call\ReflectionClassNewLazyGhost();
         $this->functionProxies['reflectionproperty::__construct'] = new Call\ReflectionPropertyConstruct();
         $this->functionProxies['reflectionproperty::getattributes'] = new Call\ReflectionPropertyGetAttributes();
         $this->functionProxies['reflectionconstant::__construct'] = new Call\ReflectionConstantConstruct();
@@ -568,6 +589,7 @@ class Context {
         $this->functionProxies['reflectionattribute::newinstance'] = new Call\ReflectionAttributeNewInstance();
 
         FiberHelper::registerJitMethods($this);
+        GeneratorHelper::registerJitMethods($this);
         ClosureBindHelper::registerJitMethods($this);
     }
 
@@ -1097,6 +1119,90 @@ class Context {
     }
 
     /**
+     * Module global for a compile-time constant array (eager __init__ — #4904, #4941).
+     */
+    public function constantArrayFromVmHashTable(string $cacheKey, \PHPCompiler\VM\HashTable $table): PHPLLVM\Value
+    {
+        if (!isset($this->arrayConstantMap[$cacheKey])) {
+            $ptrTy = $this->getTypeFromString('__value__*');
+            $global = $this->module->addGlobal($ptrTy, 'array_const_' . \count($this->arrayConstantMap));
+            $global->setInitializer($ptrTy->constNull());
+            $this->arrayConstantMap[$cacheKey] = $global;
+            $this->emitConstantArrayInitInInitBlock($global, $table);
+        }
+
+        return $this->arrayConstantMap[$cacheKey];
+    }
+
+    /** @deprecated Inline lazy-init removed; arrays initialize in __init__ (#4941). */
+    public function ensureConstantArrayLazyInit(string $cacheKey): void
+    {
+    }
+
+    private function emitConstantArrayInitInInitBlock(PHPLLVM\Value $global, \PHPCompiler\VM\HashTable $table): void
+    {
+        $oldBuilder = $this->builder;
+        $this->builder = $this->context->builderCreate();
+        $this->builder->positionAtEnd($this->initBlock);
+        $htVar = HashTableHelper::variableFromVmHashTable($this, $table);
+        $ht = HashTableHelper::loadHashtablePointer($this, $htVar);
+        $this->refcount->addref($ht);
+        $valueType = $this->getTypeFromString('__value__');
+        $heapVal = $this->memory->malloc($valueType);
+        $heapPtr = $this->builder->pointerCast(
+            $heapVal,
+            $this->getTypeFromString('__value__*')
+        );
+        $this->builder->call(
+            $this->lookupFunction('__value__writeHashtable'),
+            $heapPtr,
+            $ht
+        );
+        $this->builder->store($heapPtr, $global);
+        $this->builder = $oldBuilder;
+    }
+
+    private function materializeVmHashTableForConstInit(\PHPCompiler\VM\HashTable $table): PHPLLVM\Value
+    {
+        $ht = HashTableHelper::alloc($this);
+        $setLong = $this->lookupFunction('__hashtable__setLongAt');
+        $i64 = $this->getTypeFromString('int64');
+        foreach ($table->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $resolved = $valueVar->resolveIndirect();
+            if (VMVariable::TYPE_INTEGER !== $keyVar->type) {
+                return $this->helper->loadValue(
+                    HashTableHelper::variableFromVmHashTable($this, $table)
+                );
+            }
+            $idx = $this->constantFromInteger($keyVar->toInt(), 'size_t');
+            if (VMVariable::TYPE_INTEGER === $resolved->type) {
+                $this->builder->call(
+                    $setLong,
+                    $ht,
+                    $idx,
+                    $i64->constInt($resolved->toInt(), false)
+                );
+            } elseif (VMVariable::TYPE_ARRAY === $resolved->type) {
+                $nested = $this->materializeVmHashTableForConstInit($resolved->toArray());
+                $this->refcount->addref($nested);
+                $nestedVar = new Variable(
+                    $this,
+                    Variable::TYPE_HASHTABLE,
+                    Variable::KIND_VALUE,
+                    $nested
+                );
+                HashTableHelper::setAtIndex($this, $ht, $idx, $nestedVar);
+            } else {
+                return $this->helper->loadValue(
+                    HashTableHelper::variableFromVmHashTable($this, $table)
+                );
+            }
+        }
+
+        return $ht;
+    }
+
+    /**
      * Temporarily position the builder at __init__ (for native registry calls).
      *
      * @param callable(self): void $emit
@@ -1500,6 +1606,10 @@ class Context {
                 case VMVariable::TYPE_STRING:
                     $global = $this->constantStringFromString($phpVar->toString());
                     $this->constants[$name] = [Variable::TYPE_STRING, $global];
+                    break;
+                case VMVariable::TYPE_ARRAY:
+                    $global = $this->constantArrayFromVmHashTable($name, $phpVar->toArray());
+                    $this->constants[$name] = [Variable::TYPE_VALUE, $global];
                     break;
                 default:
                     throw new \LogicException("Non-implemented constant fetch type: " . $phpVar->type);

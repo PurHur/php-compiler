@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * bin/jit.php VM-fallback when script uses closure use (&$var); by-value use ($var) MCJIT (#72, #2483).
+ * Closure use() capture detection; by-ref no longer forces requiresVmLowering (#4625).
  */
 final class ClosureByRefVmLoweringTest extends TestCase
 {
@@ -30,7 +30,7 @@ PHP,
         $this->assertFalse(Block::requiresVmLowering($block));
     }
 
-    public function testClosureByRefRequiresVmLowering(): void
+    public function testClosureByRefDoesNotRequireVmLowering(): void
     {
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(
@@ -46,6 +46,6 @@ PHP,
         $this->assertNotNull($block);
         $this->assertTrue(Block::containsClosureByRefCaptureOpcodes($block));
         $this->assertTrue(Block::containsClosureUseCaptureOpcodes($block));
-        $this->assertTrue(Block::requiresVmLowering($block));
+        $this->assertFalse(Block::requiresVmLowering($block));
     }
 }

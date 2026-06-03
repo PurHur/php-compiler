@@ -36,6 +36,16 @@ final class ClosureState
     public ?string $boundScopeClass = null;
 
     /**
+     * Per-closure static locals (Zend zend_closure static_variables; issue #4872).
+     *
+     * @var array<string, Variable>
+     */
+    private array $staticVars = [];
+
+    /** @var array<string, true> */
+    private array $staticInitialized = [];
+
+    /**
      * @param list<array{slot: int, var: Variable, byRef: bool}> $captures
      */
     public function __construct(
@@ -43,6 +53,31 @@ final class ClosureState
         array $captures = [],
     ) {
         $this->captures = $captures;
+    }
+
+    public function ensureStatic(string $varName): Variable
+    {
+        if (!isset($this->staticVars[$varName])) {
+            $this->staticVars[$varName] = new Variable(Variable::TYPE_NULL);
+        }
+
+        return $this->staticVars[$varName];
+    }
+
+    public function isStaticInitialized(string $varName): bool
+    {
+        return isset($this->staticInitialized[$varName]);
+    }
+
+    public function markStaticInitialized(string $varName): void
+    {
+        $this->staticInitialized[$varName] = true;
+    }
+
+    /** @return list<Variable> */
+    public function staticRootsForCycleCollector(): array
+    {
+        return array_values($this->staticVars);
     }
 
     public static function fromWrappedFunc(Func $func): self
@@ -84,6 +119,10 @@ final class ClosureState
         $clone = new self($this->func, $captures);
         $clone->boundThis = null !== $this->boundThis ? $this->copyVar($this->boundThis) : null;
         $clone->boundScopeClass = $this->boundScopeClass;
+        foreach ($this->staticVars as $name => $var) {
+            $clone->staticVars[$name] = $this->copyVar($var);
+        }
+        $clone->staticInitialized = $this->staticInitialized;
 
         return $clone;
     }
@@ -91,6 +130,21 @@ final class ClosureState
     public function isUserClosure(): bool
     {
         return null === $this->wrappedFunc && null === $this->methodName;
+    }
+
+    /** Zend zend_closure_bind(): static closures cannot receive a bound $this. */
+    public function isStaticClosure(): bool
+    {
+        $compilerFunc = $this->wrappedFunc ?? $this->func;
+        if (!$compilerFunc instanceof Func\PHP) {
+            return false;
+        }
+        $cfgFunc = $compilerFunc->block->func ?? null;
+        if (null === $cfgFunc) {
+            return false;
+        }
+
+        return (($cfgFunc->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0;
     }
 
     public static function register(Context $ctx): void

@@ -50,6 +50,10 @@ final class BuiltinParamNames
                 return ['resource_type'];
             case 'get_defined_constants':
                 return ['categorize'];
+            case 'intdiv':
+                return ['num1', 'num2'];
+            case 'hex2bin':
+                return ['data', 'strict'];
         }
 
         return null;

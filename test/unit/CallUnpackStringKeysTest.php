@@ -6,10 +6,10 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** Call-time ...$arr spread must reject non-list arrays (#4321). */
+/** Call-time ...$arr spread: named unpack from string keys (#4669), unknown keys (#4321). */
 final class CallUnpackStringKeysTest extends TestCase
 {
-    public function testVmRejectsStringKeyedArray(): void
+    public function testVmRejectsUnknownNamedKeys(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -22,13 +22,13 @@ sum(...$args);
 PHP;
         try {
             $runtime->run($runtime->parseAndCompile($code, 'call_unpack_string_keys.php'));
-            self::fail('expected TypeError');
-        } catch (\TypeError $e) {
-            self::assertSame('Cannot unpack array with string keys', $e->getMessage());
+            self::fail('expected Error');
+        } catch (\Error $e) {
+            self::assertSame('Unknown named parameter $x', $e->getMessage());
         }
     }
 
-    public function testVmRejectsStringKeyedArrayInTryCatch(): void
+    public function testVmRejectsUnknownNamedKeysInTryCatch(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -40,13 +40,13 @@ $args = ['x' => 1, 'y' => 2, 'z' => 3];
 try {
     sum(...$args);
     echo "no error\n";
-} catch (TypeError $e) {
+} catch (Error $e) {
     echo $e->getMessage(), "\n";
 }
 PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'call_unpack_string_keys_try.php'));
-        self::assertSame("Cannot unpack array with string keys\n", ob_get_clean());
+        self::assertSame("Unknown named parameter \$x\n", ob_get_clean());
     }
 
     public function testVmAcceptsPackedList(): void
@@ -63,5 +63,28 @@ PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'call_unpack_packed.php'));
         self::assertSame('6', ob_get_clean());
+    }
+
+    public function testVmNamedUnpackMatchesParameterNames(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function pair(int $a, int $b): void {
+    echo "$a,$b\n";
+}
+function ordered(int $a, int $b = 0): void {
+    echo "$a,$b\n";
+}
+function optional(string $a = 'd'): void {
+    echo "$a\n";
+}
+pair(...['a' => 1, 'b' => 2]);
+ordered(...['b' => 5, 'a' => 1]);
+optional(...['a' => 'named']);
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'call_unpack_named_keys.php'));
+        self::assertSame("1,2\n1,5\nnamed\n", ob_get_clean());
     }
 }

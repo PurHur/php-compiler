@@ -35,7 +35,8 @@ final class PipeOperatorDesugar
                 break;
             }
 
-            $replacement = self::rewritePipe($lhs['text'], $rhs['text']);
+            $bindAsClosure = self::shouldBindPipeAsClosure($tokens, $lhs['startIdx'], $pipeIdx, $rhs['endIdx']);
+            $replacement = self::rewritePipe($lhs['text'], $rhs['text'], $bindAsClosure);
             $code = substr($code, 0, $lhs['start'])
                 . $replacement
                 . substr($code, $rhs['end']);
@@ -130,6 +131,7 @@ final class PipeOperatorDesugar
         return [
             'start' => $start,
             'end' => $end,
+            'startIdx' => $startIdx,
             'text' => trim(substr($code, $start, $end - $start)),
         ];
     }
@@ -237,7 +239,7 @@ final class PipeOperatorDesugar
     /**
      * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
      *
-     * @return array{start: int, end: int, text: string}|null
+     * @return array{start: int, end: int, endIdx: int, text: string}|null
      */
     private static function extractRhsCall(string $code, array $tokens, int $afterPipeIdx): ?array
     {
@@ -263,6 +265,7 @@ final class PipeOperatorDesugar
         return [
             'start' => $start,
             'end' => $end,
+            'endIdx' => $endIdx,
             'text' => trim(substr($code, $start, $end - $start)),
         ];
     }
@@ -429,7 +432,52 @@ final class PipeOperatorDesugar
         }
     }
 
-    private static function rewritePipe(string $lhs, string $rhs): string
+    /**
+     * When pipe + first-class callable is assigned to a variable, Zend keeps a Closure
+     * with the piped value bound as the first argument (#4943, zend_compile.c).
+     *
+     * Chained pipes and statement/expression contexts still invoke immediately.
+     *
+     * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function shouldBindPipeAsClosure(array $tokens, int $lhsStartIdx, int $pipeIdx, int $rhsEndIdx): bool
+    {
+        $after = $rhsEndIdx + 1;
+        while ($after < \count($tokens) && self::isIgnorable($tokens[$after])) {
+            ++$after;
+        }
+        if ($after < \count($tokens) && self::isPipeAt($tokens, $after)) {
+            return false;
+        }
+
+        $pos = $lhsStartIdx - 1;
+        self::skipBackwardIgnorable($tokens, $pos);
+        if ($pos < 0 || !\is_string($tokens[$pos]) || '=' !== $tokens[$pos]) {
+            return false;
+        }
+
+        --$pos;
+        self::skipBackwardIgnorable($tokens, $pos);
+        if ($pos < 0 || !\is_array($tokens[$pos]) || \T_VARIABLE !== $tokens[$pos][0]) {
+            return false;
+        }
+
+        --$pos;
+        self::skipBackwardIgnorable($tokens, $pos);
+        if ($pos >= 0) {
+            $token = $tokens[$pos];
+            if (\is_string($token) && '(' === $token) {
+                return false;
+            }
+            if (\is_array($token) && \in_array($token[0], [\T_RETURN, \T_ECHO, \T_PRINT, \T_THROW], true)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function rewritePipe(string $lhs, string $rhs, bool $bindAsClosure): string
     {
         $open = strpos($rhs, '(');
         if (false === $open) {
@@ -440,8 +488,12 @@ final class PipeOperatorDesugar
         $suffix = substr($rhs, $open + 1);
         $inner = ltrim($suffix);
 
-        // First-class callable: func(...) → func($lhs)
+        // First-class callable: func(...) → func($lhs) or bound Closure for assignment (#4943).
         if (preg_match('/^\\.\\.\\.(\\s*\\))/s', $inner, $m)) {
+            if ($bindAsClosure) {
+                return '(fn(...$__pipe_a) => '.$rhs.'('.$lhs.', ...$__pipe_a))';
+            }
+
             return $prefix.$lhs.$m[1];
         }
 

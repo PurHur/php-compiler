@@ -410,25 +410,7 @@ final class VmFs
         if (false === $fp) {
             return false;
         }
-        $total = 0;
-        while (!feof($fp)) {
-            $chunk = @fread($fp, 8192);
-            if (false === $chunk) {
-                @fclose($fp);
-
-                return false;
-            }
-            if ('' === $chunk) {
-                break;
-            }
-            $written = @fwrite(\STDOUT, $chunk);
-            if (false === $written) {
-                @fclose($fp);
-
-                return false;
-            }
-            $total += $written;
-        }
+        $total = self::passthruStreamToStdout($fp);
         @fclose($fp);
 
         return $total;
@@ -490,6 +472,18 @@ final class VmFs
         if (null === $fp) {
             return false;
         }
+
+        return self::passthruStreamToStdout($fp);
+    }
+
+    /**
+     * Stream remaining bytes from an open file handle to STDOUT (php_stream_passthru parity).
+     *
+     * @param resource $fp
+     *
+     * @return int|false Bytes read from $fp, or false on I/O failure
+     */
+    private static function passthruStreamToStdout($fp) {
         $total = 0;
         while (!feof($fp)) {
             $chunk = @fread($fp, 8192);
@@ -499,11 +493,12 @@ final class VmFs
             if ('' === $chunk) {
                 break;
             }
+            $readLen = \strlen($chunk);
             $written = @fwrite(\STDOUT, $chunk);
-            if (false === $written) {
+            if (false === $written || $written !== $readLen) {
                 return false;
             }
-            $total += $written;
+            $total += $readLen;
         }
 
         return $total;
@@ -701,6 +696,51 @@ final class VmFs
         }
 
         return $line;
+    }
+
+    /**
+     * php-src ext/standard/streamsfuncs.c — PHP_FUNCTION(stream_get_line).
+     */
+    public static function streamGetLine(int $handle, int $maxLength, ?string $ending = null) {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        if ($maxLength < 0) {
+            return false;
+        }
+        if (0 === $maxLength) {
+            $maxLength = 8192;
+        }
+        if (null === $ending || '' === $ending) {
+            $data = @\fread($fp, $maxLength);
+            if (false === $data || ('' === $data && \feof($fp))) {
+                return false;
+            }
+
+            return $data;
+        }
+
+        $result = '';
+        $endingLen = \strlen($ending);
+        while (\strlen($result) < $maxLength) {
+            $byte = @\fgetc($fp);
+            if (false === $byte) {
+                if ('' === $result && \feof($fp)) {
+                    return false;
+                }
+                break;
+            }
+            $result .= $byte;
+            if ($endingLen > 0 && \substr($result, -$endingLen) === $ending) {
+                return \substr($result, 0, -$endingLen);
+            }
+        }
+        if ('' === $result && \feof($fp)) {
+            return false;
+        }
+
+        return $result;
     }
 
     /**

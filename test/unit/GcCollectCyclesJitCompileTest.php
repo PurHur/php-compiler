@@ -52,6 +52,37 @@ PHP;
         $module = $context->module;
         $this->assertNotNull($module->getNamedFunction('__compiler_gc_collect_cycles'));
         $this->assertNotNull($module->getNamedFunction('phpc_gc_register'));
+        $this->assertNotNull($module->getNamedFunction('phpc_gc_enable'));
+        $this->assertNotNull($module->getNamedFunction('phpc_gc_disable'));
+        $this->assertNotNull($module->getNamedFunction('phpc_gc_is_enabled'));
+        $this->addToAssertionCount(1);
+    }
+
+    public function testGcToggleModuleVerifies(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(gc_enabled());
+gc_disable();
+var_export(gc_enabled());
+gc_enable();
+var_export(gc_enabled());
+PHP;
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'gc_toggle_jit_compile.php');
+        $this->assertNotNull($block);
+        $runtime->jitCompileBlock($block);
+
+        $context = $runtime->loadJitContext();
+        $verify = new \ReflectionMethod($context, 'compileCommon');
+        $verify->setAccessible(true);
+        $verify->invoke($context);
+
+        $module = $context->module;
+        $this->assertNotNull($module->getNamedFunction('phpc_gc_enable'));
+        $this->assertNotNull($module->getNamedFunction('phpc_gc_disable'));
+        $this->assertNotNull($module->getNamedFunction('phpc_gc_is_enabled'));
         $this->addToAssertionCount(1);
     }
 }

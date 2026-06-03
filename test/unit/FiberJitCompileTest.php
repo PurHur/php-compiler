@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\JIT\FiberHelper;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__.'/../LlvmToolchain.php';
@@ -66,5 +67,17 @@ PHP
         $verify->setAccessible(true);
         $verify->invoke($context);
         $this->addToAssertionCount(1);
+    }
+
+    public function testFiberThrowProxyRegistered(): void
+    {
+        $runtime = new Runtime();
+        $context = $runtime->loadJitContext();
+        FiberHelper::registerJitMethods($context);
+        $this->assertArrayHasKey('fiber::throw', $context->functionProxies);
+        $this->assertInstanceOf(
+            \PHPCompiler\JIT\Call\FiberThrow::class,
+            $context->functionProxies['fiber::throw']
+        );
     }
 }

@@ -204,9 +204,18 @@ final class TryCatchHelper
         \PHPCompiler\JIT $jit,
         string $message
     ): void {
+        self::emitCatchableClassError($context, 'Error', $message, $jit);
+    }
+
+    public static function emitCatchableClassError(
+        Context $context,
+        string $className,
+        string $message,
+        ?\PHPCompiler\JIT $jit = null
+    ): void {
         JitThrow::registerDeclarations($context);
         JitThrow::ensureLinked($context);
-        $handler = $context->tryCatch->handlerStack[array_key_last($context->tryCatch->handlerStack)] ?? null;
+        $handler = self::resolveThrowHandler($context);
         if (null === $handler) {
             ErrorRaise::emitRaise($context, $message);
 
@@ -214,10 +223,17 @@ final class TryCatchHelper
         }
         $func = $context->builder->getInsertBlock()->getParent();
         assert($func instanceof Function_);
-        $dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, []);
+        $dispatchBb = null !== $jit
+            ? self::dispatchBbFor($jit, $func, $context, $handler, [])
+            : $handler->dispatchBb;
+        if (null === $dispatchBb) {
+            ErrorRaise::emitRaise($context, $message);
+
+            return;
+        }
 
         $object = $context->type->object;
-        $classId = $object->lookup('Error');
+        $classId = $object->lookup($className);
         $obj = $object->allocate($classId);
         $object->markObjectConstructed($obj);
         $msgStr = $context->builder->load($context->constantStringFromString($message));
@@ -227,10 +243,62 @@ final class TryCatchHelper
             Variable::KIND_VALUE,
             $msgStr
         );
-        $object->storeInstanceProperty($obj, 'Error', 'message', $msgVar);
+        $object->storeInstanceProperty($obj, $className, 'message', $msgVar);
 
         $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
         $context->builder->branch($dispatchBb);
+    }
+
+    public static function emitRethrow(
+        \PHPCompiler\JIT $jit,
+        Context $context,
+        Function_ $func,
+        Block $block
+    ): void {
+        JitThrow::registerDeclarations($context);
+        JitThrow::ensureLinked($context);
+        $builder = $context->builder;
+        $objPtr = $context->getTypeFromString('__object__*');
+        $active = $builder->call($context->lookupFunction('phpc_jit_get_active_catch'));
+        $isNull = $builder->icmp(
+            Builder::INT_EQ,
+            $active,
+            $objPtr->constNull()
+        );
+        $throwBlock = $builder->getInsertBlock();
+        if (null === $throwBlock || null !== $throwBlock->getTerminator()) {
+            $throwBlock = self::appendBlock($func, 'rethrow_check');
+            $builder->positionAtEnd($throwBlock);
+        } else {
+            $builder->positionAtEnd($throwBlock);
+        }
+        $outsideCatch = self::appendBlock($func, 'rethrow_outside_catch');
+        $dispatchPath = self::appendBlock($func, 'rethrow_dispatch');
+        $builder->branchIf($isNull, $outsideCatch, $dispatchPath);
+        $builder->positionAtEnd($outsideCatch);
+        $handler = self::resolveThrowHandler($context);
+        if (null !== $handler) {
+            self::emitCatchableClassError(
+                $context,
+                'LogicException',
+                'Cannot use "throw;" outside of a catch block',
+                $jit
+            );
+        } else {
+            ErrorRaise::emitRaise($context, 'Cannot use "throw;" outside of a catch block');
+        }
+        $builder->positionAtEnd($dispatchPath);
+        $handler = self::resolveThrowHandler($context);
+        if (null === $handler) {
+            $context->freeDeadVariables($func, $builder->getInsertBlock(), $block);
+            $builder->call($context->lookupFunction('abort'));
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+
+            return;
+        }
+        $dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, []);
+        $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $active);
+        $builder->branch($dispatchBb);
     }
 
     public static function emitThrow(
@@ -242,7 +310,7 @@ final class TryCatchHelper
     ): void {
         JitThrow::registerDeclarations($context);
         JitThrow::ensureLinked($context);
-        $handler = $context->tryCatch->handlerStack[array_key_last($context->tryCatch->handlerStack)] ?? null;
+        $handler = self::resolveThrowHandler($context);
         if (null === $handler) {
             $builder = $context->builder;
             $throwBlock = $builder->getInsertBlock();
@@ -340,15 +408,12 @@ final class TryCatchHelper
                 ? ($context->scope->blockStorage[$catchCfg] ?? null)
                 : null;
             $catchBodyBb = $cachedCatchBb ?? self::appendBlock($func, 'try_catch_match_'.$suffix);
-            $catchEntryBb = $catchBodyBb;
-            if (null !== $cachedCatchBb && null !== $catchOp->arg3) {
-                $catchEntryBb = self::appendBlock($func, 'try_catch_assign_'.$suffix);
-            }
             $noMatchBb = self::appendBlock($func, 'try_catch_nomatch_'.$suffix);
+            $catchSetupBb = self::appendBlock($func, 'try_catch_setup_'.$suffix);
 
             $builder->positionAtEnd($nextCatch);
             if ([] === $types || $singleArm) {
-                $builder->branch($catchEntryBb);
+                $builder->branch($catchSetupBb);
             } else {
                 $checkBb = $nextCatch;
                 $typeCount = count($types);
@@ -360,25 +425,39 @@ final class TryCatchHelper
                         : $context->helper->loadValue($isInstance);
                     $isLast = $idx === $typeCount - 1;
                     if ($isLast) {
-                        $builder->branchIf($isBool, $catchEntryBb, $noMatchBb);
+                        $builder->branchIf($isBool, $catchSetupBb, $noMatchBb);
                     } else {
                         $nextCheck = self::appendBlock($func, 'try_catch_type_next_'.$suffix);
-                        $builder->branchIf($isBool, $catchEntryBb, $nextCheck);
+                        $builder->branchIf($isBool, $catchSetupBb, $nextCheck);
                         $checkBb = $nextCheck;
                         $builder->positionAtEnd($checkBb);
                     }
                 }
             }
 
+            $builder->positionAtEnd($catchSetupBb);
+            $builder->call($context->lookupFunction('phpc_jit_set_active_catch'), $pendingObj);
+            self::detachHandlerFromThrowStack($context, $handler);
+            if (null !== $catchOp->arg3) {
+                $operand = $catchOp->block1->getOperand((int) $catchOp->arg3);
+                $caughtVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
+                $jit->assignOperandForced($operand, $caughtVar);
+            }
+            $builder->branch($catchBodyBb);
+
             if (null === $cachedCatchBb) {
-                $builder->positionAtEnd($catchBodyBb);
-                if (null !== $catchOp->arg3) {
-                    $operand = $catchOp->block1->getOperand((int) $catchOp->arg3);
-                    $caughtVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
-                    $jit->assignOperandForced($operand, $caughtVar);
-                }
                 if ($context->compilingGeneratorResume && null !== $catchOp->block1) {
                     $catchResume = $context->generatorCatchDispatchEntry[spl_object_id($catchOp->block1)] ?? null;
+                    if (null !== $catchResume) {
+                        $builder->branch($catchResume);
+                        $nextCatch = $noMatchBb;
+                        $builder->positionAtEnd($nextCatch);
+
+                        continue;
+                    }
+                }
+                if ($context->compilingFiberResume && null !== $catchOp->block1) {
+                    $catchResume = $context->fiberCatchDispatchEntry[spl_object_id($catchOp->block1)] ?? null;
                     if (null !== $catchResume) {
                         $builder->branch($catchResume);
                         $nextCatch = $noMatchBb;
@@ -391,14 +470,9 @@ final class TryCatchHelper
                 $catchTail = $context->builder->getInsertBlock();
                 $builder->positionAtEnd($catchTail);
                 if (null !== $mergeBody && null === $catchTail->getTerminator()) {
+                    $builder->call($context->lookupFunction('phpc_jit_clear_active_catch'));
                     $builder->branch($mergeBody);
                 }
-            } elseif (null !== $catchOp->arg3) {
-                $builder->positionAtEnd($catchEntryBb);
-                $operand = $catchOp->block1->getOperand((int) $catchOp->arg3);
-                $caughtVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
-                $jit->assignOperandForced($operand, $caughtVar);
-                $builder->branch($catchBodyBb);
             }
 
             $nextCatch = $noMatchBb;
@@ -443,6 +517,31 @@ final class TryCatchHelper
         }
         $handler = array_pop($context->tryCatch->handlerStack);
         unset($context->tryCatch->mergeHandlers[spl_object_id($handler->mergeBlock)]);
+    }
+
+    /**
+     * Active try handler for throw/rethrow dispatch (innermost unconsumed try).
+     */
+    public static function resolveThrowHandler(Context $context): ?TryCatchHandler
+    {
+        if ([] === $context->tryCatch->handlerStack) {
+            return null;
+        }
+
+        return $context->tryCatch->handlerStack[array_key_last($context->tryCatch->handlerStack)];
+    }
+
+    /**
+     * After entering a catch arm, further throws use enclosing try handlers (#4886).
+     */
+    public static function detachHandlerFromThrowStack(Context $context, TryCatchHandler $handler): void
+    {
+        $stack = $context->tryCatch->handlerStack;
+        $idx = array_search($handler, $stack, true);
+        if (false === $idx) {
+            return;
+        }
+        array_splice($context->tryCatch->handlerStack, $idx, 1);
     }
 
     private static function countPostTryOpcodes(Block $handlerBlock, int $afterTryIndex): int

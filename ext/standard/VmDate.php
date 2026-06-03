@@ -56,6 +56,21 @@ final class VmDate
         return (int) ($stat['ino'] ?? 0);
     }
 
+    /**
+     * getlastmod() — mtime of the executed script (ext/standard/basic_functions.c, #5068).
+     *
+     * @return int|false
+     */
+    public static function getlastmod(Frame $frame)
+    {
+        $path = self::executedFilename($frame);
+        if ('' === $path || '-' === $path) {
+            return false;
+        }
+
+        return VmFs::fileMtime($path);
+    }
+
     private static function executedFilename(Frame $frame): string
     {
         if (null !== $frame->vmContext) {

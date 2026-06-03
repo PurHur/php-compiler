@@ -46,6 +46,7 @@ final class SelfHostBuiltinPolicy
         'getmypid' => 'numeric',
         'getmygrgid' => 'numeric',
         'getmyinode' => 'numeric',
+        'getlastmod' => 'numeric',
         'getrusage' => 'numeric',
         'memory_get_peak_usage' => 'numeric',
         'memory_get_usage' => 'numeric',
@@ -60,6 +61,7 @@ final class SelfHostBuiltinPolicy
         + self::CATEGORY_FILTER
         + self::CATEGORY_JSON
         + self::CATEGORY_NUMERIC
+        + self::CATEGORY_GC
         + self::CATEGORY_PASSWORD
         + self::CATEGORY_PROCESS
         + self::CATEGORY_SESSION;
@@ -85,6 +87,10 @@ final class SelfHostBuiltinPolicy
         'ob_end_flush' => true,
         'ob_get_level' => true,
         'flush' => true,
+        'gc_collect_cycles' => true,
+        'gc_disable' => true,
+        'gc_enable' => true,
+        'gc_enabled' => true,
     ];
 
     /** Session builtins for AOT user scripts under PHP_COMPILER_SELFHOST_AOT (#1891, #1967). */
@@ -129,7 +135,7 @@ final class SelfHostBuiltinPolicy
         'chmod' => 'filesystem', 'chown' => 'filesystem', 'lchown' => 'filesystem', 'chgrp' => 'filesystem', 'lchgrp' => 'filesystem', 'umask' => 'filesystem',
         'glob' => 'filesystem', 'scandir' => 'filesystem', 'fnmatch' => 'filesystem',
         'opendir' => 'filesystem', 'readdir' => 'filesystem', 'closedir' => 'filesystem', 'rewinddir' => 'filesystem',
-        'fopen' => 'filesystem', 'fread' => 'filesystem', 'fwrite' => 'filesystem', 'fgetc' => 'filesystem', 'fgets' => 'filesystem',
+        'fopen' => 'filesystem', 'fread' => 'filesystem', 'fwrite' => 'filesystem', 'fgetc' => 'filesystem', 'fgets' => 'filesystem', 'stream_get_line' => 'filesystem',
         'fgetcsv' => 'filesystem',
         'fputcsv' => 'filesystem',
         'ftell' => 'filesystem', 'fseek' => 'filesystem', 'fclose' => 'filesystem', 'flock' => 'filesystem',
@@ -144,6 +150,14 @@ final class SelfHostBuiltinPolicy
         'getcwd' => 'filesystem', 'chdir' => 'filesystem', 'gethostname' => 'filesystem',
         'gethostbynamel' => 'filesystem',
         'stream_context_create' => 'filesystem',
+    ];
+
+    /** @var array<string, string> php-src ext/standard/php_gc.c (#3209, #3160). */
+    private const CATEGORY_GC = [
+        'gc_collect_cycles' => 'gc',
+        'gc_disable' => 'gc',
+        'gc_enable' => 'gc',
+        'gc_enabled' => 'gc',
     ];
 
     /** @var array<string, string> */

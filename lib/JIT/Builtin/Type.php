@@ -412,6 +412,9 @@ class Type extends Builtin {
         $fntypeFgets = $this->context->context->functionType($strPtr, false, $i64, $i64);
         $fnFgets = $this->context->module->addFunction('__compiler_fgets', $fntypeFgets);
         $this->context->registerFunction('__compiler_fgets', $fnFgets);
+        $fntypeStreamGetLine = $this->context->context->functionType($strPtr, false, $i64, $i64, $strPtr);
+        $fnStreamGetLine = $this->context->module->addFunction('__compiler_stream_get_line', $fntypeStreamGetLine);
+        $this->context->registerFunction('__compiler_stream_get_line', $fnStreamGetLine);
         $fntypeFseek = $this->context->context->functionType($i64, false, $i64, $i64, $i64);
         $fnFseek = $this->context->module->addFunction('__compiler_fseek', $fntypeFseek);
         $this->context->registerFunction('__compiler_fseek', $fnFseek);
@@ -670,7 +673,7 @@ class Type extends Builtin {
         $fntypeWordwrap = $this->context->context->functionType($strPtr, false, $strPtr, $i64, $strPtr, $i8);
         $fnWordwrap = $this->context->module->addFunction('__compiler_wordwrap', $fntypeWordwrap);
         $this->context->registerFunction('__compiler_wordwrap', $fnWordwrap);
-        $i1 = $this->context->getTypeFromString('int1');
+        $i32 = $this->context->getTypeFromString('int32');
         $fntypeDebugBacktrace = $this->context->context->functionType(
             $htPtr,
             false,
@@ -678,7 +681,7 @@ class Type extends Builtin {
             $strPtr,
             $strPtr,
             $strPtr,
-            $i1
+            $i32
         );
         $fnDebugBacktrace = $this->context->module->addFunction(
             '__compiler_jit_debug_backtrace',

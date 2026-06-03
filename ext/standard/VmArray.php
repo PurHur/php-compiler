@@ -85,6 +85,10 @@ final class VmArray
      */
     public static function merge(HashTable $first, HashTable ...$others): HashTable
     {
+        if ([] === $others) {
+            return self::mergeSingleArgumentCopy($first);
+        }
+
         foreach ([$first, ...$others] as $ht) {
             if (!self::isReindexableList($ht)) {
                 $out = $first->replaceCopy();
@@ -106,6 +110,32 @@ final class VmArray
                 $copy = new Variable();
                 $copy->copyFrom($value);
                 $out->append($copy);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * array_merge() with one source array — reindex integer keys, preserve string keys (php-src array.c).
+     */
+    public static function mergeSingleArgumentCopy(HashTable $first): HashTable
+    {
+        $out = new HashTable();
+        foreach ($first->iterateKeyed(true) as [$key, $value]) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->append($copy);
+            } elseif (Variable::TYPE_STRING === $key->type) {
+                $s = $key->toString();
+                if (self::isCanonicalNonNegativeIntStringKey($s)) {
+                    $out->append($copy);
+                } else {
+                    $out->add($s, $copy);
+                }
+            } else {
+                $out->add($key->toString(), $copy);
             }
         }
 
@@ -184,11 +214,30 @@ final class VmArray
      */
     public static function requireArray(Variable $value, string $fn): HashTable
     {
+        return self::requireArrayParam($value, $fn, 1, 'array');
+    }
+
+    /**
+     * @throws \TypeError when {@param $value} is not an array
+     */
+    public static function requireArrayParam(
+        Variable $value,
+        string $fn,
+        int $argNum,
+        string $paramName,
+        string $expectedType = 'array'
+    ): HashTable {
         $v = $value->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $v->type) {
             throw new \TypeError(
-                $fn.'(): Argument #1 ($array) must be of type array, '
-                .self::valueTypeLabel($v).' given'
+                \sprintf(
+                    '%s(): Argument #%d ($%s) must be of type %s, %s given',
+                    $fn,
+                    $argNum,
+                    $paramName,
+                    $expectedType,
+                    self::valueTypeLabel($v)
+                )
             );
         }
 
@@ -704,7 +753,7 @@ final class VmArray
             case Variable::TYPE_ARRAY:
                 return 'array';
             case Variable::TYPE_OBJECT:
-                return 'object';
+                return $value->toObject()->class->name;
             default:
                 return 'mixed';
         }

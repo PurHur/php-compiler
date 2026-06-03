@@ -16,28 +16,31 @@ use PHPLLVM\Value;
 /** LLVM JIT helper for array_is_list() — keys must be 0..count-1. */
 final class JitArrayIsList
 {
+    public static function canLowerOperand(JITVariable $array): bool
+    {
+        return ($array->type & JITVariable::IS_NATIVE_ARRAY)
+            || JITVariable::TYPE_HASHTABLE === $array->type
+            || JITVariable::TYPE_VALUE === $array->type
+            || JitValueBox::isValueOperand($array);
+    }
+
+    /** Unreachable bool after TypeError+abort (issue #4753). */
+    public static function unreachableBool(Context $context): Value
+    {
+        return $context->constantFromBool(false);
+    }
+
     public static function invoke(Context $context, JITVariable $array): Value
     {
+        if (!self::canLowerOperand($array)) {
+            return self::unreachableBool($context);
+        }
         if ($array->type & JITVariable::IS_NATIVE_ARRAY) {
             return $context->constantFromBool(true);
         }
-        if (
-            JITVariable::TYPE_NULL === $array->type
-            || JITVariable::TYPE_NATIVE_BOOL === $array->type
-            || JITVariable::TYPE_NATIVE_LONG === $array->type
-            || JITVariable::TYPE_NATIVE_DOUBLE === $array->type
-        ) {
-            return $context->constantFromBool(false);
-        }
-        if (JITVariable::TYPE_HASHTABLE === $array->type
-            || JITVariable::TYPE_VALUE === $array->type
-            || JitValueBox::isValueOperand($array)) {
-            $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
 
-            return self::hashTableIsList($context, $ht);
-        }
-
-        throw new \LogicException('array_is_list() requires an array in this compiler build');
+        return self::hashTableIsList($context, $ht);
     }
 
     public static function hashTableIsList(Context $context, Value $ht): Value

@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
+use PHPCompiler\PseudoClassScope;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\ReadonlyRaise;
@@ -117,8 +118,18 @@ final class ClassConstFetchHelper
             $isId = $context->builder->icmp(Builder::INT_EQ, $classIdVal, $expectedId);
             $context->builder->branchIf($isId, $matchBlock, $nextCheck);
             $context->builder->positionAtEnd($matchBlock);
-            self::writeConstEntry($context, $resultSlot, $entryData);
-            $context->builder->branch($merge);
+            if ($objectType->isTraitClass(strtolower(ltrim($objectType->classNameForId($id), '\\'))) {
+                $classLabel = $objectType->classNameForId($id);
+                ErrorRaise::ensureLinked($context);
+                ErrorRaise::emitRaise(
+                    $context,
+                    "Cannot access trait constant {$classLabel}::{$constName} directly"
+                );
+                $context->builder->branch($merge);
+            } else {
+                self::writeConstEntry($context, $resultSlot, $entryData);
+                $context->builder->branch($merge);
+            }
             $checkBlock = $nextCheck;
         }
         $context->builder->positionAtEnd($checkBlock);
@@ -199,6 +210,28 @@ final class ClassConstFetchHelper
         }
         $literal = JitStringArg::compileTimeLiteral($classVar);
         if (null !== $literal) {
+            $lcLiteral = strtolower(ltrim($literal, '\\'));
+            if (
+                LateStaticBindingHelper::useRuntimeLateStatic($objectType->jitContext())
+                && \in_array($lcLiteral, ['self', 'static', 'parent'], true)
+            ) {
+                $context = $objectType->jitContext();
+                $nameStr = $context->builder->load(
+                    $context->constantStringFromString($literal)
+                );
+                if ('static' === $lcLiteral) {
+                    $scopeClass = self::jitScopeClassName($objectType, $block) ?? '';
+                    $resolvedStr = LateStaticBindingHelper::emitLateStaticResolvedNameString(
+                        $objectType,
+                        $block,
+                        $scopeClass
+                    );
+                } else {
+                    $resolvedStr = self::emitScopeResolveClassNameString($objectType, $block, $nameStr);
+                }
+
+                return self::emitResolveClassIdFromNameString($objectType, $resolvedStr);
+            }
             $resolved = self::resolveJitClassNameString($objectType, $block, $literal);
             $id = $objectType->lookup($resolved);
 
@@ -274,8 +307,18 @@ final class ClassConstFetchHelper
                 $context->builder->branchIf($isMatch, $matchBlock, $nextCheck);
 
                 $context->builder->positionAtEnd($matchBlock);
-                self::writeConstEntry($context, $resultSlot, $entry);
-                $context->builder->branch($merge);
+                if ($objectType->isTraitClass(strtolower(ltrim($objectType->classNameForId($id), '\\'))) {
+                    $classLabel = $objectType->classNameForId($id);
+                    ErrorRaise::ensureLinked($context);
+                    ErrorRaise::emitRaise(
+                        $context,
+                        "Cannot access trait constant {$classLabel}::* directly"
+                    );
+                    $context->builder->branch($merge);
+                } else {
+                    self::writeConstEntry($context, $resultSlot, $entry);
+                    $context->builder->branch($merge);
+                }
                 $checkBlock = $nextCheck;
             }
         }
@@ -311,13 +354,26 @@ final class ClassConstFetchHelper
         return Variable::fromLiteral($context, $lit);
     }
 
+    public static function resolveJitScopeClassNameForBlock(Object_ $objectType, Block $block): ?string
+    {
+        return self::jitScopeClassName($objectType, $block);
+    }
+
+    /**
+     * @return Value {@see __string__*}
+     */
+    public static function emitClassNameStringFromClassId(Object_ $objectType, Value $classId): Value
+    {
+        return self::classNameStringFromId($objectType, $classId);
+    }
+
     private static function resolveJitClassNameString(Object_ $objectType, Block $block, string $className): string
     {
         $lc = strtolower($className);
         if ('self' === $lc) {
             $scope = self::jitScopeClassName($objectType, $block);
             if (null === $scope) {
-                throw new \LogicException('self:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('self');
             }
 
             return $scope;
@@ -325,7 +381,7 @@ final class ClassConstFetchHelper
         if ('static' === $lc) {
             $scope = self::jitLateStaticClassName($objectType, $block);
             if (null === $scope) {
-                throw new \LogicException('static:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('static');
             }
 
             return $scope;
@@ -333,7 +389,7 @@ final class ClassConstFetchHelper
         if ('parent' === $lc) {
             $scope = self::jitScopeClassName($objectType, $block);
             if (null === $scope) {
-                throw new \LogicException('parent:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('parent');
             }
             $parent = $objectType->parentClassDisplayName($scope);
             if (null === $parent) {
@@ -459,7 +515,7 @@ final class ClassConstFetchHelper
 
         $context->builder->positionAtEnd($fail);
         ErrorRaise::emitRaise($context, 'Class not found');
-        $context->builder->returnVoid();
+        $context->builder->call($context->lookupFunction('abort'));
 
         $context->builder->positionAtEnd($ok);
         $context->builder->branch($merge);
@@ -556,6 +612,53 @@ final class ClassConstFetchHelper
                 $context->builder->call(
                     $context->lookupFunction('__value__writeNull'),
                     JitValueBox::pointer($context, $slot)
+                );
+                break;
+            case Variable::TYPE_HASHTABLE:
+                if (isset($entry['global'])) {
+                    $global = $context->module->getNamedGlobal($entry['global']);
+                    if (null === $global) {
+                        throw new \LogicException("Missing class constant hashtable global: {$entry['global']}");
+                    }
+                    $htPtr = $context->builder->load($global);
+                    $context->refcount->addref($htPtr);
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeHashtable'),
+                        JitValueBox::pointer($context, $slot),
+                        $htPtr
+                    );
+                    break;
+                }
+                if (!isset($entry['vmTable']) || !$entry['vmTable'] instanceof \PHPCompiler\VM\HashTable) {
+                    throw new \LogicException('Missing VM table for class constant array');
+                }
+                $htVar = HashTableHelper::variableFromVmHashTable($context, $entry['vmTable']);
+                $htPtr = $context->helper->loadValue($htVar);
+                $context->refcount->addref($htPtr);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeHashtable'),
+                    JitValueBox::pointer($context, $slot),
+                    $htPtr
+                );
+                break;
+            case Variable::TYPE_OBJECT:
+                if (!isset($entry['global'])) {
+                    throw new \LogicException('Missing global for class constant object');
+                }
+                $global = $context->module->getNamedGlobal($entry['global']);
+                if (null === $global) {
+                    throw new \LogicException("Missing class constant object global: {$entry['global']}");
+                }
+                // Immortal module-global object: clear slot before writeObject (#3196, #4028).
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeNull'),
+                    JitValueBox::pointer($context, $slot)
+                );
+                $obj = $context->builder->load($global);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeObject'),
+                    JitValueBox::pointer($context, $slot),
+                    $obj
                 );
                 break;
             default:
