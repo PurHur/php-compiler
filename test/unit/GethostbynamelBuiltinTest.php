@@ -18,6 +18,11 @@ final class GethostbynamelBuiltinTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/\\\\gethostbynamel\\s*\\(/', $src);
     }
 
+    public function testPhpcGethostbynamelCRuntimeRemoved(): void
+    {
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/AOT/runtime/phpc_gethostbynamel.c');
+    }
+
     public function testLocalhostReturnsIpv4List(): void
     {
         if (false === VmDns::gethostbynamel('localhost')) {
