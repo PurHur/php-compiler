@@ -3,14 +3,12 @@
 declare(strict_types=1);
 
 /**
- * LLVM JIT helper for substr_count() — AOT uses phpc_substr_count; MCJIT uses inline strstr loop.
+ * LLVM JIT helper for substr_count() — inline strstr loop for MCJIT and AOT.
  */
 
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin;
-use PHPCompiler\JIT\Builtin\StringSubstrCount;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -26,50 +24,7 @@ final class JitSubstrCount
         ?Value $offset = null,
         ?Value $length = null
     ): Value {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return self::countViaRuntime($context, $haystack, $needle, $offset, $length);
-        }
-
         return self::countInline($context, $haystack, $needle, $offset, $length);
-    }
-
-    private static function countViaRuntime(
-        Context $context,
-        Value $haystack,
-        Value $needle,
-        ?Value $offset,
-        ?Value $length
-    ): Value {
-        StringSubstrCount::ensureLinked($context);
-        $map = $context->structFieldMap['__string__'];
-        $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
-        $sizeT = $context->getTypeFromString('size_t');
-        $zero = $i64->constInt(0, false);
-
-        $hayLen = $context->builder->load(
-            $context->builder->structGep($haystack, $map['length'])
-        );
-        $needleLen = $context->builder->load(
-            $context->builder->structGep($needle, $map['length'])
-        );
-        $hayPtr = $context->builder->structGep($haystack, $map['value']);
-        $needlePtr = $context->builder->structGep($needle, $map['value']);
-        $offsetVal = null === $offset ? $zero : $offset;
-        $lengthVal = null === $length ? $zero : $length;
-        $lengthIsNull = $i32->constInt(null === $length ? 1 : 0, false);
-        $fn = $context->lookupFunction('phpc_substr_count');
-
-        return $context->builder->call(
-            $fn,
-            $hayPtr,
-            $context->builder->truncOrBitCast($hayLen, $sizeT),
-            $needlePtr,
-            $context->builder->truncOrBitCast($needleLen, $sizeT),
-            $offsetVal,
-            $lengthVal,
-            $lengthIsNull
-        );
     }
 
     private static function countInline(

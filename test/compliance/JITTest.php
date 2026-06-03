@@ -66,7 +66,7 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'strspn_empty_mask')) {
                 continue;
             }
-            // substr_count() offset/length: VM + AOT (#4105); MCJIT phpc_substr_count execute pending.
+            // substr_count() offset/length: VM + AOT via inline LLVM (#4105, #5188); MCJIT execute pending.
             if (str_contains($name, 'substr_count')) {
                 continue;
             }
