@@ -26,8 +26,8 @@ final class array_push extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('array_push() requires at least two arguments');
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('array_push() requires at least one argument');
         }
         $array = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $array->type) {
@@ -50,8 +50,11 @@ final class array_push extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 2) {
-            throw new \LogicException('array_push() requires at least two arguments');
+        if (\count($args) < 1) {
+            throw new \LogicException('array_push() requires at least one argument');
+        }
+        if (1 === \count($args) && JITVariable::TYPE_HASHTABLE === $args[0]->type) {
+            return ArrayBuiltinHelper::pushMergedCallUnpack($context, $args[0]);
         }
         $array = $args[0];
         $values = \array_slice($args, 1);
