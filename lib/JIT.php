@@ -8165,7 +8165,11 @@ class JIT {
                     }
                     $visFlags = \PHPCfg\Func::FLAG_PUBLIC;
                     if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
-                        $visFlags = MethodVisibility::mask($block->constants[$op->arg3]->toInt());
+                        $storedFlags = $block->constants[$op->arg3]->toInt();
+                        $visFlags = MethodVisibility::mask($storedFlags);
+                        if (($storedFlags & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+                            $visFlags |= \PHPCfg\Func::FLAG_STATIC;
+                        }
                     }
                     $methodBlock = $op->block1;
                     if (null !== $methodBlock && null !== $methodBlock->func
