@@ -398,6 +398,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'spaceship_int_nonnumeric')) {
                 continue;
             }
+            // NaN spaceship/relational: VM + AOT via phpc_double_spaceship (#4712); MCJIT native double <=> verify/execute pending.
+            if (str_contains($name, 'nan_relational')) {
+                continue;
+            }
             // gettype() object/resource is VM-only until __compiler_gettype JIT path is stable (#3618).
             if (str_contains($name, 'gettype_object_resource')) {
                 continue;
