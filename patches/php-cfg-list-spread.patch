@@ -1,0 +1,51 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assign.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assign.php
+@@ -20,6 +20,12 @@ class Assign extends Expr
+     public $expr;
+ 
++    /** `[$a, ...$rest] = $rhs` tail: full list RHS (#4835). */
++    public $listSpreadRhs = null;
++
++    /** Zero-based index of first element merged into the spread target (#4835). */
++    public $listSpreadFromIndex = null;
++
+     protected $writeVariables = ['var', 'result'];
+ 
+     public function __construct(Operand $var, Operand $expr, array $attributes = [])
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -1508,11 +1508,27 @@
+         }
+ 
+         $attributes = $this->mapAttributes($expr);
++        $logicalIndex = 0;
+         foreach ($expr->items as $i => $item) {
+             if (null === $item) {
+                 continue;
+             }
+ 
+             if ($item->key === null) {
+-                $key = new Operand\Literal($i);
++                $key = new Operand\Literal($logicalIndex);
+             } else {
+                 $key = $this->readVariable($this->parseExprNode($item->key));
+             }
+ 
+             $var = $item->value;
++            if ($item->unpack) {
++                $target = $this->writeVariable($this->parseExprNode($var));
++                $assign = new Op\Expr\Assign($target, $rhs, $attributes);
++                $assign->listSpreadRhs = $rhs;
++                $assign->listSpreadFromIndex = $logicalIndex;
++                $this->block->children[] = $assign;
++
++                continue;
++            }
++
++            if ($item->key === null) {
++                ++$logicalIndex;
++            }
++
+             $fetch = new Op\Expr\ArrayDimFetch($rhs, $key, $attributes);
+             $this->block->children[] = $fetch;
+             if ($var instanceof Expr\List_ || $var instanceof Expr\Array_) {

@@ -1066,7 +1066,10 @@ class Compiler {
                         // Lowered by compileExpr Empty_ via TYPE_ISSET + TYPE_BOOLEAN_NOT (#3298, #4586).
                         break;
                     } elseif (
-                        $child instanceof Op\Expr\ArrayDimFetch
+                        (
+                            $child instanceof Op\Expr\ArrayDimFetch
+                            || $this->isListSpreadAssignOp($child)
+                        )
                         && $this->isListDestructGroupStart($ops, $i)
                     ) {
                         [$block, $i] = $this->compileListDestructGroup($ops, $i, $block);
@@ -1138,6 +1141,13 @@ class Compiler {
         return $assign->expr === $fetch->result;
     }
 
+    private function isListSpreadAssignOp(Op $op): bool
+    {
+        return $op instanceof Op\Expr\Assign
+            && null !== $op->listSpreadRhs
+            && null !== $op->listSpreadFromIndex;
+    }
+
     /**
      * php-cfg lowers `list($a, …) = $rhs` to integer-key dim fetches (#4298).
      *
@@ -1145,6 +1155,9 @@ class Compiler {
      */
     private function isListDestructGroupStart(array $ops, int $index): bool
     {
+        if ($this->isListSpreadAssignOp($ops[$index])) {
+            return !$this->isListDestructSpreadTail($ops, $index);
+        }
         if (!$this->isPlainListDestructDimFetch($ops, $index)) {
             return false;
         }
@@ -1169,6 +1182,27 @@ class Compiler {
         }
 
         return true;
+    }
+
+    /**
+     * Spread arm at the end of `[$a, ...$rest] = $rhs` — not a separate group start (#4835).
+     *
+     * @param Op[] $ops
+     */
+    private function isListDestructSpreadTail(array $ops, int $index): bool
+    {
+        if (!$this->isListSpreadAssignOp($ops[$index])) {
+            return false;
+        }
+        if ($index < 1) {
+            return false;
+        }
+        $p = $index - 1;
+        if ($ops[$p] instanceof Op\Expr\Assign || $ops[$p] instanceof Op\Expr\AssignRef) {
+            --$p;
+        }
+
+        return $p >= 0 && $this->isPlainListDestructDimFetch($ops, $p);
     }
 
     /**
@@ -1221,11 +1255,34 @@ class Compiler {
     private function listDestructGroupEndIndex(array $ops, int $start): int
     {
         $i = $start;
+        if ($this->isListSpreadAssignOp($ops[$i])) {
+            return $i;
+        }
         while ($i < count($ops) && $this->isPlainListDestructDimFetch($ops, $i)) {
             $i = $this->listDestructOpEndIndex($ops, $i);
         }
+        if ($i < count($ops) && $this->isListSpreadAssignOp($ops[$i])) {
+            return $i;
+        }
 
         return $i - 1;
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    private function listDestructRhsOperand(array $ops, int $start): Operand
+    {
+        if ($this->isListSpreadAssignOp($ops[$start])) {
+            /** @var Op\Expr\Assign $spread */
+            $spread = $ops[$start];
+
+            return $spread->listSpreadRhs;
+        }
+        /** @var Op\Expr\ArrayDimFetch $firstFetch */
+        $firstFetch = $ops[$start];
+
+        return $firstFetch->var;
     }
 
     /**
@@ -1262,13 +1319,12 @@ class Compiler {
     private function compileListDestructGroup(array $ops, int $start, Block $block): array
     {
         $end = $this->listDestructGroupEndIndex($ops, $start);
-        /** @var Op\Expr\ArrayDimFetch $firstFetch */
-        $firstFetch = $ops[$start];
+        $rhs = $this->listDestructRhsOperand($ops, $start);
 
         $checkOp = new OpCode(
             OpCode::TYPE_LIST_UNPACK_CHECK,
             null,
-            $this->compileOperand($firstFetch->var, $block, true),
+            $this->compileOperand($rhs, $block, true),
         );
         $block->addOpCode($checkOp);
 
@@ -3612,6 +3668,16 @@ class Compiler {
                     $this->compileOperand($expr->expr, $block, true) 
                 )];
             case Op\Expr\Assign::class:
+                if (null !== $expr->listSpreadRhs && null !== $expr->listSpreadFromIndex) {
+                    $fromIndex = new Operand\Literal($expr->listSpreadFromIndex);
+
+                    return [new OpCode(
+                        OpCode::TYPE_LIST_SPREAD_ASSIGN,
+                        $this->compileOperand($expr->var, $block, false),
+                        $this->compileOperand($expr->listSpreadRhs, $block, true),
+                        $this->compileOperand($fromIndex, $block, true),
+                    )];
+                }
                 $staticPropertyFetch = $this->unwrapStaticPropertyFetch($expr->var);
                 if (null !== $staticPropertyFetch) {
                     $fetchSlot = $this->compileOperand($staticPropertyFetch->result, $block, false);
