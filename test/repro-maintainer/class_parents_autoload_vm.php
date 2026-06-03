@@ -10,5 +10,6 @@ echo count($pFalse), "\n";
 echo $pFalse['AutoloadBase5026'], "\n";
 
 interface AutoloadIface5026 {}
-echo class_parents(AutoloadIface5026::class, true) === false ? 'iface-false' : 'iface-other';
+$p = class_parents(AutoloadIface5026::class, true);
+echo is_array($p) && 0 === count($p) ? 'iface-empty' : 'iface-other';
 echo "\n";
