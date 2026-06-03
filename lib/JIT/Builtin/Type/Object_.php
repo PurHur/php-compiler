@@ -3860,6 +3860,56 @@ class Object_ extends Type {
         return new Variable($this->context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $storage);
     }
 
+    /**
+     * Zend string cast on enum case objects must throw Error (zend_enum.c, #4819).
+     */
+    public function emitEnumObjectStringErrorIfMatches(Context $context, PHPLLVM\Value $objPtr): void
+    {
+        $enumEntries = [];
+        foreach ($this->classIdToName as $id => $name) {
+            $lc = strtolower(ltrim($name, '\\'));
+            if (isset($this->enums[$lc])) {
+                $enumEntries[(int) $id] = $name;
+            }
+        }
+        if ([] === $enumEntries) {
+            return;
+        }
+
+        \PHPCompiler\JIT\Builtin\ErrorRaise::ensureLinked($context);
+        $map = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($objPtr, $map['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $doneBlock = BasicBlockHelper::append($context, 'enum_str_cast_done');
+        $ids = array_keys($enumEntries);
+        $lastIdx = count($ids) - 1;
+        foreach ($ids as $idx => $id) {
+            $matchBlock = BasicBlockHelper::append($context, 'enum_str_cast_match_'.$id);
+            $nextBlock = $idx === $lastIdx
+                ? $doneBlock
+                : BasicBlockHelper::append($context, 'enum_str_cast_next_'.$id);
+            $context->builder->branchIf(
+                $context->builder->icmp(
+                    PHPLLVM\Builder::INT_EQ,
+                    $classId,
+                    $i64->constInt($id, false)
+                ),
+                $matchBlock,
+                $nextBlock
+            );
+            $context->builder->positionAtEnd($matchBlock);
+            \PHPCompiler\JIT\Builtin\ErrorRaise::emitRaise(
+                $context,
+                'Object of class '.$enumEntries[$id].' could not be converted to string'
+            );
+            $context->builder->branch($doneBlock);
+            $context->builder->positionAtEnd($nextBlock);
+        }
+        $context->builder->positionAtEnd($doneBlock);
+    }
+
     public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name): Variable
     {
         $classId = $this->lookup('' !== $class ? $class : 'stdclass');

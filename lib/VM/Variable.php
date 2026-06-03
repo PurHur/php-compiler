@@ -522,7 +522,9 @@ final class Variable {
                 return 'Array';
             case self::TYPE_OBJECT:
                 if (EnumCaseSupport::isEnumCase($var->object)) {
-                    return EnumCaseSupport::toString($var->object);
+                    throw new \Error(
+                        'Object of class '.$var->object->class->name.' could not be converted to string'
+                    );
                 }
                 $typeString = ReflectionTypeSupport::tryObjectTypeString($var->object);
                 if (null !== $typeString) {
@@ -531,11 +533,9 @@ final class Variable {
 
                 return 'Object';
             case self::TYPE_ENUM_CASE:
-                if (null !== $var->enumCase->enumClass->backedType) {
-                    return $var->enumCase->backingValue->toString();
-                }
-
-                return $var->enumCase->caseName;
+                throw new \Error(
+                    'Object of class '.$var->enumCase->enumClass->name.' could not be converted to string'
+                );
         }
         throw new \LogicException("Cannot convert type {$var->type} to string");
     }

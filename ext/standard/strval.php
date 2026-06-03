@@ -154,6 +154,22 @@ final class strval extends Internal
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterDouble);
+        $objectBlock = BasicBlockHelper::append($context, 'strval_value_object');
+        $afterObject = BasicBlockHelper::append($context, 'strval_value_after_object');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_OBJECT, false)),
+            $objectBlock,
+            $afterObject
+        );
+
+        $context->builder->positionAtEnd($objectBlock);
+        $objPtr = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
+        $context->type->object->emitEnumObjectStringErrorIfMatches($context, $objPtr);
+        $objectEmpty = $context->builder->load($context->constantStringFromString(''));
+        $objectEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterObject);
         $fallbackBlock = BasicBlockHelper::append($context, 'strval_value_fallback');
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false)),
@@ -175,6 +191,7 @@ final class strval extends Internal
         $phi->addIncoming($longStr, $longEndBlock);
         $phi->addIncoming($boolStr, $boolEndBlock);
         $phi->addIncoming($doubleStr, $doubleEndBlock);
+        $phi->addIncoming($objectEmpty, $objectEndBlock);
         $phi->addIncoming($stringVal, $stringBlock);
         $phi->addIncoming($fallbackEmpty, $fallbackBlock);
         $restBlock = BasicBlockHelper::append($context, 'strval_value_rest');
