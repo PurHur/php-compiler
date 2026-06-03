@@ -1,13 +1,161 @@
 <?php
+
 declare(strict_types=1);
+
 namespace PHPCompiler\JIT;
+
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\VM\Variable as VmVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
-final class JitBoolArg {
-    public static function lower(Context $context, Variable $arg, string $contextLabel = "argument"): Value {
-        if (Variable::TYPE_NATIVE_BOOL === $arg->type) return $context->helper->loadValue($arg);
-        if (Variable::TYPE_NATIVE_LONG === $arg->type) return $context->builder->truncOrBitCast($context->helper->loadValue($arg), $context->getTypeFromString("int1"));
-        if (Variable::TYPE_VALUE === $arg->type) return $context->builder->truncOrBitCast($context->builder->call($context->lookupFunction("__value__readLong"), JitValueBox::valuePtrFromVariable($context, $arg)), $context->getTypeFromString("int1"));
-        if (Variable::TYPE_NULL === $arg->type) return $context->constantFromBool(false);
-        throw new \LogicException("{$contextLabel} must be a boolean in this compiler build");
+
+final class JitBoolArg
+{
+    public static function lower(Context $context, Variable $arg, string $contextLabel = 'argument'): Value
+    {
+        $literal = JitStringArg::compileTimeLiteral($arg);
+        if (null !== $literal) {
+            return $context->constantFromBool(self::coerceStringLiteral($literal, $contextLabel));
+        }
+
+        if (Variable::TYPE_NATIVE_BOOL === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (Variable::TYPE_NATIVE_LONG === $arg->type) {
+            $zero = $context->getTypeFromString('int64')->constInt(0, false);
+
+            return $context->builder->icmp(
+                Builder::INT_NE,
+                $context->helper->loadValue($arg),
+                $zero
+            );
+        }
+        if (Variable::TYPE_STRING === $arg->type) {
+            self::emitTypeErrorAndAbort($context, $contextLabel, 'string');
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            return self::lowerBoxed($context, $arg, $contextLabel);
+        }
+        if (Variable::TYPE_NULL === $arg->type) {
+            self::emitTypeErrorAndAbort($context, $contextLabel, 'null');
+        }
+        if (Variable::TYPE_HASHTABLE === $arg->type || ($arg->type & Variable::IS_NATIVE_ARRAY)) {
+            self::emitTypeErrorAndAbort($context, $contextLabel, 'array');
+        }
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            self::emitTypeErrorAndAbort($context, $contextLabel, 'object');
+        }
+
+        self::emitTypeErrorAndAbort($context, $contextLabel, 'mixed');
+
+        return $context->constantFromBool(false);
+    }
+
+    private static function lowerBoxed(Context $context, Variable $arg, string $contextLabel): Value
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+
+        foreach (
+            [
+                [VmVariable::TYPE_ARRAY, 'array'],
+                [VmVariable::TYPE_OBJECT, 'object'],
+                [VmVariable::TYPE_NULL, 'null'],
+                [VmVariable::TYPE_STRING, 'string'],
+            ] as [$vmType, $label]
+        ) {
+            $check = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt($vmType, false));
+            $ok = BasicBlockHelper::append($context, 'jit_bool_vbox_ok_'.$label);
+            $bad = BasicBlockHelper::append($context, 'jit_bool_vbox_bad_'.$label);
+            $context->builder->branchIf($check, $bad, $ok);
+            $context->builder->positionAtEnd($bad);
+            self::emitTypeErrorAndAbort($context, $contextLabel, $label);
+            $context->builder->positionAtEnd($ok);
+        }
+
+        $boolBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_bool');
+        $longBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_long');
+        $mergeBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_merge');
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $context->builder->branchIf($isBool, $boolBlock, $longBlock);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $valueField = $context->builder->structGep($valuePtr, $map['value']);
+        $firstByte = $context->builder->inBoundsGEP(
+            $valueField,
+            $context->getTypeFromString('int32')->constInt(0, false),
+            $context->getTypeFromString('int64')->constInt(0, false)
+        );
+        $boolVal = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->load($firstByte),
+            $i8->constInt(0, false)
+        );
+        $boolEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($longBlock);
+        $zero = $context->getTypeFromString('int64')->constInt(0, false);
+        $longVal = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr),
+            $zero
+        );
+        $longEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($boolVal, $boolEnd);
+        $phi->addIncoming($longVal, $longEnd);
+
+        return $phi;
+    }
+
+    private static function coerceStringLiteral(string $literal, string $contextLabel): bool
+    {
+        $lower = strtolower($literal);
+        if (\in_array($lower, ['1', 'true', 'on', 'yes'], true)) {
+            return true;
+        }
+        if (\in_array($lower, ['0', 'false', 'off', 'no', ''], true)) {
+            return false;
+        }
+
+        throw new \LogicException(self::typeErrorMessage($contextLabel, 'string'));
+    }
+
+    private static function emitTypeErrorAndAbort(Context $context, string $contextLabel, string $given): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, self::typeErrorMessage($contextLabel, $given));
+        $context->builder->call($context->lookupFunction('abort'));
+    }
+
+    private static function typeErrorMessage(string $contextLabel, string $given): string
+    {
+        if (preg_match('/^(.+\(\)): Argument #(\d+) \(\$([^)]+)\)$/', $contextLabel, $m)) {
+            return sprintf(
+                '%s(): Argument #%s ($%s) must be of type bool, %s given',
+                $m[1],
+                $m[2],
+                $m[3],
+                $given
+            );
+        }
+
+        return "{$contextLabel} must be of type bool, {$given} given";
     }
 }
