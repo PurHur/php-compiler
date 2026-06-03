@@ -61,4 +61,20 @@ PHP;
         $rt->run($block);
         $this->assertSame('1', ob_get_clean());
     }
+
+    public function testVmClassImplementsOnTraitReturnsEmptyArray(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait T {}
+$map = class_implements('T');
+echo count($map), "\n";
+echo class_implements('T') === [] ? '1' : '0';
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'class_implements_trait.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("0\n1", ob_get_clean());
+    }
 }
