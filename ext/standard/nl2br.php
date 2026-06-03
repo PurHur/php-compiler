@@ -13,7 +13,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\Builtin\StringNl2brRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -21,7 +20,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * nl2br() for strings (subset of PHP; JIT/AOT via __compiler_nl2br C runtime).
+ * nl2br() for strings (subset of PHP; JIT/AOT via __string__nl2br LLVM lowering).
  */
 final class nl2br extends Internal
 {
@@ -74,8 +73,6 @@ final class nl2br extends Internal
                 $i8
             );
         }
-
-        StringNl2brRuntime::ensureLinked($context);
 
         return JitNl2br::nl2br($context, $str, $useXhtmlI8);
     }
