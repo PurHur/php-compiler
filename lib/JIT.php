@@ -8085,6 +8085,9 @@ class JIT {
                                 $proto->dnfArms
                             );
                         }
+                        if (\PHPCompiler\VM\TypedPropertyCheck::propertyAllowsNull($proto)) {
+                            $this->context->type->object->markPropertyAllowsNull($classId, $name->value);
+                        }
                     }
                     $this->context->type->object->definePropertyVisibility(
                         $classId,
