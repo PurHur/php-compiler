@@ -8402,10 +8402,15 @@ class JIT {
                     $result->objectPropertyDnfArms
                 );
             }
-            $this->context->type->object->propertyStore(
-                $result->objectPropertySlot,
-                $value,
-                $result->objectPropertyType
+            JIT\ReadonlyClassGuard::emitStoreUnlessPending(
+                $this->context,
+                function () use ($result, $value): void {
+                    $this->context->type->object->propertyStore(
+                        $result->objectPropertySlot,
+                        $value,
+                        $result->objectPropertyType
+                    );
+                }
             );
 
             return;
@@ -9526,10 +9531,15 @@ class JIT {
                 $dest->objectPropertyDnfArms
             );
         }
-        $this->context->type->object->propertyStore(
-            $dest->objectPropertySlot,
-            $newVal,
-            $dest->objectPropertyType
+        JIT\ReadonlyClassGuard::emitStoreUnlessPending(
+            $this->context,
+            function () use ($dest, $newVal): void {
+                $this->context->type->object->propertyStore(
+                    $dest->objectPropertySlot,
+                    $newVal,
+                    $dest->objectPropertyType
+                );
+            }
         );
     }
 
@@ -9605,10 +9615,15 @@ class JIT {
         )) {
             return;
         }
-        $this->context->type->object->propertyStore(
-            $read->objectPropertySlot,
-            $newVal,
-            $read->objectPropertyType
+        JIT\ReadonlyClassGuard::emitStoreUnlessPending(
+            $this->context,
+            function () use ($read, $newVal): void {
+                $this->context->type->object->propertyStore(
+                    $read->objectPropertySlot,
+                    $newVal,
+                    $read->objectPropertyType
+                );
+            }
         );
         if ($prefix) {
             $this->assignOperand($resultOp, $newVal, true);
