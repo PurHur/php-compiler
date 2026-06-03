@@ -14,11 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -32,7 +28,12 @@ final class chr extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('chr() requires exactly one argument');
         }
-        $n = InternalStrictArg::requireInt($frame, 0, 'chr', 'codepoint')->toInt();
+        $n = VmMath::parseChrCodepoint(
+            $frame->calledArgs[0]->resolveIndirect(),
+            'chr',
+            1,
+            'codepoint'
+        );
         if (null === $frame->returnVar) {
             return;
         }
@@ -48,8 +49,7 @@ final class chr extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('chr() requires exactly one argument');
         }
-        JitInternalStrictArg::requireInt($context, $args[0], 'chr', 'codepoint', 1);
-        $v = JitLongArg::lower($context, $args[0], 'chr() codepoint');
+        $v = JitChr::lowerCodepoint($context, $args[0]);
         $const256 = $v->typeOf()->constInt(256, false);
         $rem = $context->builder->signedRem($v, $const256);
         $zero = $v->typeOf()->constInt(0, false);

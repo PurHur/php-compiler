@@ -14,9 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -30,7 +28,12 @@ final class ord extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('ord() requires exactly one argument');
         }
-        $s = InternalStrictArg::requireString($frame, 0, 'ord', 'character')->toString();
+        $s = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'ord',
+            0,
+            'character'
+        );
         if (null === $frame->returnVar) {
             return;
         }
@@ -46,8 +49,7 @@ final class ord extends Internal
             throw new \LogicException('ord() requires exactly one argument');
         }
 
-        JitInternalStrictArg::requireString($context, $args[0], 'ord', 'character', 1);
-        $strPtr = $this->jitString($context, $args[0], 'ord() argument #1');
+        $strPtr = JitOrd::lowerCharacter($context, $args[0]);
         $structName = $strPtr->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
         $lenPtr = $context->builder->structGep($strPtr, $map['length']);
