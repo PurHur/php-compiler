@@ -86,10 +86,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'array_key_exists_float')) {
                 continue;
             }
-            // array numeric-string key coercion: VM (#3679); MCJIT execute exit -1 until lookupStringKeyValue stable.
-            if (str_contains($name, 'array_numeric_string_key')) {
-                continue;
-            }
             // array literal int / numeric-string key collision: VM + AOT (#4151); MCJIT execute unstable (#98).
             if (str_contains($name, 'array_literal_numeric_string_key')) {
                 continue;
