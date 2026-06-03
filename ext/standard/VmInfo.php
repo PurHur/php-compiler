@@ -201,8 +201,8 @@ final class VmInfo
                     $buf .= '.';
                 }
             } elseif (
-                (!ctype_digit($lp) && ctype_digit($ch))
-                || (ctype_digit($lp) && !ctype_digit($ch))
+                (self::isVersionNonDigitChar($lp) && self::isVersionDigitChar($ch))
+                || (self::isVersionDigitChar($lp) && self::isVersionNonDigitChar($ch))
             ) {
                 if ('.' !== $lq) {
                     $buf .= '.';
@@ -222,6 +222,18 @@ final class VmInfo
         }
 
         return $buf;
+    }
+
+    /** php-src versioning.c isdig(): digit excluding '.' */
+    private static function isVersionDigitChar(string $ch): bool
+    {
+        return ctype_digit($ch);
+    }
+
+    /** php-src versioning.c isndig(): non-digit excluding '.' */
+    private static function isVersionNonDigitChar(string $ch): bool
+    {
+        return !ctype_digit($ch) && '.' !== $ch;
     }
 
     private static function compareSpecialVersionForms(string $form1, string $form2): int

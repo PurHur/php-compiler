@@ -17,6 +17,10 @@ final class VersionCompareVMTest extends BaseTest
             __DIR__.'/cases/stdlib/version_compare.phpt',
             'version_compare.phpt'
         );
+        yield 'version_compare_partial.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/version_compare_partial.phpt',
+            'version_compare_partial.phpt'
+        );
     }
 
     public function setUp(): void
