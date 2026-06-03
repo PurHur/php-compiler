@@ -51,6 +51,10 @@ final class NamedArgs
         $result = [];
         $filled = [];
         $nextPositional = 0;
+        /** @var list<Variable> $variadicPositional */
+        $variadicPositional = [];
+        /** @var array<string, Variable> $variadicNamed */
+        $variadicNamed = [];
 
         foreach ($entries as $entry) {
             if ('p' === $entry[0]) {
@@ -59,13 +63,23 @@ final class NamedArgs
                 while ($nextPositional < $paramCount && isset($filled[$nextPositional])) {
                     ++$nextPositional;
                 }
-                if ($nextPositional < $paramCount) {
+                if ($nextPositional < $paramCount && $nextPositional !== $variadicParamIndex) {
                     $filled[$nextPositional] = true;
                     $result[$nextPositional] = $value;
                     ++$nextPositional;
                     continue;
                 }
                 if (null !== $variadicParamIndex) {
+                    if ([] !== $variadicNamed) {
+                        $variadicPositional[] = $value;
+                        continue;
+                    }
+                    if ($nextPositional < $paramCount) {
+                        $filled[$nextPositional] = true;
+                        $result[$nextPositional] = $value;
+                        ++$nextPositional;
+                        continue;
+                    }
                     $idx = count($result);
                     $result[$idx] = $value;
                     continue;
@@ -78,6 +92,10 @@ final class NamedArgs
             $value = $entry[2];
             $idx = array_search($name, $lowerNames, true);
             if (false === $idx) {
+                if (null !== $variadicParamIndex) {
+                    $variadicNamed[(string) $entry[1]] = $value;
+                    continue;
+                }
                 throw new \Error("Unknown named parameter \${$entry[1]}");
             }
             if (isset($filled[$idx])) {
@@ -89,8 +107,54 @@ final class NamedArgs
             $result[$idx] = $value;
         }
 
+        if (null !== $variadicParamIndex && ([] !== $variadicNamed || [] !== $variadicPositional)) {
+            self::assignVariadicArray($result, $variadicParamIndex, $variadicPositional, $variadicNamed);
+        }
+
         ksort($result);
 
         return $result;
+    }
+
+    /**
+     * @param array<int, Variable>     $result
+     * @param list<Variable>           $variadicPositional
+     * @param array<string, Variable>  $variadicNamed
+     */
+    private static function assignVariadicArray(
+        array &$result,
+        int $variadicParamIndex,
+        array $variadicPositional,
+        array $variadicNamed
+    ): void {
+        $arrayVar = new Variable();
+        $arrayVar->newArray();
+        $packed = $arrayVar->toArray();
+        $numIdx = 0;
+        if (isset($result[$variadicParamIndex])) {
+            $leading = new Variable();
+            $leading->copyFrom($result[$variadicParamIndex]);
+            $packed->addIndex($numIdx++, $leading);
+            unset($result[$variadicParamIndex]);
+        }
+        foreach ($variadicPositional as $value) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $packed->addIndex($numIdx++, $copy);
+        }
+        foreach ($variadicNamed as $key => $value) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $packed->add($key, $copy);
+        }
+        foreach ($result as $idx => $existing) {
+            if ($idx > $variadicParamIndex) {
+                $copy = new Variable();
+                $copy->copyFrom($existing);
+                $packed->addIndex($numIdx++, $copy);
+                unset($result[$idx]);
+            }
+        }
+        $result[$variadicParamIndex] = $arrayVar;
     }
 }

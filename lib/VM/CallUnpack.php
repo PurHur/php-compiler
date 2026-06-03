@@ -171,6 +171,10 @@ final class CallUnpack
             $name = $key->toString();
             $idx = array_search(strtolower($name), $lowerNames, true);
             if (false === $idx) {
+                if (null !== $variadicParamIndex) {
+                    $entries[] = ['n', $name, $value];
+                    continue;
+                }
                 throw new \Error("Unknown named parameter \${$name}");
             }
             if (isset($filled[$idx])) {

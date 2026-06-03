@@ -55,4 +55,22 @@ PHP;
         $this->assertSame(3, $resolved[0]->toInt());
         $this->assertSame(2, $resolved[1]->toInt());
     }
+
+    public function testVariadicNamedArgumentsPopulateArgsArray(): void
+    {
+        $a = new Variable(Variable::TYPE_INTEGER);
+        $a->int(1);
+        $b = new Variable(Variable::TYPE_INTEGER);
+        $b->int(2);
+        $resolved = NamedArgs::resolve(
+            [['n', 'a', $a], ['n', 'b', $b]],
+            ['args'],
+            0
+        );
+        $this->assertCount(1, $resolved);
+        $this->assertSame(Variable::TYPE_ARRAY, $resolved[0]->type);
+        $packed = $resolved[0]->toArray();
+        $this->assertSame(1, $packed->find('a')?->toInt());
+        $this->assertSame(2, $packed->find('b')?->toInt());
+    }
 }
