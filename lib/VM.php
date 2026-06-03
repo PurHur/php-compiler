@@ -255,7 +255,7 @@ class VM {
         }
         $object = $var->toObject();
         if (EnumCaseSupport::isEnumCase($object)) {
-            return EnumCaseSupport::toString($object);
+            throw new \Error("Object of class {$object->class->name} could not be converted to string");
         }
         if (!$this->hasInstanceMethod($object->class, '__tostring')) {
             return 'Object';
@@ -1639,6 +1639,20 @@ restart:
                         $arg2 = $this->coerceVariableToString($frame->scope[$op->arg2]);
                         $arg3 = $this->coerceVariableToString($frame->scope[$op->arg3]);
                         $arg1->string($arg2 . $arg3);
+                    } catch (\Error $e) {
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
                     } catch (VM\MagicMethodInvocationAborted) {
                         $this->clearTryCatchUnwindState();
                         ++$frame->pos;
