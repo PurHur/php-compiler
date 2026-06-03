@@ -2345,6 +2345,19 @@ restart:
                                     $this->context
                                 );
                             }
+                            if (
+                                1 === $n - $recvIdx
+                                && isset($frame->calledArgs[$recvIdx])
+                            ) {
+                                $sole = $frame->calledArgs[$recvIdx]->resolveIndirect();
+                                if (
+                                    Variable::TYPE_ARRAY === $sole->type
+                                    && !$sole->toArray()->isPackedList()
+                                ) {
+                                    $arg1->copyFrom($sole);
+                                    break;
+                                }
+                            }
                             $arg1->newArray();
                             $packed = $arg1->toArray();
                             for ($i = $recvIdx; $i < $n; ++$i) {
