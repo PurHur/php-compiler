@@ -448,6 +448,13 @@ class Compiler {
             if ('mixed' === strtolower($returnType->name)) {
                 return;
             }
+            $returnLc = strtolower($returnType->name);
+            if ('true' === $returnLc || 'false' === $returnLc) {
+                $block->returnTypeConstraint = Variable::TYPE_BOOLEAN;
+                $block->returnLiteralBoolType = $returnLc;
+
+                return;
+            }
             $mapped = Variable::mapFromType(Type::fromDecl($returnType->name));
             if (Variable::TYPE_UNDEFINED !== $mapped) {
                 $block->returnTypeConstraint = $mapped;
@@ -2379,6 +2386,16 @@ class Compiler {
         }
         if ($declared instanceof Op\Type\Literal) {
             $declName = strtolower($declared->name);
+            if ('true' === $declName || 'false' === $declName) {
+                if ($variadicElement) {
+                    $block->paramVariadicElementTypeConstraints[$slot] = Variable::TYPE_BOOLEAN;
+                } else {
+                    $block->paramTypeConstraints[$slot] = Variable::TYPE_BOOLEAN;
+                    $block->paramLiteralBoolTypes[$slot] = $declName;
+                }
+
+                return;
+            }
             if ('mixed' !== $declName) {
                 $rawType = Type::fromDecl($declared->name);
                 $mapped = Variable::mapFromType($rawType);
@@ -2806,6 +2823,19 @@ class Compiler {
             $var->typeConstraint = Variable::TYPE_ARRAY;
             $var->genericArrayTypeSpec = $arraySpec;
             $var->declaredTypeLabel = $declName;
+
+            return $return;
+        }
+        $literalBoolName = null;
+        if ($cfgType instanceof Op\Type\Literal) {
+            $literalBoolName = strtolower($cfgType->name);
+        } elseif (null !== $declName) {
+            $literalBoolName = strtolower($declName);
+        }
+        if ('true' === $literalBoolName || 'false' === $literalBoolName) {
+            $var->typeConstraint = Variable::TYPE_BOOLEAN;
+            $var->literalBoolType = $literalBoolName;
+            $var->declaredTypeLabel = $literalBoolName;
 
             return $return;
         }
