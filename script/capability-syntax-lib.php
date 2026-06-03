@@ -739,6 +739,7 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'SourcePreprocessor lowers hooks to __phpc_property_* methods (#3145)',
                 'VM dispatches set/get on property access; JIT PropertyHookDispatch (#3723)',
+                'Static property hooks (PHP 8.4): VM dispatch via TYPE_STATIC_PROPERTY_FETCH (#4751); JIT/AOT defer to VM',
                 'AOT: user-class hook methods lower under PHP_COMPILER_SELFHOST_AOT; set-hook smoke in property_hook_set.phpt',
                 'JIT: raw backing access in hook bodies via jitPropertyHookRawProperty (set + get methods, #4025, #4205)',
             ],

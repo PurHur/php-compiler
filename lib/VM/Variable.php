@@ -78,6 +78,9 @@ final class Variable {
 
     public ?string $objectPropertyName = null;
 
+    /** Declaring class (lowercase) for static property hook set dispatch (#4751). */
+    public ?string $staticPropertyClassLc = null;
+
     /** Stream handle from fopen()/similar; distinguishes handle ints from plain integers (#3519). */
     public bool $streamResource = false;
 
