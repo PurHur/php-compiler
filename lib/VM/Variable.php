@@ -130,6 +130,16 @@ final class Variable {
         return $this->type === self::TYPE_UNDEFINED;
     }
 
+    /** True when the slot carries a declared property/parameter type (not untyped `mixed`). */
+    public function hasDeclaredTypeConstraint(): bool
+    {
+        return null !== $this->typeConstraint
+            || null !== $this->dnfArms
+            || null !== $this->unionTypeConstraints
+            || null !== $this->genericArrayTypeSpec
+            || null !== $this->literalBoolType;
+    }
+
     public function resolveIndirect(): self {
         $var = $this;
         while ($var->type === self::TYPE_INDIRECT) {

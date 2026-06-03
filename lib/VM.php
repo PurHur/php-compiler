@@ -4363,6 +4363,15 @@ restart:
             || $methodLc === strtolower($className.'::'.$wantGet);
     }
 
+    private function linkStaticTypedPropertySlot(Variable $storage, ClassEntry $entry, string $propDisplayName): void
+    {
+        if (!$storage->hasDeclaredTypeConstraint()) {
+            return;
+        }
+        $storage->staticPropertyClassLc = strtolower($entry->name);
+        $storage->objectPropertyName = $propDisplayName;
+    }
+
     private function linkStaticPropertyHooks(ClassEntry $entry): void
     {
         foreach (array_keys($entry->staticProperties) as $propLc) {
@@ -6331,6 +6340,11 @@ restart:
                     if (!is_null($op->arg2)) {
                         $storage->copyFrom($frame->scope[$op->arg2]);
                     }
+                    $this->linkStaticTypedPropertySlot(
+                        $storage,
+                        $entry,
+                        $frame->scope[$op->arg1]->toString()
+                    );
                     $entry->staticProperties[$name] = $storage;
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
@@ -6483,6 +6497,11 @@ restart:
             $name = strtolower($frame->scope[$declareOp->arg1]->toString());
             $storage = clone $frame->scope[$declareOp->arg3];
             $storage->copyFrom($value);
+            $this->linkStaticTypedPropertySlot(
+                $storage,
+                $entry,
+                $frame->scope[$declareOp->arg1]->toString()
+            );
             $entry->staticProperties[$name] = $storage;
 
             return;
