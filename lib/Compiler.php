@@ -3286,10 +3286,10 @@ class Compiler {
                     $emptySlot
                 ));
             } elseif (1 === $total) {
+                // Zend string context for a lone encapsed variable (#4785) — not a plain assign.
                 $part = $this->compileConcatListPart($op->list[0], $block);
                 $block->addOpCode(new OpCode(
-                    OpCode::TYPE_ASSIGN,
-                    $return,
+                    OpCode::TYPE_CAST_STRING,
                     $return,
                     $part
                 ));
