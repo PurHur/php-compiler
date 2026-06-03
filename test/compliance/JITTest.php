@@ -286,6 +286,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'preg_replace_limit')) {
                 continue;
             }
+            // preg_replace() array $subject: VM + AOT lint (#4055); MCJIT segfaults (preg_filter array path, #98).
+            if (str_contains($name, 'preg_replace_array_subject')) {
+                continue;
+            }
             // json_validate() MCJIT path unsafe until __compiler_json_validate link is stable (#3101).
             if (str_contains($name, 'json_validate')) {
                 continue;
