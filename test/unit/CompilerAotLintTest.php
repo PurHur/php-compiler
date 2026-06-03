@@ -69,4 +69,39 @@ final class CompilerAotLintTest extends TestCase
         yield 'JIT' => ['lib/JIT.php'];
         yield 'Doctor' => ['lib/Doctor.php'];
     }
+
+    public function testHelloWorldCompileDriverLintExitZero(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $bin = realpath($root.'/bin/compile.php');
+        $this->assertNotFalse($bin);
+        $target = $root.'/test/selfhost/compiler_helloworld_smoke/compile_driver.php';
+        $cmd = [PHP_BINARY, $bin, '-l', $target];
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $root);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $this->assertSame(
+            0,
+            $exit,
+            trim($stderr !== false ? $stderr : '')."\n".'compile.php -l failed for compile_driver.php (#5263)'
+        );
+    }
+
+    public function testNullsafeCoalesceAssignParseAndCompile(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $path = $root.'/test/fixtures/aot/cases/nullsafe_coalesce_assign_probe.php';
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $block = $runtime->parseAndCompile((string) file_get_contents($path), $path);
+        $this->assertNotNull($block);
+    }
 }

@@ -1740,9 +1740,7 @@ class Compiler {
             return;
         }
         if ($original instanceof Op\Expr) {
-            foreach ($this->compileExpr($original, $block) as $opCode) {
-                $block->addOpCode($opCode);
-            }
+            $this->compileDeferredCoalesceBranchExpr($original, $block);
         }
     }
 
@@ -3974,26 +3972,27 @@ class Compiler {
             case Op\Expr\BooleanNot::class:
             case Op\Expr\Clone_::class:
             case Op\Expr\Empty_::class:
-                $propFetch = $this->unwrapPropertyFetch($expr->expr);
+                $propFetch = $this->findCoalescePropertyFetch($expr->expr, $block);
                 if (null === $propFetch) {
-                    $propFetch = $this->findCoalescePropertyFetch($expr->expr, $block);
+                    $propFetch = $this->unwrapPropertyFetch($expr->expr);
                 }
-                if (null !== $propFetch) {
+                $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($expr->expr, $block);
+                if (null !== $propFetch || null !== $dimFetch) {
                     $resultSlot = $this->compileOperand($expr->result, $block, false);
                     $checkSlot = $this->compileBoolTemporary($block);
-                    [$containerSlot, $dimSlot] = [
-                        $this->compileOperand($propFetch->var, $block, true),
-                        $this->compileOperand($propFetch->name, $block, true),
-                    ];
-
-                    return [
-                        $this->makeIssetOpCode($checkSlot, $containerSlot, $dimSlot, true),
-                        new OpCode(
-                            OpCode::TYPE_BOOLEAN_NOT,
-                            $resultSlot,
-                            $checkSlot
-                        ),
-                    ];
+                    [$containerSlot, $dimSlot] = null !== $propFetch
+                        ? $this->resolveIssetTargetFromPropertyFetch($propFetch, $block)
+                        : $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block);
+                    if (null !== $containerSlot) {
+                        return [
+                            $this->makeIssetOpCode($checkSlot, $containerSlot, $dimSlot, null !== $propFetch),
+                            new OpCode(
+                                OpCode::TYPE_BOOLEAN_NOT,
+                                $resultSlot,
+                                $checkSlot
+                            ),
+                        ];
+                    }
                 }
 
                 return [new OpCode(
@@ -4526,12 +4525,33 @@ class Compiler {
 
                 return [null, $targetBlock];
             }
-            foreach ($this->compileExpr($exprOp, $targetBlock) as $op) {
-                $targetBlock->addOpCode($op);
+            $afterExpr = $this->compileDeferredCoalesceBranchExpr($exprOp, $targetBlock);
+            if ($afterExpr !== $targetBlock) {
+                return [$this->compileOperand($rhs, $afterExpr, true), $afterExpr];
             }
         }
 
         return [$this->compileOperand($rhs, $targetBlock, true), $targetBlock];
+    }
+
+    /**
+     * Lower stmt-deferred expr ops on a ?? branch (#3462, #5263).
+     *
+     * @return Block block where the expr result slot is valid (may differ after ?-> lowering)
+     */
+    private function compileDeferredCoalesceBranchExpr(Op\Expr $exprOp, Block $targetBlock): Block
+    {
+        if ($exprOp instanceof Op\Expr\NullsafePropertyFetch) {
+            return $this->compileNullsafePropertyFetch($exprOp, $targetBlock);
+        }
+        if ($exprOp instanceof Op\Expr\NullsafeMethodCall) {
+            return $this->compileNullsafeMethodCall($exprOp, $targetBlock);
+        }
+        foreach ($this->compileExpr($exprOp, $targetBlock) as $op) {
+            $targetBlock->addOpCode($op);
+        }
+
+        return $targetBlock;
     }
 
     /**
@@ -4726,9 +4746,7 @@ class Compiler {
         if (null === $exprOp) {
             return;
         }
-        foreach ($this->compileExpr($exprOp, $block) as $op) {
-            $block->addOpCode($op);
-        }
+        $this->compileDeferredCoalesceBranchExpr($exprOp, $block);
     }
 
     private function findOrigExprOpForOperand(Operand $operand, Block $block): ?Op\Expr
