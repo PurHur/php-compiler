@@ -78,10 +78,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'cli_argv')) {
                 continue;
             }
-            // Global const array literals: VM + compile-time fold (#4526); MCJIT escape analyzer pending on Const terminal.
-            if (str_contains($name, 'global_const_array')) {
-                continue;
-            }
             // array_key_exists() null key → "": VM + AOT (#3687); MCJIT execute segfaults (pre-existing hashtable path).
             if (str_contains($name, 'array_key_exists_null_key')) {
                 continue;
