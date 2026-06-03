@@ -17,6 +17,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -40,7 +41,7 @@ final class strval extends Internal
 
             return;
         }
-        $frame->returnVar->string($v->toString());
+        $frame->returnVar->string($v->toString(null, $frame));
     }
 
     public Context $context;
@@ -170,6 +171,21 @@ final class strval extends Internal
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterObject);
+        $arrayBlock = BasicBlockHelper::append($context, 'strval_value_array');
+        $afterArray = BasicBlockHelper::append($context, 'strval_value_after_array');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(Variable::TYPE_ARRAY, false)),
+            $arrayBlock,
+            $afterArray
+        );
+
+        $context->builder->positionAtEnd($arrayBlock);
+        self::emitArrayToStringWarning($context);
+        $arrayStr = $context->builder->load($context->constantStringFromString('Array'));
+        $arrayEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterArray);
         $fallbackBlock = BasicBlockHelper::append($context, 'strval_value_fallback');
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false)),
@@ -192,6 +208,7 @@ final class strval extends Internal
         $phi->addIncoming($boolStr, $boolEndBlock);
         $phi->addIncoming($doubleStr, $doubleEndBlock);
         $phi->addIncoming($objectEmpty, $objectEndBlock);
+        $phi->addIncoming($arrayStr, $arrayEndBlock);
         $phi->addIncoming($stringVal, $stringBlock);
         $phi->addIncoming($fallbackEmpty, $fallbackBlock);
         $restBlock = BasicBlockHelper::append($context, 'strval_value_rest');
@@ -199,6 +216,26 @@ final class strval extends Internal
         $context->builder->positionAtEnd($restBlock);
 
         return $phi;
+    }
+
+    /** Zend _convert_to_string() array branch (zend_operators.c, issue #5266). */
+    private static function emitArrayToStringWarning(Context $context): void
+    {
+        $message = 'Array to string conversion';
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $msgLen = $sizeT->constInt(\strlen($message), false);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $msgLen,
+            $i32->constInt(ErrorReporter::E_WARNING, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
     }
 
     private function boolToString(Context $context, Value $bool): Value

@@ -3776,10 +3776,12 @@ class Compiler {
 
             return [$opcode];
         } elseif ($expr instanceof Op\Expr\Cast) {
+            $line = $expr->getLine();
             return [new OpCode(
                 $this->getOpCodeTypeFromCastOp($expr),
                 $this->compileOperand($expr->result, $block, false),
                 $this->compileOperand($expr->expr, $block, true),
+                $line > 0 ? $line : null,
             )];
         }
         switch (get_class($expr)) {
