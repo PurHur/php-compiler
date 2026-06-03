@@ -3601,13 +3601,15 @@ class Compiler {
 
     protected function compileIncDecExpr(Op\Expr $expr, Block $block, int $opcode): array
     {
-        $this->rejectThisReassignment($expr->write);
+        // php-cfg may clear write after SSA replace; read still names the lvalue (#4946).
+        $write = $expr->write ?? $expr->read;
+        $this->rejectThisReassignment($write);
 
         return [new OpCode(
             $opcode,
             $this->compileOperand($expr->result, $block, false),
             $this->compileOperand($expr->read, $block, true),
-            $this->compileOperand($expr->write, $block, false),
+            $this->compileOperand($write, $block, false),
         )];
     }
 
@@ -6827,8 +6829,11 @@ class Compiler {
      *
      * @return never
      */
-    protected function rejectThisReassignment(Operand $var): void
+    protected function rejectThisReassignment(?Operand $var): void
     {
+        if (null === $var) {
+            return;
+        }
         if ('this' === $this->baseVariableName($var)) {
             $this->throwCompileError('Cannot re-assign $this');
         }
