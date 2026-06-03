@@ -192,8 +192,8 @@ static char *phpc_canonicalize_version(const char *version)
                 *q++ = '.';
             }
         } else if (
-            (!isdigit((unsigned char) lp) && isdigit((unsigned char) *p))
-            || (isdigit((unsigned char) lp) && !isdigit((unsigned char) *p))
+            (!isdigit((unsigned char) lp) && '.' != lp && isdigit((unsigned char) *p))
+            || (isdigit((unsigned char) lp) && !isdigit((unsigned char) *p) && '.' != *p)
         ) {
             if ('.' != lq) {
                 *q++ = '.';
