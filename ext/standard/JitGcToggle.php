@@ -1,0 +1,59 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\JIT\Builtin\GcCollectCyclesNative;
+use PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
+
+/** LLVM lowering for gc_enable/gc_disable/gc_enabled() (#3209). */
+final class JitGcToggle
+{
+    /** @return Value */
+    public static function enable(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) > 0) {
+            throw new \LogicException('gc_enable() takes no arguments');
+        }
+        self::prepare($context);
+        $context->builder->call($context->lookupFunction('phpc_gc_enable'));
+
+        return $context->getTypeFromString('int32')->constInt(0, false);
+    }
+
+    /** @return Value */
+    public static function disable(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) > 0) {
+            throw new \LogicException('gc_disable() takes no arguments');
+        }
+        self::prepare($context);
+        $context->builder->call($context->lookupFunction('phpc_gc_disable'));
+
+        return $context->getTypeFromString('int32')->constInt(0, false);
+    }
+
+    public static function isEnabled(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) > 0) {
+            throw new \LogicException('gc_enabled() takes no arguments');
+        }
+        self::prepare($context);
+        $enabled = $context->builder->call($context->lookupFunction('phpc_gc_is_enabled'));
+        $i32 = $context->getTypeFromString('int32');
+
+        return $context->builder->icmp(Builder::INT_NE, $enabled, $i32->constInt(0, false));
+    }
+
+    private static function prepare(Context $context): void
+    {
+        GcCollectCyclesRuntime::ensureLinked($context);
+        GcCollectCyclesNative::registerDeclarations($context);
+    }
+}

@@ -1,0 +1,10 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
+@@ -1695,7 +1695,7 @@
+         'gc_collect_cycles' => ['int'],
+         'gc_disable' => [''],
+         'gc_enable' => [''],
+-        'gc_enabled' => [''],
++        'gc_enabled' => ['bool'],
+         'gd_info' => ['array'],
+         'GearmanClient::addOptions' => ['bool', 'options' => 'int'],

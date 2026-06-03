@@ -1696,7 +1696,7 @@ class InternalArgInfo
         'gc_collect_cycles' => ['int'],
         'gc_disable' => [''],
         'gc_enable' => [''],
-        'gc_enabled' => [''],
+        'gc_enabled' => ['bool'],
         'gd_info' => ['array'],
         'GearmanClient::addOptions' => ['bool', 'options' => 'int'],
         'GearmanClient::addServer' => ['bool', 'host=' => 'string', 'port=' => 'int'],
