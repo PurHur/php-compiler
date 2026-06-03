@@ -1096,7 +1096,9 @@ restart:
                     }
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
-                    $arg3 = $frame->scope[$op->arg3];
+                    $arg3 = isset($frame->block->constants[$op->arg3])
+                        ? $frame->block->constants[$op->arg3]
+                        : $frame->scope[$op->arg3];
                     if ($this->dispatchPropertySetHookAssign($arg2, $arg3, $frame)) {
                         $arg1->copyFrom($arg3);
                         break;
@@ -1135,10 +1137,14 @@ restart:
                     }
                     $arg2->copyFrom($arg3);
                     $arg1->copyFrom($arg3);
-                    if ($op->arg2 !== $op->arg3) {
+                    if ($op->arg2 !== $op->arg3 && !isset($frame->block->constants[$op->arg3])) {
                         $arg3->null();
                     }
-                    if ($op->arg1 !== $op->arg2 && $op->arg1 !== $op->arg3) {
+                    if (
+                        $op->arg1 !== $op->arg2
+                        && $op->arg1 !== $op->arg3
+                        && !isset($frame->block->constants[$op->arg1])
+                    ) {
                         $arg1->null();
                     }
                     $strict = null !== $frame->parent
@@ -1198,7 +1204,14 @@ restart:
                             goto restart;
                         }
                     }
-                    $rhs = $frame->scope[$op->arg2]->resolveIndirect();
+                    $rhsSlot = $frame->scope[$op->arg2];
+                    $rhs = $rhsSlot->resolveIndirect();
+                    // Iterator_Value(byRef) and object property slots are already live storage
+                    // (Zend FE_FETCH_R); re-wrapping breaks multi-element foreach (&$v) (#5245).
+                    if ($rhsSlot->isIndirect() || null !== $rhs->objectPropertyOwner) {
+                        $lhs->indirect($rhs);
+                        break;
+                    }
                     if (Variable::TYPE_INDIRECT !== $rhs->type) {
                         $ref = new Variable();
                         $ref->copyFrom($rhs);
