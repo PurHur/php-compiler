@@ -5207,6 +5207,58 @@ class JIT {
                         $this->context->getVariableFromOp($block->getOperand($op->arg2))
                     );
                     break;
+                case OpCode::TYPE_LIST_SPREAD_ASSIGN:
+                    if ($this->context->listUnpackSkipAssignPath) {
+                        break;
+                    }
+                    if (!isset($block->constants[$op->arg3])) {
+                        throw new \LogicException('list spread assign requires compile-time offset');
+                    }
+                    if ([] !== $op->listSpreadExcludedKeys) {
+                        throw new \LogicException('JIT list spread with excluded string keys is not implemented');
+                    }
+                    $spreadDestOp = $block->getOperand($op->arg1);
+                    $spreadSrc = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    if (
+                        [] === $op->listSpreadExcludedKeys
+                        && !JIT\ListUnpackHelper::isDefinitelyNonArrayAtCompileTime($spreadSrc)
+                    ) {
+                        JIT\ListUnpackHelper::emitIsListBranchOrFail($this->context, $spreadSrc);
+                    }
+                    $spreadI64 = $this->context->getTypeFromString('int64');
+                    $spreadI1 = $this->context->getTypeFromString('int1');
+                    $spreadOffset = $spreadI64->constInt($block->constants[$op->arg3]->toInt(), false);
+                    $spreadTailHt = JIT\ArrayBuiltinHelper::buildSliceArray(
+                        $this->context,
+                        $spreadSrc,
+                        $spreadOffset,
+                        $spreadI1->constInt(0, false),
+                        $spreadI64->constInt(0, false)
+                    );
+                    $spreadDestVar = $this->context->getVariableFromOp($spreadDestOp);
+                    if (
+                        Variable::TYPE_VALUE !== $spreadDestVar->type
+                        || 0 !== ($spreadDestVar->type & Variable::IS_NATIVE_ARRAY)
+                    ) {
+                        $spreadBox = JIT\JitValueBox::alloc($this->context);
+                        $this->context->setVariableOp(
+                            $spreadDestOp,
+                            new Variable(
+                                $this->context,
+                                Variable::TYPE_VALUE,
+                                Variable::KIND_VARIABLE,
+                                $spreadBox
+                            )
+                        );
+                        $spreadDestVar = $this->context->getVariableFromOp($spreadDestOp);
+                    }
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('__value__writeHashtable'),
+                        JIT\JitValueBox::pointer($this->context, $spreadDestVar->value),
+                        $spreadTailHt
+                    );
+                    $spreadDestVar->valueBoxHashtable = true;
+                    break;
                 case OpCode::TYPE_TYPE_ASSERT:
                     $this->assignOperand(
                         $block->getOperand($op->arg1),
@@ -8804,6 +8856,15 @@ class JIT {
             if (null === $result->objectPropertySlot) {
                 $result->addref();
             }
+
+            return;
+        } elseif (Variable::TYPE_VALUE === $result->type && Variable::TYPE_HASHTABLE === $value->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeHashtable'),
+                $this->valueBoxPointer($result),
+                $this->context->helper->loadValue($value)
+            );
+            $result->valueBoxHashtable = true;
 
             return;
         } elseif (Variable::TYPE_STRING === $result->type && Variable::TYPE_VALUE === $value->type) {
