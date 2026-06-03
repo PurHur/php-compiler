@@ -14,4 +14,5 @@ $call = Greeter::greet(...);
 echo $call(), "\n";
 
 --EXPECT--
+3
 hello

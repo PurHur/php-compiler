@@ -6923,6 +6923,10 @@ class JIT {
                         }
                     }
                     break;
+                case OpCode::TYPE_FROM_CALLABLE:
+                    $closureVar = JIT\FromCallableHelper::createClosureVariable($this->context, $block, $op);
+                    $this->assignOperand($block->getOperand($op->arg1), $closureVar, true);
+                    break;
                 case OpCode::TYPE_BEGIN_SILENCE:
                     JIT\ErrorSilenceHelper::beginSilence($this->context);
                     break;

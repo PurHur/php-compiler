@@ -188,6 +188,12 @@ class OpCode {
     const TYPE_IN = 123;
     /** `[$a, ...$rest] = $list` tail: arg1=dest, arg2=source array, arg3=from-index constant slot (#4835). */
     const TYPE_LIST_SPREAD_ASSIGN = 124;
+    /**
+     * Wrap compile-time callable (string or `[obj, method]` array) in a Closure object (#4810).
+     *
+     * arg1 = destination slot; arg2 = callable value slot (string or array).
+     */
+    const TYPE_FROM_CALLABLE = 125;
 
     /** `['k' => $v, ...$tail] = $arr` string keys already assigned; empty = numeric spread only (#4889). */
     public array $listSpreadExcludedKeys = [];

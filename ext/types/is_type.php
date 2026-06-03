@@ -32,7 +32,7 @@ class is_type extends Internal {
         if (count($frame->calledArgs) !== 1) {
             throw new \LogicException("Expecting exactly a single argument to {$this->name}()");
         }
-        $var = $frame->calledArgs[0];
+        $var = $frame->calledArgs[0]->resolveIndirect();
         if (!is_null($frame->returnVar)) {
             $frame->returnVar->bool($var->type === $this->type);
         }
