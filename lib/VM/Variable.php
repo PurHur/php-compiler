@@ -953,7 +953,7 @@ restart:
     }
 
     /**
-     * Unary {@see OpCode::TYPE_UNARY_PLUS}: non-numeric strings warn and coerce to 0 (zend_operators.c, #4723).
+     * Unary {@see OpCode::TYPE_UNARY_PLUS}/{@see OpCode::TYPE_UNARY_MINUS}: non-numeric strings warn and coerce to 0 (zend_operators.c, #4723, #5083).
      */
     private static function coerceUnaryPlusOperand(
         Variable $expr,
@@ -1938,15 +1938,21 @@ restart:
                     $this->copyFrom($expr);
                     $this->integer *= -1;
                     return;
-                } elseif($expr->type === Variable::TYPE_FLOAT) {
+                }
+                if ($expr->type === Variable::TYPE_FLOAT) {
                     $this->copyFrom($expr);
                     $this->float *= -1.0;
+
                     return;
-                } else {
-                    $this->castFrom(self::CAST_NUMERIC, $expr);
-                    goto restart;
                 }
-                break;
+                $number = self::coerceUnaryPlusOperand($expr->resolveIndirect(), $vm, $frame);
+                if (is_int($number)) {
+                    $this->int(-$number);
+                } else {
+                    $this->float(-$number);
+                }
+
+                return;
             case OpCode::TYPE_BITWISE_NOT:
                 if ($expr->type === self::TYPE_INTEGER) {
                     $this->int(~$expr->integer);

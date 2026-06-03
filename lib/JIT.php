@@ -6159,10 +6159,16 @@ class JIT {
                                 $op,
                                 $this->context->getVariableFromOp($block->getOperand($op->arg2)),
                             )
-                            : $this->context->helper->unaryOp(
-                                $op,
-                                $this->context->getVariableFromOp($block->getOperand($op->arg2)),
-                            )
+                            : (OpCode::TYPE_UNARY_MINUS === $op->type
+                                ? JIT\JitUnaryMinus::lower(
+                                    $this->context,
+                                    $op,
+                                    $this->context->getVariableFromOp($block->getOperand($op->arg2)),
+                                )
+                                : $this->context->helper->unaryOp(
+                                    $op,
+                                    $this->context->getVariableFromOp($block->getOperand($op->arg2)),
+                                ))
                     );
                     break;
                 case OpCode::TYPE_CASE:
