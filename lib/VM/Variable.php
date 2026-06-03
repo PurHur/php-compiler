@@ -1157,6 +1157,18 @@ restart:
     }
 
     private function _compareOp(int $opCode, $left, $right): bool {
+        if ((\is_float($left) && \is_nan($left)) || (\is_float($right) && \is_nan($right))) {
+            switch ($opCode) {
+                case OpCode::TYPE_IDENTICAL:
+                    return $left === $right;
+                case OpCode::TYPE_GREATER:
+                case OpCode::TYPE_SMALLER:
+                case OpCode::TYPE_GREATER_OR_EQUAL:
+                case OpCode::TYPE_SMALLER_OR_EQUAL:
+                    // Zend compare_function: relational ops with NaN are always false (#4712).
+                    return false;
+            }
+        }
         switch ($opCode) {
             case OpCode::TYPE_IDENTICAL:
                return $left === $right;
@@ -1349,6 +1361,15 @@ restart:
     /** @param int|float $left */
     private static function spaceshipValues(int|float $left, int|float $right): int
     {
+        return self::spaceshipNumeric($left, $right);
+    }
+
+    /** Zend compare_function / spaceship for numeric operands (#4712). */
+    private static function spaceshipNumeric(int|float $left, int|float $right): int
+    {
+        if ((\is_float($left) && \is_nan($left)) || (\is_float($right) && \is_nan($right))) {
+            return 1;
+        }
         if ($left < $right) {
             return -1;
         }
@@ -1384,14 +1405,7 @@ restart:
     }
 
     private function _spaceship($left, $right): int {
-        if ($left < $right) {
-            return -1;
-        }
-        if ($left > $right) {
-            return 1;
-        }
-
-        return 0;
+        return self::spaceshipNumeric($left, $right);
     }
 
     public function bitwiseOp(int $opCode, Variable $left, Variable $right): void {

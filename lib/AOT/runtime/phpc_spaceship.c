@@ -4,6 +4,7 @@
  * @see Zend/zend_operators.c compare_function(), zend_compare_arrays()
  */
 
+#include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -171,6 +172,9 @@ static int phpc_long_spaceship(long long left, long long right)
 
 static int phpc_double_spaceship(double left, double right)
 {
+    if (isnan(left) || isnan(right)) {
+        return 1;
+    }
     if (left < right) {
         return -1;
     }
