@@ -139,6 +139,7 @@ class Analyzer
                 || $usage instanceof Op\Iterator\Value
                 || $usage instanceof Op\Iterator\Next
                 || $usage instanceof Op\Terminal\Return_
+                || $usage instanceof Op\Terminal\Echo_
                 || $usage instanceof Op\Expr\Yield_
                 || $usage instanceof Op\Expr\YieldFrom
                 || $usage instanceof Op\Terminal\StaticVar
