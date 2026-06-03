@@ -2615,8 +2615,11 @@ class Compiler {
                     $this->compileClassConstDeclaration($child, $result);
                     break;
                 case Op\Stmt\TraitUse::class:
-                    if (OpCode::TYPE_DECLARE_CLASS !== $type) {
-                        $this->throwCompileLogic('Trait use is only supported on classes for now');
+                    if (
+                        OpCode::TYPE_DECLARE_CLASS !== $type
+                        && OpCode::TYPE_DECLARE_TRAIT !== $type
+                    ) {
+                        $this->throwCompileLogic('Trait use is only supported on classes and traits for now');
                     }
                     foreach ($child->traits as $traitOperand) {
                         $result->addOpCode(new OpCode(
