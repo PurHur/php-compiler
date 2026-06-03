@@ -1094,7 +1094,7 @@ class JIT {
             }
             foreach ($block->func->params as $idx => $param) {
                 $rawType = $this->rawTypeFromCfgParam($param);
-                $type = $this->llvmTypeForCfgParam($param);
+                $type = $this->llvmTypeForCfgParam($param, $block, $idx);
                 $callbackType .= $callbackSep . $this->context->getStringFromType($type);
                 $callbackSep = ', ';
                 $rawTypes[] = $rawType;
@@ -1212,8 +1212,8 @@ class JIT {
     ): PHPLLVM\Value {
         $paramTypes = [];
         if (null !== $block->func) {
-            foreach ($block->func->params as $param) {
-                $paramTypes[] = $this->llvmTypeForCfgParam($param);
+            foreach ($block->func->params as $idx => $param) {
+                $paramTypes[] = $this->llvmTypeForCfgParam($param, $block, $idx);
             }
         }
 
@@ -1233,8 +1233,8 @@ class JIT {
     ): PHPLLVM\Value {
         $paramTypes = [];
         if (null !== $block->func) {
-            foreach ($block->func->params as $param) {
-                $paramTypes[] = $this->llvmTypeForCfgParam($param);
+            foreach ($block->func->params as $idx => $param) {
+                $paramTypes[] = $this->llvmTypeForCfgParam($param, $block, $idx);
             }
         }
 
@@ -1254,8 +1254,8 @@ class JIT {
     ): PHPLLVM\Value {
         $paramTypes = [];
         if (null !== $block->func) {
-            foreach ($block->func->params as $param) {
-                $paramTypes[] = $this->llvmTypeForCfgParam($param);
+            foreach ($block->func->params as $idx => $param) {
+                $paramTypes[] = $this->llvmTypeForCfgParam($param, $block, $idx);
             }
         }
 
@@ -2549,8 +2549,8 @@ class JIT {
         if ($this->instanceMethodUsesThis($block)) {
             $args[] = $this->context->getTypeFromString('__object__*');
         }
-        foreach ($block->func->params as $param) {
-            $args[] = $this->llvmTypeForCfgParam($param);
+        foreach ($block->func->params as $idx => $param) {
+            $args[] = $this->llvmTypeForCfgParam($param, $block, $idx);
         }
         return $args;
     }
@@ -2646,8 +2646,18 @@ class JIT {
         return null;
     }
 
-    private function llvmTypeForCfgParam(\PHPCfg\Op\Expr\Param $param): PHPLLVM\Type
-    {
+    private function llvmTypeForCfgParam(
+        \PHPCfg\Op\Expr\Param $param,
+        ?Block $block = null,
+        ?int $paramIdx = null
+    ): PHPLLVM\Type {
+        if (
+            null !== $block
+            && null !== $paramIdx
+            && $this->cfgParamIsImplicitNullable($block, $paramIdx)
+        ) {
+            return $this->context->getTypeFromString('__value__*');
+        }
         if ($param->byRef) {
             return $this->context->getTypeFromString('__value__*');
         }
@@ -7431,6 +7441,19 @@ class JIT {
         }
 
         return $declared instanceof Op\Type\Nullable;
+    }
+
+    private function cfgParamIsImplicitNullable(Block $block, int $paramIdx): bool
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARG_RECV !== $op->type || (int) $op->arg2 !== $paramIdx) {
+                continue;
+            }
+
+            return isset($block->paramImplicitNullable[(int) $op->arg1]);
+        }
+
+        return false;
     }
 
     private function callbackTypeFromPhptype(Type $type): ?string

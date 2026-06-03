@@ -362,7 +362,7 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'coalesce_assign_jit')) {
                 continue;
             }
-            // Implicit nullable `int $x = null` default: VM (#4449); MCJIT execute segfault.
+            // Implicit nullable MCJIT execute: compile in ImplicitNullableParamJitCompileTest (#4767); execute when jit-runtime-probe green.
             if (str_contains($name, 'implicit_nullable_param')) {
                 continue;
             }
