@@ -178,7 +178,7 @@ class OpCode {
     const TYPE_PRE_DEC = 117;
     /** Logical xor (`$a xor $b`): both operands evaluated, truthiness exclusive-or (#2313). */
     const TYPE_LOGICAL_XOR = 118;
-    /** `list()` / `[]` unpack: arg2 = array slot; TypeError when not a list (#4298). */
+    /** `list()` / `[]` unpack: arg2 = array slot; skip assigns when not array (block1 merge, #4325). */
     const TYPE_LIST_UNPACK_CHECK = 120;
     /** Skip runtime static init when storage key (arg2) is already initialized; jump to block1 (#4352). */
     const TYPE_JUMPIF_FUNCTION_STATIC_INITIALIZED = 121;

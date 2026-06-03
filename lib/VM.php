@@ -1242,29 +1242,7 @@ restart:
                             $frame = $this->frameForBranch($frame, $op->block1);
                             goto restart;
                         }
-                        if (!\PHPCompiler\ext\standard\VmArray::isList($unpack->toArray())) {
-                            $catchFrame = $this->dispatchVmTypeError(
-                                new \TypeError('Cannot unpack array with string keys'),
-                                $frame
-                            );
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                        }
                         break;
-                    }
-                    if (Variable::TYPE_ARRAY === $unpack->type
-                        && !\PHPCompiler\ext\standard\VmArray::isList($unpack->toArray())
-                    ) {
-                        $catchFrame = $this->dispatchVmTypeError(
-                            new \TypeError('Cannot unpack array with string keys'),
-                            $frame
-                        );
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
                     }
                     break;
                 case OpCode::TYPE_LIST_SPREAD_ASSIGN:
