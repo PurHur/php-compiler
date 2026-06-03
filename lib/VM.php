@@ -674,15 +674,28 @@ class VM {
      */
     public function invokeClosure(ClosureState $closureState, Variable ...$args): Variable
     {
-        $savedStack = $this->context->swapRunStack(null);
+        return $this->invokeClosureFrom(null, $closureState, true, ...$args);
+    }
+
+    /**
+     * Invoke a closure; when $isolated is false, run on the active stack (#4927 Closure::call).
+     */
+    public function invokeClosureFrom(
+        ?Frame $runParent,
+        ClosureState $closureState,
+        bool $isolated,
+        Variable ...$args
+    ): Variable {
+        $savedStack = $isolated ? $this->context->swapRunStack(null) : null;
         try {
-            $init = new Frame(null, $closureState->func->block, null);
+            $init = new Frame(null, $closureState->func->block, $runParent);
             $init->vmContext = $this->context;
             $this->initClosureCall($init, $closureState);
             if (null === $init->call) {
                 throw new \LogicException('Closure invocation failed in this compiler build');
             }
-            $child = $init->call->getFrame($this->context, !empty($init->callArgs) ? $init : null);
+            $parentForCallee = $runParent ?? (!empty($init->callArgs) ? $init : null);
+            $child = $init->call->getFrame($this->context, $parentForCallee);
             $this->applyClosureBinding($child, $closureState);
             $child->calledArgs = $args;
             $out = new Variable();
@@ -701,7 +714,9 @@ class VM {
 
             return $out->resolveIndirect();
         } finally {
-            $this->context->swapRunStack($savedStack);
+            if ($isolated) {
+                $this->context->swapRunStack($savedStack);
+            }
         }
     }
 
@@ -2508,7 +2523,14 @@ restart:
                     $frame->closureCallableSlot = null;
                     $frame->closureCall = null;
                     $frame->pendingClosureInvoke = null;
-                    $this->applyClosureBinding($new, $closureState);
+                    // Only bind captures/$this when entering the closure body, not nested $this->method() (#4927).
+                    if (
+                        null !== $closureState
+                        && $frame->call instanceof Func\PHP
+                        && $frame->call === $closureState->func
+                    ) {
+                        $this->applyClosureBinding($new, $closureState);
+                    }
                     if (null !== $new->block && null !== $new->block->func && (int) ($new->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) {
                         $thisIdx = $new->block->slotIndexForVariableName('this');
                         if (null !== $thisIdx) {

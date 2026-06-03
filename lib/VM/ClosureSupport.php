@@ -165,6 +165,48 @@ final class ClosureSupport
         );
     }
 
+    /**
+     * Invoke a bound closure with a temporary $this (Closure::call; issue #4927).
+     *
+     * @param list<Variable> $invokeArgs
+     */
+    public static function call(
+        Context $ctx,
+        ClosureState $state,
+        Variable $newThis,
+        array $invokeArgs,
+        string $context = 'Closure::call()'
+    ): Variable {
+        $newThis = $newThis->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $newThis->type) {
+            throw new \TypeError(
+                "{$context}: Argument #1 (\$newThis) must be of type object, "
+                .self::valueTypeName($newThis).' given'
+            );
+        }
+        if (!$state->isUserClosure()) {
+            throw new \Error(
+                'Cannot call non-static '.$state->func->getName().'() statically'
+            );
+        }
+        if ($state->isStaticClosure()) {
+            throw new \Error('Cannot bind static closure to object');
+        }
+        $invokeState = $state->cloneForBind();
+        $boundThis = new Variable();
+        $boundThis->copyFrom($newThis);
+        $invokeState->boundThis = $boundThis;
+
+        $copies = [];
+        foreach ($invokeArgs as $arg) {
+            $copy = new Variable();
+            $copy->copyFrom($arg->resolveIndirect());
+            $copies[] = $copy;
+        }
+
+        return $ctx->runtime->vm->invokeClosure($invokeState, ...$copies);
+    }
+
     private static function fromFunctionName(Context $ctx, string $name): ClosureState
     {
         $lc = strtolower($name);
