@@ -566,6 +566,15 @@ final class HashTableHelper
      */
     public static function offsetIsSetDim(Context $context, Value $ht, Variable $dim): Value
     {
+        if (Variable::TYPE_NULL === $dim->type) {
+            $emptyKey = $context->builder->load($context->constantStringFromString(''));
+
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+                $ht,
+                $emptyKey
+            );
+        }
         if (Variable::TYPE_STRING === $dim->type) {
             return $context->builder->call(
                 $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
@@ -1404,6 +1413,12 @@ final class HashTableHelper
         }
         if (Variable::TYPE_OBJECT === $key->type || Variable::TYPE_HASHTABLE === $key->type) {
             self::emitIllegalOffsetType($context);
+
+            return;
+        }
+        if (Variable::TYPE_NULL === $key->type) {
+            $emptyKey = $context->builder->load($context->constantStringFromString(''));
+            self::setAtStringKey($context, $ht, $emptyKey, $element);
 
             return;
         }

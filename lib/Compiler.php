@@ -5366,12 +5366,13 @@ class Compiler {
                 return null;
             }
             $keyOp = $expr->keys[$i] ?? null;
-            if (
-                null === $keyOp
-                || $keyOp instanceof Operand\NullOperand
-                || ($keyOp instanceof Operand\Literal && null === $keyOp->value)
-            ) {
+            if (null === $keyOp) {
                 $ht->append($valueVm);
+                continue;
+            }
+            if ($keyOp instanceof Operand\NullOperand
+                || ($keyOp instanceof Operand\Literal && null === $keyOp->value)) {
+                $ht->update('', $valueVm);
                 continue;
             }
             $keyVm = $this->vmVariableFromCfgLiteralOperand($keyOp);
@@ -5384,6 +5385,8 @@ class Compiler {
                 $ht->update($keyVm->toString(), $valueVm);
             } elseif ($keyVm->is(Variable::TYPE_BOOLEAN)) {
                 $ht->updateIndex($keyVm->toBool() ? 1 : 0, $valueVm);
+            } elseif ($keyVm->is(Variable::TYPE_NULL)) {
+                $ht->update('', $valueVm);
             } else {
                 return null;
             }

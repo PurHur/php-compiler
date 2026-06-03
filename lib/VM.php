@@ -3052,6 +3052,8 @@ restart:
                             $ht->update($key->toString(), $value);
                         } elseif ($key->is(Variable::TYPE_BOOLEAN)) {
                             $ht->updateIndex($key->toBool() ? 1 : 0, $value);
+                        } elseif ($key->is(Variable::TYPE_NULL)) {
+                            $ht->update('', $value);
                         } else {
                             throw new \TypeError('Illegal offset type');
                         }
@@ -7044,6 +7046,8 @@ restart:
                     $ht->update($key->toString(), $value);
                 } elseif ($key->is(Variable::TYPE_BOOLEAN)) {
                     $ht->updateIndex($key->toBool() ? 1 : 0, $value);
+                } elseif ($key->is(Variable::TYPE_NULL)) {
+                    $ht->update('', $value);
                 } else {
                     throw new \TypeError('Illegal offset type');
                 }

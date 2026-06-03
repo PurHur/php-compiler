@@ -185,11 +185,27 @@ final class HashTable {
         return $int;
     }
 
-    public function keyExists(Variable $index): bool
+    /**
+     * php-src: null array keys coerce to empty string (zend_hash.c; #5269).
+     */
+    public static function normalizeIndexKey(Variable $index): Variable
     {
         if (Variable::TYPE_INDIRECT === $index->type) {
             $index = $index->resolveIndirect();
         }
+        if (Variable::TYPE_NULL === $index->type) {
+            $empty = new Variable();
+            $empty->string('');
+
+            return $empty;
+        }
+
+        return $index;
+    }
+
+    public function keyExists(Variable $index): bool
+    {
+        $index = self::normalizeIndexKey($index);
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
                 return null !== $this->findIndex($index->toInt());
@@ -203,9 +219,7 @@ final class HashTable {
     }
 
     public function findVariable(Variable $index, bool $forWrite): ?Variable {
-        if (Variable::TYPE_INDIRECT === $index->type) {
-            $index = $index->resolveIndirect();
-        }
+        $index = self::normalizeIndexKey($index);
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
                 $result = $this->findIndex($index->toInt());
@@ -1288,6 +1302,7 @@ final class HashTable {
     public function hasKey(Variable $index): bool
     {
         $this->assertConsistent();
+        $index = self::normalizeIndexKey($index);
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
                 $value = $this->findIndex($index->toInt());
@@ -1310,9 +1325,7 @@ final class HashTable {
      */
     public function offsetIsSet(Variable $index): bool
     {
-        if (Variable::TYPE_INDIRECT === $index->type) {
-            $index = $index->resolveIndirect();
-        }
+        $index = self::normalizeIndexKey($index);
         $stored = null;
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
@@ -1343,9 +1356,7 @@ final class HashTable {
         }
         $this->refcount->assertSeparated();
         $bucket = null;
-        if (Variable::TYPE_INDIRECT === $index->type) {
-            $index = $index->resolveIndirect();
-        }
+        $index = self::normalizeIndexKey($index);
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
                 $bucket = $this->findBucket($index->toInt(), null);
