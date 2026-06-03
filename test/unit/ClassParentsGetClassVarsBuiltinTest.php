@@ -16,7 +16,7 @@ final class ClassParentsGetClassVarsBuiltinTest extends TestCase
 class Base3159 {}
 class Child3159 extends Base3159 { public $a = 1; private $b = 2; }
 $p = class_parents(Child3159::class);
-echo count($p), "\n", $p[0], "\n";
+echo count($p), "\n", $p['Base3159'], "\n";
 $v = get_class_vars(Child3159::class);
 echo count($v), "\n", $v['a'], "\n";
 echo isset($v['b']) ? 'has-b' : 'no-b';
@@ -26,5 +26,22 @@ PHP;
         ob_start();
         $rt->run($block);
         $this->assertSame("1\nBase3159\n1\n1\nno-b", ob_get_clean());
+    }
+
+    public function testVmClassParentsAutoloadFlag(): void
+    {
+        $code = <<<'PHP'
+<?php
+class Base5026 {}
+class Child5026 extends Base5026 {}
+$p = class_parents(Child5026::class, true);
+echo count($p), "\n", $p['Base5026'], "\n";
+echo class_parents(Child5026::class, false)['Base5026'], "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'class_parents_autoload.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("1\nBase5026\nBase5026\n", ob_get_clean());
     }
 }
