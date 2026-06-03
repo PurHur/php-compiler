@@ -344,6 +344,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/web_int.php',
         'ext/standard/wordwrap.php',
         'ext/standard/VmFs.php',
+        'ext/standard/VmFsGlob.php',
         'ext/standard/VmFilter.php',
         'ext/standard/VmHash.php',
         'ext/standard/VmSession.php',
