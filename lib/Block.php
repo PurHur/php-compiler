@@ -1479,8 +1479,8 @@ class Block {
     }
 
     /**
-     * User-defined classes with declared instance properties — MCJIT link/execute segfaults (#5111).
-     * Vendor/compiler classes (phpcfg/phpcompiler) keep MCJIT lowering.
+     * User-defined classes with declared instance properties (diagnostics / predefine pass).
+     * Vendor/compiler classes (phpcfg/phpcompiler) are excluded from the scan.
      */
     public static function containsUserClassDeclaredInstancePropertyOpcodes(?self $root): bool
     {

@@ -372,8 +372,11 @@ class Object_ extends Type {
 
         $slot = $fn->getParam(0);
         $dest = $fn->getParam(1);
-        $loaded = $this->context->builder->load($slot);
         $voidPtr = $this->context->getTypeFromString('void*');
+        $loaded = $this->context->builder->pointerCast(
+            $this->context->builder->load($slot),
+            $voidPtr
+        );
         $isNull = $this->context->builder->icmp(
             PHPLLVM\Builder::INT_EQ,
             $loaded,
@@ -985,8 +988,12 @@ class Object_ extends Type {
                 continue;
             }
             $slot = $this->propertySlotPtr($obj, $propset[3]);
-            $loaded = $this->context->builder->load($slot);
-            $nullPtr = $this->context->getTypeFromString('void*')->constNull();
+            $voidPtr = $this->context->getTypeFromString('void*');
+            $loaded = $this->context->builder->pointerCast(
+                $this->context->builder->load($slot),
+                $voidPtr
+            );
+            $nullPtr = $voidPtr->constNull();
             $isEmpty = $this->context->builder->icmp(
                 PHPLLVM\Builder::INT_EQ,
                 $loaded,
@@ -1027,8 +1034,11 @@ class Object_ extends Type {
                 continue;
             }
             $slot = $this->propertySlotPtr($obj, $propset[3]);
-            $loaded = $this->context->builder->load($slot);
-            $nullPtr = $this->context->getTypeFromString('void*')->constNull();
+            $loaded = $this->context->builder->pointerCast(
+                $this->context->builder->load($slot),
+                $voidPtr
+            );
+            $nullPtr = $voidPtr->constNull();
             $isEmpty = $this->context->builder->icmp(
                 PHPLLVM\Builder::INT_EQ,
                 $loaded,

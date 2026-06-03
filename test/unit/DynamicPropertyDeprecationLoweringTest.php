@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class DynamicPropertyDeprecationLoweringTest extends TestCase
 {
-    public function testUndeclaredWriteRequiresVmLoweringUntilMcjitExecuteGreen(): void
+    public function testUndeclaredWriteRequiresVmLoweringUntilMcjitVerifyGreen(): void
     {
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(

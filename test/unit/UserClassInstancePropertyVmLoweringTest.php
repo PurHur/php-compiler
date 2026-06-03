@@ -7,11 +7,11 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * MCJIT link/execute segfaults on user-class declared instance properties (#5111).
+ * User-class declared instance properties — MCJIT execute (#5111).
  */
 final class UserClassInstancePropertyVmLoweringTest extends TestCase
 {
-    public function testDeclaredPropertyRequiresVmLowering(): void
+    public function testDeclaredPropertyRequiresVmLoweringUntilMcjitVerifyGreen(): void
     {
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(
