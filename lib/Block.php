@@ -621,9 +621,28 @@ class Block {
         return self::findVariableInParentFramesByName($name, $frame);
     }
 
+    /** Bound $this from auto-bound / bindTo closure invoke (issue #5325, Zend zend_closures.c). */
+    private static function resolveBoundClosureThis(Frame $frame): ?Variable
+    {
+        if (null !== $frame->pendingClosureInvoke && null !== $frame->pendingClosureInvoke->boundThis) {
+            return $frame->pendingClosureInvoke->boundThis;
+        }
+        if (null !== $frame->closureCall && null !== $frame->closureCall->boundThis) {
+            return $frame->closureCall->boundThis;
+        }
+
+        return null;
+    }
+
     public static function findVariableInParentFramesByName(string $name, Frame $frame): ?Variable
     {
         for ($f = $frame; null !== $f; $f = $f->parent) {
+            if ('this' === $name) {
+                $boundThis = self::resolveBoundClosureThis($f);
+                if (null !== $boundThis) {
+                    return $boundThis;
+                }
+            }
             if ('this' === $name && !empty($f->calledArgs)) {
                 return $f->calledArgs[0];
             }
@@ -671,6 +690,12 @@ class Block {
                 if (!empty($frame->calledArgs)) {
                     $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
                     $scope[$pos]->copyFrom($frame->calledArgs[0]);
+                    continue;
+                }
+                $boundThis = self::resolveBoundClosureThis($frame);
+                if (null !== $boundThis) {
+                    $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                    $scope[$pos]->copyFrom($boundThis);
                     continue;
                 }
                 // Static method references $this; frame setup must succeed so VM/JIT raise Error (#5261).
