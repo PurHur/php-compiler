@@ -122,10 +122,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'class_uses_runtime')) {
                 continue;
             }
-            // new static() / : static return — VM late binding (#3412); JIT phase 2.
-            if (str_contains($name, 'new_static') || str_contains($name, 'static_return_type')) {
-                continue;
-            }
             // gc_collect_cycles() MCJIT execute unstable (#3160); compile: GcCollectCyclesJitCompileTest.
             if (str_contains($name, 'gc_collect_cycles')) {
                 continue;
