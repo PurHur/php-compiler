@@ -128,6 +128,12 @@ class Block {
     /** Parameter indices marked `#[\SensitiveParameter]` (issue #3351). */
     public array $paramSensitive = [];
 
+    /** `#[\NoDiscard]` on this function/method (#5078). */
+    public bool $noDiscard = false;
+
+    /** Optional message from `#[\NoDiscard(message: ...)]`. */
+    public ?string $noDiscardMessage = null;
+
     /** Parameter scope slots with non-nullable type and `= null` default (Zend 8.2 implicit nullable, #4449). */
     public array $paramImplicitNullable = [];
 
@@ -463,6 +469,8 @@ class Block {
             $this->paramByRef = $parent->paramByRef;
             $this->paramSensitive = $parent->paramSensitive;
             $this->paramImplicitNullable = $parent->paramImplicitNullable;
+            $this->noDiscard = $parent->noDiscard;
+            $this->noDiscardMessage = $parent->noDiscardMessage;
         }
     }
 

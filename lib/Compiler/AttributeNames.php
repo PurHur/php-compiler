@@ -68,6 +68,19 @@ final class AttributeNames
         return false;
     }
 
+    /** PHP 8.4+ #[\NoDiscard] on functions/methods (issue #5078, Zend zend_attributes.c). */
+    public static function hasNoDiscard(array $names): bool
+    {
+        foreach ($names as $name) {
+            $base = ltrim($name, '\\');
+            if ('NoDiscard' === $base || str_ends_with($base, '\\NoDiscard')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Zend compile-time duplicate guard (zend_compile.c, zend_is_attribute_repeated) (#3718).
      *

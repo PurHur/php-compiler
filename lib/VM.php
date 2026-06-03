@@ -12,6 +12,7 @@ namespace PHPCompiler;
 require_once __DIR__.'/OpCodeNames.php';
 
 use PHPCompiler\Compiler\AttributeNames;
+use PHPCompiler\Compiler\NoDiscardMetadata;
 use PHPCompiler\Func;
 use PHPCompiler\ext\standard\VmEval;
 use PHPCompiler\ext\standard\VmForwardStaticCall;
@@ -2402,6 +2403,7 @@ restart:
                         ? (int) ($op->arg2 ?? 0)
                         : (int) ($op->arg1 ?? 0);
                     $this->emitCallDeprecationNotice($frame);
+                    $this->emitCallNoDiscardNotice($frame, $op);
                     if ($frame->call instanceof Func\PHP && $frame->call->block->isGenerator) {
                         try {
                             $calledArgs = $this->resolveOutgoingCallArgs($frame);
@@ -7013,6 +7015,36 @@ restart:
             $message = $meta->formatFunction($name);
         }
         $this->emitDeprecatedNotice($message, $frame);
+    }
+
+    private function emitCallNoDiscardNotice(Frame $frame, OpCode $op): void
+    {
+        if (OpCode::TYPE_FUNCCALL_EXEC_NORETURN !== $op->type) {
+            return;
+        }
+        if (null === $frame->call || !($frame->call instanceof Func\PHP)) {
+            return;
+        }
+        if (!$frame->call->block->noDiscard) {
+            return;
+        }
+        $meta = new NoDiscardMetadata($frame->call->block->noDiscardMessage);
+        $name = $frame->call->getName();
+        if (str_contains($name, '::')) {
+            [$class, $method] = explode('::', $name, 2);
+            $message = $meta->formatMethod($class, $method);
+        } else {
+            $message = $meta->formatFunction($name);
+        }
+        $line = (int) ($op->arg1 ?? 0);
+        $this->context->errors->triggerError(
+            $message,
+            VM\ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $this->context,
+            $frame,
+            $line > 0 ? $line : 0
+        );
     }
 
     private function emitDeprecatedNotice(string $message, Frame $frame): void
