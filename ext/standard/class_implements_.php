@@ -47,11 +47,6 @@ final class class_implements_ extends Internal
 
             return;
         }
-        if ($entry->isTrait) {
-            $frame->returnVar->bool(false);
-
-            return;
-        }
         $frame->returnVar->copyFrom(VmReflection::classImplementsArray($entry, $ctx));
     }
 

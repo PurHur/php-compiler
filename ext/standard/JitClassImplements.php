@@ -124,6 +124,9 @@ final class JitClassImplements
     {
         $lc = strtolower(ltrim($className, '\\'));
         $object = $context->type->object;
+        if ($object->isTraitClass($lc)) {
+            return self::buildInterfaceMapFromNames($context, []);
+        }
         if ($object->hasUserDeclaredClass($className)
             || $object->isInterfaceClassLc($lc)
             || $object->hasUserDeclaredEnum($className)) {
@@ -134,7 +137,7 @@ final class JitClassImplements
         if (null !== $vm && isset($vm->classes[$lc])) {
             $entry = $vm->classes[$lc];
             if ($entry->isTrait) {
-                return self::returnFalse($context);
+                return self::buildInterfaceMapFromNames($context, []);
             }
 
             return self::buildInterfaceMapFromNames(

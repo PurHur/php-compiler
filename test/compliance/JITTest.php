@@ -114,6 +114,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'class_uses_runtime')) {
                 continue;
             }
+            // class_implements() on trait: VM + JitClassImplements lowering (#5248); MCJIT DECLARE_TRAIT LLVM verify (#3609).
+            if (str_contains($name, 'class_implements_trait')) {
+                continue;
+            }
             // gc_collect_cycles() MCJIT execute unstable (#3160); compile: GcCollectCyclesJitCompileTest.
             if (str_contains($name, 'gc_collect_cycles')) {
                 continue;
