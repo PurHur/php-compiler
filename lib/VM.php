@@ -1064,6 +1064,10 @@ class VM {
     private function dispatchEngineThrow(Frame $frame, Variable $thrown): ?Frame
     {
         $thrown = $this->normalizeThrownVariable($thrown);
+        // Zend: throw in finally discards a pending return (#5331).
+        if ($this->frameIsInFinallyBody($frame)) {
+            $this->clearPendingReturnState();
+        }
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
             return $catchFrame;
@@ -4237,6 +4241,8 @@ restart:
                 $catchFrame->parent = $mergeFrame;
             }
             $this->context->activeCatchHandlerFrame = $handler;
+            // Abandon suspended try-body call sites (throw from callee/finally; #5331).
+            $this->context->clearRunStack();
             $this->clearThrowDispatchState();
 
             return $catchFrame;
@@ -4419,9 +4425,27 @@ restart:
         return !isset($this->context->completedFinallyHandlers[spl_object_id($handler)]);
     }
 
+    private function frameIsInFinallyBody(Frame $frame): bool
+    {
+        for ($handler = $frame->parent; null !== $handler; $handler = $handler->parent) {
+            $finallyOp = $this->findFinallyOpForHandler($handler);
+            if (null === $finallyOp || null === $finallyOp->block1) {
+                continue;
+            }
+            if ($finallyOp->block1 === $frame->block) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** Normal try completion runs the finally CFG block directly; mark it done (#3082). */
     private function markFinallyCompletedWhenLeavingFinallyBody(Frame $frame): void
     {
+        if (!$this->frameIsInFinallyBody($frame)) {
+            return;
+        }
         for ($handler = $frame->parent; null !== $handler; $handler = $handler->parent) {
             $finallyOp = $this->findFinallyOpForHandler($handler);
             if (null === $finallyOp || null === $finallyOp->block1) {

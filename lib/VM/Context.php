@@ -561,6 +561,12 @@ class Context {
         return null;;
     }
 
+    /** Drop suspended call-site frames when catch takes over from a nested throw (#5331). */
+    public function clearRunStack(): void
+    {
+        $this->runStack = null;
+    }
+
     /**
      * Active user frames, innermost first (matches debug_backtrace() order, #1378, #3626).
      *
