@@ -5920,7 +5920,8 @@ class JIT {
                         if ($this->context->inlineIncludeDepth > 0) {
                             JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
                         }
-                        $merged = $this->compileBlockInternal($func, $op->block3, null, $mergeBb, 0, false, ...$args);
+                        $mergeLimit = JIT\CoalesceHelper::mergeBlockOpcodeLimit($op->block3);
+                        $merged = $this->compileBlockInternal($func, $op->block3, $mergeLimit, $mergeBb, 0, false, ...$args);
                         unset($this->context->coalesceAssignTargets[$coalesceResult]);
                         if ($this->context->inlineIncludeDepth > 0) {
                             // Do not set inlineIncludeExitBlock to the ?? merge block (#866, #784).
@@ -5967,7 +5968,8 @@ class JIT {
                             $builder->branch($mergeBb);
                         }
                         $builder->positionAtEnd($mergeBb);
-                        $merged = $this->compileBlockInternal($func, $op->block3, null, $mergeBb, 0, false, ...$args);
+                        $mergeLimit = JIT\CoalesceHelper::mergeBlockOpcodeLimit($op->block3);
+                        $merged = $this->compileBlockInternal($func, $op->block3, $mergeLimit, $mergeBb, 0, false, ...$args);
                         unset($this->context->coalesceAssignTargets[$nullsafeResult]);
 
                         return $merged;
