@@ -91,6 +91,7 @@ class JIT {
             }
         }
         JIT\Progress::noteFunction('jit_compile_compile_block_begin');
+        $this->context->jitUndeclaredInstancePropertyWrites = Block::collectJitUndeclaredInstancePropertyWrites($block);
         $return = $this->compileBlock($block);
         JIT\Progress::noteFunction('jit_compile_compile_block_done');
         JIT\Progress::noteFunction('jit_compile_run_queue_begin');
@@ -8301,6 +8302,10 @@ class JIT {
             $classId,
             $ownMethods,
             $traitMethodSources
+        );
+        $this->context->type->object->definePendingUndeclaredInstanceProperties(
+            $classId,
+            $this->context->scope->className ?? ''
         );
     }
 

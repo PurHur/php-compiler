@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Block::containsDynamicPropertyDeprecationOpcodes drives bin/jit.php VM fallback (#4570).
+ * Block::containsDynamicPropertyDeprecationOpcodes; VM fallback until MCJIT execute green (#5111).
  */
 final class DynamicPropertyDeprecationLoweringTest extends TestCase
 {

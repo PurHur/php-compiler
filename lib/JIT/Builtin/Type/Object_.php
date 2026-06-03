@@ -2698,6 +2698,27 @@ class Object_ extends Type {
     }
 
     /**
+     * After DECLARE_PROPERTY lowering, register dynamic writes so `new` allocates enough slots (#5111).
+     */
+    public function definePendingUndeclaredInstanceProperties(int $classId, string $className): void
+    {
+        if ('' === $className) {
+            return;
+        }
+        $pending = $this->context->jitUndeclaredInstancePropertyWrites[strtolower(ltrim($className, '\\'))] ?? [];
+        foreach ($pending as $propName) {
+            if ($this->hasProperty($classId, $propName)) {
+                continue;
+            }
+            // User classes: native slots avoid VALUE-box propertyStore IR that segfaults MCJIT (#5111).
+            $jitType = $this->isExternalOnlyClass($classId)
+                ? $this->externalPropertyJitType($className, $propName)
+                : Variable::TYPE_NATIVE_LONG;
+            $this->defineProperty($classId, $propName, $jitType);
+        }
+    }
+
+    /**
      * @param list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}> $arms
      */
     public function definePropertyDnfArms(int $classId, string $name, array $arms): void

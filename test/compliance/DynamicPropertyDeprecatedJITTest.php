@@ -9,9 +9,8 @@ require_once __DIR__ . '/../BaseTest.php';
 /**
  * JIT compliance for PHP 8.2 dynamic property deprecation (#4570).
  *
- * MCJIT execute for undeclared property writes still segfaults; bin/jit.php VM-fallbacks
- * via {@see Block::containsDynamicPropertyDeprecationOpcodes}. LLVM lowering emits
- * __compiler_trigger_error(E_DEPRECATED) for direct Runtime::jit() paths.
+ * MCJIT execute for undeclared property writes; LLVM lowering emits
+ * __compiler_trigger_error(E_DEPRECATED) via DynamicPropertyDeprecationGuard (#5111).
  *
  * @group llvm
  * @group jit
