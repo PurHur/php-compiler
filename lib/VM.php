@@ -2141,13 +2141,10 @@ restart:
                     if (null === $op->arg3) {
                         if (null !== $op->arg2 && isset($frame->scope[$op->arg2])) {
                             $slot = $frame->scope[$op->arg2];
-                            if (Variable::TYPE_INDIRECT === $slot->type) {
-                                $target = $slot->resolveIndirect();
-                                $target->reset();
-                                $target->type = Variable::TYPE_UNDEFINED;
-                            } else {
-                                $slot->resolveIndirect()->null();
-                            }
+                            // Break the local/reference binding only — never destroy the shared
+                            // target (Zend unset on ref; foreach &$v cleanup #4997, #3517).
+                            $slot->reset();
+                            $slot->type = Variable::TYPE_UNDEFINED;
                         }
                         break;
                     }
