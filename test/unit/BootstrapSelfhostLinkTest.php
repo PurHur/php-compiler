@@ -31,6 +31,8 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_M5_NO_ZEND', $link);
         $install = (string) file_get_contents(self::$root.'/script/bootstrap-gen0-install-prelinked-driver.sh');
         $this->assertStringContainsString('prelinked/bootstrap-gen0/bin-compile-aot', $install);
+        $this->assertStringContainsString('bootstrap_gen0_copy_prelinked_inventory_driver', $install);
+        $this->assertStringContainsString('#2930', $install);
         $this->assertStringContainsString('compiler_minimal_aot_blob', $install);
         $this->assertFileExists(self::$root.'/prelinked/bootstrap-gen0/bin-compile-aot');
         $this->assertFileExists(self::$root.'/prelinked/bootstrap-gen0/compiler_minimal_aot_blob');

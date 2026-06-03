@@ -17,6 +17,68 @@ bootstrap_gen0_prelinked_driver_ready() {
   [[ -f "${seed}" && -s "${seed}" ]]
 }
 
+# Seed link-time sidecars so Zend inventory emit skips bin/compile.php host-compile (#2930).
+bootstrap_gen0_seed_prelinked_m3_sidecars() {
+  local root="${ROOT:-}"
+  if [[ -z "${root}" ]]; then
+    return 1
+  fi
+  local seed blob minimal_seed minimal_blob
+  seed="$(bootstrap_gen0_prelinked_driver_path)"
+  if [[ ! -f "${seed}" || ! -s "${seed}" ]]; then
+    return 1
+  fi
+  minimal_seed="${root}/prelinked/bootstrap-gen0/compiler_minimal_aot_blob"
+  if [[ ! -f "${minimal_seed}" || ! -s "${minimal_seed}" ]]; then
+    return 1
+  fi
+  mkdir -p "${root}/build"
+  blob="${root}/build/.m3_bin_compile_aot_blob"
+  minimal_blob="${root}/build/.m3_compiler_minimal_aot_blob"
+  local prelinked_blob="${root}/prelinked/bootstrap-gen0/.m3_bin_compile_aot_blob"
+  if [[ -f "${prelinked_blob}" && -s "${prelinked_blob}" ]]; then
+    cp -f "${prelinked_blob}" "${blob}"
+  else
+    cp -f "${seed}" "${blob}"
+  fi
+  cp -f "${minimal_seed}" "${minimal_blob}"
+  chmod +x "${blob}" "${minimal_blob}"
+  return 0
+}
+
+# Copy committed gen-0 argv driver to inventory outputs (mitigates Zend SIGSEGV on bin/compile.php — #2930).
+bootstrap_gen0_copy_prelinked_inventory_driver() {
+  local aot_out=$1
+  local emit_helper="${2:-}"
+  local inventory_argv="${3:-}"
+  local root="${ROOT:-}"
+  if [[ -z "${root}" || -z "${aot_out}" ]]; then
+    return 1
+  fi
+  local seed
+  seed="$(bootstrap_gen0_prelinked_driver_path)"
+  if [[ ! -f "${seed}" || ! -s "${seed}" ]]; then
+    echo "bootstrap-gen0-install: missing committed driver ${seed} (#2930)" >&2
+    return 1
+  fi
+  mkdir -p "${root}/build" "$(dirname "${aot_out}")"
+  cp -f "${seed}" "${aot_out}"
+  chmod +x "${aot_out}"
+  bootstrap_gen0_seed_prelinked_m3_sidecars || true
+  if [[ -n "${emit_helper}" ]]; then
+    cp -f "${aot_out}" "${emit_helper}"
+    chmod +x "${emit_helper}"
+  fi
+  if [[ -n "${inventory_argv}" ]]; then
+    cp -f "${aot_out}" "${inventory_argv}"
+    chmod +x "${inventory_argv}"
+  fi
+  cp -f "${aot_out}" "${root}/build/.m3_bin_compile_aot_blob"
+  chmod +x "${root}/build/.m3_bin_compile_aot_blob"
+  echo "bootstrap-gen0-install: installed inventory argv driver from prelinked/bootstrap-gen0 (#2930)" >&2
+  return 0
+}
+
 bootstrap_gen0_install_prelinked_driver() {
   local root="${ROOT:-}"
   if [[ -z "${root}" ]]; then

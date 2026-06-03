@@ -8,6 +8,8 @@ SOURCE="${PHP_COMPILER_M3_SOURCE:-${ROOT}/examples/000-HelloWorld/example.php}"
 AOT_OUT="${PHP_COMPILER_M3_OUT:-${ROOT}/build/helloworld-compile-bin-aot}"
 # shellcheck source=php-env.sh
 source "$(dirname "$0")/php-env.sh"
+# shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+source "$(dirname "$0")/bootstrap-gen0-install-prelinked-driver.sh"
 ci_apply_llvm_memory_env
 
 if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLVM-9.so.1" ]]; then
@@ -34,22 +36,43 @@ fi
 if [[ "${SOURCE_NORM}" == "${ROOT}/bin/compile.php" ]]; then
   EMIT_HELPER="${ROOT}/build/selfhost-native-compile-driver"
   INVENTORY_ARGV="${ROOT}/build/bin-compile-aot-inventory"
-  rm -f "${EMIT_HELPER}" "${AOT_OUT}" "${INVENTORY_ARGV}" "${ROOT}/build/.last-jit-func-native-compile-driver" "${ROOT}/build/.m3_bin_compile_aot_blob"
+  PRELINKED_GEN0="$(bootstrap_gen0_prelinked_driver_path)"
+  # Zend inventory emit SIGSEGV on bin/compile.php — prefer committed gen-0 when unset (#2930).
+  if [[ "${BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED:-}" == "" && bootstrap_gen0_prelinked_driver_ready ]]; then
+    BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED=1
+  fi
+  rm -f "${EMIT_HELPER}" "${AOT_OUT}" "${INVENTORY_ARGV}" "${ROOT}/build/.last-jit-func-native-compile-driver"
   export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-native-compile-driver"
-  if ! env -u PHP_COMPILER_EMIT_HELPER_LINK PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1 \
-    PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \
-    PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
-    PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke \
-    php "${ROOT}/bin/compile.php" -o "${AOT_OUT}" "${ROOT}/bin/compile.php" 2>&1; then
-    echo "bootstrap-selfhost-helloworld-compile-bin: native compile driver link failed" >&2
-    exit 1
+  _inventory_zend_ok=0
+  if [[ "${BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED:-0}" != "1" ]]; then
+    bootstrap_gen0_seed_prelinked_m3_sidecars || true
+    set +e
+    _inventory_zend_out="$(
+      env -u PHP_COMPILER_EMIT_HELPER_LINK PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 \
+        PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1 PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \
+        PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
+        PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke \
+        php "${ROOT}/bin/compile.php" -o "${AOT_OUT}" "${ROOT}/bin/compile.php" 2>&1
+    )"
+    _inventory_zend_code=$?
+    set -e
+    printf '%s\n' "${_inventory_zend_out}"
+    if [[ "${_inventory_zend_code}" -eq 0 && -x "${AOT_OUT}" ]]; then
+      _inventory_zend_ok=1
+    elif [[ "${_inventory_zend_code}" -eq 139 ]]; then
+      echo "bootstrap-selfhost-helloworld-compile-bin: Zend inventory emit segfault (exit 139); trying prelinked gen-0 (#2930)" >&2
+    else
+      echo "bootstrap-selfhost-helloworld-compile-bin: Zend inventory emit failed (exit ${_inventory_zend_code}); trying prelinked gen-0 (#2930)" >&2
+    fi
   fi
-  if [[ ! -x "${AOT_OUT}" ]]; then
-    echo "bootstrap-selfhost-helloworld-compile-bin: missing ${AOT_OUT}" >&2
-    exit 1
+  if [[ "${_inventory_zend_ok}" -eq 0 ]]; then
+    if ! bootstrap_gen0_copy_prelinked_inventory_driver "${AOT_OUT}" "${EMIT_HELPER}" "${INVENTORY_ARGV}"; then
+      echo "bootstrap-selfhost-helloworld-compile-bin: native compile driver link failed (no prelinked ${PRELINKED_GEN0})" >&2
+      exit 1
+    fi
+    echo "bootstrap-selfhost-helloworld-compile-bin: OK ${AOT_OUT} (prelinked inventory argv driver; SSOT ${INVENTORY_ARGV}; #2930)"
+    exit 0
   fi
-  # Inventory driver smoke self-test is currently unstable: the driver may intentionally
-  # return null for non-sidecar sources while we bisect M3 inventory emit crashes (#2967).
   cp -f "${AOT_OUT}" "${EMIT_HELPER}"
   cp -f "${AOT_OUT}" "${ROOT}/build/.m3_bin_compile_aot_blob"
   cp -f "${AOT_OUT}" "${INVENTORY_ARGV}"
@@ -90,18 +113,37 @@ if [[ "${compile_code}" -eq 0 ]] && grep -qE 'helloworld_compile_smoke: compile 
   echo "bootstrap-selfhost-helloworld-compile-bin: OK ${OUT} -> ${AOT_OUT}"
   # M5 gen-2 argv driver must be inventory-linked bin/compile.php (~400KiB), not HelloWorld-only (~180KiB) (#3011).
   BIN_COMPILE_AOT="${ROOT}/build/bin-compile-aot-inventory"
-  rm -f "${BIN_COMPILE_AOT}" "${ROOT}/build/.m3_bin_compile_aot_blob"
-  if ! env -u PHP_COMPILER_EMIT_HELPER_LINK PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 \
-    PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1 PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \
-    PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
-    PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke \
-    php "${ROOT}/bin/compile.php" -o "${BIN_COMPILE_AOT}" "${ROOT}/bin/compile.php" 2>&1; then
-    echo "bootstrap-selfhost-helloworld-compile-bin: inventory bin/compile.php argv driver failed (#3011)" >&2
-    exit 1
+  rm -f "${BIN_COMPILE_AOT}"
+  if [[ "${BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED:-}" == "" && bootstrap_gen0_prelinked_driver_ready ]]; then
+    BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED=1
   fi
-  if [[ ! -x "${BIN_COMPILE_AOT}" ]]; then
-    echo "bootstrap-selfhost-helloworld-compile-bin: missing ${BIN_COMPILE_AOT} (inventory argv)" >&2
-    exit 1
+  _inventory_argv_ok=0
+  if [[ "${BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED:-0}" != "1" ]]; then
+    bootstrap_gen0_seed_prelinked_m3_sidecars || true
+    set +e
+    _inventory_argv_out="$(
+      env -u PHP_COMPILER_EMIT_HELPER_LINK PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 \
+        PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1 PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \
+        PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
+        PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke \
+        php "${ROOT}/bin/compile.php" -o "${BIN_COMPILE_AOT}" "${ROOT}/bin/compile.php" 2>&1
+    )"
+    _inventory_argv_code=$?
+    set -e
+    printf '%s\n' "${_inventory_argv_out}"
+    if [[ "${_inventory_argv_code}" -eq 0 && -x "${BIN_COMPILE_AOT}" ]]; then
+      _inventory_argv_ok=1
+    else
+      echo "bootstrap-selfhost-helloworld-compile-bin: Zend inventory argv failed (exit ${_inventory_argv_code}); trying prelinked gen-0 (#2930)" >&2
+    fi
+  fi
+  if [[ "${_inventory_argv_ok}" -eq 0 ]]; then
+    if ! bootstrap_gen0_copy_prelinked_inventory_driver "${BIN_COMPILE_AOT}" "" "${BIN_COMPILE_AOT}"; then
+      echo "bootstrap-selfhost-helloworld-compile-bin: inventory bin/compile.php argv driver failed (#3011)" >&2
+      exit 1
+    fi
+    echo "bootstrap-selfhost-helloworld-compile-bin: OK inventory argv ${BIN_COMPILE_AOT} (prelinked; #2930)"
+    exit 0
   fi
   cp -f "${BIN_COMPILE_AOT}" "${ROOT}/build/.m3_bin_compile_aot_blob"
   chmod +x "${BIN_COMPILE_AOT}" "${ROOT}/build/.m3_bin_compile_aot_blob"

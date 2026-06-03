@@ -3494,6 +3494,53 @@ class JIT {
                 return;
             }
         }
+        // Zend host-compile of bin/compile.php inventory argv driver SIGSEGVs — reuse committed gen-0 (#2930).
+        if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL === $sidecarRel) {
+            foreach (
+                [
+                    $repoRoot.'/prelinked/bootstrap-gen0/.m3_bin_compile_aot_blob',
+                    $repoRoot.'/prelinked/bootstrap-gen0/bin-compile-aot',
+                ] as $prelinkedBinCompile
+            ) {
+                if (!is_readable($prelinkedBinCompile)) {
+                    continue;
+                }
+                $aotBytes = file_get_contents($prelinkedBinCompile);
+                if (!is_string($aotBytes) || '' === $aotBytes) {
+                    continue;
+                }
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
+                    $this->context,
+                    $repoRoot,
+                    $code,
+                    $aotBytes,
+                    $sidecarRel,
+                    $sentinelLogical,
+                    true
+                );
+
+                return;
+            }
+        }
+        if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_MINIMAL_SIDECAR_REL === $sidecarRel) {
+            $prelinkedMinimal = $repoRoot.'/prelinked/bootstrap-gen0/compiler_minimal_aot_blob';
+            if (is_readable($prelinkedMinimal)) {
+                $aotBytes = file_get_contents($prelinkedMinimal);
+                if (is_string($aotBytes) && '' !== $aotBytes) {
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
+                        $this->context,
+                        $repoRoot,
+                        $code,
+                        $aotBytes,
+                        $sidecarRel,
+                        $sentinelLogical,
+                        true
+                    );
+
+                    return;
+                }
+            }
+        }
         $hostCompilePath = $path;
         if (str_ends_with($pathNorm, '/bin/compile.php')) {
             // For gen-3 (argv) and other bootstrap products, compiling bin/compile.php must default to the
