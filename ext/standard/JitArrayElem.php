@@ -20,7 +20,7 @@ final class JitArrayElem
 {
     private const TYPE_ERROR = '%s(): Argument #1 ($array) must be of type array, %s given';
 
-    private const TYPE_ERROR_N = '%s(): Argument #%d ($%s) must be of type array, %s given';
+    private const TYPE_ERROR_N = '%s(): Argument #%d ($%s) must be of type %s, %s given';
 
     private const EMPTY_VALUE_ERROR = '%s(): Argument #1 ($array) must not be empty';
 
@@ -184,7 +184,8 @@ final class JitArrayElem
         JITVariable $array,
         string $fn,
         int $argNum,
-        string $paramName
+        string $paramName,
+        string $expectedType = 'array'
     ): void {
         if (JITVariable::TYPE_HASHTABLE === $array->type
             || ($array->type & JITVariable::IS_NATIVE_ARRAY)
@@ -209,7 +210,7 @@ final class JitArrayElem
             $context->builder->positionAtEnd($errBlock);
             self::emitErrorAndAbort(
                 $context,
-                \sprintf(self::TYPE_ERROR_N, $fn, $argNum, $paramName, 'mixed')
+                \sprintf(self::TYPE_ERROR_N, $fn, $argNum, $paramName, $expectedType, 'mixed')
             );
             $context->builder->positionAtEnd($okBlock);
 
@@ -221,7 +222,14 @@ final class JitArrayElem
         $context->builder->positionAtEnd($errBlock);
         self::emitErrorAndAbort(
             $context,
-            \sprintf(self::TYPE_ERROR_N, $fn, $argNum, $paramName, self::jitTypeLabel($array->type))
+            \sprintf(
+                self::TYPE_ERROR_N,
+                $fn,
+                $argNum,
+                $paramName,
+                $expectedType,
+                self::jitTypeLabel($array->type)
+            )
         );
         $context->builder->positionAtEnd($okBlock);
     }
