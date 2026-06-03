@@ -406,10 +406,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'property_hook')) {
                 continue;
             }
-            // array union (+/+=) is VM-only until JIT TYPE_PLUS array branch (#3690).
-            if (str_contains($name, 'array_union')) {
-                continue;
-            }
             // User enum DECLARE_ENUM segfaults in MCJIT until enum lowering is stable (#3518).
             // enum_spaceship_jit: lowering fixed #4849; compliance JIT when jit-runtime-probe green (#98).
             // enum_case_name_value: ->name/->value JIT dispatch (#4953); compliance when jit-runtime-probe green (#98).

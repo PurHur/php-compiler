@@ -9015,6 +9015,143 @@ final class ArrayBuiltinHelper
     }
 
     /**
+     * Array union ($left + $right): left keys win; integer keys are not renumbered (#3690, #5032).
+     *
+     * @see Zend/zend_operators.c add_function() / zend_hash_merge()
+     */
+    public static function arrayUnion(Context $context, Variable $left, Variable $right): Variable
+    {
+        $leftHt = self::loadHashTable($context, $left);
+        $rightHt = self::loadHashTable($context, $right);
+        $dest = HashTableHelper::alloc($context);
+        self::overlayHashTable($context, $dest, $leftHt);
+        self::unionInPlaceMissingKeys($context, $dest, $rightHt);
+        $context->refcount->addref($dest);
+
+        if (Variable::TYPE_HASHTABLE === $left->type && Variable::TYPE_HASHTABLE === $right->type) {
+            return new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $dest);
+        }
+
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            JitValueBox::pointer($context, $slot),
+            $dest
+        );
+        $var = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+        $var->valueBoxHashtable = true;
+
+        return $var;
+    }
+
+    /**
+     * Append keys from $src that are absent in $dest (Zend array union / += semantics).
+     */
+    private static function unionInPlaceMissingKeys(Context $context, Value $dest, Value $src): void
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+
+        $nextFree = $context->builder->load($context->builder->structGep($src, $map['nextFreeElement']));
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_union_packed_idx');
+        $context->builder->store($zero, $idxSlot);
+
+        $packedHead = BasicBlockHelper::append($context, 'array_union_packed_head');
+        $packedBody = BasicBlockHelper::append($context, 'array_union_packed_body');
+        $packedCheck = BasicBlockHelper::append($context, 'array_union_packed_check');
+        $packedCopy = BasicBlockHelper::append($context, 'array_union_packed_copy');
+        $packedSkip = BasicBlockHelper::append($context, 'array_union_packed_skip');
+        $packedNext = BasicBlockHelper::append($context, 'array_union_packed_next');
+        $packedDone = BasicBlockHelper::append($context, 'array_union_packed_done');
+        $context->builder->branch($packedHead);
+
+        $context->builder->positionAtEnd($packedHead);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
+        $context->builder->branchIf($atEnd, $packedDone, $packedBody);
+
+        $context->builder->positionAtEnd($packedBody);
+        $srcSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $idx
+        );
+        $context->builder->branchIf($srcSet, $packedCheck, $packedNext);
+
+        $context->builder->positionAtEnd($packedCheck);
+        $destSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $dest,
+            $idx
+        );
+        $context->builder->branchIf($destSet, $packedSkip, $packedCopy);
+
+        $context->builder->positionAtEnd($packedCopy);
+        self::copyPackedListEntry($context, $src, $idx, $dest, $idx);
+        $context->builder->branch($packedNext);
+
+        $context->builder->positionAtEnd($packedSkip);
+        $context->builder->branch($packedNext);
+
+        $context->builder->positionAtEnd($packedNext);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($packedHead);
+
+        $strInit = BasicBlockHelper::append($context, 'array_union_str_init');
+        $strHead = BasicBlockHelper::append($context, 'array_union_str_head');
+        $context->builder->positionAtEnd($packedDone);
+        $context->builder->branch($strInit);
+
+        $context->builder->positionAtEnd($strInit);
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_union_str_walk');
+        $head = $context->builder->load($context->builder->structGep($src, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+        $strBody = BasicBlockHelper::append($context, 'array_union_str_body');
+        $strCheck = BasicBlockHelper::append($context, 'array_union_str_check');
+        $strSet = BasicBlockHelper::append($context, 'array_union_str_set');
+        $strSkip = BasicBlockHelper::append($context, 'array_union_str_skip');
+        $strNext = BasicBlockHelper::append($context, 'array_union_str_next');
+        $strDone = BasicBlockHelper::append($context, 'array_union_str_done');
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $strDone, $strBody);
+
+        $context->builder->positionAtEnd($strBody);
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $context->builder->branch($strCheck);
+
+        $context->builder->positionAtEnd($strCheck);
+        $exists = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+            $dest,
+            $keyStr
+        );
+        $context->builder->branchIf($exists, $strSkip, $strSet);
+
+        $context->builder->positionAtEnd($strSet);
+        self::storeValueEntryAtStringKey($context, $dest, $keyStr, $valEntry);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strSkip);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strNext);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strDone);
+    }
+
+    /**
      * array_replace() for arrays with int and string keys (subset of PHP; issue #1208).
      */
     public static function arrayReplace(Context $context, Variable $first, Variable ...$others): Value
