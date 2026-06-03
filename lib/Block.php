@@ -673,6 +673,11 @@ class Block {
                     $scope[$pos]->copyFrom($frame->calledArgs[0]);
                     continue;
                 }
+                // Static method references $this; frame setup must succeed so VM/JIT raise Error (#5261).
+                if ($this->isStaticMethodBlock()) {
+                    $scope[$pos] = new Variable(Variable::TYPE_UNDEFINED);
+                    continue;
+                }
             }
 
             if (isset($this->constants[$pos]) && !$this->args->contains($op)) {
@@ -720,6 +725,10 @@ class Block {
                             $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
                             continue;
                         }
+                        $scope[$pos] = new Variable(Variable::TYPE_UNDEFINED);
+                        continue;
+                    }
+                    if (null !== $name && 'this' === $name && $this->isStaticMethodBlock()) {
                         $scope[$pos] = new Variable(Variable::TYPE_UNDEFINED);
                         continue;
                     }
@@ -1847,5 +1856,12 @@ class Block {
             || self::containsTraitConstructorOpcodes($root)
             || self::containsReflectionAttributeNewInstanceOpcodes($root)
             || self::containsInterfaceAbstractStaticMcjitDeferral($root);
+    }
+
+    private function isStaticMethodBlock(): bool
+    {
+        return null !== $this->func
+            && null !== $this->func->class
+            && (($this->func->flags ?? 0) & Func::FLAG_STATIC) !== 0;
     }
 }
