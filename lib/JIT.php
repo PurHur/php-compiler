@@ -6641,6 +6641,10 @@ class JIT {
                         $this->context->scope->classId,
                         $nameOp->value
                     );
+                    $this->context->type->object->inheritInterfacePropertySetVisibility(
+                        $this->context->scope->classId,
+                        $nameOp->value
+                    );
                     $this->context->popScope();
                     break;
                 case OpCode::TYPE_DECLARE_TRAIT:
@@ -6749,6 +6753,10 @@ class JIT {
                         );
                     }
                     $this->context->type->object->inheritInterfaceConstants(
+                        $this->context->scope->classId,
+                        $nameOp->value
+                    );
+                    $this->context->type->object->inheritInterfacePropertySetVisibility(
                         $this->context->scope->classId,
                         $nameOp->value
                     );

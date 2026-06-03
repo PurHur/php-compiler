@@ -6173,6 +6173,7 @@ restart:
                 continue;
             }
             $iface = $this->context->classes[$ifaceLc];
+            $this->inheritInterfacePropertyRules($entry, $iface);
             foreach ($iface->constants as $name => $value) {
                 if (!isset($entry->constants[$name])) {
                     $entry->constants[$name] = $value;
@@ -6180,6 +6181,30 @@ restart:
                         $entry->constVisibility[$name] = $iface->constVisibility[$name];
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Merge asymmetric set visibility and parent-interface property declares (#4876).
+     */
+    protected function inheritInterfacePropertyRules(ClassEntry $entry, ClassEntry $iface): void
+    {
+        foreach ($iface->properties as $ifaceProp) {
+            $propLc = strtolower($ifaceProp->name);
+            $matched = false;
+            foreach ($entry->properties as $classProp) {
+                if (strtolower($classProp->name) !== $propLc) {
+                    continue;
+                }
+                $matched = true;
+                if (0 !== $ifaceProp->setVisibility) {
+                    $classProp->setVisibility = $ifaceProp->setVisibility;
+                }
+                break;
+            }
+            if (!$matched && $entry->isInterface) {
+                $entry->properties[] = $this->cloneClassPropertyForEntry($ifaceProp, $entry);
             }
         }
     }

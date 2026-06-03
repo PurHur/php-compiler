@@ -2831,6 +2831,28 @@ class Object_ extends Type {
         }
     }
 
+    /** Apply interface asymmetric set visibility to class properties (#4876). */
+    public function inheritInterfacePropertySetVisibility(int $classId, string $className): void
+    {
+        $classLc = strtolower(ltrim($className, '\\'));
+        foreach ($this->allInterfacesForClassLc($classLc) as $ifaceLc) {
+            if ($ifaceLc === $classLc) {
+                continue;
+            }
+            $ifaceId = $this->lookup($ifaceLc);
+            foreach ($this->properties[$ifaceId] ?? [] as $propset) {
+                $name = $propset[1];
+                $setVis = $this->propertySetVisibility($ifaceId, $name);
+                if (0 === $setVis) {
+                    continue;
+                }
+                if (null !== $this->propertySlotIndex($classId, $name)) {
+                    $this->definePropertySetVisibility($classId, $name, $setVis);
+                }
+            }
+        }
+    }
+
     public function markTraitClass(string $classLc): void
     {
         $this->traitClassLcs[strtolower(ltrim($classLc, '\\'))] = true;
