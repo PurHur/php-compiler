@@ -322,6 +322,14 @@ class VM {
             $getLc = $meta?->getHookMethodLc
                 ?? strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($propName));
             if (isset($object->class->methods[$getLc])) {
+                // unset() clears backing storage; isset must not invoke get on uninitialized slot (#5191).
+                if (null !== $meta && null !== $meta->setHookMethodLc) {
+                    $props = $object->getRawProperties();
+                    if (isset($props[$propName])
+                        && VM\TypedPropertyCheck::isUninitialized($props[$propName])) {
+                        return false;
+                    }
+                }
                 $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
                 if (null !== $hookValue) {
                     $value = $hookValue->resolveIndirect();
