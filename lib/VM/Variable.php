@@ -556,6 +556,21 @@ final class Variable {
         ObjectLifetime::addRef($value);
     }
 
+    /**
+     * Store an object without incrementing refcount (WeakReference target slot, #5089).
+     *
+     * @see https://github.com/php/php-src/blob/master/Zend/zend_weakrefs.c
+     */
+    public function weakObject(ObjectEntry $value): void
+    {
+        if (self::TYPE_OBJECT === $this->type && isset($this->object) && $this->object->id === $value->id) {
+            return;
+        }
+        $this->reset();
+        $this->type = self::TYPE_OBJECT;
+        $this->object = $value;
+    }
+
     public function enumCase(EnumCaseEntry $value): void
     {
         $this->reset();
@@ -589,6 +604,15 @@ final class Variable {
         $this->reset();
         $this->type = self::TYPE_INDIRECT;
         $this->indirect = $value;
+    }
+
+    public function directIndirectTarget(): ?self
+    {
+        if (self::TYPE_INDIRECT !== $this->type) {
+            return null;
+        }
+
+        return $this->indirect;
     }
 
     public function reset(): void {

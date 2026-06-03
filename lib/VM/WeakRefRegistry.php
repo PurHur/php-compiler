@@ -20,6 +20,9 @@ final class WeakRefRegistry
     /** @var array<int, list<array{mapId: int, key: string}>> */
     private static array $mapEntriesByTargetId = [];
 
+    /** Referent ids cleared by unset / object release (#5089). */
+    private static array $invalidatedTargetIds = [];
+
     public static function registerWeakRef(int $targetId, Variable $targetSlot, ObjectEntry $weakRef): void
     {
         self::$refsByTargetId[$targetId][] = [
@@ -83,6 +86,7 @@ final class WeakRefRegistry
 
     public static function clearForObject(int $objectId): void
     {
+        self::$invalidatedTargetIds[$objectId] = true;
         foreach (self::$refsByTargetId[$objectId] ?? [] as $entry) {
             $entry['slot']->null();
         }
@@ -108,6 +112,12 @@ final class WeakRefRegistry
     {
         self::$refsByTargetId = [];
         self::$mapEntriesByTargetId = [];
+        self::$invalidatedTargetIds = [];
+    }
+
+    public static function isReferentInvalidated(int $objectId): bool
+    {
+        return isset(self::$invalidatedTargetIds[$objectId]);
     }
 
     /** @return list<int> */

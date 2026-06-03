@@ -413,6 +413,34 @@ class Context {
         return $this->globalVars[$name];
     }
 
+    /** True when $var is the canonical storage cell for a script global (#5089). */
+    public function isGlobalStorage(Variable $var): bool
+    {
+        foreach ($this->globalVars as $global) {
+            if ($global === $var) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Reset a script-global symbol (unset($name) on {main}, #5089). */
+    public function clearGlobalByName(string $name): void
+    {
+        if (!isset($this->globalVars[$name])) {
+            return;
+        }
+        $global = $this->globalVars[$name];
+        if (Variable::TYPE_OBJECT === $global->resolveIndirect()->type) {
+            $object = $global->resolveIndirect()->toObject();
+            WeakRefRegistry::clearForObject($object->id);
+        }
+        $global->reset();
+        $global->type = Variable::TYPE_UNDEFINED;
+        $this->syncGlobalEntryInGlobalsTable($name, $global);
+    }
+
     public function ensureGlobalsTable(): Variable
     {
         if (null === $this->globalsSuperglobal) {

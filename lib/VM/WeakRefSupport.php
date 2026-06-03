@@ -7,8 +7,8 @@ namespace PHPCompiler\VM;
 /**
  * Shared helpers for WeakReference / WeakMap (issues #1366, #3282).
  *
- * Targets use indirect slots so unset() on the last strong variable clears get().
- * {@see WeakRefRegistry} clears slots when the referent is cycle-collected.
+ * Targets use non-refcounted object slots; {@see WeakRefRegistry} clears them when
+ * the referent is released (unset / GC) like Zend zend_weakrefs.c.
  */
 final class WeakRefSupport
 {
@@ -98,7 +98,12 @@ final class WeakRefSupport
             return false;
         }
         if (Variable::TYPE_OBJECT === $target->type) {
-            return ObjectRegistry::isRegistered($target->toObject()->id);
+            $objectId = $target->toObject()->id;
+            if (WeakRefRegistry::isReferentInvalidated($objectId)) {
+                return false;
+            }
+
+            return ObjectRegistry::isRegistered($objectId);
         }
 
         return true;
