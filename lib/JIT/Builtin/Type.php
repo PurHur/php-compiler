@@ -657,21 +657,6 @@ class Type extends Builtin {
         $fntypeWordwrap = $this->context->context->functionType($strPtr, false, $strPtr, $i64, $strPtr, $i8);
         $fnWordwrap = $this->context->module->addFunction('__compiler_wordwrap', $fntypeWordwrap);
         $this->context->registerFunction('__compiler_wordwrap', $fnWordwrap);
-        $i32 = $this->context->getTypeFromString('int32');
-        $fntypeDebugBacktrace = $this->context->context->functionType(
-            $htPtr,
-            false,
-            $strPtr,
-            $strPtr,
-            $strPtr,
-            $strPtr,
-            $i32
-        );
-        $fnDebugBacktrace = $this->context->module->addFunction(
-            '__compiler_jit_debug_backtrace',
-            $fntypeDebugBacktrace
-        );
-        $this->context->registerFunction('__compiler_jit_debug_backtrace', $fnDebugBacktrace);
         $fntypeAddcslashes = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr);
         $fnAddcslashes = $this->context->module->addFunction('__compiler_addcslashes', $fntypeAddcslashes);
         $this->context->registerFunction('__compiler_addcslashes', $fnAddcslashes);
