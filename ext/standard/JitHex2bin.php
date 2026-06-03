@@ -5,13 +5,14 @@ declare(strict_types=1);
 /**
  * LLVM JIT helper for hex2bin() — hex string to binary (PHP-compatible subset).
  *
- * Invalid input (odd length or non-hex) emits E_WARNING and returns boolean false.
- * php-src: ext/standard/string.c — PHP_FUNCTION(hex2bin), php_hex2bin()
+ * Non-strict: invalid input (odd length or non-hex) emits E_WARNING and returns boolean false.
+ * Strict: throws ValueError (php-src ext/standard/string.c — PHP_FUNCTION(hex2bin)).
  */
 
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\VM\ErrorReporter;
@@ -24,10 +25,15 @@ final class JitHex2bin
 
     private const MSG_INVALID_HEX = 'Input string must be hexadecimal string';
 
-    public static function convert(Context $context, Value $strPtr): Value
+    private static int $jitGuardSeq = 0;
+
+    public static function convert(Context $context, Value $strPtr, ?Value $strictPtr = null): Value
     {
         $slot = JitValueBox::alloc($context);
         $outPtr = JitValueBox::pointer($context, $slot);
+
+        $i8 = $context->getTypeFromString('int8');
+        $strict = self::strictFlag($context, $strictPtr, $i8);
 
         $map = $context->structFieldMap['__string__'];
         $len = $context->builder->load(
@@ -35,7 +41,6 @@ final class JitHex2bin
         );
         $charPtr = $context->builder->structGep($strPtr, $map['value']);
         $i64 = $context->getTypeFromString('int64');
-        $i8 = $context->getTypeFromString('int8');
         $zero = $i64->constInt(0, false);
         $one = $i64->constInt(1, false);
         $two = $i64->constInt(2, false);
@@ -65,15 +70,8 @@ final class JitHex2bin
         $isOdd = $context->builder->icmp(Builder::INT_NE, $oddBit, $zero);
         $context->builder->branchIf($isOdd, $failOddBlock, $workBlock);
 
-        $context->builder->positionAtEnd($failOddBlock);
-        self::emitWarning($context, self::MSG_ODD_LENGTH);
-        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($failPairBlock);
-        self::emitWarning($context, self::MSG_INVALID_HEX);
-        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
-        $context->builder->branch($doneBlock);
+        self::emitFailOdd($context, $slot, $failOddBlock, $doneBlock, $strict, self::MSG_ODD_LENGTH);
+        self::emitFailPair($context, $slot, $failPairBlock, $doneBlock, $strict, self::MSG_INVALID_HEX);
 
         $context->builder->positionAtEnd($workBlock);
         $outLen = $context->builder->lShr($len, $one);
@@ -142,6 +140,67 @@ final class JitHex2bin
         return $outPtr;
     }
 
+    private static function strictFlag(Context $context, ?Value $strictPtr, $i8): Value
+    {
+        if (null === $strictPtr) {
+            return $i8->constInt(0, false);
+        }
+
+        return $context->builder->zExt($strictPtr, $i8);
+    }
+
+    private static function emitFailOdd(
+        Context $context,
+        Value $slot,
+        $failBlock,
+        $doneBlock,
+        Value $strict,
+        string $message
+    ): void {
+        $context->builder->positionAtEnd($failBlock);
+        self::emitInvalidInput($context, $slot, $doneBlock, $strict, $message);
+    }
+
+    private static function emitFailPair(
+        Context $context,
+        Value $slot,
+        $failBlock,
+        $doneBlock,
+        Value $strict,
+        string $message
+    ): void {
+        $context->builder->positionAtEnd($failBlock);
+        self::emitInvalidInput($context, $slot, $doneBlock, $strict, $message);
+    }
+
+    private static function emitInvalidInput(
+        Context $context,
+        Value $slot,
+        $doneBlock,
+        Value $strict,
+        string $message
+    ): void {
+        $tag = 'h2b'.(string) ++self::$jitGuardSeq;
+        $i8 = $context->getTypeFromString('int8');
+        $zero = $i8->constInt(0, false);
+        $isStrict = $context->builder->icmp(Builder::INT_NE, $strict, $zero);
+        $strictErr = BasicBlockHelper::append($context, 'hex2bin_strict_err_'.$tag);
+        $warnFail = BasicBlockHelper::append($context, 'hex2bin_warn_fail_'.$tag);
+
+        $context->builder->branchIf($isStrict, $strictErr, $warnFail);
+
+        $context->builder->positionAtEnd($strictErr);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitValueError($context, $message);
+        $context->builder->call($context->lookupFunction('abort'));
+
+        $context->builder->positionAtEnd($warnFail);
+        self::emitWarning($context, $message);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        $context->builder->branch($doneBlock);
+    }
+
     private static function emitWarning(Context $context, string $message): void
     {
         $i8p = $context->getTypeFromString('int8*');
@@ -149,11 +208,14 @@ final class JitHex2bin
         $i32 = $context->getTypeFromString('int32');
         $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
         $msgLen = $sizeT->constInt(\strlen($message), false);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
         $context->builder->call(
             $context->lookupFunction('__compiler_trigger_error'),
             $msgPtr,
             $msgLen,
-            $i32->constInt(ErrorReporter::E_WARNING, false)
+            $i32->constInt(ErrorReporter::E_WARNING, false),
+            $emptyFile,
+            $i32->constInt(0, false)
         );
     }
 

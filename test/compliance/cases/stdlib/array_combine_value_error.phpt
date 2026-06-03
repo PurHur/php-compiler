@@ -9,7 +9,7 @@ try {
     echo get_class($e), "\n";
     echo $e->getMessage(), "\n";
 }
-echo array_combine([], []) === [] ? "empty ok\n" : "empty fail\n";
+echo [] === array_combine([], []) ? "empty ok\n" : "empty fail\n";
 --EXPECT--
 ValueError
 array_combine(): Argument #1 ($keys) and argument #2 ($values) must have the same number of elements

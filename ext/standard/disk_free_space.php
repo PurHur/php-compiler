@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** disk_free_space() — VM via host disk_free_space(); JIT/AOT via libc statvfs (php-src filestat.c, #3758). */
@@ -30,7 +29,7 @@ final class disk_free_space extends Internal
         }
         $path = null;
         if (1 === $argc) {
-            $path = self::optionalPath($frame->calledArgs[0]->resolveIndirect());
+            $path = VmString::coerceOptionalDirectoryArg($frame->calledArgs[0], 'disk_free_space');
         }
         $result = VmFs::diskFreeSpace($path);
         if (false === $result) {
@@ -45,20 +44,8 @@ final class disk_free_space extends Internal
         if (\count($args) > 1) {
             throw new \LogicException('disk_free_space() accepts at most one argument in this compiler build');
         }
-        $path = JitDiskPath::lower($context, $args[0] ?? null, 'disk_free_space() path');
+        $path = JitDiskPath::lower($context, $args[0] ?? null, 'disk_free_space');
 
         return JitStat::pathDiskFreeSpaceBoxed($context, $path);
-    }
-
-    private static function optionalPath(Variable $v): ?string
-    {
-        if (Variable::TYPE_NULL === $v->type) {
-            return null;
-        }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('disk_free_space() path must be a string or null in this compiler build');
-        }
-
-        return $v->toString();
     }
 }

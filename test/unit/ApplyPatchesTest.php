@@ -157,7 +157,8 @@ PHP;
     public function testPhpCfgPropertyReadonlyOverlayApplied(): void
     {
         $prop = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php';
-        if (!is_readable($prop)) {
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        if (!is_readable($prop) || !is_readable($parser)) {
             self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
         }
 
@@ -165,8 +166,49 @@ PHP;
         self::assertTrue(
             str_contains($body, 'public $readonly')
             || str_contains($body, 'propertyFlags'),
-            'php-cfg-property-readonly overlay must expose readonly metadata (#3149, #4234)'
+            'php-cfg-property-readonly overlay must expose readonly metadata (#3149, #4230)'
         );
+        $parserBody = (string) file_get_contents($parser);
+        self::assertMatchesRegularExpression(
+            '/propertyFlags\s*=\s*\$node->flags|\$(cfgProp|prop)->readonly\s*=/',
+            $parserBody,
+            'php-cfg-property-readonly overlay must populate flags in parseStmt_Property (#4230)'
+        );
+    }
+
+    public function testPhpCfgPropertyReadonlyOverlayReappliesAfterPartialVendor(): void
+    {
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        if (!is_readable($parser)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $original = (string) file_get_contents($parser);
+        $stripped = preg_replace(
+            '/^\s*\$prop->propertyFlags = \$node->flags;\n/m',
+            '',
+            $original
+        );
+        self::assertIsString($stripped);
+        self::assertNotSame($original, $stripped, 'fixture must include propertyFlags assignment');
+        file_put_contents($parser, $stripped);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertSame(0, $exitCode, "apply-patches failed after stripping propertyFlags:\n".$joined);
+
+            $restored = (string) file_get_contents($parser);
+            self::assertMatchesRegularExpression(
+                '/propertyFlags\s*=\s*\$node->flags/',
+                $restored,
+                'overlay must re-insert propertyFlags on harness tar-copy vendor (#4230)'
+            );
+        } finally {
+            file_put_contents($parser, $original);
+        }
     }
 
     public function testPhpCfgEnumParserPassesImplementsArrayNotBlock(): void
@@ -223,6 +265,71 @@ PHP;
     {
         $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
         self::assertStringContainsString('apply_php_cfg_asymmetric_visibility_overlay', $script);
+    }
+
+    public function testApplyPatchesInvokesInOperatorOverlayBeforeListSpread(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
+        self::assertMatchesRegularExpression(
+            '/apply_php_cfg_in_operator_overlay \|\| true[\s\S]*php-cfg-list-spread\.patch/s',
+            $script,
+            'In_ overlay must run before php-cfg-list-spread.patch (#4850)'
+        );
+    }
+
+    public function testPhpCfgInOperatorOverlayApplied(): void
+    {
+        $op = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/In_.php';
+        if (!is_dir(self::$root.'/vendor/ircmaxell/php-cfg')) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        self::assertFileIsReadable($op, 'php-cfg in-operator overlay must ship Op\\Expr\\In_ (#4682, #4850)');
+        $body = (string) file_get_contents($op);
+        self::assertStringContainsString('class In_ extends Expr', $body);
+    }
+
+    public function testPhpCfgInOperatorOverlayReappliesAfterPartialVendor(): void
+    {
+        $op = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/In_.php';
+        if (!is_readable($op)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $original = (string) file_get_contents($op);
+        unlink($op);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertSame(0, $exitCode, "apply-patches failed after removing In_.php:\n".$joined);
+            self::assertFileIsReadable($op, 'In_ overlay must restore Op\\Expr\\In_ (#4850)');
+        } finally {
+            if (!is_readable($op)) {
+                $dir = dirname($op);
+                if (!is_dir($dir)) {
+                    mkdir($dir, 0777, true);
+                }
+                file_put_contents($op, $original);
+            }
+        }
+    }
+
+    public function testPhpCfgParserExtractsPromotedAsymmetricSetVisibility(): void
+    {
+        $parserFile = dirname(__DIR__, 2).'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        self::assertFileExists($parserFile);
+        self::assertStringContainsString(
+            'extractAsymmetricSetVisibilityFromAttributes',
+            (string) file_get_contents($parserFile),
+            'Parser must recover phpc-asymmetric-set markers (#4690)'
+        );
+        self::assertStringContainsString(
+            'promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes',
+            (string) file_get_contents($parserFile)
+        );
     }
 
     public function testPhpCfgAsymmetricVisibilityFieldsPresentAfterApplyPatches(): void

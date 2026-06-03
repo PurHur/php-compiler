@@ -14,6 +14,30 @@ use PHPCompiler\Block;
 use PHPCompiler\Web\Superglobals;
 
 /**
+ * MCJIT embed needs at least one user class in the module init table (#4964, #98).
+ * Inert bootstrap for classless -r / stdin snippets until bare-module execute is stable.
+ */
+function php_compiler_jit_prepare_embed_code(string $filename, string $code): string
+{
+    if ('Command line code' !== $filename && '-' !== $filename) {
+        return $code;
+    }
+    if (preg_match('/\b(class|interface|trait|enum)\b/i', $code)) {
+        return $code;
+    }
+    if (!preg_match('/^<\?php\s/', $code)) {
+        return $code;
+    }
+
+    return preg_replace(
+        '/^<\?php\s*/',
+        '<?php class __phpc_mcjit_embed_bootstrap { public function __toString(): string { return ""; } } ',
+        $code,
+        1
+    ) ?? $code;
+}
+
+/**
  * Run a script via MCJIT. CGI superglobals refresh each execution (issue #642, #2257):
  * - `-q` / `-p` set QUERY_STRING / REQUEST_BODY (and POST method when body non-empty)
  * - `REQUEST_METHOD`, `PATH_INFO`, `SCRIPT_NAME`, `HTTPS`, etc. come from the process
@@ -21,6 +45,7 @@ use PHPCompiler\Web\Superglobals;
  */
 function run(string $filename, string $code, array $options): void
 {
+    $code = php_compiler_jit_prepare_embed_code($filename, $code);
     $runtime = new Runtime();
     $queryString = $options['-q'] ?? null;
     $postBody = $options['-p'] ?? null;

@@ -35,6 +35,9 @@ class Frame {
     /** Absolute path of the script this frame executes (issue #707). */
     public string $scriptPath = '';
 
+    /** Call-site line for the pending FUNCCALL (issue #4482). */
+    public int $callSiteLine = 0;
+
     /** VM context for nested builtin calls (set when invoking Internal handlers). */
     public ?Context $vmContext = null;
 
@@ -53,6 +56,12 @@ class Frame {
     /** Pending closure call: captures bound when the callee frame is entered (issue #72). */
     public ?VM\ClosureState $closureCall = null;
 
+    /** Scope slot of the callable operand for the pending FUNCCALL (issue #4872). */
+    public ?int $closureCallableSlot = null;
+
+    /** Closure pending __invoke / FUNCCALL (survives until callee entry; issue #4872). */
+    public ?VM\ClosureState $pendingClosureInvoke = null;
+
     /**
      * When set, writes to this instance property name use backing storage (inside a hook body, #3145).
      */
@@ -69,6 +78,9 @@ class Frame {
 
     /** Set when Fiber::suspend() suspends; runFrames returns FIBER_SUSPEND. */
     public bool $fiberSuspend = false;
+
+    /** Skip one ECHO after builtin string coercion throw was caught (#4284). */
+    public bool $suppressNextEcho = false;
 
     /**
      * Foreach iterator container cache keyed by scope slot.

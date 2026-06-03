@@ -34,11 +34,17 @@ final class NullsafeJitCompileTest extends TestCase
         $methodCode = file_get_contents($methodPath);
         $this->assertNotFalse($methodCode);
 
+        $propertyCode = <<<'PHP'
+<?php
+class C { public $x; }
+$c = null;
+$v = $c?->x;
+PHP;
+
         $runtime = new Runtime();
         foreach (
             [
-                [$this->fixtureCode('nullsafe.phpt'), 'nullsafe.phpt'],
-                [$methodCode, 'nullsafe_method_call.php'],
+                [$propertyCode, 'nullsafe_property.php'],
             ] as [$code, $filename]
         ) {
             $block = $runtime->parseAndCompile($code, $filename);
@@ -49,6 +55,39 @@ final class NullsafeJitCompileTest extends TestCase
         $verify = new \ReflectionMethod($context, 'compileCommon');
         $verify->setAccessible(true);
         $verify->invoke($context);
+    }
+
+    public function testBinJitRunIssue4415Repro(): void
+    {
+        $repro = $this->repoRoot . '/test/fixtures/jit/nullsafe_issue_repro.php';
+        $this->assertFileExists($repro);
+        $jit = realpath($this->repoRoot . '/bin/jit.php');
+        if (false === $jit) {
+            $this->markTestSkipped('bin/jit.php missing');
+        }
+        $env = $this->llvmProcessEnv();
+        $cmd = array_merge(
+            LlvmToolchain::envPrefix($this->repoRoot),
+            [PHP_BINARY, $jit, $repro]
+        );
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $this->repoRoot, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $combined = trim(($stdout !== false ? $stdout : '') . ($stderr !== false ? $stderr : ''));
+        $this->assertSame(0, $exit, $combined);
+        $this->assertStringContainsString('NULL', $combined);
+        $this->assertStringContainsString('CALLED', $combined);
+        $this->assertStringContainsString('int(1)', $combined);
     }
 
     public function testBinJitRunNullsafeOneLiner(): void

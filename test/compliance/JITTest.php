@@ -94,6 +94,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'array_literal_numeric_string_key')) {
                 continue;
             }
+            // array literal duplicate keys: VM + AOT (#4703); MCJIT execute unstable (#98).
+            if (str_contains($name, 'array_literal_duplicate_key')) {
+                continue;
+            }
             // base_convert() MCJIT execute unstable until MathBaseConvert verify (#3173).
             if (str_contains($name, 'base_convert') || str_contains(strtolower($case[0]), 'base_convert')) {
                 continue;
@@ -114,16 +118,8 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'class_uses_runtime')) {
                 continue;
             }
-            // new static() / : static return — VM late binding (#3412); JIT phase 2.
-            if (str_contains($name, 'new_static') || str_contains($name, 'static_return_type')) {
-                continue;
-            }
             // gc_collect_cycles() MCJIT execute unstable (#3160); compile: GcCollectCyclesJitCompileTest.
             if (str_contains($name, 'gc_collect_cycles')) {
-                continue;
-            }
-            // gc_enable/gc_disable/gc_enabled() are VM-only (#3209).
-            if (str_contains($name, 'gc_enabled')) {
                 continue;
             }
             // set_exception_handler() / restore_exception_handler() VM-only (#3146).
@@ -168,6 +164,10 @@ class JITTest extends BaseTest {
             }
             // get_resource_id() MCJIT: VM + AOT lint (#3180); fopen/__compiler_is_resource execute segfault until stable.
             if (str_contains($name, 'get_resource_id')) {
+                continue;
+            }
+            // stream/dir resource ==/=== MCJIT: VM + dedicated JIT PHPT (#4699); umbrella skips opendir path.
+            if (str_contains($name, 'stream_resource_compare') && !str_contains($name, '_jit')) {
                 continue;
             }
             // stream_set_timeout/chunk_size MCJIT: VM + AOT (#3754); jit.php execute exit -1 until stable.
@@ -226,6 +226,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'round_precision_mode')) {
                 continue;
             }
+            // number_format() NAN/INF: VM + AOT (#4680); MCJIT execute segfault on INF/NAN constants until stable.
+            if (str_contains($name, 'number_format_non_finite')) {
+                continue;
+            }
             // phpversion/php_sapi_name/php_uname MCJIT: VM + AOT (#3174); umbrella JITTest skips until stable.
             if (str_contains($name, 'phpversion')) {
                 continue;
@@ -250,6 +254,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'uasort_closure') || str_contains($name, 'uksort_closure')) {
                 continue;
             }
+            // variadic + named args: VM parity (#4808); MCJIT NamedArgs variadic pack (#3777 follow-up).
+            if (str_contains($name, 'named_args_variadic')) {
+                continue;
+            }
             // #[\AllowDynamicProperties] is VM-only until JIT class flag (#3467).
             if (str_contains($name, 'allow_dynamic_properties')) {
                 continue;
@@ -270,6 +278,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'preg_replace_limit')) {
                 continue;
             }
+            // preg_replace() array $subject: VM + AOT lint (#4055); MCJIT segfaults (preg_filter array path, #98).
+            if (str_contains($name, 'preg_replace_array_subject')) {
+                continue;
+            }
             // json_validate() MCJIT path unsafe until __compiler_json_validate link is stable (#3101).
             if (str_contains($name, 'json_validate')) {
                 continue;
@@ -286,16 +298,16 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'ternary_func_call')) {
                 continue;
             }
-            // Nested break/continue levels use php-cfg goto labels; VM-only until JIT (#3405).
-            if (str_contains($name, 'break2_') || str_contains($name, 'continue2_')) {
-                continue;
-            }
             // (unset) cast reference break is VM-only until JIT TYPE_CAST_UNSET lowering (#3517).
             if (str_contains($name, 'cast_unset')) {
                 continue;
             }
             // exit/die expression ScriptExit status — VM compliance (#3539).
             if (str_contains($name, 'exit_expression') || str_contains($name, 'die_expression')) {
+                continue;
+            }
+            // exit()/die() scalar coercion — VM (#4696); JIT TYPE_EXIT MCJIT unstable.
+            if (str_contains($name, 'exit_status_coercion')) {
                 continue;
             }
             // class const scalar expressions — VM defineClass eval (#3567); JIT deferred.
@@ -330,24 +342,20 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'magic_const_method_function')) {
                 continue;
             }
-            // object == structural compare is VM-only until JIT Object_ lowering (#3602).
-            if (str_contains($name, 'object_loose_equals')) {
-                continue;
-            }
-            // object <=> is VM-only until JIT zend_compare_objects lowering (#3691).
-            if (str_contains($name, 'spaceship_objects')) {
-                continue;
-            }
             // Return-by-reference MCJIT execute: LLVM verify in ReturnByRefJitCompileTest (#3778).
             if (str_contains($name, 'return_by_ref_jit')) {
                 continue;
             }
-            // ??= MCJIT execute: LLVM verify in CoalesceAssignJitCompileTest (#3792).
+            // object ==: compile verify in ObjectLooseEqualsJitCompileTest (#4766); MCJIT execute segfault (boxed operands).
+            if (str_contains($name, 'object_loose_equals')) {
+                continue;
+            }
+            // ??= MCJIT execute: compile in CoalesceAssignJitCompileTest (#3792); execute in CoalesceAssignJitExecuteTest (#4763).
             if (str_contains($name, 'coalesce_assign_jit')) {
                 continue;
             }
-            // Chained ?? MCJIT: VM-only until nested coalesce JIT (#3798).
-            if (str_contains($name, 'coalesce_chain')) {
+            // Implicit nullable MCJIT execute: compile in ImplicitNullableParamJitCompileTest (#4767); execute when jit-runtime-probe green.
+            if (str_contains($name, 'implicit_nullable_param')) {
                 continue;
             }
             // var_dump() not JIT-implemented; int↔string loose == IR guarded by LooseScientificStringJitCompileTest (#3658).
@@ -378,6 +386,14 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'spaceship_array')) {
                 continue;
             }
+            // int <=> non-numeric string: MCJIT lowering landed (#4681); execute gated like spaceship_operator_jit.
+            if (str_contains($name, 'spaceship_int_nonnumeric')) {
+                continue;
+            }
+            // NaN spaceship/relational: VM + AOT via phpc_double_spaceship (#4712); MCJIT native double <=> verify/execute pending.
+            if (str_contains($name, 'nan_relational')) {
+                continue;
+            }
             // gettype() object/resource is VM-only until __compiler_gettype JIT path is stable (#3618).
             if (str_contains($name, 'gettype_object_resource')) {
                 continue;
@@ -388,6 +404,10 @@ class JITTest extends BaseTest {
             }
             // __TRAIT__ in trait bodies requires trait JIT lowering (#3609); parse-time fold is VM-only for now.
             if (str_contains($name, 'magic_const_trait')) {
+                continue;
+            }
+            // Unary +: LLVM verify in UnaryPlusJitCompileTest (#4820); MCJIT execute gated by jit-runtime-probe (#98).
+            if (str_contains($name, 'unary_plus')) {
                 continue;
             }
             // pre/post inc/dec VM-only until JIT lowering (#3552).
@@ -403,6 +423,7 @@ class JITTest extends BaseTest {
                 continue;
             }
             // User enum DECLARE_ENUM segfaults in MCJIT until enum lowering is stable (#3518).
+            // enum_spaceship_jit: lowering fixed #4849; compliance JIT when jit-runtime-probe green (#98).
             if (str_contains($name, 'enum_') || str_contains($name, 'abstract_enum')) {
                 continue;
             }
@@ -412,6 +433,10 @@ class JITTest extends BaseTest {
             }
             // Generator foreach MCJIT resume (#3074); VM in GeneratorVMTest, compile in GeneratorJITTest/GeneratorJitCompileTest.
             if (str_contains($name, 'generator_')) {
+                continue;
+            }
+            // Named call-time unpack (...$assoc) is VM-only until JIT resolveOutgoingCall expansion (#4669).
+            if (str_contains($name, 'call_unpack_named_keys')) {
                 continue;
             }
             // Negative string offsets: VM (#3751); MCJIT StringOffsetHelper still segfaults (#198).
@@ -479,6 +504,22 @@ class JITTest extends BaseTest {
             // parse_str() one-arg in function scope: VM + AOT; MCJIT try/catch pending dispatch (#4034).
             if (str_contains($name, 'parse_str_function_scope')
                 || str_contains($name, 'parse_str_local_scope')) {
+                continue;
+            }
+            // PHP 8.3 typed class constants: VM + AOT; MCJIT execute unstable (#4511, #3592).
+            if (str_contains($name, 'typed_class_const')) {
+                continue;
+            }
+            // list() from null/false/int: VM + LLVM verify (#4325); MCJIT execute segfault until list unpack branch stable.
+            if (str_contains($name, 'list_destructure_null')) {
+                continue;
+            }
+            // list() from string: VM + LLVM verify (#4308); MCJIT execute segfault until list unpack branch stable.
+            if (str_contains($name, 'list_destructure_string')) {
+                continue;
+            }
+            // Pipe operator (|>): VM + AOT via desugar (#3243, #4456); MCJIT in PipeOperatorJit*Test (#98).
+            if (str_contains($name, 'pipe_operator') || str_contains($name, 'pipe_first_class')) {
                 continue;
             }
             yield $name => $case;

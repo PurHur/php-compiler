@@ -52,11 +52,24 @@ class Context {
 
     public Runtime $runtime;
 
+    /**
+     * Property-hook virtual/backing metadata from {@see \PHPCompiler\SourcePreprocessor\PropertyHooks} (#4687).
+     *
+     * @var array<string, array<string, array<string, mixed>>>
+     */
+    public array $propertyHookRegistry = [];
+
     /** Pending thrown value while dispatching catch handlers (issue #1362). */
     public ?Variable $pendingException = null;
 
     /** Set when a property set hook throws (even if caught); suppresses outer assign (#3145). */
     public bool $propertyHookSetAborted = false;
+
+    /** Active object-to-string coercion via __toString (issue #4284). */
+    public bool $coercingObjectToString = false;
+
+    /** User catch ran during coercion; caller must not use a coerced result (#4284). */
+    public bool $magicMethodThrowHandled = false;
 
     /** Handler frame whose catch chain resumes after a throw-path finally (issue #2114). */
     public ?Frame $pendingCatchResumeHandler = null;
@@ -66,6 +79,9 @@ class Context {
 
     /** Merge block to enter after catch-path finally completes (#195, Zend zend_exceptions.c). */
     public ?Block $pendingMergeAfterFinally = null;
+
+    /** Label/merge target after goto exits a try with pending finally (#4491). */
+    public ?Block $pendingGotoAfterFinally = null;
 
     /** @var array<int, true> handler frame object id => finally already ran for current unwind */
     public array $completedFinallyHandlers = [];
@@ -110,6 +126,9 @@ class Context {
      * @var array<int, bool>
      */
     public array $foreachObjectAdvance = [];
+
+    /** @var array<int, true> foreach warned on non-traversable operand; loop body skipped (#4879). */
+    public array $foreachInvalidSlots = [];
 
     /** Fiber executing on this VM stack (issue #3130). */
     public ?FiberState $currentFiber = null;
@@ -538,6 +557,11 @@ class Context {
         $this->runStack = $stack;
 
         return $prev;
+    }
+
+    public function hasRunStack(): bool
+    {
+        return null !== $this->runStack;
     }
 
     /**

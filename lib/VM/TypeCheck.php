@@ -14,7 +14,8 @@ final class TypeCheck
 {
     public static function variadicSlotNeedsElementChecks(Block $block, int $slot): bool
     {
-        return isset($block->paramVariadicElementTypeConstraints[$slot])
+        return isset($block->paramIterableSlots[$slot])
+            || isset($block->paramVariadicElementTypeConstraints[$slot])
             || isset($block->paramVariadicElementGenericArrayTypeSpecs[$slot])
             || isset($block->paramVariadicElementIntersectionConstraints[$slot])
             || isset($block->paramVariadicElementDnfConstraints[$slot]);
@@ -34,12 +35,18 @@ final class TypeCheck
         ?GenericArrayTypeSpec $arraySpec,
         ?array $intersection,
         ?array $dnfArms,
-        Context $context
+        Context $context,
+        bool $iterableElement = false
     ): void {
         foreach ($elements as $element) {
             $probe = new Variable();
             $probe->copyFrom($element);
             $resolved = $probe->resolveIndirect();
+            if ($iterableElement) {
+                IterableCheck::assertParameter($probe, $context);
+
+                continue;
+            }
             if (null !== $typeConstraint) {
                 $resolved->typeConstraint = $typeConstraint;
             }
@@ -90,9 +97,47 @@ final class TypeCheck
         }
     }
 
-    public static function coerceReturn(Variable $value, bool $strict, int $constraint): void
-    {
+    public static function coerceReturn(
+        Variable $value,
+        bool $strict,
+        int $constraint,
+        ?string $literalBoolType = null
+    ): void {
+        if (null !== $literalBoolType) {
+            $probe = new Variable();
+            $probe->copyFrom($value);
+            $probe->resolveIndirect()->literalBoolType = $literalBoolType;
+            self::coerceTypedSlot($probe, true, 'Return value', $constraint);
+
+            return;
+        }
         self::coerceTypedSlot($value, $strict, 'Return value', $constraint);
+    }
+
+    /**
+     * PHP 8.3 typed class constants: strict match; int literal allowed for float (zend_compile.c, #4541).
+     */
+    public static function assertClassConstantValue(
+        Variable $value,
+        int $constraint,
+        ?string $constName = null
+    ): void {
+        $target = $value->resolveIndirect();
+        if (self::isExactType($target, $constraint)) {
+            return;
+        }
+        if (Variable::TYPE_FLOAT === $constraint && Variable::TYPE_INTEGER === $target->type) {
+            $target->float((float) $target->toInt());
+
+            return;
+        }
+        $expected = self::typeName($constraint);
+        $given = self::typeName($target->type);
+        if (null !== $constName && '' !== $constName) {
+            throw new \TypeError("Cannot assign {$given} to class constant {$constName} of type {$expected}");
+        }
+
+        throw new \TypeError("Cannot assign {$given} to class constant of type {$expected}");
     }
 
     public static function assertVoidReturn(?Variable $value): void
@@ -165,6 +210,11 @@ final class TypeCheck
         if (null === $constraint) {
             return;
         }
+        if (null !== $target->literalBoolType) {
+            self::assertLiteralBool($dest, $target->literalBoolType, $kind, $propertyWrite, $constraint);
+
+            return;
+        }
         $value = $target;
         if ($strict) {
             if (!self::isExactType($value, $constraint)) {
@@ -183,9 +233,98 @@ final class TypeCheck
         }
     }
 
+    public static function parameterMatchesType(
+        Variable $value,
+        int $constraint,
+        ?string $literalBoolType = null
+    ): bool {
+        if (null !== $literalBoolType) {
+            return self::matchesLiteralBool($value, $literalBoolType);
+        }
+
+        return self::isExactType($value->resolveIndirect(), $constraint);
+    }
+
+    /**
+     * Zend 8.2: `int $x = null` accepts null at call sites (implicit nullable, #4449).
+     */
+    public static function skipParameterTypeCheckForImplicitNullable(
+        Block $block,
+        int $slot,
+        Variable $argument
+    ): bool {
+        return isset($block->paramImplicitNullable[$slot])
+            && Variable::TYPE_NULL === $argument->resolveIndirect()->type;
+    }
+
+    public static function typeNameForConstraint(int $type, ?string $literalBoolType = null): string
+    {
+        if (null !== $literalBoolType) {
+            return $literalBoolType;
+        }
+
+        return self::typeName($type);
+    }
+
+    /**
+     * Zend ZEND_FETCH_DIM_R on null/bool/int/float (zend_execute.c, #4867).
+     */
+    public static function isScalarNonContainerDimRead(Variable $value): bool
+    {
+        $resolved = $value->resolveIndirect();
+
+        return \in_array($resolved->type, [
+            Variable::TYPE_NULL,
+            Variable::TYPE_BOOLEAN,
+            Variable::TYPE_INTEGER,
+            Variable::TYPE_FLOAT,
+        ], true);
+    }
+
+    /**
+     * Zend write/append [] on scalars — TypeError "Cannot use [] on …" (zend_operators.c, #4713).
+     */
+    public static function cannotUseBracketOn(Variable $value): ?string
+    {
+        $resolved = $value->resolveIndirect();
+        switch ($resolved->type) {
+            case Variable::TYPE_NULL:
+            case Variable::TYPE_BOOLEAN:
+            case Variable::TYPE_INTEGER:
+            case Variable::TYPE_FLOAT:
+                return 'Cannot use [] on ' . self::typeNameForConstraint($resolved->type);
+            default:
+                return null;
+        }
+    }
+
     private static function isExactType(Variable $value, int $constraint): bool
     {
         return $value->type === $constraint;
+    }
+
+    private static function matchesLiteralBool(Variable $value, string $literal): bool
+    {
+        $resolved = $value->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN !== $resolved->type) {
+            return false;
+        }
+
+        return ('true' === $literal) === $resolved->toBool();
+    }
+
+    private static function assertLiteralBool(
+        Variable $dest,
+        string $literal,
+        string $kind,
+        bool $propertyWrite,
+        int $constraint
+    ): void {
+        if (self::matchesLiteralBool($dest, $literal)) {
+            return;
+        }
+        $value = $dest->resolveIndirect();
+        throw self::typedSlotError($dest, $constraint, $value, $kind, $propertyWrite, $literal);
     }
 
     private static function weakCoerceInPlace(
@@ -304,13 +443,17 @@ final class TypeCheck
         int $constraint,
         Variable $value,
         string $kind,
-        bool $propertyWrite
+        bool $propertyWrite,
+        ?string $literalBoolType = null
     ): \TypeError {
+        $expected = null !== $literalBoolType
+            ? $literalBoolType
+            : self::typeName($constraint);
         if ($propertyWrite && 'Property' === $kind) {
-            return self::propertyTypeError($target, self::typeName($constraint), $value);
+            return self::propertyTypeError($target, $expected, $value);
         }
 
-        return new \TypeError(self::strictMessage($constraint, $value, $kind));
+        return new \TypeError(self::strictMessage($constraint, $value, $kind, $expected));
     }
 
     private static function propertyTypeError(
@@ -337,12 +480,23 @@ final class TypeCheck
         ));
     }
 
-    private static function strictMessage(int $constraint, Variable $value, string $kind = 'Argument'): string
-    {
-        $expected = self::typeName($constraint);
-        $given = self::typeName($value->type);
+    private static function strictMessage(
+        int $constraint,
+        Variable $value,
+        string $kind = 'Argument',
+        ?string $expectedOverride = null
+    ): string {
+        $expected = $expectedOverride ?? self::typeName($constraint);
+        $given = self::valueTypeLabel($value);
 
         return "{$kind} must be of type {$expected}, {$given} given";
+    }
+
+    private static function valueTypeLabel(Variable $value): string
+    {
+        $resolved = $value->resolveIndirect();
+
+        return self::typeName($resolved->type);
     }
 
     private static function assertGenericArrayShape(Variable $dest, GenericArrayTypeSpec $spec, string $kind): void

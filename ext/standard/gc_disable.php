@@ -33,6 +33,6 @@ final class gc_disable extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('gc_disable() is not implemented for JIT in this compiler build');
+        return JitGcToggle::disable($context, ...$args);
     }
 }

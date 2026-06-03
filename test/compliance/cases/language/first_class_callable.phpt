@@ -2,8 +2,8 @@
 First-class callable syntax for functions and static methods (issue #1230)
 --FILE--
 <?php
-$fn = strlen(...);
-echo $fn("hi"), "\n";
+$c = strlen(...);
+echo $c('abc'), "\n";
 
 class Greeter {
     public static function greet() {
@@ -12,6 +12,7 @@ class Greeter {
 }
 $call = Greeter::greet(...);
 echo $call(), "\n";
+
 --EXPECT--
-2
+3
 hello

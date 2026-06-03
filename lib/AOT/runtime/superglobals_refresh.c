@@ -3,6 +3,7 @@
  * Linked with LLVM object code; reads getenv and repopulates sg_* globals.
  */
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -2184,6 +2185,17 @@ __string__ *__compiler_number_format(
     __string__ *dec_sep,
     __string__ *thou_sep
 ) {
+    (void) decimals;
+    (void) dec_sep;
+    (void) thou_sep;
+
+    if (isnan(num)) {
+        return cstr_to_string("nan");
+    }
+    if (isinf(num)) {
+        return cstr_to_string("inf");
+    }
+
     char buf[128];
     char int_buf[64];
     char frac_buf[32];
@@ -2484,6 +2496,39 @@ void __phpc_last_error_record(int type, const char *msg, size_t msg_len, const c
 
 extern int __compiler_phpc_error_level_enabled(int level);
 
+static void phpc_stderr_print_cli_error(int level, const char *message, const char *file, int line)
+{
+    const char *prefix = "PHP Unknown error";
+
+    switch (level) {
+        case 2:
+        case 512:
+            prefix = "PHP Warning";
+            break;
+        case 8:
+        case 1024:
+            prefix = "PHP Notice";
+            break;
+        case 8192:
+        case 16384:
+            prefix = "PHP Deprecated";
+            break;
+        case 256:
+            prefix = "PHP Fatal error";
+            break;
+    }
+    if (file && file[0] != '\0') {
+        if (line > 0) {
+            fprintf(stderr, "%s:  %s in %s on line %d\n", prefix, message, file, line);
+        } else {
+            fprintf(stderr, "%s:  %s in %s\n", prefix, message, file);
+        }
+
+        return;
+    }
+    fprintf(stderr, "%s:  %s\n", prefix, message);
+}
+
 void __compiler_undefined_array_key_warning_cstr(const char *key, size_t len)
 {
     char msg[512];
@@ -2491,62 +2536,59 @@ void __compiler_undefined_array_key_warning_cstr(const char *key, size_t len)
     if (!key) {
         return;
     }
+    snprintf(msg, sizeof msg, "Undefined array key \"%.*s\"", (int) len, key);
+    __phpc_last_error_record(2, msg, strlen(msg), "", 0);
     if (!__compiler_phpc_error_level_enabled(2)) {
         return;
     }
-    snprintf(msg, sizeof msg, "Undefined array key \"%.*s\"", (int) len, key);
-    __phpc_last_error_record(2, msg, strlen(msg), "", 0);
-    fprintf(stderr, "Warning: %s\n", msg);
+    phpc_stderr_print_cli_error(2, msg, "", 0);
 }
 
 void __compiler_undefined_array_key_warning_long(long long key)
 {
     char msg[64];
 
+    snprintf(msg, sizeof msg, "Undefined array key %lld", key);
+    __phpc_last_error_record(2, msg, strlen(msg), "", 0);
     if (!__compiler_phpc_error_level_enabled(2)) {
         return;
     }
-    snprintf(msg, sizeof msg, "Undefined array key %lld", key);
-    __phpc_last_error_record(2, msg, strlen(msg), "", 0);
-    fprintf(stderr, "Warning: %s\n", msg);
+    phpc_stderr_print_cli_error(2, msg, "", 0);
 }
 
 extern int __phpc_error_handler_dispatch(int errno, const char *msg, size_t msg_len, int line);
 
-void __compiler_trigger_error(const char *message, size_t len, int level)
+void __compiler_trigger_error(const char *message, size_t len, int level, const char *file, int line)
 {
     if (!message) {
         return;
     }
+    if (NULL == file) {
+        file = "";
+    }
+    if (line < 0) {
+        line = 0;
+    }
+    __phpc_last_error_record(level, message, len, file, line);
     if (!__compiler_phpc_error_level_enabled(level)) {
         return;
     }
-    __phpc_last_error_record(level, message, len, "", 0);
-    if (__phpc_error_handler_dispatch(level, message, len, 0)) {
+    if (__phpc_error_handler_dispatch(level, message, len, line)) {
         if (256 == level) {
             abort();
         }
         return;
     }
-    const char *prefix = "Unknown error";
-    switch (level) {
-        case 2:
-            prefix = "Warning";
-            break;
-        case 256:
-            prefix = "Fatal error";
-            break;
-        case 512:
-            prefix = "Warning";
-            break;
-        case 1024:
-            prefix = "Notice";
-            break;
-        case 16384:
-            prefix = "Deprecated";
-            break;
+    {
+        char buf[4096];
+
+        if (len >= sizeof(buf)) {
+            len = sizeof(buf) - 1;
+        }
+        memcpy(buf, message, len);
+        buf[len] = '\0';
+        phpc_stderr_print_cli_error(level, buf, file, line);
     }
-    fprintf(stderr, "%s: %.*s\n", prefix, (int) len, message);
     if (256 == level) {
         abort();
     }
@@ -2556,11 +2598,11 @@ void __compiler_trigger_error(const char *message, size_t len, int level)
 void __compiler_assert_fail(const char *message, size_t len)
 {
     if (!message || 0 == len) {
-        __compiler_trigger_error("assert(): assert(false) failed", 29, 512);
+        __compiler_trigger_error("assert(): assert(false) failed", 29, 512, "", 0);
 
         return;
     }
-    __compiler_trigger_error(message, len, 512);
+    __compiler_trigger_error(message, len, 512, "", 0);
 }
 
 /** assert() failure with runtime PHP string description. */

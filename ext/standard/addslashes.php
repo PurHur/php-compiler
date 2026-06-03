@@ -23,10 +23,11 @@ final class addslashes extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $subject->type) {
-            throw new \LogicException('addslashes() only supports strings in this compiler build');
-        }
-        $frame->returnVar->string(VmString::addslashes($subject->toString()));
+        $frame->returnVar->string(
+            VmString::addslashes(
+                VmString::coerceStringBuiltinArg($subject->resolveIndirect(), 'addslashes')
+            )
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value

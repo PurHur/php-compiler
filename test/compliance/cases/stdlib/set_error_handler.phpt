@@ -13,6 +13,6 @@ restore_error_handler();
 trigger_error('default', 1024);
 echo "done\n";
 --EXPECT--
-handled:1024:test notice:0
+handled:1024:test notice:7
 after
 done

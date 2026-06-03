@@ -24,6 +24,11 @@ final class FiberStart implements Call
         FiberHelper::storeStateOnFiberObject($context, $context->helper->loadValue($fiberVar), $statePtr);
         $fiberVar->fiberStatePtr = $statePtr;
         $fiberVar->fiberResumeName = $resumeName;
+        $map = $context->structFieldMap['__fiber_state__'];
+        $context->builder->store(
+            $context->getTypeFromString('int1')->constInt(1, false),
+            $context->builder->structGep($statePtr, $map['started'])
+        );
         $result = FiberHelper::runResumeAndBoxResult($context, $resumeName, $statePtr);
 
         return $result->value;

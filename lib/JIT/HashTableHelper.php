@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\string_trim;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -320,6 +321,13 @@ final class HashTableHelper
                         Variable::KIND_VARIABLE,
                         $nullSlot
                     ));
+                } elseif (\PHPCompiler\VM\Variable::TYPE_ARRAY === $resolved->type) {
+                    self::setAtIndex(
+                        $context,
+                        $ht,
+                        $idx,
+                        self::variableFromVmHashTable($context, $resolved->toArray())
+                    );
                 } else {
                     throw new \LogicException('Unsupported class constant array element type for JIT');
                 }
@@ -343,6 +351,13 @@ final class HashTableHelper
                     $ht,
                     $key,
                     $context->getTypeFromString('int64')->constInt($resolved->toInt(), false)
+                );
+            } elseif (\PHPCompiler\VM\Variable::TYPE_ARRAY === $resolved->type) {
+                self::setAtKeyCoercingNumericString(
+                    $context,
+                    $ht,
+                    $key,
+                    self::variableFromVmHashTable($context, $resolved->toArray())
                 );
             } else {
                 throw new \LogicException('Unsupported class constant array element type for JIT');
@@ -1313,6 +1328,11 @@ final class HashTableHelper
 
             return;
         }
+        if (Variable::TYPE_OBJECT === $key->type || Variable::TYPE_HASHTABLE === $key->type) {
+            self::emitIllegalOffsetType($context);
+
+            return;
+        }
         if (Variable::TYPE_STRING === $key->type) {
             $keyPtr = $context->helper->loadValue($key);
             self::setAtKeyCoercingNumericString($context, $ht, $keyPtr, $element);
@@ -2100,14 +2120,41 @@ final class HashTableHelper
     }
 
     /**
-     * Array-literal spread: append packed list then string keys (issue #141, #1361).
+     * Array-literal spread: append packed list then string keys (issue #141, #1361, #4453).
      */
     public static function spreadInto(Context $context, Variable $dest, Variable $source): void
     {
+        if (self::needsTraversableMaterialization($context, $source)) {
+            $srcPtr = \PHPCompiler\ext\standard\JitIteratorToArray::materializeHashtable(
+                $context,
+                $source,
+                true,
+                $source->userType ?? null
+            );
+            self::spreadPackedInto($context, $dest, $srcPtr);
+            self::spreadStringKeysInto($context, $dest, $srcPtr);
+
+            return;
+        }
         $srcHt = self::coerceToPackedHashtable($context, $source);
         $srcPtr = $context->helper->loadValue($srcHt);
         self::spreadPackedInto($context, $dest, $srcPtr);
         self::spreadStringKeysInto($context, $dest, $srcPtr);
+    }
+
+    private static function needsTraversableMaterialization(Context $context, Variable $source): bool
+    {
+        if (ListUnpackHelper::isDefinitelyArrayAtCompileTime($source)) {
+            return false;
+        }
+        if (GeneratorHelper::isGeneratorVariable($source)) {
+            return true;
+        }
+        if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $source, $source->userType ?? null)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -2120,6 +2167,9 @@ final class HashTableHelper
         if (1 === \count($entries)) {
             $only = $entries[0];
             if (\is_array($only) && isset($only['unpack'])) {
+                ListUnpackHelper::emitCallUnpackOperandCheck($context, $only['unpack']);
+                ListUnpackHelper::emitCheck($context, $only['unpack']);
+
                 return self::coerceToPackedHashtable($context, $only['unpack']);
             }
         }
@@ -2133,10 +2183,22 @@ final class HashTableHelper
         );
         foreach ($entries as $entry) {
             if (\is_array($entry) && isset($entry['unpack'])) {
+                ListUnpackHelper::emitCallUnpackOperandCheck($context, $entry['unpack']);
+                ListUnpackHelper::emitCheck($context, $entry['unpack']);
                 self::spreadInto($context, $destVar, $entry['unpack']);
                 continue;
             }
-            $value = \is_array($entry) ? $entry['v'] : $entry;
+            if (\is_array($entry) && isset($entry['named'])) {
+                $nameVar = new Variable(
+                    $context,
+                    Variable::TYPE_STRING,
+                    Variable::KIND_VALUE,
+                    $context->constantFromString((string) $entry['named'])
+                );
+                self::addElement($context, $destVar, $entry['value'], $nameVar);
+                continue;
+            }
+            $value = \is_array($entry) ? ($entry['v'] ?? $entry['value'] ?? null) : $entry;
             self::addElement($context, $destVar, $value, null);
         }
 
@@ -2230,5 +2292,13 @@ final class HashTableHelper
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($done);
+    }
+
+    private static function emitIllegalOffsetType(Context $context): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, 'Illegal offset type');
+        $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
     }
 }

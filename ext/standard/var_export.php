@@ -9,13 +9,15 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\ValueEchoHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * var_export() subset for bootstrap/AOT (bool scalars; issue isset_array_offset fixture).
+ * var_export() subset for bootstrap/AOT (issue #4474 repro, #1492).
  */
 final class var_export extends Internal
 {
@@ -47,44 +49,111 @@ final class var_export extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (count($args) < 1 || count($args) > 2) {
-            throw new \LogicException('var_export() requires one or two arguments in this compiler build');
+        $argc = count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('var_export() requires one or two arguments in this compiler build (JIT/AOT)');
         }
-        if (count($args) >= 2) {
-            if (JITVariable::TYPE_NATIVE_BOOL !== $args[1]->type) {
-                throw new \LogicException('var_export() return argument must be boolean in this compiler build');
-            }
-            $returnArg = $context->helper->loadValue($args[1]);
-            $returnBlock = BasicBlockHelper::append($context, 'var_export_return');
-            $echoBlock = BasicBlockHelper::append($context, 'var_export_echo');
-            $doneBlock = BasicBlockHelper::append($context, 'var_export_done');
-            $context->builder->branchIf($returnArg, $returnBlock, $echoBlock);
-            $context->builder->positionAtEnd($returnBlock);
-            $str = self::exportJit($context, $args[0]);
-            $context->builder->branch($doneBlock);
-            $context->builder->positionAtEnd($echoBlock);
-            self::echoJit($context, $args[0]);
-            $context->builder->branch($doneBlock);
-            $context->builder->positionAtEnd($doneBlock);
+        if (JITVariable::TYPE_NATIVE_BOOL === $args[0]->type) {
+            self::echoBoolJit($context, self::boolValForBranch($context, $args[0]));
+            $outSlot = JitValueBox::alloc($context);
+            $outPtr = JitValueBox::pointer($context, $outSlot);
+            $context->builder->call($context->lookupFunction('__value__writeNull'), $outPtr);
 
-            return $str;
+            return $outPtr;
         }
-        self::echoJit($context, $args[0]);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $args[0]);
+        $str = $context->builder->call(
+            $context->lookupFunction('__compiler_var_export'),
+            $valuePtr
+        );
+        $outSlot = JitValueBox::alloc($context);
+        $outPtr = JitValueBox::pointer($context, $outSlot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $outPtr,
+            $str
+        );
+        if (1 === $argc) {
+            ValueEchoHelper::echo($context, $outPtr);
+            $context->builder->call($context->lookupFunction('__value__writeNull'), $outPtr);
+            $nullSlot = JitValueBox::alloc($context);
+            $nullPtr = JitValueBox::pointer($context, $nullSlot);
+            $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
 
-        $this->jitString($context, $args[0], 'varexport() argument #1');
-        return $context->getTypeFromString('int32')->constInt(0, false);
+            return $nullPtr;
+        }
+        $returns = self::boolValForBranch($context, $args[1]);
+        $returnBb = BasicBlockHelper::append($context, 'var_export_return_mode');
+        $echoBb = BasicBlockHelper::append($context, 'var_export_echo_mode');
+        $doneBb = BasicBlockHelper::append($context, 'var_export_call_done');
+        $context->builder->branchIf($returns, $returnBb, $echoBb);
+        $context->builder->positionAtEnd($returnBb);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($echoBb);
+        ValueEchoHelper::echo($context, $outPtr);
+        $echoEndBb = $context->builder->getInsertBlock();
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $outPtr);
+        $nullSlot = JitValueBox::alloc($context);
+        $nullPtr = JitValueBox::pointer($context, $nullSlot);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($doneBb);
+        $ptrTy = $context->getTypeFromString('__value__*');
+        $result = $context->builder->phi($ptrTy);
+        $result->addIncoming($outPtr, $returnBb);
+        $result->addIncoming($nullPtr, $echoEndBb);
+
+        return $result;
     }
 
     private static function exportVm(Variable $v): string
     {
+        return self::exportVmNested($v, 0);
+    }
+
+    private static function exportVmNested(Variable $v, int $level): string
+    {
         if (Variable::TYPE_BOOLEAN === $v->type) {
             return $v->toBool() ? 'true' : 'false';
         }
-        if (Variable::TYPE_NULL === $v->type) {
+        if (Variable::TYPE_NULL === $v->type || Variable::TYPE_UNDEFINED === $v->type) {
             return 'NULL';
+        }
+        if (Variable::TYPE_INTEGER === $v->type) {
+            return (string) $v->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $v->type) {
+            $s = (string) $v->toFloat();
+            if (false === strpos($s, '.')) {
+                return $s.'.0';
+            }
+
+            return $s;
+        }
+        if (Variable::TYPE_STRING === $v->type) {
+            return "'".str_replace(["\\", "'"], ["\\\\", "\\'"], $v->toString())."'";
+        }
+        if (Variable::TYPE_ARRAY === $v->type) {
+            return self::exportVmArray($v->toArray(), $level);
         }
 
         throw new \LogicException('var_export() does not support this value type in this compiler build');
+    }
+
+    private static function exportVmArray(HashTable $ht, int $level): string
+    {
+        $indent = str_repeat('  ', $level);
+        $inner = str_repeat('  ', $level + 1);
+        $lines = ["array (\n"];
+        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
+            $k = Variable::TYPE_INTEGER === $key->type
+                ? (string) $key->toInt()
+                : "'".str_replace(["\\", "'"], ["\\\\", "\\'"], $key->toString())."'";
+            $lines[] = $inner.$k.' => '.self::exportVmNested($value->resolveIndirect(), $level + 1).",\n";
+        }
+        $lines[] = $indent.")";
+
+        return implode('', $lines);
     }
 
     private static function echoJit(Context $context, JITVariable $arg): void
@@ -101,6 +170,32 @@ final class var_export extends Internal
                 $printf,
                 $context->builder->pointerCast($context->constantFromString('NULL'), $charPtr)
             );
+
+            return;
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            $typeByte = $context->builder->load(
+                $context->builder->structGep(
+                    JitValueBox::valuePtrFromVariable($context, $arg),
+                    $context->structFieldMap['__value__']['type']
+                )
+            );
+            $i8 = $context->getTypeFromString('int8');
+            $isNull = $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_NULL, false)
+            );
+            $done = BasicBlockHelper::append($context, 'var_export_null_done');
+            $emit = BasicBlockHelper::append($context, 'var_export_null_emit');
+            $context->builder->branchIf($isNull, $emit, $done);
+            $context->builder->positionAtEnd($emit);
+            $context->builder->call(
+                $printf,
+                $context->builder->pointerCast($context->constantFromString('NULL'), $charPtr)
+            );
+            $context->builder->branch($done);
+            $context->builder->positionAtEnd($done);
 
             return;
         }

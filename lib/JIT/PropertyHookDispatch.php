@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\SourcePreprocessor\PropertyHooks;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -23,7 +25,8 @@ final class PropertyHookDispatch
         Context $context,
         Variable $lvalue,
         Variable $value,
-        ?Block $enclosingBlock
+        ?Block $enclosingBlock,
+        ?\PHPCompiler\JIT $jit = null
     ): bool {
         if (null === $lvalue->objectPropertySlot || null === $lvalue->objectPropertyName) {
             return false;
@@ -35,9 +38,14 @@ final class PropertyHookDispatch
             return false;
         }
         $className = $lvalue->objectPropertyClassName ?? 'stdclass';
-        $hookLc = strtolower(PropertyHooks::setHookMethodName($lvalue->objectPropertyName));
+        $propName = $lvalue->objectPropertyName;
+        $hookLc = strtolower(PropertyHooks::setHookMethodName($propName));
         $proxyName = self::resolveHookProxy($context, $className, $hookLc);
-        if (null === $proxyName) {
+        if (null === $proxyName || self::proxyIsStatic($context, $proxyName)) {
+            if (self::emitGetOnlyVirtualWriteGuard($context, $jit, $className, $propName)) {
+                return true;
+            }
+
             return false;
         }
 
@@ -71,7 +79,7 @@ final class PropertyHookDispatch
         }
         $hookLc = strtolower(PropertyHooks::getHookMethodName($propertyName));
         $proxyName = self::resolveHookProxy($context, $declaringClass, $hookLc);
-        if (null === $proxyName) {
+        if (null === $proxyName || self::proxyIsStatic($context, $proxyName)) {
             return null;
         }
 
@@ -88,6 +96,124 @@ final class PropertyHookDispatch
         $context->callerStrictTypes = $prevStrict;
 
         return $hookValue;
+    }
+
+    /**
+     * isset($obj->prop) on hooked properties — invoke get hook, then Zend isset rules (#4586).
+     */
+    public static function tryEmitPropertyIsSet(
+        Context $context,
+        Value $receiver,
+        string $declaringClass,
+        string $propertyName,
+        ?Block $enclosingBlock
+    ): ?Value {
+        $hookValue = self::tryEmitPropertyGet(
+            $context,
+            $receiver,
+            $declaringClass,
+            $propertyName,
+            $enclosingBlock
+        );
+        if (null === $hookValue) {
+            return null;
+        }
+
+        return self::compileIssetForHookValue($context, $hookValue);
+    }
+
+    /**
+     * Invoke static get hook instead of loading the backing global (#4807).
+     */
+    public static function tryEmitStaticPropertyGet(
+        Context $context,
+        string $declaringClass,
+        string $propertyName,
+        ?Block $enclosingBlock
+    ): ?Value {
+        if (self::isRawHookWrite($context, $propertyName, $enclosingBlock)) {
+            return null;
+        }
+        $hookLc = strtolower(PropertyHooks::getHookMethodName($propertyName));
+        $proxyName = self::resolveStaticHookProxy($context, $declaringClass, $hookLc);
+        if (null === $proxyName) {
+            return null;
+        }
+        $toCall = $context->resolveFunctionProxy($proxyName);
+        $prevStrict = $context->callerStrictTypes;
+        $context->callerStrictTypes = $enclosingBlock?->strictTypes ?? false;
+        $hookValue = $toCall->call($context);
+        $context->callerStrictTypes = $prevStrict;
+
+        return $hookValue;
+    }
+
+    /**
+     * Whether a static property has a lowered static set hook at compile time (#4807).
+     */
+    public static function staticPropertyHasSetHook(
+        Context $context,
+        string $declaringClass,
+        string $propertyName
+    ): bool {
+        $hookLc = strtolower(PropertyHooks::setHookMethodName($propertyName));
+
+        return null !== self::resolveStaticHookProxy($context, $declaringClass, $hookLc);
+    }
+
+    /**
+     * Invoke static set hook instead of storing the backing global (#4807).
+     */
+    public static function emitStaticSetHookIfNeeded(
+        Context $context,
+        Variable $lvalue,
+        Variable $value,
+        ?Block $enclosingBlock,
+        ?\PHPCompiler\JIT $jit = null
+    ): bool {
+        if (null === $lvalue->staticPropertyGlobal || null === $lvalue->staticPropertyHookClassLc) {
+            return false;
+        }
+        $propName = $lvalue->objectPropertyName;
+        if (null === $propName) {
+            return false;
+        }
+        if (self::isRawHookWrite($context, $propName, $enclosingBlock)) {
+            return false;
+        }
+        $className = $lvalue->staticPropertyHookClassLc;
+        $hookLc = strtolower(PropertyHooks::setHookMethodName($propName));
+        $proxyName = self::resolveStaticHookProxy($context, $className, $hookLc);
+        if (null === $proxyName) {
+            if (self::emitGetOnlyVirtualWriteGuard($context, $jit, $className, $propName, true)) {
+                return true;
+            }
+
+            return false;
+        }
+        $toCall = $context->resolveFunctionProxy($proxyName);
+        $prevStrict = $context->callerStrictTypes;
+        $context->callerStrictTypes = $enclosingBlock?->strictTypes ?? false;
+        $toCall->call($context, $value);
+        $context->callerStrictTypes = $prevStrict;
+
+        return true;
+    }
+
+    private static function compileIssetForHookValue(Context $context, Value $hookValue): Value
+    {
+        $valuePtr = JitValueBox::normalizeValuePtr($context, $hookValue);
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $nullType = $i8->constInt(\PHPCompiler\VM\Variable::TYPE_NULL, false);
+        $undefType = $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED, false);
+        $notNull = $context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
+        $notUndef = $context->builder->icmp(Builder::INT_NE, $typeByte, $undefType);
+
+        return $context->builder->and($notNull, $notUndef);
     }
 
     private static function isRawHookWrite(Context $context, string $propertyName, ?Block $block): bool
@@ -136,6 +262,30 @@ final class PropertyHookDispatch
         return false;
     }
 
+    private static function resolveStaticHookProxy(Context $context, string $className, string $hookMethodLc): ?string
+    {
+        $proxy = self::resolveHookProxy($context, $className, $hookMethodLc);
+        if (null === $proxy || !self::proxyIsStatic($context, $proxy)) {
+            return null;
+        }
+
+        return $proxy;
+    }
+
+    private static function proxyIsStatic(Context $context, string $proxyName): bool
+    {
+        $parts = explode('::', $proxyName, 2);
+        if (2 !== count($parts)) {
+            return false;
+        }
+        $objectType = $context->type->object;
+        assert($objectType instanceof Object_);
+        $classId = $objectType->lookup($parts[0]);
+        $flags = $objectType->methodVisibility($classId, $parts[1]);
+
+        return ($flags & \PHPCfg\Func::FLAG_STATIC) !== 0;
+    }
+
     private static function resolveHookProxy(Context $context, string $className, string $hookMethodLc): ?string
     {
         $objectType = $context->type->object;
@@ -156,5 +306,43 @@ final class PropertyHookDispatch
         }
 
         return null;
+    }
+
+    /**
+     * Block stores to get-only virtual hooked properties (#4687).
+     *
+     * @return bool true when the store was blocked (caller must skip propertyStore)
+     */
+    private static function emitGetOnlyVirtualWriteGuard(
+        Context $context,
+        ?\PHPCompiler\JIT $jit,
+        string $className,
+        string $propertyName,
+        bool $staticProperty = false
+    ): bool {
+        $lcClass = strtolower(ltrim($className, '\\'));
+        $propLc = strtolower($propertyName);
+        $meta = $context->runtime->vmContext->propertyHookRegistry[$lcClass][$propertyName]
+            ?? $context->runtime->vmContext->propertyHookRegistry[$lcClass][$propLc]
+            ?? null;
+        if (!is_array($meta) || empty($meta['virtual']) || isset($meta['set'])) {
+            return false;
+        }
+        $getLc = strtolower(PropertyHooks::getHookMethodName($propertyName));
+        $getProxy = $staticProperty
+            ? self::resolveStaticHookProxy($context, $className, $getLc)
+            : self::resolveHookProxy($context, $className, $getLc);
+        if (null === $getProxy || (!$staticProperty && self::proxyIsStatic($context, $getProxy))) {
+            return false;
+        }
+
+        $message = sprintf('Property %s::$%s is read-only', $className, $propertyName);
+        if (null !== $jit && [] !== $context->tryCatch->handlerStack) {
+            TryCatchHelper::emitCatchableErrorMessage($context, $jit, $message);
+        } else {
+            ErrorRaise::emitRaise($context, $message);
+        }
+
+        return true;
     }
 }

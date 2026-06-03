@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Call\Native;
 use PHPCompiler\OpCode;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPCfg\Operand;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -24,7 +27,23 @@ final class GeneratorHelper
     /** int64 property holding {@see __generator_state__*} bits (#3115). */
     public const STATE_PROPERTY = '__generator_state';
 
+    private const YIELD_FROM_STRING_ERROR = 'Can use "yield from" only with arrays and Traversables';
+
+    private const YIELD_FROM_TYPE_ERROR = 'Can only use yield from on Traversable|array';
+
     private static bool $typesRegistered = false;
+
+    public static function registerJitMethods(Context $context): void
+    {
+        $context->functionProxies['generator::send'] = new Call\GeneratorSend();
+        $context->functionProxies['generator::throw'] = new Call\GeneratorThrow();
+        $context->functionProxies['generator::getreturn'] = new Call\GeneratorGetReturn();
+        $context->functionProxies['generator::next'] = new Call\GeneratorNext();
+        $context->functionProxies['generator::current'] = new Call\GeneratorCurrent();
+        $context->functionProxies['generator::rewind'] = new Call\GeneratorRewind();
+        $context->functionProxies['generator::valid'] = new Call\GeneratorValid();
+        $context->functionProxies['generator::key'] = new Call\GeneratorKey();
+    }
 
     public static function ensureTypes(Context $context): void
     {
@@ -47,6 +66,15 @@ final class GeneratorHelper
             $context->getTypeFromString('__hashtable__*'),
             $context->getTypeFromString('size_t'),
             $context->getTypeFromString('int1'),
+            $context->getTypeFromString('int1'),
+            $context->getTypeFromString('__object__*'),
+            $context->getTypeFromString('int1'),
+            $context->getTypeFromString('__value__'),
+            $context->getTypeFromString('int1'),
+            $context->getTypeFromString('int1'),
+            $context->getTypeFromString('__value__'),
+            $context->getTypeFromString('__value__'),
+            $context->getTypeFromString('int1'),
         );
         $context->structFieldMap['__generator_state__'] = [
             'resume_ip' => 0,
@@ -59,7 +87,74 @@ final class GeneratorHelper
             'yield_from_ht' => 7,
             'yield_from_idx' => 8,
             'yield_from_is_generator' => 9,
+            'yield_from_is_iterator' => 10,
+            'yield_from_iter_obj' => 11,
+            'yield_from_iter_advance' => 12,
+            'pending_send' => 13,
+            'has_pending_send' => 14,
+            'has_pending_throw' => 15,
+            'pending_throw' => 16,
+            'return_value' => 17,
+            'has_returned' => 18,
         ];
+    }
+
+    private static function clearPendingAndReturnFields(Context $context, Value $statePtr): void
+    {
+        $map = $context->structFieldMap['__generator_state__'];
+        $i1 = $context->getTypeFromString('int1');
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['has_pending_send']));
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['has_pending_throw']));
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['has_returned']));
+        foreach (['pending_send', 'pending_throw', 'return_value'] as $field) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $context->builder->structGep($statePtr, $map[$field]))
+            );
+        }
+    }
+
+    private static function clearYieldFromFields(Context $context, Value $statePtr): void
+    {
+        $map = $context->structFieldMap['__generator_state__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $i1 = $context->getTypeFromString('int1');
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $zero = $sizeT->constInt(0, false);
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['yield_from_active']));
+        $context->builder->store($htPtrTy->constNull(), $context->builder->structGep($statePtr, $map['yield_from_ht']));
+        $context->builder->store($zero, $context->builder->structGep($statePtr, $map['yield_from_idx']));
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['yield_from_is_generator']));
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['yield_from_is_iterator']));
+        $context->builder->store($objPtrTy->constNull(), $context->builder->structGep($statePtr, $map['yield_from_iter_obj']));
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['yield_from_iter_advance']));
+    }
+
+    private static function yieldFromContainerUserType(Block $block, OpCode $op): ?string
+    {
+        if (null === $op->arg2) {
+            return null;
+        }
+        $operand = $block->getOperand($op->arg2);
+        $userType = $operand->type->userType ?? null;
+        if (null !== $userType && '' !== $userType) {
+            return $userType;
+        }
+
+        return null;
+    }
+
+    private static function copyVariableToStateValueField(
+        Context $context,
+        Variable $src,
+        Value $destField
+    ): void {
+        JitValueBox::copyFromPointer(
+            $context,
+            $destField,
+            JitValueBox::valuePtrFromVariable($context, $src)
+        );
     }
 
     public static function registerCreator(Context $context, string $funcLc, string $resumeInternalName): void
@@ -580,17 +675,33 @@ final class GeneratorHelper
         $invalidIdx = $context->builder->sub($zero, $sizeT->constInt(1, false));
         $fn = $context->builder->getInsertBlock()->getParent();
         $innerResumeName = self::resolveYieldFromGeneratorResumeName($block, $op, $context);
+        $containerUserType = self::yieldFromContainerUserType($block, $op);
+        $supportsIterator = false;
+        if (null !== $op->arg2) {
+            try {
+                $previewVar = $context->getVariableFromOp($block->getOperand($op->arg2));
+                $supportsIterator = IteratorProtocolHelper::canLowerIteratorProtocol(
+                    $context,
+                    $previewVar,
+                    $containerUserType
+                );
+            } catch (\LogicException) {
+                $supportsIterator = false;
+            }
+        }
 
         $activeField = $context->builder->structGep($stateParam, $map['yield_from_active']);
         $htField = $context->builder->structGep($stateParam, $map['yield_from_ht']);
         $idxField = $context->builder->structGep($stateParam, $map['yield_from_idx']);
         $isGenField = $context->builder->structGep($stateParam, $map['yield_from_is_generator']);
+        $isIterField = $context->builder->structGep($stateParam, $map['yield_from_is_iterator']);
         $active = $context->builder->load($activeField);
 
         $initBb = $fn->appendBasicBlock('gen_yf_init');
         $dispatchBb = $fn->appendBasicBlock('gen_yf_dispatch');
         $arrayIterBb = $fn->appendBasicBlock('gen_yf_iter_array');
         $genIterBb = $fn->appendBasicBlock('gen_yf_iter_gen');
+        $iterIterBb = $supportsIterator ? $fn->appendBasicBlock('gen_yf_iter_obj') : null;
         $context->builder->branchIf($active, $dispatchBb, $initBb);
 
         $context->builder->positionAtEnd($initBb);
@@ -605,6 +716,8 @@ final class GeneratorHelper
             $prefixStart
         );
         $effectiveResumeName = $innerResumeName ?? $containerVar->generatorResumeName;
+        $i64 = $context->getTypeFromString('int64');
+        $invalidContainerBb = $fn->appendBasicBlock('gen_yf_invalid_container');
         if (
             null !== $effectiveResumeName
             && self::isGeneratorVariable($containerVar)
@@ -616,36 +729,81 @@ final class GeneratorHelper
                 $htField
             );
             $context->builder->store($i1->constInt(1, false), $isGenField);
+            $context->builder->store($i1->constInt(0, false), $isIterField);
             $context->builder->store($i1->constInt(1, false), $activeField);
             self::resetGeneratorStateInPlace($context, $innerState);
             $context->builder->branch($genIterBb);
+        } elseif (Variable::TYPE_STRING === $containerVar->type) {
+            $context->builder->branch($invalidContainerBb);
         } elseif (
             ($containerVar->type & Variable::IS_NATIVE_ARRAY)
             || Variable::TYPE_HASHTABLE === $containerVar->type
-            || Variable::TYPE_VALUE === $containerVar->type
         ) {
             if ($containerVar->type & Variable::IS_NATIVE_ARRAY) {
                 $htPtr = HashTableHelper::materializeNativeArrayForCall($context, $containerVar);
-            } elseif (Variable::TYPE_HASHTABLE === $containerVar->type) {
-                $htPtr = $context->helper->loadValue(HashTableHelper::asDetachedHashtable($context, $containerVar));
             } else {
-                $htPtr = $context->builder->call(
-                    $context->lookupFunction('__value__readHashtable'),
-                    JitValueBox::valuePtrFromVariable($context, $containerVar)
-                );
+                $htPtr = $context->helper->loadValue(HashTableHelper::asDetachedHashtable($context, $containerVar));
             }
             $context->builder->store($htPtr, $htField);
             $context->builder->store($invalidIdx, $idxField);
             $context->builder->store($i1->constInt(0, false), $isGenField);
+            $context->builder->store($i1->constInt(0, false), $isIterField);
             $context->builder->store($i1->constInt(1, false), $activeField);
             $context->builder->branch($arrayIterBb);
+        } elseif (
+            Variable::TYPE_VALUE === $containerVar->type
+            && !IteratorProtocolHelper::canLowerIteratorProtocol($context, $containerVar, $containerUserType)
+        ) {
+            self::compileYieldFromValueBoxContainerInit(
+                $context,
+                $fn,
+                $containerVar,
+                $stateParam,
+                $map,
+                $htField,
+                $idxField,
+                $activeField,
+                $isGenField,
+                $isIterField,
+                $invalidIdx,
+                $arrayIterBb,
+                $invalidContainerBb
+            );
+        } elseif (IteratorProtocolHelper::canLowerIteratorProtocol($context, $containerVar, $containerUserType)) {
+            $receiver = IteratorProtocolHelper::resolveForeachReceiver(
+                $context,
+                $containerVar,
+                $containerUserType
+            );
+            $obj = Variable::KIND_VALUE === $receiver->kind
+                ? $receiver->value
+                : $context->builder->load($receiver->value);
+            $context->refcount->addref($obj);
+            $context->builder->store($obj, $context->builder->structGep($stateParam, $map['yield_from_iter_obj']));
+            IteratorProtocolHelper::invokeIteratorMethod($context, $receiver, 'rewind', $containerUserType);
+            $context->builder->store($i1->constInt(0, false), $isGenField);
+            $context->builder->store($i1->constInt(1, false), $isIterField);
+            $context->builder->store($i1->constInt(0, false), $context->builder->structGep($stateParam, $map['yield_from_iter_advance']));
+            $context->builder->store($i1->constInt(1, false), $activeField);
+            $context->builder->branch($iterIterBb);
         } else {
-            throw new \LogicException('yield from in JIT requires array or Generator container (issue #3074)');
+            throw new \LogicException('yield from in JIT requires array, Generator, or Iterator container (issue #4562)');
         }
+
+        $context->builder->positionAtEnd($invalidContainerBb);
+        self::emitYieldFromStringErrorAndFinish($context, $stateParam, $map, $i1, $i64);
 
         $context->builder->positionAtEnd($dispatchBb);
         $isGen = $context->builder->load($isGenField);
-        $context->builder->branchIf($isGen, $genIterBb, $arrayIterBb);
+        if ($supportsIterator) {
+            $isIter = $context->builder->load($isIterField);
+            $notGenBb = $fn->appendBasicBlock('gen_yf_not_gen');
+            $context->builder->branchIf($isGen, $genIterBb, $notGenBb);
+            $context->builder->positionAtEnd($notGenBb);
+            $context->builder->branchIf($isIter, $iterIterBb, $arrayIterBb);
+        } else {
+            $context->builder->branchIf($isGen, $genIterBb, $arrayIterBb);
+        }
 
         $context->builder->positionAtEnd($genIterBb);
         if (null !== $effectiveResumeName) {
@@ -655,6 +813,7 @@ final class GeneratorHelper
                 $htField,
                 $activeField,
                 $isGenField,
+                $isIterField,
                 $effectiveResumeName,
                 $resumeIp,
                 $fn
@@ -671,10 +830,25 @@ final class GeneratorHelper
             $idxField,
             $activeField,
             $isGenField,
+            $isIterField,
             $resumeIp,
             $fn,
             $arrayIterBb
         );
+
+        if ($supportsIterator && null !== $iterIterBb) {
+            $context->builder->positionAtEnd($iterIterBb);
+            self::emitYieldFromIteratorIter(
+                $context,
+                $stateParam,
+                $activeField,
+                $isGenField,
+                $isIterField,
+                $containerUserType,
+                $resumeIp,
+                $fn
+            );
+        }
     }
 
     private static function castGeneratorStateToHtPtr(Context $context, Value $statePtr): Value
@@ -701,6 +875,7 @@ final class GeneratorHelper
         Value $htField,
         Value $activeField,
         Value $isGenField,
+        Value $isIterField,
         string $innerResumeName,
         int $resumeIp,
         \PHPLLVM\Value\Function_ $fn
@@ -733,6 +908,72 @@ final class GeneratorHelper
         $context->builder->positionAtEnd($exhausted);
         $context->builder->store($i1->constInt(0, false), $activeField);
         $context->builder->store($i1->constInt(0, false), $isGenField);
+        $context->builder->store($i1->constInt(0, false), $isIterField);
+        $context->builder->store(
+            $sizeT->constInt($resumeIp + 1, false),
+            $context->builder->structGep($stateParam, $map['resume_ip'])
+        );
+        $context->builder->returnValue($i64->constInt(0, false));
+    }
+
+    private static function emitYieldFromIteratorIter(
+        Context $context,
+        Value $stateParam,
+        Value $activeField,
+        Value $isGenField,
+        Value $isIterField,
+        ?string $containerUserType,
+        int $resumeIp,
+        \PHPLLVM\Value\Function_ $fn
+    ): void {
+        $map = $context->structFieldMap['__generator_state__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $i1 = $context->getTypeFromString('int1');
+        $i64 = $context->getTypeFromString('int64');
+        $objField = $context->builder->structGep($stateParam, $map['yield_from_iter_obj']);
+        $advanceField = $context->builder->structGep($stateParam, $map['yield_from_iter_advance']);
+        $obj = $context->builder->load($objField);
+        $receiver = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
+
+        $maybeNext = $fn->appendBasicBlock('gen_yf_iter_maybe_next');
+        $checkValid = $fn->appendBasicBlock('gen_yf_iter_valid');
+        $yieldBb = $fn->appendBasicBlock('gen_yf_iter_yield');
+        $exhausted = $fn->appendBasicBlock('gen_yf_iter_exhausted');
+
+        $needsNext = $context->builder->load($advanceField);
+        $context->builder->branchIf($needsNext, $maybeNext, $checkValid);
+
+        $context->builder->positionAtEnd($maybeNext);
+        IteratorProtocolHelper::invokeIteratorMethod($context, $receiver, 'next', $containerUserType);
+        $context->builder->store($i1->constInt(0, false), $advanceField);
+        $context->builder->branch($checkValid);
+
+        $context->builder->positionAtEnd($checkValid);
+        $valid = IteratorProtocolHelper::invokeIteratorMethodBool($context, $receiver, 'valid', $containerUserType);
+        $context->builder->branchIf($valid, $yieldBb, $exhausted);
+
+        $context->builder->positionAtEnd($yieldBb);
+        $key = IteratorProtocolHelper::invokeIteratorMethodValue($context, $receiver, 'key', $containerUserType);
+        $value = IteratorProtocolHelper::invokeIteratorMethodValue($context, $receiver, 'current', $containerUserType);
+        self::copyVariableToStateValueField(
+            $context,
+            $key,
+            $context->builder->structGep($stateParam, $map['current_key'])
+        );
+        self::copyVariableToStateValueField(
+            $context,
+            $value,
+            $context->builder->structGep($stateParam, $map['current_value'])
+        );
+        $context->builder->store($i1->constInt(1, false), $advanceField);
+        $context->builder->store($i1->constInt(1, false), $context->builder->structGep($stateParam, $map['has_current']));
+        $context->builder->store($sizeT->constInt($resumeIp, false), $context->builder->structGep($stateParam, $map['resume_ip']));
+        $context->builder->returnValue($i64->constInt(1, false));
+
+        $context->builder->positionAtEnd($exhausted);
+        $context->builder->store($i1->constInt(0, false), $activeField);
+        $context->builder->store($i1->constInt(0, false), $isGenField);
+        $context->builder->store($i1->constInt(0, false), $isIterField);
         $context->builder->store(
             $sizeT->constInt($resumeIp + 1, false),
             $context->builder->structGep($stateParam, $map['resume_ip'])
@@ -747,6 +988,7 @@ final class GeneratorHelper
         Value $idxField,
         Value $activeField,
         Value $isGenField,
+        Value $isIterField,
         int $resumeIp,
         \PHPLLVM\Value\Function_ $fn,
         \PHPLLVM\BasicBlock $iterBb
@@ -801,6 +1043,7 @@ final class GeneratorHelper
         $context->builder->positionAtEnd($exhausted);
         $context->builder->store($i1->constInt(0, false), $activeField);
         $context->builder->store($i1->constInt(0, false), $isGenField);
+        $context->builder->store($i1->constInt(0, false), $isIterField);
         $context->builder->store(
             $sizeT->constInt($resumeIp + 1, false),
             $context->builder->structGep($stateParam, $map['resume_ip'])
@@ -813,16 +1056,12 @@ final class GeneratorHelper
         $map = $context->structFieldMap['__generator_state__'];
         $sizeT = $context->getTypeFromString('size_t');
         $i1 = $context->getTypeFromString('int1');
-        $htPtrTy = $context->getTypeFromString('__hashtable__*');
         $zero = $sizeT->constInt(0, false);
         $context->builder->store($zero, $context->builder->structGep($statePtr, $map['resume_ip']));
         $context->builder->store($zero, $context->builder->structGep($statePtr, $map['auto_key']));
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['has_current']));
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['done']));
-        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['yield_from_active']));
-        $context->builder->store($htPtrTy->constNull(), $context->builder->structGep($statePtr, $map['yield_from_ht']));
-        $context->builder->store($zero, $context->builder->structGep($statePtr, $map['yield_from_idx']));
-        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['yield_from_is_generator']));
+        self::clearYieldFromFields($context, $statePtr);
     }
 
     private static function copyCurrentFromInnerToOuter(
@@ -850,16 +1089,13 @@ final class GeneratorHelper
         $map = $context->structFieldMap['__generator_state__'];
         $sizeT = $context->getTypeFromString('size_t');
         $i1 = $context->getTypeFromString('int1');
-        $htPtrTy = $context->getTypeFromString('__hashtable__*');
         $zero = $sizeT->constInt(0, false);
         $context->builder->store($zero, $context->builder->structGep($statePtr, $map['resume_ip']));
         $context->builder->store($zero, $context->builder->structGep($statePtr, $map['auto_key']));
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['has_current']));
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['done']));
-        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['yield_from_active']));
-        $context->builder->store($htPtrTy->constNull(), $context->builder->structGep($statePtr, $map['yield_from_ht']));
-        $context->builder->store($zero, $context->builder->structGep($statePtr, $map['yield_from_idx']));
-        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['yield_from_is_generator']));
+        self::clearYieldFromFields($context, $statePtr);
+        self::clearPendingAndReturnFields($context, $statePtr);
         $context->builder->call(
             $context->lookupFunction('__value__writeNull'),
             JitValueBox::pointer($context, $context->builder->structGep($statePtr, $map['current_key']))
@@ -986,16 +1222,205 @@ final class GeneratorHelper
         $map = $context->structFieldMap['__generator_state__'];
         $sizeT = $context->getTypeFromString('size_t');
         $i1 = $context->getTypeFromString('int1');
-        $htPtrTy = $context->getTypeFromString('__hashtable__*');
         $zero = $sizeT->constInt(0, false);
         $context->builder->store($zero, $context->builder->structGep($state, $map['resume_ip']));
         $context->builder->store($zero, $context->builder->structGep($state, $map['auto_key']));
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($state, $map['has_current']));
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($state, $map['done']));
-        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($state, $map['yield_from_active']));
-        $context->builder->store($htPtrTy->constNull(), $context->builder->structGep($state, $map['yield_from_ht']));
-        $context->builder->store($zero, $context->builder->structGep($state, $map['yield_from_idx']));
-        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($state, $map['yield_from_is_generator']));
+        self::clearYieldFromFields($context, $state);
+        self::clearPendingAndReturnFields($context, $state);
+    }
+
+    public static function loadStateFromGeneratorObject(Context $context, Variable $genVar): Value
+    {
+        if (null !== $genVar->generatorStatePtr) {
+            return $genVar->generatorStatePtr;
+        }
+        throw new \LogicException('Generator missing __generator_state in JIT');
+    }
+
+    public static function resolveResumeLc(Context $context, Variable $genVar): string
+    {
+        if (null !== $genVar->generatorResumeName) {
+            return strtolower($genVar->generatorResumeName);
+        }
+        throw new \LogicException('Generator missing __generator_resume metadata in JIT');
+    }
+
+    public static function boxCurrentOrNull(Context $context, Value $statePtr): Value
+    {
+        $map = $context->structFieldMap['__generator_state__'];
+        $i1 = $context->getTypeFromString('int1');
+        $hasCurrent = $context->builder->load($context->builder->structGep($statePtr, $map['has_current']));
+        $nullSlot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $nullSlot)
+        );
+        $currentSlot = JitValueBox::alloc($context);
+        JitValueBox::copyFromPointer(
+            $context,
+            $currentSlot,
+            $context->builder->structGep($statePtr, $map['current_value'])
+        );
+        $has = $context->builder->icmp(Builder::INT_NE, $hasCurrent, $i1->constInt(0, false));
+
+        return $context->builder->select(
+            $has,
+            JitValueBox::pointer($context, $currentSlot),
+            JitValueBox::pointer($context, $nullSlot)
+        );
+    }
+
+    public static function runSingleResume(Context $context, string $resumeLc, Value $statePtr): Value
+    {
+        $resumeFn = $context->functions[strtolower($resumeLc)] ?? null;
+        if (!$resumeFn instanceof \PHPLLVM\Value\Function_) {
+            throw new \LogicException('Generator resume function missing from JIT context');
+        }
+
+        return $context->builder->call($resumeFn, $statePtr);
+    }
+
+    public static function resumeAndBoxYield(Context $context, Variable $genVar): Value
+    {
+        $statePtr = self::loadStateFromGeneratorObject($context, $genVar);
+        self::runSingleResume($context, self::resolveResumeLc($context, $genVar), $statePtr);
+
+        return self::boxCurrentOrNull($context, $statePtr);
+    }
+
+    public static function ensureStarted(Context $context, Variable $genVar): void
+    {
+        $statePtr = self::loadStateFromGeneratorObject($context, $genVar);
+        $map = $context->structFieldMap['__generator_state__'];
+        $i1 = $context->getTypeFromString('int1');
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $resumeIp = $context->builder->load($context->builder->structGep($statePtr, $map['resume_ip']));
+        $hasCurrent = $context->builder->load($context->builder->structGep($statePtr, $map['has_current']));
+        $done = $context->builder->load($context->builder->structGep($statePtr, $map['done']));
+        $hasReturned = $context->builder->load($context->builder->structGep($statePtr, $map['has_returned']));
+        $needsStart = $context->builder->and(
+            $context->builder->icmp(Builder::INT_EQ, $resumeIp, $zero),
+            $context->builder->and(
+                $context->builder->icmp(Builder::INT_EQ, $hasCurrent, $i1->constInt(0, false)),
+                $context->builder->and(
+                    $context->builder->icmp(Builder::INT_EQ, $done, $i1->constInt(0, false)),
+                    $context->builder->icmp(Builder::INT_EQ, $hasReturned, $i1->constInt(0, false))
+                )
+            )
+        );
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $startBb = $fn->appendBasicBlock('gen_ensure_start');
+        $skipBb = $fn->appendBasicBlock('gen_ensure_skip');
+        $context->builder->branchIf($needsStart, $startBb, $skipBb);
+        $context->builder->positionAtEnd($startBb);
+        self::runSingleResume($context, self::resolveResumeLc($context, $genVar), $statePtr);
+        $context->builder->branch($skipBb);
+        $context->builder->positionAtEnd($skipBb);
+    }
+
+    public static function assignValueField(
+        Context $context,
+        Value $destField,
+        Variable $src,
+        ?Operand $srcOp = null
+    ): void {
+        FiberHelper::assignValueField($context, $destField, $src, $srcOp);
+    }
+
+    private static function emitYieldFromStringErrorAndFinish(
+        Context $context,
+        Value $stateParam,
+        array $map,
+        \PHPLLVM\Type\IntegerType $i1,
+        \PHPLLVM\Type\IntegerType $i64
+    ): void {
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise($context, self::YIELD_FROM_STRING_ERROR);
+        $context->builder->store($i1->constInt(1, false), $context->builder->structGep($stateParam, $map['done']));
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($stateParam, $map['has_current']));
+        $context->builder->returnValue($i64->constInt(0, false));
+    }
+
+    private static function emitYieldFromTypeErrorAndFinish(
+        Context $context,
+        Value $stateParam,
+        array $map,
+        \PHPLLVM\Type\IntegerType $i1,
+        \PHPLLVM\Type\IntegerType $i64
+    ): void {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, self::YIELD_FROM_TYPE_ERROR);
+        $context->builder->store($i1->constInt(1, false), $context->builder->structGep($stateParam, $map['done']));
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($stateParam, $map['has_current']));
+        $context->builder->returnValue($i64->constInt(0, false));
+    }
+
+    private static function compileYieldFromValueBoxContainerInit(
+        Context $context,
+        \PHPLLVM\Value\Function_ $fn,
+        Variable $containerVar,
+        Value $stateParam,
+        array $map,
+        Value $htField,
+        Value $idxField,
+        Value $activeField,
+        Value $isGenField,
+        Value $isIterField,
+        Value $invalidIdx,
+        \PHPLLVM\BasicBlock $arrayIterBb,
+        \PHPLLVM\BasicBlock $invalidContainerBb
+    ): void {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $containerVar);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $context->structFieldMap['__value__']['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        $tag = 'u'.(string) spl_object_id($context);
+
+        $arrayBb = $fn->appendBasicBlock('gen_yf_vb_array_'.$tag);
+        $stringBb = $fn->appendBasicBlock('gen_yf_vb_string_'.$tag);
+        $failBb = $fn->appendBasicBlock('gen_yf_vb_fail_'.$tag);
+        $afterArray = $fn->appendBasicBlock('gen_yf_vb_after_array_'.$tag);
+
+        $isArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_ARRAY, false)
+        );
+        $context->builder->branchIf($isArray, $arrayBb, $afterArray);
+
+        $context->builder->positionAtEnd($afterArray);
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_STRING, false)
+        );
+        $context->builder->branchIf($isString, $stringBb, $failBb);
+
+        $context->builder->positionAtEnd($arrayBb);
+        $htPtr = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valuePtr
+        );
+        $context->builder->store($htPtr, $htField);
+        $context->builder->store($invalidIdx, $idxField);
+        $context->builder->store($i1->constInt(0, false), $isGenField);
+        $context->builder->store($i1->constInt(0, false), $isIterField);
+        $context->builder->store($i1->constInt(1, false), $activeField);
+        $context->builder->branch($arrayIterBb);
+
+        $context->builder->positionAtEnd($stringBb);
+        $context->builder->branch($invalidContainerBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $i64 = $context->getTypeFromString('int64');
+        self::emitYieldFromTypeErrorAndFinish($context, $stateParam, $map, $i1, $i64);
     }
 
     private static function llvmInternalName(string $name): string

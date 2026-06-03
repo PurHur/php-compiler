@@ -4,6 +4,9 @@
          if (preg_match('/^(list|array)\s*</i', trim($decl))) {
              return new self(self::TYPE_ARRAY);
          }
++        if (preg_match('/@anonymous\x00/', $decl)) {
++            return new self(self::TYPE_OBJECT, [], $decl);
++        }
 +        if (preg_match('/^AnonymousClass@\d+$/', trim($decl))) {
 +            return new self(self::TYPE_OBJECT, [], $decl);
 +        }

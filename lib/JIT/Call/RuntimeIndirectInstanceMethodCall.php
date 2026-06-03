@@ -114,6 +114,12 @@ final class RuntimeIndirectInstanceMethodCall implements Call
             $context->builder->branchIf($isMatch, $onMatch, $onMiss);
 
             $context->builder->positionAtEnd($onMatch);
+            if (LateStaticBindingHelper::useRuntimeLateStatic($context)) {
+                LateStaticBindingHelper::emitStoreClassId(
+                    $context,
+                    $context->constantFromInteger($id, 'int64')
+                );
+            }
             $proxy = $this->candidatesByClassId[$id];
             assert($proxy instanceof Call);
             $raw = $proxy->call($context, ...$callArgs);

@@ -51,6 +51,9 @@ final class JitThrow
             'phpc_jit_has_throw_pending' => [$i32, false, []],
             'phpc_jit_set_throw_pending' => [$void, false, [$objPtr]],
             'phpc_jit_take_throw_pending' => [$objPtr, false, []],
+            'phpc_jit_clear_active_catch' => [$void, false, []],
+            'phpc_jit_get_active_catch' => [$objPtr, false, []],
+            'phpc_jit_set_active_catch' => [$void, false, [$objPtr]],
         ];
         foreach ($decls as $name => [$ret, $vararg, $params]) {
             if (null !== $context->module->getNamedFunction($name)) {
@@ -77,6 +80,10 @@ final class JitThrow
         if (null === $context->module->getNamedGlobal('phpc_jit_throw_obj_i64')) {
             $obj = $context->module->addGlobal($i64, 'phpc_jit_throw_obj_i64');
             $obj->setInitializer($i64->constInt(0, false));
+        }
+        if (null === $context->module->getNamedGlobal('phpc_jit_active_catch_i64')) {
+            $active = $context->module->addGlobal($i64, 'phpc_jit_active_catch_i64');
+            $active->setInitializer($i64->constInt(0, false));
         }
         self::$globalsRegisteredForModule[$moduleId] = true;
     }
@@ -158,6 +165,44 @@ final class JitThrow
             $phi->addIncoming($loaded, $loadBlock);
             $phi->addIncoming($objPtr->constNull(), $nullBlock);
             $context->builder->returnValue($phi);
+            $context->builder->clearInsertionPosition();
+        }
+
+        if (null === $context->module->getNamedFunction('phpc_jit_clear_active_catch')
+            || 0 === $context->module->getNamedFunction('phpc_jit_clear_active_catch')->countBasicBlocks()
+        ) {
+            $clear = $context->lookupFunction('phpc_jit_clear_active_catch');
+            $block = $clear->appendBasicBlock('entry');
+            $context->builder->positionAtEnd($block);
+            $active = $context->module->getNamedGlobal('phpc_jit_active_catch_i64');
+            $context->builder->store($i64->constInt(0, false), $active);
+            $context->builder->returnVoid();
+            $context->builder->clearInsertionPosition();
+        }
+
+        if (null === $context->module->getNamedFunction('phpc_jit_get_active_catch')
+            || 0 === $context->module->getNamedFunction('phpc_jit_get_active_catch')->countBasicBlocks()
+        ) {
+            $get = $context->lookupFunction('phpc_jit_get_active_catch');
+            $block = $get->appendBasicBlock('entry');
+            $context->builder->positionAtEnd($block);
+            $active = $context->module->getNamedGlobal('phpc_jit_active_catch_i64');
+            $addr = $context->builder->load($active);
+            $loaded = $context->builder->intToPtr($addr, $objPtr);
+            $context->builder->returnValue($loaded);
+            $context->builder->clearInsertionPosition();
+        }
+
+        if (null === $context->module->getNamedFunction('phpc_jit_set_active_catch')
+            || 0 === $context->module->getNamedFunction('phpc_jit_set_active_catch')->countBasicBlocks()
+        ) {
+            $set = $context->lookupFunction('phpc_jit_set_active_catch');
+            $block = $set->appendBasicBlock('entry');
+            $context->builder->positionAtEnd($block);
+            $obj = $set->getParam(0);
+            $active = $context->module->getNamedGlobal('phpc_jit_active_catch_i64');
+            $context->builder->store($context->builder->ptrToInt($obj, $i64), $active);
+            $context->builder->returnVoid();
             $context->builder->clearInsertionPosition();
         }
     }

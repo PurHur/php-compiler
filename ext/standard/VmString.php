@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM;
 use PHPCompiler\VM\Variable;
 
 final class VmString
@@ -15,11 +16,75 @@ final class VmString
     public const TRIM_DEFAULT = " \t\n\r\0\x0B";
 
     /**
-     * Coerce a string-search builtin operand to string (php-src _convert_to_string parity, #3549).
+     * Coerce a string builtin operand to string (php-src _convert_to_string parity, #3549, #4284).
+     *
+     * Objects with __toString invoke the magic method so exceptions reach enclosing try/catch.
      */
     public static function coerceOperand(Variable $var): string
     {
+        $vm = VM::running();
+        if (null !== $vm) {
+            return $vm->coerceVariableToString($var);
+        }
+
         return $var->resolveIndirect()->toString();
+    }
+
+    /**
+     * Coerce a string builtin operand (php-src Z_PARAM_STR; rejects array / plain object, #4553).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function coerceStringBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'string'
+    ): string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'array'));
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $vm = VM::running();
+            $object = $var->toObject();
+            if (null === $vm || !$vm->hasInstanceMethod($object->class, '__tostring')) {
+                throw new \TypeError(
+                    self::stringBuiltinTypeError($function, $argIndex, $paramName, $object->class->name)
+                );
+            }
+        }
+
+        return self::coerceOperand($var);
+    }
+
+    /**
+     * Coerce disk_*_space() directory operand; null means default path (php-src filestat.c, #4915).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function coerceOptionalDirectoryArg(Variable $var, string $function): ?string
+    {
+        if (Variable::TYPE_NULL === $var->resolveIndirect()->type) {
+            return null;
+        }
+
+        return self::coerceStringBuiltinArg($var, $function, 0, 'directory');
+    }
+
+    private static function stringBuiltinTypeError(
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $given
+    ): string {
+        return sprintf(
+            '%s(): Argument #%d ($%s) must be of type string, %s given',
+            $function,
+            $argIndex + 1,
+            $paramName,
+            $given
+        );
     }
 
     /** Regex metacharacters escaped by preg_quote() (PHP 8.2 byte subset). */
@@ -304,7 +369,7 @@ final class VmString
             $ordA = self::byteOrd($a[$i]);
             $ordB = self::byteOrd($b[$i]);
             if ($ordA !== $ordB) {
-                return $ordA <=> $ordB;
+                return $ordA - $ordB;
             }
         }
 
@@ -461,7 +526,7 @@ final class VmString
             $ordA = self::byteOrd($a[$i]);
             $ordB = self::byteOrd($b[$i]);
             if ($ordA !== $ordB) {
-                return $ordA <=> $ordB;
+                return $ordA - $ordB;
             }
         }
 
@@ -477,7 +542,7 @@ final class VmString
             $ordA = self::byteOrd(self::asciiLowerByte($a[$i]));
             $ordB = self::byteOrd(self::asciiLowerByte($b[$i]));
             if ($ordA !== $ordB) {
-                return $ordA <=> $ordB;
+                return $ordA - $ordB;
             }
         }
 
@@ -502,7 +567,7 @@ final class VmString
             $ordA = self::byteOrd(self::asciiLowerByte($a[$i]));
             $ordB = self::byteOrd(self::asciiLowerByte($b[$i]));
             if ($ordA !== $ordB) {
-                return $ordA <=> $ordB;
+                return $ordA - $ordB;
             }
         }
 
@@ -759,7 +824,7 @@ final class VmString
             $ordA = self::byteOrd(self::asciiLowerByte($a[$i]));
             $ordB = self::byteOrd(self::asciiLowerByte($b[$i]));
             if ($ordA !== $ordB) {
-                return $ordA <=> $ordB;
+                return $ordA - $ordB;
             }
         }
 
@@ -876,13 +941,24 @@ final class VmString
         return $out;
     }
 
-    /** Decode a hex string to binary (PHP hex2bin subset; false on invalid input). */
-    public static function hex2bin(string $data) {
+    /**
+     * Decode a hex string to binary (PHP hex2bin subset).
+     *
+     * @return string|false decoded bytes, or false when input is invalid (non-strict)
+     *
+     * @throws \ValueError when $strict is true and input has odd length or invalid hex
+     */
+    public static function hex2bin(string $data, bool $strict = false)
+    {
         $len = self::byteLength($data);
         if (0 === $len) {
             return '';
         }
         if (0 !== ($len & 1)) {
+            if ($strict) {
+                throw new \ValueError('Hexadecimal input string must have an even length');
+            }
+
             return false;
         }
         $out = '';
@@ -890,6 +966,10 @@ final class VmString
             $hi = self::hexDigit(self::byteOrd($data[$i]));
             $lo = self::hexDigit(self::byteOrd($data[$i + 1]));
             if (null === $hi || null === $lo) {
+                if ($strict) {
+                    throw new \ValueError('Input string must be hexadecimal string');
+                }
+
                 return false;
             }
             $out .= \chr(($hi << 4) | $lo);

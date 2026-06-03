@@ -53,6 +53,9 @@ class Native implements Call {
     /** PHP variadic parameter index for named-arg resolution (issue #3777). */
     public ?int $namedArgsVariadicIndex = null;
 
+    /** LLVM arg index => implicit nullable (`int $x = null`, #4449). */
+    public array $paramImplicitNullableByArg = [];
+
     public function __construct(
         Value $function,
         string $name,
@@ -64,7 +67,8 @@ class Native implements Call {
         array $paramDnfConstraintsByArg = [],
         array $paramByRefByArg = [],
         array $paramNames = [],
-        ?int $namedArgsVariadicIndex = null
+        ?int $namedArgsVariadicIndex = null,
+        array $paramImplicitNullableByArg = []
     ) {
         $this->function = $function;
         $this->name = $name;
@@ -77,6 +81,7 @@ class Native implements Call {
         $this->paramByRefByArg = $paramByRefByArg;
         $this->paramNames = $paramNames;
         $this->namedArgsVariadicIndex = $namedArgsVariadicIndex;
+        $this->paramImplicitNullableByArg = $paramImplicitNullableByArg;
     }
 
     public function call(Context $context, Variable ... $args): Value {
@@ -100,7 +105,11 @@ class Native implements Call {
             $skipVariadicPackedTypeCheck = null !== $this->variadicArgIndex
                 && $index === $this->variadicArgIndex
                 && $this->variadicSlotUsesElementTypeChecks($index);
-            if (!$skipVariadicPackedTypeCheck && isset($this->paramTypeConstraintsByArg[$index])) {
+            if (
+                !$skipVariadicPackedTypeCheck
+                && isset($this->paramTypeConstraintsByArg[$index])
+                && !$this->skipImplicitNullableTypeCheck($index, $arg)
+            ) {
                 \PHPCompiler\JIT\TypeCheck::enforceParameter(
                     $context,
                     $arg,
@@ -433,7 +442,10 @@ class Native implements Call {
         $extra = array_slice($args, $idx);
         $strict = $context->callerStrictTypes;
         foreach ($extra as $arg) {
-            if (isset($this->paramTypeConstraintsByArg[$idx])) {
+            if (
+                isset($this->paramTypeConstraintsByArg[$idx])
+                && !$this->skipImplicitNullableTypeCheck($idx, $arg)
+            ) {
                 \PHPCompiler\JIT\TypeCheck::enforceParameter(
                     $context,
                     $arg,
@@ -463,6 +475,12 @@ class Native implements Call {
         return isset($this->paramTypeConstraintsByArg[$llvmArgIndex])
             || isset($this->paramIntersectionConstraintsByArg[$llvmArgIndex])
             || isset($this->paramDnfConstraintsByArg[$llvmArgIndex]);
+    }
+
+    private function skipImplicitNullableTypeCheck(int $index, Variable $arg): bool
+    {
+        return isset($this->paramImplicitNullableByArg[$index])
+            && (Variable::TYPE_NULL === $arg->type || !empty($arg->isNullConstant));
     }
 
     /**

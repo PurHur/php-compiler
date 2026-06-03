@@ -14,10 +14,12 @@ allow:\runtime::loadcoremodules
 allow:\runtime::loadjit
 allow:\runtime::loadjitcompilemodulefuncs
 allow:\runtime::loadjitcontext
+allow:\runtime::noteparsecompilenullforscript
 allow:\runtime::parse
 allow:\runtime::parseandcompile
 allow:\runtime::parseandcompileemitsmoke
+allow:\runtime::peeklastparsefailure
 allow:\runtime::standalone
-allow:slotindexforvariablename
 allow:slotforoperand
+allow:slotindexforvariablename
 deny:\bootstrapaot\helloworld_compile_smoke

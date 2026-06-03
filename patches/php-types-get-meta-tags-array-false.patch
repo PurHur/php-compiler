@@ -1,6 +1,12 @@
---- vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
-+++ vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
-@@ -1852,7 +1852,7 @@
+diff --git a/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php b/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
+index 0000000..0000000 100644
+--- a/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
++++ b/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
+@@ -1850,9 +1850,9 @@
+         'get_included_files' => ['array'],
+         'get_include_path' => ['string'],
+         'getlastmod' => ['int'],
+         'get_loaded_extensions' => ['array', 'zend_extensions=' => 'bool'],
          'get_magic_quotes_gpc' => ['int'],
          'get_magic_quotes_runtime' => ['int'],
 -        'get_meta_tags' => ['array', 'filename' => 'string', 'use_include_path=' => 'bool'],

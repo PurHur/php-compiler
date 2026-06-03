@@ -17,6 +17,8 @@ final class TypeErrorRaise
 
     private const PENDING_ARGUMENT_COUNT_ERROR = 2;
 
+    private const PENDING_VALUE_ERROR = 3;
+
     private static ?int $hasPendingAddress = null;
 
     private static ?int $copyPendingAddress = null;
@@ -59,6 +61,11 @@ final class TypeErrorRaise
     public static function emitArgumentCountError(Context $context, string $message): void
     {
         self::emitPendingMessage($context, $message, '__compiler_jit_raise_argument_count_error');
+    }
+
+    public static function emitValueError(Context $context, string $message): void
+    {
+        self::emitPendingMessage($context, $message, '__compiler_jit_raise_value_error');
     }
 
     private static function emitPendingMessage(Context $context, string $message, string $callee): void
@@ -230,6 +237,7 @@ final class TypeErrorRaise
         $decls = [
             '__compiler_jit_raise_type_error' => [$void, false, [$i8p, $sizeT]],
             '__compiler_jit_raise_argument_count_error' => [$void, false, [$i8p, $sizeT]],
+            '__compiler_jit_raise_value_error' => [$void, false, [$i8p, $sizeT]],
             'phpc_jit_type_error_clear_pending' => [$void, false, []],
             'phpc_jit_type_error_has_pending' => [$i32, false, []],
             'phpc_jit_type_error_pending_kind_get' => [$i32, false, []],
@@ -284,6 +292,9 @@ final class TypeErrorRaise
         if ('' !== $msg) {
             if (self::PENDING_ARGUMENT_COUNT_ERROR === $kind) {
                 throw new \ArgumentCountError($msg);
+            }
+            if (self::PENDING_VALUE_ERROR === $kind) {
+                throw new \ValueError($msg);
             }
             throw new \TypeError($msg);
         }

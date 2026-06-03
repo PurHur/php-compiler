@@ -23,6 +23,25 @@ final class JitNativeString
             if (null !== $magic) {
                 return $magic;
             }
+            $classHint = ltrim((string) ($var->type?->userType ?? ''), '\\');
+            if (
+                '' !== $classHint
+                && 'object' !== strtolower($classHint)
+                && $context->type->object->isEnumClassLc(strtolower($classHint))
+            ) {
+                Builtin\ErrorRaise::ensureLinked($context);
+                Builtin\ErrorRaise::emitRaise(
+                    $context,
+                    'Object of class '.$classHint.' could not be converted to string'
+                );
+
+                return new Variable(
+                    $context,
+                    Variable::TYPE_STRING,
+                    Variable::KIND_VALUE,
+                    $context->builder->load($context->constantStringFromString(''))
+                );
+            }
             throw new \LogicException(
                 'Cannot coerce JIT type '.Variable::getStringType($var->type).' to string for concat'
             );

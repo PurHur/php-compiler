@@ -20,6 +20,10 @@ final class ArrayIsListJITTest extends BaseTest
             __DIR__.'/cases/stdlib/array_is_list_jit.phpt',
             'array_is_list_jit.phpt'
         );
+        yield 'array_is_list_type_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_is_list_type_jit.phpt',
+            'array_is_list_type_jit.phpt'
+        );
     }
 
     public function setUp(): void

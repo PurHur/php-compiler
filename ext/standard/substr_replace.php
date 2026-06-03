@@ -35,10 +35,13 @@ final class substr_replace extends Internal
         $length = null;
         if (4 === $argc) {
             $lengthArg = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $lengthArg->type) {
+            if (Variable::TYPE_NULL === $lengthArg->type) {
+                $length = null;
+            } elseif (Variable::TYPE_INTEGER !== $lengthArg->type) {
                 throw new \LogicException('substr_replace() length must be an integer in this compiler build');
+            } else {
+                $length = $lengthArg->toInt();
             }
-            $length = $lengthArg->toInt();
         }
         $frame->returnVar->string(VmString::substr_replace(
             $string->toString(),
@@ -63,11 +66,18 @@ final class substr_replace extends Internal
         $lengthVal = $i64->constInt(0, false);
         $hasLength = $i32->constInt(0, false);
         if (4 === $argc) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[3]->type) {
-                throw new \LogicException('substr_replace() length must be an integer in this compiler build');
+            if (JITVariable::TYPE_NATIVE_LONG === $args[3]->type) {
+                $lengthVal = $this->jitLong($context, $args[3], 'substr_replace() length');
+                $hasLength = $i32->constInt(1, false);
+            } elseif (JITVariable::TYPE_VALUE === $args[3]->type) {
+                if (!$args[3]->isNullConstant) {
+                    throw new \LogicException('substr_replace() length must be an integer or literal null in this compiler build');
+                }
+                $lengthVal = $i64->constInt(0, false);
+                $hasLength = $i32->constInt(0, false);
+            } else {
+                throw new \LogicException('substr_replace() length must be an integer or null in this compiler build');
             }
-            $lengthVal = $this->jitLong($context, $args[3], 'substr_replace() length');
-            $hasLength = $i32->constInt(1, false);
         }
 
         return JitSubstrReplace::replace(

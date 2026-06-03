@@ -228,6 +228,18 @@ function opcode_type_name(int $type): string
             return 'TYPE_LOGICAL_XOR';
         case 119:
             return 'TYPE_TRAIT_USE_ADAPTATION';
+        case 120:
+            return 'TYPE_LIST_UNPACK_CHECK';
+        case 121:
+            return 'TYPE_JUMPIF_FUNCTION_STATIC_INITIALIZED';
+        case 122:
+            return 'TYPE_FUNCTION_STATIC_INIT_STORE';
+        case 123:
+            return 'TYPE_IN';
+        case 124:
+            return 'TYPE_LIST_SPREAD_ASSIGN';
+        case 125:
+            return 'TYPE_FROM_CALLABLE';
         default:
             return 'unknown opcode';
     }

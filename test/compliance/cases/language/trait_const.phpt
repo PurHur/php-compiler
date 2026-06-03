@@ -1,5 +1,5 @@
 --TEST--
-trait class constants — C::N and T::N fetch (issue #3431, Zend zend_traits.c)
+trait class constants — C::N fetch via using class (issue #3431, Zend zend_traits.c)
 --FILE--
 <?php
 trait T {
@@ -8,6 +8,6 @@ trait T {
 class C {
     use T;
 }
-echo C::N, ' ', T::N, "\n";
+echo C::N, "\n";
 --EXPECT--
-42 42
+42

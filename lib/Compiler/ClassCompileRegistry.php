@@ -8,12 +8,15 @@ use PHPCfg\Block as CfgBlock;
 use PHPCfg\Op\Stmt\ClassMethod;
 
 /**
- * Compile-time map of declared class/interface/trait methods (#3211).
+ * Compile-time map of declared class/interface/trait methods (#3211, #4529).
  */
 final class ClassCompileRegistry
 {
-    /** @var array<string, list<string>> lcName => method names (lowercase) */
+    /** @var array<string, array<string, MethodSig>> lcName => method lc => signature */
     private array $methods = [];
+
+    /** @var array<string, string> lcName => display name */
+    private array $displayNames = [];
 
     /** @var array<string, ?string> lcName => parent lc name */
     private array $parents = [];
@@ -21,28 +24,40 @@ final class ClassCompileRegistry
     /** @var array<string, list<string>> lcName => extended interface lc names */
     private array $interfaces = [];
 
+    /** @var array<string, true> registered trait lc names (#4973) */
+    private array $traits = [];
+
     public function registerClass(string $name, ?string $parentLc, array $interfaceLcs, CfgBlock $stmts): void
     {
         $lc = self::lc($name);
+        $this->displayNames[$lc] = ltrim($name, '\\');
         $this->parents[$lc] = $parentLc;
         $this->interfaces[$lc] = $interfaceLcs;
-        $this->methods[$lc] = self::methodNamesFromStmts($stmts);
+        $this->methods[$lc] = self::methodSigsFromStmts($stmts, $lc);
     }
 
     public function registerInterface(string $name, array $extendsLcs, CfgBlock $stmts): void
     {
         $lc = self::lc($name);
+        $this->displayNames[$lc] = ltrim($name, '\\');
         $this->parents[$lc] = null;
         $this->interfaces[$lc] = $extendsLcs;
-        $this->methods[$lc] = self::methodNamesFromStmts($stmts);
+        $this->methods[$lc] = self::methodSigsFromStmts($stmts, $lc);
     }
 
     public function registerTrait(string $name, CfgBlock $stmts): void
     {
         $lc = self::lc($name);
+        $this->displayNames[$lc] = ltrim($name, '\\');
         $this->parents[$lc] = null;
         $this->interfaces[$lc] = [];
-        $this->methods[$lc] = self::methodNamesFromStmts($stmts);
+        $this->traits[$lc] = true;
+        $this->methods[$lc] = self::methodSigsFromStmts($stmts, $lc);
+    }
+
+    public function isTrait(string $lcName): bool
+    {
+        return isset($this->traits[self::lc($lcName)]);
     }
 
     public function hasOverridableMethod(?string $parentLc, array $interfaceLcs, string $methodLc): bool
@@ -60,13 +75,99 @@ final class ClassCompileRegistry
         return false;
     }
 
+    /**
+     * @return array{sig: MethodSig, ownerLc: string, ownerDisplay: string}|null
+     */
+    public function findOverriddenMethod(?string $parentLc, array $interfaceLcs, string $methodLc): ?array
+    {
+        if (null !== $parentLc && '' !== $parentLc) {
+            $found = $this->findMethodInClassChain($parentLc, $methodLc);
+            if (null !== $found) {
+                return $found;
+            }
+        }
+
+        foreach ($interfaceLcs as $ifaceLc) {
+            $found = $this->findMethodInInterfaceChain($ifaceLc, $methodLc);
+            if (null !== $found) {
+                return $found;
+            }
+        }
+
+        return null;
+    }
+
+    public function isClassSubtypeOf(string $subtypeLc, string $supertypeLc): bool
+    {
+        if ($subtypeLc === $supertypeLc) {
+            return true;
+        }
+        $current = $subtypeLc;
+        $guard = 0;
+        while (null !== ($parent = $this->parents[$current] ?? null) && '' !== $parent) {
+            if (++$guard > 256) {
+                return false;
+            }
+            if ($parent === $supertypeLc) {
+                return true;
+            }
+            $current = $parent;
+        }
+
+        return false;
+    }
+
+    public function classImplementsInterface(string $classLc, string $interfaceLc): bool
+    {
+        if ($classLc === $interfaceLc) {
+            return true;
+        }
+        foreach ($this->interfaces[$classLc] ?? [] as $ifaceLc) {
+            if ($this->interfaceExtendsOrEquals($ifaceLc, $interfaceLc)) {
+                return true;
+            }
+        }
+        $parent = $this->parents[$classLc] ?? null;
+        if (null !== $parent && '' !== $parent) {
+            return $this->classImplementsInterface($parent, $interfaceLc);
+        }
+
+        return false;
+    }
+
+    private function interfaceExtendsOrEquals(string $ifaceLc, string $targetLc): bool
+    {
+        if ($ifaceLc === $targetLc) {
+            return true;
+        }
+        foreach ($this->interfaces[$ifaceLc] ?? [] as $parentIface) {
+            if ($this->interfaceExtendsOrEquals($parentIface, $targetLc)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function hasMethodInClassChain(string $classLc, string $methodLc): bool
+    {
+        return null !== $this->findMethodInClassChain($classLc, $methodLc);
+    }
+
+    /**
+     * @return array{sig: MethodSig, ownerLc: string, ownerDisplay: string}|null
+     */
+    private function findMethodInClassChain(string $classLc, string $methodLc): ?array
     {
         $visited = [];
         while ('' !== $classLc && !isset($visited[$classLc])) {
             $visited[$classLc] = true;
-            if (isset($this->methods[$classLc]) && in_array($methodLc, $this->methods[$classLc], true)) {
-                return true;
+            if (isset($this->methods[$classLc][$methodLc])) {
+                return [
+                    'sig' => $this->methods[$classLc][$methodLc],
+                    'ownerLc' => $classLc,
+                    'ownerDisplay' => $this->displayNames[$classLc] ?? $classLc,
+                ];
             }
             $parent = $this->parents[$classLc] ?? null;
             if (null === $parent || '' === $parent) {
@@ -75,10 +176,18 @@ final class ClassCompileRegistry
             $classLc = $parent;
         }
 
-        return false;
+        return null;
     }
 
     private function hasMethodInInterfaceChain(string $ifaceLc, string $methodLc): bool
+    {
+        return null !== $this->findMethodInInterfaceChain($ifaceLc, $methodLc);
+    }
+
+    /**
+     * @return array{sig: MethodSig, ownerLc: string, ownerDisplay: string}|null
+     */
+    private function findMethodInInterfaceChain(string $ifaceLc, string $methodLc): ?array
     {
         $visited = [];
         $queue = [$ifaceLc];
@@ -88,30 +197,35 @@ final class ClassCompileRegistry
                 continue;
             }
             $visited[$current] = true;
-            if (isset($this->methods[$current]) && in_array($methodLc, $this->methods[$current], true)) {
-                return true;
+            if (isset($this->methods[$current][$methodLc])) {
+                return [
+                    'sig' => $this->methods[$current][$methodLc],
+                    'ownerLc' => $current,
+                    'ownerDisplay' => $this->displayNames[$current] ?? $current,
+                ];
             }
             foreach ($this->interfaces[$current] ?? [] as $parentIface) {
                 $queue[] = $parentIface;
             }
         }
 
-        return false;
+        return null;
     }
 
     /**
-     * @return list<string>
+     * @return array<string, MethodSig>
      */
-    private static function methodNamesFromStmts(CfgBlock $stmts): array
+    private static function methodSigsFromStmts(CfgBlock $stmts, string $ownerLc): array
     {
-        $names = [];
+        $methods = [];
         foreach ($stmts->children as $child) {
             if ($child instanceof ClassMethod) {
-                $names[] = strtolower($child->func->name);
+                $name = strtolower($child->func->name);
+                $methods[$name] = MethodSig::fromFunc($child->func, $ownerLc);
             }
         }
 
-        return $names;
+        return $methods;
     }
 
     private static function lc(string $name): string

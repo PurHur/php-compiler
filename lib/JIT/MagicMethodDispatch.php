@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_;
+use PHPCompiler\MethodVisibility;
+use PHPCompiler\PropertyVisibility;
 use PHPCfg\Operand;
 use PHPLLVM\Value;
 
@@ -63,6 +66,62 @@ final class MagicMethodDispatch
     }
 
     /**
+     * Compile-time mirror of VM propertyReadUsesMagicGet (#4673).
+     */
+    public static function propertyReadUsesMagicGetAtCompileTime(
+        Context $context,
+        int $classId,
+        string $declaringClass,
+        string $propertyName,
+        ?Block $enclosingBlock
+    ): bool {
+        if (!self::hasInstanceMethod($context->type->object, $classId, '__get')) {
+            return false;
+        }
+        if (!$context->type->object->hasProperty($classId, $propertyName)) {
+            return true;
+        }
+        $callerClassLc = null;
+        if (null !== $enclosingBlock?->func?->class) {
+            $callerClassLc = strtolower($enclosingBlock->func->class->value);
+        }
+        $visibility = $context->type->object->propertyVisibility($classId, $propertyName);
+        if (MethodVisibility::isPublic($visibility)) {
+            return false;
+        }
+        $declaringClassLc = strtolower(ltrim($declaringClass, '\\'));
+        $objectClassLc = strtolower(ltrim($context->type->object->classNameForId($classId), '\\'));
+        try {
+            PropertyVisibility::assertAccessible(
+                $visibility,
+                $callerClassLc,
+                $declaringClassLc,
+                $declaringClass,
+                $propertyName,
+                $objectClassLc,
+                fn (string $classLc, string $ancestorLc): bool => $context->type->object->classIsSubclassOf($classLc, $ancestorLc)
+                    || $classLc === $ancestorLc
+            );
+
+            return false;
+        } catch (\LogicException $e) {
+            return true;
+        }
+    }
+
+    public static function emitMagicGetIndirectModifyError(Context $context, string $className, string $propertyName): void
+    {
+        ErrorRaise::emitRaise(
+            $context,
+            sprintf(
+                'Indirect modification of overloaded property %s::$%s has no effect',
+                $className,
+                $propertyName
+            )
+        );
+    }
+
+    /**
      * @return Value|null lowered __get return value
      */
     public static function tryEmitMagicGet(
@@ -73,7 +132,7 @@ final class MagicMethodDispatch
         ?Block $enclosingBlock
     ): ?Value {
         $classId = $context->type->object->lookup($declaringClass);
-        if ($context->type->object->hasProperty($classId, $propertyName)) {
+        if (!self::propertyReadUsesMagicGetAtCompileTime($context, $classId, $declaringClass, $propertyName, $enclosingBlock)) {
             return null;
         }
         if (!self::hasInstanceMethod($context->type->object, $classId, '__get')) {

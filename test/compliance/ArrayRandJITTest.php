@@ -20,6 +20,10 @@ final class ArrayRandJITTest extends BaseTest
             __DIR__.'/cases/stdlib/array_rand_jit.phpt',
             'array_rand_jit.phpt'
         );
+        yield 'array_rand_validation_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_rand_validation_jit.phpt',
+            'array_rand_validation_jit.phpt'
+        );
     }
 
     public function setUp(): void

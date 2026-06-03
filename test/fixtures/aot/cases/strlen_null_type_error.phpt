@@ -1,0 +1,7 @@
+--TEST--
+AOT: strlen() — null deprecated, returns 0 (#5000)
+--FILE--
+<?php
+echo strlen(null), "\n";
+--EXPECT--
+0

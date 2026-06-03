@@ -20,6 +20,8 @@ final class JitArrayElem
 {
     private const TYPE_ERROR = '%s(): Argument #1 ($array) must be of type array, %s given';
 
+    private const TYPE_ERROR_N = '%s(): Argument #%d ($%s) must be of type %s, %s given';
+
     private const EMPTY_VALUE_ERROR = '%s(): Argument #1 ($array) must not be empty';
 
     public static function first(Context $context, JITVariable $array): Value
@@ -174,6 +176,17 @@ final class JitArrayElem
 
     public static function requireArrayArg(Context $context, JITVariable $array, string $fn): void
     {
+        self::requireArrayParam($context, $array, $fn, 1, 'array');
+    }
+
+    public static function requireArrayParam(
+        Context $context,
+        JITVariable $array,
+        string $fn,
+        int $argNum,
+        string $paramName,
+        string $expectedType = 'array'
+    ): void {
         if (JITVariable::TYPE_HASHTABLE === $array->type
             || ($array->type & JITVariable::IS_NATIVE_ARRAY)
         ) {
@@ -195,7 +208,10 @@ final class JitArrayElem
             $errBlock = BasicBlockHelper::append($context, 'array_elem_req_err');
             $context->builder->branchIf($isHt, $okBlock, $errBlock);
             $context->builder->positionAtEnd($errBlock);
-            self::emitErrorAndAbort($context, \sprintf(self::TYPE_ERROR, $fn, 'mixed'));
+            self::emitErrorAndAbort(
+                $context,
+                \sprintf(self::TYPE_ERROR_N, $fn, $argNum, $paramName, $expectedType, 'mixed')
+            );
             $context->builder->positionAtEnd($okBlock);
 
             return;
@@ -204,7 +220,17 @@ final class JitArrayElem
         $errBlock = BasicBlockHelper::append($context, 'array_req_err');
         $context->builder->branch($errBlock);
         $context->builder->positionAtEnd($errBlock);
-        self::emitErrorAndAbort($context, \sprintf(self::TYPE_ERROR, $fn, self::jitTypeLabel($array->type)));
+        self::emitErrorAndAbort(
+            $context,
+            \sprintf(
+                self::TYPE_ERROR_N,
+                $fn,
+                $argNum,
+                $paramName,
+                $expectedType,
+                self::jitTypeLabel($array->type)
+            )
+        );
         $context->builder->positionAtEnd($okBlock);
     }
 

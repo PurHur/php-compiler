@@ -16,22 +16,46 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\Frame;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 
+use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\Variable as VmVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 
 class strlen extends Internal {
 
+    private const NULL_DEPRECATION =
+        'strlen(): Passing null to parameter #1 ($string) of type string is deprecated';
+
     public function execute(Frame $frame): void {
         if (count($frame->calledArgs) !== 1) {
             throw new \LogicException("Expecting exactly a single argument to strlen()");
         }
-        $var = $frame->calledArgs[0];
+        $var = $frame->calledArgs[0]->resolveIndirect();
+        if (VmVariable::TYPE_NULL === $var->type) {
+            if (null !== $frame->vmContext) {
+                $frame->vmContext->errors->triggerError(
+                    self::NULL_DEPRECATION,
+                    ErrorReporter::E_DEPRECATED,
+                    '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                    $frame->vmContext,
+                    $frame
+                );
+            }
+            if (!is_null($frame->returnVar)) {
+                $frame->returnVar->int(0);
+            }
+
+            return;
+        }
         if (!is_null($frame->returnVar)) {
-            $frame->returnVar->int(VmString::byteLength($var->resolveIndirect()->toString()));
+            $frame->returnVar->int(VmString::byteLength(VmString::coerceOperand($var)));
         }
     }
 
@@ -39,11 +63,81 @@ class strlen extends Internal {
         if (count($args) !== 1) {
             throw new \LogicException('Too few args passed to strlen()');
         }
-        $argValue = JitStringArg::lower($context, $args[0], 'strlen() string');
+        $arg = $args[0];
+        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            self::emitNullDeprecation($context);
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            return self::strlenFromValueBox($context, $arg);
+        }
+        $argValue = JitStringArg::lower($context, $arg, 'strlen() string');
         $offset = $context->structFieldIndex($argValue, 'length');
 
         return $context->builder->load(
             $context->builder->structGep($argValue, $offset)
+        );
+    }
+
+    /** @return Value int32 length */
+    private static function strlenFromValueBox(Context $context, Variable $arg): Value
+    {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $nullBlock = BasicBlockHelper::append($context, 'strlen_null_deprec');
+        $okBlock = BasicBlockHelper::append($context, 'strlen_value_ok');
+        $mergeBlock = BasicBlockHelper::append($context, 'strlen_value_merge');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(VmVariable::TYPE_NULL, false)
+            ),
+            $nullBlock,
+            $okBlock
+        );
+        $context->builder->positionAtEnd($nullBlock);
+        self::emitNullDeprecation($context);
+        $context->builder->branch($mergeBlock);
+        $context->builder->positionAtEnd($okBlock);
+        $argValue = JitStringArg::lower($context, $arg, 'strlen() string');
+        $offset = $context->structFieldIndex($argValue, 'length');
+        $len = $context->builder->load(
+            $context->builder->structGep($argValue, $offset)
+        );
+        $context->builder->branch($mergeBlock);
+        $context->builder->positionAtEnd($mergeBlock);
+        $phi = $context->builder->phi($i64);
+        $context->builder->addIncomingToPhi($phi, $i64->constInt(0, false), $nullBlock);
+        $context->builder->addIncomingToPhi($phi, $len, $okBlock);
+
+        return $phi;
+    }
+
+    private static function emitNullDeprecation(Context $context): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $msgPtr = $context->builder->pointerCast(
+            $context->constantFromString(self::NULL_DEPRECATION),
+            $i8p
+        );
+        $msgLen = $sizeT->constInt(\strlen(self::NULL_DEPRECATION), false);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $msgLen,
+            $i32->constInt(ErrorReporter::E_DEPRECATED, false),
+            $emptyFile,
+            $i32->constInt(0, false)
         );
     }
 

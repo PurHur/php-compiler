@@ -4,24 +4,37 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /** LLVM lowering for property_exists() (issue #1372). */
 final class JitPropertyExists
 {
+    private const TYPE_ERROR =
+        'property_exists(): Argument #1 ($object_or_class) must be of type object|string, %s given';
+
     public static function invoke(Context $context, JITVariable $objectOrClass, JITVariable $propertyArg): Value
     {
         $propLiteral = JitStringArg::compileTimeLiteral($propertyArg);
         if (JITVariable::TYPE_OBJECT === $objectOrClass->type) {
             return self::forObject($context, $objectOrClass, $propLiteral);
         }
-        if (JITVariable::TYPE_STRING !== $objectOrClass->type && JITVariable::TYPE_VALUE !== $objectOrClass->type) {
-            throw new \LogicException('property_exists() expects an object or class name string in this compiler build');
+        if (JITVariable::TYPE_VALUE === $objectOrClass->type) {
+            return self::invokeFromValueBox($context, $objectOrClass, $propertyArg, $propLiteral);
+        }
+        if (JITVariable::TYPE_STRING !== $objectOrClass->type) {
+            self::emitTypeErrorAndAbort($context, self::scalarTypeError($objectOrClass->type));
+            $i1 = $context->getTypeFromString('int1');
+
+            return $i1->constInt(0, false);
         }
         $classLiteral = JitStringArg::compileTimeLiteral($objectOrClass);
         if (null !== $classLiteral && null !== $propLiteral) {
@@ -32,6 +45,118 @@ final class JitPropertyExists
         }
 
         throw new \LogicException('property_exists() requires a string literal class name in this compiler build');
+    }
+
+    private static function invokeFromValueBox(
+        Context $context,
+        JITVariable $objectOrClass,
+        JITVariable $propertyArg,
+        ?string $propLiteral
+    ): Value {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $objectOrClass);
+        $typeField = $context->structFieldMap['__value__']['type'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $typeField)
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_OBJECT, false)
+        );
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+
+        $nullBlock = BasicBlockHelper::append($context, 'prop_exists_null');
+        $notNull = BasicBlockHelper::append($context, 'prop_exists_not_null');
+        $objectBlock = BasicBlockHelper::append($context, 'prop_exists_obj');
+        $notObject = BasicBlockHelper::append($context, 'prop_exists_not_obj');
+        $stringBlock = BasicBlockHelper::append($context, 'prop_exists_str');
+        $errBlock = BasicBlockHelper::append($context, 'prop_exists_err');
+        $mergeBlock = BasicBlockHelper::append($context, 'prop_exists_merge');
+
+        $context->builder->branchIf($isNull, $nullBlock, $notNull);
+
+        $context->builder->positionAtEnd($nullBlock);
+        self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'null'));
+
+        $context->builder->positionAtEnd($notNull);
+        $context->builder->branchIf($isObject, $objectBlock, $notObject);
+
+        $context->builder->positionAtEnd($objectBlock);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $objVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $obj
+        );
+        $objResult = self::forObject($context, $objVar, $propLiteral);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($notObject);
+        $context->builder->branchIf($isString, $stringBlock, $errBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $classLiteral = JitStringArg::compileTimeLiteral($objectOrClass);
+        if (null !== $classLiteral && null !== $propLiteral) {
+            $strResult = ReflectionBuiltinHelper::propertyExistsLiteral(
+                $context,
+                $classLiteral,
+                $propLiteral
+            );
+        } elseif (null !== $classLiteral) {
+            $strResult = self::forClassLiteralRuntimeProperty($context, $classLiteral, $propertyArg);
+        } else {
+            $i1 = $context->getTypeFromString('int1');
+            $strResult = $i1->constInt(0, false);
+        }
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($errBlock);
+        self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'mixed'));
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $phi = $context->builder->phi($objResult->typeOf());
+        $phi->addIncoming($objResult, $objectBlock);
+        $phi->addIncoming($strResult, $stringBlock);
+
+        return $phi;
+    }
+
+    private static function emitTypeErrorAndAbort(Context $context, string $message): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, $message);
+        $context->builder->call($context->lookupFunction('abort'));
+    }
+
+    private static function scalarTypeError(int $type): string
+    {
+        switch ($type) {
+            case JITVariable::TYPE_NATIVE_LONG:
+                return \sprintf(self::TYPE_ERROR, 'int');
+            case JITVariable::TYPE_NATIVE_DOUBLE:
+                return \sprintf(self::TYPE_ERROR, 'float');
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return \sprintf(self::TYPE_ERROR, 'bool');
+            case JITVariable::TYPE_NULL:
+                return \sprintf(self::TYPE_ERROR, 'null');
+            default:
+                return \sprintf(self::TYPE_ERROR, 'mixed');
+        }
     }
 
     private static function forObject(Context $context, JITVariable $objectArg, ?string $propLiteral): Value

@@ -24,6 +24,7 @@ final class CompactApplyArg
             $valuePtrTy,
             $charPtrPtr,
             $valuePtrTy->pointerType(0),
+            $context->getTypeFromString('int64'),
             $context->getTypeFromString('int64')
         );
         $fn = $context->module->addFunction('__compiler_compact_apply_arg', $fnType);

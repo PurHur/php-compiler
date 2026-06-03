@@ -297,8 +297,15 @@ if (!function_exists('php_compiler_cli_dispatch')) {
 
         if (function_exists('run')) {
             php_compiler_cli_note_progress('php:cli_dispatch_run');
-            // @phan-suppress-next-line PhanUndeclaredFunction yes it is we just made a function_exists call
-            run($execFile, $execCode, $options);
+            try {
+                // @phan-suppress-next-line PhanUndeclaredFunction yes it is we just made a function_exists call
+                run($execFile, $execCode, $options);
+            } catch (PHPCompiler\VM\ScriptExit $e) {
+                exit($e->status);
+            } catch (\LogicException $e) {
+                echo $e->getMessage(), "\n";
+                exit(255);
+            }
         } else {
             throw new \RuntimeException('Must define run before including cli.php');
         }

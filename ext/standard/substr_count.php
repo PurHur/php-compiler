@@ -8,6 +8,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\Builtin\StringSubstrCount;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -41,10 +43,13 @@ final class substr_count extends Internal
         $length = null;
         if (4 === $argc) {
             $lenVar = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $lenVar->type) {
+            if (Variable::TYPE_NULL === $lenVar->type) {
+                $length = null;
+            } elseif (Variable::TYPE_INTEGER !== $lenVar->type) {
                 throw new \LogicException('substr_count() length must be an integer in this compiler build');
+            } else {
+                $length = $lenVar->toInt();
             }
-            $length = $lenVar->toInt();
         }
         $frame->returnVar->int(
             VmString::substr_count($haystack->toString(), $needle->toString(), $offset, $length)
@@ -63,8 +68,10 @@ final class substr_count extends Internal
         if ($argc >= 3 && JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
             throw new \LogicException('substr_count() offset must be an integer in this compiler build');
         }
-        if (4 === $argc && JITVariable::TYPE_NATIVE_LONG !== $args[3]->type) {
-            throw new \LogicException('substr_count() length must be an integer in this compiler build');
+        if (4 === $argc
+            && JITVariable::TYPE_NATIVE_LONG !== $args[3]->type
+            && JITVariable::TYPE_VALUE !== $args[3]->type) {
+            throw new \LogicException('substr_count() length must be an integer or null in this compiler build');
         }
 
         $hay = $this->jitString($context, $args[0], 'substr_count() argument #1');
@@ -73,10 +80,68 @@ final class substr_count extends Internal
         $offset = $argc >= 3
             ? $context->builder->truncOrBitCast($context->helper->loadValue($args[2]), $i64)
             : null;
-        $length = 4 === $argc
+        $length = 4 === $argc && JITVariable::TYPE_NATIVE_LONG === $args[3]->type
             ? $context->builder->truncOrBitCast($context->helper->loadValue($args[3]), $i64)
             : null;
 
-        return JitSubstrCount::count($context, $hay, $needle, $offset, $length);
+        if (4 !== $argc || JITVariable::TYPE_NATIVE_LONG === $args[3]->type) {
+            return JitSubstrCount::count($context, $hay, $needle, $offset, $length);
+        }
+        // Nullable $length would force a CFG split around JitSubstrCount::countInline (which builds its own CFG),
+        // so lower via the runtime helper with an explicit "length is null" flag instead.
+        StringSubstrCount::ensureLinked($context);
+        $map = $context->structFieldMap['__string__'];
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $i64->constInt(0, false);
+
+        $hayLen = $context->builder->load($context->builder->structGep($hay, $map['length']));
+        $needleLen = $context->builder->load($context->builder->structGep($needle, $map['length']));
+        $hayPtr = $context->builder->structGep($hay, $map['value']);
+        $needlePtr = $context->builder->structGep($needle, $map['value']);
+
+        $offsetVal = null === $offset ? $zero : $offset;
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $args[3]);
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load($context->builder->structGep($valuePtr, $valueMap['type']));
+        $i8 = $context->getTypeFromString('int8');
+        $isNull = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(JITVariable::TYPE_NULL, false)
+        );
+
+        $nullBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'substr_count_len_null');
+        $lenBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'substr_count_len_value');
+        $done = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'substr_count_len_done');
+        $context->builder->branchIf($isNull, $nullBlock, $lenBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($lenBlock);
+        $lenI64 = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $lenPhi = $context->builder->phi($i64);
+        $lenPhi->addIncoming($zero, $nullBlock);
+        $lenPhi->addIncoming($lenI64, $lenBlock);
+        $isNullPhi = $context->builder->phi($i32);
+        $isNullPhi->addIncoming($i32->constInt(1, false), $nullBlock);
+        $isNullPhi->addIncoming($i32->constInt(0, false), $lenBlock);
+
+        $fn = $context->lookupFunction('phpc_substr_count');
+
+        return $context->builder->call(
+            $fn,
+            $hayPtr,
+            $context->builder->truncOrBitCast($hayLen, $sizeT),
+            $needlePtr,
+            $context->builder->truncOrBitCast($needleLen, $sizeT),
+            $offsetVal,
+            $lenPhi,
+            $isNullPhi
+        );
     }
 }

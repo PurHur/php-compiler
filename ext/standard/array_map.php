@@ -121,7 +121,7 @@ final class array_map extends Internal
     private static function appendKeyed(HashTable $out, Variable $key, Variable $value): void
     {
         if ($key->type === Variable::TYPE_INTEGER) {
-            $out->append($value);
+            $out->addIndex($key->toInt(), $value);
 
             return;
         }

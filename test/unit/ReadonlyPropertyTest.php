@@ -44,9 +44,49 @@ class Box {
 $o = new Box();
 $o->v = 2;
 PHP;
-        $this->expectException(\Exception::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot modify readonly property Box::$v');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_after.php'));
+    }
+
+    public function testReadonlyPropertyRejectsAssignThroughReferenceAfterConstruct(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public readonly int $x;
+    public function __construct() {
+        $this->x = 1;
+    }
+}
+$c = new C();
+$r = &$c->x;
+$r = 99;
+PHP;
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Cannot modify readonly property C::$x');
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_assign_ref.php'));
+    }
+
+    public function testReadonlyClassPropertyRejectsAssignThroughReferenceAfterConstruct(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+readonly class RC {
+    public int $x;
+    public function __construct() {
+        $this->x = 1;
+    }
+}
+$c = new RC();
+$r = &$c->x;
+$r = 2;
+PHP;
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Cannot modify readonly property RC::$x');
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_class_assign_ref.php'));
     }
 
     public function testPromotedReadonlyPropertyRejectsAssignAfterConstruct(): void
@@ -60,7 +100,7 @@ class C {
 $c = new C('a');
 $c->id = 'b';
 PHP;
-        $this->expectException(\Exception::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot modify readonly property C::$id');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_promoted.php'));
     }
@@ -80,7 +120,7 @@ class C extends P {}
 $c = new C();
 $c->x = 2;
 PHP;
-        $this->expectException(\Exception::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot modify readonly property P::$x');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_inherited.php'));
     }
@@ -99,7 +139,7 @@ class C {
 $c = new C();
 unset($c->x);
 PHP;
-        $this->expectException(\Exception::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot unset readonly property C::$x');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_unset.php'));
     }
@@ -118,7 +158,7 @@ class C {
 $c = new C();
 $c->x++;
 PHP;
-        $this->expectException(\Exception::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot modify readonly property C::$x');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_post_inc.php'));
     }
@@ -137,7 +177,7 @@ class C {
 $c = new C();
 --$c->x;
 PHP;
-        $this->expectException(\Exception::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot modify readonly property C::$x');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_pre_dec.php'));
     }
@@ -156,7 +196,7 @@ class C {
 $c = new C();
 $c->x += 1;
 PHP;
-        $this->expectException(\Exception::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot modify readonly property C::$x');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_compound.php'));
     }
@@ -175,7 +215,7 @@ class C {
 $c = new C();
 $c->x .= 'b';
 PHP;
-        $this->expectException(\Exception::class);
+        $this->expectException(\Error::class);
         $this->expectExceptionMessage('Cannot modify readonly property C::$x');
         $runtime->run($runtime->parseAndCompile($code, 'readonly_prop_concat.php'));
     }
@@ -308,6 +348,41 @@ PHP;
             'readonly_allow_store',
             $ir,
             'JIT should allow readonly property stores while object is not constructed (#3149)'
+        );
+    }
+
+    /**
+     * @group llvm
+     * @group jit
+     */
+    public function testReadonlyPropertyJitLowersAssignThroughReferenceAfterConstructCheck(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $code = <<<'PHP'
+<?php
+class C {
+    public readonly int $x;
+    public function __construct() {
+        $this->x = 1;
+    }
+}
+$c = new C();
+$r = &$c->x;
+$r = 99;
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'readonly_prop_assign_ref_jit.php');
+        $runtime->jitCompileBlock($block);
+        $ir = $runtime->loadJitContext()->module->printToString();
+        self::assertStringContainsString(
+            '__compiler_jit_raise_logic_exception',
+            $ir,
+            'JIT should lower readonly checks for reference writes to properties (#4273)'
+        );
+        self::assertStringContainsString(
+            'readonly_violation',
+            $ir,
+            'JIT should branch on readonly violation for reference property writes (#4273)'
         );
     }
 

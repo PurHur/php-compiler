@@ -24,8 +24,11 @@ final class ClassValidator
 
     public static function assertInstantiable(ClassEntry $entry): void
     {
+        if ($entry->isEnum) {
+            throw new \Error("Cannot instantiate enum {$entry->name}");
+        }
         if ($entry->isAbstract || [] !== $entry->abstractMethods) {
-            throw new \LogicException("Cannot instantiate abstract class {$entry->name}");
+            throw new \Error("Cannot instantiate abstract class {$entry->name}");
         }
     }
 

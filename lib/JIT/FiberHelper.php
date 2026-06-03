@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
+use PHPCompiler\JIT\Builtin\JitThrow;
 use PHPCompiler\JIT\Call\Native;
 use PHPCompiler\OpCode;
 use PHPCfg\Operand;
@@ -30,6 +31,7 @@ final class FiberHelper
         $context->functionProxies['fiber::__construct'] = new Call\FiberConstruct();
         $context->functionProxies['fiber::start'] = new Call\FiberStart();
         $context->functionProxies['fiber::resume'] = new Call\FiberResume();
+        $context->functionProxies['fiber::throw'] = new Call\FiberThrow();
         $context->functionProxies['fiber::suspend'] = new Call\FiberSuspendStatic();
     }
 
@@ -63,6 +65,10 @@ final class FiberHelper
             $context->getTypeFromString('__value__'),
             $context->getTypeFromString('__value__'),
             $context->getTypeFromString('int1'),
+            $context->getTypeFromString('int1'),
+            $context->getTypeFromString('__value__'),
+            $context->getTypeFromString('int1'),
+            $context->getTypeFromString('int1'),
         );
         $context->structFieldMap['__fiber_state__'] = [
             'resume_ip' => 0,
@@ -70,6 +76,10 @@ final class FiberHelper
             'resume_argument' => 2,
             'fiber_return' => 3,
             'done' => 4,
+            'has_pending_throw' => 5,
+            'pending_throw' => 6,
+            'started' => 7,
+            'suspended' => 8,
         ];
     }
 
@@ -89,14 +99,14 @@ final class FiberHelper
     }
 
     /**
-     * @return list<array{op: OpCode, index: int}>
+     * @return list<array{op: OpCode, index: int, block: Block}>
      */
     public static function collectSuspendPoints(Block $block): array
     {
         $points = [];
         foreach ($block->opCodes as $i => $op) {
             if (self::isFiberSuspendInit($block, $op)) {
-                $points[] = ['op' => $op, 'index' => $i];
+                $points[] = ['op' => $op, 'index' => $i, 'block' => $block];
             } elseif (
                 OpCode::TYPE_RETURN === $op->type
                 || OpCode::TYPE_RETURN_VOID === $op->type
@@ -178,16 +188,23 @@ final class FiberHelper
         }
 
         for ($i = 0; $i < $n; ++$i) {
-            $context->builder->positionAtEnd($caseBlocks[$i]);
+            $prefixEntry = self::emitPendingThrowGate(
+                $jit,
+                $func,
+                $stateParam,
+                $caseBlocks[$i]
+            );
             $suspendIdx = $points[$i]['index'];
             $prefixStart = self::resumePrefixStart($block, $points, $i);
+            $resumeTail = $prefixEntry;
             if ($prefixStart < $suspendIdx) {
                 $savedStorage = $context->scope->blockStorage;
                 $context->scope->blockStorage = new \SplObjectStorage();
-                $exit = $jit->compileGeneratorResumePrefix($func, $block, $prefixStart, $suspendIdx, $caseBlocks[$i]);
-                $context->builder->positionAtEnd($exit);
+                $resumeTail = $jit->compileGeneratorResumePrefix($func, $block, $prefixStart, $suspendIdx, $prefixEntry);
+                $context->builder->positionAtEnd($resumeTail);
                 $context->scope->blockStorage = $savedStorage;
             }
+            $context->builder->positionAtEnd($resumeTail);
             self::emitSuspendPoint($jit, $block, $points[$i]['op'], $stateParam, $i + 1);
         }
 
@@ -326,7 +343,10 @@ final class FiberHelper
         $zero = $sizeT->constInt(0, false);
         $context->builder->store($zero, $context->builder->structGep($statePtr, $map['resume_ip']));
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['done']));
-        foreach (['suspend_return', 'resume_argument', 'fiber_return'] as $field) {
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['has_pending_throw']));
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['started']));
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['suspended']));
+        foreach (['suspend_return', 'resume_argument', 'fiber_return', 'pending_throw'] as $field) {
             $context->builder->call(
                 $context->lookupFunction('__value__writeNull'),
                 JitValueBox::pointer($context, $context->builder->structGep($statePtr, $map[$field]))
@@ -480,6 +500,10 @@ final class FiberHelper
         $i64 = $context->getTypeFromString('int64');
         $status = $context->builder->call($resumeFn, $statePtr);
         $suspended = $context->builder->icmp(\PHPLLVM\Builder::INT_NE, $status, $i64->constInt(0, false));
+        $context->builder->store(
+            $context->builder->zext($suspended, $context->getTypeFromString('int1')),
+            $context->builder->structGep($statePtr, $map['suspended'])
+        );
         $suspendSlot = JitValueBox::alloc($context);
         $doneSlot = JitValueBox::alloc($context);
         JitValueBox::copyFromPointer(
@@ -509,5 +533,49 @@ final class FiberHelper
         }
 
         return $sanitized;
+    }
+
+    private static function emitPendingThrowGate(
+        \PHPCompiler\JIT $jit,
+        \PHPLLVM\Value\Function_ $func,
+        Value $stateParam,
+        \PHPLLVM\BasicBlock $caseBlock
+    ): \PHPLLVM\BasicBlock {
+        $context = $jit->context;
+        $map = $context->structFieldMap['__fiber_state__'];
+        $i1 = $context->getTypeFromString('int1');
+        $normalEntry = $func->appendBasicBlock('fiber_resume_normal');
+        $throwEntry = $func->appendBasicBlock('fiber_resume_throw_inject');
+        $context->builder->positionAtEnd($caseBlock);
+        $hasPending = $context->builder->load(
+            $context->builder->structGep($stateParam, $map['has_pending_throw'])
+        );
+        $context->builder->branchIf(
+            $context->builder->icmp(\PHPLLVM\Builder::INT_NE, $hasPending, $i1->constInt(0, false)),
+            $throwEntry,
+            $normalEntry
+        );
+        $context->builder->positionAtEnd($throwEntry);
+        JitThrow::registerDeclarations($context);
+        JitThrow::ensureLinked($context);
+        $pendingField = $context->builder->structGep($stateParam, $map['pending_throw']);
+        $excObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            JitValueBox::pointer($context, $pendingField)
+        );
+        $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $excObj);
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($stateParam, $map['has_pending_throw']));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $pendingField)
+        );
+        $handler = $context->tryCatch->handlerStack[array_key_last($context->tryCatch->handlerStack)] ?? null;
+        if (null !== $handler && null !== $handler->dispatchBb) {
+            $context->builder->branch($handler->dispatchBb);
+        } else {
+            $context->builder->call($context->lookupFunction('abort'));
+        }
+
+        return $normalEntry;
     }
 }

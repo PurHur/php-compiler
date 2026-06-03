@@ -5,17 +5,23 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\gethostbynamel;
+use PHPCompiler\ext\standard\VmDns;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPUnit\Framework\TestCase;
 
 /** VM builtin for gethostbynamel() (#3707). */
 final class GethostbynamelBuiltinTest extends TestCase
 {
+    public function testVmDnsDoesNotDelegateToHostGethostbynamel(): void
+    {
+        $src = (string) \file_get_contents(__DIR__.'/../../ext/standard/VmDns.php');
+        $this->assertDoesNotMatchRegularExpression('/\\\\gethostbynamel\\s*\\(/', $src);
+    }
+
     public function testLocalhostReturnsIpv4List(): void
     {
-        $zend = @\gethostbynamel('localhost');
-        if (false === $zend || !\is_array($zend) || [] === $zend) {
-            $this->markTestSkipped('host gethostbynamel(localhost) unavailable');
+        if (false === VmDns::gethostbynamel('localhost')) {
+            $this->markTestSkipped('native gethostbynamel(localhost) unavailable');
         }
 
         $runtime = new Runtime();
@@ -32,7 +38,7 @@ final class GethostbynamelBuiltinTest extends TestCase
         $first = $ht->find('0');
         $this->assertNotNull($first);
         $this->assertSame(VMVariable::TYPE_STRING, $first->type);
-        $this->assertSame($zend[0], $first->toString());
+        $this->assertMatchesRegularExpression('/^\d{1,3}(\.\d{1,3}){3}$/', $first->toString());
     }
 
     public function testUnknownHostReturnsFalse(): void

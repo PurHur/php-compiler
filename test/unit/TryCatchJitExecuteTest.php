@@ -60,6 +60,24 @@ PHP
             , "ok\n");
     }
 
+    public function testBareThrowRethrowNestedCatchExecutesViaMcjit(): void
+    {
+        $this->assertMcjitOutput(<<<'PHP'
+<?php
+class Ex {}
+try {
+    try {
+        throw new Ex();
+    } catch (Ex $e) {
+        throw;
+    }
+} catch (Ex $e) {
+    echo "ok\n";
+}
+PHP
+            , "ok\n");
+    }
+
     public function testContainsFinallyOpcodesDetectsFinally(): void
     {
         $runtime = new Runtime();

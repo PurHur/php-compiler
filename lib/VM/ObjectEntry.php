@@ -186,6 +186,9 @@ class ObjectEntry {
         if ($this === $other) {
             return true;
         }
+        if (EnumCaseSupport::isEnumCase($this) && EnumCaseSupport::isEnumCase($other)) {
+            return EnumCaseSupport::compareEquals($this, $other);
+        }
         if ($this->class->name !== $other->class->name) {
             return false;
         }
@@ -218,6 +221,9 @@ class ObjectEntry {
      */
     public function compareSpaceship(self $other): int
     {
+        if (EnumCaseSupport::isEnumCase($this) && EnumCaseSupport::isEnumCase($other)) {
+            return EnumCaseSupport::compareSpaceship($this, $other);
+        }
         if ($this === $other) {
             return 0;
         }

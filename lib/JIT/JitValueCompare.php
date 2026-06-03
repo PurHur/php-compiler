@@ -64,9 +64,14 @@ final class JitValueCompare
                     $valuePtr
                 );
                 $nativeLong = $context->helper->loadValue($native);
-                $matches = $context->builder->icmp(Builder::INT_EQ, $stored, $nativeLong);
+                $isResource = self::nativeLongIsResource($context, $stored);
+                $matches = self::nativeLongEqualWithResourceIdentity($context, $stored, $nativeLong);
 
-                return $context->builder->select($sameType, $matches, $falseVal);
+                return $context->builder->select(
+                    $sameType,
+                    $context->builder->select($isResource, $falseVal, $matches),
+                    $falseVal
+                );
             case Variable::TYPE_NULL:
                 $nullTag = $i8->constInt(Variable::TYPE_NULL, false);
 
@@ -131,7 +136,8 @@ final class JitValueCompare
             $context->lookupFunction('__value__readLong'),
             $valuePtr
         );
-        $longMatches = $context->builder->icmp(Builder::INT_EQ, $stored, $__native);
+        $isResource = self::nativeLongIsResource($context, $stored);
+        $longMatches = self::nativeLongEqualWithResourceIdentity($context, $stored, $__native);
 
         $boolTag = $i8->constInt(Variable::TYPE_NATIVE_BOOL, false);
         $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolTag);
@@ -147,7 +153,7 @@ final class JitValueCompare
 
         return $context->builder->select(
             $isLong,
-            $longMatches,
+            $context->builder->select($isResource, $falseVal, $longMatches),
             $context->builder->select(
                 $isBool,
                 $boolMatches,
@@ -459,7 +465,7 @@ final class JitValueCompare
         $context->builder->positionAtEnd($longBlock);
         $leftLong = $context->builder->call($context->lookupFunction('__value__readLong'), $leftPtr);
         $rightLong = $context->builder->call($context->lookupFunction('__value__readLong'), $rightPtr);
-        $longMatch = $context->builder->icmp(Builder::INT_EQ, $leftLong, $rightLong);
+        $longMatch = self::nativeLongEqualWithResourceIdentity($context, $leftLong, $rightLong);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($objectCheckBlock);
@@ -499,6 +505,87 @@ final class JitValueCompare
         $context->builder->branch($exitBlock);
 
         return [$phi, $doneBlock];
+    }
+
+    /**
+     * Loose == for operand pair (#4766): native {@see __object__*} or boxed {@see __value__}.
+     */
+    public static function looseEqualOperands(Context $context, Variable $left, Variable $right): Value
+    {
+        if (Variable::TYPE_OBJECT === $left->type && Variable::TYPE_OBJECT === $right->type) {
+            return self::looseEqualObjectPair(
+                $context,
+                $context->helper->loadValue($left),
+                $context->helper->loadValue($right)
+            );
+        }
+
+        return self::looseEqualValueToValue($context, $left, $right);
+    }
+
+    /**
+     * Loose == on two boxed {@see __value__} operands (#4766, Zend compare_objects).
+     */
+    public static function looseEqualValueToValue(
+        Context $context,
+        Variable $left,
+        Variable $right
+    ): Value {
+        if (!JitValueBox::isValueOperand($left) || !JitValueBox::isValueOperand($right)) {
+            throw new \LogicException('Expected two boxed __value__ operands');
+        }
+        Builtin\SpaceshipRuntime::ensureLinked($context);
+        $readFn = $context->lookupFunction('__value__readObject');
+        $readTy = $readFn->getParam(0)->typeOf();
+        $leftObj = $context->builder->call(
+            $readFn,
+            $context->builder->pointerCast(self::runtimeValuePtr($context, $left), $readTy)
+        );
+        $rightObj = $context->builder->call(
+            $readFn,
+            $context->builder->pointerCast(self::runtimeValuePtr($context, $right), $readTy)
+        );
+        $cmpFn = $context->lookupFunction('__object__compareSpaceship');
+        $cmp = $context->builder->call(
+            $cmpFn,
+            $context->builder->pointerCast($leftObj, $cmpFn->getParam(0)->typeOf()),
+            $context->builder->pointerCast($rightObj, $cmpFn->getParam(1)->typeOf())
+        );
+        $zero = $cmp->typeOf()->constInt(0, false);
+
+        return $context->builder->icmp(Builder::INT_EQ, $cmp, $zero);
+    }
+
+    /**
+     * Loose == on two {@see __object__*} handles (#4766, {@see __object__compareSpaceship}).
+     */
+    public static function looseEqualObjectPair(Context $context, Value $leftObj, Value $rightObj): Value
+    {
+        Builtin\SpaceshipRuntime::ensureLinked($context);
+        $cmp = $context->builder->call(
+            $context->lookupFunction('__object__compareSpaceship'),
+            $leftObj,
+            $rightObj
+        );
+        $zero = $cmp->typeOf()->constInt(0, false);
+
+        return $context->builder->icmp(Builder::INT_EQ, $cmp, $zero);
+    }
+
+    /** {@see __value__*} with types accepted by linked runtime bitcode (#4766). */
+    public static function runtimeValuePtr(Context $context, Variable $var): Value
+    {
+        if (Variable::KIND_VARIABLE === $var->kind) {
+            $ty = $context->getStringFromType($var->value->typeOf());
+            if ('__value__' === $ty) {
+                return JitValueBox::pointer($context, $var->value);
+            }
+        }
+
+        return JitValueBox::normalizeValuePtr(
+            $context,
+            JitValueBox::valuePtrFromVariable($context, $var)
+        );
     }
 
     public static function notIdenticalValueToValue(
@@ -686,7 +773,7 @@ final class JitValueCompare
         return $context->builder->or($identical, $numericMatch);
     }
 
-    private static function stringIsNumeric(Context $context, Value $strPtr): Value
+    public static function stringIsNumeric(Context $context, Value $strPtr): Value
     {
         $structName = $strPtr->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
@@ -799,5 +886,42 @@ final class JitValueCompare
         $context->builder->store($nullEnd, $endPtrSlot);
 
         return $context->builder->call($context->lookupFunction('strtod'), $charPtr, $endPtrSlot);
+    }
+
+    /** True when a native handle id is registered in the stream/dir tables (#4699). */
+    public static function nativeLongIsResource(Context $context, Value $handleLong): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $ret = $context->builder->call(
+            $context->lookupFunction('__compiler_is_resource'),
+            $handleLong
+        );
+
+        return $context->builder->icmp(Builder::INT_NE, $ret, $i32->constInt(0, false));
+    }
+
+    /**
+     * == / === for native long operands: resources compare by handle id; plain ints ignore resource slots (#4699).
+     */
+    public static function nativeLongEqualWithResourceIdentity(
+        Context $context,
+        Value $leftLong,
+        Value $rightLong
+    ): Value {
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+        $leftRes = self::nativeLongIsResource($context, $leftLong);
+        $rightRes = self::nativeLongIsResource($context, $rightLong);
+        $sameResKind = $context->builder->icmp(Builder::INT_EQ, $leftRes, $rightRes);
+        $sameId = $context->builder->icmp(Builder::INT_EQ, $leftLong, $rightLong);
+        $bothRes = $context->builder->and($leftRes, $rightRes);
+        $plainMatch = $context->builder->and(
+            $context->builder->not($leftRes),
+            $context->builder->and($context->builder->not($rightRes), $sameId)
+        );
+        $resourceMatch = $context->builder->and($bothRes, $sameId);
+        $match = $context->builder->or($plainMatch, $resourceMatch);
+
+        return $context->builder->select($sameResKind, $match, $falseVal);
     }
 }

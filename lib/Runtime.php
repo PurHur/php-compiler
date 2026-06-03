@@ -28,7 +28,9 @@ use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Ast\GroupUseStripper;
 use PHPCompiler\Ast\SealedClassAnnotator;
 use PHPCompiler\Ast\SealedClassPreprocessor;
+use PHPCompiler\Ast\InOperatorDesugar;
 use PHPCompiler\Ast\PipeOperatorDesugar;
+use PHPCompiler\Visitor\InOperatorResolver;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Lint\LintCompiler;
 use PHPCompiler\VM\OutputBuffer;
@@ -109,6 +111,7 @@ class Runtime {
         );
 
         $this->preprocessor = new Traverser;
+        $this->preprocessor->addVisitor(new InOperatorResolver);
         $this->preprocessor->addVisitor(new Visitor\Simplifier);
         $this->preprocessor->addVisitor(new Visitor\DeadBlockEliminator);
         $this->postprocessor = new Traverser;
@@ -290,7 +293,7 @@ class Runtime {
         $sealedPreprocessor = new SealedClassPreprocessor();
         [$code, $permitsByLine] = $sealedPreprocessor->preprocess($code);
         $this->sealedClassAnnotator->setPermitsByLine($permitsByLine);
-        [$code] = (new SourcePreprocessor\PropertyHooks())->process($code);
+        [$code, $this->vmContext->propertyHookRegistry] = (new SourcePreprocessor\PropertyHooks())->process($code);
         $code = SwitchCommaCaseRewriter::rewrite($code);
         $code = GenericArrayTypeSourceRewriter::rewrite($code);
         [$code, $abstractEnumLines] = AbstractEnumSourceRewriter::rewrite($code);
@@ -299,11 +302,23 @@ class Runtime {
         return SourceBareThrowRewriter::rewrite($code);
     }
 
+    /**
+     * Source rewrites applied immediately before php-parser / PHPCfg (issue #3243, #4456).
+     *
+     * Must run on any path that calls Parser::parse() directly (AOT include discovery, etc.).
+     */
+    public function rewriteSourceBeforeParser(string $code): string
+    {
+        $code = AsymmetricVisibilityRewriter::rewrite($code);
+        $code = InOperatorDesugar::desugar($code);
+        return PipeOperatorDesugar::desugar($code);
+    }
+
     public function parse(string $code, string $filename): Script {
         [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code);
         $this->compiler->setBareRethrowLines($bareRethrowLines);
-        $code = AsymmetricVisibilityRewriter::rewrite($code);
-        $code = PipeOperatorDesugar::desugar($code);
+        $code = $this->rewriteSourceBeforeParser($code);
+        $fileStrictTypes = $this->detectFileStrictTypes($code);
         try {
             $script = $this->parser->parse($code, $filename);
         } finally {
@@ -316,7 +331,76 @@ class Runtime {
         }
         $this->postprocessor->traverse($script);
         $this->detector->detect($script);
+        // `declare(strict_types=1)` is file-scoped and influences call-site scalar type checks.
+        // Some parser paths miss the directive when `<?php declare(...)` shares a line (#4411).
+        if ($fileStrictTypes) {
+            $script->main->strictTypes = true;
+        }
         return $script;
+    }
+
+    private function detectFileStrictTypes(string $code): bool
+    {
+        if (!\function_exists('token_get_all')) {
+            return false;
+        }
+        $tokens = @token_get_all($code);
+        if (!\is_array($tokens)) {
+            return false;
+        }
+        $i = 0;
+        $n = \count($tokens);
+        while ($i < $n) {
+            $t = $tokens[$i];
+            $id = \is_array($t) ? $t[0] : null;
+            if (\in_array($id, [T_OPEN_TAG, T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
+                ++$i;
+                continue;
+            }
+            break;
+        }
+        if ($i >= $n) {
+            return false;
+        }
+        $t = $tokens[$i];
+        if (!\is_array($t) || T_DECLARE !== $t[0]) {
+            return false;
+        }
+        ++$i;
+        while ($i < $n) {
+            $t = $tokens[$i];
+            $text = \is_array($t) ? (string) $t[1] : (string) $t;
+            if ('(' === $text) {
+                break;
+            }
+            ++$i;
+        }
+        if ($i >= $n) {
+            return false;
+        }
+        ++$i; // after '('
+        $level = 1;
+        $body = '';
+        for (; $i < $n; ++$i) {
+            $t = $tokens[$i];
+            $text = \is_array($t) ? (string) $t[1] : (string) $t;
+            if ('(' === $text) {
+                ++$level;
+            } elseif (')' === $text) {
+                --$level;
+                if (0 === $level) {
+                    break;
+                }
+            }
+            if ($level > 0) {
+                $body .= $text;
+            }
+        }
+        if ('' === $body) {
+            return false;
+        }
+
+        return (bool) preg_match('/\\bstrict_types\\s*=\\s*1\\b/i', $body);
     }
 
     /**

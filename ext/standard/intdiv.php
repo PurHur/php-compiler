@@ -14,31 +14,42 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitNumericDivisionGuard;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
+/**
+ * intdiv() — integer division (php-src ext/standard/math.c; #4982 numeric-string parity).
+ */
 final class intdiv extends Internal
 {
+    private const FUNCTION = 'intdiv';
+
     public function execute(Frame $frame): void
     {
         if (2 !== count($frame->calledArgs)) {
             throw new \LogicException('intdiv() requires exactly two arguments');
         }
-        $a = $frame->calledArgs[0]->resolveIndirect();
-        $b = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $a->type || Variable::TYPE_INTEGER !== $b->type) {
-            throw new \LogicException('intdiv() only supports integers in this compiler build');
-        }
-        $den = $b->toInt();
-        if (0 === $den) {
-            throw new \DivisionByZeroError('intdiv() division by zero');
+        $num1 = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[0]->resolveIndirect(),
+            self::FUNCTION,
+            1,
+            'num1'
+        );
+        $num2 = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[1]->resolveIndirect(),
+            self::FUNCTION,
+            2,
+            'num2'
+        );
+        if (0 === $num2) {
+            throw new \DivisionByZeroError('Division by zero');
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(\intdiv($a->toInt(), $den));
+        $frame->returnVar->int(\intdiv($num1, $num2));
     }
 
     public Context $context;
@@ -49,12 +60,9 @@ final class intdiv extends Internal
         if (2 !== count($args)) {
             throw new \LogicException('intdiv() requires exactly two arguments');
         }
-        if (JITVariable::TYPE_NATIVE_LONG !== $args[0]->type || JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-            throw new \LogicException('intdiv() only supports integers in this compiler build');
-        }
-        $l = $context->helper->loadValue($args[0]);
-        $r = $context->helper->loadValue($args[1]);
+        [$left, $right] = JitIntdiv::lowerOperands($context, $args[0], $args[1]);
+        JitNumericDivisionGuard::emitZeroLongDivisorGuard($context, $right, 'Division by zero');
 
-        return $context->builder->signedDiv($l, $r);
+        return $context->builder->signedDiv($left, $right);
     }
 }

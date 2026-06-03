@@ -46,6 +46,7 @@ final class SelfHostBuiltinPolicy
         'getmypid' => 'numeric',
         'getmygrgid' => 'numeric',
         'getmyinode' => 'numeric',
+        'getlastmod' => 'numeric',
         'getrusage' => 'numeric',
         'memory_get_peak_usage' => 'numeric',
         'memory_get_usage' => 'numeric',
@@ -60,6 +61,7 @@ final class SelfHostBuiltinPolicy
         + self::CATEGORY_FILTER
         + self::CATEGORY_JSON
         + self::CATEGORY_NUMERIC
+        + self::CATEGORY_GC
         + self::CATEGORY_PASSWORD
         + self::CATEGORY_PROCESS
         + self::CATEGORY_SESSION;
@@ -69,12 +71,26 @@ final class SelfHostBuiltinPolicy
 
     /** @var array<string, string> */
     private const CATEGORY_OUTPUT = [
-        'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_end_flush' => 'output',
-        'ob_get_level' => 'output', 'ob_implicit_flush' => 'output', 'flush' => 'output',
+        'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_get_flush' => 'output',
+        'ob_end_flush' => 'output', 'ob_get_level' => 'output', 'ob_implicit_flush' => 'output', 'flush' => 'output',
         'getallheaders' => 'output', 'header_list' => 'output', 'headers_list' => 'output',
         'headers_sent' => 'output', 'header_register_callback' => 'output',
         'register_shutdown_function' => 'output',
         'set_error_handler' => 'error', 'restore_error_handler' => 'error',
+    ];
+
+    /** User-script AOT (bin/compile.php): real ob_* / flush lowering (#3753, mirrors #3725 closures). */
+    private const AOT_USER_SCRIPT_REAL_OUTPUT = [
+        'ob_start' => true,
+        'ob_get_clean' => true,
+        'ob_get_flush' => true,
+        'ob_end_flush' => true,
+        'ob_get_level' => true,
+        'flush' => true,
+        'gc_collect_cycles' => true,
+        'gc_disable' => true,
+        'gc_enable' => true,
+        'gc_enabled' => true,
     ];
 
     /** Session builtins for AOT user scripts under PHP_COMPILER_SELFHOST_AOT (#1891, #1967). */
@@ -106,18 +122,27 @@ final class SelfHostBuiltinPolicy
         'fstat' => 'filesystem',
         'is_file' => 'filesystem', 'is_dir' => 'filesystem', 'is_readable' => 'filesystem',
         'is_writable' => 'filesystem', 'file_get_contents' => 'filesystem', 'file_put_contents' => 'filesystem',
-        'filemtime' => 'filesystem', 'fileatime' => 'filesystem', 'filectime' => 'filesystem', 'fileinode' => 'filesystem',
-        'fileperms' => 'filesystem', 'filesize' => 'filesystem', 'filetype' => 'filesystem',
+        'filemtime' => 'filesystem',
+        'fileatime' => 'filesystem',
+        'filectime' => 'filesystem',
+        'fileinode' => 'filesystem',
+        'fileowner' => 'filesystem',
+        'filegroup' => 'filesystem',
+        'fileperms' => 'filesystem',
+        'filesize' => 'filesystem',
+        'filetype' => 'filesystem',
         'mkdir' => 'filesystem', 'unlink' => 'filesystem', 'rmdir' => 'filesystem', 'realpath' => 'filesystem',
         'chmod' => 'filesystem', 'chown' => 'filesystem', 'lchown' => 'filesystem', 'chgrp' => 'filesystem', 'lchgrp' => 'filesystem', 'umask' => 'filesystem',
         'glob' => 'filesystem', 'scandir' => 'filesystem', 'fnmatch' => 'filesystem',
         'opendir' => 'filesystem', 'readdir' => 'filesystem', 'closedir' => 'filesystem', 'rewinddir' => 'filesystem',
-        'fopen' => 'filesystem', 'fread' => 'filesystem', 'fwrite' => 'filesystem', 'fgetc' => 'filesystem', 'fgets' => 'filesystem',
+        'fopen' => 'filesystem', 'fread' => 'filesystem', 'fwrite' => 'filesystem', 'fgetc' => 'filesystem', 'fgets' => 'filesystem', 'stream_get_line' => 'filesystem',
         'fgetcsv' => 'filesystem',
         'fputcsv' => 'filesystem',
         'ftell' => 'filesystem', 'fseek' => 'filesystem', 'fclose' => 'filesystem', 'flock' => 'filesystem',
         'is_resource' => 'filesystem',
+        'get_resource_type' => 'filesystem',
         'get_resource_id' => 'filesystem',
+        'stream_get_contents' => 'filesystem',
         'feof' => 'filesystem', 'fflush' => 'filesystem', 'ftruncate' => 'filesystem', 'rewind' => 'filesystem', 'fpassthru' => 'filesystem',
         'pathinfo' => 'filesystem', 'readfile' => 'filesystem', 'readlink' => 'filesystem', 'link' => 'filesystem', 'symlink' => 'filesystem', 'rename' => 'filesystem',
         'is_uploaded_file' => 'filesystem', 'move_uploaded_file' => 'filesystem', 'touch' => 'filesystem',
@@ -125,6 +150,14 @@ final class SelfHostBuiltinPolicy
         'getcwd' => 'filesystem', 'chdir' => 'filesystem', 'gethostname' => 'filesystem',
         'gethostbynamel' => 'filesystem',
         'stream_context_create' => 'filesystem',
+    ];
+
+    /** @var array<string, string> php-src ext/standard/php_gc.c (#3209, #3160). */
+    private const CATEGORY_GC = [
+        'gc_collect_cycles' => 'gc',
+        'gc_disable' => 'gc',
+        'gc_enable' => 'gc',
+        'gc_enabled' => 'gc',
     ];
 
     /** @var array<string, string> */
@@ -318,7 +351,21 @@ final class SelfHostBuiltinPolicy
             return false;
         }
 
+        if (self::isAotUserScriptRealOutput($name)) {
+            return false;
+        }
+
         return self::isAutoStubBatchMember($name) || self::looksLikeStdlibBuiltin($name);
+    }
+
+    private static function isAotUserScriptRealOutput(string $name): bool
+    {
+        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        if ('1' !== $userScript && 'true' !== strtolower((string) $userScript)) {
+            return false;
+        }
+
+        return isset(self::AOT_USER_SCRIPT_REAL_OUTPUT[self::normalizeName($name)]);
     }
 
     /** @var array<string, true>|null */

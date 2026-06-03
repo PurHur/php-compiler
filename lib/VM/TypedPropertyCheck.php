@@ -5,14 +5,20 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 /**
- * Uninitialized typed property guards (Zend zend_object_handlers.c parity, #3429).
+ * Uninitialized typed property guards (Zend zend_object_handlers.c parity, #3429, #4908).
  */
 final class TypedPropertyCheck
 {
     public static function isUninitialized(Variable $var): bool
     {
         $target = $var->resolveIndirect();
-        if (null === $target->objectPropertyOwner || Variable::TYPE_UNDEFINED !== $target->type) {
+        if (Variable::TYPE_UNDEFINED !== $target->type) {
+            return false;
+        }
+        if (null !== $target->staticPropertyClassLc && null !== $target->objectPropertyName) {
+            return $target->hasDeclaredTypeConstraint();
+        }
+        if (null === $target->objectPropertyOwner) {
             return false;
         }
         $name = $target->objectPropertyName;
@@ -24,7 +30,15 @@ final class TypedPropertyCheck
                 continue;
             }
             // Typed slots use TYPE_UNDEFINED prototype; untyped use TYPE_NULL (#4240).
-            return $property->prototype->isUndefined();
+            if ($property->prototype->isUndefined()) {
+                return true;
+            }
+            // Readonly without default stays uninitialized until constructor assigns (#4248).
+            if ($property->readonly && null === $property->default && !$property->hasRuntimeDefaultInit()) {
+                return Variable::TYPE_UNDEFINED === $target->type;
+            }
+
+            return false;
         }
 
         return false;
@@ -33,8 +47,21 @@ final class TypedPropertyCheck
     public static function errorMessage(Variable $var): string
     {
         $target = $var->resolveIndirect();
-        $owner = $target->objectPropertyOwner;
         $name = $target->objectPropertyName ?? 'property';
+        if (null !== $target->staticPropertyClassLc) {
+            $classLabel = $target->staticPropertyClassLc;
+            $vm = \PHPCompiler\VM::running();
+            if (null !== $vm && isset($vm->context->classes[$target->staticPropertyClassLc])) {
+                $classLabel = $vm->context->classes[$target->staticPropertyClassLc]->name;
+            }
+
+            return sprintf(
+                'Typed static property %s::$%s must not be accessed before initialization',
+                $classLabel,
+                $name
+            );
+        }
+        $owner = $target->objectPropertyOwner;
 
         return sprintf(
             'Typed property %s::$%s must not be accessed before initialization',

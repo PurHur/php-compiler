@@ -47,6 +47,7 @@ final class Linker
         __DIR__.'/runtime/crc32.c',
         __DIR__.'/runtime/crc32c.c',
         __DIR__.'/runtime/strtr.c',
+        __DIR__.'/runtime/phpc_trim_mask.c',
         __DIR__.'/runtime/phpc_array_merge_recursive.c',
         __DIR__.'/runtime/phpc_array_replace_recursive.c',
         __DIR__.'/runtime/phpc_uuencode.c',
@@ -87,6 +88,7 @@ final class Linker
         __DIR__.'/runtime/preg_match.c',
         __DIR__.'/runtime/phpc_pack.c',
         __DIR__.'/runtime/phpc_unpack.c',
+        __DIR__.'/runtime/phpc_var_export.c',
         __DIR__.'/runtime/phpc_ini_set.c',
         __DIR__.'/runtime/phpc_error_handler.c',
         __DIR__.'/runtime/phpc_last_error.c',
@@ -104,6 +106,7 @@ final class Linker
         __DIR__.'/runtime/phpc_cli_argv.c',
         __DIR__.'/runtime/phpc_weakref.c',
         __DIR__.'/runtime/phpc_gc.c',
+        __DIR__.'/runtime/phpc_lazy.c',
     ];
 
     private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt';

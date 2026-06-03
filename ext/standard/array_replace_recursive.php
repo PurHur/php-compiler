@@ -28,8 +28,9 @@ final class array_replace_recursive extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('array_replace_recursive() requires at least two arguments');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1) {
+            throw new \ArgumentCountError('array_replace_recursive() expects at least 1 argument, 0 given');
         }
         if (null === $frame->returnVar) {
             return;
@@ -38,8 +39,13 @@ final class array_replace_recursive extends Internal
         if (Variable::TYPE_ARRAY !== $first->type) {
             throw new \LogicException('array_replace_recursive() first argument must be an array in this compiler build');
         }
+        if (1 === $argc) {
+            $frame->returnVar->array($first->toArray()->replaceRecursiveCopy());
+
+            return;
+        }
         $others = [];
-        for ($i = 1, $n = \count($frame->calledArgs); $i < $n; ++$i) {
+        for ($i = 1, $n = $argc; $i < $n; ++$i) {
             $arg = $frame->calledArgs[$i]->resolveIndirect();
             if (Variable::TYPE_ARRAY !== $arg->type) {
                 throw new \LogicException('array_replace_recursive() arguments must be arrays in this compiler build');
@@ -53,8 +59,8 @@ final class array_replace_recursive extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 2) {
-            throw new \LogicException('array_replace_recursive() requires at least two arguments');
+        if (\count($args) < 1) {
+            throw new \ArgumentCountError('array_replace_recursive() expects at least 1 argument, 0 given');
         }
 
         return ArrayBuiltinHelper::arrayReplaceRecursive($context, $args[0], ...\array_slice($args, 1));

@@ -320,11 +320,11 @@ final class IteratorHelper
         $context->builder->branch($packedBody);
 
         $context->builder->positionAtEnd($strInit);
-        $context->builder->store($zero, $slot);
         $strEntry = $fn->appendBasicBlock('foreach_str_entry');
         $context->builder->branch($strEntry);
 
         $context->builder->positionAtEnd($strEntry);
+        $ord = $context->builder->load($slot);
         $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
         $headNull = $context->builder->icmp(Builder::INT_EQ, $head, $head->typeOf()->constNull());
         $context->builder->branchIf($headNull, $empty, $strWalk);
@@ -333,7 +333,7 @@ final class IteratorHelper
         $node = $context->builder->phi($head->typeOf());
         $node->addIncoming($head, $strEntry);
         $remaining = $context->builder->phi($sizeT);
-        $remaining->addIncoming($zero, $strEntry);
+        $remaining->addIncoming($ord, $strEntry);
         $atTarget = $context->builder->icmp(Builder::INT_EQ, $remaining, $zero);
         $strStep = $fn->appendBasicBlock('foreach_str_step');
         $context->builder->branchIf($atTarget, $found, $strStep);
@@ -486,7 +486,10 @@ final class IteratorHelper
         $zero = $context->getTypeFromString('size_t')->constInt(0, false);
         $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
 
-        return new Variable($context, $elemType, Variable::KIND_VARIABLE, $slot);
+        $var = new Variable($context, $elemType, Variable::KIND_VARIABLE, $slot);
+        $var->borrowedValueEntry = true;
+
+        return $var;
     }
 
     private static function compileValueObject(Context $context, Variable $slotKey): Variable
@@ -509,7 +512,10 @@ final class IteratorHelper
         $node = $context->builder->load(self::objNodeSlot($context, $slotKey));
         $valField = $context->builder->structGep($node, $nodeMap['value']);
 
-        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $valField);
+        $var = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $valField);
+        $var->borrowedValueEntry = true;
+
+        return $var;
     }
 
     private static function compileValueByRefHashtable(Context $context, Variable $array, Variable $slotKey): Variable
@@ -540,8 +546,10 @@ final class IteratorHelper
         $entry = $context->builder->phi($packedEntry->typeOf());
         $entry->addIncoming($packedEntry, $packed);
         $entry->addIncoming($strEntry, $strEntryBlock);
+        $var = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $entry);
+        $var->borrowedValueEntry = true;
 
-        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $entry);
+        return $var;
     }
 
     private static function compileValueHashtable(Context $context, Variable $array, Variable $slotKey): Variable

@@ -13,7 +13,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for getprotobynumber() / getservbyport() (JIT/AOT, issue #3650). */
+/** LLVM lowering for getprotobynumber()/getservbyport()/getprotobyname()/getservbyname() (JIT/AOT, issues #3650, #4024). */
 final class JitNetworkServices
 {
     private static int $blockSerial = 0;
@@ -31,6 +31,21 @@ final class JitNetworkServices
         );
     }
 
+    public static function getprotobyname(Context $context, JITVariable $name): Value
+    {
+        StringNetworkServices::ensureLinked($context);
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_getprotobyname'),
+            JitStringArg::lower($context, $name, 'getprotobyname() name'),
+            $ptr
+        );
+
+        return $ptr;
+    }
+
     public static function getservbyport(Context $context, JITVariable $port, JITVariable $protocol): Value
     {
         StringNetworkServices::ensureLinked($context);
@@ -43,6 +58,22 @@ final class JitNetworkServices
                 JitStringArg::lower($context, $protocol, 'getservbyport() protocol')
             )
         );
+    }
+
+    public static function getservbyname(Context $context, JITVariable $service, JITVariable $protocol): Value
+    {
+        StringNetworkServices::ensureLinked($context);
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_getservbyname'),
+            JitStringArg::lower($context, $service, 'getservbyname() service'),
+            JitStringArg::lower($context, $protocol, 'getservbyname() protocol'),
+            $ptr
+        );
+
+        return $ptr;
     }
 
     private static function jitIntArg(Context $context, JITVariable $arg, string $label): Value

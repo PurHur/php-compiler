@@ -17,9 +17,14 @@ use PHPCompiler\VM\Builtin\ExceptionGetLine;
 use PHPCompiler\VM\Builtin\ExceptionGetMessage;
 use PHPCompiler\VM\Builtin\FiberConstruct;
 use PHPCompiler\VM\Builtin\FiberGetCurrent;
+use PHPCompiler\VM\Builtin\FiberIsRunning;
+use PHPCompiler\VM\Builtin\FiberIsStarted;
+use PHPCompiler\VM\Builtin\FiberIsSuspended;
+use PHPCompiler\VM\Builtin\FiberIsTerminated;
 use PHPCompiler\VM\Builtin\FiberResume;
 use PHPCompiler\VM\Builtin\FiberStart;
 use PHPCompiler\VM\Builtin\FiberSuspend;
+use PHPCompiler\VM\Builtin\FiberThrow;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetArguments;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetName;
 use PHPCompiler\VM\Builtin\ReflectionAttributeNewInstance;
@@ -27,6 +32,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethod;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethods;
+use PHPCompiler\VM\Builtin\ReflectionClassGetProperty;
 use PHPCompiler\VM\Builtin\ReflectionClassGetProperties;
 use PHPCompiler\VM\Builtin\ReflectionClassGetReflectionConstant;
 use PHPCompiler\VM\Builtin\ReflectionClassNewLazyGhost;
@@ -61,6 +67,9 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyConstruct;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetName;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetValue;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsPrivate;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsProtected;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsPublic;
 use PHPCompiler\VM\Builtin\ReflectionTypeAllowsNull;
 use PHPCompiler\VM\Builtin\ReflectionTypeToString;
 use PHPCompiler\VM\Builtin\WeakMapConstruct;
@@ -85,6 +94,7 @@ final class BuiltinClasses
         StringableSupport::register($ctx);
         self::registerStdClass($ctx);
         self::registerCountable($ctx);
+        self::registerTraversableInterfaces($ctx);
         SensitiveParamSupport::register($ctx);
         self::registerWeakReference($ctx);
         self::registerWeakMap($ctx);
@@ -95,6 +105,24 @@ final class BuiltinClasses
         self::registerFiber($ctx);
         GeneratorState::register($ctx);
         ClosureState::register($ctx);
+    }
+
+    /** Zend: Traversable/Iterator interfaces for instanceof and foreach parity. */
+    private static function registerTraversableInterfaces(Context $ctx): void
+    {
+        $traversable = new ClassEntry('Traversable');
+        $traversable->isInterface = true;
+        $ctx->classes['traversable'] = $traversable;
+
+        $iterator = new ClassEntry('Iterator');
+        $iterator->isInterface = true;
+        $iterator->interfaces = ['traversable'];
+        $ctx->classes['iterator'] = $iterator;
+
+        $iteratorAggregate = new ClassEntry('IteratorAggregate');
+        $iteratorAggregate->isInterface = true;
+        $iteratorAggregate->interfaces = ['traversable'];
+        $ctx->classes['iteratoraggregate'] = $iteratorAggregate;
     }
 
     /** Zend zend_interfaces.c — Countable interface (#3364). */
@@ -220,6 +248,8 @@ final class BuiltinClasses
         $rc->methodVisibility['getattributes'] = $pub;
         $rc->methods['getmethod'] = new ReflectionClassGetMethod();
         $rc->methodVisibility['getmethod'] = $pub;
+        $rc->methods['getproperty'] = new ReflectionClassGetProperty();
+        $rc->methodVisibility['getproperty'] = $pub;
         $rc->methods['getproperties'] = new ReflectionClassGetProperties();
         $rc->methodVisibility['getproperties'] = $pub;
         $rc->methods['getmethods'] = new ReflectionClassGetMethods();
@@ -243,6 +273,16 @@ final class BuiltinClasses
         $rp->methodVisibility['getvalue'] = $pub;
         $rp->methods['getattributes'] = new ReflectionPropertyGetAttributes();
         $rp->methodVisibility['getattributes'] = $pub;
+        foreach (
+            [
+                'ispublic' => new ReflectionPropertyIsPublic(),
+                'isprivate' => new ReflectionPropertyIsPrivate(),
+                'isprotected' => new ReflectionPropertyIsProtected(),
+            ] as $name => $method
+        ) {
+            $rp->methods[$name] = $method;
+            $rp->methodVisibility[$name] = $pub;
+        }
         $ctx->classes[ReflectionSupport::REFLECTION_PROPERTY] = $rp;
 
         $rf = new ClassEntry('ReflectionFunction');
@@ -421,6 +461,7 @@ final class BuiltinClasses
         self::registerThrowableClass($ctx, 'Error', ExceptionSupport::CLASS_ERROR);
         self::registerThrowableClass($ctx, 'TypeError', ExceptionSupport::CLASS_TYPE_ERROR, ExceptionSupport::CLASS_ERROR);
         self::registerThrowableClass($ctx, 'ValueError', ExceptionSupport::CLASS_VALUE_ERROR, ExceptionSupport::CLASS_ERROR);
+        self::registerThrowableClass($ctx, 'FiberError', ExceptionSupport::CLASS_FIBER_ERROR, ExceptionSupport::CLASS_ERROR);
         self::registerThrowableClass(
             $ctx,
             'ArgumentCountError',
@@ -510,8 +551,13 @@ final class BuiltinClasses
             [
                 'start' => new FiberStart(),
                 'resume' => new FiberResume(),
+                'throw' => new FiberThrow(),
                 'suspend' => new FiberSuspend(),
                 'getcurrent' => new FiberGetCurrent(),
+                'isstarted' => new FiberIsStarted(),
+                'issuspended' => new FiberIsSuspended(),
+                'isrunning' => new FiberIsRunning(),
+                'isterminated' => new FiberIsTerminated(),
             ] as $name => $method
         ) {
             $entry->methods[$name] = $method;

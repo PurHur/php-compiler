@@ -37,6 +37,48 @@ echo $_GET["missing"] ?? "from-get", "\n";
         );
     }
 
+    /** Issue #4416: RHS side effects only when LHS is null (zend_compile.c ??=). */
+    public function testNullCoalesceAssignRhsSideEffects(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+$side = 0;
+function rhs() { global $side; $side++; return 123; }
+
+$a = null;
+$a ??= rhs();
+echo $a, ",", $side, "\n";
+
+$b = 5;
+$b ??= rhs();
+echo $b, ",", $side, "\n";
+
+$arr = ["k" => null];
+$arr["k"] ??= rhs();
+echo $arr["k"], ",", $side, "\n";
+
+$arr2 = ["k" => 9];
+$arr2["k"] ??= rhs();
+echo $arr2["k"], ",", $side, "\n";
+',
+            "123,1\n5,1\n123,2\n9,2\n"
+        );
+    }
+
+    /** Issue #4416: unset offset ??= must not eager-fetch before isset (no undefined-key warning). */
+    public function testNullCoalesceAssignUnsetKeyFunctionRhs(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+function rhs() { return 42; }
+$u = [];
+$u["k"] ??= rhs();
+echo $u["k"], "\n";
+',
+            "42\n"
+        );
+    }
+
     public function testNullCoalesceAssign(): void
     {
         $this->assertVmOutput(

@@ -92,16 +92,18 @@ final class VmScope
     {
         $caller = self::requireCaller($frame);
         $result = new HashTable();
-        foreach (self::collectCompactNamesFromArgs($frame->calledArgs) as $name) {
-            $slot = self::slotForName($caller, $name);
-            if (null === $slot) {
-                self::compactUndefinedVariableWarning($frame, $name);
-                continue;
+        foreach ($frame->calledArgs as $argIndex => $arg) {
+            foreach (self::collectCompactNames($frame, (int) $argIndex + 1, $arg->resolveIndirect()) as $name) {
+                $slot = self::slotForName($caller, $name);
+                if (null === $slot) {
+                    self::compactUndefinedVariableWarning($frame, $name);
+                    continue;
+                }
+                $value = $caller->scope[$slot];
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $result->add($name, $copy);
             }
-            $value = $caller->scope[$slot];
-            $copy = new Variable();
-            $copy->copyFrom($value);
-            $result->add($name, $copy);
         }
 
         return $result;
@@ -110,20 +112,7 @@ final class VmScope
     /**
      * @return list<string>
      */
-    private static function collectCompactNamesFromArgs(array $args): array
-    {
-        $names = [];
-        foreach ($args as $arg) {
-            $names = array_merge($names, self::collectCompactNames($arg->resolveIndirect()));
-        }
-
-        return $names;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private static function collectCompactNames(Variable $var): array
+    private static function collectCompactNames(Frame $frame, int $argNum, Variable $var): array
     {
         if (Variable::TYPE_STRING === $var->type) {
             return [$var->toString()];
@@ -131,15 +120,49 @@ final class VmScope
         if (Variable::TYPE_ARRAY === $var->type) {
             $names = [];
             foreach ($var->toArray()->iterateKeyed(true) as [, $valueVar]) {
-                $names = array_merge($names, self::collectCompactNames($valueVar->resolveIndirect()));
+                $names = array_merge(
+                    $names,
+                    self::collectCompactNames($frame, $argNum, $valueVar->resolveIndirect())
+                );
             }
 
             return $names;
         }
 
-        throw new \LogicException(
-            'compact() arguments must be string variable names or arrays of names in this compiler build'
+        self::compactInvalidArgumentWarning($frame, $argNum, $var);
+
+        return [];
+    }
+
+    private static function compactInvalidArgumentWarning(Frame $frame, int $argNum, Variable $var): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $typeName = self::compactInvalidArgTypeName($var);
+        [$file, $line] = self::compactCallSite($frame);
+        $frame->vmContext->errors->triggerError(
+            "compact(): Argument #{$argNum} must be string or array of strings, {$typeName} given",
+            ErrorReporter::E_WARNING,
+            $file,
+            $frame->vmContext,
+            $frame,
+            $line
         );
+    }
+
+    private static function compactInvalidArgTypeName(Variable $var): string
+    {
+        return match ($var->type) {
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            default => 'unknown type',
+        };
     }
 
     private static function compactUndefinedVariableWarning(Frame $frame, string $name): void
@@ -147,14 +170,29 @@ final class VmScope
         if (null === $frame->vmContext) {
             return;
         }
-        $file = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+        [$file, $line] = self::compactCallSite($frame);
         $frame->vmContext->errors->triggerError(
             "compact(): Undefined variable \${$name}",
             ErrorReporter::E_WARNING,
             $file,
             $frame->vmContext,
-            $frame
+            $frame,
+            $line
         );
+    }
+
+    /**
+     * @return array{0: ?string, 1: int}
+     */
+    private static function compactCallSite(Frame $frame): array
+    {
+        $caller = $frame->parent;
+        if (null === $caller) {
+            return [null, 0];
+        }
+        $file = '' !== $caller->scriptPath ? $caller->scriptPath : null;
+
+        return [$file, $caller->callSiteLine];
     }
 
     private static function callerVarIsSet(Variable $var): bool

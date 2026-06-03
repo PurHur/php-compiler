@@ -45,10 +45,12 @@ final class array_slice extends Internal
         $length = null;
         if (3 === $argc) {
             $lengthArg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $lengthArg->type) {
-                throw new \LogicException('array_slice() length must be an integer in this compiler build');
+            if (Variable::TYPE_NULL !== $lengthArg->type) {
+                if (Variable::TYPE_INTEGER !== $lengthArg->type) {
+                    throw new \LogicException('array_slice() length must be an integer in this compiler build');
+                }
+                $length = $lengthArg->toInt();
             }
-            $length = $lengthArg->toInt();
         }
         $frame->returnVar->array($array->toArray()->sliceCopy($offset->toInt(), $length));
     }
@@ -64,15 +66,22 @@ final class array_slice extends Internal
         if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
             throw new \LogicException('array_slice() offset must be an integer in this compiler build');
         }
-        if (3 === $argc && JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-            throw new \LogicException('array_slice() length must be an integer in this compiler build');
+        $hasExplicitLength = false;
+        if (3 === $argc) {
+            if (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {
+                $hasExplicitLength = false;
+            } elseif (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
+                throw new \LogicException('array_slice() length must be an integer in this compiler build');
+            } else {
+                $hasExplicitLength = true;
+            }
         }
 
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
         $offset = JitLongArg::lower($context, $args[1], 'array_slice() offset');
-        $hasLength = $i1->constInt(3 === $argc ? 1 : 0, false);
-        $length = 3 === $argc
+        $hasLength = $i1->constInt($hasExplicitLength ? 1 : 0, false);
+        $length = $hasExplicitLength
             ? JitLongArg::lower($context, $args[2], 'array_slice() length')
             : $i64->constInt(0, false);
 

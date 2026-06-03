@@ -305,6 +305,15 @@ class TypeReconstructor
                 }
 
                 return [Type::string()];
+            case 'Expr_PostInc':
+            case 'Expr_PostDec':
+            case 'Expr_PreInc':
+            case 'Expr_PreDec':
+                if ($resolved->contains($op->read)) {
+                    return [$resolved[$op->read]];
+                }
+
+                return false;
         }
 
         throw new \LogicException('Unknown variable op found: '.$op->getType());

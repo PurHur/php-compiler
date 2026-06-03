@@ -23,7 +23,9 @@ class OpCode {
     const TYPE_FUNCCALL_INIT = 11;
     const TYPE_ARG_SEND = 12;
     const TYPE_ARG_RECV = 13;
+    /** arg2 = call-site line when known (#4482). */
     const TYPE_FUNCCALL_EXEC_RETURN = 14;
+    /** arg1 = call-site line when known (#4482). */
     const TYPE_FUNCCALL_EXEC_NORETURN = 15;
     const TYPE_IDENTICAL = 16;
     const TYPE_RETURN = 17;
@@ -111,6 +113,12 @@ class OpCode {
 
     public const SCRIPT_MAGIC_LINE = 3;
 
+    /** include/require kind encoded for TYPE_INCLUDE (issue #4426). */
+    public const INCLUDE_KIND_INCLUDE = 1;
+    public const INCLUDE_KIND_INCLUDE_ONCE = 2;
+    public const INCLUDE_KIND_REQUIRE = 3;
+    public const INCLUDE_KIND_REQUIRE_ONCE = 4;
+
     const TYPE_ASSIGN_REF = 97;
     const TYPE_DECLARE_GLOBAL = 98;
     const TYPE_DECLARE_STATIC_PROPERTY = 99;
@@ -125,7 +133,8 @@ class OpCode {
     /** unset(Class::$prop) — arg2 class, arg3 property name (#2256). */
     const TYPE_STATIC_PROPERTY_UNSET = 104;
     /**
-     * Function-local static: arg1 local slot, arg2 storage key constant slot, arg3 default constant slot (#2286).
+     * Function-local static: arg1 local slot, arg2 storage key constant slot, arg3 compile-time default slot (#2286).
+     * When arg3 is null, bind only — runtime init via TYPE_FUNCTION_STATIC_INIT_STORE (#4352).
      */
     const TYPE_DECLARE_FUNCTION_STATIC = 105;
     /** User trait declaration with method bodies (#2312). */
@@ -169,6 +178,25 @@ class OpCode {
     const TYPE_PRE_DEC = 117;
     /** Logical xor (`$a xor $b`): both operands evaluated, truthiness exclusive-or (#2313). */
     const TYPE_LOGICAL_XOR = 118;
+    /** `list()` / `[]` unpack: arg2 = array slot; skip assigns when not array (block1 merge, #4325). */
+    const TYPE_LIST_UNPACK_CHECK = 120;
+    /** Skip runtime static init when storage key (arg2) is already initialized; jump to block1 (#4352). */
+    const TYPE_JUMPIF_FUNCTION_STATIC_INITIALIZED = 121;
+    /** Store runtime static default: arg2 = key constant slot, arg3 = value slot (#4352). */
+    const TYPE_FUNCTION_STATIC_INIT_STORE = 122;
+    /** PHP 8.3+ `$needle in $haystack` strict contains (#4682). arg2=needle, arg3=haystack. */
+    const TYPE_IN = 123;
+    /** `[$a, ...$rest] = $list` tail: arg1=dest, arg2=source array, arg3=from-index constant slot (#4835). */
+    const TYPE_LIST_SPREAD_ASSIGN = 124;
+    /**
+     * Wrap compile-time callable (string or `[obj, method]` array) in a Closure object (#4810).
+     *
+     * arg1 = destination slot; arg2 = callable value slot (string or array).
+     */
+    const TYPE_FROM_CALLABLE = 125;
+
+    /** `['k' => $v, ...$tail] = $arr` string keys already assigned; empty = numeric spread only (#4889). */
+    public array $listSpreadExcludedKeys = [];
 
     public int $type;
     public ?int $arg1;
@@ -229,6 +257,13 @@ class OpCode {
     public int $propertySetVisibility = 0;
     /** TYPE_CLASS_CONST_FETCH: `::class` on a runtime expression operand (must be object, #4241). */
     public bool $classConstFetchOnObject = false;
+    /** TYPE_DECLARE_CLASS_CONST: PHPCfg visibility flags (#4651). */
+    public int $classConstVisibilityFlags = 0;
+    /** TYPE_DECLARE_CLASS_CONST: `case` in enum body vs user `const` (#5054, zend_enum.c). */
+    public bool $isEnumCaseDeclare = false;
+
+    /** TYPE_INCLUDE: include/require + once/non-once semantics (issue #4426). */
+    public int $includeKind = self::INCLUDE_KIND_INCLUDE_ONCE;
 
     public function __construct(int $type, ?int $arg1 = null, ?int $arg2 = null, ?int $arg3 = null) {
         $this->type = $type;

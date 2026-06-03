@@ -17,7 +17,7 @@ echo $b['x'], $b['y'], "\n";
 
 $c = iterator_to_array($assoc);
 echo count($c), "\n";
-echo $c[0], $c[1], "\n";
+echo $c['x'], $c['y'], "\n";
 --EXPECT--
 2
 12

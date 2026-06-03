@@ -886,6 +886,37 @@ final class HashTable {
     }
 
     /**
+     * List spread tail for keyed destructuring: all entries except excluded string keys and int indices below $offset (#4889).
+     *
+     * @param list<string> $excludedStringKeys
+     */
+    public function copyListSpreadTail(int $offset, array $excludedStringKeys): self
+    {
+        $exclude = array_flip($excludedStringKeys);
+        $out = new self();
+        foreach ($this->iterateKeyed(true) as [$key, $value]) {
+            if (Variable::TYPE_INTEGER === $key->type) {
+                if ($key->toInt() < $offset) {
+                    continue;
+                }
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $out->addIndex($key->toInt(), $copy);
+            } else {
+                $k = $key->toString();
+                if (isset($exclude[$k])) {
+                    continue;
+                }
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $out->add($k, $copy);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Copy a sub-range of a packed list array into a new list (non-negative offset).
      */
     public function sliceCopy(int $offset, ?int $length = null): HashTable
@@ -1351,7 +1382,8 @@ final class HashTable {
             if ($key->is(Variable::TYPE_INTEGER)) {
                 $this->append($copy);
             } else {
-                $this->add($key->toString(), $copy);
+                // Zend array spread overwrites string keys from later operands.
+                $this->update($key->toString(), $copy);
             }
         }
     }

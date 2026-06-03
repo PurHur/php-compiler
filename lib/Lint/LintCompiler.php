@@ -98,7 +98,20 @@ final class LintCompiler extends Compiler
                 case Op\Stmt\Property::class:
                     try {
                         if ($type !== OpCode::TYPE_DECLARE_CLASS) {
-                            throw new \LogicException('Properties are only supported on classes for now');
+                            if (OpCode::TYPE_DECLARE_TRAIT === $type) {
+                                if (!$child->static) {
+                                    throw new \LogicException('Traits cannot declare non-static properties');
+                                }
+                            } elseif (OpCode::TYPE_DECLARE_INTERFACE === $type) {
+                                if ($child->static) {
+                                    throw new \LogicException('Interfaces cannot declare static properties');
+                                }
+                                if (!is_null($child->defaultBlock) || null !== $child->defaultVar) {
+                                    throw new \LogicException('Interface properties cannot have default values');
+                                }
+                            } else {
+                                throw new \LogicException('Properties are only supported on classes for now');
+                            }
                         }
                         if (!is_null($child->defaultBlock)) {
                             $this->compileOps($child->defaultBlock->children, $result);

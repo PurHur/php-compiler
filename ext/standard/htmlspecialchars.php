@@ -32,9 +32,6 @@ final class htmlspecialchars extends Internal
             throw new \LogicException('htmlspecialchars() requires one to four arguments');
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (VMVariable::TYPE_STRING !== $v->type) {
             throw new \LogicException('htmlspecialchars() only supports strings in this compiler build');
         }
@@ -50,11 +47,7 @@ final class htmlspecialchars extends Internal
             $flags = $flagsVar->toInt();
         }
         if ($argc >= 3) {
-            $encVar = $frame->calledArgs[2]->resolveIndirect();
-            if (VMVariable::TYPE_STRING !== $encVar->type) {
-                throw new \LogicException('htmlspecialchars() encoding must be a string in this compiler build');
-            }
-            $encoding = $encVar->toString();
+            $encoding = self::resolveEncodingVm($frame->calledArgs[2]->resolveIndirect());
         }
         if (4 === $argc) {
             $deVar = $frame->calledArgs[3]->resolveIndirect();
@@ -62,6 +55,9 @@ final class htmlspecialchars extends Internal
                 throw new \LogicException('htmlspecialchars() double_encode must be a boolean in this compiler build');
             }
             $doubleEncode = $deVar->toBool();
+        }
+        if (null === $frame->returnVar) {
+            return;
         }
         $frame->returnVar->string(VmString::htmlspecialchars($string, $flags, $encoding, $doubleEncode));
     }
@@ -81,7 +77,8 @@ final class htmlspecialchars extends Internal
             return $folded;
         }
 
-        if ($argc >= 3) {
+        $effectiveArgc = self::jitEffectiveArgc($argc, $args);
+        if ($effectiveArgc >= 3) {
             throw new \LogicException(
                 'htmlspecialchars() JIT only supports string and optional flags in this compiler build'
             );
@@ -95,7 +92,7 @@ final class htmlspecialchars extends Internal
                 $literal = $maybeLiteral;
             }
         }
-        if (null !== $literal && 1 === $argc) {
+        if (null !== $literal && 1 === $effectiveArgc) {
             return $context->builder->load(
                 $context->constantStringFromString(
                     VmString::htmlspecialchars($literal, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', true)
@@ -105,11 +102,56 @@ final class htmlspecialchars extends Internal
 
         $str = JitStringArg::lower($context, $args[0], 'htmlspecialchars() string');
         $flags = $context->getTypeFromString('int64')->constInt(ENT_QUOTES | ENT_SUBSTITUTE, false);
-        if ($argc >= 2) {
+        if ($effectiveArgc >= 2) {
             $flags = JitLongArg::lower($context, $args[1], 'htmlspecialchars() flags');
         }
 
         return JitHtmlspecialchars::escape($context, $str, $flags);
+    }
+
+    private static function resolveEncodingVm(VMVariable $encVar): string
+    {
+        if (VMVariable::TYPE_NULL === $encVar->type) {
+            return 'UTF-8';
+        }
+        if (VMVariable::TYPE_STRING !== $encVar->type) {
+            throw new \TypeError(
+                'htmlspecialchars(): Argument #3 ($encoding) must be of type ?string, '
+                .self::vmTypeName($encVar->type).' given'
+            );
+        }
+
+        return $encVar->toString();
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function jitEffectiveArgc(int $argc, array $args): int
+    {
+        if ($argc >= 3 && self::encodingArgIsNull($args[2])) {
+            return 2;
+        }
+
+        return $argc;
+    }
+
+    private static function encodingArgIsNull(JITVariable $var): bool
+    {
+        return JITVariable::TYPE_NULL === $var->type || $var->isNullConstant;
+    }
+
+    private static function vmTypeName(int $type): string
+    {
+        return match ($type) {
+            VMVariable::TYPE_INTEGER => 'int',
+            VMVariable::TYPE_FLOAT => 'float',
+            VMVariable::TYPE_BOOLEAN => 'bool',
+            VMVariable::TYPE_ARRAY => 'array',
+            VMVariable::TYPE_OBJECT => 'object',
+            VMVariable::TYPE_RESOURCE => 'resource',
+            default => 'unknown type',
+        };
     }
 
     /**
@@ -133,7 +175,7 @@ final class htmlspecialchars extends Internal
         }
 
         $encoding = 'UTF-8';
-        if ($argc >= 3) {
+        if ($argc >= 3 && !self::encodingArgIsNull($args[2])) {
             $encodingLit = JitStringArg::compileTimeLiteral($args[2]);
             if (null === $encodingLit || JITVariable::KIND_VALUE !== $args[2]->kind) {
                 return null;

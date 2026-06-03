@@ -41,4 +41,38 @@ PHP;
         self::assertTrue($props['redacted']->toBool());
         self::assertArrayNotHasKey('secret', $props);
     }
+
+    public function testGetObjectDebugPropertiesRejectsNonArrayReturn(): void
+    {
+        $source = <<<'PHP'
+<?php
+class C {
+    public function __debugInfo() {
+        return 'not-array';
+    }
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($source, 'debug_info_bad.php');
+        self::assertNotNull($block);
+        $runtime->run($block);
+
+        $ctx = $runtime->vmContext;
+        $vm = $runtime->vm;
+        self::assertNotNull($vm);
+
+        $class = $ctx->classes['c'];
+        $object = new ObjectEntry($class);
+        $object->constructed = true;
+
+        try {
+            $vm->getObjectDebugProperties($object);
+            self::fail('Expected TypeError for non-array __debugInfo() return');
+        } catch (\TypeError $e) {
+            self::assertSame(
+                'C::__debugInfo(): Return value must be of type array, string returned',
+                $e->getMessage()
+            );
+        }
+    }
 }

@@ -16,6 +16,8 @@ class Scope {
     public bool $classIsReadonly = false;
     /** Runtime called class for late static binding (issue #1231). */
     public string $calledClassName = '';
+    /** Call-site class id for standalone `new static()` / `: static` (#4792). */
+    public ?int $lateStaticCallClassId = null;
     public \SplObjectStorage $blockStorage;
     public \SplObjectStorage $variables;
     public ?Call $toCall = null;

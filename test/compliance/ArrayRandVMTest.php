@@ -17,6 +17,10 @@ final class ArrayRandVMTest extends BaseTest
             __DIR__.'/cases/stdlib/array_rand.phpt',
             'array_rand.phpt'
         );
+        yield 'array_rand_validation.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_rand_validation.phpt',
+            'array_rand_validation.phpt'
+        );
     }
 
     public function setUp(): void
