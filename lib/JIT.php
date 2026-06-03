@@ -5214,27 +5214,30 @@ class JIT {
                     if (!isset($block->constants[$op->arg3])) {
                         throw new \LogicException('list spread assign requires compile-time offset');
                     }
-                    if ([] !== $op->listSpreadExcludedKeys) {
-                        throw new \LogicException('JIT list spread with excluded string keys is not implemented');
-                    }
                     $spreadDestOp = $block->getOperand($op->arg1);
                     $spreadSrc = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    if (
-                        [] === $op->listSpreadExcludedKeys
-                        && !JIT\ListUnpackHelper::isDefinitelyNonArrayAtCompileTime($spreadSrc)
-                    ) {
-                        JIT\ListUnpackHelper::emitIsListBranchOrFail($this->context, $spreadSrc);
-                    }
                     $spreadI64 = $this->context->getTypeFromString('int64');
                     $spreadI1 = $this->context->getTypeFromString('int1');
                     $spreadOffset = $spreadI64->constInt($block->constants[$op->arg3]->toInt(), false);
-                    $spreadTailHt = JIT\ArrayBuiltinHelper::buildSliceArray(
-                        $this->context,
-                        $spreadSrc,
-                        $spreadOffset,
-                        $spreadI1->constInt(0, false),
-                        $spreadI64->constInt(0, false)
-                    );
+                    if ([] !== $op->listSpreadExcludedKeys) {
+                        $spreadTailHt = JIT\ArrayBuiltinHelper::buildCopyListSpreadTail(
+                            $this->context,
+                            $spreadSrc,
+                            $spreadOffset,
+                            $op->listSpreadExcludedKeys
+                        );
+                    } else {
+                        if (!JIT\ListUnpackHelper::isDefinitelyNonArrayAtCompileTime($spreadSrc)) {
+                            JIT\ListUnpackHelper::emitIsListBranchOrFail($this->context, $spreadSrc);
+                        }
+                        $spreadTailHt = JIT\ArrayBuiltinHelper::buildSliceArray(
+                            $this->context,
+                            $spreadSrc,
+                            $spreadOffset,
+                            $spreadI1->constInt(0, false),
+                            $spreadI64->constInt(0, false)
+                        );
+                    }
                     $spreadDestVar = $this->context->getVariableFromOp($spreadDestOp);
                     if (
                         Variable::TYPE_VALUE !== $spreadDestVar->type
