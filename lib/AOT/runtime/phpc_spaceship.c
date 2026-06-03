@@ -181,6 +181,186 @@ static int phpc_double_spaceship(double left, double right)
     return 0;
 }
 
+static int phpc_string_to_bool(__string__ *s)
+{
+    size_t len = phpc_string_len(s);
+
+    if (0 == len) {
+        return 0;
+    }
+    if (1 == len && '0' == phpc_string_data(s)[0]) {
+        return 0;
+    }
+
+    return 1;
+}
+
+static int phpc_string_is_numeric(__string__ *s)
+{
+    const char *data = phpc_string_data(s);
+    size_t len = phpc_string_len(s);
+    char *end = NULL;
+    double d;
+
+    if (0 == len) {
+        return 0;
+    }
+    d = strtod(data, &end);
+    if (end == data) {
+        return 0;
+    }
+
+    return (size_t) (end - data) == len;
+}
+
+static double phpc_string_to_numeric(__string__ *s)
+{
+    if (!phpc_string_is_numeric(s)) {
+        return 0.0;
+    }
+
+    return strtod(phpc_string_data(s), NULL);
+}
+
+/** Zend compare_function number↔string path (#4681). */
+static int phpc_spaceship_number_string(double num, __string__ *str, int num_on_left)
+{
+    size_t len = phpc_string_len(str);
+
+    if (0 == len) {
+        return num_on_left ? 1 : -1;
+    }
+    if (phpc_string_is_numeric(str)) {
+        double rhs = phpc_string_to_numeric(str);
+        int cmp = phpc_double_spaceship(num, rhs);
+
+        return num_on_left ? cmp : -cmp;
+    }
+
+    return num_on_left ? -1 : 1;
+}
+
+static int phpc_spaceship_mixed(__value__ *left, __value__ *right)
+{
+    int lkind = phpc_value_kind(left);
+    int rkind = phpc_value_kind(right);
+
+    if (PHPC_TYPE_NATIVE_BOOL == lkind && PHPC_TYPE_STRING == rkind) {
+        int lbool = left->value[0] ? 1 : 0;
+
+        return phpc_long_spaceship(lbool, phpc_string_to_bool(__value__readString(right)));
+    }
+    if (PHPC_TYPE_STRING == lkind && PHPC_TYPE_NATIVE_BOOL == rkind) {
+        int rbool = right->value[0] ? 1 : 0;
+
+        return phpc_long_spaceship(phpc_string_to_bool(__value__readString(left)), rbool);
+    }
+    if (PHPC_TYPE_NULL == lkind && PHPC_TYPE_STRING == rkind) {
+        __string__ *str = __value__readString(right);
+
+        if (0 == phpc_string_len(str)) {
+            return 0;
+        }
+
+        return phpc_spaceship_number_string(0.0, str, 1);
+    }
+    if (PHPC_TYPE_STRING == lkind && PHPC_TYPE_NULL == rkind) {
+        __string__ *str = __value__readString(left);
+
+        if (0 == phpc_string_len(str)) {
+            return 0;
+        }
+
+        return -phpc_spaceship_number_string(0.0, str, 1);
+    }
+    if (PHPC_TYPE_NATIVE_LONG == lkind && PHPC_TYPE_STRING == rkind) {
+        return phpc_spaceship_number_string((double) __value__readLong(left), __value__readString(right), 1);
+    }
+    if (PHPC_TYPE_STRING == lkind && PHPC_TYPE_NATIVE_LONG == rkind) {
+        return -phpc_spaceship_number_string((double) __value__readLong(right), __value__readString(left), 1);
+    }
+    if (PHPC_TYPE_NATIVE_DOUBLE == lkind && PHPC_TYPE_STRING == rkind) {
+        double lval;
+
+        memcpy(&lval, left->value, sizeof lval);
+
+        return phpc_spaceship_number_string(lval, __value__readString(right), 1);
+    }
+    if (PHPC_TYPE_STRING == lkind && PHPC_TYPE_NATIVE_DOUBLE == rkind) {
+        double rval;
+
+        memcpy(&rval, right->value, sizeof rval);
+
+        return -phpc_spaceship_number_string(rval, __value__readString(left), 1);
+    }
+    if (PHPC_TYPE_NATIVE_BOOL == lkind
+        && (PHPC_TYPE_NATIVE_LONG == rkind || PHPC_TYPE_NATIVE_DOUBLE == rkind || PHPC_TYPE_NULL == rkind)
+    ) {
+        int lbool = left->value[0] ? 1 : 0;
+        double rnum = PHPC_TYPE_NULL == rkind ? 0.0
+            : (PHPC_TYPE_NATIVE_LONG == rkind ? (double) __value__readLong(right) : 0.0);
+
+        if (PHPC_TYPE_NATIVE_DOUBLE == rkind) {
+            memcpy(&rnum, right->value, sizeof rnum);
+        }
+
+        return phpc_long_spaceship(lbool, (long long) rnum);
+    }
+    if (PHPC_TYPE_NATIVE_BOOL == rkind
+        && (PHPC_TYPE_NATIVE_LONG == lkind || PHPC_TYPE_NATIVE_DOUBLE == lkind || PHPC_TYPE_NULL == lkind)
+    ) {
+        int rbool = right->value[0] ? 1 : 0;
+        double lnum = PHPC_TYPE_NULL == lkind ? 0.0
+            : (PHPC_TYPE_NATIVE_LONG == lkind ? (double) __value__readLong(left) : 0.0);
+
+        if (PHPC_TYPE_NATIVE_DOUBLE == lkind) {
+            memcpy(&lnum, left->value, sizeof lnum);
+        }
+
+        return phpc_long_spaceship((long long) lnum, rbool);
+    }
+    if (PHPC_TYPE_NULL == lkind
+        && (PHPC_TYPE_NATIVE_LONG == rkind || PHPC_TYPE_NATIVE_DOUBLE == rkind)
+    ) {
+        double rnum = PHPC_TYPE_NATIVE_LONG == rkind
+            ? (double) __value__readLong(right) : 0.0;
+
+        if (PHPC_TYPE_NATIVE_DOUBLE == rkind) {
+            memcpy(&rnum, right->value, sizeof rnum);
+        }
+
+        return phpc_double_spaceship(0.0, rnum);
+    }
+    if (PHPC_TYPE_NULL == rkind
+        && (PHPC_TYPE_NATIVE_LONG == lkind || PHPC_TYPE_NATIVE_DOUBLE == lkind)
+    ) {
+        double lnum = PHPC_TYPE_NATIVE_LONG == lkind
+            ? (double) __value__readLong(left) : 0.0;
+
+        if (PHPC_TYPE_NATIVE_DOUBLE == lkind) {
+            memcpy(&lnum, left->value, sizeof lnum);
+        }
+
+        return phpc_double_spaceship(lnum, 0.0);
+    }
+    if (PHPC_TYPE_NATIVE_LONG == lkind && PHPC_TYPE_NATIVE_DOUBLE == rkind) {
+        double rval;
+
+        memcpy(&rval, right->value, sizeof rval);
+
+        return phpc_double_spaceship((double) __value__readLong(left), rval);
+    }
+    if (PHPC_TYPE_NATIVE_DOUBLE == lkind && PHPC_TYPE_NATIVE_LONG == rkind) {
+        double lval;
+
+        memcpy(&lval, left->value, sizeof lval);
+
+        return phpc_double_spaceship(lval, (double) __value__readLong(right));
+    }
+
+    return phpc_long_spaceship((long long) lkind, (long long) rkind);
+}
+
 long long __value__spaceship(__value__ *left, __value__ *right)
 {
     int lkind;
@@ -230,7 +410,7 @@ long long __value__spaceship(__value__ *left, __value__ *right)
         }
     }
 
-    return phpc_long_spaceship((long long) lkind, (long long) rkind);
+    return phpc_spaceship_mixed(left, right);
 }
 
 long long __object__compareSpaceship(__object__ *left, __object__ *right)
