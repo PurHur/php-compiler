@@ -516,7 +516,7 @@ final class VmReflection
         foreach (self::classParentsList($entry, $ctx) as $parentName) {
             $value = new Variable();
             $value->string($parentName);
-            $ht->append($value);
+            $ht->add($parentName, $value);
         }
 
         return $result;

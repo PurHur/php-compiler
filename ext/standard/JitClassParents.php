@@ -175,19 +175,15 @@ final class JitClassParents
     private static function buildParentsFromNames(Context $context, array $parentNames): Value
     {
         $ht = HashTableHelper::alloc($context);
-        foreach ($parentNames as $index => $parentName) {
+        foreach ($parentNames as $parentName) {
+            $keyStr = $context->builder->load($context->constantStringFromString($parentName));
             $jit = new JITVariable(
                 $context,
                 JITVariable::TYPE_STRING,
                 JITVariable::KIND_VALUE,
                 $context->builder->load($context->constantStringFromString($parentName))
             );
-            HashTableHelper::setAtIndex(
-                $context,
-                $ht,
-                $context->getTypeFromString('int64')->constInt($index, false),
-                $jit
-            );
+            HashTableHelper::setAtStringKey($context, $ht, $keyStr, $jit);
         }
 
         $slot = JitValueBox::alloc($context);

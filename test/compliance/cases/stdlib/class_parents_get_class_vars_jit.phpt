@@ -8,8 +8,8 @@ class LeafJit3159 extends MidJit3159 { public $y = 3; private $z = 4; }
 
 $p = class_parents(LeafJit3159::class);
 echo count($p), "\n";
-echo $p[0], "\n";
-echo $p[1], "\n";
+echo $p['MidJit3159'], "\n";
+echo $p['BaseJit3159'], "\n";
 
 $v = get_class_vars(MidJit3159::class);
 echo count($v), "\n";

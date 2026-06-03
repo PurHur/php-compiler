@@ -7,7 +7,7 @@ class Child extends Base { public $a = 1; private $b = 2; }
 
 $parents = class_parents(Child::class);
 echo count($parents), "\n";
-echo $parents[0], "\n";
+echo $parents['Base'], "\n";
 
 $vars = get_class_vars(Child::class);
 echo count($vars), "\n";
