@@ -127,6 +127,9 @@ class Context {
      */
     public array $foreachObjectAdvance = [];
 
+    /** @var array<int, true> foreach warned on non-traversable operand; loop body skipped (#4879). */
+    public array $foreachInvalidSlots = [];
+
     /** Fiber executing on this VM stack (issue #3130). */
     public ?FiberState $currentFiber = null;
 
