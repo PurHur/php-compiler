@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\ext\standard\JitArrayIsList;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 
-/** Runtime guard for `list()` / `[]` destructuring on non-list arrays (#4298) and non-array RHS (#4325, #4308). */
+/** Runtime guard for `list()` / `[]` destructuring on non-array RHS (#4325, #4308); spread uses isList (#4298, #4841). */
 final class ListUnpackHelper
 {
     public const TYPE_ERROR_MESSAGE = 'Cannot unpack array with string keys';
@@ -68,8 +68,8 @@ final class ListUnpackHelper
         $arrayCheckBb = BasicBlockHelper::append($context, 'list_unpack_array_check');
         $context->builder->positionAtEnd($branchBlock);
         $context->builder->branchIf($isArray, $arrayCheckBb, $mergeEntry);
+        // Numeric list slots warn per-key at dim fetch; spread tail keeps isList in TYPE_LIST_SPREAD_ASSIGN (#4841).
         $context->builder->positionAtEnd($arrayCheckBb);
-        self::emitIsListBranchOrFail($context, $array);
 
         return false;
     }
