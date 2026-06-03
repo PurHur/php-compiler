@@ -1222,6 +1222,50 @@ restart:
                 );
                 goto return_long;
             }
+            if (Variable::TYPE_OBJECT === $leftType && Variable::TYPE_STRING === $rightType) {
+                Builtin\SpaceshipRuntime::ensureLinked($this->context);
+                $objTmp = $this->context->memory->malloc($this->context->getTypeFromString('__value__'));
+                $objPtr = $this->context->builder->pointerCast($objTmp, $this->context->getTypeFromString('__value__*'));
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeObject'),
+                    $objPtr,
+                    $leftValue
+                );
+                $strTmp = JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeString'),
+                    JitValueBox::pointer($this->context, $strTmp),
+                    $rightValue
+                );
+                $result = Builtin\SpaceshipRuntime::callValueSpaceship(
+                    $this->context,
+                    $objPtr,
+                    JitValueBox::pointer($this->context, $strTmp)
+                );
+                goto return_long;
+            }
+            if (Variable::TYPE_STRING === $leftType && Variable::TYPE_OBJECT === $rightType) {
+                Builtin\SpaceshipRuntime::ensureLinked($this->context);
+                $strTmp = JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeString'),
+                    JitValueBox::pointer($this->context, $strTmp),
+                    $leftValue
+                );
+                $objTmp = $this->context->memory->malloc($this->context->getTypeFromString('__value__'));
+                $objPtr = $this->context->builder->pointerCast($objTmp, $this->context->getTypeFromString('__value__*'));
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeObject'),
+                    $objPtr,
+                    $rightValue
+                );
+                $result = Builtin\SpaceshipRuntime::callValueSpaceship(
+                    $this->context,
+                    JitValueBox::pointer($this->context, $strTmp),
+                    $objPtr
+                );
+                goto return_long;
+            }
             if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_STRING === $rightType) {
                 Builtin\SpaceshipRuntime::ensureLinked($this->context);
                 $boxedPtr = JitValueBox::valuePtrFromVariable($this->context, $left);
