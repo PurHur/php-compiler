@@ -888,6 +888,60 @@ restart:
     }
 
     /**
+     * Unary {@see OpCode::TYPE_UNARY_PLUS}: non-numeric strings warn and coerce to 0 (zend_operators.c, #4723).
+     */
+    private static function coerceUnaryPlusOperand(
+        Variable $expr,
+        ?\PHPCompiler\VM $vm = null,
+        ?\PHPCompiler\Frame $frame = null
+    ): int|float {
+        $expr = $expr->resolveIndirect();
+        TypedPropertyCheck::assertReadable($expr);
+        switch ($expr->type) {
+            case self::TYPE_NULL:
+                return 0;
+            case self::TYPE_INTEGER:
+                return $expr->integer;
+            case self::TYPE_FLOAT:
+                return $expr->float;
+            case self::TYPE_BOOLEAN:
+                return $expr->bool ? 1 : 0;
+            case self::TYPE_STRING:
+                if (!is_numeric($expr->string)) {
+                    self::warnNonNumericValue($vm, $frame);
+
+                    return 0;
+                }
+
+                return self::looseNumericFromString($expr->string);
+            case self::TYPE_OBJECT:
+                return self::coerceUnaryPlusOperand(
+                    $expr->objectToScalarString($vm, 'int'),
+                    $vm,
+                    $frame
+                );
+        }
+        throw new \TypeError(sprintf(
+            'Unsupported operand types: %s',
+            self::operandZendTypeName($expr)
+        ));
+    }
+
+    private static function warnNonNumericValue(?\PHPCompiler\VM $vm, ?\PHPCompiler\Frame $frame): void
+    {
+        if (null === $vm) {
+            return;
+        }
+        $vm->context->errors->triggerError(
+            'A non-numeric value encountered',
+            ErrorReporter::E_WARNING,
+            '' !== ($frame->scriptPath ?? '') ? $frame->scriptPath : null,
+            $vm->context,
+            $frame
+        );
+    }
+
+    /**
      * Zend compare_function: non-numeric strings compare as 0 against numbers (zend_operators.c).
      */
     private static function looseNumericFromString(string $s): int|float
@@ -1635,10 +1689,10 @@ restart:
         }
     }
 
-    public function unaryOp(int $opCode, Variable $expr): void {
+    public function unaryOp(int $opCode, Variable $expr, ?\PHPCompiler\VM $vm = null, ?\PHPCompiler\Frame $frame = null): void {
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();
-            $result->unaryOp($opCode, $expr);
+            $result->unaryOp($opCode, $expr, $vm, $frame);
             $this->indirect->copyFrom($result);
 
             return;
@@ -1647,7 +1701,13 @@ restart:
 restart:
         switch ($opCode) {
             case OpCode::TYPE_UNARY_PLUS:
-                $this->castFrom(self::CAST_NUMERIC, $expr);
+                $number = self::coerceUnaryPlusOperand($expr, $vm, $frame);
+                if (is_int($number)) {
+                    $this->int($number);
+                } else {
+                    $this->float($number);
+                }
+
                 return;
             case OpCode::TYPE_UNARY_MINUS:
                 if ($expr->type === Variable::TYPE_INTEGER) {
