@@ -58,6 +58,20 @@ final class VmString
         return self::coerceOperand($var);
     }
 
+    /**
+     * Coerce disk_*_space() directory operand; null means default path (php-src filestat.c, #4915).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function coerceOptionalDirectoryArg(Variable $var, string $function): ?string
+    {
+        if (Variable::TYPE_NULL === $var->resolveIndirect()->type) {
+            return null;
+        }
+
+        return self::coerceStringBuiltinArg($var, $function, 0, 'directory');
+    }
+
     private static function stringBuiltinTypeError(
         string $function,
         int $argIndex,
