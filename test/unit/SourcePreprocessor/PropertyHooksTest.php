@@ -45,6 +45,22 @@ PHP;
         self::assertStringContainsString('$this->label = ($value = trim($value));', $out);
     }
 
+    public function testMarksVirtualWhenHooksDoNotTouchBacking(): void
+    {
+        $src = <<<'PHP'
+<?php
+class Box {
+    private string $label = 'ok';
+    public string $name {
+        get => $this->label;
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('function __phpc_property_get_name', $out);
+        self::assertTrue($registry['box']['name']['virtual'] ?? false);
+    }
+
     public function testLowersStaticPropertyHooksAsStaticMethods(): void
     {
         $src = <<<'PHP'

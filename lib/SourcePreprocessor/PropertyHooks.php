@@ -131,7 +131,13 @@ final class PropertyHooks
                 $propDecl .= ';';
             }
             $out .= $declPrefix.$propDecl;
-            $methods = $this->lowerHooks($hookSource, $prop, $lcClass, $isStatic);
+            [$methods, $usesBacking] = $this->lowerHooks($hookSource, $prop, $lcClass, $isStatic);
+            if ([] !== $methods && !$usesBacking) {
+                if (!isset($this->registry[$lcClass][$prop])) {
+                    $this->registry[$lcClass][$prop] = [];
+                }
+                $this->registry[$lcClass][$prop]['virtual'] = true;
+            }
             $injections = array_merge($injections, $methods);
             $offset = $close + 1;
         }
@@ -144,16 +150,18 @@ final class PropertyHooks
     }
 
     /**
-     * @return list<string> method source chunks
+     * @return array{0: list<string>, 1: bool} method source chunks, whether any hook touches backing storage
      */
     private function lowerHooks(string $hookSource, string $prop, string $lcClass, bool $isStatic = false): array
     {
         $methods = [];
+        $usesBacking = false;
         $rest = trim($hookSource);
         while ('' !== $rest) {
             if (preg_match('/^get\s*=>\s*/s', $rest)) {
                 $rest = preg_replace('/^get\s*=>\s*/', '', $rest, 1) ?? $rest;
                 [$expr, $rest] = $this->takeUntilSemicolon($rest);
+                $usesBacking = $usesBacking || $this->hookTouchesBacking($expr, $prop, $isStatic);
                 $body = '{ return '.$expr.'; }';
                 $method = self::GET_METHOD_PREFIX.$prop;
                 $methods[] = $this->hookMethodDecl($isStatic, $method, '', $body);
@@ -163,6 +171,7 @@ final class PropertyHooks
             if (preg_match('/^get\s*\{/s', $rest)) {
                 $rest = preg_replace('/^get\s*/', '', $rest, 1) ?? $rest;
                 [$body, $rest] = $this->takeBraceBody($rest);
+                $usesBacking = $usesBacking || $this->hookTouchesBacking($body, $prop, $isStatic);
                 $method = self::GET_METHOD_PREFIX.$prop;
                 $methods[] = $this->hookMethodDecl($isStatic, $method, '', $body);
                 $this->registerHook($lcClass, $prop, 'get', $method, $isStatic);
@@ -173,6 +182,7 @@ final class PropertyHooks
                 [$expr, $rest] = $this->takeUntilSemicolon($rest);
                 $expr = rtrim($expr);
                 $backing = $isStatic ? 'self::$'.$prop : '$this->'.$prop;
+                $usesBacking = true;
                 $body = '{ '.$backing.' = ('.$expr.'); }';
                 $method = self::SET_METHOD_PREFIX.$prop;
                 $methods[] = $this->hookMethodDecl($isStatic, $method, '$value', $body);
@@ -187,6 +197,7 @@ final class PropertyHooks
                 $params = trim($pm[1]);
                 $rest = substr($rest, strlen($pm[0]) - 1);
                 [$body, $rest] = $this->takeBraceBody($rest);
+                $usesBacking = $usesBacking || $this->hookTouchesBacking($body, $prop, $isStatic);
                 $method = self::SET_METHOD_PREFIX.$prop;
                 $methods[] = $this->hookMethodDecl($isStatic, $method, $params, $body);
                 $this->registerHook($lcClass, $prop, 'set', $method, $isStatic);
@@ -195,7 +206,16 @@ final class PropertyHooks
             break;
         }
 
-        return $methods;
+        return [$methods, $usesBacking];
+    }
+
+    private function hookTouchesBacking(string $source, string $prop, bool $isStatic): bool
+    {
+        $pattern = $isStatic
+            ? '/\bself::\$'.preg_quote($prop, '/').'\b/'
+            : '/\$this->'.preg_quote($prop, '/').'\b/';
+
+        return (bool) preg_match($pattern, $source);
     }
 
     private function hookMethodDecl(bool $isStatic, string $method, string $params, string $body): string

@@ -52,6 +52,13 @@ class Context {
 
     public Runtime $runtime;
 
+    /**
+     * Property-hook virtual/backing metadata from {@see \PHPCompiler\SourcePreprocessor\PropertyHooks} (#4687).
+     *
+     * @var array<string, array<string, array<string, mixed>>>
+     */
+    public array $propertyHookRegistry = [];
+
     /** Pending thrown value while dispatching catch handlers (issue #1362). */
     public ?Variable $pendingException = null;
 
