@@ -174,6 +174,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'get_resource_id')) {
                 continue;
             }
+            // stream/dir resource ==/=== MCJIT: VM + dedicated JIT PHPT (#4699); umbrella skips opendir path.
+            if (str_contains($name, 'stream_resource_compare') && !str_contains($name, '_jit')) {
+                continue;
+            }
             // stream_set_timeout/chunk_size MCJIT: VM + AOT (#3754); jit.php execute exit -1 until stable.
             if (str_contains($name, 'stream_set_timeout')) {
                 continue;
