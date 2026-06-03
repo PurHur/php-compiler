@@ -142,7 +142,13 @@ final class Variable {
 
     public function resolveIndirect(): self {
         $var = $this;
+        $seen = [];
         while ($var->type === self::TYPE_INDIRECT) {
+            $id = \spl_object_id($var);
+            if (isset($seen[$id])) {
+                throw new \LogicException('Circular variable reference');
+            }
+            $seen[$id] = true;
             $var = $var->indirect;
         }
         return $var;

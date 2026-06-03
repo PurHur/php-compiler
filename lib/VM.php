@@ -2620,7 +2620,11 @@ restart:
                     }
                     if (array_key_exists($recvIdx, $frame->calledArgs)) {
                         if (isset($frame->block->paramByRef[(int) $op->arg2])) {
-                            $arg1->indirect($frame->calledArgs[$recvIdx]);
+                            $src = $frame->calledArgs[$recvIdx];
+                            // Avoid self-indirect when callee param slot aliases the argument (#5023).
+                            if ($arg1 !== $src) {
+                                $arg1->indirect($src);
+                            }
                         } else {
                             $arg1->copyFrom($frame->calledArgs[$recvIdx]);
                         }
