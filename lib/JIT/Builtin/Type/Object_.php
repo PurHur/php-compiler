@@ -12,6 +12,7 @@ namespace PHPCompiler\JIT\Builtin\Type;
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCompiler\Block;
+use PHPCompiler\PseudoClassScope;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\ClassConstFetchHelper;
 use PHPCompiler\JIT\Context;
@@ -100,6 +101,9 @@ class Object_ extends Type {
     /** @var array<string, PHPLLVM\Value> singleton __object__* globals for object class constants (#3196) */
     private array $classConstObjectGlobals = [];
 
+    /** @var array<string, PHPLLVM\Value> immortal __hashtable__* globals for array class constants (#4900) */
+    private array $classConstHashtableGlobals = [];
+
     /** @var array<int, array<int, array{propertyType: int, type: int, value: int|float|bool|string|null}>> */
     private array $propertyDefaults = [];
 
@@ -116,6 +120,8 @@ class Object_ extends Type {
     private ?int $weakReferenceClassId = null;
 
     private ?int $weakMapClassId = null;
+
+    private bool $traversableInterfacesSeeded = false;
 
     /** @var array<int, true> class ids declared readonly (issue #1360) */
     private array $readonlyClassIds = [];
@@ -523,6 +529,173 @@ class Object_ extends Type {
         );
 
         return $obj;
+    }
+
+    /**
+     * `new static()` / runtime class operand — dispatch allocate by class_id (#4792).
+     */
+    private static function ensureStrNcasecmp(Context $context): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        if (null !== $context->module->getNamedFunction('strncasecmp')) {
+            return;
+        }
+        $ft = $context->context->functionType($i32, false, $i8p, $i8p, $sizeT);
+        $fn = $context->module->addFunction('strncasecmp', $ft);
+        $context->registerFunction('strncasecmp', $fn);
+    }
+
+    /** Resolve declared class id from runtime class name cstring (#4940). */
+    public function classIdFromRuntimeName(PHPLLVM\Value $namePtr, PHPLLVM\Value $nameLen): PHPLLVM\Value
+    {
+        $fn = \PHPCompiler\JIT\BasicBlockHelper::parentFunction($this->context);
+        $entry = $this->context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock('class_name_id_done');
+        $fail = $fn->appendBasicBlock('class_name_id_fail');
+        $resultSlot = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca(
+            $this->context,
+            $this->context->getTypeFromString('int64')
+        );
+        $this->context->builder->store(
+            $this->context->constantFromInteger(-1, 'int64'),
+            $resultSlot
+        );
+        $i8p = $this->context->getTypeFromString('int8*');
+        $check = $entry;
+        $hasCase = false;
+        foreach ($this->allClassNamesById() as $id => $className) {
+            $hasCase = true;
+            $case = $fn->appendBasicBlock('class_name_id_'.$id);
+            $next = $fn->appendBasicBlock('class_name_id_try_'.$id);
+            $this->context->builder->positionAtEnd($check);
+            $expected = $this->context->builder->pointerCast(
+                $this->context->constantFromString(strtolower(ltrim($className, '\\'))),
+                $i8p
+            );
+            self::ensureStrNcasecmp($this->context);
+            $cmp = $this->context->builder->call(
+                $this->context->lookupFunction('strncasecmp'),
+                $namePtr,
+                $expected,
+                $this->context->builder->zExt($nameLen, $this->context->getTypeFromString('size_t'))
+            );
+            $isMatch = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
+            $this->context->builder->branchIf($isMatch, $case, $next);
+            $this->context->builder->positionAtEnd($case);
+            $this->context->builder->store(
+                $this->context->constantFromInteger($id, 'int64'),
+                $resultSlot
+            );
+            $this->context->builder->branch($done);
+            $check = $next;
+        }
+        if (!$hasCase) {
+            $this->context->builder->branch($fail);
+        } else {
+            $this->context->builder->positionAtEnd($check);
+            $this->context->builder->branch($fail);
+        }
+        $this->context->builder->positionAtEnd($fail);
+        $this->context->builder->call($this->context->lookupFunction('abort'));
+        $this->context->builder->positionAtEnd($done);
+
+        return $this->context->builder->load($resultSlot);
+    }
+
+    public function allocateForRuntimeClassId(PHPLLVM\Value $classIdVal): PHPLLVM\Value
+    {
+        $fn = \PHPCompiler\JIT\BasicBlockHelper::parentFunction($this->context);
+        $entry = $this->context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock('new_runtime_class_done');
+        $fail = $fn->appendBasicBlock('new_runtime_class_fail');
+        $resultSlot = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca(
+            $this->context,
+            $this->context->getTypeFromString('__object__*')
+        );
+        $nullObj = $this->context->getTypeFromString('__object__*')->constNull();
+        $this->context->builder->store($nullObj, $resultSlot);
+        $checkBlock = $entry;
+        $hasCase = false;
+        foreach (array_keys($this->allClassNamesById()) as $id) {
+            $hasCase = true;
+            $caseBlock = $fn->appendBasicBlock('new_runtime_class_case_'.$id);
+            $nextCheck = $fn->appendBasicBlock('new_runtime_class_try_'.$id);
+            $this->context->builder->positionAtEnd($checkBlock);
+            $expected = $this->context->constantFromInteger($id, 'int64');
+            $isId = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $classIdVal, $expected);
+            $this->context->builder->branchIf($isId, $caseBlock, $nextCheck);
+            $this->context->builder->positionAtEnd($caseBlock);
+            $obj = $this->allocate($id);
+            $this->context->builder->store($obj, $resultSlot);
+            $this->context->builder->branch($done);
+            $checkBlock = $nextCheck;
+        }
+        if (!$hasCase) {
+            $this->context->builder->branch($fail);
+        } else {
+            $this->context->builder->positionAtEnd($checkBlock);
+            $this->context->builder->branch($fail);
+        }
+        $this->context->builder->positionAtEnd($fail);
+        \PHPCompiler\JIT\Builtin\ErrorRaise::ensureLinked($this->context);
+        \PHPCompiler\JIT\Builtin\ErrorRaise::emitRaise($this->context, 'Class not found');
+        $this->context->builder->call($this->context->lookupFunction('abort'));
+        $this->context->builder->positionAtEnd($done);
+
+        return $this->context->builder->load($resultSlot);
+    }
+
+    /**
+     * `: static` return — return object's class_id must be called class or a subclass (#4792).
+     */
+    public function emitClassIdMatchesLateStaticReturn(
+        PHPLLVM\Value $actualClassId,
+        PHPLLVM\Value $expectedClassId
+    ): PHPLLVM\Value {
+        $i1 = $this->context->getTypeFromString('int1');
+        $acc = $i1->constInt(0, false);
+        foreach ($this->allClassNamesById() as $actualId => $_) {
+            foreach ($this->allClassNamesById() as $expectedId => $_) {
+                if (!$this->compileTimeClassIsSubclassOrEqual($actualId, $expectedId)) {
+                    continue;
+                }
+                $isExpected = $this->context->builder->icmp(
+                    PHPLLVM\Builder::INT_EQ,
+                    $expectedClassId,
+                    $this->context->constantFromInteger($expectedId, 'int64')
+                );
+                $isActual = $this->context->builder->icmp(
+                    PHPLLVM\Builder::INT_EQ,
+                    $actualClassId,
+                    $this->context->constantFromInteger($actualId, 'int64')
+                );
+                $acc = $this->context->builder->or($acc, $this->context->builder->and($isExpected, $isActual));
+            }
+        }
+
+        return $acc;
+    }
+
+    public function compileTimeClassIsSubclassOrEqual(int $childId, int $ancestorId): bool
+    {
+        if ($childId === $ancestorId) {
+            return true;
+        }
+        $childLc = strtolower(ltrim($this->classNameForId($childId), '\\'));
+        $ancestorLc = strtolower(ltrim($this->classNameForId($ancestorId), '\\'));
+        $current = $childLc;
+        while (true) {
+            $parent = $this->parentClassLc($current);
+            if (null === $parent) {
+                return false;
+            }
+            if ($parent === $ancestorLc) {
+                return true;
+            }
+            $current = $parent;
+        }
     }
 
     /**
@@ -1094,6 +1267,7 @@ class Object_ extends Type {
      */
     public function classIdsInstanceOf(string $className): array
     {
+        $this->ensureTraversableBuiltinInterfaces();
         $wantLc = strtolower(ltrim($className, '\\'));
         $ids = [];
         foreach ($this->classIdToName as $id => $name) {
@@ -1139,6 +1313,7 @@ class Object_ extends Type {
      */
     public function setClassInterfaces(string $className, array $interfaceLcs): void
     {
+        $this->ensureTraversableBuiltinInterfaces();
         $lc = strtolower(ltrim($className, '\\'));
         $expanded = [];
         foreach ($interfaceLcs as $iface) {
@@ -1207,6 +1382,23 @@ class Object_ extends Type {
         }
 
         return array_values(array_unique($out));
+    }
+
+    /** Zend traversable/iterator/iteratoraggregate hierarchy for instanceof (#4754, #4771). */
+    private function ensureTraversableBuiltinInterfaces(): void
+    {
+        if ($this->traversableInterfacesSeeded) {
+            return;
+        }
+        $this->traversableInterfacesSeeded = true;
+        $this->lookup('Traversable');
+        $this->markInterfaceClass('Traversable');
+        $this->lookup('Iterator');
+        $this->markInterfaceClass('Iterator');
+        $this->setInterfaceExtends('Iterator', ['Traversable']);
+        $this->lookup('IteratorAggregate');
+        $this->markInterfaceClass('IteratorAggregate');
+        $this->setInterfaceExtends('IteratorAggregate', ['Traversable']);
     }
 
     public function classLcForId(int $classId): ?string
@@ -1281,11 +1473,33 @@ class Object_ extends Type {
             throw new \LogicException("Unknown enum case: {$caseKey}");
         }
 
-        return $this->allocEnumCaseSingletonIr(
-            $classId,
-            $this->enumCaseCanonicalName($classId, $caseKey),
-            $this->jitConstantFromEntry($this->classConstants[$classId][$caseKey])
-        );
+        $globalName = 'php_compiler_enum_case_jit_'.$classId.'_'.$caseKey;
+        if (!isset($this->classConstObjectGlobals[$globalName])) {
+            $objPtrType = $this->context->getTypeFromString('__object__*');
+            $global = $this->context->module->addGlobal($objPtrType, $globalName);
+            $global->setInitializer($objPtrType->constNull());
+            $this->classConstObjectGlobals[$globalName] = $global;
+            $canonicalName = $this->enumCaseCanonicalName($classId, $caseKey);
+            $backingEntry = $this->classConstants[$classId][$caseKey];
+            $this->context->emitInInit(function (Context $ctx) use (
+                $classId,
+                $canonicalName,
+                $backingEntry,
+                $global
+            ): void {
+                $alloc = $this->allocateClassConstantEnumCase(
+                    $classId,
+                    $canonicalName,
+                    $this->jitConstantFromEntry($backingEntry)
+                );
+                $ctx->builder->store($alloc, $global);
+            });
+        }
+
+        return $this->jitClassConstObjectFromGlobal([
+            'type' => Variable::TYPE_OBJECT,
+            'global' => $globalName,
+        ]);
     }
 
     public function allocEnumCaseSingletonIr(int $classId, string $caseName, Variable $backingJit): Variable
@@ -1339,7 +1553,7 @@ class Object_ extends Type {
         $this->context->builder->call(
             $this->context->lookupFunction('phpc_gc_register'),
             $this->context->builder->pointerCast($obj, $this->context->getTypeFromString('int8*')),
-            $this->context->constantFromInteger(0, 'int32')
+            $this->context->constantFromInteger(2, 'int32')
         );
 
         return new Variable(
@@ -1697,6 +1911,92 @@ class Object_ extends Type {
         $this->context->callerStrictTypes = $prevStrict;
     }
 
+    /** Reset instance slots to null (lazy ghost before initializer, #4940). */
+    public function resetInstancePropertySlots(PHPLLVM\Value $obj, PHPLLVM\Value $classIdVal): void
+    {
+        $this->dispatchByRuntimeClassId($classIdVal, function (int $id) use ($obj): void {
+            $propCount = \count($this->properties[$id] ?? []);
+            if ($propCount > 0) {
+                $this->initPropertySlots($obj, $propCount);
+            }
+        }, 'lazy_reset_props');
+    }
+
+    /** Apply declared defaults for lazy ghost init (#4940). */
+    public function applyLazyGhostPropertyDefaults(PHPLLVM\Value $obj, PHPLLVM\Value $classIdVal): void
+    {
+        $this->dispatchByRuntimeClassId($classIdVal, function (int $id) use ($obj): void {
+            $this->initPropertyDefaults($obj, $id);
+        }, 'lazy_defaults');
+    }
+
+    /** Copy instance properties from initializer result object (lazy proxy, #4940). */
+    public function copyInstancePropertiesFrom(PHPLLVM\Value $dest, PHPLLVM\Value $src, PHPLLVM\Value $classIdVal): void
+    {
+        $fn = \PHPCompiler\JIT\BasicBlockHelper::parentFunction($this->context);
+        $entry = $this->context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock('lazy_copy_props_done');
+        $fail = $fn->appendBasicBlock('lazy_copy_props_fail');
+        $check = $entry;
+        $hasCase = false;
+        foreach (array_keys($this->allClassNamesById()) as $id) {
+            $hasCase = true;
+            $case = $fn->appendBasicBlock('lazy_copy_props_'.$id);
+            $next = $fn->appendBasicBlock('lazy_copy_try_'.$id);
+            $this->context->builder->positionAtEnd($check);
+            $expected = $this->context->constantFromInteger($id, 'int64');
+            $match = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $classIdVal, $expected);
+            $this->context->builder->branchIf($match, $case, $next);
+            $this->context->builder->positionAtEnd($case);
+            $this->copyPropertySlots($dest, $src, $id, $done);
+            $check = $next;
+        }
+        if (!$hasCase) {
+            $this->context->builder->branch($fail);
+        } else {
+            $this->context->builder->positionAtEnd($check);
+            $this->context->builder->branch($fail);
+        }
+        $this->context->builder->positionAtEnd($fail);
+        $this->context->builder->call($this->context->lookupFunction('abort'));
+        $this->context->builder->positionAtEnd($done);
+    }
+
+    /**
+     * @param callable(int): void $body
+     */
+    private function dispatchByRuntimeClassId(PHPLLVM\Value $classIdVal, callable $body, string $tag): void
+    {
+        $fn = \PHPCompiler\JIT\BasicBlockHelper::parentFunction($this->context);
+        $entry = $this->context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock($tag.'_done');
+        $fail = $fn->appendBasicBlock($tag.'_fail');
+        $check = $entry;
+        $hasCase = false;
+        foreach (array_keys($this->allClassNamesById()) as $id) {
+            $hasCase = true;
+            $case = $fn->appendBasicBlock($tag.'_'.$id);
+            $next = $fn->appendBasicBlock($tag.'_try_'.$id);
+            $this->context->builder->positionAtEnd($check);
+            $expected = $this->context->constantFromInteger($id, 'int64');
+            $match = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $classIdVal, $expected);
+            $this->context->builder->branchIf($match, $case, $next);
+            $this->context->builder->positionAtEnd($case);
+            $body($id);
+            $this->context->builder->branch($done);
+            $check = $next;
+        }
+        if (!$hasCase) {
+            $this->context->builder->branch($fail);
+        } else {
+            $this->context->builder->positionAtEnd($check);
+            $this->context->builder->branch($fail);
+        }
+        $this->context->builder->positionAtEnd($fail);
+        $this->context->builder->call($this->context->lookupFunction('abort'));
+        $this->context->builder->positionAtEnd($done);
+    }
+
     private function copyPropertySlots(
         PHPLLVM\Value $dest,
         PHPLLVM\Value $src,
@@ -2043,10 +2343,15 @@ class Object_ extends Type {
         if ('generator' === $lcname) {
             $this->defineProperty($id, GeneratorHelper::TARGET_PROPERTY, Variable::TYPE_STRING);
             $this->defineProperty($id, GeneratorHelper::STATE_PROPERTY, Variable::TYPE_NATIVE_LONG);
+            $this->ensureTraversableBuiltinInterfaces();
+            $this->setClassInterfaces($displayName, ['Iterator']);
         }
         if ('splobjectstorage' === $lcname) {
             $this->splObjectStorageClassId = $id;
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
+        }
+        if ('sensitiveparametervalue' === $lcname) {
+            // Empty marker class for #[\SensitiveParameter] trace redaction (#3351, #4621).
         }
         if ('weakreference' === $lcname) {
             $this->weakReferenceClassId = $id;
@@ -2452,10 +2757,20 @@ class Object_ extends Type {
             if (!$table instanceof \PHPCompiler\VM\HashTable) {
                 throw new \LogicException('Class constant array must be a HashTable');
             }
+            $globalName = 'php_compiler_class_const_ht_'.$classId.'_'.$key;
+            $htPtrType = $this->context->getTypeFromString('__hashtable__*');
+            $global = $this->context->module->addGlobal($htPtrType, $globalName);
+            $global->setInitializer($htPtrType->constNull());
+            $this->classConstHashtableGlobals[$globalName] = $global;
+            $this->context->emitInInit(function (Context $ctx) use ($table, $global): void {
+                $htVar = HashTableHelper::variableFromVmHashTable($ctx, $table);
+                $htPtr = $ctx->helper->loadValue($htVar);
+                $ctx->refcount->addref($htPtr);
+                $ctx->builder->store($htPtr, $global);
+            });
             $this->classConstants[$classId][$key] = [
                 'type' => Variable::TYPE_HASHTABLE,
-                'value' => null,
-                'vmTable' => $table,
+                'global' => $globalName,
             ];
 
             return;
@@ -2550,6 +2865,28 @@ class Object_ extends Type {
             foreach ($this->classConstants[$ifaceId] as $name => $entry) {
                 if (!isset($this->classConstants[$classId][$name])) {
                     $this->classConstants[$classId][$name] = $entry;
+                }
+            }
+        }
+    }
+
+    /** Apply interface asymmetric set visibility to class properties (#4876). */
+    public function inheritInterfacePropertySetVisibility(int $classId, string $className): void
+    {
+        $classLc = strtolower(ltrim($className, '\\'));
+        foreach ($this->allInterfacesForClassLc($classLc) as $ifaceLc) {
+            if ($ifaceLc === $classLc) {
+                continue;
+            }
+            $ifaceId = $this->lookup($ifaceLc);
+            foreach ($this->properties[$ifaceId] ?? [] as $propset) {
+                $name = $propset[1];
+                $setVis = $this->propertySetVisibility($ifaceId, $name);
+                if (0 === $setVis) {
+                    continue;
+                }
+                if (null !== $this->propertySlotIndex($classId, $name)) {
+                    $this->definePropertySetVisibility($classId, $name, $setVis);
                 }
             }
         }
@@ -2710,7 +3047,7 @@ class Object_ extends Type {
         $name = strtolower($classOp->value);
         if ('self' === $name) {
             if ('' === $this->context->scope->className) {
-                throw new \LogicException('self:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('self');
             }
 
             return $this->lookup($this->context->scope->className);
@@ -2723,11 +3060,11 @@ class Object_ extends Type {
             if ('' !== $this->context->scope->className) {
                 return $this->lookup($this->context->scope->className);
             }
-            throw new \LogicException('static:: used outside of class scope');
+            PseudoClassScope::fatalInGlobalScope('static');
         }
         if ('parent' === $name) {
             if ('' === $this->context->scope->className) {
-                throw new \LogicException('parent:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('parent');
             }
             $parentLc = $this->parentClassLc($this->context->scope->className);
             if (null === $parentLc) {
@@ -2742,9 +3079,14 @@ class Object_ extends Type {
 
     public function classConstFetch(int $classId, string $constName): Variable
     {
+        $this->emitDirectTraitConstAccessErrorIfNeeded($classId, $constName);
         $key = strtolower($constName);
         if (!isset($this->classConstants[$classId][$key])) {
             throw new \LogicException("Undefined class constant: {$constName}");
+        }
+
+        if ($this->isEnumClassId($classId)) {
+            return $this->jitEnumCaseFromBacking($classId, $key);
         }
 
         return $this->jitConstantFromEntry($this->classConstants[$classId][$key]);
@@ -2753,6 +3095,22 @@ class Object_ extends Type {
     public function classConstFetchDynamic(int $classId, Variable $nameVar, Operand $classOp): Variable
     {
         return ClassConstFetchHelper::fetchDynamic($this, $classId, $nameVar, $classOp);
+    }
+
+    public function emitDirectTraitConstAccessErrorIfNeeded(int $classId, string $constName): void
+    {
+        if ('class' === strtolower($constName)) {
+            return;
+        }
+        $classLabel = $this->classNameForId($classId);
+        if (!$this->isTraitClass(strtolower(ltrim($classLabel, '\\')))) {
+            return;
+        }
+        ErrorRaise::ensureLinked($this->context);
+        ErrorRaise::emitRaise(
+            $this->context,
+            "Cannot access trait constant {$classLabel}::{$constName} directly"
+        );
     }
 
     public function jitContext(): Context
@@ -3423,6 +3781,9 @@ class Object_ extends Type {
                     $slot
                 );
             case Variable::TYPE_HASHTABLE:
+                if (isset($entry['global'])) {
+                    return $this->jitClassConstHashtableFromGlobal($entry);
+                }
                 if (!isset($entry['vmTable']) || !$entry['vmTable'] instanceof \PHPCompiler\VM\HashTable) {
                     throw new \LogicException('Missing VM table for class constant array');
                 }
@@ -3433,6 +3794,25 @@ class Object_ extends Type {
             default:
                 throw new \LogicException('Unsupported class constant type for JIT');
         }
+    }
+
+    /**
+     * @param array{type: int, global: string} $entry
+     */
+    private function jitClassConstHashtableFromGlobal(array $entry): Variable
+    {
+        $globalName = $entry['global'];
+        if (!isset($this->classConstHashtableGlobals[$globalName])) {
+            throw new \LogicException("Missing class constant hashtable global: {$globalName}");
+        }
+        $ht = $this->context->builder->load($this->classConstHashtableGlobals[$globalName]);
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $ht
+        );
     }
 
     /**
@@ -3542,6 +3922,56 @@ class Object_ extends Type {
         );
 
         return new Variable($this->context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $storage);
+    }
+
+    /**
+     * Zend string cast on enum case objects must throw Error (zend_enum.c, #4819).
+     */
+    public function emitEnumObjectStringErrorIfMatches(Context $context, PHPLLVM\Value $objPtr): void
+    {
+        $enumEntries = [];
+        foreach ($this->classIdToName as $id => $name) {
+            $lc = strtolower(ltrim($name, '\\'));
+            if (isset($this->enums[$lc])) {
+                $enumEntries[(int) $id] = $name;
+            }
+        }
+        if ([] === $enumEntries) {
+            return;
+        }
+
+        \PHPCompiler\JIT\Builtin\ErrorRaise::ensureLinked($context);
+        $map = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($objPtr, $map['class_id'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $doneBlock = BasicBlockHelper::append($context, 'enum_str_cast_done');
+        $ids = array_keys($enumEntries);
+        $lastIdx = count($ids) - 1;
+        foreach ($ids as $idx => $id) {
+            $matchBlock = BasicBlockHelper::append($context, 'enum_str_cast_match_'.$id);
+            $nextBlock = $idx === $lastIdx
+                ? $doneBlock
+                : BasicBlockHelper::append($context, 'enum_str_cast_next_'.$id);
+            $context->builder->branchIf(
+                $context->builder->icmp(
+                    PHPLLVM\Builder::INT_EQ,
+                    $classId,
+                    $i64->constInt($id, false)
+                ),
+                $matchBlock,
+                $nextBlock
+            );
+            $context->builder->positionAtEnd($matchBlock);
+            \PHPCompiler\JIT\Builtin\ErrorRaise::emitRaise(
+                $context,
+                'Object of class '.$enumEntries[$id].' could not be converted to string'
+            );
+            $context->builder->branch($doneBlock);
+            $context->builder->positionAtEnd($nextBlock);
+        }
+        $context->builder->positionAtEnd($doneBlock);
     }
 
     public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name): Variable

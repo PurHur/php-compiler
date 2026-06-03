@@ -321,6 +321,13 @@ final class HashTableHelper
                         Variable::KIND_VARIABLE,
                         $nullSlot
                     ));
+                } elseif (\PHPCompiler\VM\Variable::TYPE_ARRAY === $resolved->type) {
+                    self::setAtIndex(
+                        $context,
+                        $ht,
+                        $idx,
+                        self::variableFromVmHashTable($context, $resolved->toArray())
+                    );
                 } else {
                     throw new \LogicException('Unsupported class constant array element type for JIT');
                 }
@@ -344,6 +351,13 @@ final class HashTableHelper
                     $ht,
                     $key,
                     $context->getTypeFromString('int64')->constInt($resolved->toInt(), false)
+                );
+            } elseif (\PHPCompiler\VM\Variable::TYPE_ARRAY === $resolved->type) {
+                self::setAtKeyCoercingNumericString(
+                    $context,
+                    $ht,
+                    $key,
+                    self::variableFromVmHashTable($context, $resolved->toArray())
                 );
             } else {
                 throw new \LogicException('Unsupported class constant array element type for JIT');

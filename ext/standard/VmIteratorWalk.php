@@ -7,8 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\VM;
 use PHPCompiler\VM\Context;
-use PHPCompiler\VM\ForeachIterator;
-use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -16,29 +14,9 @@ use PHPCompiler\VM\Variable;
  */
 final class VmIteratorWalk
 {
-    private const TRAVERSABLE_IFACES = ['traversable', 'iterator', 'iteratoraggregate'];
-
     public static function isIterable(Variable $value, Context $ctx): bool
     {
-        $value = $value->resolveIndirect();
-        if (Variable::TYPE_ARRAY === $value->type) {
-            return true;
-        }
-        if (Variable::TYPE_OBJECT !== $value->type) {
-            return false;
-        }
-        $entry = $value->toObject();
-        if (null !== $entry->generatorState) {
-            return true;
-        }
-        $class = $entry->class;
-        foreach (self::TRAVERSABLE_IFACES as $ifaceLc) {
-            if (InterfaceCheck::entryImplements($class, $ifaceLc, $ctx)) {
-                return true;
-            }
-        }
-
-        return ForeachIterator::entryImplementsIteratorProtocol($class, $ctx);
+        return VM\IterableCheck::isIterable($value, $ctx);
     }
 
     public static function assertTraversable(Variable $value, Context $ctx, string $funcName): Variable
@@ -46,8 +24,8 @@ final class VmIteratorWalk
         $value = $value->resolveIndirect();
         if (!self::isIterable($value, $ctx)) {
             throw new \TypeError(
-                "{$funcName}(): Argument #1 must be of type Traversable|array, "
-                .self::valueTypeName($value).' given'
+                "{$funcName}(): Argument #1 must be of type ".VM\IterableCheck::TYPE_LABEL.', '
+                .VM\IterableCheck::valueTypeName($value).' given'
             );
         }
 
@@ -235,17 +213,4 @@ final class VmIteratorWalk
         return false;
     }
 
-    private static function valueTypeName(Variable $value): string
-    {
-        return match ($value->type) {
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            default => 'mixed',
-        };
-    }
 }

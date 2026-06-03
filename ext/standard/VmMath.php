@@ -34,6 +34,78 @@ final class VmMath
     }
 
     /**
+     * Z_PARAM_LONG-style coercion for int-only builtins (php-src math.c; #4982 intdiv).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function parseIntBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): int {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'array'));
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'object'));
+        }
+        if (Variable::TYPE_FLOAT === $var->type) {
+            throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'float'));
+        }
+        switch ($var->type) {
+            case Variable::TYPE_INTEGER:
+                return $var->toInt();
+            case Variable::TYPE_BOOLEAN:
+                return $var->toBool() ? 1 : 0;
+            case Variable::TYPE_NULL:
+                return 0;
+            case Variable::TYPE_STRING:
+                $s = $var->toString();
+                if ('' === $s || !is_numeric($s)) {
+                    throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'string'));
+                }
+
+                return (int) $s;
+            default:
+                throw new \TypeError(
+                    self::intBuiltinTypeError($function, $argIndex, $paramName, self::vmTypeName($var->type))
+                );
+        }
+    }
+
+    private static function intBuiltinTypeError(
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $given
+    ): string {
+        return sprintf(
+            '%s(): Argument #%d ($%s) must be of type int, %s given',
+            $function,
+            $argIndex,
+            $paramName,
+            $given
+        );
+    }
+
+    private static function vmTypeName(int $type): string
+    {
+        return match ($type) {
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            Variable::TYPE_RESOURCE => 'resource',
+            default => 'mixed',
+        };
+    }
+
+    /**
      * pow() return typing — int when both operands are int with integral result (php-src math.c, issue #3678).
      */
     public static function applyPow(Variable $returnVar, Variable $base, Variable $exp): void

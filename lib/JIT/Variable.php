@@ -115,6 +115,9 @@ final class Variable {
     /** Declared JIT type when {@see $staticPropertyGlobal} is set. */
     public ?int $staticPropertyType = null;
 
+    /** Declaring class lc for static property set-hook dispatch (#4807). */
+    public ?string $staticPropertyHookClassLc = null;
+
     /** Callee slot for a literal-include caller local; skip delref in unrelated assigns (#866). */
     public bool $includeBinding = false;
 

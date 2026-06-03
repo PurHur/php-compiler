@@ -178,7 +178,7 @@ class OpCode {
     const TYPE_PRE_DEC = 117;
     /** Logical xor (`$a xor $b`): both operands evaluated, truthiness exclusive-or (#2313). */
     const TYPE_LOGICAL_XOR = 118;
-    /** `list()` / `[]` unpack: arg2 = array slot; TypeError when not a list (#4298). */
+    /** `list()` / `[]` unpack: arg2 = array slot; skip assigns when not array (block1 merge, #4325). */
     const TYPE_LIST_UNPACK_CHECK = 120;
     /** Skip runtime static init when storage key (arg2) is already initialized; jump to block1 (#4352). */
     const TYPE_JUMPIF_FUNCTION_STATIC_INITIALIZED = 121;
@@ -186,6 +186,17 @@ class OpCode {
     const TYPE_FUNCTION_STATIC_INIT_STORE = 122;
     /** PHP 8.3+ `$needle in $haystack` strict contains (#4682). arg2=needle, arg3=haystack. */
     const TYPE_IN = 123;
+    /** `[$a, ...$rest] = $list` tail: arg1=dest, arg2=source array, arg3=from-index constant slot (#4835). */
+    const TYPE_LIST_SPREAD_ASSIGN = 124;
+    /**
+     * Wrap compile-time callable (string or `[obj, method]` array) in a Closure object (#4810).
+     *
+     * arg1 = destination slot; arg2 = callable value slot (string or array).
+     */
+    const TYPE_FROM_CALLABLE = 125;
+
+    /** `['k' => $v, ...$tail] = $arr` string keys already assigned; empty = numeric spread only (#4889). */
+    public array $listSpreadExcludedKeys = [];
 
     public int $type;
     public ?int $arg1;
@@ -248,6 +259,8 @@ class OpCode {
     public bool $classConstFetchOnObject = false;
     /** TYPE_DECLARE_CLASS_CONST: PHPCfg visibility flags (#4651). */
     public int $classConstVisibilityFlags = 0;
+    /** TYPE_DECLARE_CLASS_CONST: `case` in enum body vs user `const` (#5054, zend_enum.c). */
+    public bool $isEnumCaseDeclare = false;
 
     /** TYPE_INCLUDE: include/require + once/non-once semantics (issue #4426). */
     public int $includeKind = self::INCLUDE_KIND_INCLUDE_ONCE;

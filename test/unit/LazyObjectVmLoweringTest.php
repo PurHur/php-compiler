@@ -8,7 +8,7 @@ use PHPCompiler\Block;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #4685 */
+/** @covers issue #4685, #4823 */
 final class LazyObjectVmLoweringTest extends TestCase
 {
     public function testRequiresVmLoweringForLazyProxyScript(): void
@@ -25,7 +25,7 @@ echo $lazy->id;
 PHP;
         $block = $runtime->parseAndCompile($code, 'lazy_vm_lowering.php');
         $this->assertNotNull($block);
-        $this->assertTrue(Block::requiresVmLowering($block));
+        $this->assertFalse(Block::requiresVmLowering($block));
         $this->assertTrue(Block::containsLazyObjectOpcodes($block));
     }
 

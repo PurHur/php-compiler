@@ -1,5 +1,11 @@
 --TEST--
-Language: ReflectionClass::newLazyProxy defers constructor (#3317)
+Language: ReflectionClass::newLazyProxy defers constructor (#3317, #4823)
+--SKIPIF--
+<?php
+if (PHP_VERSION_ID < 80400) {
+    die('skip ReflectionClass::newLazyProxy requires PHP 8.4+');
+}
+?>
 --FILE--
 <?php
 class Svc {

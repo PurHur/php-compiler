@@ -230,6 +230,23 @@ final class ErrorReporter
     }
 
     /**
+     * Zend E_WARNING for ZEND_FETCH_DIM_R on scalars (zend_execute.c, #4867).
+     */
+    public function arrayOffsetOnNonContainer(
+        string $typeName,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        $this->emitWarning(
+            "Trying to access array offset on value of type {$typeName}",
+            $context,
+            $frame,
+            $file
+        );
+    }
+
+    /**
      * Zend E_WARNING for language-level diagnostics (issue #4502).
      */
     public function languageWarning(

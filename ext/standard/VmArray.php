@@ -224,16 +224,18 @@ final class VmArray
         Variable $value,
         string $fn,
         int $argNum,
-        string $paramName
+        string $paramName,
+        string $expectedType = 'array'
     ): HashTable {
         $v = $value->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $v->type) {
             throw new \TypeError(
                 \sprintf(
-                    '%s(): Argument #%d ($%s) must be of type array, %s given',
+                    '%s(): Argument #%d ($%s) must be of type %s, %s given',
                     $fn,
                     $argNum,
                     $paramName,
+                    $expectedType,
                     self::valueTypeLabel($v)
                 )
             );

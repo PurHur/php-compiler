@@ -15,6 +15,7 @@ namespace PHPCompiler\JIT;
 require_once __DIR__.'/../OpCodeNames.php';
 
 use PHPCompiler\ext\standard\StdlibConstants;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\OpCode;
 use function PHPCompiler\opcode_type_name;
 use PHPLLVM;
@@ -112,6 +113,31 @@ class Helper {
                         $result = $this->context->builder->negate($long);
                         goto return_long;
                     case OpCode::TYPE_BITWISE_NOT:
+                        if (JitValueBox::isValueOperand($var)) {
+                            $valuePtr = JitValueBox::valuePtrFromVariable($this->context, $var);
+                            $map = $this->context->structFieldMap['__value__'];
+                            $typeByte = $this->context->builder->load(
+                                $this->context->builder->structGep($valuePtr, $map['type'])
+                            );
+                            $i8 = $this->context->getTypeFromString('int8');
+                            $isDouble = $this->context->builder->icmp(
+                                Builder::INT_EQ,
+                                $typeByte,
+                                $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+                            );
+                            $doubleBlock = BasicBlockHelper::append($this->context, 'bitwise_not_vbox_double');
+                            $longBlock = BasicBlockHelper::append($this->context, 'bitwise_not_vbox_long');
+                            $this->context->builder->branchIf($isDouble, $doubleBlock, $longBlock);
+                            $this->context->builder->positionAtEnd($doubleBlock);
+                            $this->emitBitwiseNotFloatTypeError();
+                            $this->context->builder->positionAtEnd($longBlock);
+                            $long = $this->context->builder->call(
+                                $this->context->lookupFunction('__value__readLong'),
+                                $valuePtr
+                            );
+                            $result = $this->context->builder->not($long);
+                            goto return_long;
+                        }
                         $long = JitLongArg::lower($this->context, $var, 'bitwise not operand');
                         $result = $this->context->builder->not($long);
                         goto return_long;
@@ -122,58 +148,20 @@ class Helper {
                     case OpCode::TYPE_UNARY_MINUS:
                         $result = $this->context->builder->fNegate($varValue);
                         goto return_double;
+                    case OpCode::TYPE_BITWISE_NOT:
+                        return $this->emitBitwiseNotFloatTypeError();
                 }
                 break;
-        }
-        if (Variable::TYPE_NULL === $leftType && JitValueBox::isValueOperand($right)) {
-            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
-                $result = JitValueCompare::valueBoxIsNull($this->context, $right);
-                goto return_bool;
-            }
-            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                $isNull = JitValueCompare::valueBoxIsNull($this->context, $right);
-                $result = $this->context->builder->xor(
-                    $isNull,
-                    $this->context->getTypeFromString('int1')->constInt(1, false)
-                );
-                goto return_bool;
-            }
-        }
-        if (JitValueBox::isValueOperand($left) && Variable::TYPE_NULL === $rightType) {
-            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
-                $result = JitValueCompare::valueBoxIsNull($this->context, $left);
-                goto return_bool;
-            }
-            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                $isNull = JitValueCompare::valueBoxIsNull($this->context, $left);
-                $result = $this->context->builder->xor(
-                    $isNull,
-                    $this->context->getTypeFromString('int1')->constInt(1, false)
-                );
-                goto return_bool;
-            }
-        }
-        if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
-            if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_OBJECT === $rightType) {
-                $result = JitValueCompare::identicalValueBoxToObject($this->context, $left, $right);
-                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
-                    $result = $this->context->builder->xor(
-                        $result,
-                        $this->context->getTypeFromString('int1')->constInt(1, false)
+            case Variable::TYPE_STRING:
+                if (OpCode::TYPE_BITWISE_NOT === $opcode->type) {
+                    $result = $this->context->builder->call(
+                        $this->context->lookupFunction('__string__bitwiseNot'),
+                        $varValue
                     );
+
+                    goto return_string;
                 }
-                goto return_bool;
-            }
-            if (Variable::TYPE_OBJECT === $leftType && Variable::TYPE_VALUE === $rightType) {
-                $result = JitValueCompare::identicalValueBoxToObject($this->context, $right, $left);
-                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
-                    $result = $this->context->builder->xor(
-                        $result,
-                        $this->context->getTypeFromString('int1')->constInt(1, false)
-                    );
-                }
-                goto return_bool;
-            }
+                break;
         }
         $type = opcode_type_name($opcode->type);
         throw new \LogicException("Reached end of switch, can't handle unary operation yet: $type for type {$var->type}");
@@ -183,12 +171,16 @@ return_long:
         return new Variable($this->context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $result);
 return_bool:
         return new Variable($this->context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $result);
+return_string:
+        return new Variable($this->context, Variable::TYPE_STRING, Variable::KIND_VALUE, $result);
     }
 
     public function binaryOp(OpCode $opcode, Variable $left, Variable $right): Variable {
         if (OpCode::TYPE_BITWISE_AND === $opcode->type
             || OpCode::TYPE_BITWISE_OR === $opcode->type
             || OpCode::TYPE_BITWISE_XOR === $opcode->type
+            || OpCode::TYPE_SHIFT_LEFT === $opcode->type
+            || OpCode::TYPE_SHIFT_RIGHT === $opcode->type
         ) {
             $folded = $this->tryFoldCoreIntBitwise($opcode->type, $left, $right);
             if (null !== $folded) {
@@ -201,6 +193,11 @@ return_bool:
         $rightValue = $this->loadValue($right);
         $leftType = $this->operandJitType($left);
         $rightType = $this->operandJitType($right);
+        if (OpCode::TYPE_SHIFT_LEFT === $opcode->type || OpCode::TYPE_SHIFT_RIGHT === $opcode->type) {
+            if (Variable::TYPE_NATIVE_DOUBLE === $leftType || Variable::TYPE_NATIVE_DOUBLE === $rightType) {
+                return $this->emitShiftFloatOperandTypeError($opcode, $leftType, $rightType);
+            }
+        }
         if (OpCode::TYPE_LOGICAL_XOR === $opcode->type) {
             $zeroI64 = $this->context->getTypeFromString('int64')->constInt(0, false);
             if (Variable::TYPE_NATIVE_BOOL === $leftType) {
@@ -286,9 +283,19 @@ restart:
                         $result = $this->context->builder->fsub($leftValue, $rightValue);
                         goto return_double;
                     case OpCode::TYPE_DIV:
+                        JitNumericDivisionGuard::emitZeroDoubleDivisorGuard(
+                            $this->context,
+                            $rightValue,
+                            'Division by zero'
+                        );
                         $result = $this->context->builder->fdiv($leftValue, $rightValue);
                         goto return_double;
                     case OpCode::TYPE_MODULO:
+                        JitNumericDivisionGuard::emitZeroDoubleDivisorGuard(
+                            $this->context,
+                            $rightValue,
+                            'Modulo by zero'
+                        );
                         $i64 = $this->context->getTypeFromString('int64');
                         $leftLong = $this->context->builder->fpToSi($leftValue, $i64);
                         $rightLong = $this->context->builder->fpToSi($rightValue, $i64);
@@ -389,49 +396,21 @@ restart:
                         goto return_long;
                     case OpCode::TYPE_DIV:
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
-                            
-                            
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-                            $result = $this->context->builder->signedDiv($leftValue, $__right);
-    
+                        JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                            $this->context,
+                            $__right,
+                            'Division by zero'
+                        );
+                        $result = $this->context->builder->signedDiv($leftValue, $__right);
                         goto return_long;
                     case OpCode::TYPE_MODULO:
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
-                            
-                            
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-                            $result = $this->context->builder->signedRem($leftValue, $__right);
-    
+                        JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                            $this->context,
+                            $__right,
+                            'Modulo by zero'
+                        );
+                        $result = $this->context->builder->signedRem($leftValue, $__right);
                         goto return_long;
                     case OpCode::TYPE_BITWISE_AND:
                     case OpCode::TYPE_BITWISE_OR:
@@ -849,6 +828,16 @@ restart:
                 $result = $this->context->builder->addNoSignedWrap($leftLong, $rightLong);
                 goto return_long;
             }
+            if (OpCode::TYPE_DIV === $opcode->type || OpCode::TYPE_MODULO === $opcode->type) {
+                $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
+                $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
+                $zeroMsg = OpCode::TYPE_MODULO === $opcode->type ? 'Modulo by zero' : 'Division by zero';
+                JitNumericDivisionGuard::emitZeroLongDivisorGuard($this->context, $rightLong, $zeroMsg);
+                $result = OpCode::TYPE_DIV === $opcode->type
+                    ? $this->context->builder->signedDiv($leftLong, $rightLong)
+                    : $this->context->builder->signedRem($leftLong, $rightLong);
+                goto return_long;
+            }
             switch ($opcode->type) {
                 case OpCode::TYPE_BITWISE_AND:
                 case OpCode::TYPE_BITWISE_OR:
@@ -922,6 +911,22 @@ restart:
                         goto return_long;
                     case OpCode::TYPE_MUL:
                         $result = $this->context->builder->mulNoSignedWrap($leftLong, $__right);
+                        goto return_long;
+                    case OpCode::TYPE_DIV:
+                        JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                            $this->context,
+                            $__right,
+                            'Division by zero'
+                        );
+                        $result = $this->context->builder->signedDiv($leftLong, $__right);
+                        goto return_long;
+                    case OpCode::TYPE_MODULO:
+                        JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                            $this->context,
+                            $__right,
+                            'Modulo by zero'
+                        );
+                        $result = $this->context->builder->signedRem($leftLong, $__right);
                         goto return_long;
                     case OpCode::TYPE_BITWISE_AND:
                         $result = $this->context->builder->bitwiseAnd($leftLong, $__right);
@@ -1018,6 +1023,22 @@ restart:
                     case OpCode::TYPE_MUL:
                         $result = $this->context->builder->mulNoSignedWrap($__left, $rightLong);
                         goto return_long;
+                    case OpCode::TYPE_DIV:
+                        JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                            $this->context,
+                            $rightLong,
+                            'Division by zero'
+                        );
+                        $result = $this->context->builder->signedDiv($__left, $rightLong);
+                        goto return_long;
+                    case OpCode::TYPE_MODULO:
+                        JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                            $this->context,
+                            $rightLong,
+                            'Modulo by zero'
+                        );
+                        $result = $this->context->builder->signedRem($__left, $rightLong);
+                        goto return_long;
                     case OpCode::TYPE_BITWISE_AND:
                         $result = $this->context->builder->bitwiseAnd($__left, $rightLong);
                         goto return_long;
@@ -1098,8 +1119,8 @@ restart:
         if (Variable::TYPE_OBJECT === $leftType && $leftType === $rightType) {
             if (OpCode::TYPE_SPACESHIP === $opcode->type) {
                 Builtin\SpaceshipRuntime::ensureLinked($this->context);
-                $result = $this->context->builder->call(
-                    $this->context->lookupFunction('__object__compareSpaceship'),
+                $result = Builtin\SpaceshipRuntime::callObjectCompareSpaceship(
+                    $this->context,
                     $leftValue,
                     $rightValue
                 );
@@ -1173,11 +1194,50 @@ restart:
         if (OpCode::TYPE_SPACESHIP === $opcode->type) {
             if (JitValueBox::isValueOperand($left) && JitValueBox::isValueOperand($right)) {
                 Builtin\SpaceshipRuntime::ensureLinked($this->context);
-                $result = $this->context->builder->call(
-                    $this->context->lookupFunction('__value__spaceship'),
-                    JitValueBox::valuePtrFromVariable($this->context, $left),
-                    JitValueBox::valuePtrFromVariable($this->context, $right)
+                $leftPtr = JitValueBox::valuePtrFromVariable($this->context, $left);
+                $rightPtr = JitValueBox::valuePtrFromVariable($this->context, $right);
+                $map = $this->context->structFieldMap['__value__'];
+                $i8 = $this->context->getTypeFromString('int8');
+                $objTag = $i8->constInt(Variable::TYPE_OBJECT, false);
+                $leftKind = $this->context->builder->load(
+                    $this->context->builder->structGep($leftPtr, $map['type'])
                 );
+                $rightKind = $this->context->builder->load(
+                    $this->context->builder->structGep($rightPtr, $map['type'])
+                );
+                $bothObj = $this->context->builder->and(
+                    $this->context->builder->icmp(Builder::INT_EQ, $leftKind, $objTag),
+                    $this->context->builder->icmp(Builder::INT_EQ, $rightKind, $objTag)
+                );
+                $parentFn = BasicBlockHelper::parentFunction($this->context);
+                $objBb = $parentFn->appendBasicBlock('val_spaceship_obj');
+                $genBb = $parentFn->appendBasicBlock('val_spaceship_gen');
+                $doneBb = $parentFn->appendBasicBlock('val_spaceship_done');
+                $i64 = $this->context->getTypeFromString('int64');
+                $resultSlot = BasicBlockHelper::entryAlloca($this->context, $i64);
+                $this->context->builder->branchIf($bothObj, $objBb, $genBb);
+                $this->context->builder->positionAtEnd($objBb);
+                $leftObj = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readObject'),
+                    $leftPtr
+                );
+                $rightObj = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readObject'),
+                    $rightPtr
+                );
+                $objCmp = Builtin\SpaceshipRuntime::callObjectCompareSpaceship(
+                    $this->context,
+                    $leftObj,
+                    $rightObj
+                );
+                $this->context->builder->store($objCmp, $resultSlot);
+                $this->context->builder->branch($doneBb);
+                $this->context->builder->positionAtEnd($genBb);
+                $genCmp = Builtin\SpaceshipRuntime::callValueSpaceship($this->context, $leftPtr, $rightPtr);
+                $this->context->builder->store($genCmp, $resultSlot);
+                $this->context->builder->branch($doneBb);
+                $this->context->builder->positionAtEnd($doneBb);
+                $result = $this->context->builder->load($resultSlot);
                 goto return_long;
             }
             if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_OBJECT === $rightType) {
@@ -1189,8 +1249,8 @@ restart:
                     $this->context->builder->pointerCast($tmp, $this->context->getTypeFromString('__value__*')),
                     $rightValue
                 );
-                $result = $this->context->builder->call(
-                    $this->context->lookupFunction('__value__spaceship'),
+                $result = Builtin\SpaceshipRuntime::callValueSpaceship(
+                    $this->context,
                     $boxed,
                     $this->context->builder->pointerCast($tmp, $this->context->getTypeFromString('__value__*'))
                 );
@@ -1205,11 +1265,133 @@ restart:
                     $this->context->builder->pointerCast($tmp, $this->context->getTypeFromString('__value__*')),
                     $leftValue
                 );
-                $result = $this->context->builder->call(
-                    $this->context->lookupFunction('__value__spaceship'),
+                $result = Builtin\SpaceshipRuntime::callValueSpaceship(
+                    $this->context,
                     $this->context->builder->pointerCast($tmp, $this->context->getTypeFromString('__value__*')),
                     $boxed
                 );
+                goto return_long;
+            }
+            if (Variable::TYPE_OBJECT === $leftType && Variable::TYPE_STRING === $rightType) {
+                Builtin\SpaceshipRuntime::ensureLinked($this->context);
+                $objTmp = $this->context->memory->malloc($this->context->getTypeFromString('__value__'));
+                $objPtr = $this->context->builder->pointerCast($objTmp, $this->context->getTypeFromString('__value__*'));
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeObject'),
+                    $objPtr,
+                    $leftValue
+                );
+                $strTmp = JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeString'),
+                    JitValueBox::pointer($this->context, $strTmp),
+                    $rightValue
+                );
+                $result = Builtin\SpaceshipRuntime::callValueSpaceship(
+                    $this->context,
+                    $objPtr,
+                    JitValueBox::pointer($this->context, $strTmp)
+                );
+                goto return_long;
+            }
+            if (Variable::TYPE_STRING === $leftType && Variable::TYPE_OBJECT === $rightType) {
+                Builtin\SpaceshipRuntime::ensureLinked($this->context);
+                $strTmp = JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeString'),
+                    JitValueBox::pointer($this->context, $strTmp),
+                    $leftValue
+                );
+                $objTmp = $this->context->memory->malloc($this->context->getTypeFromString('__value__'));
+                $objPtr = $this->context->builder->pointerCast($objTmp, $this->context->getTypeFromString('__value__*'));
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeObject'),
+                    $objPtr,
+                    $rightValue
+                );
+                $result = Builtin\SpaceshipRuntime::callValueSpaceship(
+                    $this->context,
+                    JitValueBox::pointer($this->context, $strTmp),
+                    $objPtr
+                );
+                goto return_long;
+            }
+            if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_STRING === $rightType) {
+                Builtin\SpaceshipRuntime::ensureLinked($this->context);
+                $boxedPtr = JitValueBox::valuePtrFromVariable($this->context, $left);
+                $map = $this->context->structFieldMap['__value__'];
+                $i8 = $this->context->getTypeFromString('int8');
+                $objTag = $i8->constInt(Variable::TYPE_OBJECT, false);
+                $kind = $this->context->builder->load(
+                    $this->context->builder->structGep($boxedPtr, $map['type'])
+                );
+                $isObj = $this->context->builder->icmp(Builder::INT_EQ, $kind, $objTag);
+                $i64 = $this->context->getTypeFromString('int64');
+                $one = $i64->constInt(1, true);
+                $parentFn = BasicBlockHelper::parentFunction($this->context);
+                $oneBb = $parentFn->appendBasicBlock('val_spaceship_enum_str_one');
+                $genBb = $parentFn->appendBasicBlock('val_spaceship_enum_str_gen');
+                $doneBb = $parentFn->appendBasicBlock('val_spaceship_enum_str_done');
+                $resultSlot = BasicBlockHelper::entryAlloca($this->context, $i64);
+                $this->context->builder->branchIf($isObj, $oneBb, $genBb);
+                $this->context->builder->positionAtEnd($oneBb);
+                $this->context->builder->store($one, $resultSlot);
+                $this->context->builder->branch($doneBb);
+                $this->context->builder->positionAtEnd($genBb);
+                $tmp = JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeString'),
+                    JitValueBox::pointer($this->context, $tmp),
+                    $rightValue
+                );
+                $genCmp = Builtin\SpaceshipRuntime::callValueSpaceship(
+                    $this->context,
+                    $boxedPtr,
+                    JitValueBox::pointer($this->context, $tmp)
+                );
+                $this->context->builder->store($genCmp, $resultSlot);
+                $this->context->builder->branch($doneBb);
+                $this->context->builder->positionAtEnd($doneBb);
+                $result = $this->context->builder->load($resultSlot);
+                goto return_long;
+            }
+            if (Variable::TYPE_STRING === $leftType && Variable::TYPE_VALUE === $rightType) {
+                Builtin\SpaceshipRuntime::ensureLinked($this->context);
+                $boxedPtr = JitValueBox::valuePtrFromVariable($this->context, $right);
+                $map = $this->context->structFieldMap['__value__'];
+                $i8 = $this->context->getTypeFromString('int8');
+                $objTag = $i8->constInt(Variable::TYPE_OBJECT, false);
+                $kind = $this->context->builder->load(
+                    $this->context->builder->structGep($boxedPtr, $map['type'])
+                );
+                $isObj = $this->context->builder->icmp(Builder::INT_EQ, $kind, $objTag);
+                $i64 = $this->context->getTypeFromString('int64');
+                $one = $i64->constInt(1, true);
+                $parentFn = BasicBlockHelper::parentFunction($this->context);
+                $oneBb = $parentFn->appendBasicBlock('val_spaceship_str_enum_one');
+                $genBb = $parentFn->appendBasicBlock('val_spaceship_str_enum_gen');
+                $doneBb = $parentFn->appendBasicBlock('val_spaceship_str_enum_done');
+                $resultSlot = BasicBlockHelper::entryAlloca($this->context, $i64);
+                $this->context->builder->branchIf($isObj, $oneBb, $genBb);
+                $this->context->builder->positionAtEnd($oneBb);
+                $this->context->builder->store($one, $resultSlot);
+                $this->context->builder->branch($doneBb);
+                $this->context->builder->positionAtEnd($genBb);
+                $tmp = JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeString'),
+                    JitValueBox::pointer($this->context, $tmp),
+                    $leftValue
+                );
+                $genCmp = Builtin\SpaceshipRuntime::callValueSpaceship(
+                    $this->context,
+                    JitValueBox::pointer($this->context, $tmp),
+                    $boxedPtr
+                );
+                $this->context->builder->store($genCmp, $resultSlot);
+                $this->context->builder->branch($doneBb);
+                $this->context->builder->positionAtEnd($doneBb);
+                $result = $this->context->builder->load($resultSlot);
                 goto return_long;
             }
         }
@@ -1350,6 +1532,18 @@ restart:
                 );
                 goto return_bool;
             }
+            if (OpCode::TYPE_SHIFT_LEFT === $opcode->type) {
+                $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
+                $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
+                $result = $this->context->builder->shl($leftLong, $__right);
+                goto return_long;
+            }
+            if (OpCode::TYPE_SHIFT_RIGHT === $opcode->type) {
+                $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
+                $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
+                $result = $this->context->builder->aShr($leftLong, $__right);
+                goto return_long;
+            }
         }
         if (Variable::TYPE_NATIVE_LONG === $leftType && Variable::TYPE_STRING === $rightType) {
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
@@ -1380,6 +1574,18 @@ restart:
                     $this->context->getTypeFromString('int1')->constInt(0, false)
                 );
                 goto return_bool;
+            }
+            if (OpCode::TYPE_SHIFT_LEFT === $opcode->type) {
+                $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
+                $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
+                $result = $this->context->builder->shl($__left, $rightLong);
+                goto return_long;
+            }
+            if (OpCode::TYPE_SHIFT_RIGHT === $opcode->type) {
+                $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
+                $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
+                $result = $this->context->builder->aShr($__left, $rightLong);
+                goto return_long;
             }
         }
         if (Variable::TYPE_STRING === $leftType && Variable::TYPE_NATIVE_DOUBLE === $rightType) {
@@ -1605,7 +1811,58 @@ return_bool:
             OpCode::TYPE_BITWISE_AND => $leftInt & $rightInt,
             OpCode::TYPE_BITWISE_OR => $leftInt | $rightInt,
             OpCode::TYPE_BITWISE_XOR => $leftInt ^ $rightInt,
+            OpCode::TYPE_SHIFT_LEFT => $leftInt << $rightInt,
+            OpCode::TYPE_SHIFT_RIGHT => $leftInt >> $rightInt,
             default => null,
+        };
+    }
+
+    private function emitBitwiseNotFloatTypeError(): Variable
+    {
+        TypeErrorRaise::registerDeclarations($this->context);
+        TypeErrorRaise::ensureLinked($this->context);
+        TypeErrorRaise::emitRaise($this->context, 'Unsupported operand types: float');
+        $this->context->builder->call($this->context->lookupFunction('abort'));
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $this->context->getTypeFromString('int64')->constInt(0, false)
+        );
+    }
+
+    private function emitShiftFloatOperandTypeError(OpCode $opcode, int $leftType, int $rightType): Variable
+    {
+        $opSym = OpCode::TYPE_SHIFT_LEFT === $opcode->type ? '<<' : '>>';
+        $message = sprintf(
+            'Unsupported operand types: %s %s %s',
+            $this->shiftOperandJitTypeName($leftType),
+            $opSym,
+            $this->shiftOperandJitTypeName($rightType)
+        );
+        TypeErrorRaise::registerDeclarations($this->context);
+        TypeErrorRaise::ensureLinked($this->context);
+        TypeErrorRaise::emitRaise($this->context, $message);
+        $this->context->builder->call($this->context->lookupFunction('abort'));
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $this->context->getTypeFromString('int64')->constInt(0, false)
+        );
+    }
+
+    private function shiftOperandJitTypeName(int $jitType): string
+    {
+        return match ($jitType) {
+            Variable::TYPE_NATIVE_LONG => 'int',
+            Variable::TYPE_NATIVE_DOUBLE => 'float',
+            Variable::TYPE_NATIVE_BOOL => 'bool',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_VALUE => 'mixed',
+            default => 'mixed',
         };
     }
 
@@ -1618,6 +1875,11 @@ return_bool:
             if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
                 return (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
             }
+        }
+
+        $literal = $var->compileTimeString ?? null;
+        if (null !== $literal && is_numeric($literal) && ((string) (int) $literal) === $literal) {
+            return (int) $literal;
         }
 
         $name = $var->compileTimeConstantName ?? null;

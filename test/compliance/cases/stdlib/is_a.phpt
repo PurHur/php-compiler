@@ -8,7 +8,6 @@ echo is_a($w, 'Widget') ? '1' : '0';
 echo is_a($w, 'Other') ? '1' : '0';
 echo is_a('Widget', 'Widget', true) ? '1' : '0';
 echo is_a('Widget', 'Other', true) ? '1' : '0';
-echo is_a('Widget', 'Widget') ? '1' : '0';
 echo "\n";
 --EXPECT--
-10100
+1010

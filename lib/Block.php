@@ -65,6 +65,12 @@ class Block {
     /** @var array<int, int> scope slot index => Variable::TYPE_* for typed parameters */
     public array $paramTypeConstraints = [];
 
+    /** Parameter scope slots declared `iterable` (array|Traversable union, #4829). */
+    public array $paramIterableSlots = [];
+
+    /** @var array<int, 'true'|'false'> standalone bool literal parameter types (#4784) */
+    public array $paramLiteralBoolTypes = [];
+
     /** @var array<int, int> typed variadic element constraints — not applied to the packed array local (#4185) */
     public array $paramVariadicElementTypeConstraints = [];
 
@@ -97,6 +103,9 @@ class Block {
 
     /** Declared scalar return type for this function (issue #205), or null when untyped. */
     public ?int $returnTypeConstraint = null;
+
+    /** Standalone `: true` / `: false` return type (#4784), or null. */
+    public ?string $returnLiteralBoolType = null;
 
     /** Declared `: void` return — non-null returns are rejected. */
     public bool $returnTypeVoid = false;
@@ -445,9 +454,14 @@ class Block {
             $this->returnDeclaredType = $parent->returnDeclaredType;
             $this->paramDeclaredTypes = $parent->paramDeclaredTypes;
             $this->paramTypeConstraints = $parent->paramTypeConstraints;
+            $this->paramIterableSlots = $parent->paramIterableSlots;
+            $this->paramLiteralBoolTypes = $parent->paramLiteralBoolTypes;
+            $this->returnLiteralBoolType = $parent->returnLiteralBoolType;
             $this->paramIntersectionConstraints = $parent->paramIntersectionConstraints;
             $this->paramDnfConstraints = $parent->paramDnfConstraints;
             $this->paramNames = $parent->paramNames;
+            $this->paramByRef = $parent->paramByRef;
+            $this->paramSensitive = $parent->paramSensitive;
             $this->paramImplicitNullable = $parent->paramImplicitNullable;
         }
     }
@@ -744,8 +758,14 @@ class Block {
         $return = new Frame(null, $this, $frame);
         $return->scope = $scope;
         $return->scriptPath = $this->scriptPath();
-        if (!is_null($frame) && !is_null($frame->returnVar)) {
-            $return->returnVar = $frame->returnVar;
+        if (null !== $frame) {
+            if (null !== $frame->returnVar) {
+                $return->returnVar = $frame->returnVar;
+            }
+            // CFG branch targets (e.g. function-static init) must keep closure invoke context (#4872).
+            if (null !== $frame->closureCall) {
+                $return->closureCall = $frame->closureCall;
+            }
         }
         return $return;
     }
@@ -777,6 +797,9 @@ class Block {
             if (isset($block->paramTypeConstraints[$slot])) {
                 $local->resolveIndirect()->typeConstraint = $block->paramTypeConstraints[$slot];
             }
+            if (isset($block->paramLiteralBoolTypes[$slot])) {
+                $local->resolveIndirect()->literalBoolType = $block->paramLiteralBoolTypes[$slot];
+            }
             if (isset($block->paramGenericArrayTypeSpecs[$slot])) {
                 $local->resolveIndirect()->genericArrayTypeSpec = $block->paramGenericArrayTypeSpecs[$slot];
             }
@@ -806,6 +829,9 @@ class Block {
         $var = new Variable(Variable::TYPE_NULL);
         if (isset($block->paramTypeConstraints[$slot])) {
             $var->typeConstraint = $block->paramTypeConstraints[$slot];
+        }
+        if (isset($block->paramLiteralBoolTypes[$slot])) {
+            $var->literalBoolType = $block->paramLiteralBoolTypes[$slot];
         }
         if (isset($block->paramGenericArrayTypeSpecs[$slot])) {
             $var->genericArrayTypeSpec = $block->paramGenericArrayTypeSpecs[$slot];
@@ -1336,7 +1362,7 @@ class Block {
      * Simple try/catch without `finally` may pass MCJIT when {@see TryCatchJitExecuteTest} is green.
      */
     /**
-     * ReflectionClass::newLazyProxy/Ghost — VM lazy init until MCJIT lowering (#4685).
+     * ReflectionClass::newLazyProxy/Ghost — detection for scripts using lazy objects (#4685, #4940).
      *
      * @see Zend/zend_lazy_objects.c
      */
@@ -1685,6 +1711,39 @@ class Block {
         return false;
     }
 
+    /**
+     * Global {@code const NAME = [...]} literals (MCJIT uses module globals — #4904, #4941).
+     */
+    public static function containsGlobalConstArrayLiteralOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_GLOBAL_CONST === $op->type
+                    && isset($block->constants[$op->arg2])
+                    && Variable::TYPE_ARRAY === $block->constants[$op->arg2]->type) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     public static function requiresVmLowering(?self $root): bool
     {
         return self::containsGeneratorOpcodesInScriptScope($root)
@@ -1696,7 +1755,6 @@ class Block {
             || self::containsReadonlyClassOpcodes($root)
             || self::containsDynamicPropertyDeprecationOpcodes($root)
             || self::containsFiberSuspendOpcodes($root)
-            || self::containsTraitConstructorOpcodes($root)
-            || self::containsLazyObjectOpcodes($root);
+            || self::containsTraitConstructorOpcodes($root);
     }
 }

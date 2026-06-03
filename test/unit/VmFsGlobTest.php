@@ -1,0 +1,44 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\Test\Unit;
+
+use PHPUnit\Framework\TestCase;
+
+final class VmFsGlobTest extends TestCase
+{
+    private static string $root;
+
+    public static function setUpBeforeClass(): void
+    {
+        self::$root = dirname(__DIR__, 2);
+    }
+
+    public function testGlobBuiltinDoesNotCallHostGlob(): void
+    {
+        $source = (string) file_get_contents(self::$root.'/ext/standard/glob_.php');
+        $this->assertStringNotContainsString('\\glob(', $source);
+        $this->assertStringContainsString('VmFsGlob::glob', $source);
+    }
+
+    public function testVmFsGlobMatchesFixturePhpFiles(): void
+    {
+        $dir = self::$root.'/test/compliance/cases/stdlib/glob_scandir_fixture';
+        $matches = \PHPCompiler\ext\standard\VmFsGlob::glob($dir.'/*.php');
+        $this->assertIsArray($matches);
+        $this->assertCount(2, $matches);
+        $names = array_map('basename', $matches);
+        sort($names);
+        $this->assertSame(['a.php', 'b.php'], $names);
+    }
+
+    public function testVmFsGlobOnlydirFiltersNonDirectories(): void
+    {
+        $dir = self::$root.'/test/compliance/cases/stdlib/glob_onlydir_fixture';
+        $matches = \PHPCompiler\ext\standard\VmFsGlob::glob($dir.'/*', \GLOB_ONLYDIR);
+        $this->assertIsArray($matches);
+        $this->assertCount(1, $matches);
+        $this->assertSame('subdir', basename($matches[0]));
+    }
+}

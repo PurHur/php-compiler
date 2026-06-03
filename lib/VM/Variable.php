@@ -67,6 +67,9 @@ final class Variable {
     /** Display label for property TypeError messages, e.g. `int|string`. */
     public ?string $declaredTypeLabel = null;
 
+    /** Standalone `true`/`false` type hint — reject non-bool scalars (PHP 8.2+, issue #4784). */
+    public ?string $literalBoolType = null;
+
     /** list&lt;T&gt; / array&lt;K,V&gt; shape when declaration used generic array syntax (#3705). */
     public ?GenericArrayTypeSpec $genericArrayTypeSpec = null;
 
@@ -125,6 +128,16 @@ final class Variable {
 
     public function isUndefined(): bool {
         return $this->type === self::TYPE_UNDEFINED;
+    }
+
+    /** True when the slot carries a declared property/parameter type (not untyped `mixed`). */
+    public function hasDeclaredTypeConstraint(): bool
+    {
+        return null !== $this->typeConstraint
+            || null !== $this->dnfArms
+            || null !== $this->unionTypeConstraints
+            || null !== $this->genericArrayTypeSpec
+            || null !== $this->literalBoolType;
     }
 
     public function resolveIndirect(): self {
@@ -341,9 +354,13 @@ final class Variable {
         ));
     }
 
-    /** Zend zend_operators.c type name for operand TypeError messages (#3695). */
+    /** Zend zend_operators.c type name for operand TypeError messages (#3695, #4811). */
     private static function operandZendTypeName(Variable $var): string
     {
+        $enumName = self::operandEnumClassName($var);
+        if (null !== $enumName) {
+            return $enumName;
+        }
         switch ($var->type) {
             case self::TYPE_INTEGER:
                 return 'int';
@@ -358,11 +375,24 @@ final class Variable {
             case self::TYPE_ARRAY:
                 return 'array';
             case self::TYPE_OBJECT:
-            case self::TYPE_ENUM_CASE:
                 return 'object';
             default:
                 return 'mixed';
         }
+    }
+
+    /** Enum case operands use the enum type name in unsupported-op messages (zend_operators.c). */
+    private static function operandEnumClassName(Variable $var): ?string
+    {
+        $var = $var->resolveIndirect();
+        if (self::TYPE_ENUM_CASE === $var->type) {
+            return $var->enumCase->enumClass->name;
+        }
+        if (self::TYPE_OBJECT === $var->type && EnumCaseSupport::isEnumCase($var->object)) {
+            return $var->object->class->name;
+        }
+
+        return null;
     }
 
     private static function numericOpOperatorSymbol(int $opCode): string
@@ -380,6 +410,10 @@ final class Variable {
                 return '%';
             case OpCode::TYPE_POW:
                 return '**';
+            case OpCode::TYPE_SHIFT_LEFT:
+                return '<<';
+            case OpCode::TYPE_SHIFT_RIGHT:
+                return '>>';
             default:
                 return '?';
         }
@@ -400,18 +434,12 @@ final class Variable {
         if (self::TYPE_ARRAY === $left->type || self::TYPE_ARRAY === $right->type) {
             return false;
         }
-        if (self::TYPE_STRING === $left->type && !is_numeric($left->string)) {
-            return false;
-        }
-        if (self::TYPE_STRING === $right->type && !is_numeric($right->string)) {
-            return false;
-        }
         if (self::TYPE_STRING_OFFSET === $left->type
             || self::TYPE_STRING_OFFSET === $right->type
             || self::TYPE_UNDEFINED === $left->type
             || self::TYPE_UNDEFINED === $right->type
-            || self::TYPE_ENUM_CASE === $left->type
-            || self::TYPE_ENUM_CASE === $right->type) {
+            || self::isEnumCaseOperand($left)
+            || self::isEnumCaseOperand($right)) {
             return false;
         }
 
@@ -494,7 +522,9 @@ final class Variable {
                 return 'Array';
             case self::TYPE_OBJECT:
                 if (EnumCaseSupport::isEnumCase($var->object)) {
-                    return EnumCaseSupport::toString($var->object);
+                    throw new \Error(
+                        'Object of class '.$var->object->class->name.' could not be converted to string'
+                    );
                 }
                 $typeString = ReflectionTypeSupport::tryObjectTypeString($var->object);
                 if (null !== $typeString) {
@@ -503,11 +533,9 @@ final class Variable {
 
                 return 'Object';
             case self::TYPE_ENUM_CASE:
-                if (null !== $var->enumCase->enumClass->backedType) {
-                    return $var->enumCase->backingValue->toString();
-                }
-
-                return $var->enumCase->caseName;
+                throw new \Error(
+                    'Object of class '.$var->enumCase->enumClass->name.' could not be converted to string'
+                );
         }
         throw new \LogicException("Cannot convert type {$var->type} to string");
     }
@@ -961,6 +989,92 @@ restart:
         }
 
         return (float) $s;
+    }
+
+    /**
+     * Zend convert_scalar_to_number for string operands in add_function / compound assign (#4892).
+     *
+     * @return array{0: int|float, 1: bool} numeric value and whether E_WARNING is needed
+     */
+    private static function parseStringForArithmetic(string $s): array
+    {
+        if (is_numeric($s)) {
+            if (((string) (int) $s) === $s) {
+                return [(int) $s, false];
+            }
+
+            return [(float) $s, false];
+        }
+        if (!preg_match('/^\s*[+-]?(?:(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)/', $s, $m)) {
+            throw new \LogicException('no_numeric_prefix');
+        }
+        $matched = $m[0];
+        if ('' === ltrim($matched) || !preg_match('/\d/', $matched)) {
+            throw new \LogicException('no_numeric_prefix');
+        }
+        $numPart = ltrim($matched, " \t\n\r\0\x0B");
+        if (((string) (int) $numPart) === $numPart
+            && !str_contains($numPart, '.')
+            && !str_contains(strtolower($numPart), 'e')) {
+            return [(int) $numPart, true];
+        }
+
+        return [(float) $numPart, true];
+    }
+
+    /**
+     * Numeric coercion for binary/compound arithmetic (zend_operators.c add_function, #4892).
+     */
+    public function toNumericForArithmetic(
+        ?\PHPCompiler\VM $vm = null,
+        ?\PHPCompiler\Frame $frame = null
+    ): int|float {
+        if (self::TYPE_INDIRECT === $this->type) {
+            return $this->indirect->toNumericForArithmetic($vm, $frame);
+        }
+        TypedPropertyCheck::assertReadable($this);
+        switch ($this->type) {
+            case self::TYPE_NULL:
+                return 0;
+            case self::TYPE_INTEGER:
+                return $this->integer;
+            case self::TYPE_FLOAT:
+                return $this->float;
+            case self::TYPE_BOOLEAN:
+                return $this->bool ? 1 : 0;
+            case self::TYPE_STRING:
+                try {
+                    [$value, $warn] = self::parseStringForArithmetic($this->string);
+                } catch (\LogicException) {
+                    throw new \TypeError(sprintf(
+                        'Unsupported operand types: %s',
+                        self::operandZendTypeName($this)
+                    ));
+                }
+                if ($warn) {
+                    self::warnNonNumericValue($vm, $frame);
+                }
+
+                return $value;
+            case self::TYPE_OBJECT:
+                return self::toNumericForArithmeticFromVariable(
+                    $this->objectToScalarString($vm, 'int'),
+                    $vm,
+                    $frame
+                );
+        }
+        throw new \TypeError(sprintf(
+            'Unsupported operand types: %s',
+            self::operandZendTypeName($this)
+        ));
+    }
+
+    private static function toNumericForArithmeticFromVariable(
+        Variable $var,
+        ?\PHPCompiler\VM $vm,
+        ?\PHPCompiler\Frame $frame
+    ): int|float {
+        return $var->toNumericForArithmetic($vm, $frame);
     }
 
     /**
@@ -1425,6 +1539,22 @@ restart:
         }
         $this->reset();
 restart:
+        if ($left->type === self::TYPE_INDIRECT) {
+            $left = $left->indirect;
+            goto restart;
+        }
+        if ($right->type === self::TYPE_INDIRECT) {
+            $right = $right->indirect;
+            goto restart;
+        }
+        if (OpCode::TYPE_SHIFT_LEFT === $opCode || OpCode::TYPE_SHIFT_RIGHT === $opCode) {
+            if (self::TYPE_FLOAT === $left->type || self::TYPE_FLOAT === $right->type) {
+                self::throwUnsupportedOperandTypes($opCode, $left, $right);
+            }
+            $this->int($this->_bitwiseOp($opCode, $left->toNumeric(), $right->toNumeric()));
+
+            return;
+        }
         $pair = type_pair($left->type, $right->type);
         if ($pair === TYPE_PAIR_INTEGER_INTEGER) {
             $result = $this->_bitwiseOp($opCode, $left->integer, $right->integer);        
@@ -1439,12 +1569,6 @@ restart:
             $this->float($this->_bitwiseOp($opCode, $left->float, $right->integer));
         } elseif ($pair === TYPE_PAIR_FLOAT_FLOAT) {
             $this->float($this->_bitwiseOp($opCode, $left->float, $right->float));
-        } elseif ($left->type === self::TYPE_INDIRECT) {
-            $left = $left->indirect;
-            goto restart;
-        } elseif ($right->type === self::TYPE_INDIRECT) {
-            $right = $right->indirect;
-            goto restart;
         } else {
             $this->string($this->_bitwiseOp($opCode, $left->toString(), $right->toString()));
         }
@@ -1467,10 +1591,16 @@ restart:
         }
     }
 
-    public function numericOp(int $opCode, Variable $left, Variable $right): void {
+    public function numericOp(
+        int $opCode,
+        Variable $left,
+        Variable $right,
+        ?\PHPCompiler\VM $vm = null,
+        ?\PHPCompiler\Frame $frame = null
+    ): void {
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();
-            $result->numericOp($opCode, $left, $right);
+            $result->numericOp($opCode, $left, $right, $vm, $frame);
             $this->indirect->copyFrom($result);
 
             return;
@@ -1493,7 +1623,11 @@ restart:
         }
         // In-place ops (e.g. $i++ → PLUS($i,$i,1)) alias $this with an operand (#1228).
         if ($this === $left || $this === $right) {
-            $this->storeNumericOp($opCode, $left->toNumeric(), $right->toNumeric());
+            $this->storeNumericOp(
+                $opCode,
+                $left->toNumericForArithmetic($vm, $frame),
+                $right->toNumericForArithmetic($vm, $frame)
+            );
 
             return;
         }
@@ -1527,7 +1661,11 @@ restart:
             $right = $right->indirect;
             goto restart;
         } else {
-            $result = $this->_numericOp($opCode, $left->toNumeric(), $right->toNumeric());
+            $result = $this->_numericOp(
+                $opCode,
+                $left->toNumericForArithmetic($vm, $frame),
+                $right->toNumericForArithmetic($vm, $frame)
+            );
             if (is_int($result)) {
                 $this->int($result);
             } else {
@@ -1647,9 +1785,18 @@ restart:
             case OpCode::TYPE_MUL:
                 return $left * $right;
             case OpCode::TYPE_DIV:
+                if (0 === $right || 0.0 === $right) {
+                    throw new \DivisionByZeroError('Division by zero');
+                }
+
                 return $left / $right;
             case OpCode::TYPE_MODULO:
-                return self::numericToZendLong($left) % self::numericToZendLong($right);
+                $rightLong = self::numericToZendLong($right);
+                if (0 === $rightLong) {
+                    throw new \DivisionByZeroError('Modulo by zero');
+                }
+
+                return self::numericToZendLong($left) % $rightLong;
             case OpCode::TYPE_POW:
                 if (is_int($left) && is_int($right)) {
                     return $left ** $right;
@@ -1768,6 +1915,36 @@ restart:
                     goto restart;
                 }
                 break;
+            case OpCode::TYPE_BITWISE_NOT:
+                if ($expr->type === self::TYPE_INTEGER) {
+                    $this->int(~$expr->integer);
+
+                    return;
+                }
+                if ($expr->type === self::TYPE_FLOAT) {
+                    throw new \TypeError(sprintf(
+                        'Unsupported operand types: %s',
+                        self::operandZendTypeName($expr)
+                    ));
+                }
+                if ($expr->type === self::TYPE_STRING) {
+                    $bytes = $expr->string;
+                    $out = '';
+                    for ($i = 0, $len = strlen($bytes); $i < $len; $i++) {
+                        $out .= chr((~ord($bytes[$i])) & 0xFF);
+                    }
+                    $this->string($out);
+
+                    return;
+                }
+                if ($expr->type === self::TYPE_BOOLEAN || $expr->type === self::TYPE_NULL) {
+                    throw new \TypeError(sprintf(
+                        'Cannot perform bitwise not on %s',
+                        self::TYPE_BOOLEAN === $expr->type ? 'bool' : 'null'
+                    ));
+                }
+                $this->castFrom(self::CAST_NUMERIC, $expr);
+                goto restart;
         }
         throw new \LogicException("UnaryOp $opCode not implemented for type $expr->type");
     }

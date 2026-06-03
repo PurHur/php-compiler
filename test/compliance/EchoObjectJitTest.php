@@ -18,7 +18,7 @@ final class EchoObjectJitTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
-        foreach (['echo_object_jit.phpt', 'echo_resource_jit.phpt'] as $file) {
+        foreach (['echo_object_jit.phpt', 'echo_resource_jit.phpt', 'echo_array_jit.phpt', 'echo_object_error_jit.phpt'] as $file) {
             $path = __DIR__.'/cases/language/'.$file;
             $name = preg_replace('/\.phpt$/', '', $file) ?: $file;
             yield $name => self::parsePHPT($path, $file);

@@ -1,33 +1,31 @@
 --TEST--
-Language: array dim fetch on null/bool — TypeError Cannot use [] (#4713, zend_operators.c)
+Language: array dim fetch read on null/bool — E_WARNING (#4867; zend_execute.c)
 --FILE--
 <?php
-try {
+function warn_capture(int $errno, string $message): bool
+{
+    echo 'W:', $message, "\n";
+
+    return true;
+}
+set_error_handler('warn_capture');
+
+function read_scalar(string $label, callable $fn): void
+{
+    $fn();
+    echo $label, ": NULL\n";
+}
+
+read_scalar('read_null', function () {
     $x = null;
-    echo $x[0];
-} catch (TypeError $e) {
-    echo 'read_null: TypeError: ', $e->getMessage(), "\n";
-}
-try {
-    $y = null;
-    $y['k'] = 1;
-} catch (TypeError $e) {
-    echo 'write_null: TypeError: ', $e->getMessage(), "\n";
-}
-try {
+    $x[0];
+});
+read_scalar('read_false', function () {
     $x = false;
-    echo $x[0];
-} catch (TypeError $e) {
-    echo 'read_false: TypeError: ', $e->getMessage(), "\n";
-}
-try {
-    $y = true;
-    $y['k'] = 1;
-} catch (TypeError $e) {
-    echo 'write_true: TypeError: ', $e->getMessage(), "\n";
-}
+    $x[0];
+});
 --EXPECT--
-read_null: TypeError: Cannot use [] on null
-write_null: TypeError: Cannot use [] on null
-read_false: TypeError: Cannot use [] on bool
-write_true: TypeError: Cannot use [] on bool
+W:Trying to access array offset on value of type null
+read_null: NULL
+W:Trying to access array offset on value of type bool
+read_false: NULL

@@ -503,6 +503,7 @@ class Module extends ModuleAbstract
             new getmypid(),
             new getmygrgid(),
             new getmyinode(),
+            new getlastmod(),
             new getrusage(),
             new memory_get_peak_usage(),
             new memory_get_usage(),

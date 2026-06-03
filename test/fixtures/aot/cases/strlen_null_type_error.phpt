@@ -1,8 +1,7 @@
 --TEST--
-AOT: strlen() — TypeError when argument is null (#4365)
+AOT: strlen() — null deprecated, returns 0 (#5000)
 --FILE--
 <?php
-strlen(null);
+echo strlen(null), "\n";
 --EXPECT--
---EXPECT_EXIT--
-134
+0

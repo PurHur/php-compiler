@@ -157,9 +157,8 @@ final class ClassConstExpr
         if (!isset($classEntry->constants[$constName])) {
             throw new \LogicException("Undefined class constant {$className}::{$constName}");
         }
-        if ($classEntry->isEnum) {
-            $canonical = $classEntry->enumCaseCanonicalNames[$constName]
-                ?? $frame->scope[$op->arg3]->toString();
+        if ($classEntry->isEnum && isset($classEntry->enumCaseCanonicalNames[$constName])) {
+            $canonical = $classEntry->enumCaseCanonicalNames[$constName];
             $backing = new Variable();
             $backing->copyFrom($classEntry->constants[$constName]);
             $frame->scope[$op->arg1]->enumCase(

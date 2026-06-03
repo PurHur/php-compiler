@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -24,22 +23,25 @@ final class ucwords extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('ucwords() requires one or two arguments');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
+        $string = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'ucwords',
+            0,
+            'string'
+        );
+        $separators = VmString::TRIM_DEFAULT;
+        if (2 === $argc) {
+            $separators = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[1],
+                'ucwords',
+                1,
+                'separators'
+            );
+        }
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('ucwords() only supports strings in this compiler build');
-        }
-        $separators = VmString::TRIM_DEFAULT;
-        if (2 === $argc) {
-            $sepVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $sepVar->type) {
-                throw new \LogicException('ucwords() separators must be a string in this compiler build');
-            }
-            $separators = $sepVar->toString();
-        }
-        $frame->returnVar->string(VmString::asciiUcwordsEx($v->toString(), $separators));
+        $frame->returnVar->string(VmString::asciiUcwordsEx($string, $separators));
     }
 
     public Context $context;
@@ -51,7 +53,7 @@ final class ucwords extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('ucwords() requires one or two arguments');
         }
-        $str = $this->jitString($context, $args[0], 'ucwords() argument #1');
+        $str = JitQuotPrint::lowerStringSubject($context, $args[0], 'ucwords', 1, 'string');
         if (1 === $argc) {
             return $context->builder->call(
                 $context->lookupFunction('__string__ucwords'),
@@ -62,7 +64,7 @@ final class ucwords extends Internal
         return $context->builder->call(
             $context->lookupFunction('__string__ucwords_ex'),
             $str,
-            $this->jitString($context, $args[1], 'ucwords() argument #2 ($separators)')
+            JitQuotPrint::lowerStringSubject($context, $args[1], 'ucwords', 2, 'separators')
         );
     }
 }

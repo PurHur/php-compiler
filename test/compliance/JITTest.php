@@ -78,10 +78,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'cli_argv')) {
                 continue;
             }
-            // Global const array literals: VM + compile-time fold (#4526); MCJIT escape analyzer pending on Const terminal.
-            if (str_contains($name, 'global_const_array')) {
-                continue;
-            }
             // array_key_exists() null key → "": VM + AOT (#3687); MCJIT execute segfaults (pre-existing hashtable path).
             if (str_contains($name, 'array_key_exists_null_key')) {
                 continue;
@@ -122,16 +118,8 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'class_uses_runtime')) {
                 continue;
             }
-            // new static() / : static return — VM late binding (#3412); JIT phase 2.
-            if (str_contains($name, 'new_static') || str_contains($name, 'static_return_type')) {
-                continue;
-            }
             // gc_collect_cycles() MCJIT execute unstable (#3160); compile: GcCollectCyclesJitCompileTest.
             if (str_contains($name, 'gc_collect_cycles')) {
-                continue;
-            }
-            // gc_enable/gc_disable/gc_enabled() are VM-only (#3209).
-            if (str_contains($name, 'gc_enabled')) {
                 continue;
             }
             // set_exception_handler() / restore_exception_handler() VM-only (#3146).
@@ -266,6 +254,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'uasort_closure') || str_contains($name, 'uksort_closure')) {
                 continue;
             }
+            // variadic + named args: VM parity (#4808); MCJIT NamedArgs variadic pack (#3777 follow-up).
+            if (str_contains($name, 'named_args_variadic')) {
+                continue;
+            }
             // #[\AllowDynamicProperties] is VM-only until JIT class flag (#3467).
             if (str_contains($name, 'allow_dynamic_properties')) {
                 continue;
@@ -304,10 +296,6 @@ class JITTest extends BaseTest {
             }
             // ?: merge branch slot unification is VM-only until JIT CFG merge (#3790).
             if (str_contains($name, 'ternary_func_call')) {
-                continue;
-            }
-            // Nested break/continue levels use php-cfg goto labels; VM-only until JIT (#3405).
-            if (str_contains($name, 'break2_') || str_contains($name, 'continue2_')) {
                 continue;
             }
             // (unset) cast reference break is VM-only until JIT TYPE_CAST_UNSET lowering (#3517).
@@ -362,15 +350,11 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'object_loose_equals')) {
                 continue;
             }
-            // ??= MCJIT execute: LLVM verify in CoalesceAssignJitCompileTest (#3792).
+            // ??= MCJIT execute: compile in CoalesceAssignJitCompileTest (#3792); execute in CoalesceAssignJitExecuteTest (#4763).
             if (str_contains($name, 'coalesce_assign_jit')) {
                 continue;
             }
-            // Chained ?? MCJIT: VM-only until nested coalesce JIT (#3798).
-            if (str_contains($name, 'coalesce_chain')) {
-                continue;
-            }
-            // Implicit nullable `int $x = null` default: VM (#4449); MCJIT execute segfault.
+            // Implicit nullable MCJIT execute: compile in ImplicitNullableParamJitCompileTest (#4767); execute when jit-runtime-probe green.
             if (str_contains($name, 'implicit_nullable_param')) {
                 continue;
             }
@@ -422,6 +406,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'magic_const_trait')) {
                 continue;
             }
+            // Unary +: LLVM verify in UnaryPlusJitCompileTest (#4820); MCJIT execute gated by jit-runtime-probe (#98).
+            if (str_contains($name, 'unary_plus')) {
+                continue;
+            }
             // pre/post inc/dec VM-only until JIT lowering (#3552).
             if (str_contains($name, 'pre_post_inc')) {
                 continue;
@@ -435,6 +423,7 @@ class JITTest extends BaseTest {
                 continue;
             }
             // User enum DECLARE_ENUM segfaults in MCJIT until enum lowering is stable (#3518).
+            // enum_spaceship_jit: lowering fixed #4849; compliance JIT when jit-runtime-probe green (#98).
             if (str_contains($name, 'enum_') || str_contains($name, 'abstract_enum')) {
                 continue;
             }
@@ -525,12 +514,8 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'list_destructure_string')) {
                 continue;
             }
-            // PHP 8.3 typed class constants: VM + AOT; MCJIT execute unstable (#4511, #3592).
-            if (str_contains($name, 'typed_class_const')) {
-                continue;
-            }
             // Pipe operator (|>): VM + AOT via desugar (#3243, #4456); MCJIT in PipeOperatorJit*Test (#98).
-            if (str_contains($name, 'pipe_operator')) {
+            if (str_contains($name, 'pipe_operator') || str_contains($name, 'pipe_first_class')) {
                 continue;
             }
             yield $name => $case;
