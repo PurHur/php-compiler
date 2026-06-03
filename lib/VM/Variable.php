@@ -500,7 +500,7 @@ final class Variable {
         $this->string = $value;
     }
 
-    public function toString(): string {
+    public function toString(?\PHPCompiler\VM $vm = null, ?\PHPCompiler\Frame $frame = null): string {
         $var = $this->resolveIndirect();
         TypedPropertyCheck::assertReadable($var);
         switch ($var->type) {
@@ -524,7 +524,7 @@ final class Variable {
             case self::TYPE_UNDEFINED:
                 return '';
             case self::TYPE_ARRAY:
-                // todo: raise notice
+                self::emitArrayToStringWarning($vm, $frame);
                 return 'Array';
             case self::TYPE_OBJECT:
                 if (EnumCaseSupport::isEnumCase($var->object)) {
@@ -714,10 +714,10 @@ final class Variable {
         $this->stringOffsetFile = $file;
     }
 
-    public function castFrom(int $type, self $var, ?\PHPCompiler\VM $vm = null) {
+    public function castFrom(int $type, self $var, ?\PHPCompiler\VM $vm = null, ?\PHPCompiler\Frame $frame = null) {
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();
-            $result->castFrom($type, $var, $vm);
+            $result->castFrom($type, $var, $vm, $frame);
             $this->indirect->copyFrom($result);
 
             return;
@@ -747,7 +747,7 @@ final class Variable {
                 if (self::TYPE_OBJECT === $src->type && null !== $vm) {
                     $this->string = $vm->castObjectToString($src->toObject());
                 } else {
-                    $this->string = $var->toString();
+                    $this->string = $var->toString($vm, $frame);
                 }
                 break;
             default:
@@ -990,6 +990,24 @@ restart:
             'Unsupported operand types: %s',
             self::operandZendTypeName($expr)
         ));
+    }
+
+    /**
+     * Zend _convert_to_string() array branch (zend_operators.c, issue #5266).
+     */
+    private static function emitArrayToStringWarning(?\PHPCompiler\VM $vm, ?\PHPCompiler\Frame $frame): void
+    {
+        $context = $vm?->context ?? $frame?->vmContext;
+        if (null === $context) {
+            return;
+        }
+        $context->errors->languageWarning(
+            'Array to string conversion',
+            null,
+            0,
+            $context,
+            $frame
+        );
     }
 
     private static function warnNonNumericValue(?\PHPCompiler\VM $vm, ?\PHPCompiler\Frame $frame): void

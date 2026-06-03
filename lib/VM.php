@@ -250,11 +250,11 @@ class VM {
     }
 
     /** Coerce a VM value to string, invoking __toString on objects when defined (issue #3296). */
-    public function coerceVariableToString(Variable $var): string
+    public function coerceVariableToString(Variable $var, ?Frame $frame = null): string
     {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $var->type) {
-            return $var->toString();
+            return $var->toString($this, $frame);
         }
         $object = $var->toObject();
         if (EnumCaseSupport::isEnumCase($object)) {
@@ -270,7 +270,7 @@ class VM {
             $this->context->coercingObjectToString = false;
         }
 
-        return $result->toString();
+        return $result->toString($this, $frame);
     }
 
     /** Invoke a user instance method from VM internals (e.g. __debugInfo, #3259). */
@@ -427,11 +427,11 @@ class VM {
      *
      * php-src: Zend/zend_operators.c — cast to string via __toString when defined.
      */
-    public function valueToPrintString(Variable $var): string
+    public function valueToPrintString(Variable $var, ?Frame $frame = null): string
     {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $var->type) {
-            return $var->toString();
+            return $var->toString($this, $frame);
         }
         $object = $var->toObject();
         if (EnumCaseSupport::isEnumCase($object)) {
@@ -447,7 +447,7 @@ class VM {
             $this->context->coercingObjectToString = false;
         }
 
-        return $result->toString();
+        return $result->toString($this, $frame);
     }
 
     /**
@@ -1544,9 +1544,14 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_CAST_STRING:
+                    $savedCallSiteLine = $frame->callSiteLine;
+                    if (null !== $op->arg3 && $op->arg3 > 0) {
+                        $frame->callSiteLine = $op->arg3;
+                    }
                     try {
-                        $frame->scope[$op->arg1]->castFrom(Variable::TYPE_STRING, $frame->scope[$op->arg2], $this);
+                        $frame->scope[$op->arg1]->castFrom(Variable::TYPE_STRING, $frame->scope[$op->arg2], $this, $frame);
                     } catch (\Error $e) {
+                        $frame->callSiteLine = $savedCallSiteLine;
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
@@ -1554,6 +1559,7 @@ restart:
                         }
                         break;
                     } catch (\TypeError $e) {
+                        $frame->callSiteLine = $savedCallSiteLine;
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
@@ -1561,10 +1567,12 @@ restart:
                         }
                         break;
                     } catch (VM\MagicMethodInvocationAborted) {
+                        $frame->callSiteLine = $savedCallSiteLine;
                         $this->clearTryCatchUnwindState();
                         ++$frame->pos;
                         break;
                     }
+                    $frame->callSiteLine = $savedCallSiteLine;
                     break;
                 case OpCode::TYPE_CAST_ARRAY:
                     $frame->scope[$op->arg1]->copyFrom(
@@ -1780,8 +1788,8 @@ restart:
                         goto restart;
                     }
                     try {
-                        $arg2 = $this->coerceVariableToString($frame->scope[$op->arg2]);
-                        $arg3 = $this->coerceVariableToString($frame->scope[$op->arg3]);
+                        $arg2 = $this->coerceVariableToString($frame->scope[$op->arg2], $frame);
+                        $arg3 = $this->coerceVariableToString($frame->scope[$op->arg3], $frame);
                         $arg1->string($arg2 . $arg3);
                     } catch (\Error $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
@@ -1813,7 +1821,7 @@ restart:
                         if (!VM\SapiOutput::headersSent()) {
                             VM\HeaderCallbackQueue::runBeforeOutput($this->context);
                         }
-                        VM\OutputBuffer::append($this->valueToPrintString($frame->scope[$op->arg1]));
+                        VM\OutputBuffer::append($this->valueToPrintString($frame->scope[$op->arg1], $frame));
                     } catch (\Error $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                         if (null !== $catchFrame) {
@@ -1837,7 +1845,7 @@ restart:
                         if (!VM\SapiOutput::headersSent()) {
                             VM\HeaderCallbackQueue::runBeforeOutput($this->context);
                         }
-                        VM\OutputBuffer::append($this->valueToPrintString($frame->scope[$op->arg2]));
+                        VM\OutputBuffer::append($this->valueToPrintString($frame->scope[$op->arg2], $frame));
                         $frame->scope[$op->arg1]->int(1);
                     } catch (\Error $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
