@@ -72,5 +72,7 @@ final class EchoArrayObjectJITTest extends BaseTest
         yield 'echo_array' => ['echo_array.phpt'];
         yield 'echo_null' => ['echo_null.phpt'];
         yield 'echo_object' => ['echo_object.phpt'];
+        yield 'echo_object_jit' => ['echo_object_jit.phpt'];
+        yield 'echo_resource_jit' => ['echo_resource_jit.phpt'];
     }
 }
