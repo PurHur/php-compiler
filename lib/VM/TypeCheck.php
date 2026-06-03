@@ -267,7 +267,22 @@ final class TypeCheck
     }
 
     /**
-     * Zend 8+ dim fetch on null/bool/int/float (#4713, zend_operators.c).
+     * Zend ZEND_FETCH_DIM_R on null/bool/int/float (zend_execute.c, #4867).
+     */
+    public static function isScalarNonContainerDimRead(Variable $value): bool
+    {
+        $resolved = $value->resolveIndirect();
+
+        return \in_array($resolved->type, [
+            Variable::TYPE_NULL,
+            Variable::TYPE_BOOLEAN,
+            Variable::TYPE_INTEGER,
+            Variable::TYPE_FLOAT,
+        ], true);
+    }
+
+    /**
+     * Zend write/append [] on scalars — TypeError "Cannot use [] on …" (zend_operators.c, #4713).
      */
     public static function cannotUseBracketOn(Variable $value): ?string
     {

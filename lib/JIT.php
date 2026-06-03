@@ -5064,6 +5064,14 @@ class JIT {
                     }
                     $bracketLabel = Variable::cannotUseBracketLabel($value->type);
                     if (null !== $bracketLabel && !$this->context->listUnpackSkipAssignPath) {
+                        if (!$forWrite) {
+                            JIT\ScalarDimFetchHelper::lowerScalarDimRead(
+                                $this->context,
+                                $resultOp,
+                                $bracketLabel
+                            );
+                            break;
+                        }
                         JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
                         JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
                         JIT\Builtin\TypeErrorRaise::emitRaise(
