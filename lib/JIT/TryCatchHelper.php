@@ -393,10 +393,18 @@ final class TryCatchHelper
         $dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, []);
 
         $thrown = $context->getVariableFromOp($block->getOperand($op->arg1));
-        $obj = $context->helper->loadValue($thrown);
-        if (Variable::TYPE_OBJECT !== $thrown->type) {
-            $valuePtr = JitValueBox::valuePtrFromVariable($context, $thrown);
-            $obj = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
+        if (
+            Variable::TYPE_OBJECT !== $thrown->type
+            && Variable::TYPE_VALUE !== $thrown->type
+        ) {
+            self::emitCatchableClassError(
+                $context,
+                'TypeError',
+                \PHPCompiler\VM\ExceptionSupport::THROW_NON_THROWABLE_MESSAGE,
+                $jit
+            );
+
+            return;
         }
 
         $builder = $context->builder;
@@ -407,6 +415,29 @@ final class TryCatchHelper
         } else {
             $builder->positionAtEnd($throwBlock);
         }
+
+        $isThrowable = ReflectionBuiltinHelper::emitInstanceOf($context, $thrown, 'Throwable');
+        $isBool = Variable::TYPE_NATIVE_BOOL === $isThrowable->type
+            ? $isThrowable->value
+            : $context->helper->loadValue($isThrowable);
+        $validThrow = self::appendBlock($func, 'throw_valid_'.self::blockSuffix($handler));
+        $invalidThrow = self::appendBlock($func, 'throw_non_throwable_'.self::blockSuffix($handler));
+        $builder->branchIf($isBool, $validThrow, $invalidThrow);
+        $builder->positionAtEnd($invalidThrow);
+        self::emitCatchableClassError(
+            $context,
+            'TypeError',
+            \PHPCompiler\VM\ExceptionSupport::THROW_NON_THROWABLE_MESSAGE,
+            $jit
+        );
+        $builder->positionAtEnd($validThrow);
+
+        $obj = $context->helper->loadValue($thrown);
+        if (Variable::TYPE_OBJECT !== $thrown->type) {
+            $valuePtr = JitValueBox::valuePtrFromVariable($context, $thrown);
+            $obj = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
+        }
+
         $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
         $builder->branch($dispatchBb);
     }
