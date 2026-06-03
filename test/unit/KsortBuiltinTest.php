@@ -7,6 +7,7 @@ namespace PHPCompiler;
 use PHPCompiler\ext\standard\ksort_;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPUnit\Framework\TestCase;
 
@@ -65,6 +66,27 @@ final class KsortBuiltinTest extends TestCase
             $vals[] = $v->toInt();
         }
         $this->assertSame([1, 2, 3], $vals);
+    }
+
+    public function testTypeErrorOnObject(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile('<?php class Dummy {}', 'dummy.php');
+        self::assertNotNull($block);
+        $runtime->run($block);
+        $class = $runtime->vmContext->classes['dummy'];
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+
+        $fn = new ksort_();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $obj = new VMVariable();
+        $obj->object($entry);
+        $frame->calledArgs = [$obj];
+        $frame->returnVar = new VMVariable();
+        $this->expectException(\TypeError::class);
+        $this->expectExceptionMessage('ksort(): Argument #1 ($array) must be of type array, Dummy given');
+        $fn->execute($frame);
     }
 
     private function runKsort(Internal $fn, Runtime $runtime, HashTable $array): HashTable

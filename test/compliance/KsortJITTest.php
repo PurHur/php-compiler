@@ -20,6 +20,10 @@ final class KsortJITTest extends BaseTest
             __DIR__.'/cases/stdlib/ksort_jit.phpt',
             'ksort_jit.phpt'
         );
+        yield 'ksort_type_error_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/ksort_type_error_jit.phpt',
+            'ksort_type_error_jit.phpt'
+        );
     }
 
     public function setUp(): void

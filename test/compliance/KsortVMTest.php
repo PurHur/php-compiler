@@ -13,7 +13,7 @@ final class KsortVMTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
-        foreach (['ksort.phpt', 'ksort_int.phpt'] as $file) {
+        foreach (['ksort.phpt', 'ksort_int.phpt', 'ksort_type_error_object.phpt'] as $file) {
             yield $file => self::parsePHPT(
                 __DIR__.'/cases/stdlib/'.$file,
                 $file
