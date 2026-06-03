@@ -31,13 +31,21 @@ final class IssetHelper
         Variable $container,
         ?Variable $dim,
         ?Operand $dimOp = null,
-        ?Operand $containerOp = null
+        ?Operand $containerOp = null,
+        bool $issetOnProperty = false
     ): Value {
         if (null === $dim) {
             return self::compileVariableIsSet($context, $container);
         }
 
-        return self::compileOffsetIsSet($context, $container, $dim, $dimOp, $containerOp);
+        return self::compileOffsetIsSet(
+            $context,
+            $container,
+            $dim,
+            $dimOp,
+            $containerOp,
+            $issetOnProperty
+        );
     }
 
     /**
@@ -153,8 +161,22 @@ final class IssetHelper
         Variable $container,
         Variable $dim,
         ?Operand $dimOp,
-        ?Operand $containerOp
+        ?Operand $containerOp,
+        bool $issetOnProperty = false
     ): Value {
+        if ($issetOnProperty) {
+            $isArrayContainer = ($container->type & Variable::IS_NATIVE_ARRAY) !== 0
+                || Variable::TYPE_HASHTABLE === $container->type
+                || (
+                    Variable::TYPE_VALUE === $container->type
+                    && null !== $containerOp
+                    && null !== $containerOp->type
+                    && Type::TYPE_ARRAY === $containerOp->type->type
+                );
+            if ($isArrayContainer) {
+                return $context->getTypeFromString('int1')->constInt(0, false);
+            }
+        }
         if ($container->type === Variable::TYPE_STRING) {
             return self::compileStringOffsetIsSet($context, $container, $dim);
         }

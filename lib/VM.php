@@ -3063,6 +3063,10 @@ restart:
                     if (null !== $op->arg3) {
                         $container = $frame->scope[$op->arg2]->resolveIndirect();
                         if (Variable::TYPE_ARRAY === $container->type) {
+                            if ($op->issetOnProperty) {
+                                $dst->bool(false);
+                                break;
+                            }
                             $dst->bool($container->toArray()->offsetIsSet($frame->scope[$op->arg3]));
                             break;
                         }

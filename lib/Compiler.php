@@ -3903,12 +3903,7 @@ class Compiler {
                     ];
 
                     return [
-                        new OpCode(
-                            OpCode::TYPE_ISSET,
-                            $checkSlot,
-                            $containerSlot,
-                            $dimSlot
-                        ),
+                        $this->makeIssetOpCode($checkSlot, $containerSlot, $dimSlot, true),
                         new OpCode(
                             OpCode::TYPE_BOOLEAN_NOT,
                             $resultSlot,
@@ -4350,12 +4345,7 @@ class Compiler {
                 ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
                 : $this->resolveIssetTarget($expr->vars[0], $block));
 
-        return [new OpCode(
-            OpCode::TYPE_ISSET,
-            $resultSlot,
-            $containerSlot,
-            $dimSlot
-        )];
+        return [$this->makeIssetOpCode($resultSlot, $containerSlot, $dimSlot, null !== $propFetch)];
     }
 
     protected function compileIncludeOp(Op\Expr\Include_ $expr, Block $block): OpCode
@@ -4685,7 +4675,8 @@ class Compiler {
         if ($resultOperand instanceof Operand\Temporary && [] === $resultOperand->usages) {
             $resultOperand->usages[] = $resultOperand;
         }
-        $dimFetch = $this->findCoalesceArrayDimFetch($expr->left, $block);
+        $propFetch = $this->findCoalescePropertyFetch($expr->left, $block);
+        $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($expr->left, $block);
         // ??= on $arr['key']: dim fetch temp is read on the left branch (#3792).
         if (
             null !== $dimFetch
@@ -4697,16 +4688,18 @@ class Compiler {
         $resultSlot = $this->compileOperand($resultOperand, $block, false);
 
         $checkSlot = $this->compileBoolTemporary($block);
-        $issetTarget = null !== $dimFetch
-            ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
-            : $this->resolveCoalesceIssetTarget($expr->left, $block);
+        $issetTarget = null !== $propFetch
+            ? $this->resolveIssetTargetFromPropertyFetch($propFetch, $block)
+            : (null !== $dimFetch
+                ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
+                : $this->resolveCoalesceIssetTarget($expr->left, $block));
         if (null !== $issetTarget) {
             [$containerSlot, $dimSlot] = $issetTarget;
-            $block->addOpCode(new OpCode(
-                OpCode::TYPE_ISSET,
+            $block->addOpCode($this->makeIssetOpCode(
                 $checkSlot,
                 $containerSlot,
-                $dimSlot
+                $dimSlot,
+                null !== $propFetch
             ));
         } else {
             $leftSlot = $this->compileOperand($expr->left, $block, true);
@@ -5527,6 +5520,18 @@ class Compiler {
         ];
     }
 
+    protected function makeIssetOpCode(
+        int $resultSlot,
+        int $containerSlot,
+        ?int $dimSlot,
+        bool $issetOnProperty
+    ): OpCode {
+        $op = new OpCode(OpCode::TYPE_ISSET, $resultSlot, $containerSlot, $dimSlot);
+        $op->issetOnProperty = $issetOnProperty;
+
+        return $op;
+    }
+
     protected function unwrapVariableOperand(Operand $operand): ?Operand\Variable
     {
         while ($operand instanceof Temporary) {
@@ -5585,11 +5590,11 @@ class Compiler {
             if ($i < $last) {
                 $checkSlot = $this->compileBoolTemporary($current);
             }
-            $current->addOpCode(new OpCode(
-                OpCode::TYPE_ISSET,
+            $current->addOpCode($this->makeIssetOpCode(
                 $checkSlot,
                 $containerSlot,
-                $dimSlot
+                $dimSlot,
+                null !== $propFetch
             ));
             if ($i < $last) {
                 $next = new Block($block->orig);
