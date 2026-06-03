@@ -101,6 +101,9 @@ class Object_ extends Type {
     /** @var array<string, PHPLLVM\Value> singleton __object__* globals for object class constants (#3196) */
     private array $classConstObjectGlobals = [];
 
+    /** @var array<string, PHPLLVM\Value> immortal __hashtable__* globals for array class constants (#4900) */
+    private array $classConstHashtableGlobals = [];
+
     /** @var array<int, array<int, array{propertyType: int, type: int, value: int|float|bool|string|null}>> */
     private array $propertyDefaults = [];
 
@@ -2729,10 +2732,20 @@ class Object_ extends Type {
             if (!$table instanceof \PHPCompiler\VM\HashTable) {
                 throw new \LogicException('Class constant array must be a HashTable');
             }
+            $globalName = 'php_compiler_class_const_ht_'.$classId.'_'.$key;
+            $htPtrType = $this->context->getTypeFromString('__hashtable__*');
+            $global = $this->context->module->addGlobal($htPtrType, $globalName);
+            $global->setInitializer($htPtrType->constNull());
+            $this->classConstHashtableGlobals[$globalName] = $global;
+            $this->context->emitInInit(function (Context $ctx) use ($table, $global): void {
+                $htVar = HashTableHelper::variableFromVmHashTable($ctx, $table);
+                $htPtr = $ctx->helper->loadValue($htVar);
+                $ctx->refcount->addref($htPtr);
+                $ctx->builder->store($htPtr, $global);
+            });
             $this->classConstants[$classId][$key] = [
                 'type' => Variable::TYPE_HASHTABLE,
-                'value' => null,
-                'vmTable' => $table,
+                'global' => $globalName,
             ];
 
             return;
@@ -3739,6 +3752,9 @@ class Object_ extends Type {
                     $slot
                 );
             case Variable::TYPE_HASHTABLE:
+                if (isset($entry['global'])) {
+                    return $this->jitClassConstHashtableFromGlobal($entry);
+                }
                 if (!isset($entry['vmTable']) || !$entry['vmTable'] instanceof \PHPCompiler\VM\HashTable) {
                     throw new \LogicException('Missing VM table for class constant array');
                 }
@@ -3749,6 +3765,25 @@ class Object_ extends Type {
             default:
                 throw new \LogicException('Unsupported class constant type for JIT');
         }
+    }
+
+    /**
+     * @param array{type: int, global: string} $entry
+     */
+    private function jitClassConstHashtableFromGlobal(array $entry): Variable
+    {
+        $globalName = $entry['global'];
+        if (!isset($this->classConstHashtableGlobals[$globalName])) {
+            throw new \LogicException("Missing class constant hashtable global: {$globalName}");
+        }
+        $ht = $this->context->builder->load($this->classConstHashtableGlobals[$globalName]);
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $ht
+        );
     }
 
     /**
