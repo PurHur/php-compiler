@@ -117,6 +117,11 @@ bootstrap_ensure_inventory_argv_driver() {
     return 1
   fi
   echo "bootstrap-ensure-inventory-argv-driver: building inventory argv driver ${out} (#3012)" >&2
+  if [[ "${BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED:-}" == "" ]] \
+    && declare -F bootstrap_gen0_prelinked_driver_ready >/dev/null 2>&1 \
+    && bootstrap_gen0_prelinked_driver_ready; then
+    export BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED=1
+  fi
   if ! declare -F bootstrap_gen0_seed_prelinked_m3_sidecars >/dev/null 2>&1; then
     # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
     source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-gen0-install-prelinked-driver.sh"

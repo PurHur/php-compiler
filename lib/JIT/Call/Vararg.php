@@ -37,9 +37,7 @@ class Vararg implements Call {
         $varargs = array_slice($argValues, $this->numRequiredArgs);
         return $context->builder->call(
             $this->function,
-            ...$required,
-            count($varargs),
-            ...$varargs
+            ...array_merge($required, [count($varargs)], $varargs)
         );
     }
 

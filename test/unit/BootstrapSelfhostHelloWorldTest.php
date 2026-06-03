@@ -154,6 +154,9 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1', $source);
         $this->assertStringContainsString('BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED', $source);
         $this->assertStringContainsString('#2930', $source);
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('m3EmitSidecarHostCompileEnv', $jit);
+        $this->assertStringContainsString('PHP_COMPILER_MEMORY_LIMIT', $jit);
     }
 
     /** Issue #2880: M4 full-revision probe script and native argv main for bin/compile.php. */

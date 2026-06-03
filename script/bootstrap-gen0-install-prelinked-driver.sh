@@ -69,7 +69,7 @@ bootstrap_gen0_copy_prelinked_inventory_driver() {
     cp -f "${aot_out}" "${emit_helper}"
     chmod +x "${emit_helper}"
   fi
-  if [[ -n "${inventory_argv}" ]]; then
+  if [[ -n "${inventory_argv}" && "${inventory_argv}" != "${aot_out}" ]]; then
     cp -f "${aot_out}" "${inventory_argv}"
     chmod +x "${inventory_argv}"
   fi
