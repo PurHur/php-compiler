@@ -3415,6 +3415,31 @@ class JIT {
         }
     }
 
+    /**
+     * Environment for nested bin/compile.php sidecar host-compiles (#2930).
+     *
+     * PHP CLI often leaves $_ENV empty while getenv() still sees exports from bootstrap scripts
+     * (e.g. PHP_COMPILER_MEMORY_LIMIT=4096M). Without that, nested compiles default to 2G and OOM
+     * during inventory argv link, which surfaces as exit 139.
+     *
+     * @param array<string, string> $overrides
+     *
+     * @return array<string, string>
+     */
+    private function m3EmitSidecarHostCompileEnv(array $overrides = []): array
+    {
+        $base = getenv();
+        if (!is_array($base)) {
+            $base = is_array($_ENV) ? $_ENV : [];
+        }
+        $memLimit = getenv('PHP_COMPILER_MEMORY_LIMIT');
+        if (is_string($memLimit) && '' !== $memLimit && '-1' !== $memLimit) {
+            $base['PHP_COMPILER_MEMORY_LIMIT'] = $memLimit;
+        }
+
+        return array_merge($base, $overrides);
+    }
+
     /** Host-compile one probe source and register link-time AOT sidecar bytes (#2559, #2618). */
     private function registerM3EmitTuSidecarFromPath(
         string $path,
@@ -3557,10 +3582,15 @@ class JIT {
         $cacheOut = sys_get_temp_dir().'/m3_emit_sidecar_cache_'.$cacheKey;
         $tmpOut = sys_get_temp_dir().'/m3_emit_sidecar_aot_'.getmypid().'_'.substr(md5($sidecarRel), 0, 8);
         @unlink($tmpOut);
-        $compileCmd = 'php '.escapeshellarg($repoRoot.'/bin/compile.php')
+        $compileCmd = 'php';
+        $memLimit = getenv('PHP_COMPILER_MEMORY_LIMIT');
+        if (is_string($memLimit) && '' !== $memLimit && '-1' !== $memLimit) {
+            $compileCmd .= ' -d memory_limit='.escapeshellarg($memLimit);
+        }
+        $compileCmd .= ' '.escapeshellarg($repoRoot.'/bin/compile.php')
             .' -o '.escapeshellarg($tmpOut)
             .' '.escapeshellarg($hostCompilePath);
-        $compileEnv = $_ENV;
+        $compileEnv = $this->m3EmitSidecarHostCompileEnv();
         // Self-host skips cli/vendor includes during link; M3 compile-driver Runtime ctor native (#2600, #2633).
         $compileEnv['PHP_COMPILER_SELFHOST_AOT'] = '1';
         $compileEnv['PHP_COMPILER_M3_COMPILE_DRIVER'] = '1';
