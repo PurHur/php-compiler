@@ -2733,6 +2733,14 @@ class Compiler {
 
     protected function compileClassConstDeclaration(Op\Terminal\Const_ $child, Block $result): void
     {
+        $constName = $this->staticNameFromOperand($child->name);
+        if (null !== $constName && null !== $this->compilingClassLc) {
+            $lc = strtolower($constName);
+            if (isset($this->compileTimeClassConsts[$this->compilingClassLc][$lc])) {
+                $class = $this->compilingClassDisplayName ?? 'class';
+                $this->throwCompileError(sprintf('Cannot redefine class constant %s::%s', $class, $constName));
+            }
+        }
         $valueSlot = $this->tryFoldClassConstValueSlot($child, $result);
         if (null === $valueSlot) {
             $this->compileOps($child->valueBlock->children, $result);
