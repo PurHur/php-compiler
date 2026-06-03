@@ -28,6 +28,8 @@ typedef struct phpc_reflect_attr_node {
     const void *obj;
     const char *attr_name;
     size_t attr_len;
+    const char *owner_class;
+    size_t owner_idx;
     struct phpc_reflect_attr_node *next;
 } phpc_reflect_attr_node;
 
@@ -167,8 +169,41 @@ void phpc_reflect_set_attr_name(const void *obj, const char *name, size_t len)
     n->obj = obj;
     n->attr_name = NULL != copy ? copy : name;
     n->attr_len = len;
+    n->owner_class = NULL;
+    n->owner_idx = 0;
     n->next = phpc_reflect_attr_head;
     phpc_reflect_attr_head = n;
+}
+
+void phpc_reflect_set_attr_owner(const void *obj, const char *class_name, size_t idx)
+{
+    phpc_reflect_attr_node *n = phpc_reflect_attr_head;
+    while (NULL != n) {
+        if (n->obj == obj) {
+            n->owner_class = class_name;
+            n->owner_idx = idx;
+            return;
+        }
+        n = n->next;
+    }
+}
+
+const char *phpc_reflect_get_attr_owner(const void *obj, size_t *out_idx)
+{
+    phpc_reflect_attr_node *n = phpc_reflect_attr_head;
+    while (NULL != n) {
+        if (n->obj == obj) {
+            if (NULL != out_idx) {
+                *out_idx = n->owner_idx;
+            }
+            return n->owner_class;
+        }
+        n = n->next;
+    }
+    if (NULL != out_idx) {
+        *out_idx = 0;
+    }
+    return NULL;
 }
 
 const char *phpc_reflect_get_attr_name(const void *obj, size_t *out_len)

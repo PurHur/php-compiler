@@ -24,6 +24,7 @@ final class ReflectionClassConstruct implements Call
         }
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         ReflectionSetup::emitSetClassFromStringVar($context, $obj, $args[1]);
+        ReflectionSetup::markConstructed($context, $obj);
 
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
