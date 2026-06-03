@@ -751,7 +751,7 @@ final class VmArray
             case Variable::TYPE_ARRAY:
                 return 'array';
             case Variable::TYPE_OBJECT:
-                return 'object';
+                return $value->toObject()->class->name;
             default:
                 return 'mixed';
         }
