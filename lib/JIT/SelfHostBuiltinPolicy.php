@@ -46,6 +46,7 @@ final class SelfHostBuiltinPolicy
         'getmypid' => 'numeric',
         'getmygrgid' => 'numeric',
         'getmyinode' => 'numeric',
+        'getlastmod' => 'numeric',
         'getrusage' => 'numeric',
         'memory_get_peak_usage' => 'numeric',
         'memory_get_usage' => 'numeric',
