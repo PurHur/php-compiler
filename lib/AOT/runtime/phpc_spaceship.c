@@ -49,6 +49,7 @@ typedef struct __hashtable__ {
 #define PHPC_TYPE_HASHTABLE 7
 
 #define PHPC_TYPEINFO_TYPEMASK 0xFFFFFFFC
+#define PHPC_TYPEINFO_TYPE_STRING 4
 #define PHPC_TYPEINFO_TYPE_OBJECT 8
 
 typedef void __object__;
@@ -244,6 +245,84 @@ static int phpc_spaceship_number_string(double num, __string__ *str, int num_on_
     return num_on_left ? -1 : 1;
 }
 
+static int phpc_slot_points_to_string(void *slot)
+{
+    phpc_ref_head *head;
+
+    if (NULL == slot) {
+        return 0;
+    }
+    head = (phpc_ref_head *) slot;
+
+    return (head->typeinfo & PHPC_TYPEINFO_TYPEMASK) == PHPC_TYPEINFO_TYPE_STRING;
+}
+
+static __string__ *phpc_object_case_name_slot(__object__ *obj, int slot_index)
+{
+    size_t header = phpc_object_header_bytes();
+    char *base = (char *) obj;
+    void **slot_ptr = (void **) (base + header + (size_t) slot_index * sizeof(void *));
+
+    if (NULL == *slot_ptr || !phpc_slot_points_to_string(*slot_ptr)) {
+        return NULL;
+    }
+
+    return (__string__ *) *slot_ptr;
+}
+
+/** Zend zend_compare_enum() — returns -1 if operands are not enum-case layout (#4805). */
+static int phpc_try_enum_case_spaceship(__object__ *left, __object__ *right)
+{
+    phpc_object_header *lhdr;
+    phpc_object_header *rhdr;
+    int lprops;
+    int rprops;
+    __string__ *lname;
+    __string__ *rname;
+    const char *ldata;
+    const char *rdata;
+    size_t llen;
+    size_t rlen;
+
+    if (left == right) {
+        return 0;
+    }
+    if (NULL == left || NULL == right) {
+        return -1;
+    }
+
+    lprops = phpc_object_prop_count(left);
+    rprops = phpc_object_prop_count(right);
+    if (lprops != rprops || (lprops != 0 && lprops != 2)) {
+        return -1;
+    }
+
+    lname = phpc_object_case_name_slot(left, 0);
+    rname = phpc_object_case_name_slot(right, 0);
+    if (NULL == lname || NULL == rname) {
+        return -1;
+    }
+
+    lhdr = (phpc_object_header *) left;
+    rhdr = (phpc_object_header *) right;
+    if (lhdr->class_id != rhdr->class_id) {
+        return 1;
+    }
+
+    ldata = phpc_string_data(lname);
+    rdata = phpc_string_data(rname);
+    llen = phpc_string_len(lname);
+    rlen = phpc_string_len(rname);
+    if (llen != rlen) {
+        return 1;
+    }
+    if (0 == strncasecmp(ldata, rdata, llen)) {
+        return 0;
+    }
+
+    return 1;
+}
+
 static int phpc_spaceship_mixed(__value__ *left, __value__ *right)
 {
     int lkind = phpc_value_kind(left);
@@ -362,6 +441,17 @@ static int phpc_spaceship_mixed(__value__ *left, __value__ *right)
         return phpc_double_spaceship(lval, (double) __value__readLong(right));
     }
 
+    if (PHPC_TYPE_OBJECT == lkind && PHPC_TYPE_STRING == rkind) {
+        if (NULL != phpc_object_case_name_slot(__value__readObject(left), 0)) {
+            return 1;
+        }
+    }
+    if (PHPC_TYPE_STRING == lkind && PHPC_TYPE_OBJECT == rkind) {
+        if (NULL != phpc_object_case_name_slot(__value__readObject(right), 0)) {
+            return 1;
+        }
+    }
+
     return phpc_long_spaceship((long long) lkind, (long long) rkind);
 }
 
@@ -419,6 +509,7 @@ long long __value__spaceship(__value__ *left, __value__ *right)
 
 long long __object__compareSpaceship(__object__ *left, __object__ *right)
 {
+    int enum_cmp;
     phpc_object_header *lhdr;
     phpc_object_header *rhdr;
     int prop_count;
@@ -437,6 +528,11 @@ long long __object__compareSpaceship(__object__ *left, __object__ *right)
             left != NULL ? (long long) PHPC_TYPE_OBJECT : (long long) PHPC_TYPE_NULL,
             right != NULL ? (long long) PHPC_TYPE_OBJECT : (long long) PHPC_TYPE_NULL
         );
+    }
+
+    enum_cmp = phpc_try_enum_case_spaceship(left, right);
+    if (enum_cmp >= 0) {
+        return (long long) enum_cmp;
     }
 
     lhdr = (phpc_object_header *) left;

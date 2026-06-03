@@ -1098,8 +1098,8 @@ restart:
         if (Variable::TYPE_OBJECT === $leftType && $leftType === $rightType) {
             if (OpCode::TYPE_SPACESHIP === $opcode->type) {
                 Builtin\SpaceshipRuntime::ensureLinked($this->context);
-                $result = $this->context->builder->call(
-                    $this->context->lookupFunction('__object__compareSpaceship'),
+                $result = Builtin\SpaceshipRuntime::callObjectCompareSpaceship(
+                    $this->context,
                     $leftValue,
                     $rightValue
                 );
@@ -1123,11 +1123,50 @@ restart:
         if (OpCode::TYPE_SPACESHIP === $opcode->type) {
             if (JitValueBox::isValueOperand($left) && JitValueBox::isValueOperand($right)) {
                 Builtin\SpaceshipRuntime::ensureLinked($this->context);
-                $result = $this->context->builder->call(
-                    $this->context->lookupFunction('__value__spaceship'),
-                    JitValueBox::valuePtrFromVariable($this->context, $left),
-                    JitValueBox::valuePtrFromVariable($this->context, $right)
+                $leftPtr = JitValueBox::valuePtrFromVariable($this->context, $left);
+                $rightPtr = JitValueBox::valuePtrFromVariable($this->context, $right);
+                $map = $this->context->structFieldMap['__value__'];
+                $i8 = $this->context->getTypeFromString('int8');
+                $objTag = $i8->constInt(Variable::TYPE_OBJECT, false);
+                $leftKind = $this->context->builder->load(
+                    $this->context->builder->structGep($leftPtr, $map['type'])
                 );
+                $rightKind = $this->context->builder->load(
+                    $this->context->builder->structGep($rightPtr, $map['type'])
+                );
+                $bothObj = $this->context->builder->and(
+                    $this->context->builder->icmp(Builder::INT_EQ, $leftKind, $objTag),
+                    $this->context->builder->icmp(Builder::INT_EQ, $rightKind, $objTag)
+                );
+                $parentFn = BasicBlockHelper::parentFunction($this->context);
+                $objBb = $parentFn->appendBasicBlock('val_spaceship_obj');
+                $genBb = $parentFn->appendBasicBlock('val_spaceship_gen');
+                $doneBb = $parentFn->appendBasicBlock('val_spaceship_done');
+                $i64 = $this->context->getTypeFromString('int64');
+                $resultSlot = BasicBlockHelper::entryAlloca($this->context, $i64);
+                $this->context->builder->branchIf($bothObj, $objBb, $genBb);
+                $this->context->builder->positionAtEnd($objBb);
+                $leftObj = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readObject'),
+                    $leftPtr
+                );
+                $rightObj = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readObject'),
+                    $rightPtr
+                );
+                $objCmp = Builtin\SpaceshipRuntime::callObjectCompareSpaceship(
+                    $this->context,
+                    $leftObj,
+                    $rightObj
+                );
+                $this->context->builder->store($objCmp, $resultSlot);
+                $this->context->builder->branch($doneBb);
+                $this->context->builder->positionAtEnd($genBb);
+                $genCmp = Builtin\SpaceshipRuntime::callValueSpaceship($this->context, $leftPtr, $rightPtr);
+                $this->context->builder->store($genCmp, $resultSlot);
+                $this->context->builder->branch($doneBb);
+                $this->context->builder->positionAtEnd($doneBb);
+                $result = $this->context->builder->load($resultSlot);
                 goto return_long;
             }
             if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_OBJECT === $rightType) {
@@ -1139,8 +1178,8 @@ restart:
                     $this->context->builder->pointerCast($tmp, $this->context->getTypeFromString('__value__*')),
                     $rightValue
                 );
-                $result = $this->context->builder->call(
-                    $this->context->lookupFunction('__value__spaceship'),
+                $result = Builtin\SpaceshipRuntime::callValueSpaceship(
+                    $this->context,
                     $boxed,
                     $this->context->builder->pointerCast($tmp, $this->context->getTypeFromString('__value__*'))
                 );
@@ -1155,11 +1194,89 @@ restart:
                     $this->context->builder->pointerCast($tmp, $this->context->getTypeFromString('__value__*')),
                     $leftValue
                 );
-                $result = $this->context->builder->call(
-                    $this->context->lookupFunction('__value__spaceship'),
+                $result = Builtin\SpaceshipRuntime::callValueSpaceship(
+                    $this->context,
                     $this->context->builder->pointerCast($tmp, $this->context->getTypeFromString('__value__*')),
                     $boxed
                 );
+                goto return_long;
+            }
+            if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_STRING === $rightType) {
+                Builtin\SpaceshipRuntime::ensureLinked($this->context);
+                $boxedPtr = JitValueBox::valuePtrFromVariable($this->context, $left);
+                $map = $this->context->structFieldMap['__value__'];
+                $i8 = $this->context->getTypeFromString('int8');
+                $objTag = $i8->constInt(Variable::TYPE_OBJECT, false);
+                $kind = $this->context->builder->load(
+                    $this->context->builder->structGep($boxedPtr, $map['type'])
+                );
+                $isObj = $this->context->builder->icmp(Builder::INT_EQ, $kind, $objTag);
+                $i64 = $this->context->getTypeFromString('int64');
+                $one = $i64->constInt(1, true);
+                $parentFn = BasicBlockHelper::parentFunction($this->context);
+                $oneBb = $parentFn->appendBasicBlock('val_spaceship_enum_str_one');
+                $genBb = $parentFn->appendBasicBlock('val_spaceship_enum_str_gen');
+                $doneBb = $parentFn->appendBasicBlock('val_spaceship_enum_str_done');
+                $resultSlot = BasicBlockHelper::entryAlloca($this->context, $i64);
+                $this->context->builder->branchIf($isObj, $oneBb, $genBb);
+                $this->context->builder->positionAtEnd($oneBb);
+                $this->context->builder->store($one, $resultSlot);
+                $this->context->builder->branch($doneBb);
+                $this->context->builder->positionAtEnd($genBb);
+                $tmp = JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeString'),
+                    JitValueBox::pointer($this->context, $tmp),
+                    $rightValue
+                );
+                $genCmp = Builtin\SpaceshipRuntime::callValueSpaceship(
+                    $this->context,
+                    $boxedPtr,
+                    JitValueBox::pointer($this->context, $tmp)
+                );
+                $this->context->builder->store($genCmp, $resultSlot);
+                $this->context->builder->branch($doneBb);
+                $this->context->builder->positionAtEnd($doneBb);
+                $result = $this->context->builder->load($resultSlot);
+                goto return_long;
+            }
+            if (Variable::TYPE_STRING === $leftType && Variable::TYPE_VALUE === $rightType) {
+                Builtin\SpaceshipRuntime::ensureLinked($this->context);
+                $boxedPtr = JitValueBox::valuePtrFromVariable($this->context, $right);
+                $map = $this->context->structFieldMap['__value__'];
+                $i8 = $this->context->getTypeFromString('int8');
+                $objTag = $i8->constInt(Variable::TYPE_OBJECT, false);
+                $kind = $this->context->builder->load(
+                    $this->context->builder->structGep($boxedPtr, $map['type'])
+                );
+                $isObj = $this->context->builder->icmp(Builder::INT_EQ, $kind, $objTag);
+                $i64 = $this->context->getTypeFromString('int64');
+                $one = $i64->constInt(1, true);
+                $parentFn = BasicBlockHelper::parentFunction($this->context);
+                $oneBb = $parentFn->appendBasicBlock('val_spaceship_str_enum_one');
+                $genBb = $parentFn->appendBasicBlock('val_spaceship_str_enum_gen');
+                $doneBb = $parentFn->appendBasicBlock('val_spaceship_str_enum_done');
+                $resultSlot = BasicBlockHelper::entryAlloca($this->context, $i64);
+                $this->context->builder->branchIf($isObj, $oneBb, $genBb);
+                $this->context->builder->positionAtEnd($oneBb);
+                $this->context->builder->store($one, $resultSlot);
+                $this->context->builder->branch($doneBb);
+                $this->context->builder->positionAtEnd($genBb);
+                $tmp = JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeString'),
+                    JitValueBox::pointer($this->context, $tmp),
+                    $leftValue
+                );
+                $genCmp = Builtin\SpaceshipRuntime::callValueSpaceship(
+                    $this->context,
+                    JitValueBox::pointer($this->context, $tmp),
+                    $boxedPtr
+                );
+                $this->context->builder->store($genCmp, $resultSlot);
+                $this->context->builder->branch($doneBb);
+                $this->context->builder->positionAtEnd($doneBb);
+                $result = $this->context->builder->load($resultSlot);
                 goto return_long;
             }
         }
