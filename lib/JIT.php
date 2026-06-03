@@ -5686,11 +5686,9 @@ class JIT {
                             );
                             break;
                         case Variable::TYPE_NATIVE_LONG:
-                            $argValue = $this->context->helper->loadValue($arg);
-                            $i64 = $this->context->getTypeFromString('int64');
-                            $this->context->builder->call(
-                                $this->context->lookupFunction('__phpc_ob_echo_ll'),
-                                $this->context->builder->zExt($argValue, $i64)
+                            JIT\ValueEchoHelper::echoNativeLong(
+                                $this->context,
+                                $this->context->helper->loadValue($arg)
                             );
                             break;
                         case Variable::TYPE_NATIVE_DOUBLE:
@@ -5723,28 +5721,11 @@ class JIT {
                             break;
                         case Variable::TYPE_OBJECT:
                             $classHint = $block->getOperand($argOffset)->type?->userType ?? null;
-                            $asString = JIT\MagicMethodDispatch::coerceObjectToString(
+                            JIT\ValueEchoHelper::echoObjectVariable(
                                 $this->context,
                                 $arg,
                                 $classHint
                             );
-                            if (null !== $asString) {
-                                $argValue = $this->context->helper->loadValue($asString);
-                                $offset = $this->context->structFieldIndex($argValue, 'length');
-                                $__str__length = $this->context->builder->load(
-                                    $this->context->builder->structGep($argValue, $offset)
-                                );
-                                $offset = $this->context->structFieldIndex($argValue, 'value');
-                                $__str__value = $this->context->builder->structGep($argValue, $offset);
-                                $sizeT = $this->context->getTypeFromString('size_t');
-                                $this->context->builder->call(
-                                    $this->context->lookupFunction('__phpc_ob_echo_substr'),
-                                    $__str__value,
-                                    $this->context->builder->zExt($__str__length, $sizeT)
-                                );
-                                break;
-                            }
-                            JIT\ValueEchoHelper::echoLiteral($this->context, 'Object');
                             break;
 
                         default:

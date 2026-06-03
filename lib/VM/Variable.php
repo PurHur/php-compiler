@@ -473,6 +473,10 @@ final class Variable {
             case self::TYPE_STRING:
                 return $var->string;
             case self::TYPE_INTEGER:
+                if ($var->isVmResource()) {
+                    return 'Resource id #'.$var->integer;
+                }
+
                 return (string) $var->integer;
             case self::TYPE_FLOAT:
                 return (string) $var->float;
