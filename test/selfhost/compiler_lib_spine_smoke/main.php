@@ -982,6 +982,7 @@ require_once __DIR__.'/../../../ext/standard/gethostbynamel.php';
 require_once __DIR__.'/../../../ext/standard/gethostname.php';
 require_once __DIR__.'/../../../ext/standard/getmygrgid.php';
 require_once __DIR__.'/../../../ext/standard/getmyinode.php';
+require_once __DIR__.'/../../../ext/standard/getlastmod.php';
 require_once __DIR__.'/../../../ext/standard/getprotobyname.php';
 require_once __DIR__.'/../../../ext/standard/getprotobynumber.php';
 require_once __DIR__.'/../../../ext/standard/getrusage.php';

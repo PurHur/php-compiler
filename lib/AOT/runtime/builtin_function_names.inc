@@ -192,6 +192,7 @@ static const char *phpc_builtin_functions[] = {
     "gethostbynamel",
     "gethostname",
     "getmygrgid",
+    "getlastmod",
     "getmyinode",
     "getmypid",
     "getprotobyname",

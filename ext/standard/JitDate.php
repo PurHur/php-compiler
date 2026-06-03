@@ -79,6 +79,33 @@ final class JitDate
         return JitStat::pathFileInodeBoxed($context, $pathStr);
     }
 
+    public static function getlastmod(Context $context): Value
+    {
+        $block = $context->jitEnclosingBlock;
+        if (!$block instanceof Block) {
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            $i1 = $context->getTypeFromString('int1');
+            JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+
+            return $ptr;
+        }
+
+        $path = ScriptMagic::stringForBlock($block, OpCode::SCRIPT_MAGIC_FILE);
+        if ('' === $path) {
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            $i1 = $context->getTypeFromString('int1');
+            JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+
+            return $ptr;
+        }
+
+        $pathStr = $context->builder->load($context->constantStringFromString($path));
+
+        return JitStat::pathFileMtimeBoxed($context, $pathStr);
+    }
+
     public static function microtime(Context $context, Value $asFloat): Value
     {
         StringMicrotime::ensureLinked($context);

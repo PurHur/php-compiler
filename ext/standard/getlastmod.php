@@ -1,0 +1,46 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Value;
+
+/** getlastmod() — mtime of the executed script (ext/standard/basic_functions.c, #5068). */
+final class getlastmod extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('getlastmod');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (0 !== \count($frame->calledArgs)) {
+            throw new \LogicException('getlastmod() takes no arguments');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $mtime = VmDate::getlastmod($frame);
+        if (false === $mtime) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->int($mtime);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        if (0 !== \count($args)) {
+            throw new \LogicException('getlastmod() takes no arguments');
+        }
+
+        return JitDate::getlastmod($context);
+    }
+}
