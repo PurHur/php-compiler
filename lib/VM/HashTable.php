@@ -193,6 +193,8 @@ final class HashTable {
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
                 return null !== $this->findIndex($index->toInt());
+            case Variable::TYPE_FLOAT:
+                return null !== $this->findIndex($index->toInt());
             case Variable::TYPE_STRING:
                 return null !== $this->findByStringKey($index->toString());
             default:
@@ -206,6 +208,9 @@ final class HashTable {
         }
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
+                $result = $this->findIndex($index->toInt());
+                break;
+            case Variable::TYPE_FLOAT:
                 $result = $this->findIndex($index->toInt());
                 break;
             case Variable::TYPE_STRING:
@@ -1313,6 +1318,9 @@ final class HashTable {
             case Variable::TYPE_INTEGER:
                 $stored = $this->findIndex($index->toInt());
                 break;
+            case Variable::TYPE_FLOAT:
+                $stored = $this->findIndex($index->toInt());
+                break;
             case Variable::TYPE_STRING:
                 $stored = $this->findByStringKey($index->toString());
                 break;
@@ -1335,8 +1343,14 @@ final class HashTable {
         }
         $this->refcount->assertSeparated();
         $bucket = null;
+        if (Variable::TYPE_INDIRECT === $index->type) {
+            $index = $index->resolveIndirect();
+        }
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
+                $bucket = $this->findBucket($index->toInt(), null);
+                break;
+            case Variable::TYPE_FLOAT:
                 $bucket = $this->findBucket($index->toInt(), null);
                 break;
             case Variable::TYPE_STRING:
