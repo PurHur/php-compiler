@@ -72,20 +72,36 @@ final class JitGetClassVars
     {
         $object = $context->type->object;
         $classId = $object->lookup($className);
-        $defaults = $object->propertyDefaultEntries($classId);
         $ht = HashTableHelper::alloc($context);
-        foreach ($object->instancePropertySets($classId) as $propset) {
-            $propName = $propset[1];
-            if (!MethodVisibility::isPublic($object->propertyVisibility($classId, $propName))) {
-                continue;
+        /** @var array<string, true> $seen */
+        $seen = [];
+        $currentId = $classId;
+        for ($depth = 0; $depth < 64; ++$depth) {
+            $defaults = $object->propertyDefaultEntries($currentId);
+            foreach ($object->instancePropertySets($currentId) as $propset) {
+                $propName = $propset[1];
+                if (isset($seen[$propName])) {
+                    continue;
+                }
+                if (!MethodVisibility::isPublic($object->propertyVisibility($currentId, $propName))) {
+                    continue;
+                }
+                $slotIndex = $propset[3];
+                $keyStr = $context->builder->load($context->constantStringFromString($propName));
+                if (!isset($defaults[$slotIndex])) {
+                    $seen[$propName] = true;
+
+                    continue;
+                }
+                $entry = $defaults[$slotIndex];
+                self::storeCompileTimeDefault($context, $ht, $keyStr, $entry);
+                $seen[$propName] = true;
             }
-            $slotIndex = $propset[3];
-            $keyStr = $context->builder->load($context->constantStringFromString($propName));
-            if (!isset($defaults[$slotIndex])) {
-                continue;
+            $parentName = $object->parentClassDisplayName($object->classNameForId($currentId));
+            if (null === $parentName) {
+                break;
             }
-            $entry = $defaults[$slotIndex];
-            self::storeCompileTimeDefault($context, $ht, $keyStr, $entry);
+            $currentId = $object->lookup($parentName);
         }
 
         return $ht;

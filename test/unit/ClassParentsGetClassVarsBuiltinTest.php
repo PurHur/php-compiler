@@ -13,19 +13,19 @@ final class ClassParentsGetClassVarsBuiltinTest extends TestCase
     {
         $code = <<<'PHP'
 <?php
-class Base3159 {}
+class Base3159 { public $inherited = 9; }
 class Child3159 extends Base3159 { public $a = 1; private $b = 2; }
 $p = class_parents(Child3159::class);
 echo count($p), "\n", $p['Base3159'], "\n";
 $v = get_class_vars(Child3159::class);
-echo count($v), "\n", $v['a'], "\n";
+echo count($v), "\n", $v['a'], "\n", $v['inherited'], "\n";
 echo isset($v['b']) ? 'has-b' : 'no-b';
 PHP;
         $rt = new Runtime();
         $block = $rt->parseAndCompile($code, 'class_parents_get_class_vars.php');
         ob_start();
         $rt->run($block);
-        $this->assertSame("1\nBase3159\n1\n1\nno-b", ob_get_clean());
+        $this->assertSame("1\nBase3159\n2\n1\n9\nno-b", ob_get_clean());
     }
 
     public function testVmClassParentsAutoloadFlag(): void
