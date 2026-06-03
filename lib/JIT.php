@@ -6549,6 +6549,12 @@ class JIT {
                         }
                         throw new \LogicException("Cannot redefine constant {$nameOp->value}");
                     }
+                    if (VM\Variable::TYPE_ARRAY === $constValue->type) {
+                        $this->context->constantArrayFromVmHashTable(
+                            $nameOp->value,
+                            $constValue->toArray()
+                        );
+                    }
                     break;
                 case OpCode::TYPE_DECLARE_INTERFACE:
                     $nameOp = $block->getOperand($op->arg1);

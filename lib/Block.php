@@ -1703,6 +1703,39 @@ class Block {
         return false;
     }
 
+    /**
+     * Global {@code const NAME = [...]} literals: MCJIT execute unstable until #4904.
+     */
+    public static function containsGlobalConstArrayLiteralOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_GLOBAL_CONST === $op->type
+                    && isset($block->constants[$op->arg2])
+                    && Variable::TYPE_ARRAY === $block->constants[$op->arg2]->type) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     public static function requiresVmLowering(?self $root): bool
     {
         return self::containsGeneratorOpcodesInScriptScope($root)
@@ -1715,6 +1748,7 @@ class Block {
             || self::containsDynamicPropertyDeprecationOpcodes($root)
             || self::containsFiberSuspendOpcodes($root)
             || self::containsTraitConstructorOpcodes($root)
-            || self::containsLazyObjectOpcodes($root);
+            || self::containsLazyObjectOpcodes($root)
+            || self::containsGlobalConstArrayLiteralOpcodes($root);
     }
 }

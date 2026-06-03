@@ -76,6 +76,9 @@ class Analyzer
                 || $usage instanceof Op\Expr\YieldFrom
                 || $usage instanceof Op\Terminal\StaticVar) {
                 continue;
+            } elseif ($usage instanceof Op\Terminal\Const_) {
+                // Global const array literals stay on __hashtable__ / module globals (#4904).
+                return true;
             } else {
                 throw new \LogicException('Not implemented escape operand '.get_class($usage));
             }
@@ -138,7 +141,8 @@ class Analyzer
                 || $usage instanceof Op\Terminal\Return_
                 || $usage instanceof Op\Expr\Yield_
                 || $usage instanceof Op\Expr\YieldFrom
-                || $usage instanceof Op\Terminal\StaticVar) {
+                || $usage instanceof Op\Terminal\StaticVar
+                || $usage instanceof Op\Terminal\Const_) {
                 // not a dynamic packed-array append
             } else {
                 throw new \LogicException('Not implemented dynamic append operand '.get_class($usage));
@@ -193,7 +197,9 @@ class Analyzer
                 || $op instanceof Op\Expr\MethodCall
                 || $op instanceof Op\Expr\PropertyFetch
                 || $op instanceof Op\Expr\Param
-                || $op instanceof FirstClassCallable) {
+                || $op instanceof Op\Expr\ConstFetch
+                || $op instanceof FirstClassCallable
+                || $op instanceof Op\Terminal\Const_) {
                 return null;
             } else {
                 throw new \LogicException('Unknown array write op: '.get_class($op));
