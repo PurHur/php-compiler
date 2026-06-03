@@ -1894,6 +1894,35 @@ restart:
                     goto restart;
                 }
                 break;
+            case OpCode::TYPE_BITWISE_NOT:
+                if ($expr->type === self::TYPE_INTEGER) {
+                    $this->int(~$expr->integer);
+
+                    return;
+                }
+                if ($expr->type === self::TYPE_FLOAT) {
+                    $this->int(~(int) $expr->float);
+
+                    return;
+                }
+                if ($expr->type === self::TYPE_STRING) {
+                    $bytes = $expr->string;
+                    $out = '';
+                    for ($i = 0, $len = strlen($bytes); $i < $len; $i++) {
+                        $out .= chr((~ord($bytes[$i])) & 0xFF);
+                    }
+                    $this->string($out);
+
+                    return;
+                }
+                if ($expr->type === self::TYPE_BOOLEAN || $expr->type === self::TYPE_NULL) {
+                    throw new \TypeError(sprintf(
+                        'Cannot perform bitwise not on %s',
+                        self::TYPE_BOOLEAN === $expr->type ? 'bool' : 'null'
+                    ));
+                }
+                $this->castFrom(self::CAST_NUMERIC, $expr);
+                goto restart;
         }
         throw new \LogicException("UnaryOp $opCode not implemented for type $expr->type");
     }

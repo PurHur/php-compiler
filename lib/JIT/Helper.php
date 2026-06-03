@@ -124,56 +124,16 @@ class Helper {
                         goto return_double;
                 }
                 break;
-        }
-        if (Variable::TYPE_NULL === $leftType && JitValueBox::isValueOperand($right)) {
-            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
-                $result = JitValueCompare::valueBoxIsNull($this->context, $right);
-                goto return_bool;
-            }
-            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                $isNull = JitValueCompare::valueBoxIsNull($this->context, $right);
-                $result = $this->context->builder->xor(
-                    $isNull,
-                    $this->context->getTypeFromString('int1')->constInt(1, false)
-                );
-                goto return_bool;
-            }
-        }
-        if (JitValueBox::isValueOperand($left) && Variable::TYPE_NULL === $rightType) {
-            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
-                $result = JitValueCompare::valueBoxIsNull($this->context, $left);
-                goto return_bool;
-            }
-            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                $isNull = JitValueCompare::valueBoxIsNull($this->context, $left);
-                $result = $this->context->builder->xor(
-                    $isNull,
-                    $this->context->getTypeFromString('int1')->constInt(1, false)
-                );
-                goto return_bool;
-            }
-        }
-        if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
-            if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_OBJECT === $rightType) {
-                $result = JitValueCompare::identicalValueBoxToObject($this->context, $left, $right);
-                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
-                    $result = $this->context->builder->xor(
-                        $result,
-                        $this->context->getTypeFromString('int1')->constInt(1, false)
+            case Variable::TYPE_STRING:
+                if (OpCode::TYPE_BITWISE_NOT === $opcode->type) {
+                    $result = $this->context->builder->call(
+                        $this->context->lookupFunction('__string__bitwiseNot'),
+                        $varValue
                     );
+
+                    goto return_string;
                 }
-                goto return_bool;
-            }
-            if (Variable::TYPE_OBJECT === $leftType && Variable::TYPE_VALUE === $rightType) {
-                $result = JitValueCompare::identicalValueBoxToObject($this->context, $right, $left);
-                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
-                    $result = $this->context->builder->xor(
-                        $result,
-                        $this->context->getTypeFromString('int1')->constInt(1, false)
-                    );
-                }
-                goto return_bool;
-            }
+                break;
         }
         $type = opcode_type_name($opcode->type);
         throw new \LogicException("Reached end of switch, can't handle unary operation yet: $type for type {$var->type}");
@@ -183,6 +143,8 @@ return_long:
         return new Variable($this->context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $result);
 return_bool:
         return new Variable($this->context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $result);
+return_string:
+        return new Variable($this->context, Variable::TYPE_STRING, Variable::KIND_VALUE, $result);
     }
 
     public function binaryOp(OpCode $opcode, Variable $left, Variable $right): Variable {
