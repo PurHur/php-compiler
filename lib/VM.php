@@ -1942,6 +1942,11 @@ restart:
                     }
                     if (Variable::TYPE_OBJECT === $classOperand->type) {
                         $classEntry = $classOperand->toObject()->class;
+                        $traitConstFrame = $this->enforceDirectTraitConstAccess($classEntry, $memberNameRaw, $frame);
+                        if (null !== $traitConstFrame) {
+                            $frame = $traitConstFrame;
+                            goto restart;
+                        }
                         $constLc = strtolower($memberNameRaw);
                         if (isset($classEntry->constants[$constLc])) {
                             $visFrame = $this->enforceClassConstVisibility($classEntry, $memberNameRaw, $frame);
@@ -1987,6 +1992,11 @@ restart:
                         return $this->raise("Unknown class for constant fetch: {$className}", $frame);
                     }
                     $classEntry = $this->context->classes[$lcClass];
+                    $traitConstFrame = $this->enforceDirectTraitConstAccess($classEntry, $memberNameRaw, $frame);
+                    if (null !== $traitConstFrame) {
+                        $frame = $traitConstFrame;
+                        goto restart;
+                    }
                     $constLc = strtolower($memberNameRaw);
                     if (isset($classEntry->constants[$constLc])) {
                         $visFrame = $this->enforceClassConstVisibility($classEntry, $memberNameRaw, $frame);
@@ -4834,6 +4844,18 @@ restart:
         }
 
         return null;
+    }
+
+    private function enforceDirectTraitConstAccess(ClassEntry $classEntry, string $constName, Frame $frame): ?Frame
+    {
+        if (!$classEntry->isTrait || 'class' === strtolower($constName)) {
+            return null;
+        }
+
+        return $this->dispatchVmError(
+            "Cannot access trait constant {$classEntry->name}::{$constName} directly",
+            $frame
+        );
     }
 
     private function enforceClassConstVisibility(ClassEntry $classEntry, string $constName, Frame $frame): ?Frame

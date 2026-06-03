@@ -3271,6 +3271,9 @@ class Compiler {
         if (null === $lcClass) {
             return null;
         }
+        if ($this->classCompileRegistry->isTrait($lcClass)) {
+            return null;
+        }
         $lcConst = strtolower($constName);
         if (isset($this->compileTimeClassConsts[$lcClass][$lcConst])) {
             $value = new Variable();

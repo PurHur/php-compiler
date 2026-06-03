@@ -3018,6 +3018,7 @@ class Object_ extends Type {
 
     public function classConstFetch(int $classId, string $constName): Variable
     {
+        $this->emitDirectTraitConstAccessErrorIfNeeded($classId, $constName);
         $key = strtolower($constName);
         if (!isset($this->classConstants[$classId][$key])) {
             throw new \LogicException("Undefined class constant: {$constName}");
@@ -3029,6 +3030,22 @@ class Object_ extends Type {
     public function classConstFetchDynamic(int $classId, Variable $nameVar, Operand $classOp): Variable
     {
         return ClassConstFetchHelper::fetchDynamic($this, $classId, $nameVar, $classOp);
+    }
+
+    public function emitDirectTraitConstAccessErrorIfNeeded(int $classId, string $constName): void
+    {
+        if ('class' === strtolower($constName)) {
+            return;
+        }
+        $classLabel = $this->classNameForId($classId);
+        if (!$this->isTraitClass(strtolower(ltrim($classLabel, '\\'))) {
+            return;
+        }
+        ErrorRaise::ensureLinked($this->context);
+        ErrorRaise::emitRaise(
+            $this->context,
+            "Cannot access trait constant {$classLabel}::{$constName} directly"
+        );
     }
 
     public function jitContext(): Context

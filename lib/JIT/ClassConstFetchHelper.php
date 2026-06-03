@@ -117,8 +117,18 @@ final class ClassConstFetchHelper
             $isId = $context->builder->icmp(Builder::INT_EQ, $classIdVal, $expectedId);
             $context->builder->branchIf($isId, $matchBlock, $nextCheck);
             $context->builder->positionAtEnd($matchBlock);
-            self::writeConstEntry($context, $resultSlot, $entryData);
-            $context->builder->branch($merge);
+            if ($objectType->isTraitClass(strtolower(ltrim($objectType->classNameForId($id), '\\'))) {
+                $classLabel = $objectType->classNameForId($id);
+                ErrorRaise::ensureLinked($context);
+                ErrorRaise::emitRaise(
+                    $context,
+                    "Cannot access trait constant {$classLabel}::{$constName} directly"
+                );
+                $context->builder->branch($merge);
+            } else {
+                self::writeConstEntry($context, $resultSlot, $entryData);
+                $context->builder->branch($merge);
+            }
             $checkBlock = $nextCheck;
         }
         $context->builder->positionAtEnd($checkBlock);
@@ -296,8 +306,18 @@ final class ClassConstFetchHelper
                 $context->builder->branchIf($isMatch, $matchBlock, $nextCheck);
 
                 $context->builder->positionAtEnd($matchBlock);
-                self::writeConstEntry($context, $resultSlot, $entry);
-                $context->builder->branch($merge);
+                if ($objectType->isTraitClass(strtolower(ltrim($objectType->classNameForId($id), '\\'))) {
+                    $classLabel = $objectType->classNameForId($id);
+                    ErrorRaise::ensureLinked($context);
+                    ErrorRaise::emitRaise(
+                        $context,
+                        "Cannot access trait constant {$classLabel}::* directly"
+                    );
+                    $context->builder->branch($merge);
+                } else {
+                    self::writeConstEntry($context, $resultSlot, $entry);
+                    $context->builder->branch($merge);
+                }
                 $checkBlock = $nextCheck;
             }
         }
