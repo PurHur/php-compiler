@@ -14,7 +14,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -33,11 +35,12 @@ final class array_combine extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('array_combine() requires exactly two arguments');
         }
-        $keysArg = $frame->calledArgs[0]->resolveIndirect();
-        $valuesArg = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $keysArg->type || Variable::TYPE_ARRAY !== $valuesArg->type) {
-            throw new \LogicException('array_combine() requires two arrays in this compiler build');
-        }
+        $keysArg = $frame->calledArgs[0];
+        $valuesArg = $frame->calledArgs[1];
+        VmArray::requireArrayParam($keysArg, 'array_combine', 1, 'keys');
+        VmArray::requireArrayParam($valuesArg, 'array_combine', 2, 'values');
+        $keysArg = $keysArg->resolveIndirect();
+        $valuesArg = $valuesArg->resolveIndirect();
         $keys = [];
         foreach ($keysArg->toArray()->iterateKeyed(true) as [, $key]) {
             $keys[] = $key;
@@ -84,21 +87,52 @@ final class array_combine extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('array_combine() requires exactly two arguments');
         }
-        if (JITVariable::TYPE_HASHTABLE !== $args[0]->type
-            && !($args[0]->type & JITVariable::IS_NATIVE_ARRAY)) {
-            throw new \LogicException('array_combine() requires two arrays in this compiler build');
-        }
-        if (JITVariable::TYPE_HASHTABLE !== $args[1]->type
-            && !($args[1]->type & JITVariable::IS_NATIVE_ARRAY)) {
-            throw new \LogicException('array_combine() requires two arrays in this compiler build');
-        }
+        TypeErrorRaise::ensureLinked($context);
 
-        foreach ($args as $i => $arg) {
-            if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
-                $this->jitString($context, $arg, 'array_combine() argument #'.((int) $i + 1));
+        foreach ([0 => 'keys', 1 => 'values'] as $i => $paramName) {
+            $arg = $args[$i];
+            if (JITVariable::TYPE_HASHTABLE === $arg->type
+                || ($arg->type & JITVariable::IS_NATIVE_ARRAY)
+            ) {
+                continue;
             }
+            if (JITVariable::TYPE_VALUE === $arg->type) {
+                JitArrayElem::requireArrayParam($context, $arg, 'array_combine', $i + 1, $paramName);
+                continue;
+            }
+            TypeErrorRaise::registerDeclarations($context);
+            TypeErrorRaise::emitRaise(
+                $context,
+                \sprintf(
+                    'array_combine(): Argument #%d ($%s) must be of type array, %s given',
+                    $i + 1,
+                    $paramName,
+                    self::jitArgTypeLabel($arg)
+                )
+            );
+            $context->builder->call($context->lookupFunction('abort'));
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
 
         return ArrayBuiltinHelper::combine($context, $args[0], $args[1]);
+    }
+
+    private static function jitArgTypeLabel(JITVariable $arg): string
+    {
+        switch ($arg->type) {
+            case JITVariable::TYPE_NATIVE_LONG:
+                return 'int';
+            case JITVariable::TYPE_NATIVE_DOUBLE:
+                return 'float';
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return 'bool';
+            case JITVariable::TYPE_STRING:
+                return 'string';
+            case JITVariable::TYPE_OBJECT:
+                return 'object';
+            default:
+                return 'mixed';
+        }
     }
 }
