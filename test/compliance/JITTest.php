@@ -342,12 +342,12 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'magic_const_method_function')) {
                 continue;
             }
-            // object == structural compare is VM-only until JIT Object_ lowering (#3602).
-            if (str_contains($name, 'object_loose_equals')) {
-                continue;
-            }
             // Return-by-reference MCJIT execute: LLVM verify in ReturnByRefJitCompileTest (#3778).
             if (str_contains($name, 'return_by_ref_jit')) {
+                continue;
+            }
+            // object ==: compile verify in ObjectLooseEqualsJitCompileTest (#4766); MCJIT execute segfault (boxed operands).
+            if (str_contains($name, 'object_loose_equals')) {
                 continue;
             }
             // ??= MCJIT execute: compile in CoalesceAssignJitCompileTest (#3792); execute in CoalesceAssignJitExecuteTest (#4763).
