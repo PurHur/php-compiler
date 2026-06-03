@@ -224,7 +224,7 @@ final class ErrorReporter
         ?Frame $frame = null,
         ?string $file = null
     ): void {
-        $key = $this->formatArrayKey($index);
+        $key = $this->formatArrayKey(HashTable::normalizeIndexKey($index));
         $message = "Undefined array key {$key}";
         $this->emitWarning($message, $context, $frame, $file);
     }
