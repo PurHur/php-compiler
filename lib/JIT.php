@@ -6088,6 +6088,10 @@ class JIT {
                     JIT\TryCatchHelper::emitThrow($this, $this->context, $func, $block, $op);
 
                     return $origBasicBlock;
+                case OpCode::TYPE_RETHROW:
+                    JIT\TryCatchHelper::emitRethrow($this, $this->context, $func, $block);
+
+                    return $origBasicBlock;
                 case OpCode::TYPE_RETURN_VOID:
                     $returnBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($returnBlock);

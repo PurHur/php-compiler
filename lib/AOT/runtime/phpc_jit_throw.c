@@ -9,6 +9,7 @@ typedef struct __object__ __object__;
 
 static __object__ *phpc_jit_throw_pending_obj;
 static int phpc_jit_throw_pending_set;
+static __object__ *phpc_jit_active_catch_obj;
 
 void phpc_jit_clear_throw_pending(void)
 {
@@ -34,4 +35,19 @@ __object__ *phpc_jit_take_throw_pending(void)
     phpc_jit_throw_pending_obj = 0;
 
     return obj;
+}
+
+void phpc_jit_clear_active_catch(void)
+{
+    phpc_jit_active_catch_obj = 0;
+}
+
+void phpc_jit_set_active_catch(__object__ *obj)
+{
+    phpc_jit_active_catch_obj = obj;
+}
+
+__object__ *phpc_jit_get_active_catch(void)
+{
+    return phpc_jit_active_catch_obj;
 }
