@@ -49,7 +49,7 @@ function syntaxRowDefinitions(): array
             'issue' => 1356,
             'aot' => true,
             'notes' => [
-                'Backed enum case objects with `->name` / `->value`; echo coerces to backed scalar (#3518); double-quoted `"$case"` throws Error (#4785)',
+                'Backed enum case objects with `->name` / `->value`; `echo $case` throws Error (#4891); double-quoted `"$case"` throws Error (#4785)',
                 '`Foo::Bar` singleton fetch; `enum_exists` registry; `implements` interface list + instance methods + `instanceof` (#3373)',
                 'static methods (#2299); `Enum::cases()` JIT (#3308, #4068); AOT fixture enum_backed.phpt (#3076)',
                 '`BackedEnum::from()` / `tryFrom()` VM lookup with Zend-parity ValueError (#3114); JIT deferred',

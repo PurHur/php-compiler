@@ -425,7 +425,7 @@ class VM {
         }
         $object = $var->toObject();
         if (EnumCaseSupport::isEnumCase($object)) {
-            return EnumCaseSupport::toString($object);
+            throw new \Error("Object of class {$object->class->name} could not be converted to string");
         }
         if (!$this->hasInstanceMethod($object->class, '__tostring')) {
             throw new \Error("Object of class {$object->class->name} could not be converted to string");
