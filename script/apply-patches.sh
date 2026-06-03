@@ -1514,6 +1514,28 @@ PY
   echo "Applied php-types-throw-expr.patch (overlay)"
 }
 
+apply_php_types_hex2bin_strict_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php"
+  if grep -q "'hex2bin' => \['string', 'data' => 'string', 'strict=' => 'bool'\]" "$target" 2>/dev/null; then
+    echo "Skip php-types-hex2bin-strict.patch (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+old = "        'hex2bin' => ['string', 'data' => 'string'],\n"
+new = "        'hex2bin' => ['string', 'data' => 'string', 'strict=' => 'bool'],\n"
+if old not in text:
+    sys.stderr.write("php-types-hex2bin-strict: hex2bin anchor not found\n")
+    raise SystemExit(1)
+path.write_text(text.replace(old, new, 1))
+PY
+  echo "Applied php-types-hex2bin-strict.patch (overlay)"
+}
+
 apply_php_types_str_bool_fns_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php"
   if grep -q "'str_contains' => \['bool'" "$target" 2>/dev/null; then
@@ -2711,6 +2733,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-cast-object.patch"
   apply_patch "$PATCH_DIR/php-types-cast-unset.patch"
   apply_patch "$PATCH_DIR/php-types-binaryop-spaceship.patch"
+  apply_php_types_hex2bin_strict_overlay
   apply_patch "$PATCH_DIR/php-types-str-bool-fns.patch"
   apply_patch "$PATCH_DIR/php-types-str-incdec.patch"
   apply_patch "$PATCH_DIR/php-types-str-split-string-array.patch"
