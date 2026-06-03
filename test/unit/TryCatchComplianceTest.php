@@ -126,6 +126,28 @@ echo f(), "\n";
         );
     }
 
+    /** Issue #5331: finally throw must discard pending return, not relaunch finally. */
+    public function testFinallyThrowOverridesPendingReturn(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+function g(): int {
+    try {
+        return 1;
+    } finally {
+        throw new Exception("f");
+    }
+}
+try {
+    var_dump(g());
+} catch (Throwable $e) {
+    echo "caught: ", $e->getMessage(), "\n";
+}
+',
+            "caught: f\n"
+        );
+    }
+
     public function testNestedFinallyOnReturn(): void
     {
         $this->assertVmOutput(
