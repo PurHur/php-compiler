@@ -1354,7 +1354,7 @@ class Block {
      * Simple try/catch without `finally` may pass MCJIT when {@see TryCatchJitExecuteTest} is green.
      */
     /**
-     * ReflectionClass::newLazyProxy/Ghost — VM lazy init until MCJIT lowering (#4685).
+     * ReflectionClass::newLazyProxy/Ghost — detection for scripts using lazy objects (#4685, #4940).
      *
      * @see Zend/zend_lazy_objects.c
      */
@@ -1748,7 +1748,6 @@ class Block {
             || self::containsDynamicPropertyDeprecationOpcodes($root)
             || self::containsFiberSuspendOpcodes($root)
             || self::containsTraitConstructorOpcodes($root)
-            || self::containsLazyObjectOpcodes($root)
             || self::containsGlobalConstArrayLiteralOpcodes($root);
     }
 }

@@ -43,6 +43,9 @@ class Context {
     public array $constants = [];
     public array $functions = [];
     public array $functionProxies = [];
+
+    /** @var array<int, Call> lazy initializer proxies for phpc_lazy registry (#4940) */
+    public array $lazyInitProxies = [];
     /** @var array<string, true> JIT stubs registered for external Class::method (issue #579). */
     public array $externalMethodStubs = [];
     public array $functionReturnType = [];
@@ -576,6 +579,8 @@ class Context {
         $this->functionProxies['reflectionclass::getattributes'] = new Call\ReflectionClassGetAttributes();
         $this->functionProxies['reflectionclass::getmethod'] = new Call\ReflectionClassGetMethod();
         $this->functionProxies['reflectionclass::getreflectionconstant'] = new Call\ReflectionClassGetReflectionConstant();
+        $this->functionProxies['reflectionclass::newlazyproxy'] = new Call\ReflectionClassNewLazyProxy();
+        $this->functionProxies['reflectionclass::newlazyghost'] = new Call\ReflectionClassNewLazyGhost();
         $this->functionProxies['reflectionproperty::__construct'] = new Call\ReflectionPropertyConstruct();
         $this->functionProxies['reflectionproperty::getattributes'] = new Call\ReflectionPropertyGetAttributes();
         $this->functionProxies['reflectionconstant::__construct'] = new Call\ReflectionConstantConstruct();

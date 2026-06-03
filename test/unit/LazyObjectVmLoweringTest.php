@@ -25,7 +25,7 @@ echo $lazy->id;
 PHP;
         $block = $runtime->parseAndCompile($code, 'lazy_vm_lowering.php');
         $this->assertNotNull($block);
-        $this->assertTrue(Block::requiresVmLowering($block));
+        $this->assertFalse(Block::requiresVmLowering($block));
         $this->assertTrue(Block::containsLazyObjectOpcodes($block));
     }
 
