@@ -54,6 +54,43 @@ final class VmMath
         if (Variable::TYPE_FLOAT === $var->type) {
             throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'float'));
         }
+
+        return self::parseLongBuiltinArgCore($var, $function, $argIndex, $paramName);
+    }
+
+    /**
+     * chr() codepoint coercion (php-src ext/standard/string.c php_chr; #5085).
+     *
+     * Float operands truncate toward zero; non-numeric strings throw TypeError.
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function parseChrCodepoint(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): int {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'array'));
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'object'));
+        }
+        if (Variable::TYPE_FLOAT === $var->type) {
+            return (int) $var->toFloat();
+        }
+
+        return self::parseLongBuiltinArgCore($var, $function, $argIndex, $paramName);
+    }
+
+    private static function parseLongBuiltinArgCore(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): int {
         switch ($var->type) {
             case Variable::TYPE_INTEGER:
                 return $var->toInt();
