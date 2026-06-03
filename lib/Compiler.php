@@ -3320,6 +3320,19 @@ class Compiler {
         return $value;
     }
 
+    protected function pseudoClassInCompileScope(string $className, Block $block): bool
+    {
+        $lc = strtolower($className);
+        if (!in_array($lc, ['self', 'parent', 'static'], true)) {
+            return true;
+        }
+        if (null !== $this->compilingClassLc) {
+            return true;
+        }
+
+        return null !== $block->func && null !== $block->func->class;
+    }
+
     protected function resolveDefaultClassConstScope(string $className, Block $block): ?string
     {
         $lc = strtolower($className);
@@ -6288,6 +6301,15 @@ class Compiler {
     protected function compileClassConstFetch(Op\Expr\ClassConstFetch $expr, Block $block): array
     {
         $constName = $this->staticNameFromOperand($expr->name);
+        $className = $this->staticNameFromOperand($expr->class);
+        if (null !== $constName
+            && 'class' === strtolower($constName)
+            && null !== $className
+            && !$this->pseudoClassInCompileScope($className, $block)) {
+            $this->throwCompileError(
+                'Cannot use "'.strtolower($className).'" in the global scope'
+            );
+        }
         $op = new OpCode(
             OpCode::TYPE_CLASS_CONST_FETCH,
             $this->compileOperand($expr->result, $block, false),

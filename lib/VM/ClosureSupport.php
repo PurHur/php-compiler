@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
 use PHPCompiler\MethodVisibility;
+use PHPCompiler\PseudoClassScope;
 
 /**
  * Closure::fromCallable / bind / bindTo helpers (issue #3266, #3673, Zend zend_closures.c).
@@ -291,7 +292,7 @@ final class ClosureSupport
         $lcClass = strtolower($className);
         if ('self' === $lcClass) {
             if (null === $frame->block->func || null === $frame->block->func->class) {
-                throw new \LogicException('self:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('self');
             }
 
             return strtolower($frame->block->func->class->value);
@@ -301,18 +302,18 @@ final class ClosureSupport
                 return strtolower($frame->calledClass);
             }
             if (null === $frame->block->func || null === $frame->block->func->class) {
-                throw new \LogicException('static:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('static');
             }
 
             return strtolower($frame->block->func->class->value);
         }
         if ('parent' === $lcClass) {
             if (null === $frame->block->func || null === $frame->block->func->class) {
-                throw new \LogicException('parent:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('parent');
             }
             $declaring = strtolower($frame->block->func->class->value);
             if (!isset($ctx->classes[$declaring])) {
-                throw new \LogicException('parent:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('parent');
             }
             $parentLc = $ctx->classes[$declaring]->parentLc;
             if (null === $parentLc) {

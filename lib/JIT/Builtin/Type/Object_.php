@@ -12,6 +12,7 @@ namespace PHPCompiler\JIT\Builtin\Type;
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCompiler\Block;
+use PHPCompiler\PseudoClassScope;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\ClassConstFetchHelper;
 use PHPCompiler\JIT\Context;
@@ -3008,7 +3009,7 @@ class Object_ extends Type {
         $name = strtolower($classOp->value);
         if ('self' === $name) {
             if ('' === $this->context->scope->className) {
-                throw new \LogicException('self:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('self');
             }
 
             return $this->lookup($this->context->scope->className);
@@ -3021,11 +3022,11 @@ class Object_ extends Type {
             if ('' !== $this->context->scope->className) {
                 return $this->lookup($this->context->scope->className);
             }
-            throw new \LogicException('static:: used outside of class scope');
+            PseudoClassScope::fatalInGlobalScope('static');
         }
         if ('parent' === $name) {
             if ('' === $this->context->scope->className) {
-                throw new \LogicException('parent:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('parent');
             }
             $parentLc = $this->parentClassLc($this->context->scope->className);
             if (null === $parentLc) {
