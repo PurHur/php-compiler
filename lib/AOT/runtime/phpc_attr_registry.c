@@ -522,3 +522,39 @@ __hashtable__ *phpc_attr_class_args_hashtable(const char *class_lc, size_t attr_
     }
     return out;
 }
+
+/** First positional string ctor arg for ReflectionAttribute::newInstance() JIT (#4598). */
+const char *phpc_attr_class_string_arg(const char *class_lc, size_t attr_idx, size_t arg_idx)
+{
+    char *tmp;
+    const phpc_attr_class_args_node *node;
+    phpc_attr_args_list *list;
+    if (NULL == class_lc) {
+        return NULL;
+    }
+    tmp = phpc_ascii_lower_dup(class_lc);
+    node = phpc_attr_find_args(NULL != tmp ? tmp : class_lc);
+    if (NULL != tmp) {
+        free(tmp);
+    }
+    if (NULL == node) {
+        char *class_key = phpc_ascii_lower_dup(class_lc);
+        if (NULL != class_key) {
+            phpc_attr_materialize_flat_args(class_key);
+            node = phpc_attr_find_args(class_key);
+            free(class_key);
+        }
+    }
+    if (NULL == node || NULL == node->per_attr || attr_idx >= node->attr_count) {
+        return NULL;
+    }
+    list = &node->per_attr[attr_idx];
+    if (NULL == list->specs || arg_idx >= list->count) {
+        return NULL;
+    }
+    if (PHPC_ATTR_ARG_STRING != list->specs[arg_idx].value_type) {
+        return NULL;
+    }
+
+    return list->specs[arg_idx].sval;
+}

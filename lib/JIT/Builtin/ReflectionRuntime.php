@@ -72,6 +72,7 @@ final class ReflectionRuntime
                 'phpc_attr_method_count',
                 'phpc_attr_method_name_at',
                 'phpc_attr_class_args_hashtable',
+                'phpc_attr_class_string_arg',
             ] as $fnName
         ) {
             $fn = $context->module->getNamedFunction($fnName);

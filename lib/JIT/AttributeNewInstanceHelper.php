@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\ext\standard\JitClassExists;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -59,17 +60,86 @@ final class AttributeNewInstanceHelper
 
     public static function readFirstPositionalArg(Context $context, Variable $argsVar): Variable
     {
+        return self::readPositionalArgAt($context, $argsVar, 0);
+    }
+
+    /** Ctor arg from attribute owner registry (skips args hashtable MCJIT path, #4598). */
+    public static function emitReadCtorArgFromAttrOwner(Context $context, \PHPLLVM\Value $attrObj): Variable
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $attrObjArg = $context->builder->pointerCast($attrObj, $i8p);
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $ownerPtr = $context->builder->call(
+            $context->lookupFunction('phpc_reflect_get_attr_owner'),
+            $attrObjArg,
+            $idxSlot
+        );
+        $ownerIdx = $context->builder->load($idxSlot);
+        $argPtr = $context->builder->call(
+            $context->lookupFunction('phpc_attr_class_string_arg'),
+            $ownerPtr,
+            $ownerIdx,
+            $sizeT->constInt(0, false)
+        );
+        $isNull = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $argPtr,
+            $argPtr->typeOf()->constNull()
+        );
+        $empty = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $safe = $context->builder->select($isNull, $empty, $argPtr);
+        $len = $context->builder->call(
+            $context->lookupFunction('strlen'),
+            $context->builder->pointerCast($safe, $i8p)
+        );
+        $str = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->zExt($len, $context->getTypeFromString('int64')),
+            $safe
+        );
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $str
+        );
+
+        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+    }
+
+    public static function readPositionalArgAt(Context $context, Variable $argsVar, int $index): Variable
+    {
         if (Variable::TYPE_HASHTABLE === $argsVar->type) {
             $argsHt = $argsVar->value;
         } else {
             $argsHt = HashTableHelper::readHashtableFromValueBox($context, $argsVar);
         }
         $sizeT = $context->getTypeFromString('size_t');
-        $entryVar = HashTableHelper::readIndexedToValueBox($context, $argsHt, $sizeT->constInt(0, false));
+        $entryVar = HashTableHelper::readIndexedToValueBox($context, $argsHt, $sizeT->constInt($index, false));
         $entryHt = HashTableHelper::readHashtableFromValueBox($context, $entryVar);
         $valueKey = $context->builder->load($context->constantStringFromString('value'));
 
         return HashTableHelper::readStringKeyToValueBox($context, $entryHt, $valueKey);
+    }
+
+    /**
+     * Promoted ctor params may not assign $this->prop when __construct is invoked from reflection (#3216, #4598).
+     */
+    public static function emitApplyConstructorPropertyArgs(
+        Context $context,
+        \PHPLLVM\Value $obj,
+        int $classId,
+        Variable $ctorArg,
+    ): void {
+        $propSets = $context->type->object->instancePropertySets($classId);
+        if ([] === $propSets) {
+            return;
+        }
+        $className = $context->type->object->classNameForId($classId);
+        $propset = $propSets[0];
+        $slot = $context->type->object->propertySlotFor($obj, $className, $propset[1]);
+        $context->type->object->propertyStore($slot, $ctorArg, $propset[2]);
     }
 
     public static function boxObject(Context $context, Value $obj): Value
