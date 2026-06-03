@@ -224,6 +224,13 @@ class Context {
     /** @var array<string, Variable> */
     public array $namedVariableBindings = [];
 
+    /** Clear per-script local name/ref bindings before lowering a new {main} TU (#4763). */
+    public function resetScriptLocalBindings(): void
+    {
+        $this->namedVariableBindings = [];
+        $this->refAliasNames = [];
+    }
+
     public function bindVariableByName(string $name, Variable $var): void
     {
         $resolved = $this->resolveRefAliasName($name);

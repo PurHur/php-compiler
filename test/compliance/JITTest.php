@@ -358,7 +358,7 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'return_by_ref_jit')) {
                 continue;
             }
-            // ??= MCJIT execute: LLVM verify in CoalesceAssignJitCompileTest (#3792).
+            // ??= MCJIT execute: compile in CoalesceAssignJitCompileTest (#3792); execute in CoalesceAssignJitExecuteTest (#4763).
             if (str_contains($name, 'coalesce_assign_jit')) {
                 continue;
             }

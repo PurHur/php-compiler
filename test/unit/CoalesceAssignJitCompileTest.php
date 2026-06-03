@@ -13,7 +13,7 @@ require_once __DIR__.'/../LlvmToolchain.php';
  *
  * php-src: Zend/zend_compile.c (ZEND_ASSIGN_OP / IS_COALESCE), zend_execute.c
  *
- * MCJIT execute remains gated by jit-runtime-probe (#98); this test guards IR lowering.
+ * MCJIT execute remains gated by jit-runtime-probe (#98); CoalesceAssignJitExecuteTest (#4763).
  *
  * @group llvm
  */
