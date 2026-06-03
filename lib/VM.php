@@ -1638,7 +1638,7 @@ restart:
                         ) {
                             $arg1->incDecOp($op->type, $arg2, $arg3);
                         } else {
-                            $arg1->numericOp($op->type, $arg2, $arg3);
+                            $arg1->numericOp($op->type, $arg2, $arg3, $this, $frame);
                         }
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
