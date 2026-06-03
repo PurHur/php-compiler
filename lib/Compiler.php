@@ -505,6 +505,16 @@ class Compiler {
         }
     }
 
+    /**
+     * @param list<Op\Expr\Param> $params
+     */
+    protected function assertNoDuplicateParameterAttributes(array $params): void
+    {
+        foreach ($params as $param) {
+            AttributeNames::assertNoDuplicates(AttributeNames::fromOp($param));
+        }
+    }
+
     protected function compileCfgBlock(CfgBlock $block, array $params = [], ?CfgFunc $func = null): Block {
         if (null === $this->seen) {
             $this->seen = new SplObjectStorage;
@@ -518,6 +528,7 @@ class Compiler {
             }
             if ([] !== $params) {
                 $this->assertNoDuplicateParameterNames($params);
+                $this->assertNoDuplicateParameterAttributes($params);
             }
             $paramIdx = 0;
             foreach ($params as $param) {
@@ -2188,6 +2199,7 @@ class Compiler {
             VM\StringableSupport::assertConcreteClassImplements($class, $className);
         }
         $this->assignAttributeMetadata($return, $class);
+        AttributeNames::assertNoDuplicates($return->attributeNames);
         $this->applySealedMetadataFromOp($class, $return);
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($class->flags);
         if ($return->classIsAbstract) {
