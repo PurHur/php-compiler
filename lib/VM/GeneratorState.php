@@ -23,6 +23,9 @@ final class GeneratorState
 {
     public bool $done = false;
 
+    /** True after the generator body has been entered (Zend rewind guard, #5195). */
+    public bool $started = false;
+
     public bool $hasCurrent = false;
 
     public int $autoKey = 0;
@@ -120,6 +123,9 @@ final class GeneratorState
 
     public function rewind(): void
     {
+        if ($this->started) {
+            throw new \Exception('Cannot rewind a generator that was already run');
+        }
         $this->done = false;
         $this->hasCurrent = false;
         $this->frame = null;

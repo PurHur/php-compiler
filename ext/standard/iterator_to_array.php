@@ -39,9 +39,6 @@ final class iterator_to_array extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('iterator_to_array() requires one or two arguments in this compiler build');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (null === $frame->vmContext) {
             throw new \LogicException('iterator_to_array() requires VM context in this compiler build');
         }
@@ -55,7 +52,9 @@ final class iterator_to_array extends Internal
             $preserveKeys = $flag->toBool();
         }
         $out = $frame->vmContext->runtime->vm->iteratorToArray($iterator, $preserveKeys);
-        $frame->returnVar->array($out);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->array($out);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value
