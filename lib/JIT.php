@@ -6950,6 +6950,10 @@ class JIT {
                             $this->assignOperandValue($result, $hookFetched);
                             break;
                         }
+                        JIT\LazyObjectHelper::emitEnsureInitialized(
+                            $this->context,
+                            $this->loadPropertyFetchReceiver($obj)
+                        );
                         $fetched = $this->context->type->object->propertyFetch(
                             $receiver,
                             $declaringClass,
@@ -10074,6 +10078,12 @@ class JIT {
 
         $proxyName = $this->resolveJitInstanceMethodProxyName($declaringClassLc, $methodLc);
         $receiverVar = $this->context->getVariableFromOp($receiverOp);
+        if (Type::TYPE_OBJECT === $receiverOp->type?->type) {
+            JIT\LazyObjectHelper::emitEnsureInitialized(
+                $this->context,
+                $this->context->helper->loadValue($receiverVar)
+            );
+        }
         if (!$this->context->functionIsRegistered($proxyName)) {
             if (JIT\MagicMethodDispatch::tryInitMagicCall(
                 $this->context,

@@ -530,6 +530,76 @@ class Object_ extends Type {
     /**
      * `new static()` / runtime class operand — dispatch allocate by class_id (#4792).
      */
+    private static function ensureStrNcasecmp(Context $context): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        if (null !== $context->module->getNamedFunction('strncasecmp')) {
+            return;
+        }
+        $ft = $context->context->functionType($i32, false, $i8p, $i8p, $sizeT);
+        $fn = $context->module->addFunction('strncasecmp', $ft);
+        $context->registerFunction('strncasecmp', $fn);
+    }
+
+    /** Resolve declared class id from runtime class name cstring (#4940). */
+    public function classIdFromRuntimeName(PHPLLVM\Value $namePtr, PHPLLVM\Value $nameLen): PHPLLVM\Value
+    {
+        $fn = \PHPCompiler\JIT\BasicBlockHelper::parentFunction($this->context);
+        $entry = $this->context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock('class_name_id_done');
+        $fail = $fn->appendBasicBlock('class_name_id_fail');
+        $resultSlot = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca(
+            $this->context,
+            $this->context->getTypeFromString('int64')
+        );
+        $this->context->builder->store(
+            $this->context->constantFromInteger(-1, 'int64'),
+            $resultSlot
+        );
+        $i8p = $this->context->getTypeFromString('int8*');
+        $check = $entry;
+        $hasCase = false;
+        foreach ($this->allClassNamesById() as $id => $className) {
+            $hasCase = true;
+            $case = $fn->appendBasicBlock('class_name_id_'.$id);
+            $next = $fn->appendBasicBlock('class_name_id_try_'.$id);
+            $this->context->builder->positionAtEnd($check);
+            $expected = $this->context->builder->pointerCast(
+                $this->context->constantFromString(strtolower(ltrim($className, '\\'))),
+                $i8p
+            );
+            self::ensureStrNcasecmp($this->context);
+            $cmp = $this->context->builder->call(
+                $this->context->lookupFunction('strncasecmp'),
+                $namePtr,
+                $expected,
+                $this->context->builder->zExt($nameLen, $this->context->getTypeFromString('size_t'))
+            );
+            $isMatch = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
+            $this->context->builder->branchIf($isMatch, $case, $next);
+            $this->context->builder->positionAtEnd($case);
+            $this->context->builder->store(
+                $this->context->constantFromInteger($id, 'int64'),
+                $resultSlot
+            );
+            $this->context->builder->branch($done);
+            $check = $next;
+        }
+        if (!$hasCase) {
+            $this->context->builder->branch($fail);
+        } else {
+            $this->context->builder->positionAtEnd($check);
+            $this->context->builder->branch($fail);
+        }
+        $this->context->builder->positionAtEnd($fail);
+        $this->context->builder->call($this->context->lookupFunction('abort'));
+        $this->context->builder->positionAtEnd($done);
+
+        return $this->context->builder->load($resultSlot);
+    }
+
     public function allocateForRuntimeClassId(PHPLLVM\Value $classIdVal): PHPLLVM\Value
     {
         $fn = \PHPCompiler\JIT\BasicBlockHelper::parentFunction($this->context);
@@ -1813,6 +1883,92 @@ class Object_ extends Type {
         $this->context->callerStrictTypes = $block->strictTypes;
         $toCall->call($this->context, $objVar);
         $this->context->callerStrictTypes = $prevStrict;
+    }
+
+    /** Reset instance slots to null (lazy ghost before initializer, #4940). */
+    public function resetInstancePropertySlots(PHPLLVM\Value $obj, PHPLLVM\Value $classIdVal): void
+    {
+        $this->dispatchByRuntimeClassId($classIdVal, function (int $id) use ($obj): void {
+            $propCount = \count($this->properties[$id] ?? []);
+            if ($propCount > 0) {
+                $this->initPropertySlots($obj, $propCount);
+            }
+        }, 'lazy_reset_props');
+    }
+
+    /** Apply declared defaults for lazy ghost init (#4940). */
+    public function applyLazyGhostPropertyDefaults(PHPLLVM\Value $obj, PHPLLVM\Value $classIdVal): void
+    {
+        $this->dispatchByRuntimeClassId($classIdVal, function (int $id) use ($obj): void {
+            $this->initPropertyDefaults($obj, $id);
+        }, 'lazy_defaults');
+    }
+
+    /** Copy instance properties from initializer result object (lazy proxy, #4940). */
+    public function copyInstancePropertiesFrom(PHPLLVM\Value $dest, PHPLLVM\Value $src, PHPLLVM\Value $classIdVal): void
+    {
+        $fn = \PHPCompiler\JIT\BasicBlockHelper::parentFunction($this->context);
+        $entry = $this->context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock('lazy_copy_props_done');
+        $fail = $fn->appendBasicBlock('lazy_copy_props_fail');
+        $check = $entry;
+        $hasCase = false;
+        foreach (array_keys($this->allClassNamesById()) as $id) {
+            $hasCase = true;
+            $case = $fn->appendBasicBlock('lazy_copy_props_'.$id);
+            $next = $fn->appendBasicBlock('lazy_copy_try_'.$id);
+            $this->context->builder->positionAtEnd($check);
+            $expected = $this->context->constantFromInteger($id, 'int64');
+            $match = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $classIdVal, $expected);
+            $this->context->builder->branchIf($match, $case, $next);
+            $this->context->builder->positionAtEnd($case);
+            $this->copyPropertySlots($dest, $src, $id, $done);
+            $check = $next;
+        }
+        if (!$hasCase) {
+            $this->context->builder->branch($fail);
+        } else {
+            $this->context->builder->positionAtEnd($check);
+            $this->context->builder->branch($fail);
+        }
+        $this->context->builder->positionAtEnd($fail);
+        $this->context->builder->call($this->context->lookupFunction('abort'));
+        $this->context->builder->positionAtEnd($done);
+    }
+
+    /**
+     * @param callable(int): void $body
+     */
+    private function dispatchByRuntimeClassId(PHPLLVM\Value $classIdVal, callable $body, string $tag): void
+    {
+        $fn = \PHPCompiler\JIT\BasicBlockHelper::parentFunction($this->context);
+        $entry = $this->context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock($tag.'_done');
+        $fail = $fn->appendBasicBlock($tag.'_fail');
+        $check = $entry;
+        $hasCase = false;
+        foreach (array_keys($this->allClassNamesById()) as $id) {
+            $hasCase = true;
+            $case = $fn->appendBasicBlock($tag.'_'.$id);
+            $next = $fn->appendBasicBlock($tag.'_try_'.$id);
+            $this->context->builder->positionAtEnd($check);
+            $expected = $this->context->constantFromInteger($id, 'int64');
+            $match = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $classIdVal, $expected);
+            $this->context->builder->branchIf($match, $case, $next);
+            $this->context->builder->positionAtEnd($case);
+            $body($id);
+            $this->context->builder->branch($done);
+            $check = $next;
+        }
+        if (!$hasCase) {
+            $this->context->builder->branch($fail);
+        } else {
+            $this->context->builder->positionAtEnd($check);
+            $this->context->builder->branch($fail);
+        }
+        $this->context->builder->positionAtEnd($fail);
+        $this->context->builder->call($this->context->lookupFunction('abort'));
+        $this->context->builder->positionAtEnd($done);
     }
 
     private function copyPropertySlots(
