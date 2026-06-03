@@ -410,6 +410,10 @@ final class Variable {
                 return '%';
             case OpCode::TYPE_POW:
                 return '**';
+            case OpCode::TYPE_SHIFT_LEFT:
+                return '<<';
+            case OpCode::TYPE_SHIFT_RIGHT:
+                return '>>';
             default:
                 return '?';
         }
@@ -1535,6 +1539,22 @@ restart:
         }
         $this->reset();
 restart:
+        if ($left->type === self::TYPE_INDIRECT) {
+            $left = $left->indirect;
+            goto restart;
+        }
+        if ($right->type === self::TYPE_INDIRECT) {
+            $right = $right->indirect;
+            goto restart;
+        }
+        if (OpCode::TYPE_SHIFT_LEFT === $opCode || OpCode::TYPE_SHIFT_RIGHT === $opCode) {
+            if (self::TYPE_FLOAT === $left->type || self::TYPE_FLOAT === $right->type) {
+                self::throwUnsupportedOperandTypes($opCode, $left, $right);
+            }
+            $this->int($this->_bitwiseOp($opCode, $left->toNumeric(), $right->toNumeric()));
+
+            return;
+        }
         $pair = type_pair($left->type, $right->type);
         if ($pair === TYPE_PAIR_INTEGER_INTEGER) {
             $result = $this->_bitwiseOp($opCode, $left->integer, $right->integer);        
@@ -1549,14 +1569,6 @@ restart:
             $this->float($this->_bitwiseOp($opCode, $left->float, $right->integer));
         } elseif ($pair === TYPE_PAIR_FLOAT_FLOAT) {
             $this->float($this->_bitwiseOp($opCode, $left->float, $right->float));
-        } elseif ($left->type === self::TYPE_INDIRECT) {
-            $left = $left->indirect;
-            goto restart;
-        } elseif ($right->type === self::TYPE_INDIRECT) {
-            $right = $right->indirect;
-            goto restart;
-        } elseif (OpCode::TYPE_SHIFT_LEFT === $opCode || OpCode::TYPE_SHIFT_RIGHT === $opCode) {
-            $this->int($this->_bitwiseOp($opCode, $left->toNumeric(), $right->toNumeric()));
         } else {
             $this->string($this->_bitwiseOp($opCode, $left->toString(), $right->toString()));
         }

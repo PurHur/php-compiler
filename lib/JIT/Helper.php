@@ -15,6 +15,7 @@ namespace PHPCompiler\JIT;
 require_once __DIR__.'/../OpCodeNames.php';
 
 use PHPCompiler\ext\standard\StdlibConstants;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\OpCode;
 use function PHPCompiler\opcode_type_name;
 use PHPLLVM;
@@ -165,6 +166,11 @@ return_string:
         $rightValue = $this->loadValue($right);
         $leftType = $this->operandJitType($left);
         $rightType = $this->operandJitType($right);
+        if (OpCode::TYPE_SHIFT_LEFT === $opcode->type || OpCode::TYPE_SHIFT_RIGHT === $opcode->type) {
+            if (Variable::TYPE_NATIVE_DOUBLE === $leftType || Variable::TYPE_NATIVE_DOUBLE === $rightType) {
+                return $this->emitShiftFloatOperandTypeError($opcode, $leftType, $rightType);
+            }
+        }
         if (OpCode::TYPE_LOGICAL_XOR === $opcode->type) {
             $zeroI64 = $this->context->getTypeFromString('int64')->constInt(0, false);
             if (Variable::TYPE_NATIVE_BOOL === $leftType) {
@@ -1687,6 +1693,40 @@ return_bool:
             OpCode::TYPE_SHIFT_LEFT => $leftInt << $rightInt,
             OpCode::TYPE_SHIFT_RIGHT => $leftInt >> $rightInt,
             default => null,
+        };
+    }
+
+    private function emitShiftFloatOperandTypeError(OpCode $opcode, int $leftType, int $rightType): Variable
+    {
+        $opSym = OpCode::TYPE_SHIFT_LEFT === $opcode->type ? '<<' : '>>';
+        $message = sprintf(
+            'Unsupported operand types: %s %s %s',
+            $this->shiftOperandJitTypeName($leftType),
+            $opSym,
+            $this->shiftOperandJitTypeName($rightType)
+        );
+        TypeErrorRaise::registerDeclarations($this->context);
+        TypeErrorRaise::ensureLinked($this->context);
+        TypeErrorRaise::emitRaise($this->context, $message);
+        $this->context->builder->call($this->context->lookupFunction('abort'));
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $this->context->getTypeFromString('int64')->constInt(0, false)
+        );
+    }
+
+    private function shiftOperandJitTypeName(int $jitType): string
+    {
+        return match ($jitType) {
+            Variable::TYPE_NATIVE_LONG => 'int',
+            Variable::TYPE_NATIVE_DOUBLE => 'float',
+            Variable::TYPE_NATIVE_BOOL => 'bool',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_VALUE => 'mixed',
+            default => 'mixed',
         };
     }
 
