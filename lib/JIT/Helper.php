@@ -1402,10 +1402,16 @@ restart:
         if (Variable::TYPE_HASHTABLE === $leftType && $leftType === $rightType) {
             $lhs = $this->loadValue($left);
             $rhs = $this->loadValue($right);
+            $trueVal = $this->context->getTypeFromString('int1')->constInt(1, false);
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                 $result = $this->context->builder->icmp(Builder::INT_EQ, $lhs, $rhs);
             } elseif (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
                 $result = $this->context->builder->icmp(Builder::INT_NE, $lhs, $rhs);
+            } elseif (OpCode::TYPE_EQUAL === $opcode->type) {
+                $result = JitValueCompare::looseEqualHashtablePair($this->context, $lhs, $rhs);
+            } elseif (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $same = JitValueCompare::looseEqualHashtablePair($this->context, $lhs, $rhs);
+                $result = $this->context->builder->xor($same, $trueVal);
             } else {
                 $type = opcode_type_name($opcode->type);
                 throw new \LogicException("Reached end of switch, can't handle binary operation yet: $type for hashtable pair");
@@ -1672,6 +1678,18 @@ restart:
                         $this->context->getTypeFromString('int1')->constInt(1, false)
                     );
                 }
+                goto return_bool;
+            }
+        }
+        if (ArrayBuiltinHelper::isNativeArray($leftType) && $leftType === $rightType) {
+            $trueVal = $this->context->getTypeFromString('int1')->constInt(1, false);
+            if (OpCode::TYPE_EQUAL === $opcode->type) {
+                $result = JitValueCompare::looseEqualNativeArrayPair($this->context, $left, $right);
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $same = JitValueCompare::looseEqualNativeArrayPair($this->context, $left, $right);
+                $result = $this->context->builder->xor($same, $trueVal);
                 goto return_bool;
             }
         }
