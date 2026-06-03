@@ -102,6 +102,13 @@ final class LintCompiler extends Compiler
                                 if (!$child->static) {
                                     throw new \LogicException('Traits cannot declare non-static properties');
                                 }
+                            } elseif (OpCode::TYPE_DECLARE_INTERFACE === $type) {
+                                if ($child->static) {
+                                    throw new \LogicException('Interfaces cannot declare static properties');
+                                }
+                                if (!is_null($child->defaultBlock) || null !== $child->defaultVar) {
+                                    throw new \LogicException('Interface properties cannot have default values');
+                                }
                             } else {
                                 throw new \LogicException('Properties are only supported on classes for now');
                             }

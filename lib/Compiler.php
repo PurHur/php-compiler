@@ -2579,12 +2579,20 @@ class Compiler {
                             if (!$child->static) {
                                 $this->throwCompileLogic('Traits cannot declare non-static properties');
                             }
+                        } elseif (OpCode::TYPE_DECLARE_INTERFACE === $type) {
+                            if ($child->static) {
+                                $this->throwCompileLogic('Interfaces cannot declare static properties');
+                            }
+                            if (!is_null($child->defaultBlock) || null !== $child->defaultVar) {
+                                $this->throwCompileLogic('Interface properties cannot have default values');
+                            }
                         } else {
                             $this->throwCompileLogic('Properties are only supported on classes for now');
                         }
                     }
                     if (
-                        !$child->static
+                        OpCode::TYPE_DECLARE_CLASS === $type
+                        && !$child->static
                         && $child->name instanceof Operand\Literal
                         && is_string($child->name->value)
                     ) {
