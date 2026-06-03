@@ -1046,8 +1046,21 @@ class VM {
         return $thrown;
     }
 
+    private function normalizeThrownVariable(Variable $thrown): Variable
+    {
+        if (VM\ExceptionSupport::isThrowableVariable($thrown, $this->context)) {
+            return $thrown;
+        }
+
+        return $this->makeEngineError(
+            VM\ExceptionSupport::THROW_NON_THROWABLE_MESSAGE,
+            'TypeError'
+        );
+    }
+
     private function dispatchEngineThrow(Frame $frame, Variable $thrown): ?Frame
     {
+        $thrown = $this->normalizeThrownVariable($thrown);
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
             return $catchFrame;

@@ -45,6 +45,9 @@ final class ExceptionSupport
     public const PROP_FILE = 'file';
     public const PROP_LINE = 'line';
 
+    /** Zend zend_exceptions.c — throw non-Throwable (#5223). */
+    public const THROW_NON_THROWABLE_MESSAGE = 'Cannot throw objects that do not implement Throwable';
+
     public static function requireThrowableObject(Variable $var, string $label, ?Context $ctx = null): ObjectEntry
     {
         $var = $var->resolveIndirect();
@@ -62,6 +65,16 @@ final class ExceptionSupport
     public static function objectImplementsThrowable(ObjectEntry $obj, ?Context $ctx = null): bool
     {
         return self::classEntryImplementsThrowable($obj->class, $ctx);
+    }
+
+    public static function isThrowableVariable(Variable $var, ?Context $ctx = null): bool
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            return false;
+        }
+
+        return self::objectImplementsThrowable($var->toObject(), $ctx);
     }
 
     public static function classEntryImplementsThrowable(ClassEntry $class, ?Context $ctx = null): bool
