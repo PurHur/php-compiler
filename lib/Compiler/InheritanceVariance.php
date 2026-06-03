@@ -130,10 +130,43 @@ final class InheritanceVariance
     private function validate(callable $report): void
     {
         foreach ($this->units as $lc => $unit) {
-            if (!$unit instanceof Class_) {
+            if ($unit instanceof Class_) {
+                $this->validateClass($lc, $unit, $report);
+            } elseif ($unit instanceof Interface_) {
+                $this->validateInterface($lc, $unit, $report);
+            }
+        }
+    }
+
+    /**
+     * @param callable(string): void $report
+     */
+    private function validateInterface(string $childLc, Interface_ $iface, callable $report): void
+    {
+        $childMethods = $this->methods[$childLc] ?? [];
+        $childName = $this->displayNameFromOperand($iface->name) ?? $childLc;
+
+        foreach ($this->interfaceExtends[$childLc] ?? [] as $parentIfaceLc) {
+            if (!isset($this->units[$parentIfaceLc])) {
                 continue;
             }
-            $this->validateClass($lc, $unit, $report);
+            $parentMethods = $this->methods[$parentIfaceLc] ?? [];
+            $parentName = $this->displayNameFromOperand($this->units[$parentIfaceLc]->name) ?? $parentIfaceLc;
+            foreach ($childMethods as $methodLc => $childSig) {
+                if (!isset($parentMethods[$methodLc])) {
+                    continue;
+                }
+                $msg = $this->compatibilityError(
+                    $childName,
+                    $methodLc,
+                    $childSig,
+                    $parentName,
+                    $parentMethods[$methodLc]
+                );
+                if (null !== $msg) {
+                    $report($msg);
+                }
+            }
         }
     }
 

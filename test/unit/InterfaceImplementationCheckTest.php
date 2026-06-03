@@ -77,6 +77,42 @@ PHP;
         $runtime->parseAndCompile($code, 'missing_inherited_static.php');
     }
 
+    public function testMissingInterfaceAbstractStaticFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {
+    abstract public static function f(): void;
+}
+class C implements I {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class C contains 1 abstract method');
+        $this->expectExceptionMessage('I::f');
+        $runtime->parseAndCompile($code, 'missing_iface_static.php');
+    }
+
+    public function testInterfaceAbstractStaticDispatch(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {
+    abstract public static function f(): void;
+}
+class C implements I {
+    public static function f(): void { echo "impl\n"; }
+}
+C::f();
+PHP;
+        $block = $runtime->parseAndCompile($code, 'iface_static_ok.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("impl\n", ob_get_clean());
+    }
+
     public function testParentImplementationSatisfiesChild(): void
     {
         $runtime = new Runtime();

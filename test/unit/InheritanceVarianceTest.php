@@ -10,6 +10,23 @@ use PHPUnit\Framework\TestCase;
 /** @covers issue #3323 */
 final class InheritanceVarianceTest extends TestCase
 {
+    public function testInterfaceExtendsIncompatibleStaticReturnFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface A {
+    abstract public static function f(): void;
+}
+interface B extends A {
+    abstract public static function f(): int;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Declaration of B::f(): int must be compatible with A::f(): void');
+        $runtime->parseAndCompile($code, 'iface_static_variance.php');
+    }
+
     public function testNarrowParameterTypeFailsAtCompileTime(): void
     {
         $runtime = new Runtime();

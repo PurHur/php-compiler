@@ -2089,7 +2089,11 @@ class Compiler {
         $methodName = new Operand\Literal($child->func->name);
         $methodName->type = Type::string();
         $visVar = new Variable(Variable::TYPE_INTEGER);
-        $visVar->int(MethodVisibility::mask($child->func->flags));
+        $visFlags = MethodVisibility::mask($child->func->flags);
+        if (($child->func->flags & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+            $visFlags |= \PHPCfg\Func::FLAG_STATIC;
+        }
+        $visVar->int($visFlags);
         $visOperand = new Operand\Temporary;
         $visOperand->type = Type::int();
         $visIdx = $result->registerConstant($visOperand, $visVar);
