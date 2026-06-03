@@ -5522,6 +5522,12 @@ class JIT {
                     $result = $this->context->type->object->emitInstanceOf($expr, $classOp->value);
                     $this->assignOperand($block->getOperand($op->arg1), $result);
                     break;
+                case OpCode::TYPE_IN:
+                    $needle = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $haystack = $this->context->getVariableFromOp($block->getOperand($op->arg3));
+                    $found = JIT\InOperatorHelper::emitContains($this->context, $needle, $haystack);
+                    $this->assignOperand($block->getOperand($op->arg1), $found);
+                    break;
                 case OpCode::TYPE_STATIC_PROPERTY_FETCH:
                     $classOp = $block->getOperand($op->arg2);
                     $nameOp = $block->getOperand($op->arg3);

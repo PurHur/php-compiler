@@ -189,6 +189,17 @@ function syntaxRowDefinitions(): array
             'probe' => 'interface A {} interface B {} class C implements A, B {} echo ((new C) instanceof (A|B)) ? "1" : "0";',
         ],
         [
+            'id' => 'in_operator',
+            'construct' => 'PHP 8.3+ `in` operator (`$needle in $haystack`)',
+            'opcodes' => ['TYPE_IN'],
+            'issue' => 4682,
+            'notes' => [
+                'Ast\\InOperatorDesugar + InOperatorResolver (#4682); VM InOperator::contains (===)',
+                'JIT TYPE_IN via ArrayBuiltinHelper::inArray strict (#4716); EnumInOperatorJitCompileTest',
+            ],
+            'probe' => 'enum E: string { case A = "a"; case B = "b"; } echo (E::A in [E::A, E::B]) ? "yes" : "no";',
+        ],
+        [
             'id' => 'match_expr',
             'construct' => '`match` expression',
             'opcodes' => ['TYPE_IDENTICAL', 'TYPE_JUMPIF', 'TYPE_ASSIGN'],
@@ -963,6 +974,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'dynamic_property_fetch' => '/->\$/',
         'native_user_class' => '/\b(?:class\s+\w+|new\s+\w+)/',
         'instanceof' => '/\binstanceof\b/',
+        'in_operator' => '/(?<![\w\$])in(?![\w\$])/',
         'match_expr' => '/\bmatch\s*\(/',
         'closures' => '/function\s*\([^)]*\)\s*(?:use\s*\([^)]*\)\s*)?\{/',
         'arrow_functions' => '/\bfn\s*\(/',
