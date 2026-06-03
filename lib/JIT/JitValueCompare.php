@@ -507,6 +507,87 @@ final class JitValueCompare
         return [$phi, $doneBlock];
     }
 
+    /**
+     * Loose == for operand pair (#4766): native {@see __object__*} or boxed {@see __value__}.
+     */
+    public static function looseEqualOperands(Context $context, Variable $left, Variable $right): Value
+    {
+        if (Variable::TYPE_OBJECT === $left->type && Variable::TYPE_OBJECT === $right->type) {
+            return self::looseEqualObjectPair(
+                $context,
+                $context->helper->loadValue($left),
+                $context->helper->loadValue($right)
+            );
+        }
+
+        return self::looseEqualValueToValue($context, $left, $right);
+    }
+
+    /**
+     * Loose == on two boxed {@see __value__} operands (#4766, Zend compare_objects).
+     */
+    public static function looseEqualValueToValue(
+        Context $context,
+        Variable $left,
+        Variable $right
+    ): Value {
+        if (!JitValueBox::isValueOperand($left) || !JitValueBox::isValueOperand($right)) {
+            throw new \LogicException('Expected two boxed __value__ operands');
+        }
+        Builtin\SpaceshipRuntime::ensureLinked($context);
+        $readFn = $context->lookupFunction('__value__readObject');
+        $readTy = $readFn->getParam(0)->typeOf();
+        $leftObj = $context->builder->call(
+            $readFn,
+            $context->builder->pointerCast(self::runtimeValuePtr($context, $left), $readTy)
+        );
+        $rightObj = $context->builder->call(
+            $readFn,
+            $context->builder->pointerCast(self::runtimeValuePtr($context, $right), $readTy)
+        );
+        $cmpFn = $context->lookupFunction('__object__compareSpaceship');
+        $cmp = $context->builder->call(
+            $cmpFn,
+            $context->builder->pointerCast($leftObj, $cmpFn->getParam(0)->typeOf()),
+            $context->builder->pointerCast($rightObj, $cmpFn->getParam(1)->typeOf())
+        );
+        $zero = $cmp->typeOf()->constInt(0, false);
+
+        return $context->builder->icmp(Builder::INT_EQ, $cmp, $zero);
+    }
+
+    /**
+     * Loose == on two {@see __object__*} handles (#4766, {@see __object__compareSpaceship}).
+     */
+    public static function looseEqualObjectPair(Context $context, Value $leftObj, Value $rightObj): Value
+    {
+        Builtin\SpaceshipRuntime::ensureLinked($context);
+        $cmp = $context->builder->call(
+            $context->lookupFunction('__object__compareSpaceship'),
+            $leftObj,
+            $rightObj
+        );
+        $zero = $cmp->typeOf()->constInt(0, false);
+
+        return $context->builder->icmp(Builder::INT_EQ, $cmp, $zero);
+    }
+
+    /** {@see __value__*} with types accepted by linked runtime bitcode (#4766). */
+    public static function runtimeValuePtr(Context $context, Variable $var): Value
+    {
+        if (Variable::KIND_VARIABLE === $var->kind) {
+            $ty = $context->getStringFromType($var->value->typeOf());
+            if ('__value__' === $ty) {
+                return JitValueBox::pointer($context, $var->value);
+            }
+        }
+
+        return JitValueBox::normalizeValuePtr(
+            $context,
+            JitValueBox::valuePtrFromVariable($context, $var)
+        );
+    }
+
     public static function notIdenticalValueToValue(
         Context $context,
         Variable $left,
