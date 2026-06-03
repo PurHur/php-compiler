@@ -465,12 +465,15 @@ final class Variable {
                     $context->lookupFunction('__value__writeNull'),
                     JitValueBox::pointer($context, $slot)
                 );
-                return new Variable(
+                $nullVar = new Variable(
                     $context,
                     self::TYPE_VALUE,
                     Variable::KIND_VARIABLE,
                     $slot
                 );
+                $nullVar->isNullConstant = true;
+
+                return $nullVar;
             case self::TYPE_VALUE:
                 $slot = JitValueBox::alloc($context);
                 $ptr = JitValueBox::pointer($context, $slot);

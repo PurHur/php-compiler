@@ -50,8 +50,8 @@ final class var_export extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = count($args);
-        if (1 !== $argc) {
-            throw new \LogicException('var_export() requires exactly one argument in this compiler build (JIT/AOT)');
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('var_export() requires one or two arguments in this compiler build (JIT/AOT)');
         }
         if (JITVariable::TYPE_NATIVE_BOOL === $args[0]->type) {
             self::echoBoolJit($context, self::boolValForBranch($context, $args[0]));
@@ -68,17 +68,42 @@ final class var_export extends Internal
         );
         $outSlot = JitValueBox::alloc($context);
         $outPtr = JitValueBox::pointer($context, $outSlot);
-        $tmpSlot = JitValueBox::alloc($context);
-        $tmpPtr = JitValueBox::pointer($context, $tmpSlot);
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
-            $tmpPtr,
+            $outPtr,
             $str
         );
-        ValueEchoHelper::echo($context, $tmpPtr);
-        $context->builder->call($context->lookupFunction('__value__writeNull'), $outPtr);
+        if (1 === $argc) {
+            ValueEchoHelper::echo($context, $outPtr);
+            $context->builder->call($context->lookupFunction('__value__writeNull'), $outPtr);
+            $nullSlot = JitValueBox::alloc($context);
+            $nullPtr = JitValueBox::pointer($context, $nullSlot);
+            $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
 
-        return $outPtr;
+            return $nullPtr;
+        }
+        $returns = self::boolValForBranch($context, $args[1]);
+        $returnBb = BasicBlockHelper::append($context, 'var_export_return_mode');
+        $echoBb = BasicBlockHelper::append($context, 'var_export_echo_mode');
+        $doneBb = BasicBlockHelper::append($context, 'var_export_call_done');
+        $context->builder->branchIf($returns, $returnBb, $echoBb);
+        $context->builder->positionAtEnd($returnBb);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($echoBb);
+        ValueEchoHelper::echo($context, $outPtr);
+        $echoEndBb = $context->builder->getInsertBlock();
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $outPtr);
+        $nullSlot = JitValueBox::alloc($context);
+        $nullPtr = JitValueBox::pointer($context, $nullSlot);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $nullPtr);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($doneBb);
+        $ptrTy = $context->getTypeFromString('__value__*');
+        $result = $context->builder->phi($ptrTy);
+        $result->addIncoming($outPtr, $returnBb);
+        $result->addIncoming($nullPtr, $echoEndBb);
+
+        return $result;
     }
 
     private static function exportVm(Variable $v): string
