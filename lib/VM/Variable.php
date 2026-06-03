@@ -293,6 +293,8 @@ final class Variable {
                 return $this->bool ? 1 : 0;
             case self::TYPE_STRING:
                 return (int) $this->string;
+            case self::TYPE_ARRAY:
+                return $this->toArray()->getNumElements() > 0 ? 1 : 0;
             case self::TYPE_OBJECT:
                 return $this->objectToScalarString($vm, 'int')->toInt($vm);
             case self::TYPE_ARRAYACCESS_OFFSET:
