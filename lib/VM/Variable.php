@@ -1637,6 +1637,8 @@ restart:
         }
         $left = $left->resolveIndirect();
         $right = $right->resolveIndirect();
+        TypedPropertyCheck::assertReadable($left);
+        TypedPropertyCheck::assertReadable($right);
         if (OpCode::TYPE_PLUS === $opCode
             && self::TYPE_ARRAY === $left->type
             && self::TYPE_ARRAY === $right->type) {
