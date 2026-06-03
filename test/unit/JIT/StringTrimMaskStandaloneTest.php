@@ -9,17 +9,19 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #4646: AOT standalone must declare __phpc_char_in_mask for linker resolution.
+ * Issue #4646: AOT standalone must define __phpc_char_in_mask (PHP LLVM, not C bitcode).
  *
  * @group aot-lint
  */
 final class StringTrimMaskStandaloneTest extends TestCase
 {
-    public function testEnsureLinkedDeclaresCharInMaskForStandalone(): void
+    public function testEnsureLinkedDefinesCharInMaskForStandalone(): void
     {
         $runtime = new Runtime(Runtime::MODE_AOT);
         $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
         StringTrimMask::ensureLinked($ctx);
-        $this->assertNotNull($ctx->lookupFunction('__phpc_char_in_mask'));
+        $fn = $ctx->lookupFunction('__phpc_char_in_mask');
+        $this->assertNotNull($fn);
+        $this->assertGreaterThan(0, $fn->countBasicBlocks());
     }
 }

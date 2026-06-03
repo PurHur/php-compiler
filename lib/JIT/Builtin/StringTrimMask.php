@@ -4,18 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
 
 /**
- * JIT MCJIT runtime for trim/ltrim/rtrim custom character masks (issue #3709).
+ * LLVM implementation of __phpc_char_in_mask for trim/ltrim/rtrim masks (#3709, #4646).
  *
- * Links {@see lib/AOT/runtime/phpc_trim_mask.c}.
+ * php-src: ext/standard/string.c php_charmask subset (literal mask bytes).
  */
 final class StringTrimMask
 {
-    private const RUNTIME_SOURCE = __DIR__.'/../../AOT/runtime/phpc_trim_mask.c';
-
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -23,16 +22,6 @@ final class StringTrimMask
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $fn = $context->module->getNamedFunction('__phpc_char_in_mask');
-            if (null === $fn) {
-                $fn = self::declareStandalone($context);
-            }
-            $context->registerFunction('__phpc_char_in_mask', $fn);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__phpc_char_in_mask');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -40,155 +29,81 @@ final class StringTrimMask
             return;
         }
 
-        $bitcode = self::ensureBitcode();
-        $data = file_get_contents($bitcode);
-        if (false === $data || '' === $data) {
-            throw new \LogicException('Failed to read trim mask JIT bitcode: '.$bitcode);
-        }
-        $buffer = $context->llvm->createMemoryBufferWithString($data, 'phpc_trim_mask.bc');
-        $runtimeModule = $buffer->parseBitcode($context->context);
-        if (!$context->module->link($runtimeModule)) {
-            throw new \LogicException('Failed to link trim mask JIT runtime bitcode');
-        }
+        $i32 = $context->getTypeFromString('int32');
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $ft = $context->context->functionType($i32, false, $i32, $strPtrTy);
+        $fn = $context->module->addFunction('__phpc_char_in_mask', $ft);
+        self::implementCharInMask($context, $fn);
         self::registerLinkedRuntime($context);
     }
 
-    private static function declareStandalone(Context $context)
+    private static function implementCharInMask(Context $context, Value $fn): void
     {
-        $i32 = $context->getTypeFromString('int32');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $ft = $context->context->functionType($i32, false, $i32, $strPtr);
+        $entry = $fn->appendBasicBlock('char_in_mask_entry');
+        $context->builder->positionAtEnd($entry);
 
-        return $context->module->addFunction('__phpc_char_in_mask', $ft);
+        $ch = $fn->getParam(0);
+        $mask = $fn->getParam(1);
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $zeroI64 = $i64->constInt(0, false);
+        $zeroI32 = $i32->constInt(0, false);
+        $oneI32 = $i32->constInt(1, false);
+
+        $emptyBlock = $fn->appendBasicBlock('char_in_mask_empty');
+        $loopHead = $fn->appendBasicBlock('char_in_mask_head');
+        $loopBody = $fn->appendBasicBlock('char_in_mask_body');
+        $loopInc = $fn->appendBasicBlock('char_in_mask_inc');
+        $foundBlock = $fn->appendBasicBlock('char_in_mask_found');
+        $notFoundBlock = $fn->appendBasicBlock('char_in_mask_miss');
+        $oneI64 = $i64->constInt(1, false);
+
+        $maskLen = $context->builder->load($context->builder->structGep($mask, $map['length']));
+        $iSlot = $context->builder->alloca($i64, 1, 'char_in_mask_i');
+        $context->builder->store($zeroI64, $iSlot);
+        $maskChars = $context->builder->structGep($mask, $map['value']);
+        $chByte = $context->builder->trunc($ch, $i8);
+        $nonPositive = $context->builder->icmp(Builder::INT_SLE, $maskLen, $zeroI64);
+        $context->builder->branchIf($nonPositive, $emptyBlock, $loopHead);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $context->builder->returnValue($zeroI32);
+        $context->builder->clearInsertionPosition();
+
+        $context->builder->positionAtEnd($loopHead);
+        $i = $context->builder->load($iSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $i, $maskLen);
+        $context->builder->branchIf($atEnd, $notFoundBlock, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        $maskByte = $context->builder->load($context->builder->gep($maskChars, $i));
+        $matches = $context->builder->icmp(Builder::INT_EQ, $maskByte, $chByte);
+        $context->builder->branchIf($matches, $foundBlock, $loopInc);
+
+        $context->builder->positionAtEnd($loopInc);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($i, $oneI64),
+            $iSlot
+        );
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($foundBlock);
+        $context->builder->returnValue($oneI32);
+        $context->builder->clearInsertionPosition();
+
+        $context->builder->positionAtEnd($notFoundBlock);
+        $context->builder->returnValue($zeroI32);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
         $fn = $context->module->getNamedFunction('__phpc_char_in_mask');
         if (null === $fn) {
-            throw new \LogicException('__phpc_char_in_mask missing after trim mask bitcode link');
+            throw new \LogicException('__phpc_char_in_mask missing after trim mask LLVM implement');
         }
         $context->registerFunction('__phpc_char_in_mask', $fn);
-    }
-
-    private static function ensureBitcode(): string
-    {
-        $source = realpath(self::RUNTIME_SOURCE);
-        if (false === $source || !is_file($source)) {
-            throw new \LogicException('trim mask runtime source not found: '.self::RUNTIME_SOURCE);
-        }
-
-        $compiler = self::resolveCompiler();
-        $cacheDir = sys_get_temp_dir().'/phpc-jit-runtime';
-        if (!is_dir($cacheDir) && !mkdir($cacheDir, 0777, true) && !is_dir($cacheDir)) {
-            throw new \LogicException('Cannot create JIT runtime cache: '.$cacheDir);
-        }
-
-        $cache = $cacheDir.'/'.basename($source, '.c').'-'.substr(
-            sha1($source.filemtime($source).$compiler.'host'),
-            0,
-            16
-        ).'.bc';
-        if (is_file($cache) && filemtime($cache) >= filemtime($source)) {
-            return $cache;
-        }
-
-        $includes = self::hostLibcIncludeFlags();
-        $cmd = escapeshellarg($compiler)
-            .' -emit-llvm -c -fPIC -O2'.$includes.' '
-            .escapeshellarg($source).' -o '.escapeshellarg($cache).' 2>&1';
-        $output = shell_exec($cmd);
-        if (!is_file($cache)) {
-            throw new \LogicException(
-                'Failed to compile trim mask JIT bitcode: '.trim((string) $output)
-            );
-        }
-
-        return $cache;
-    }
-
-    private static function resolveCompiler(): string
-    {
-        $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
-        if (false !== $llvmDir && '' !== $llvmDir) {
-            foreach (['clang-9', 'clang'] as $name) {
-                $candidate = $llvmDir.'/'.$name;
-                if (is_executable($candidate)) {
-                    return $candidate;
-                }
-            }
-        }
-
-        foreach (['clang-9', 'clang', 'gcc', 'cc'] as $name) {
-            $path = trim((string) shell_exec('command -v '.escapeshellarg($name).' 2>/dev/null'));
-            if ('' !== $path) {
-                return $path;
-            }
-        }
-
-        throw new \LogicException('No C compiler found for trim mask JIT runtime bitcode');
-    }
-
-    private static function hostLibcIncludeFlags(): string
-    {
-        $flags = '';
-        foreach (self::discoverSystemIncludeDirs() as $dir) {
-            $flags .= ' -isystem '.escapeshellarg($dir);
-        }
-        if ('' === $flags && is_file('/usr/include/stdio.h')) {
-            $flags = ' -isystem /usr/include';
-        }
-
-        return $flags;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private static function discoverSystemIncludeDirs(): array
-    {
-        $dirs = [];
-        foreach (['gcc', 'cc', 'clang'] as $compiler) {
-            $path = trim((string) shell_exec('command -v '.escapeshellarg($compiler).' 2>/dev/null'));
-            if ('' === $path) {
-                continue;
-            }
-            $verbose = shell_exec(
-                escapeshellarg($path).' -E -Wp,-v -xc /dev/null 2>&1'
-            );
-            if (!is_string($verbose)) {
-                continue;
-            }
-            $capture = false;
-            foreach (explode("\n", $verbose) as $line) {
-                if (str_contains($line, '#include <...> search starts here:')) {
-                    $capture = true;
-
-                    continue;
-                }
-                if ($capture) {
-                    if (str_contains($line, 'End of search list')) {
-                        break;
-                    }
-                    $dir = trim($line);
-                    if ('' !== $dir && is_dir($dir)) {
-                        $dirs[$dir] = true;
-                    }
-                }
-            }
-            if ([] !== $dirs) {
-                break;
-            }
-        }
-
-        if ([] === $dirs) {
-            foreach (['/usr/include', '/usr/include/x86_64-linux-gnu'] as $fallback) {
-                if (is_dir($fallback)) {
-                    $dirs[$fallback] = true;
-                }
-            }
-        }
-
-        return array_keys($dirs);
     }
 }
