@@ -467,8 +467,11 @@ class VM {
         if ($this->hasInstanceMethod($object->class, '__debuginfo')) {
             $result = $this->invokeInstanceMethod($object, '__debugInfo')->resolveIndirect();
             if (Variable::TYPE_ARRAY !== $result->type) {
-                throw new \LogicException(
-                    "{$object->class->name}::__debugInfo() must return an array in this compiler build"
+                $given = Variable::TYPE_OBJECT === $result->type
+                    ? $result->toObject()->class->name
+                    : TypeCheck::typeNameForConstraint($result->type);
+                throw new \TypeError(
+                    "{$object->class->name}::__debugInfo(): Return value must be of type array, {$given} returned"
                 );
             }
             $props = [];
