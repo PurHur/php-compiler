@@ -1158,7 +1158,10 @@ class Compiler {
         if ($this->isListSpreadAssignOp($ops[$index])) {
             return !$this->isListDestructSpreadTail($ops, $index);
         }
-        if (!$this->isPlainListDestructDimFetch($ops, $index)) {
+        if (
+            !$this->isPlainListDestructDimFetch($ops, $index)
+            && !$this->isKeyedListDestructDimFetch($ops, $index)
+        ) {
             return false;
         }
         /** @var Op\Expr\ArrayDimFetch $cur */
@@ -1172,7 +1175,7 @@ class Compiler {
             }
             if (
                 $op instanceof Op\Expr\ArrayDimFetch
-                && $this->isPlainListDestructDimFetch($ops, $p)
+                && ($this->isPlainListDestructDimFetch($ops, $p) || $this->isKeyedListDestructDimFetch($ops, $p))
                 && $op->var === $cur->var
             ) {
                 return false;
@@ -1202,7 +1205,8 @@ class Compiler {
             --$p;
         }
 
-        return $p >= 0 && $this->isPlainListDestructDimFetch($ops, $p);
+        return $p >= 0
+            && ($this->isPlainListDestructDimFetch($ops, $p) || $this->isKeyedListDestructDimFetch($ops, $p));
     }
 
     /**
@@ -1258,7 +1262,10 @@ class Compiler {
         if ($this->isListSpreadAssignOp($ops[$i])) {
             return $i;
         }
-        while ($i < count($ops) && $this->isPlainListDestructDimFetch($ops, $i)) {
+        while (
+            $i < count($ops)
+            && ($this->isPlainListDestructDimFetch($ops, $i) || $this->isKeyedListDestructDimFetch($ops, $i))
+        ) {
             $i = $this->listDestructOpEndIndex($ops, $i);
         }
         if ($i < count($ops) && $this->isListSpreadAssignOp($ops[$i])) {
@@ -3675,13 +3682,15 @@ class Compiler {
                 }
                 if (null !== $expr->listSpreadRhs && null !== $expr->listSpreadFromIndex) {
                     $fromIndex = new Operand\Literal($expr->listSpreadFromIndex);
-
-                    return [new OpCode(
+                    $spreadOp = new OpCode(
                         OpCode::TYPE_LIST_SPREAD_ASSIGN,
                         $this->compileOperand($expr->var, $block, false),
                         $this->compileOperand($expr->listSpreadRhs, $block, true),
                         $this->compileOperand($fromIndex, $block, true),
-                    )];
+                    );
+                    $spreadOp->listSpreadExcludedKeys = $expr->listSpreadExcludedKeys ?? [];
+
+                    return [$spreadOp];
                 }
                 $staticPropertyFetch = $this->unwrapStaticPropertyFetch($expr->var);
                 if (null !== $staticPropertyFetch) {
