@@ -137,10 +137,15 @@ final class VmPreg
         return $result;
     }
 
+    /**
+     * @param string|list<string> $subject
+     *
+     * @return string|list<string>|false
+     */
     public static function pregReplace(
         string $pattern,
         string $replacement,
-        string $subject,
+        string|array $subject,
         int $limit = -1
     ) {
         if (strlen($pattern) > self::MAX_PATTERN_BYTES) {

@@ -6,13 +6,18 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** property_exists() — whether a class or object has a property (issue #1372). */
 final class property_exists_ extends Internal
 {
+    private const OBJECT_OR_CLASS_TYPE_ERROR =
+        'property_exists(): Argument #1 ($object_or_class) must be of type object|string, %s given';
+
     public function __construct()
     {
         parent::__construct('property_exists');
@@ -24,6 +29,7 @@ final class property_exists_ extends Internal
             throw new \LogicException('property_exists() requires exactly two arguments');
         }
         $ctx = VmReflection::requireContext($frame);
+        self::requireValidObjectOrClass($frame->calledArgs[0]->resolveIndirect());
         $property = VmReflection::stringArg($frame->calledArgs[1], 'property_exists() property name');
         $exists = VmReflection::propertyExists($ctx, $frame->calledArgs[0], $property);
         if (null !== $frame->returnVar) {
@@ -39,7 +45,77 @@ final class property_exists_ extends Internal
         if (JITVariable::TYPE_STRING !== $args[1]->type && JITVariable::TYPE_VALUE !== $args[1]->type) {
             throw new \LogicException('property_exists() property name must be a string in this compiler build');
         }
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            self::emitJitTypeErrorAndAbort($context, \sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, 'null'));
+            $i1 = $context->getTypeFromString('int1');
+
+            return $i1->constInt(0, false);
+        }
+        if (!\in_array($args[0]->type, [
+            JITVariable::TYPE_OBJECT,
+            JITVariable::TYPE_STRING,
+            JITVariable::TYPE_VALUE,
+        ], true)) {
+            self::emitJitTypeErrorAndAbort($context, self::jitTypeErrorMessage($args[0]->type));
+            $i1 = $context->getTypeFromString('int1');
+
+            return $i1->constInt(0, false);
+        }
 
         return JitPropertyExists::invoke($context, $args[0], $args[1]);
+    }
+
+    private static function requireValidObjectOrClass(Variable $objectOrClass): void
+    {
+        if (Variable::TYPE_STRING === $objectOrClass->type || Variable::TYPE_OBJECT === $objectOrClass->type) {
+            return;
+        }
+        throw new \TypeError(\sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, self::vmTypeName($objectOrClass->type)));
+    }
+
+    private static function emitJitTypeErrorAndAbort(Context $context, string $message): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, $message);
+        $context->builder->call($context->lookupFunction('abort'));
+    }
+
+    private static function jitTypeErrorMessage(int $type): string
+    {
+        switch ($type) {
+            case JITVariable::TYPE_NATIVE_LONG:
+                return \sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, 'int');
+            case JITVariable::TYPE_NATIVE_DOUBLE:
+                return \sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, 'float');
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return \sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, 'bool');
+            case JITVariable::TYPE_NULL:
+                return \sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, 'null');
+            default:
+                return \sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, 'mixed');
+        }
+    }
+
+    private static function vmTypeName(int $type): string
+    {
+        switch ($type) {
+            case Variable::TYPE_INTEGER:
+                return 'int';
+            case Variable::TYPE_FLOAT:
+                return 'float';
+            case Variable::TYPE_BOOLEAN:
+                return 'bool';
+            case Variable::TYPE_STRING:
+                return 'string';
+            case Variable::TYPE_NULL:
+                return 'null';
+            case Variable::TYPE_ARRAY:
+                return 'array';
+            case Variable::TYPE_OBJECT:
+                return 'object';
+            default:
+                return 'mixed';
+        }
     }
 }

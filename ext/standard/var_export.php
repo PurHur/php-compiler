@@ -53,6 +53,14 @@ final class var_export extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('var_export() requires one or two arguments in this compiler build (JIT/AOT)');
         }
+        if (JITVariable::TYPE_NATIVE_BOOL === $args[0]->type) {
+            self::echoBoolJit($context, self::boolValForBranch($context, $args[0]));
+            $outSlot = JitValueBox::alloc($context);
+            $outPtr = JitValueBox::pointer($context, $outSlot);
+            $context->builder->call($context->lookupFunction('__value__writeNull'), $outPtr);
+
+            return $outPtr;
+        }
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $args[0]);
         $str = $context->builder->call(
             $context->lookupFunction('__compiler_var_export'),

@@ -41,6 +41,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
         'readonly_property_promoted.phpt',
         'readonly_property_coalesce_assign.phpt',
         'late_static_binding.phpt',
+        'new_static.phpt',
         'match_guard_falsy.phpt',
     ];
 
@@ -93,6 +94,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
     {
         return [
             'enum_instanceof.php' => ['enum_instanceof.php'],
+            'enum_string_interpolation.php' => ['enum_string_interpolation.php'],
             'loose_numeric_string_eq.php' => ['loose_numeric_string_eq.php'],
             'loose_scientific_string_eq.php' => ['loose_scientific_string_eq.php'],
             'bool_increment.php' => ['bool_increment.php'],

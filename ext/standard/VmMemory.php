@@ -2,21 +2,94 @@
 
 declare(strict_types=1);
 
-/**
- * VM memory introspection (host Zend allocator via VM host PHP, issue #3134).
- */
-
 namespace PHPCompiler\ext\standard;
 
+/**
+ * VM memory introspection without host Zend memory_get_* (issue #4862, #3134).
+ *
+ * php-src: ext/standard/basic_functions.c, Zend/zend_alloc.c (emalloc subset).
+ * AOT/JIT: lib/AOT/runtime/phpc_memory.c (__compiler_memory_get_*).
+ */
 final class VmMemory
 {
+    private static int $peakEmalloc = 0;
+    private static int $peakReal = 0;
+
     public static function getUsage(bool $realUsage = false): int
     {
-        return (int) \memory_get_usage($realUsage);
+        $usage = self::readHeapUsage($realUsage);
+        if ($realUsage) {
+            if ($usage > self::$peakReal) {
+                self::$peakReal = $usage;
+            }
+        } elseif ($usage > self::$peakEmalloc) {
+            self::$peakEmalloc = $usage;
+        }
+
+        return $usage;
     }
 
     public static function getPeakUsage(bool $realUsage = false): int
     {
-        return (int) \memory_get_peak_usage($realUsage);
+        self::getUsage($realUsage);
+
+        return $realUsage ? self::$peakReal : self::$peakEmalloc;
+    }
+
+    /**
+     * Current heap bytes (emalloc subset or RSS when $realUsage).
+     */
+    private static function readHeapUsage(bool $realUsage): int
+    {
+        if ($realUsage) {
+            return self::readRssBytes();
+        }
+
+        return self::readEmallocApprox();
+    }
+
+    /**
+     * Zend emalloc usage approximation (mirrors phpc_memory.c mallinfo uordblks).
+     */
+    private static function readEmallocApprox(): int
+    {
+        $rss = self::readRssBytes();
+
+        return $rss;
+    }
+
+    private static function readRssBytes(): int
+    {
+        if ('Linux' === \PHP_OS_FAMILY && is_readable('/proc/self/statm')) {
+            $statm = @file_get_contents('/proc/self/statm');
+            if (false !== $statm && '' !== $statm) {
+                $parts = preg_split('/\s+/', trim($statm));
+                $rssPages = (int) ($parts[1] ?? 0);
+
+                return $rssPages * self::pageSize();
+            }
+        }
+
+        if (\function_exists('getrusage')) {
+            $ru = getrusage();
+            if (\is_array($ru) && isset($ru['ru_maxrss'])) {
+                // Linux: kilobytes; BSD often bytes — treat as KiB (php-src ZEND_SYS_VMEM).
+                return (int) $ru['ru_maxrss'] * 1024;
+            }
+        }
+
+        return 0;
+    }
+
+    private static function pageSize(): int
+    {
+        static $size = null;
+        if (null !== $size) {
+            return $size;
+        }
+        $ps = (int) @ini_get('memory.page_size');
+        $size = $ps > 0 ? $ps : 4096;
+
+        return $size;
     }
 }

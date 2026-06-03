@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
+use PHPCompiler\JIT\Builtin\ReadonlyRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPLLVM\Builder;
 
@@ -96,14 +97,51 @@ final class ReadonlyClassGuard
                 $msgCStr,
                 $msgLen
             );
-            // returnVoid after pending raise: Func\JIT::execute throws catchable Error (#4082, #3149).
-            $context->builder->returnVoid();
+            // Merge with allow path: pending flag + skip store (#3149, #4875). Avoid returnVoid here —
+            // it breaks AOT LLVM verify and MCJIT uncaught readonly inc/dec (#4082).
+            $context->builder->branch($exitBlock);
             $checkBlock = $nextCheck;
         }
 
         $context->builder->positionAtEnd($storeBlock);
         $context->builder->branch($exitBlock);
         $context->builder->positionAtEnd($exitBlock);
+    }
+
+    /**
+     * Run $emitStore only when no pending readonly LogicException was recorded (#4875).
+     * Call immediately after {@see emitBeforePropertyStore()} and before propertyStore.
+     */
+    public static function emitStoreUnlessPending(Context $context, callable $emitStore): void
+    {
+        ReadonlyRaise::ensureLinked($context);
+        ReadonlyRaise::registerDeclarations($context);
+
+        $fn = BasicBlockHelper::parentFunction($context);
+        $doStore = $fn->appendBasicBlock('readonly_store_do');
+        $skipStore = $fn->appendBasicBlock('readonly_store_skip');
+        $done = $fn->appendBasicBlock('readonly_store_done');
+        $entry = $context->builder->getInsertBlock();
+
+        $hasPending = $context->builder->call(
+            $context->lookupFunction('phpc_jit_has_pending_exception')
+        );
+        $i32 = $context->getTypeFromString('int32');
+        $isPending = $context->builder->icmp(
+            Builder::INT_NE,
+            $hasPending,
+            $i32->constInt(0, false)
+        );
+        $context->builder->branchIf($isPending, $skipStore, $doStore);
+
+        $context->builder->positionAtEnd($doStore);
+        $emitStore();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($skipStore);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
     }
 
     private static function isConstructBlock(?Block $block): bool

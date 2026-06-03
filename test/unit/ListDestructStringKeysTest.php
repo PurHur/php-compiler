@@ -7,22 +7,21 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 use PHPCompiler\Runtime;
 
-/** list() / [] destructuring must reject non-list arrays (#4298). */
+/** list() numeric destruct on string-key arrays warns per slot (#4841). */
 final class ListDestructStringKeysTest extends TestCase
 {
-    public function testVmRejectsStringKeyedArray(): void
+    public function testVmWarnsAndContinuesForStringKeyedArray(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
 list($a, $b) = ['x' => 1, 'y' => 2];
+echo $a === null ? 'null' : $a;
+echo $b === null ? 'null' : $b;
 PHP;
-        try {
-            $runtime->run($runtime->parseAndCompile($code, 'list_destruct_string_keys.php'));
-            self::fail('expected TypeError');
-        } catch (\TypeError $e) {
-            self::assertSame('Cannot unpack array with string keys', $e->getMessage());
-        }
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'list_destruct_string_keys.php'));
+        self::assertSame('nullnull', ob_get_clean());
     }
 
     public function testVmAcceptsPackedList(): void

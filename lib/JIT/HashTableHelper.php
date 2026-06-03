@@ -321,6 +321,13 @@ final class HashTableHelper
                         Variable::KIND_VARIABLE,
                         $nullSlot
                     ));
+                } elseif (\PHPCompiler\VM\Variable::TYPE_ARRAY === $resolved->type) {
+                    self::setAtIndex(
+                        $context,
+                        $ht,
+                        $idx,
+                        self::variableFromVmHashTable($context, $resolved->toArray())
+                    );
                 } else {
                     throw new \LogicException('Unsupported class constant array element type for JIT');
                 }
@@ -344,6 +351,13 @@ final class HashTableHelper
                     $ht,
                     $key,
                     $context->getTypeFromString('int64')->constInt($resolved->toInt(), false)
+                );
+            } elseif (\PHPCompiler\VM\Variable::TYPE_ARRAY === $resolved->type) {
+                self::setAtKeyCoercingNumericString(
+                    $context,
+                    $ht,
+                    $key,
+                    self::variableFromVmHashTable($context, $resolved->toArray())
                 );
             } else {
                 throw new \LogicException('Unsupported class constant array element type for JIT');
@@ -2174,7 +2188,17 @@ final class HashTableHelper
                 self::spreadInto($context, $destVar, $entry['unpack']);
                 continue;
             }
-            $value = \is_array($entry) ? $entry['v'] : $entry;
+            if (\is_array($entry) && isset($entry['named'])) {
+                $nameVar = new Variable(
+                    $context,
+                    Variable::TYPE_STRING,
+                    Variable::KIND_VALUE,
+                    $context->constantFromString((string) $entry['named'])
+                );
+                self::addElement($context, $destVar, $entry['value'], $nameVar);
+                continue;
+            }
+            $value = \is_array($entry) ? ($entry['v'] ?? $entry['value'] ?? null) : $entry;
             self::addElement($context, $destVar, $value, null);
         }
 

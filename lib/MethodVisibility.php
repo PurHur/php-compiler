@@ -33,7 +33,9 @@ final class MethodVisibility
         string $declaringClassLc,
         string $declaringClassDisplay,
         string $methodName,
-        bool $parentScopeAllows = false
+        bool $parentScopeAllows = false,
+        ?callable $isSameOrSubclassOf = null,
+        ?string $callerClassDisplay = null
     ): void {
         if (self::isPublic($visibilityFlags)) {
             return;
@@ -46,15 +48,29 @@ final class MethodVisibility
         }
         if (($visibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0) {
             if ($callerClassLc !== $declaringClassLc) {
-                self::deny($visibilityFlags, $declaringClassDisplay, $methodName, $callerClassLc);
+                self::deny(
+                    $visibilityFlags,
+                    $declaringClassDisplay,
+                    $methodName,
+                    $callerClassDisplay ?? $callerClassLc
+                );
             }
 
             return;
         }
         if (($visibilityFlags & CfgFunc::FLAG_PROTECTED) !== 0) {
-            if ($callerClassLc !== $declaringClassLc) {
-                self::deny($visibilityFlags, $declaringClassDisplay, $methodName, $callerClassLc);
+            if ($callerClassLc === $declaringClassLc) {
+                return;
             }
+            if (null !== $isSameOrSubclassOf && $isSameOrSubclassOf($callerClassLc, $declaringClassLc)) {
+                return;
+            }
+            self::deny(
+                $visibilityFlags,
+                $declaringClassDisplay,
+                $methodName,
+                $callerClassDisplay ?? $callerClassLc
+            );
         }
     }
 
@@ -103,12 +119,12 @@ final class MethodVisibility
         return true;
     }
 
-    private static function deny(int $visibilityFlags, string $className, string $methodName, ?string $fromScopeLc): void
+    private static function deny(int $visibilityFlags, string $className, string $methodName, ?string $fromScope): void
     {
         $kind = ($visibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0 ? 'private' : 'protected';
-        if (null === $fromScopeLc) {
+        if (null === $fromScope) {
             throw new \LogicException("Call to {$kind} method {$className}::{$methodName}() from global scope");
         }
-        throw new \LogicException("Call to {$kind} method {$className}::{$methodName}() from scope {$fromScopeLc}");
+        throw new \LogicException("Call to {$kind} method {$className}::{$methodName}() from scope {$fromScope}");
     }
 }

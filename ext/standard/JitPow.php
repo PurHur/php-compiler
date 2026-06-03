@@ -33,10 +33,8 @@ final class JitPow
     {
         $slot = JitValueBox::alloc($context);
         $slotPtr = JitValueBox::pointer($context, $slot);
-        $baseIsLong = JITVariable::TYPE_NATIVE_LONG === $args[0]->type;
-        $expIsLong = JITVariable::TYPE_NATIVE_LONG === $args[1]->type;
 
-        if ($baseIsLong && $expIsLong) {
+        if (self::preferIntegerPowPath(...$args)) {
             $baseL = JitLongArg::lower($context, $args[0], 'pow() base');
             $expL = JitLongArg::lower($context, $args[1], 'pow() exponent');
             $context->builder->call(
@@ -74,5 +72,24 @@ final class JitPow
         );
 
         return $slotPtr;
+    }
+
+    /**
+     * Zend pow_function / ** operator: numeric strings promote to int when both operands are integral.
+     */
+    private static function preferIntegerPowPath(JITVariable $base, JITVariable $exp): bool
+    {
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $base->type
+            || JITVariable::TYPE_NATIVE_DOUBLE === $exp->type) {
+            return false;
+        }
+        if (JITVariable::TYPE_OBJECT === $base->type
+            || JITVariable::TYPE_OBJECT === $exp->type
+            || JITVariable::TYPE_HASHTABLE === $base->type
+            || JITVariable::TYPE_HASHTABLE === $exp->type) {
+            return false;
+        }
+
+        return true;
     }
 }

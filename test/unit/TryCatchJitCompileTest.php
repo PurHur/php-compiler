@@ -80,6 +80,33 @@ PHP,
         $this->addToAssertionCount(1);
     }
 
+    public function testBareThrowRethrowNestedModuleVerifies(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class Ex {}
+try {
+    try {
+        throw new Ex();
+    } catch (Ex $e) {
+        throw;
+    }
+} catch (Ex $e) {
+    echo "ok\n";
+}
+PHP
+            ,
+            'throw_rethrow_nested.php'
+        );
+        $runtime->jitCompileBlock($block);
+        $context = $runtime->loadJitContext();
+        $verify = new \ReflectionMethod($context, 'compileCommon');
+        $verify->setAccessible(true);
+        $verify->invoke($context);
+        $this->addToAssertionCount(1);
+    }
+
     public function testRequiresVmLoweringForTryCatchWithoutYield(): void
     {
         $runtime = new Runtime();

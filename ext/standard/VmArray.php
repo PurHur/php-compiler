@@ -214,11 +214,30 @@ final class VmArray
      */
     public static function requireArray(Variable $value, string $fn): HashTable
     {
+        return self::requireArrayParam($value, $fn, 1, 'array');
+    }
+
+    /**
+     * @throws \TypeError when {@param $value} is not an array
+     */
+    public static function requireArrayParam(
+        Variable $value,
+        string $fn,
+        int $argNum,
+        string $paramName,
+        string $expectedType = 'array'
+    ): HashTable {
         $v = $value->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $v->type) {
             throw new \TypeError(
-                $fn.'(): Argument #1 ($array) must be of type array, '
-                .self::valueTypeLabel($v).' given'
+                \sprintf(
+                    '%s(): Argument #%d ($%s) must be of type %s, %s given',
+                    $fn,
+                    $argNum,
+                    $paramName,
+                    $expectedType,
+                    self::valueTypeLabel($v)
+                )
             );
         }
 
@@ -734,7 +753,7 @@ final class VmArray
             case Variable::TYPE_ARRAY:
                 return 'array';
             case Variable::TYPE_OBJECT:
-                return 'object';
+                return $value->toObject()->class->name;
             default:
                 return 'mixed';
         }

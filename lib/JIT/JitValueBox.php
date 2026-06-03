@@ -562,11 +562,7 @@ final class JitValueBox
                 self::writeLong($context, $slot, $native);
                 break;
             case Variable::TYPE_NATIVE_BOOL:
-                self::writeLong(
-                    $context,
-                    $slot,
-                    $context->builder->zExt($native, $context->getTypeFromString('int64'))
-                );
+                self::writeBool($context, $slot, $native);
                 break;
             case Variable::TYPE_NATIVE_DOUBLE:
                 $context->builder->call(

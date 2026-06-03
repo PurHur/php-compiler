@@ -64,9 +64,14 @@ final class JitValueCompare
                     $valuePtr
                 );
                 $nativeLong = $context->helper->loadValue($native);
-                $matches = $context->builder->icmp(Builder::INT_EQ, $stored, $nativeLong);
+                $isResource = self::nativeLongIsResource($context, $stored);
+                $matches = self::nativeLongEqualWithResourceIdentity($context, $stored, $nativeLong);
 
-                return $context->builder->select($sameType, $matches, $falseVal);
+                return $context->builder->select(
+                    $sameType,
+                    $context->builder->select($isResource, $falseVal, $matches),
+                    $falseVal
+                );
             case Variable::TYPE_NULL:
                 $nullTag = $i8->constInt(Variable::TYPE_NULL, false);
 
@@ -131,7 +136,8 @@ final class JitValueCompare
             $context->lookupFunction('__value__readLong'),
             $valuePtr
         );
-        $longMatches = $context->builder->icmp(Builder::INT_EQ, $stored, $__native);
+        $isResource = self::nativeLongIsResource($context, $stored);
+        $longMatches = self::nativeLongEqualWithResourceIdentity($context, $stored, $__native);
 
         $boolTag = $i8->constInt(Variable::TYPE_NATIVE_BOOL, false);
         $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolTag);
@@ -147,7 +153,7 @@ final class JitValueCompare
 
         return $context->builder->select(
             $isLong,
-            $longMatches,
+            $context->builder->select($isResource, $falseVal, $longMatches),
             $context->builder->select(
                 $isBool,
                 $boolMatches,
@@ -459,7 +465,7 @@ final class JitValueCompare
         $context->builder->positionAtEnd($longBlock);
         $leftLong = $context->builder->call($context->lookupFunction('__value__readLong'), $leftPtr);
         $rightLong = $context->builder->call($context->lookupFunction('__value__readLong'), $rightPtr);
-        $longMatch = $context->builder->icmp(Builder::INT_EQ, $leftLong, $rightLong);
+        $longMatch = self::nativeLongEqualWithResourceIdentity($context, $leftLong, $rightLong);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($objectCheckBlock);
@@ -686,7 +692,7 @@ final class JitValueCompare
         return $context->builder->or($identical, $numericMatch);
     }
 
-    private static function stringIsNumeric(Context $context, Value $strPtr): Value
+    public static function stringIsNumeric(Context $context, Value $strPtr): Value
     {
         $structName = $strPtr->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
@@ -799,5 +805,42 @@ final class JitValueCompare
         $context->builder->store($nullEnd, $endPtrSlot);
 
         return $context->builder->call($context->lookupFunction('strtod'), $charPtr, $endPtrSlot);
+    }
+
+    /** True when a native handle id is registered in the stream/dir tables (#4699). */
+    public static function nativeLongIsResource(Context $context, Value $handleLong): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $ret = $context->builder->call(
+            $context->lookupFunction('__compiler_is_resource'),
+            $handleLong
+        );
+
+        return $context->builder->icmp(Builder::INT_NE, $ret, $i32->constInt(0, false));
+    }
+
+    /**
+     * == / === for native long operands: resources compare by handle id; plain ints ignore resource slots (#4699).
+     */
+    public static function nativeLongEqualWithResourceIdentity(
+        Context $context,
+        Value $leftLong,
+        Value $rightLong
+    ): Value {
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+        $leftRes = self::nativeLongIsResource($context, $leftLong);
+        $rightRes = self::nativeLongIsResource($context, $rightLong);
+        $sameResKind = $context->builder->icmp(Builder::INT_EQ, $leftRes, $rightRes);
+        $sameId = $context->builder->icmp(Builder::INT_EQ, $leftLong, $rightLong);
+        $bothRes = $context->builder->and($leftRes, $rightRes);
+        $plainMatch = $context->builder->and(
+            $context->builder->not($leftRes),
+            $context->builder->and($context->builder->not($rightRes), $sameId)
+        );
+        $resourceMatch = $context->builder->and($bothRes, $sameId);
+        $match = $context->builder->or($plainMatch, $resourceMatch);
+
+        return $context->builder->select($sameResKind, $match, $falseVal);
     }
 }

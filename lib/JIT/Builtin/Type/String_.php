@@ -57,7 +57,8 @@ class String_ extends Type {
             
             
             $this->context->registerFunction('__string__strlen', $fn___cfcd208495d565ef66e7dff9f98764da);
-        
+
+        \PHPCompiler\JIT\Builtin\StringBitwiseNot::register($this->context);
 
         
 
@@ -286,6 +287,7 @@ class String_ extends Type {
         $this->implementRealloc();
         $this->implementSeparate();
         $this->implementStrlen();
+        \PHPCompiler\JIT\Builtin\StringBitwiseNot::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringHtmlspecialchars::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringHtmlspecialcharsDecode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringPregQuote::implement($this->context);

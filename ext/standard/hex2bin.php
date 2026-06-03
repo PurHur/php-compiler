@@ -21,19 +21,28 @@ final class hex2bin extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('hex2bin() requires exactly one argument');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('hex2bin() requires one or two arguments');
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_STRING !== $v->type) {
             throw new \LogicException('hex2bin() only supports strings in this compiler build');
+        }
+        $strict = false;
+        if (2 === $argc) {
+            $strictVar = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_BOOLEAN !== $strictVar->type) {
+                throw new \LogicException('hex2bin() argument #2 ($strict) must be a boolean in this compiler build');
+            }
+            $strict = $strictVar->toBool();
         }
         $data = $v->toString();
         $len = VmString::byteLength($data);
         if ($len > 0 && 0 !== ($len & 1)) {
+            if ($strict) {
+                throw new \ValueError(self::MSG_ODD_LENGTH);
+            }
             if (null !== $frame->vmContext) {
                 $frame->vmContext->errors->triggerError(
                     self::MSG_ODD_LENGTH,
@@ -43,12 +52,22 @@ final class hex2bin extends Internal
                     $frame
                 );
             }
+            if (null === $frame->returnVar) {
+                return;
+            }
             $frame->returnVar->bool(false);
 
             return;
         }
-        $result = VmString::hex2bin($data);
+        try {
+            $result = VmString::hex2bin($data, $strict);
+        } catch (\ValueError $e) {
+            throw $e;
+        }
         if (false === $result) {
+            if ($strict) {
+                throw new \ValueError(self::MSG_INVALID_HEX);
+            }
             if ($len > 0 && null !== $frame->vmContext) {
                 $frame->vmContext->errors->triggerError(
                     self::MSG_INVALID_HEX,
@@ -58,8 +77,14 @@ final class hex2bin extends Internal
                     $frame
                 );
             }
+            if (null === $frame->returnVar) {
+                return;
+            }
             $frame->returnVar->bool(false);
 
+            return;
+        }
+        if (null === $frame->returnVar) {
             return;
         }
         $frame->returnVar->string($result);
@@ -67,11 +92,16 @@ final class hex2bin extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('hex2bin() requires exactly one argument');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('hex2bin() requires one or two arguments');
+        }
+        $strict = null;
+        if (2 === $argc) {
+            $strict = $this->jitBool($context, $args[1], 'hex2bin() argument #2 ($strict)');
         }
 
-        return JitHex2bin::convert($context, $this->jitString($context, $args[0], 'hex2bin() argument #1'));
+        return JitHex2bin::convert($context, $this->jitString($context, $args[0], 'hex2bin() argument #1'), $strict);
     }
 
 }

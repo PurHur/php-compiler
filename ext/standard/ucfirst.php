@@ -15,7 +15,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -28,14 +27,16 @@ final class ucfirst extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('ucfirst() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('ucfirst() only supports strings in this compiler build');
-        }
-        $frame->returnVar->string(VmString::asciiUcfirst($v->toString()));
+        $subject = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'ucfirst',
+            0,
+            'string'
+        );
+        $frame->returnVar->string(VmString::asciiUcfirst($subject));
     }
 
     public Context $context;

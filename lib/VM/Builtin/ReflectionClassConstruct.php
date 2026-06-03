@@ -27,8 +27,5 @@ final class ReflectionClassConstruct extends VmClassMethod
         $receiver = ReflectionSupport::requireReflectionClass($frame, $frame->calledArgs[0]);
         $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($target->name);
         $receiver->constructed = true;
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->null();
-        }
     }
 }

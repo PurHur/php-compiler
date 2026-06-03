@@ -20,8 +20,14 @@
 
         foreach ($expr->arms as $arm) {
             if (null === $arm->conds) {
+                if (null !== $defaultArm) {
+                    throw new \CompileError('Match expressions may only contain one default arm');
+                }
                 $defaultArm = $arm;
                 continue;
+            }
+            if (null !== $defaultArm) {
+                throw new \CompileError('Default arm must be the last arm in the match expression');
             }
             $matchBlock = $this->block->create();
             $afterArmBlock = $this->block->create();

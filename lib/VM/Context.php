@@ -52,6 +52,13 @@ class Context {
 
     public Runtime $runtime;
 
+    /**
+     * Property-hook virtual/backing metadata from {@see \PHPCompiler\SourcePreprocessor\PropertyHooks} (#4687).
+     *
+     * @var array<string, array<string, array<string, mixed>>>
+     */
+    public array $propertyHookRegistry = [];
+
     /** Pending thrown value while dispatching catch handlers (issue #1362). */
     public ?Variable $pendingException = null;
 
@@ -119,6 +126,9 @@ class Context {
      * @var array<int, bool>
      */
     public array $foreachObjectAdvance = [];
+
+    /** @var array<int, true> foreach warned on non-traversable operand; loop body skipped (#4879). */
+    public array $foreachInvalidSlots = [];
 
     /** Fiber executing on this VM stack (issue #3130). */
     public ?FiberState $currentFiber = null;

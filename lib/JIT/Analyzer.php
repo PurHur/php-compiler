@@ -62,6 +62,7 @@ class Analyzer
                 || $usage instanceof Op\Expr\MethodCall
                 || $usage instanceof Op\Expr\PropertyFetch
                 || $usage instanceof Op\Expr\Empty_
+                || $usage instanceof Op\Expr\In_
                 || $usage instanceof Op\Expr\Include_
                 || $usage instanceof Op\Terminal\Return_
                 || $usage instanceof Op\Iterator\Reset
@@ -74,6 +75,9 @@ class Analyzer
                 || $usage instanceof Op\Expr\Yield_
                 || $usage instanceof Op\Expr\YieldFrom
                 || $usage instanceof Op\Terminal\StaticVar) {
+                continue;
+            } elseif ($usage instanceof Op\Terminal\Const_) {
+                // Immutable global const arrays use module globals in __init__ (#4904, #4941).
                 continue;
             } else {
                 throw new \LogicException('Not implemented escape operand '.get_class($usage));
@@ -123,6 +127,7 @@ class Analyzer
                 || $usage instanceof Op\Phi
                 || $usage instanceof Op\Expr\ConcatList
                 || $usage instanceof Op\Expr\Assertion
+                || $usage instanceof Op\Expr\In_
                 || $usage instanceof Op\Expr\New_
                 || $usage instanceof Op\Expr\MethodCall
                 || $usage instanceof Op\Expr\StaticCall
@@ -134,9 +139,11 @@ class Analyzer
                 || $usage instanceof Op\Iterator\Value
                 || $usage instanceof Op\Iterator\Next
                 || $usage instanceof Op\Terminal\Return_
+                || $usage instanceof Op\Terminal\Echo_
                 || $usage instanceof Op\Expr\Yield_
                 || $usage instanceof Op\Expr\YieldFrom
-                || $usage instanceof Op\Terminal\StaticVar) {
+                || $usage instanceof Op\Terminal\StaticVar
+                || $usage instanceof Op\Terminal\Const_) {
                 // not a dynamic packed-array append
             } else {
                 throw new \LogicException('Not implemented dynamic append operand '.get_class($usage));
@@ -191,7 +198,9 @@ class Analyzer
                 || $op instanceof Op\Expr\MethodCall
                 || $op instanceof Op\Expr\PropertyFetch
                 || $op instanceof Op\Expr\Param
-                || $op instanceof FirstClassCallable) {
+                || $op instanceof Op\Expr\ConstFetch
+                || $op instanceof FirstClassCallable
+                || $op instanceof Op\Terminal\Const_) {
                 return null;
             } else {
                 throw new \LogicException('Unknown array write op: '.get_class($op));

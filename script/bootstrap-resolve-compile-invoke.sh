@@ -119,6 +119,17 @@ bootstrap_ensure_inventory_argv_driver() {
   echo "bootstrap-ensure-inventory-argv-driver: building inventory argv driver ${out} (#3012)" >&2
   if ! env PHP_COMPILER_M3_SOURCE="${root}/bin/compile.php" PHP_COMPILER_M3_OUT="${out}" \
     "${root}/script/bootstrap-selfhost-helloworld-compile-bin.sh"; then
+    local prelink="${root}/prelinked/bootstrap-gen0/bin-compile-aot"
+    if [[ -x "${prelink}" ]]; then
+      echo "bootstrap-ensure-inventory-argv-driver: helloworld-compile-bin failed; trying prelinked gen-0 (#3053)" >&2
+      mkdir -p "${root}/build"
+      cp -f "${prelink}" "${out}"
+      cp -f "${prelink}" "${root}/build/.m3_bin_compile_aot_blob"
+      chmod +x "${out}" "${root}/build/.m3_bin_compile_aot_blob"
+      if bootstrap_inventory_argv_driver_smoke "${out}"; then
+        return 0
+      fi
+    fi
     echo "bootstrap-ensure-inventory-argv-driver: helloworld-compile-bin failed" >&2
     return 1
   fi

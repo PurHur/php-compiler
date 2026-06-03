@@ -68,6 +68,40 @@ PHP,
         $fn->execute($frame);
     }
 
+    /** Issue #4580: non-string $string throws TypeError (php-src ext/standard/string.c). */
+    public function testVmNonStringThrowsTypeError(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(
+            <<<'PHP'
+<?php
+try {
+    chunk_split([]);
+} catch (Throwable $e) {
+    echo get_class($e), "\n";
+    echo $e->getMessage(), "\n";
+}
+try {
+    chunk_split(new stdClass());
+} catch (Throwable $e) {
+    echo get_class($e), "\n";
+    echo $e->getMessage(), "\n";
+}
+PHP,
+            'chunk_split_type_error.php'
+        );
+        ob_start();
+        try {
+            $runtime->run($block);
+        } catch (VM\ScriptExit $e) {
+        }
+        $this->assertSame(
+            "TypeError\nchunk_split(): Argument #1 (\$string) must be of type string, array given\n"
+            . "TypeError\nchunk_split(): Argument #1 (\$string) must be of type string, stdClass given\n",
+            ob_get_clean()
+        );
+    }
+
     /**
      * @group llvm
      * @group jit

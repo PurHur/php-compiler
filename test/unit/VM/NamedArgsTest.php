@@ -55,4 +55,59 @@ PHP;
         $this->assertSame(3, $resolved[0]->toInt());
         $this->assertSame(2, $resolved[1]->toInt());
     }
+
+    public function testVariadicNamedArgumentsPopulateArgsArray(): void
+    {
+        $a = new Variable(Variable::TYPE_INTEGER);
+        $a->int(1);
+        $b = new Variable(Variable::TYPE_INTEGER);
+        $b->int(2);
+        $resolved = NamedArgs::resolve(
+            [['n', 'a', $a], ['n', 'b', $b]],
+            ['args'],
+            0
+        );
+        $this->assertCount(1, $resolved);
+        $this->assertSame(Variable::TYPE_ARRAY, $resolved[0]->type);
+        $packed = $resolved[0]->toArray();
+        $this->assertSame(1, $packed->find('a')?->toInt());
+        $this->assertSame(2, $packed->find('b')?->toInt());
+    }
+
+    public function testVariadicNamedWithLeadingPositionalParam(): void
+    {
+        $x = new Variable(Variable::TYPE_INTEGER);
+        $x->int(1);
+        $a = new Variable(Variable::TYPE_INTEGER);
+        $a->int(2);
+        $b = new Variable(Variable::TYPE_INTEGER);
+        $b->int(3);
+        $resolved = NamedArgs::resolve(
+            [['n', 'x', $x], ['n', 'a', $a], ['n', 'b', $b]],
+            ['x', 'args'],
+            1
+        );
+        $this->assertCount(2, $resolved);
+        $this->assertSame(1, $resolved[0]->toInt());
+        $packed = $resolved[1]->toArray();
+        $this->assertSame(2, $packed->find('a')?->toInt());
+        $this->assertSame(3, $packed->find('b')?->toInt());
+    }
+
+    public function testVariadicPositionalThenNamedOverflow(): void
+    {
+        $x = new Variable(Variable::TYPE_INTEGER);
+        $x->int(1);
+        $b = new Variable(Variable::TYPE_INTEGER);
+        $b->int(2);
+        $resolved = NamedArgs::resolve(
+            [['p', $x], ['n', 'b', $b]],
+            ['x', 'args'],
+            1
+        );
+        $this->assertCount(2, $resolved);
+        $this->assertSame(1, $resolved[0]->toInt());
+        $packed = $resolved[1]->toArray();
+        $this->assertSame(2, $packed->find('b')?->toInt());
+    }
 }

@@ -43,6 +43,7 @@ final class InterfaceCheck
 
     public static function entryImplements(ClassEntry $entry, string $ifaceLc, Context $context): bool
     {
+        $ifaceLc = strtolower(ltrim($ifaceLc, '\\'));
         $visited = [];
         $current = $entry;
         while (null !== $current) {
@@ -51,8 +52,10 @@ final class InterfaceCheck
                 break;
             }
             $visited[$lc] = true;
-            if (in_array($ifaceLc, $current->interfaces, true)) {
-                return true;
+            foreach ($current->interfaces as $impl) {
+                if (self::interfaceLcExtends($impl, $ifaceLc, $context)) {
+                    return true;
+                }
             }
             if ($current->isInterface && $lc === $ifaceLc) {
                 return true;
@@ -71,6 +74,7 @@ final class InterfaceCheck
 
     public static function entryIsInstanceOf(ClassEntry $entry, string $classLc, Context $context): bool
     {
+        $classLc = strtolower(ltrim($classLc, '\\'));
         $visited = [];
         $current = $entry;
         while (null !== $current) {
@@ -82,8 +86,10 @@ final class InterfaceCheck
             if ($lc === $classLc) {
                 return true;
             }
-            if (in_array($classLc, $current->interfaces, true)) {
-                return true;
+            foreach ($current->interfaces as $impl) {
+                if (self::interfaceLcExtends($impl, $classLc, $context)) {
+                    return true;
+                }
             }
             if ($current->isInterface && $lc === $classLc) {
                 return true;
@@ -95,6 +101,42 @@ final class InterfaceCheck
                 break;
             }
             $current = $context->classes[$current->parentLc];
+        }
+
+        return false;
+    }
+
+    /**
+     * True when $ifaceLc is $wantLc or extends it via interface inheritance (zend_inheritance.c, #4754).
+     */
+    public static function interfaceLcExtends(string $ifaceLc, string $wantLc, Context $context): bool
+    {
+        $ifaceLc = strtolower(ltrim($ifaceLc, '\\'));
+        $wantLc = strtolower(ltrim($wantLc, '\\'));
+        if ($ifaceLc === $wantLc) {
+            return true;
+        }
+        $visited = [];
+        $stack = [$ifaceLc];
+        while ([] !== $stack) {
+            $current = array_pop($stack);
+            if (isset($visited[$current])) {
+                continue;
+            }
+            $visited[$current] = true;
+            if ($current === $wantLc) {
+                return true;
+            }
+            $entry = $context->classes[$current] ?? null;
+            if (null === $entry) {
+                continue;
+            }
+            foreach ($entry->interfaces as $parent) {
+                $parent = strtolower(ltrim($parent, '\\'));
+                if (!isset($visited[$parent])) {
+                    $stack[] = $parent;
+                }
+            }
         }
 
         return false;

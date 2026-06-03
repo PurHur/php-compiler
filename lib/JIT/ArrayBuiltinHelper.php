@@ -98,6 +98,58 @@ final class ArrayBuiltinHelper
     }
 
     /**
+     * array_push($stack, ...$values) when JIT merges call-time unpack into one packed list (#1361, #4721).
+     *
+     * php-src: ext/standard/array.c — zero-length spread is a no-op; stack is argument #1.
+     */
+    public static function pushMergedCallUnpack(Context $context, Variable $packed): Value
+    {
+        $packedPtr = $context->helper->loadValue($packed);
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $stackBox = HashTableHelper::readIndexedToValueBox($context, $packedPtr, $zero);
+        $stackVar = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $stackBox->value
+        );
+        $stackHt = self::loadHashTable($context, $stackVar);
+        $count = $context->builder->truncOrBitCast(
+            self::getNumElements($context, $packedPtr),
+            $sizeT
+        );
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($one, $idxSlot);
+        $tag = (string) ++self::$copyListEntrySeq;
+        $head = BasicBlockHelper::append($context, 'array_push_unpack_head_'.$tag);
+        $body = BasicBlockHelper::append($context, 'array_push_unpack_body_'.$tag);
+        $advance = BasicBlockHelper::append($context, 'array_push_unpack_advance_'.$tag);
+        $done = BasicBlockHelper::append($context, 'array_push_unpack_done_'.$tag);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $value = HashTableHelper::readIndexedToValueBox($context, $packedPtr, $idx);
+        self::appendElement($context, $stackHt, $value);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+        HashTableHelper::storeHashtableInArrayVariable($context, $stackVar, $stackHt);
+
+        return self::getNumElements($context, $stackHt);
+    }
+
+    /**
      * Prepend values to a packed list hashtable; returns new element count.
      */
     public static function unshift(Context $context, Variable $array, Variable ...$values): Value
@@ -1940,6 +1992,177 @@ final class ArrayBuiltinHelper
             $hasLength,
             $length
         );
+    }
+
+    /**
+     * List spread tail for keyed destructuring — VM HashTable::copyListSpreadTail (#4889, #4979).
+     *
+     * @param list<string> $excludedStringKeys compile-time string keys already bound before spread
+     */
+    public static function buildCopyListSpreadTail(
+        Context $context,
+        Variable $array,
+        Value $offset,
+        array $excludedStringKeys
+    ): Value {
+        if (self::isNativeArray($array->type)) {
+            $src = self::nativeListToHashTable($context, $array);
+        } else {
+            $src = self::loadHashTable($context, $array);
+        }
+
+        return self::buildCopyListSpreadTailFromHashTable(
+            $context,
+            $src,
+            $offset,
+            $excludedStringKeys
+        );
+    }
+
+    /**
+     * @param list<string> $excludedStringKeys
+     */
+    private static function buildCopyListSpreadTailFromHashTable(
+        Context $context,
+        Value $src,
+        Value $offset,
+        array $excludedStringKeys
+    ): Value {
+        $tag = 'lst'.(string) ++self::$copyListEntrySeq;
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $normOffset = $context->builder->truncOrBitCast($offset, $sizeT);
+
+        $dest = HashTableHelper::alloc($context);
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'list_spread_tail_idx_'.$tag);
+        $context->builder->store($zero, $idxSlot);
+
+        $packedHead = BasicBlockHelper::append($context, 'list_spread_tail_packed_head_'.$tag);
+        $packedBody = BasicBlockHelper::append($context, 'list_spread_tail_packed_body_'.$tag);
+        $packedCopy = BasicBlockHelper::append($context, 'list_spread_tail_packed_copy_'.$tag);
+        $packedSkip = BasicBlockHelper::append($context, 'list_spread_tail_packed_skip_'.$tag);
+        $packedNext = BasicBlockHelper::append($context, 'list_spread_tail_packed_next_'.$tag);
+        $packedDone = BasicBlockHelper::append($context, 'list_spread_tail_packed_done_'.$tag);
+        $context->builder->branch($packedHead);
+
+        $context->builder->positionAtEnd($packedHead);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
+        $context->builder->branchIf($atEnd, $packedDone, $packedBody);
+
+        $context->builder->positionAtEnd($packedBody);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $idx
+        );
+        $context->builder->branchIf($isSet, $packedCopy, $packedSkip);
+
+        $context->builder->positionAtEnd($packedCopy);
+        $idx = $context->builder->load($idxSlot);
+        $belowOffset = $context->builder->icmp(Builder::INT_SLT, $idx, $normOffset);
+        $context->builder->branchIf($belowOffset, $packedSkip, $packedNext);
+
+        $context->builder->positionAtEnd($packedNext);
+        $idx = $context->builder->load($idxSlot);
+        self::storeValueEntryAtIndex(
+            $context,
+            $dest,
+            $idx,
+            self::listEntryAt($context, $src, $idx)
+        );
+        $context->builder->branch($packedSkip);
+
+        $context->builder->positionAtEnd($packedSkip);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($context->builder->load($idxSlot), $one),
+            $idxSlot
+        );
+        $context->builder->branch($packedHead);
+
+        $strInit = BasicBlockHelper::append($context, 'list_spread_tail_str_init_'.$tag);
+        $strHead = BasicBlockHelper::append($context, 'list_spread_tail_str_head_'.$tag);
+        $strBody = BasicBlockHelper::append($context, 'list_spread_tail_str_body_'.$tag);
+        $strNext = BasicBlockHelper::append($context, 'list_spread_tail_str_next_'.$tag);
+        $strDone = BasicBlockHelper::append($context, 'list_spread_tail_str_done_'.$tag);
+
+        $context->builder->positionAtEnd($packedDone);
+        $context->builder->branch($strInit);
+
+        $context->builder->positionAtEnd($strInit);
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'list_spread_tail_walk_'.$tag);
+        $head = $context->builder->load($context->builder->structGep($src, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $strDone, $strBody);
+
+        $context->builder->positionAtEnd($strBody);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $isExcluded = self::isListSpreadExcludedStringKey($context, $keyStr, $excludedStringKeys);
+        $strCopy = BasicBlockHelper::append($context, 'list_spread_tail_str_copy_'.$tag);
+        $context->builder->branchIf($isExcluded, $strNext, $strCopy);
+
+        $context->builder->positionAtEnd($strCopy);
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $ownedKey = $context->builder->call($context->lookupFunction('__string__separate'), $keyStr);
+        self::storeValueEntryAtStringKey($context, $dest, $ownedKey, $valEntry);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strNext);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strDone);
+
+        return $dest;
+    }
+
+    /**
+     * @param list<string> $excludedStringKeys
+     */
+    private static function isListSpreadExcludedStringKey(
+        Context $context,
+        Value $keyStr,
+        array $excludedStringKeys
+    ): Value {
+        $i1 = $context->getTypeFromString('int1');
+        if ([] === $excludedStringKeys) {
+            return $i1->constInt(0, false);
+        }
+        $strMap = $context->structFieldMap['__string__'];
+        $keyData = $context->builder->structGep($keyStr, $strMap['value']);
+        $excluded = $i1->constInt(0, false);
+        foreach ($excludedStringKeys as $excl) {
+            $exclPtr = $context->builder->pointerCast(
+                $context->constantFromString($excl),
+                $context->getTypeFromString('int8*')
+            );
+            $cmp = $context->builder->call(
+                $context->lookupFunction('strcmp'),
+                $keyData,
+                $exclPtr
+            );
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                $cmp,
+                $cmp->typeOf()->constInt(0, false)
+            );
+            $excluded = $context->builder->or($excluded, $match);
+        }
+
+        return $excluded;
     }
 
     private static function normalizeSliceOffset(Context $context, Value $offset, Value $count): Value
@@ -6109,6 +6332,14 @@ final class ArrayBuiltinHelper
                 $context->builder->call($context->lookupFunction('__value__readDouble'), $needle->value)
             );
         }
+        if (Variable::TYPE_OBJECT === $targetType) {
+            return new Variable(
+                $context,
+                Variable::TYPE_OBJECT,
+                Variable::KIND_VALUE,
+                $context->builder->call($context->lookupFunction('__value__readObject'), $needle->value)
+            );
+        }
 
         return $needle;
     }
@@ -6138,6 +6369,8 @@ final class ArrayBuiltinHelper
         $bbDouble = BasicBlockHelper::append($context, 'entry_match_double');
         $bbCheckHashtable = BasicBlockHelper::append($context, 'entry_match_check_hashtable');
         $bbHashtable = BasicBlockHelper::append($context, 'entry_match_hashtable');
+        $bbCheckObject = BasicBlockHelper::append($context, 'entry_match_check_object');
+        $bbObject = BasicBlockHelper::append($context, 'entry_match_object');
         $bbNull = BasicBlockHelper::append($context, 'entry_match_null');
         $bbDone = BasicBlockHelper::append($context, 'entry_match_done');
 
@@ -6233,7 +6466,35 @@ final class ArrayBuiltinHelper
             $typeByte,
             $i8->constInt(Variable::TYPE_HASHTABLE, false)
         );
-        $context->builder->branchIf($isHashtable, $bbHashtable, $bbNull);
+        $context->builder->branchIf($isHashtable, $bbHashtable, $bbCheckObject);
+
+        $context->builder->positionAtEnd($bbCheckObject);
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_OBJECT, false)
+        );
+        $context->builder->branchIf($isObject, $bbObject, $bbNull);
+
+        $context->builder->positionAtEnd($bbObject);
+        $objCand = new Variable(
+            $context,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $context->builder->call($context->lookupFunction('__value__readObject'), $entry)
+        );
+        if (Variable::TYPE_VALUE === $needle->type) {
+            $objectMatch = JitValueCompare::identicalValueBoxToObject($context, $needle, $objCand);
+        } else {
+            $objectMatch = self::valuesEqual(
+                $context,
+                self::coerceNeedleForCompare($context, $needle, Variable::TYPE_OBJECT),
+                $objCand,
+                $strict
+            );
+        }
+        $context->builder->store($objectMatch, $resultSlot);
+        $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbHashtable);
         $htCand = new Variable(
@@ -6645,6 +6906,19 @@ final class ArrayBuiltinHelper
                     $context->helper->loadValue($left),
                     $context->helper->loadValue($right)
                 );
+            case Variable::TYPE_OBJECT:
+                $voidp = $context->getTypeFromString('void')->pointerType(0);
+                $sizeT = $context->getTypeFromString('size_t');
+                $leftPtr = $context->builder->ptrToInt(
+                    $context->builder->pointerCast($context->helper->loadValue($left), $voidp),
+                    $sizeT
+                );
+                $rightPtr = $context->builder->ptrToInt(
+                    $context->builder->pointerCast($context->helper->loadValue($right), $voidp),
+                    $sizeT
+                );
+
+                return $context->builder->icmp(Builder::INT_EQ, $leftPtr, $rightPtr);
             case Variable::TYPE_NULL:
                 return $context->constantFromBool(true);
             default:

@@ -84,6 +84,29 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'readonly_dynamic_prop.php'));
     }
 
+    public function testReadonlyClassDynamicPropertyErrorIsCatchable(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+readonly class R {
+    public int $x;
+    public function __construct(int $x) {
+        $this->x = $x;
+    }
+}
+$r = new R(1);
+try {
+    $r->y = 2;
+} catch (Throwable $e) {
+    echo 'caught ', get_class($e), "\n";
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_dynamic_catch.php'));
+        $this->assertSame("caught Error\n", ob_get_clean());
+    }
+
     public function testReadonlyClassDeclRequiresVmLoweringForBinJit(): void
     {
         $runtime = new Runtime();

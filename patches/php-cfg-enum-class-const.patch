@@ -1,0 +1,37 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php
+@@ -30,6 +30,9 @@ class Const_ extends Terminal
+     /** PhpParser Stmt\ClassConst flags (MODIFIER_FINAL, visibility, etc.). */
+     public int $flags = 0;
+ 
++    /** True for `case Name = value` in enums; false for `const` in enum/class bodies (#5054). */
++    public bool $isEnumCase = false;
++
+     public function __construct(Operand $name, Operand $value, Block $valueBlock, array $attributes = [])
+     {
+         parent::__construct($attributes);
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -377,6 +377,8 @@ class Parser extends ParserAbstract
+                 $this->parseEnumCase($stmt);
+             } elseif ($stmt instanceof Stmt\ClassMethod) {
+                 $this->parseStmt_ClassMethod($stmt);
++            } elseif ($stmt instanceof Stmt\ClassConst) {
++                $this->parseStmt_ClassConst($stmt);
+             }
+         }
+         $this->block = $savedBlock;
+@@ -402,7 +404,9 @@ class Parser extends ParserAbstract
+         }
+         $this->block = $tmp;
+ 
+-        $this->block->children[] = new Op\Terminal\Const_(
++        $constOp = new Op\Terminal\Const_(
+             $this->parseExprNode($node->name),
+             $value,
+             $valueBlock,
+             $this->mapAttributes($node)
+         );
++        $constOp->isEnumCase = true;
++        $this->block->children[] = $constOp;
+     }

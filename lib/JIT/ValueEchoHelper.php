@@ -27,6 +27,100 @@ final class ValueEchoHelper
         );
     }
 
+    /**
+     * Echo a native long, formatting stream/dir resources like Zend (ext/standard, #4740).
+     */
+    public static function echoNativeLong(Context $context, Value $longVal): void
+    {
+        Builtin\StringDir::ensureLinked($context);
+        $tag = 'enl'.(string) ++self::$seq;
+        $i64 = $context->getTypeFromString('int64');
+        $handle = $context->builder->zExt($longVal, $i64);
+        $isRes = JitValueCompare::nativeLongIsResource($context, $handle);
+
+        $plainBlock = BasicBlockHelper::append($context, 'echo_native_long_plain_'.$tag);
+        $resBlock = BasicBlockHelper::append($context, 'echo_native_long_res_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'echo_native_long_done_'.$tag);
+
+        $context->builder->branchIf($isRes, $resBlock, $plainBlock);
+
+        $context->builder->positionAtEnd($plainBlock);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_ob_echo_ll'),
+            $handle
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($resBlock);
+        $charPtr = $context->getTypeFromString('char*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $bufSize = $sizeT->constInt(32, false);
+        $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
+        $bufChar = $context->builder->pointerCast($buf, $charPtr);
+        $fmt = $context->builder->pointerCast(
+            $context->constantFromString('Resource id #%lld'),
+            $charPtr
+        );
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufChar,
+            $bufSize,
+            $fmt,
+            $handle
+        );
+        $context->builder->call(
+            $context->lookupFunction('__phpc_ob_echo_substr'),
+            $bufChar,
+            $context->builder->zExt($written, $sizeT)
+        );
+        $context->builder->call($context->lookupFunction('__mm__free'), $buf);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+    }
+
+    /**
+     * Echo an object via __toString when defined; otherwise raise Error (Zend cast-to-string, #4740).
+     */
+    public static function echoObjectVariable(Context $context, Variable $objectVar, ?string $classHint = null): void
+    {
+        $asString = MagicMethodDispatch::coerceObjectToString($context, $objectVar, $classHint);
+        if (null !== $asString) {
+            self::echoStringVariable($context, $asString);
+
+            return;
+        }
+        $classHint = $classHint ?? $objectVar->type?->userType ?? '';
+        $classHint = ltrim((string) $classHint, '\\');
+        if ('' !== $classHint && 'object' !== strtolower($classHint)) {
+            Builtin\ErrorRaise::ensureLinked($context);
+            Builtin\ErrorRaise::emitRaise(
+                $context,
+                'Object of class '.$classHint.' could not be converted to string'
+            );
+
+            return;
+        }
+        self::echoLiteral($context, 'Object');
+    }
+
+    public static function echoStringVariable(Context $context, Variable $stringVar): void
+    {
+        $argValue = $context->helper->loadValue($stringVar);
+        $offset = $context->structFieldIndex($argValue, 'length');
+        $__str__length = $context->builder->load(
+            $context->builder->structGep($argValue, $offset)
+        );
+        $offset = $context->structFieldIndex($argValue, 'value');
+        $__str__value = $context->builder->structGep($argValue, $offset);
+        $sizeT = $context->getTypeFromString('size_t');
+        $context->builder->call(
+            $context->lookupFunction('__phpc_ob_echo_substr'),
+            $__str__value,
+            $context->builder->zExt($__str__length, $sizeT)
+        );
+    }
+
     public static function echo(Context $context, Value $valuePtr): void
     {
         $tag = 'ev'.(string) ++self::$seq;
@@ -96,11 +190,7 @@ final class ValueEchoHelper
             $context->lookupFunction('__value__readLong'),
             $valuePtr
         );
-        $i64 = $context->getTypeFromString('int64');
-        $context->builder->call(
-            $context->lookupFunction('__phpc_ob_echo_ll'),
-            $context->builder->zExt($longVal, $i64)
-        );
+        self::echoNativeLong($context, $longVal);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterLong);
@@ -161,7 +251,17 @@ final class ValueEchoHelper
         $context->builder->branchIf($isObject, $objectBlock, $afterObject);
 
         $context->builder->positionAtEnd($objectBlock);
-        self::echoLiteral($context, 'Object');
+        $objPtr = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $objVar = new Variable(
+            $context,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $objPtr
+        );
+        self::echoObjectVariable($context, $objVar);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterObject);

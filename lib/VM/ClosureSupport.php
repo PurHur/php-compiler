@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
 use PHPCompiler\MethodVisibility;
+use PHPCompiler\PseudoClassScope;
 
 /**
  * Closure::fromCallable / bind / bindTo helpers (issue #3266, #3673, Zend zend_closures.c).
@@ -152,12 +153,17 @@ final class ClosureSupport
         $methodLc = strtolower($methodName);
         [$class, $methodLc] = self::resolveStaticMethod($ctx, $lcClass, $methodLc);
         $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        $callerClassLc = self::callerClassLc($frame);
+        $callerDisplay = self::classDisplayName($ctx, $callerClassLc);
         MethodVisibility::assertCallable(
             $vis,
-            self::callerClassLc($frame),
-            $lcClass,
+            $callerClassLc,
+            strtolower($class->name),
             $class->name,
-            $methodName
+            $class->methodNames[$methodLc] ?? $methodName,
+            false,
+            fn (string $classLc, string $ancestorLc): bool => self::isClassSameOrSubclassOf($ctx, $classLc, $ancestorLc),
+            $callerDisplay
         );
 
         return ClosureState::fromWrappedFunc($class->methods[$methodLc]);
@@ -202,22 +208,23 @@ final class ClosureSupport
         $object = $receiver->toObject();
         $methodLc = strtolower($methodName);
         $class = $object->class;
-        if (!isset($class->methods[$methodLc])) {
-            throw new \LogicException(
-                "Closure::fromCallable(): Method {$class->name}::{$methodName}() not found"
-            );
-        }
-        $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        [$declaringClass, $methodLc] = self::resolveStaticMethod($ctx, strtolower($class->name), $methodLc);
+        $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        $callerClassLc = self::callerClassLc($frame);
+        $callerDisplay = self::classDisplayName($ctx, $callerClassLc);
         MethodVisibility::assertCallable(
             $vis,
-            self::callerClassLc($frame),
-            strtolower($class->name),
-            $class->name,
-            $methodName
+            $callerClassLc,
+            strtolower($declaringClass->name),
+            $declaringClass->name,
+            $declaringClass->methodNames[$methodLc] ?? $methodName,
+            false,
+            fn (string $classLc, string $ancestorLc): bool => self::isClassSameOrSubclassOf($ctx, $classLc, $ancestorLc),
+            $callerDisplay
         );
         $boundThis = new Variable();
         $boundThis->copyFrom($receiver);
-        $state = ClosureState::fromMethodCallable($class->methods[$methodLc], $boundThis, $methodName);
+        $state = ClosureState::fromMethodCallable($declaringClass->methods[$methodLc], $boundThis, $methodName);
         $state->boundScopeClass = $class->name;
 
         return $state;
@@ -285,7 +292,7 @@ final class ClosureSupport
         $lcClass = strtolower($className);
         if ('self' === $lcClass) {
             if (null === $frame->block->func || null === $frame->block->func->class) {
-                throw new \LogicException('self:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('self');
             }
 
             return strtolower($frame->block->func->class->value);
@@ -295,18 +302,18 @@ final class ClosureSupport
                 return strtolower($frame->calledClass);
             }
             if (null === $frame->block->func || null === $frame->block->func->class) {
-                throw new \LogicException('static:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('static');
             }
 
             return strtolower($frame->block->func->class->value);
         }
         if ('parent' === $lcClass) {
             if (null === $frame->block->func || null === $frame->block->func->class) {
-                throw new \LogicException('parent:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('parent');
             }
             $declaring = strtolower($frame->block->func->class->value);
             if (!isset($ctx->classes[$declaring])) {
-                throw new \LogicException('parent:: used outside of class scope');
+                PseudoClassScope::fatalInGlobalScope('parent');
             }
             $parentLc = $ctx->classes[$declaring]->parentLc;
             if (null === $parentLc) {
@@ -341,5 +348,32 @@ final class ClosureSupport
         }
 
         throw new \LogicException("Call to undefined static method {$lcClass}::{$methodLc}()");
+    }
+
+    private static function classDisplayName(Context $ctx, ?string $classLc): ?string
+    {
+        if (null === $classLc || !isset($ctx->classes[$classLc])) {
+            return null;
+        }
+
+        return $ctx->classes[$classLc]->name;
+    }
+
+    private static function isClassSameOrSubclassOf(Context $ctx, string $classLc, string $ancestorLc): bool
+    {
+        $current = $classLc;
+        while (true) {
+            if ($current === $ancestorLc) {
+                return true;
+            }
+            if (!isset($ctx->classes[$current])) {
+                return false;
+            }
+            $parentLc = $ctx->classes[$current]->parentLc;
+            if (null === $parentLc) {
+                return false;
+            }
+            $current = $parentLc;
+        }
     }
 }

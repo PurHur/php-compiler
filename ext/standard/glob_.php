@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** glob() — path pattern matching (VM via host PHP; JIT defers to VM). */
+/** glob() — path pattern matching (VM via libc glob; JIT via __phpc_glob_vec, #4859). */
 final class glob_ extends Internal
 {
     public function __construct()
@@ -42,7 +42,7 @@ final class glob_ extends Internal
             return;
         }
 
-        $result = \glob($patternVar->toString(), $flags);
+        $result = VmFsGlob::glob($patternVar->toString(), $flags);
         if (false === $result) {
             $frame->returnVar->bool(false);
 

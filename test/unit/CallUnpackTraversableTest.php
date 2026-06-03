@@ -67,9 +67,9 @@ sum(...$gen);
 PHP;
         try {
             $runtime->run($runtime->parseAndCompile($code, 'call_unpack_gen_string_keys.php'));
-            self::fail('expected TypeError');
-        } catch (\TypeError $e) {
-            self::assertSame('Cannot unpack array with string keys', $e->getMessage());
+            self::fail('expected Error');
+        } catch (\Error $e) {
+            self::assertSame('Unknown named parameter $x', $e->getMessage());
         }
     }
 }

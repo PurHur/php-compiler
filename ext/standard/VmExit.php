@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\ScriptExit;
 use PHPCompiler\VM\ShutdownQueue;
+use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
 
@@ -14,11 +15,12 @@ final class VmExit
 {
     public static function terminate(?Variable $arg): never
     {
+        $status = self::resolveStatus($arg);
         $ctx = Superglobals::getActiveContext();
         if (null !== $ctx) {
             ShutdownQueue::run($ctx);
         }
-        throw new ScriptExit(self::resolveStatus($arg));
+        throw new ScriptExit($status);
     }
 
     public static function resolveStatus(?Variable $arg): int
@@ -35,7 +37,32 @@ final class VmExit
         if (Variable::TYPE_INTEGER === $v->type) {
             return $v->toInt();
         }
+        if (Variable::TYPE_NULL === $v->type) {
+            return 0;
+        }
+        if (Variable::TYPE_FLOAT === $v->type || Variable::TYPE_BOOLEAN === $v->type) {
+            echo $v->toString();
 
-        throw new \LogicException('exit() only supports string or integer status in this compiler build');
+            return 0;
+        }
+
+        throw self::typeErrorForStatus($v);
+    }
+
+    private static function typeErrorForStatus(Variable $value): \TypeError
+    {
+        return new \TypeError(sprintf(
+            'exit(): Argument #1 ($status) must be of type string|int, %s given',
+            self::statusTypeName($value)
+        ));
+    }
+
+    private static function statusTypeName(Variable $value): string
+    {
+        if (Variable::TYPE_OBJECT === $value->type) {
+            return $value->toObject()->class->name;
+        }
+
+        return TypeCheck::typeNameForConstraint($value->type);
     }
 }

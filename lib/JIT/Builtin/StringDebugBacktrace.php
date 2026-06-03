@@ -67,8 +67,9 @@ final class StringDebugBacktrace
         }
 
         $includes = self::includeFlags();
+        $runtimeDir = dirname($source);
         $cmd = escapeshellarg($compiler)
-            .' -emit-llvm -c -fPIC -O2'.$includes.' '
+            .' -emit-llvm -c -fPIC -O2'.$includes.' -I'.escapeshellarg($runtimeDir).' '
             .escapeshellarg($source).' -o '.escapeshellarg($cache).' 2>&1';
         $output = shell_exec($cmd);
         if (!is_file($cache)) {
@@ -105,11 +106,67 @@ final class StringDebugBacktrace
     private static function includeFlags(): string
     {
         $flags = '';
+        foreach (self::discoverSystemIncludeDirs() as $dir) {
+            $flags .= ' -isystem '.escapeshellarg($dir);
+        }
+        if (!str_contains($flags, '-isystem') && is_file('/usr/include/stdio.h')) {
+            $flags .= ' -isystem /usr/include';
+        }
         $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
         if (false !== $llvmDir && '' !== $llvmDir) {
             $flags .= ' -I'.escapeshellarg($llvmDir.'/include');
         }
 
         return $flags;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function discoverSystemIncludeDirs(): array
+    {
+        $dirs = [];
+        foreach (['gcc', 'cc', 'clang'] as $compiler) {
+            $path = trim((string) shell_exec('command -v '.escapeshellarg($compiler).' 2>/dev/null'));
+            if ('' === $path) {
+                continue;
+            }
+            $verbose = shell_exec(
+                escapeshellarg($path).' -E -Wp,-v -xc /dev/null 2>&1'
+            );
+            if (!is_string($verbose)) {
+                continue;
+            }
+            $capture = false;
+            foreach (explode("\n", $verbose) as $line) {
+                if (str_contains($line, '#include <...> search starts here:')) {
+                    $capture = true;
+
+                    continue;
+                }
+                if ($capture) {
+                    if (str_contains($line, 'End of search list')) {
+                        break;
+                    }
+                    $dir = trim($line);
+                    if ('' !== $dir && is_dir($dir)) {
+                        $dirs[$dir] = true;
+                    }
+                }
+            }
+            if ([] !== $dirs) {
+                break;
+            }
+        }
+
+        if ([] === $dirs) {
+            foreach (['/usr/include', '/usr/include/x86_64-linux-gnu'] as $fallback) {
+                if (is_dir($fallback)) {
+                    $dirs[$fallback] = true;
+                }
+            }
+        }
+
+        return array_keys($dirs);
     }
 }

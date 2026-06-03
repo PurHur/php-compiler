@@ -38,19 +38,28 @@ final class implode extends Internal
         }
         if (1 === $argc) {
             $glue = '';
-            $array = $frame->calledArgs[0]->resolveIndirect();
+            $ht = VmArray::requireArrayParam(
+                $frame->calledArgs[0],
+                $this->getName(),
+                1,
+                'array',
+                'array'
+            );
         } else {
             $glue = $frame->calledArgs[0]->resolveIndirect()->toString();
-            $array = $frame->calledArgs[1]->resolveIndirect();
+            $ht = VmArray::requireArrayParam(
+                $frame->calledArgs[1],
+                $this->getName(),
+                2,
+                'array',
+                '?array'
+            );
         }
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException($this->getName().'() array argument must be an array in this compiler build');
-        }
         $parts = [];
-        foreach ($array->toArray()->iterate(true) as $value) {
+        foreach ($ht->iterate(true) as $value) {
             $parts[] = $value->resolveIndirect()->toString();
         }
         $frame->returnVar->string(VmString::implode($glue, $parts));
@@ -70,17 +79,25 @@ final class implode extends Internal
                 $context->lookupFunction('__string__alloc'),
                 $i64->constInt(0, false)
             );
-            $haystack = $this->loadHaystack($context, $args[0]);
+            $haystack = $this->loadHaystack($context, $args[0], false);
         } else {
             $glue = $this->jitString($context, $args[0], $this->getName().'() glue');
-            $haystack = $this->loadHaystack($context, $args[1]);
+            $haystack = $this->loadHaystack($context, $args[1], true);
         }
 
         return JitImplode::implode($context, $glue, $haystack);
     }
 
-    private function loadHaystack(Context $context, JITVariable $arg): Value
+    private function loadHaystack(Context $context, JITVariable $arg, bool $glueAndArrayForm): Value
     {
+        JitArrayElem::requireArrayParam(
+            $context,
+            $arg,
+            $this->getName(),
+            $glueAndArrayForm ? 2 : 1,
+            'array',
+            $glueAndArrayForm ? '?array' : 'array'
+        );
         if (JITVariable::TYPE_HASHTABLE === $arg->type) {
             return $context->helper->loadValue($arg);
         }
@@ -94,6 +111,6 @@ final class implode extends Internal
             );
         }
 
-        throw new \LogicException($this->getName().'() array argument must be an array in this compiler build');
+        return $context->getTypeFromString('__hashtable__*')->constNull();
     }
 }

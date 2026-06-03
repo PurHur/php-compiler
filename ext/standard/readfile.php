@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * readfile() — stream file bytes to stdout; returns bytes written or false (subset of PHP).
+ * readfile() — stream file bytes to stdout; returns bytes read or false (php-src php_stream_passthru).
  */
 final class readfile extends Internal
 {

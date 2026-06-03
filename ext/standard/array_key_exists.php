@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -32,12 +33,14 @@ final class array_key_exists extends Internal
             throw new \LogicException('array_key_exists() requires exactly two arguments');
         }
         $key = $frame->calledArgs[0]->resolveIndirect();
-        $array = $frame->calledArgs[1]->resolveIndirect();
+        $array = VmArray::requireArrayParam(
+            $frame->calledArgs[1],
+            'array_key_exists',
+            2,
+            'array'
+        );
         if (null === $frame->returnVar) {
             return;
-        }
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_key_exists() second argument must be an array in this compiler build');
         }
         if (Variable::TYPE_NULL === $key->type) {
             $emptyKey = new Variable();
@@ -48,7 +51,7 @@ final class array_key_exists extends Internal
             && Variable::TYPE_FLOAT !== $key->type) {
             throw new \LogicException('array_key_exists() key must be an integer or string in this compiler build');
         }
-        $frame->returnVar->bool($array->toArray()->hasKey($key));
+        $frame->returnVar->bool($array->hasKey($key));
     }
 
     public Context $context;
@@ -60,6 +63,26 @@ final class array_key_exists extends Internal
         }
         $key = $args[0];
         $array = $args[1];
+        if (JITVariable::TYPE_HASHTABLE !== $array->type
+            && !($array->type & JITVariable::IS_NATIVE_ARRAY)
+        ) {
+            if (JITVariable::TYPE_VALUE === $array->type) {
+                JitArrayElem::requireArrayParam($context, $array, 'array_key_exists', 2, 'array');
+            } else {
+                TypeErrorRaise::ensureLinked($context);
+                TypeErrorRaise::registerDeclarations($context);
+                TypeErrorRaise::emitRaise(
+                    $context,
+                    \sprintf(
+                        'array_key_exists(): Argument #2 ($array) must be of type array, %s given',
+                        self::jitArgTypeLabel($array)
+                    )
+                );
+                $context->builder->call($context->lookupFunction('abort'));
+            }
+
+            return $context->constantFromInteger(0, 'int1');
+        }
         if (JITVariable::TYPE_HASHTABLE === $array->type) {
             $ht = $context->helper->loadValue($array);
 
@@ -84,9 +107,24 @@ final class array_key_exists extends Internal
 
             return $context->builder->and($inRange, $nonNeg);
         }
-        throw new \LogicException(
-            'array_key_exists() second argument must be an array in this compiler build'
-        );
+    }
+
+    private static function jitArgTypeLabel(JITVariable $arg): string
+    {
+        switch ($arg->type) {
+            case JITVariable::TYPE_NATIVE_LONG:
+                return 'int';
+            case JITVariable::TYPE_NATIVE_DOUBLE:
+                return 'float';
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return 'bool';
+            case JITVariable::TYPE_STRING:
+                return 'string';
+            case JITVariable::TYPE_OBJECT:
+                return 'object';
+            default:
+                return 'mixed';
+        }
     }
 
     /**

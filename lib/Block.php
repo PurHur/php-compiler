@@ -18,6 +18,7 @@ use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCfg\Operand\Temporary;
 use PHPCfg\Operand\Variable as VarOperand;
+use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ScriptStack;
 use PHPCompiler\VM\Variable;
@@ -64,6 +65,12 @@ class Block {
     /** @var array<int, int> scope slot index => Variable::TYPE_* for typed parameters */
     public array $paramTypeConstraints = [];
 
+    /** Parameter scope slots declared `iterable` (array|Traversable union, #4829). */
+    public array $paramIterableSlots = [];
+
+    /** @var array<int, 'true'|'false'> standalone bool literal parameter types (#4784) */
+    public array $paramLiteralBoolTypes = [];
+
     /** @var array<int, int> typed variadic element constraints — not applied to the packed array local (#4185) */
     public array $paramVariadicElementTypeConstraints = [];
 
@@ -96,6 +103,9 @@ class Block {
 
     /** Declared scalar return type for this function (issue #205), or null when untyped. */
     public ?int $returnTypeConstraint = null;
+
+    /** Standalone `: true` / `: false` return type (#4784), or null. */
+    public ?string $returnLiteralBoolType = null;
 
     /** Declared `: void` return — non-null returns are rejected. */
     public bool $returnTypeVoid = false;
@@ -444,9 +454,14 @@ class Block {
             $this->returnDeclaredType = $parent->returnDeclaredType;
             $this->paramDeclaredTypes = $parent->paramDeclaredTypes;
             $this->paramTypeConstraints = $parent->paramTypeConstraints;
+            $this->paramIterableSlots = $parent->paramIterableSlots;
+            $this->paramLiteralBoolTypes = $parent->paramLiteralBoolTypes;
+            $this->returnLiteralBoolType = $parent->returnLiteralBoolType;
             $this->paramIntersectionConstraints = $parent->paramIntersectionConstraints;
             $this->paramDnfConstraints = $parent->paramDnfConstraints;
             $this->paramNames = $parent->paramNames;
+            $this->paramByRef = $parent->paramByRef;
+            $this->paramSensitive = $parent->paramSensitive;
             $this->paramImplicitNullable = $parent->paramImplicitNullable;
         }
     }
@@ -743,8 +758,14 @@ class Block {
         $return = new Frame(null, $this, $frame);
         $return->scope = $scope;
         $return->scriptPath = $this->scriptPath();
-        if (!is_null($frame) && !is_null($frame->returnVar)) {
-            $return->returnVar = $frame->returnVar;
+        if (null !== $frame) {
+            if (null !== $frame->returnVar) {
+                $return->returnVar = $frame->returnVar;
+            }
+            // CFG branch targets (e.g. function-static init) must keep closure invoke context (#4872).
+            if (null !== $frame->closureCall) {
+                $return->closureCall = $frame->closureCall;
+            }
         }
         return $return;
     }
@@ -776,6 +797,9 @@ class Block {
             if (isset($block->paramTypeConstraints[$slot])) {
                 $local->resolveIndirect()->typeConstraint = $block->paramTypeConstraints[$slot];
             }
+            if (isset($block->paramLiteralBoolTypes[$slot])) {
+                $local->resolveIndirect()->literalBoolType = $block->paramLiteralBoolTypes[$slot];
+            }
             if (isset($block->paramGenericArrayTypeSpecs[$slot])) {
                 $local->resolveIndirect()->genericArrayTypeSpec = $block->paramGenericArrayTypeSpecs[$slot];
             }
@@ -805,6 +829,9 @@ class Block {
         $var = new Variable(Variable::TYPE_NULL);
         if (isset($block->paramTypeConstraints[$slot])) {
             $var->typeConstraint = $block->paramTypeConstraints[$slot];
+        }
+        if (isset($block->paramLiteralBoolTypes[$slot])) {
+            $var->literalBoolType = $block->paramLiteralBoolTypes[$slot];
         }
         if (isset($block->paramGenericArrayTypeSpecs[$slot])) {
             $var->genericArrayTypeSpec = $block->paramGenericArrayTypeSpecs[$slot];
@@ -1334,6 +1361,45 @@ class Block {
      * CFG regions that MCJIT must not execute yet; `bin/jit.php` runs the VM instead (#2114, #167).
      * Simple try/catch without `finally` may pass MCJIT when {@see TryCatchJitExecuteTest} is green.
      */
+    /**
+     * ReflectionClass::newLazyProxy/Ghost — detection for scripts using lazy objects (#4685, #4940).
+     *
+     * @see Zend/zend_lazy_objects.c
+     */
+    public static function containsLazyObjectOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_METHODCALL_INIT === $op->type) {
+                    $nameOp = $block->getOperand($op->arg2);
+                    if ($nameOp instanceof Literal) {
+                        $methodLc = strtolower($nameOp->value);
+                        if ('newlazyproxy' === $methodLc || 'newlazyghost' === $methodLc) {
+                            return true;
+                        }
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     /** Script or nested closure uses Fiber::suspend() (#4019). */
     public static function containsFiberSuspendOpcodes(?self $root): bool
     {
@@ -1395,6 +1461,289 @@ class Block {
         return false;
     }
 
+    /**
+     * Writes to undeclared instance properties on classes without #[\AllowDynamicProperties].
+     * MCJIT execute segfaults on this path (#4570); VM emits E_DEPRECATED (zend_object_handlers.c).
+     */
+    public static function containsDynamicPropertyDeprecationOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        /** @var array<string, array<string, true>> $declaredProps lc class => lc prop => true */
+        $declaredProps = [];
+        /** @var array<string, true> $allowsDynamic lc class => true */
+        $allowsDynamic = [];
+        /** @var array<string, true> $hasMagicSet lc class => true */
+        $hasMagicSet = [];
+        self::collectDynamicPropertyClassMetadata($root, $declaredProps, $allowsDynamic, $hasMagicSet);
+
+        return self::scanUndeclaredInstancePropertyWrites($root, $declaredProps, $allowsDynamic, $hasMagicSet);
+    }
+
+    /**
+     * @param array<string, array<string, true>> $declaredProps
+     * @param array<string, true>               $allowsDynamic
+     * @param array<string, true>               $hasMagicSet
+     */
+    private static function collectDynamicPropertyClassMetadata(
+        ?self $root,
+        array &$declaredProps,
+        array &$allowsDynamic,
+        array &$hasMagicSet
+    ): void {
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_CLASS === $op->type) {
+                    $nameOp = $block->getOperand($op->arg1);
+                    if ($nameOp instanceof Literal) {
+                        $classLc = strtolower(ltrim($nameOp->value, '\\'));
+                        $declaredProps[$classLc] = $declaredProps[$classLc] ?? [];
+                        if (AttributeNames::hasAllowDynamicProperties($op->attributeNames)) {
+                            $allowsDynamic[$classLc] = true;
+                        }
+                        if ($op->block1 instanceof self) {
+                            self::collectDeclaredPropertiesFromClassBody(
+                                $op->block1,
+                                $classLc,
+                                $declaredProps,
+                                $hasMagicSet
+                            );
+                        }
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @param array<string, array<string, true>> $declaredProps
+     * @param array<string, true>               $hasMagicSet
+     */
+    private static function collectDeclaredPropertiesFromClassBody(
+        self $classBlock,
+        string $classLc,
+        array &$declaredProps,
+        array &$hasMagicSet
+    ): void {
+        $seen = new \SplObjectStorage();
+        $stack = [$classBlock];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if ($seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_PROPERTY === $op->type) {
+                    $propOp = $block->getOperand($op->arg1);
+                    if ($propOp instanceof Literal) {
+                        $declaredProps[$classLc][strtolower($propOp->value)] = true;
+                    }
+                }
+                if (OpCode::TYPE_DECLARE_METHOD === $op->type) {
+                    $methodOp = $block->getOperand($op->arg1);
+                    if ($methodOp instanceof Literal && '__set' === strtolower($methodOp->value)) {
+                        $hasMagicSet[$classLc] = true;
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @param array<string, array<string, true>> $declaredProps
+     * @param array<string, true>               $allowsDynamic
+     * @param array<string, true>               $hasMagicSet
+     */
+    private static function scanUndeclaredInstancePropertyWrites(
+        ?self $root,
+        array $declaredProps,
+        array $allowsDynamic,
+        array $hasMagicSet
+    ): bool {
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $i => $op) {
+                if (OpCode::TYPE_PROPERTY_FETCH !== $op->type) {
+                    foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                        if ($sub instanceof self) {
+                            $stack[] = $sub;
+                        }
+                    }
+                    continue;
+                }
+                $nameOp = $block->getOperand($op->arg3);
+                $objOp = $block->getOperand($op->arg2);
+                if (!$nameOp instanceof Literal || null === $objOp->type || null === $objOp->type->userType) {
+                    foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                        if ($sub instanceof self) {
+                            $stack[] = $sub;
+                        }
+                    }
+                    continue;
+                }
+                if (!self::propertyFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1)) {
+                    foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                        if ($sub instanceof self) {
+                            $stack[] = $sub;
+                        }
+                    }
+                    continue;
+                }
+                $classLc = strtolower(ltrim($objOp->type->userType, '\\'));
+                if (isset($allowsDynamic[$classLc]) || isset($hasMagicSet[$classLc])) {
+                    foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                        if ($sub instanceof self) {
+                            $stack[] = $sub;
+                        }
+                    }
+                    continue;
+                }
+                $propLc = strtolower($nameOp->value);
+                if (!isset($declaredProps[$classLc][$propLc])) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static function propertyFetchDestUsedAsAssignLvalue(self $block, int $opIndex, int $destSlot): bool
+    {
+        for ($j = $opIndex + 1, $n = count($block->opCodes); $j < $n; $j++) {
+            $next = $block->opCodes[$j];
+            if (OpCode::TYPE_ASSIGN === $next->type && $next->arg2 === $destSlot) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Trait `__construct` merged into a using class — MCJIT execute segfaults (#4671).
+     */
+    public static function containsTraitConstructorOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_TRAIT === $op->type && null !== $op->block1) {
+                    if (self::classBodyDeclaresMethod($op->block1, '__construct')) {
+                        return true;
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static function classBodyDeclaresMethod(self $body, string $methodLc): bool
+    {
+        $seen = new \SplObjectStorage();
+        $stack = [$body];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if ($seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_METHOD === $op->type) {
+                    $name = $block->getOperand($op->arg1);
+                    if ($name instanceof Literal && $methodLc === strtolower($name->value)) {
+                        return true;
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Global {@code const NAME = [...]} literals (MCJIT uses module globals — #4904, #4941).
+     */
+    public static function containsGlobalConstArrayLiteralOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_GLOBAL_CONST === $op->type
+                    && isset($block->constants[$op->arg2])
+                    && Variable::TYPE_ARRAY === $block->constants[$op->arg2]->type) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     public static function requiresVmLowering(?self $root): bool
     {
         return self::containsGeneratorOpcodesInScriptScope($root)
@@ -1404,6 +1753,8 @@ class Block {
             || self::containsTypedNonVoidReturnOpcodes($root)
             || self::containsReadonlyPropertyOpcodes($root)
             || self::containsReadonlyClassOpcodes($root)
-            || self::containsFiberSuspendOpcodes($root);
+            || self::containsDynamicPropertyDeprecationOpcodes($root)
+            || self::containsFiberSuspendOpcodes($root)
+            || self::containsTraitConstructorOpcodes($root);
     }
 }
