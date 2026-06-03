@@ -12,7 +12,7 @@ use PHPCompiler\VM\OutputBuffer;
 use PHPLLVM\Value;
 
 /**
- * ob_get_length() — byte length of active output buffer (ext/standard/output.c, issue #3236).
+ * ob_get_length() — byte length of active output buffer (ext/standard/output.c, issue #3236; JIT {@see JitObGetLength}).
  */
 final class ob_get_length extends Internal
 {
@@ -40,6 +40,6 @@ final class ob_get_length extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ob_get_length() is VM-only in this compiler build');
+        return JitObGetLength::invoke($context, ...$args);
     }
 }

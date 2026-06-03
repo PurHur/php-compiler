@@ -12,7 +12,7 @@ use PHPCompiler\VM\OutputBuffer;
 use PHPLLVM\Value;
 
 /**
- * ob_get_contents() — return active buffer without ending (ext/standard/output.c, issue #3236).
+ * ob_get_contents() — return active buffer without ending (ext/standard/output.c, issue #3236; JIT {@see JitObGetContents}).
  */
 final class ob_get_contents extends Internal
 {
@@ -40,6 +40,6 @@ final class ob_get_contents extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ob_get_contents() is VM-only in this compiler build');
+        return JitObGetContents::invoke($context, ...$args);
     }
 }
