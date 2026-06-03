@@ -398,6 +398,7 @@ class Compiler {
         if (null === $returnType) {
             return;
         }
+        $this->assertNeverIsStandaloneType($returnType);
         $block->returnDeclaredType = $returnType;
         if ($returnType instanceof Op\Type\Void_) {
             $block->returnTypeVoid = true;
@@ -2354,6 +2355,64 @@ class Compiler {
         return false;
     }
 
+    protected function cfgTypeIsStandaloneNever(?Op\Type $type): bool
+    {
+        if (null === $type) {
+            return false;
+        }
+        if ($type instanceof Op\Type\Never_) {
+            return true;
+        }
+
+        return $type instanceof Op\Type\Literal && 'never' === strtolower($type->name);
+    }
+
+    protected function cfgTypeContainsNever(?Op\Type $type): bool
+    {
+        if (null === $type) {
+            return false;
+        }
+        if ($type instanceof Op\Type\Never_) {
+            return true;
+        }
+        if ($type instanceof Op\Type\Literal && 'never' === strtolower($type->name)) {
+            return true;
+        }
+        if ($type instanceof Op\Type\Union_) {
+            foreach ($type->types as $member) {
+                if ($this->cfgTypeContainsNever($member)) {
+                    return true;
+                }
+            }
+        }
+        if ($type instanceof Op\Type\Intersection) {
+            foreach ($type->types as $member) {
+                if ($this->cfgTypeContainsNever($member)) {
+                    return true;
+                }
+            }
+        }
+        if ($type instanceof Op\Type\Nullable) {
+            return $this->cfgTypeContainsNever($type->subtype);
+        }
+
+        return false;
+    }
+
+    /**
+     * Zend zend_handle_never_type — never must not appear in unions/intersections/DNF (#4970).
+     */
+    protected function assertNeverIsStandaloneType(?Op\Type $type): void
+    {
+        if (!$this->cfgTypeContainsNever($type)) {
+            return;
+        }
+        if ($this->cfgTypeIsStandaloneNever($type)) {
+            return;
+        }
+        $this->throwCompileError('never can only be used as a standalone type');
+    }
+
     protected function dnfTypeLabelFromCfgType(?Op\Type $declared): string
     {
         if (null === $declared) {
@@ -2399,12 +2458,10 @@ class Compiler {
     protected function applyParamDeclaredType(Op\Expr\Param $param, Block $block, int $slot, bool $variadicElement = false): void
     {
         $declared = $param->declaredType;
-        if ($declared instanceof Op\Type\Never_) {
+        if ($this->cfgTypeIsStandaloneNever($declared)) {
             $this->throwCompileError('never cannot be used as a parameter type');
         }
-        if ($declared instanceof Op\Type\Literal && 'never' === strtolower($declared->name)) {
-            $this->throwCompileError('never cannot be used as a parameter type');
-        }
+        $this->assertNeverIsStandaloneType($declared);
         if (null !== $declared) {
             $block->paramDeclaredTypes[$slot] = $declared;
         }
@@ -2534,6 +2591,7 @@ class Compiler {
                     if (!is_null($child->defaultBlock)) {
                         $this->compileOps($child->defaultBlock->children, $result);
                     }
+                    $this->assertNeverIsStandaloneType($child->declaredType);
                     $propertyDeclName = $this->declNameFromCfgType($child->declaredType);
                     $declared = null !== $propertyDeclName
                         ? Type::fromDecl($propertyDeclName)
