@@ -49,4 +49,28 @@ final class ListSpreadAssignJitCompileTest extends TestCase
         $verify->invoke($context);
         $this->addToAssertionCount(1);
     }
+
+    public function testKeyedListSpreadAssignModuleVerify(): void
+    {
+        $path = $this->repoRoot.'/test/compliance/cases/language/list_destructuring_keyed_spread.phpt';
+        $code = file_get_contents($path);
+        $this->assertNotFalse($code);
+        if (preg_match('/--FILE--\s*\n(.*?)\n--EXPECT--/s', $code, $m)) {
+            $code = $m[1];
+        }
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, $path);
+        $this->assertNotNull($block);
+        $runtime->jitCompileBlock($block);
+
+        $context = $runtime->loadJitContext();
+        $bc = $context->module->printToString();
+        $this->assertStringContainsString('list_spread_tail', $bc);
+
+        $verify = new \ReflectionMethod($context, 'compileCommon');
+        $verify->setAccessible(true);
+        $verify->invoke($context);
+        $this->addToAssertionCount(1);
+    }
 }
