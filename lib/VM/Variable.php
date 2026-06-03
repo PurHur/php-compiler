@@ -215,6 +215,36 @@ final class Variable {
         return $this->dirResource && self::TYPE_INTEGER === $this->type;
     }
 
+    public function isVmResource(): bool
+    {
+        return $this->isStreamResource() || $this->isDirResource();
+    }
+
+    /**
+     * Zend zend_compare_resources: stream/dir handles compare by registry id, not bare int (#4699).
+     *
+     * @return bool|null null when neither operand is a VM resource tag
+     */
+    private static function compareVmResources(Variable $left, Variable $right): ?bool
+    {
+        $left = $left->resolveIndirect();
+        $right = $right->resolveIndirect();
+        $leftRes = $left->isVmResource();
+        $rightRes = $right->isVmResource();
+        if (!$leftRes && !$rightRes) {
+            return null;
+        }
+        if ($leftRes !== $rightRes) {
+            return false;
+        }
+        if ($left->streamResource !== $right->streamResource
+            || $left->dirResource !== $right->dirResource) {
+            return false;
+        }
+
+        return $left->integer === $right->integer;
+    }
+
     public function is(int $type): bool {
         if ($this->type === $type) {
             return true;
@@ -807,6 +837,10 @@ final class Variable {
         if (self::TYPE_STRING === $self->type) {
             return $self->string === $other->string;
         }
+        $resourceCmp = self::compareVmResources($self, $other);
+        if (null !== $resourceCmp) {
+            return $resourceCmp;
+        }
 
         return $self->equals($other);
     }
@@ -817,6 +851,11 @@ restart:
         $pair = type_pair($self->type, $other->type);
         switch ($pair) {
             case TYPE_PAIR_INTEGER_INTEGER:
+                $resourceCmp = self::compareVmResources($self, $other);
+                if (null !== $resourceCmp) {
+                    return $resourceCmp;
+                }
+
                 return $self->integer === $other->integer;
             case TYPE_PAIR_FLOAT_FLOAT:
                 return $self->float === $other->float;

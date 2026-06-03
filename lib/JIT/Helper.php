@@ -611,7 +611,11 @@ restart:
 
                         
 
-                        $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $leftValue, $__right);
+                        $result = JitValueCompare::nativeLongEqualWithResourceIdentity(
+                            $this->context,
+                            $leftValue,
+                            $__right
+                        );
     
                         goto return_bool;
                     case OpCode::TYPE_NOT_IDENTICAL:
@@ -649,7 +653,16 @@ restart:
 
                         
 
-                        $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $leftValue, $__right);
+                        $same = JitValueCompare::nativeLongEqualWithResourceIdentity(
+                            $this->context,
+                            $leftValue,
+                            $__right
+                        );
+                        $result = $this->context->builder->icmp(
+                            \PHPLLVM\Builder::INT_EQ,
+                            $same,
+                            $this->context->getTypeFromString('int1')->constInt(0, false)
+                        );
     
                         goto return_bool;
                     case OpCode::TYPE_NOT_IDENTICAL:
