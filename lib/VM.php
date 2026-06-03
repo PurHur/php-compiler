@@ -1267,6 +1267,35 @@ restart:
                         }
                     }
                     break;
+                case OpCode::TYPE_LIST_SPREAD_ASSIGN:
+                    $dest = $frame->scope[$op->arg1];
+                    $src = $frame->scope[$op->arg2]->resolveIndirect();
+                    if (Variable::TYPE_ARRAY !== $src->type) {
+                        if (null !== $op->block1) {
+                            $frame = $this->frameForBranch($frame, $op->block1);
+                            goto restart;
+                        }
+                        break;
+                    }
+                    if (!isset($frame->block->constants[$op->arg3])) {
+                        throw new \LogicException('list spread assign requires compile-time offset');
+                    }
+                    $offset = $frame->block->constants[$op->arg3]->toInt();
+                    $ht = $src->toArray();
+                    if (!\PHPCompiler\ext\standard\VmArray::isList($ht)) {
+                        $catchFrame = $this->dispatchVmTypeError(
+                            new \TypeError('Cannot unpack array with string keys'),
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
+                    $tail = $ht->sliceCopy($offset, null);
+                    $dest->array($tail);
+                    break;
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
                 case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:
                     $arg1 = $frame->scope[$op->arg1];

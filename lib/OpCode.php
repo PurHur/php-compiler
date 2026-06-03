@@ -186,6 +186,8 @@ class OpCode {
     const TYPE_FUNCTION_STATIC_INIT_STORE = 122;
     /** PHP 8.3+ `$needle in $haystack` strict contains (#4682). arg2=needle, arg3=haystack. */
     const TYPE_IN = 123;
+    /** `[$a, ...$rest] = $list` tail: arg1=dest, arg2=source array, arg3=from-index constant slot (#4835). */
+    const TYPE_LIST_SPREAD_ASSIGN = 124;
 
     public int $type;
     public ?int $arg1;
