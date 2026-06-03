@@ -250,9 +250,19 @@ restart:
                         $result = $this->context->builder->fsub($leftValue, $rightValue);
                         goto return_double;
                     case OpCode::TYPE_DIV:
+                        JitNumericDivisionGuard::emitZeroDoubleDivisorGuard(
+                            $this->context,
+                            $rightValue,
+                            'Division by zero'
+                        );
                         $result = $this->context->builder->fdiv($leftValue, $rightValue);
                         goto return_double;
                     case OpCode::TYPE_MODULO:
+                        JitNumericDivisionGuard::emitZeroDoubleDivisorGuard(
+                            $this->context,
+                            $rightValue,
+                            'Modulo by zero'
+                        );
                         $i64 = $this->context->getTypeFromString('int64');
                         $leftLong = $this->context->builder->fpToSi($leftValue, $i64);
                         $rightLong = $this->context->builder->fpToSi($rightValue, $i64);
@@ -353,49 +363,21 @@ restart:
                         goto return_long;
                     case OpCode::TYPE_DIV:
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
-                            
-                            
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-                            $result = $this->context->builder->signedDiv($leftValue, $__right);
-    
+                        JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                            $this->context,
+                            $__right,
+                            'Division by zero'
+                        );
+                        $result = $this->context->builder->signedDiv($leftValue, $__right);
                         goto return_long;
                     case OpCode::TYPE_MODULO:
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
-                            
-                            
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-
-                        
-                            $result = $this->context->builder->signedRem($leftValue, $__right);
-    
+                        JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                            $this->context,
+                            $__right,
+                            'Modulo by zero'
+                        );
+                        $result = $this->context->builder->signedRem($leftValue, $__right);
                         goto return_long;
                     case OpCode::TYPE_BITWISE_AND:
                     case OpCode::TYPE_BITWISE_OR:
@@ -813,6 +795,16 @@ restart:
                 $result = $this->context->builder->addNoSignedWrap($leftLong, $rightLong);
                 goto return_long;
             }
+            if (OpCode::TYPE_DIV === $opcode->type || OpCode::TYPE_MODULO === $opcode->type) {
+                $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
+                $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
+                $zeroMsg = OpCode::TYPE_MODULO === $opcode->type ? 'Modulo by zero' : 'Division by zero';
+                JitNumericDivisionGuard::emitZeroLongDivisorGuard($this->context, $rightLong, $zeroMsg);
+                $result = OpCode::TYPE_DIV === $opcode->type
+                    ? $this->context->builder->signedDiv($leftLong, $rightLong)
+                    : $this->context->builder->signedRem($leftLong, $rightLong);
+                goto return_long;
+            }
             switch ($opcode->type) {
                 case OpCode::TYPE_BITWISE_AND:
                 case OpCode::TYPE_BITWISE_OR:
@@ -886,6 +878,22 @@ restart:
                         goto return_long;
                     case OpCode::TYPE_MUL:
                         $result = $this->context->builder->mulNoSignedWrap($leftLong, $__right);
+                        goto return_long;
+                    case OpCode::TYPE_DIV:
+                        JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                            $this->context,
+                            $__right,
+                            'Division by zero'
+                        );
+                        $result = $this->context->builder->signedDiv($leftLong, $__right);
+                        goto return_long;
+                    case OpCode::TYPE_MODULO:
+                        JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                            $this->context,
+                            $__right,
+                            'Modulo by zero'
+                        );
+                        $result = $this->context->builder->signedRem($leftLong, $__right);
                         goto return_long;
                     case OpCode::TYPE_BITWISE_AND:
                         $result = $this->context->builder->bitwiseAnd($leftLong, $__right);
@@ -981,6 +989,22 @@ restart:
                         goto return_long;
                     case OpCode::TYPE_MUL:
                         $result = $this->context->builder->mulNoSignedWrap($__left, $rightLong);
+                        goto return_long;
+                    case OpCode::TYPE_DIV:
+                        JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                            $this->context,
+                            $rightLong,
+                            'Division by zero'
+                        );
+                        $result = $this->context->builder->signedDiv($__left, $rightLong);
+                        goto return_long;
+                    case OpCode::TYPE_MODULO:
+                        JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                            $this->context,
+                            $rightLong,
+                            'Modulo by zero'
+                        );
+                        $result = $this->context->builder->signedRem($__left, $rightLong);
                         goto return_long;
                     case OpCode::TYPE_BITWISE_AND:
                         $result = $this->context->builder->bitwiseAnd($__left, $rightLong);
