@@ -72,7 +72,8 @@ final class ObjectLifetime
 
     public static function releaseDirectObject(Variable $var): void
     {
-        if (Variable::TYPE_OBJECT === $var->type) {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $var->type && isset($var->object)) {
             self::releaseRef($var->toObject());
         }
     }

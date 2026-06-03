@@ -26,6 +26,23 @@ PHP;
         $this->assertSame('1', ob_get_clean());
     }
 
+    public function testWeakReferenceGetNullAfterCompareEchoUnset(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Box {}
+$o = new Box();
+$r = WeakReference::create($o);
+echo $r->get() !== null ? '1' : '0';
+unset($o);
+echo $r->get() === null ? '1' : '0';
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakref_compare.php'));
+        $this->assertSame('11', ob_get_clean());
+    }
+
     public function testWeakReferenceGetReturnsObjectWhileAlive(): void
     {
         $runtime = new Runtime();

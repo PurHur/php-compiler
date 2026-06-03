@@ -33,6 +33,7 @@ use PHPCompiler\VM\ObjectPropertyIterator;
 use PHPCompiler\VM\ScriptExit;
 use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\TypedPropertyReadSignal;
+use PHPCompiler\VM\WeakRefRegistry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
 
@@ -2202,8 +2203,30 @@ restart:
                     if (null === $op->arg3) {
                         if (null !== $op->arg2 && isset($frame->scope[$op->arg2])) {
                             $slot = $frame->scope[$op->arg2];
+                            $unsetTarget = $slot->resolveIndirect();
+                            if (null !== $frame->block && $frame->block->isMainScript()) {
+                                foreach ($frame->block->eachNamedScopeSlot() as [$globalName, $namedSlot]) {
+                                    if ($namedSlot === (int) $op->arg2) {
+                                        $this->context->clearGlobalByName($globalName);
+                                        break;
+                                    }
+                                }
+                            } elseif (
+                                Variable::TYPE_OBJECT === $unsetTarget->type
+                                && isset($unsetTarget->object)
+                            ) {
+                                WeakRefRegistry::clearForObject($unsetTarget->toObject()->id);
+                            }
                             // Break the local/reference binding only — never destroy the shared
                             // target (Zend unset on ref; foreach &$v cleanup #4997, #3517).
+                            $globalBinding = $slot->directIndirectTarget();
+                            if (
+                                null !== $globalBinding
+                                && $this->context->isGlobalStorage($globalBinding)
+                            ) {
+                                $globalBinding->reset();
+                                $globalBinding->type = Variable::TYPE_UNDEFINED;
+                            }
                             $slot->reset();
                             $slot->type = Variable::TYPE_UNDEFINED;
                         }
