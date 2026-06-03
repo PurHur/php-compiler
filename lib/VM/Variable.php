@@ -420,9 +420,32 @@ final class Variable {
                 return '<<';
             case OpCode::TYPE_SHIFT_RIGHT:
                 return '>>';
+            case OpCode::TYPE_BITWISE_AND:
+                return '&';
+            case OpCode::TYPE_BITWISE_OR:
+                return '|';
+            case OpCode::TYPE_BITWISE_XOR:
+                return '^';
             default:
                 return '?';
         }
+    }
+
+    private static function operandsValidForBitwiseOp(Variable $left, Variable $right): bool
+    {
+        if (self::TYPE_ARRAY === $left->type || self::TYPE_ARRAY === $right->type) {
+            return false;
+        }
+        if (self::TYPE_STRING_OFFSET === $left->type
+            || self::TYPE_STRING_OFFSET === $right->type
+            || self::TYPE_UNDEFINED === $left->type
+            || self::TYPE_UNDEFINED === $right->type
+            || self::isEnumCaseOperand($left)
+            || self::isEnumCaseOperand($right)) {
+            return false;
+        }
+
+        return true;
     }
 
     private static function throwUnsupportedOperandTypes(int $opCode, Variable $left, Variable $right): void
@@ -1615,6 +1638,9 @@ restart:
         } elseif ($pair === TYPE_PAIR_FLOAT_FLOAT) {
             $this->float($this->_bitwiseOp($opCode, $left->float, $right->float));
         } else {
+            if (!self::operandsValidForBitwiseOp($left, $right)) {
+                self::throwUnsupportedOperandTypes($opCode, $left, $right);
+            }
             $this->string($this->_bitwiseOp($opCode, $left->toString(), $right->toString()));
         }
     }
