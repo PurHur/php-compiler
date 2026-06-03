@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNumericDivisionGuard;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -43,7 +44,7 @@ final class intdiv extends Internal
             'num2'
         );
         if (0 === $num2) {
-            throw new \DivisionByZeroError('intdiv() division by zero');
+            throw new \DivisionByZeroError('Division by zero');
         }
         if (null === $frame->returnVar) {
             return;
@@ -60,6 +61,7 @@ final class intdiv extends Internal
             throw new \LogicException('intdiv() requires exactly two arguments');
         }
         [$left, $right] = JitIntdiv::lowerOperands($context, $args[0], $args[1]);
+        JitNumericDivisionGuard::emitZeroLongDivisorGuard($context, $right, 'Division by zero');
 
         return $context->builder->signedDiv($left, $right);
     }
