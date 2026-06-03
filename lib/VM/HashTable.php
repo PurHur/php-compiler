@@ -222,7 +222,7 @@ final class HashTable {
         if (is_null($result)) {
             $result = new Variable;
             if ($forWrite) {
-                if ($index->type === Variable::TYPE_INTEGER) {
+                if ($index->type === Variable::TYPE_INTEGER || $index->type === Variable::TYPE_FLOAT) {
                     return $this->addIndex($index->toInt(), $result);
                 }
                 $keyStr = $index->toString();
