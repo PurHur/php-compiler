@@ -1,8 +1,5 @@
 <?php
-// Maintainer repro for #4964 — echo array/object on JIT (with MCJIT embed bootstrap class).
-class EchoArrayJitBootstrap {
-    public function __toString(): string { return ''; }
-}
+// Maintainer repro for #4964 — echo array/object on JIT (file path; -r uses bin/jit.php embed bootstrap).
 echo [1, 2];
 echo "\n";
 class C {}
