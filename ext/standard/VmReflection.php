@@ -657,7 +657,10 @@ final class VmReflection
     {
         $object = $object->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $object->type) {
-            throw new \LogicException('get_object_vars() argument must be an object in this compiler build');
+            throw new \TypeError(\sprintf(
+                'get_object_vars(): Argument #1 ($object) must be of type object, %s given',
+                VmStreamArg::debugTypeName($object)
+            ));
         }
         $result = new Variable();
         $result->newArray();

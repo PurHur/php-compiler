@@ -5,17 +5,21 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /** LLVM lowering for get_object_vars() (issue #1370). */
 final class JitGetObjectVars
 {
+    private const TYPE_ERROR = 'get_object_vars(): Argument #1 ($object) must be of type object, %s given';
+
     public static function invoke(Context $context, JITVariable $objectArg): Value
     {
         $obj = self::resolveObject($context, $objectArg);
@@ -57,25 +61,68 @@ final class JitGetObjectVars
         if (JITVariable::TYPE_OBJECT === $objectArg->type) {
             return $context->helper->loadValue($objectArg);
         }
-        if (JITVariable::TYPE_VALUE !== $objectArg->type) {
-            throw new \LogicException('get_object_vars() argument must be an object in this compiler build');
+        if (JITVariable::TYPE_VALUE === $objectArg->type) {
+            return self::resolveBoxedObject($context, $objectArg);
         }
+
+        self::emitTypeErrorAndAbort($context, self::scalarTypeError($objectArg->type));
+
+        return $context->getTypeFromString('__object__*')->constNull();
+    }
+
+    private static function resolveBoxedObject(Context $context, JITVariable $objectArg): Value
+    {
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $objectArg);
+        $typeField = $context->structFieldMap['__value__']['type'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $typeField)
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_OBJECT, false)
+        );
+        $okBlock = BasicBlockHelper::append($context, 'get_object_vars_ok');
+        $errBlock = BasicBlockHelper::append($context, 'get_object_vars_err');
+        $context->builder->branchIf($isObject, $okBlock, $errBlock);
+
+        $context->builder->positionAtEnd($errBlock);
+        self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'mixed'));
+
+        $context->builder->positionAtEnd($okBlock);
         $obj = $context->builder->call(
             $context->lookupFunction('__value__readObject'),
             $valuePtr
         );
-        $objType = $context->getTypeFromString('__object__*');
-        $isObject = $context->builder->icmp(
-            Builder::INT_NE,
-            $obj,
-            $objType->constNull()
-        );
-        if (!$isObject) {
-            throw new \LogicException('get_object_vars() argument must be an object in this compiler build');
-        }
 
         return $obj;
+    }
+
+    private static function emitTypeErrorAndAbort(Context $context, string $message): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, $message);
+        $context->builder->call($context->lookupFunction('abort'));
+    }
+
+    private static function scalarTypeError(int $type): string
+    {
+        switch ($type) {
+            case JITVariable::TYPE_NATIVE_LONG:
+                return \sprintf(self::TYPE_ERROR, 'int');
+            case JITVariable::TYPE_NATIVE_DOUBLE:
+                return \sprintf(self::TYPE_ERROR, 'float');
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return \sprintf(self::TYPE_ERROR, 'bool');
+            case JITVariable::TYPE_STRING:
+                return \sprintf(self::TYPE_ERROR, 'string');
+            case JITVariable::TYPE_NULL:
+                return \sprintf(self::TYPE_ERROR, 'null');
+            default:
+                return \sprintf(self::TYPE_ERROR, 'mixed');
+        }
     }
 
     private static function appendInstanceProperties(
