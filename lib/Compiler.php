@@ -4988,6 +4988,10 @@ class Compiler {
 
     protected function functionStaticStorageKey(\PHPCfg\Func $func, string $varName): string
     {
+        if (((int) ($func->flags ?? 0)) & \PHPCfg\Func::FLAG_CLOSURE) {
+            return $varName;
+        }
+
         return $this->resolveFuncDisplayName($func)."\0".$varName;
     }
 

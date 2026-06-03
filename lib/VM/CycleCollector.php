@@ -130,6 +130,9 @@ final class CycleCollector
         foreach ($state->captures as $capture) {
             $visitVar($capture['var']);
         }
+        foreach ($state->staticRootsForCycleCollector() as $static) {
+            $visitVar($static);
+        }
     }
 
     /** @param callable(Variable): void $visitVar */

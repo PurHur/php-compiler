@@ -1214,11 +1214,11 @@ restart:
                         throw new \LogicException('Function static key must be a compile-time constant');
                     }
                     $storageKey = $frame->block->constants[$op->arg2]->toString();
-                    $storage = $this->context->ensureFunctionStatic($storageKey);
-                    if (!$this->context->isFunctionStaticInitialized($storageKey)) {
+                    $storage = $this->ensureFunctionStaticForFrame($frame, $storageKey);
+                    if (!$this->isFunctionStaticInitializedForFrame($frame, $storageKey)) {
                         if (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
                             $storage->copyFrom($frame->block->constants[$op->arg3]);
-                            $this->context->markFunctionStaticInitialized($storageKey);
+                            $this->markFunctionStaticInitializedForFrame($frame, $storageKey);
                         }
                     }
                     $frame->scope[$op->arg1]->indirect($storage);
@@ -1228,7 +1228,7 @@ restart:
                         throw new \LogicException('Function static key must be a compile-time constant');
                     }
                     $jumpKey = $frame->block->constants[$op->arg2]->toString();
-                    if ($this->context->isFunctionStaticInitialized($jumpKey)) {
+                    if ($this->isFunctionStaticInitializedForFrame($frame, $jumpKey)) {
                         $frame = $this->frameForBranch($frame, $op->block1);
                         goto restart;
                     }
@@ -1241,9 +1241,9 @@ restart:
                         throw new \LogicException('Function static init store requires a value slot');
                     }
                     $storeKey = $frame->block->constants[$op->arg2]->toString();
-                    $store = $this->context->ensureFunctionStatic($storeKey);
+                    $store = $this->ensureFunctionStaticForFrame($frame, $storeKey);
                     $store->copyFrom($frame->scope[$op->arg3]->resolveIndirect());
-                    $this->context->markFunctionStaticInitialized($storeKey);
+                    $this->markFunctionStaticInitializedForFrame($frame, $storeKey);
                     break;
                 case OpCode::TYPE_LIST_UNPACK_CHECK:
                     $unpack = $frame->scope[$op->arg2]->resolveIndirect();
@@ -2257,6 +2257,7 @@ restart:
                         $closureState = $callee->toObject()->closureState;
                         if (null !== $closureState) {
                             $this->initClosureCall($frame, $closureState);
+                            $frame->closureCallableSlot = $op->arg1;
                             break;
                         }
                         $catchFrame = $this->initMethodCall($frame, $callee, '__invoke');
@@ -2288,14 +2289,17 @@ restart:
                     if ($receiver->type !== Variable::TYPE_OBJECT) {
                         throw new \LogicException('Method call on non-object');
                     }
-                    $catchFrame = $this->initMethodCall(
-                        $frame,
-                        $receiver,
-                        $frame->scope[$op->arg2]->toString()
-                    );
+                    $methodName = $frame->scope[$op->arg2]->toString();
+                    $catchFrame = $this->initMethodCall($frame, $receiver, $methodName);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
                         goto restart;
+                    }
+                    if (
+                        '__invoke' === strtolower($methodName)
+                        && null !== $receiver->toObject()->closureState
+                    ) {
+                        $frame->closureCallableSlot = $op->arg1;
                     }
                     break;
                 case OpCode::TYPE_ARG_SEND:
@@ -2442,8 +2446,11 @@ restart:
                         $this->context,
                         $frame
                     );
-                    $this->applyClosureBinding($new, $frame->closureCall);
+                    $closureState = $this->resolvePendingClosureState($frame);
+                    $frame->closureCallableSlot = null;
                     $frame->closureCall = null;
+                    $frame->pendingClosureInvoke = null;
+                    $this->applyClosureBinding($new, $closureState);
                     if (null !== $new->block && null !== $new->block->func && (int) ($new->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) {
                         $thisIdx = $new->block->slotIndexForVariableName('this');
                         if (null !== $thisIdx) {
@@ -5370,6 +5377,57 @@ restart:
         return $captures;
     }
 
+    protected function resolvePendingClosureState(Frame $frame): ?ClosureState
+    {
+        if (null !== $frame->pendingClosureInvoke) {
+            return $frame->pendingClosureInvoke;
+        }
+        if (null !== $frame->closureCall) {
+            return $frame->closureCall;
+        }
+        if (null !== $frame->closureCallableSlot && isset($frame->scope[$frame->closureCallableSlot])) {
+            $callable = $frame->scope[$frame->closureCallableSlot]->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $callable->type) {
+                return $callable->toObject()->closureState;
+            }
+        }
+
+        return null;
+    }
+
+    protected function frameUsesClosureStaticStorage(Frame $frame): bool
+    {
+        return null !== $frame->closureCall;
+    }
+
+    protected function ensureFunctionStaticForFrame(Frame $frame, string $storageKey): Variable
+    {
+        if ($this->frameUsesClosureStaticStorage($frame)) {
+            return $frame->closureCall->ensureStatic($storageKey);
+        }
+
+        return $this->context->ensureFunctionStatic($storageKey);
+    }
+
+    protected function isFunctionStaticInitializedForFrame(Frame $frame, string $storageKey): bool
+    {
+        if ($this->frameUsesClosureStaticStorage($frame)) {
+            return $frame->closureCall->isStaticInitialized($storageKey);
+        }
+
+        return $this->context->isFunctionStaticInitialized($storageKey);
+    }
+
+    protected function markFunctionStaticInitializedForFrame(Frame $frame, string $storageKey): void
+    {
+        if ($this->frameUsesClosureStaticStorage($frame)) {
+            $frame->closureCall->markStaticInitialized($storageKey);
+
+            return;
+        }
+        $this->context->markFunctionStaticInitialized($storageKey);
+    }
+
     protected function bindClosureCallCaptures(Frame $callee, ?ClosureState $closureState): void
     {
         if (null === $closureState || [] === $closureState->captures) {
@@ -5406,6 +5464,7 @@ restart:
         }
         $frame->call = $state->func;
         $frame->closureCall = $state;
+        $frame->pendingClosureInvoke = $state;
         $frame->callArgs = [];
         $frame->callArgEntries = [];
     }
@@ -5416,6 +5475,7 @@ restart:
         if (null === $closureState) {
             return;
         }
+        $callee->closureCall = $closureState;
         if (null !== $closureState->boundThis) {
             $thisIdx = $closureState->func->block->slotIndexForVariableName('this');
             if (null !== $thisIdx) {

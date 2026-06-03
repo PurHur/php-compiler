@@ -756,8 +756,14 @@ class Block {
         $return = new Frame(null, $this, $frame);
         $return->scope = $scope;
         $return->scriptPath = $this->scriptPath();
-        if (!is_null($frame) && !is_null($frame->returnVar)) {
-            $return->returnVar = $frame->returnVar;
+        if (null !== $frame) {
+            if (null !== $frame->returnVar) {
+                $return->returnVar = $frame->returnVar;
+            }
+            // CFG branch targets (e.g. function-static init) must keep closure invoke context (#4872).
+            if (null !== $frame->closureCall) {
+                $return->closureCall = $frame->closureCall;
+            }
         }
         return $return;
     }
