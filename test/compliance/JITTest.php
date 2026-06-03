@@ -526,7 +526,7 @@ class JITTest extends BaseTest {
                 continue;
             }
             // Pipe operator (|>): VM + AOT via desugar (#3243, #4456); MCJIT in PipeOperatorJit*Test (#98).
-            if (str_contains($name, 'pipe_operator')) {
+            if (str_contains($name, 'pipe_operator') || str_contains($name, 'pipe_first_class')) {
                 continue;
             }
             yield $name => $case;

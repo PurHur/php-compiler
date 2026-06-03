@@ -56,4 +56,27 @@ PHP;
             PipeOperatorDesugar::desugar('<?php echo "hi" |> strtoupper(...);')
         );
     }
+
+    public function testDesugarBindsPipeFirstClassCallableForAssignment(): void
+    {
+        $this->assertSame(
+            '<?php $fn = (fn(...$__pipe_a) => strtoupper(...)("hi", ...$__pipe_a));',
+            PipeOperatorDesugar::desugar('<?php $fn = "hi" |> strtoupper(...);')
+        );
+    }
+
+    public function testVmPipeFirstClassCallableAssignmentIsClosure(): void
+    {
+        $code = <<<'PHP'
+<?php
+$fn = "hi" |> strtoupper(...);
+echo $fn instanceof Closure ? "closure\n" : get_debug_type($fn), "\n";
+echo $fn(), "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("closure\n\nHI\n", ob_get_clean());
+    }
 }
