@@ -362,10 +362,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'coalesce_assign_jit')) {
                 continue;
             }
-            // Chained ?? MCJIT: VM-only until nested coalesce JIT (#3798).
-            if (str_contains($name, 'coalesce_chain')) {
-                continue;
-            }
             // Implicit nullable `int $x = null` default: VM (#4449); MCJIT execute segfault.
             if (str_contains($name, 'implicit_nullable_param')) {
                 continue;
