@@ -194,10 +194,15 @@ final class UnsetHelper
                     $context->jitEnclosingBlock,
                     'unset'
                 );
-                $context->type->object->propertyStore(
-                    $prop->objectPropertySlot,
-                    $null,
-                    $prop->objectPropertyType
+                ReadonlyClassGuard::emitStoreUnlessPending(
+                    $context,
+                    static function () use ($context, $prop, $null): void {
+                        $context->type->object->propertyStore(
+                            $prop->objectPropertySlot,
+                            $null,
+                            $prop->objectPropertyType
+                        );
+                    }
                 );
             }
 
@@ -212,10 +217,15 @@ final class UnsetHelper
                 $context->jitEnclosingBlock,
                 'unset'
             );
-            $context->type->object->propertyStore(
-                $prop->objectPropertySlot,
-                $null,
-                $prop->objectPropertyType
+            ReadonlyClassGuard::emitStoreUnlessPending(
+                $context,
+                static function () use ($context, $prop, $null): void {
+                    $context->type->object->propertyStore(
+                        $prop->objectPropertySlot,
+                        $null,
+                        $prop->objectPropertyType
+                    );
+                }
             );
         }
     }
