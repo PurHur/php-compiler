@@ -189,6 +189,8 @@ return_bool:
         if (OpCode::TYPE_BITWISE_AND === $opcode->type
             || OpCode::TYPE_BITWISE_OR === $opcode->type
             || OpCode::TYPE_BITWISE_XOR === $opcode->type
+            || OpCode::TYPE_SHIFT_LEFT === $opcode->type
+            || OpCode::TYPE_SHIFT_RIGHT === $opcode->type
         ) {
             $folded = $this->tryFoldCoreIntBitwise($opcode->type, $left, $right);
             if (null !== $folded) {
@@ -1417,6 +1419,18 @@ restart:
                 );
                 goto return_bool;
             }
+            if (OpCode::TYPE_SHIFT_LEFT === $opcode->type) {
+                $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
+                $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
+                $result = $this->context->builder->shl($leftLong, $__right);
+                goto return_long;
+            }
+            if (OpCode::TYPE_SHIFT_RIGHT === $opcode->type) {
+                $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
+                $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
+                $result = $this->context->builder->aShr($leftLong, $__right);
+                goto return_long;
+            }
         }
         if (Variable::TYPE_NATIVE_LONG === $leftType && Variable::TYPE_STRING === $rightType) {
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
@@ -1447,6 +1461,18 @@ restart:
                     $this->context->getTypeFromString('int1')->constInt(0, false)
                 );
                 goto return_bool;
+            }
+            if (OpCode::TYPE_SHIFT_LEFT === $opcode->type) {
+                $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
+                $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
+                $result = $this->context->builder->shl($__left, $rightLong);
+                goto return_long;
+            }
+            if (OpCode::TYPE_SHIFT_RIGHT === $opcode->type) {
+                $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
+                $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
+                $result = $this->context->builder->aShr($__left, $rightLong);
+                goto return_long;
             }
         }
         if (Variable::TYPE_STRING === $leftType && Variable::TYPE_NATIVE_DOUBLE === $rightType) {
@@ -1672,6 +1698,8 @@ return_bool:
             OpCode::TYPE_BITWISE_AND => $leftInt & $rightInt,
             OpCode::TYPE_BITWISE_OR => $leftInt | $rightInt,
             OpCode::TYPE_BITWISE_XOR => $leftInt ^ $rightInt,
+            OpCode::TYPE_SHIFT_LEFT => $leftInt << $rightInt,
+            OpCode::TYPE_SHIFT_RIGHT => $leftInt >> $rightInt,
             default => null,
         };
     }
@@ -1685,6 +1713,11 @@ return_bool:
             if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
                 return (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
             }
+        }
+
+        $literal = $var->compileTimeString ?? null;
+        if (null !== $literal && is_numeric($literal) && ((string) (int) $literal) === $literal) {
+            return (int) $literal;
         }
 
         $name = $var->compileTimeConstantName ?? null;

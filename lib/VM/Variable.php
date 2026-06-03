@@ -1555,6 +1555,8 @@ restart:
         } elseif ($right->type === self::TYPE_INDIRECT) {
             $right = $right->indirect;
             goto restart;
+        } elseif (OpCode::TYPE_SHIFT_LEFT === $opCode || OpCode::TYPE_SHIFT_RIGHT === $opCode) {
+            $this->int($this->_bitwiseOp($opCode, $left->toNumeric(), $right->toNumeric()));
         } else {
             $this->string($this->_bitwiseOp($opCode, $left->toString(), $right->toString()));
         }
