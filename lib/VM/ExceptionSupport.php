@@ -17,6 +17,18 @@ final class ExceptionSupport
     public const CLASS_THROWABLE = 'throwable';
     public const CLASS_EXCEPTION = 'exception';
     public const CLASS_LOGIC_EXCEPTION = 'logicexception';
+    public const CLASS_BAD_FUNCTION_CALL_EXCEPTION = 'badfunctioncallexception';
+    public const CLASS_BAD_METHOD_CALL_EXCEPTION = 'badmethodcallexception';
+    public const CLASS_DOMAIN_EXCEPTION = 'domainexception';
+    public const CLASS_INVALID_ARGUMENT_EXCEPTION = 'invalidargumentexception';
+    public const CLASS_LENGTH_EXCEPTION = 'lengthexception';
+    public const CLASS_OUT_OF_RANGE_EXCEPTION = 'outofrangeexception';
+    public const CLASS_RUNTIME_EXCEPTION = 'runtimeexception';
+    public const CLASS_OUT_OF_BOUNDS_EXCEPTION = 'outofboundsexception';
+    public const CLASS_OVERFLOW_EXCEPTION = 'overflowexception';
+    public const CLASS_RANGE_EXCEPTION = 'rangeexception';
+    public const CLASS_UNDERFLOW_EXCEPTION = 'underflowexception';
+    public const CLASS_UNEXPECTED_VALUE_EXCEPTION = 'unexpectedvalueexception';
     public const CLASS_ERROR = 'error';
     public const CLASS_TYPE_ERROR = 'typeerror';
     public const CLASS_VALUE_ERROR = 'valueerror';
@@ -58,7 +70,7 @@ final class ExceptionSupport
             return InterfaceCheck::entryImplements($class, self::CLASS_THROWABLE, $ctx);
         }
         $lc = strtolower($class->name);
-        if (self::CLASS_EXCEPTION === $lc || self::CLASS_ERROR === $lc || self::CLASS_LOGIC_EXCEPTION === $lc) {
+        if (self::isBuiltinExceptionSubclass($lc) || self::CLASS_ERROR === $lc) {
             return true;
         }
         if (self::isBuiltinErrorSubclass($lc)) {
@@ -66,6 +78,26 @@ final class ExceptionSupport
         }
 
         return in_array(self::CLASS_THROWABLE, $class->interfaces, true);
+    }
+
+    public static function isBuiltinExceptionSubclass(string $lc): bool
+    {
+        return in_array($lc, [
+            self::CLASS_EXCEPTION,
+            self::CLASS_LOGIC_EXCEPTION,
+            self::CLASS_BAD_FUNCTION_CALL_EXCEPTION,
+            self::CLASS_BAD_METHOD_CALL_EXCEPTION,
+            self::CLASS_DOMAIN_EXCEPTION,
+            self::CLASS_INVALID_ARGUMENT_EXCEPTION,
+            self::CLASS_LENGTH_EXCEPTION,
+            self::CLASS_OUT_OF_RANGE_EXCEPTION,
+            self::CLASS_RUNTIME_EXCEPTION,
+            self::CLASS_OUT_OF_BOUNDS_EXCEPTION,
+            self::CLASS_OVERFLOW_EXCEPTION,
+            self::CLASS_RANGE_EXCEPTION,
+            self::CLASS_UNDERFLOW_EXCEPTION,
+            self::CLASS_UNEXPECTED_VALUE_EXCEPTION,
+        ], true);
     }
 
     public static function isBuiltinErrorSubclass(string $lc): bool
@@ -192,6 +224,18 @@ final class ExceptionSupport
             self::CLASS_FIBER_ERROR => new \Error('FiberError: '.$message),
             self::CLASS_ERROR => new \Error($message),
             self::CLASS_LOGIC_EXCEPTION => new \LogicException($message),
+            self::CLASS_BAD_FUNCTION_CALL_EXCEPTION => new \BadFunctionCallException($message),
+            self::CLASS_BAD_METHOD_CALL_EXCEPTION => new \BadMethodCallException($message),
+            self::CLASS_DOMAIN_EXCEPTION => new \DomainException($message),
+            self::CLASS_INVALID_ARGUMENT_EXCEPTION => new \InvalidArgumentException($message),
+            self::CLASS_LENGTH_EXCEPTION => new \LengthException($message),
+            self::CLASS_OUT_OF_RANGE_EXCEPTION => new \OutOfRangeException($message),
+            self::CLASS_RUNTIME_EXCEPTION => new \RuntimeException($message),
+            self::CLASS_OUT_OF_BOUNDS_EXCEPTION => new \OutOfBoundsException($message),
+            self::CLASS_OVERFLOW_EXCEPTION => new \OverflowException($message),
+            self::CLASS_RANGE_EXCEPTION => new \RangeException($message),
+            self::CLASS_UNDERFLOW_EXCEPTION => new \UnderflowException($message),
+            self::CLASS_UNEXPECTED_VALUE_EXCEPTION => new \UnexpectedValueException($message),
             self::CLASS_EXCEPTION => new \Exception($message),
             default => new \Exception($message),
         };
