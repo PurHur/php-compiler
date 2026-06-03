@@ -98,6 +98,58 @@ final class ArrayBuiltinHelper
     }
 
     /**
+     * array_push($stack, ...$values) when JIT merges call-time unpack into one packed list (#1361, #4721).
+     *
+     * php-src: ext/standard/array.c — zero-length spread is a no-op; stack is argument #1.
+     */
+    public static function pushMergedCallUnpack(Context $context, Variable $packed): Value
+    {
+        $packedPtr = $context->helper->loadValue($packed);
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $stackBox = HashTableHelper::readIndexedToValueBox($context, $packedPtr, $zero);
+        $stackVar = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $stackBox->value
+        );
+        $stackHt = self::loadHashTable($context, $stackVar);
+        $count = $context->builder->truncOrBitCast(
+            self::getNumElements($context, $packedPtr),
+            $sizeT
+        );
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($one, $idxSlot);
+        $tag = (string) ++self::$copyListEntrySeq;
+        $head = BasicBlockHelper::append($context, 'array_push_unpack_head_'.$tag);
+        $body = BasicBlockHelper::append($context, 'array_push_unpack_body_'.$tag);
+        $advance = BasicBlockHelper::append($context, 'array_push_unpack_advance_'.$tag);
+        $done = BasicBlockHelper::append($context, 'array_push_unpack_done_'.$tag);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $value = HashTableHelper::readIndexedToValueBox($context, $packedPtr, $idx);
+        self::appendElement($context, $stackHt, $value);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+        HashTableHelper::storeHashtableInArrayVariable($context, $stackVar, $stackHt);
+
+        return self::getNumElements($context, $stackHt);
+    }
+
+    /**
      * Prepend values to a packed list hashtable; returns new element count.
      */
     public static function unshift(Context $context, Variable $array, Variable ...$values): Value
