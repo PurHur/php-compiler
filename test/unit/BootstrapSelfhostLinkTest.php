@@ -34,6 +34,9 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('bootstrap_gen0_copy_prelinked_inventory_driver', $install);
         $this->assertStringContainsString('#2930', $install);
         $this->assertStringContainsString('compiler_minimal_aot_blob', $install);
+        $this->assertStringContainsString('bootstrap_ensure_m3_compiler_lib_sidecar', $install);
+        $this->assertStringContainsString('.m3_compiler_lib_aot_blob', $install);
+        $this->assertStringContainsString('bootstrap_compiler_lib_spine_entry_sha', $install);
         $this->assertFileExists(self::$root.'/prelinked/bootstrap-gen0/bin-compile-aot');
         $this->assertFileExists(self::$root.'/prelinked/bootstrap-gen0/compiler_minimal_aot_blob');
     }
@@ -50,6 +53,7 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('build/bin-compile-aot-inventory', $body);
         $this->assertStringContainsString('exited 0 but missing', $body);
         $this->assertStringContainsString('bootstrap_gen0_seed_prelinked_m3_sidecars', $body);
+        $this->assertStringContainsString('bootstrap_ensure_m3_compiler_lib_sidecar', $body);
         $this->assertStringContainsString('build/selfhost-compile-driver', $body);
         $this->assertStringContainsString('build/bin-compile-aot', $body);
         $this->assertStringContainsString(

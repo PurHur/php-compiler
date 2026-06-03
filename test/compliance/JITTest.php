@@ -66,7 +66,7 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'strspn_empty_mask')) {
                 continue;
             }
-            // substr_count() offset/length: VM + AOT (#4105); MCJIT phpc_substr_count execute pending.
+            // substr_count() offset/length: VM + AOT via inline LLVM (#4105, #5188); MCJIT execute pending.
             if (str_contains($name, 'substr_count')) {
                 continue;
             }
@@ -372,10 +372,6 @@ class JITTest extends BaseTest {
             }
             // int <=> non-numeric string: MCJIT lowering landed (#4681); execute gated like spaceship_operator_jit.
             if (str_contains($name, 'spaceship_int_nonnumeric')) {
-                continue;
-            }
-            // NaN spaceship/relational: VM + AOT via phpc_double_spaceship (#4712); MCJIT native double <=> verify/execute pending.
-            if (str_contains($name, 'nan_relational')) {
                 continue;
             }
             // gettype() object/resource is VM-only until __compiler_gettype JIT path is stable (#3618).

@@ -2089,7 +2089,11 @@ class Compiler {
         $methodName = new Operand\Literal($child->func->name);
         $methodName->type = Type::string();
         $visVar = new Variable(Variable::TYPE_INTEGER);
-        $visVar->int(MethodVisibility::mask($child->func->flags));
+        $visFlags = MethodVisibility::mask($child->func->flags);
+        if (($child->func->flags & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+            $visFlags |= \PHPCfg\Func::FLAG_STATIC;
+        }
+        $visVar->int($visFlags);
         $visOperand = new Operand\Temporary;
         $visOperand->type = Type::int();
         $visIdx = $result->registerConstant($visOperand, $visVar);
@@ -2729,6 +2733,14 @@ class Compiler {
 
     protected function compileClassConstDeclaration(Op\Terminal\Const_ $child, Block $result): void
     {
+        $constName = $this->staticNameFromOperand($child->name);
+        if (null !== $constName && null !== $this->compilingClassLc) {
+            $lc = strtolower($constName);
+            if (isset($this->compileTimeClassConsts[$this->compilingClassLc][$lc])) {
+                $class = $this->compilingClassDisplayName ?? 'class';
+                $this->throwCompileError(sprintf('Cannot redefine class constant %s::%s', $class, $constName));
+            }
+        }
         $valueSlot = $this->tryFoldClassConstValueSlot($child, $result);
         if (null === $valueSlot) {
             $this->compileOps($child->valueBlock->children, $result);

@@ -178,36 +178,22 @@ restart:
                     case OpCode::TYPE_BITWISE_XOR:
                         break;
                     case OpCode::TYPE_GREATER_OR_EQUAL:
-                        $result = $this->context->builder->fcmp(Builder::REAL_OGE, $leftValue, $rightValue);
-                        goto return_bool;
                     case OpCode::TYPE_SMALLER_OR_EQUAL:
-                        $result = $this->context->builder->fcmp(Builder::REAL_OLE, $leftValue, $rightValue);
-                        goto return_bool;
                     case OpCode::TYPE_GREATER:
-                        $result = $this->context->builder->fcmp(Builder::REAL_OGT, $leftValue, $rightValue);
-                        goto return_bool;
                     case OpCode::TYPE_SMALLER:
-                        $result = $this->context->builder->fcmp(Builder::REAL_OLT, $leftValue, $rightValue);
-                        goto return_bool;
                     case OpCode::TYPE_IDENTICAL:
                     case OpCode::TYPE_EQUAL:
-                        $result = $this->context->builder->fcmp(Builder::REAL_OEQ, $leftValue, $rightValue);
-                        goto return_bool;
                     case OpCode::TYPE_NOT_IDENTICAL:
                     case OpCode::TYPE_NOT_EQUAL:
-                    case OpCode::TYPE_NOT_IDENTICAL:
-                        $result = $this->context->builder->fcmp(Builder::REAL_ONE, $leftValue, $rightValue);
+                        $result = JitFloatCompare::relationalCompare(
+                            $this->context,
+                            $opcode->type,
+                            $leftValue,
+                            $rightValue
+                        );
                         goto return_bool;
                     case OpCode::TYPE_SPACESHIP:
-                        compile {
-                            if ($leftValue < $rightValue) {
-                                $result = -1;
-                            } elseif ($leftValue > $rightValue) {
-                                $result = 1;
-                            } else {
-                                $result = 0;
-                            }
-                        }
+                        $result = JitFloatCompare::spaceship($this->context, $leftValue, $rightValue);
                         goto return_long;
                 }
                 break;
@@ -393,6 +379,17 @@ restart:
                 }
                 break;
             case TYPE_PAIR_STRING_STRING:
+                if (OpCode::TYPE_MODULO === $opcode->type) {
+                    $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
+                    $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
+                    JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                        $this->context,
+                        $rightLong,
+                        'Modulo by zero'
+                    );
+                    $result = $this->context->builder->signedRem($leftLong, $rightLong);
+                    goto return_long;
+                }
                 $result = JitStringCompare::binaryOp($this->context, $opcode, $leftValue, $rightValue);
                 goto return_bool;
         }

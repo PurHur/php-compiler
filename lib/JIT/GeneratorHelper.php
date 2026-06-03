@@ -1419,8 +1419,7 @@ final class GeneratorHelper
         $context->builder->branch($invalidContainerBb);
 
         $context->builder->positionAtEnd($failBb);
-        $i64 = $context->getTypeFromString('int64');
-        self::emitYieldFromTypeErrorAndFinish($context, $stateParam, $map, $i1, $i64);
+        self::emitYieldFromStringErrorAndFinish($context, $stateParam, $map, $i1, $context->getTypeFromString('int64'));
     }
 
     private static function llvmInternalName(string $name): string

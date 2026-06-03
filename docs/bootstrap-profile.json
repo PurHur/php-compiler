@@ -937,7 +937,6 @@
         "lib/JIT/Builtin/StringMicrotime.php",
         "lib/JIT/Builtin/StringNetworkServices.php",
         "lib/JIT/Builtin/StringNl2br.php",
-        "lib/JIT/Builtin/StringNl2brRuntime.php",
         "lib/JIT/Builtin/StringParseStr.php",
         "lib/JIT/Builtin/StringPasswordCrypto.php",
         "lib/JIT/Builtin/StringPregMatch.php",

@@ -11,30 +11,12 @@ declare(strict_types=1);
 
 use PHPCompiler\Runtime;
 use PHPCompiler\Block;
+use PHPCompiler\JitMcjitEmbed;
 use PHPCompiler\Web\Superglobals;
 
-/**
- * MCJIT embed needs at least one user class in the module init table (#4964, #98).
- * Inert bootstrap for classless -r / stdin snippets until bare-module execute is stable.
- */
 function php_compiler_jit_prepare_embed_code(string $filename, string $code): string
 {
-    if ('Command line code' !== $filename && '-' !== $filename) {
-        return $code;
-    }
-    if (preg_match('/\b(class|interface|trait|enum)\b/i', $code)) {
-        return $code;
-    }
-    if (!preg_match('/^<\?php\s/', $code)) {
-        return $code;
-    }
-
-    return preg_replace(
-        '/^<\?php\s*/',
-        '<?php class __phpc_mcjit_embed_bootstrap { public function __toString(): string { return ""; } } ',
-        $code,
-        1
-    ) ?? $code;
+    return JitMcjitEmbed::prepareClassless($code);
 }
 
 /**

@@ -33,6 +33,7 @@ final class ReflectionNative
                 ['phpc_attr_method_count', $sizeT, [$i8p, $i8p]],
                 ['phpc_attr_method_name_at', $i8p, [$i8p, $i8p, $sizeT]],
                 ['phpc_attr_class_args_hashtable', $context->getTypeFromString('__hashtable__*'), [$i8p, $sizeT]],
+                ['phpc_attr_class_string_arg', $i8p, [$i8p, $sizeT, $sizeT]],
             ] as [$name, $ret, $params]
         ) {
             $existing = $context->module->getNamedFunction($name);

@@ -1832,6 +1832,87 @@ class Block {
         return false;
     }
 
+    /**
+     * Interface abstract static + static call: MCJIT execute segfault (#5090); VM matches Zend.
+     */
+    public static function containsInterfaceAbstractStaticMcjitDeferral(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $hasAbstractIfaceStatic = false;
+        $hasStaticCall = false;
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_STATICCALL_INIT === $op->type) {
+                    $hasStaticCall = true;
+                }
+                if (OpCode::TYPE_DECLARE_INTERFACE === $op->type && $op->block1 instanceof self) {
+                    foreach ($op->block1->opCodes as $memberOp) {
+                        if (OpCode::TYPE_DECLARE_METHOD !== $memberOp->type || null !== $memberOp->block1) {
+                            continue;
+                        }
+                        $visFlags = Func::FLAG_PUBLIC;
+                        if (null !== $memberOp->arg3 && isset($op->block1->constants[$memberOp->arg3])) {
+                            $visFlags = $op->block1->constants[$memberOp->arg3]->toInt();
+                        }
+                        if (($visFlags & Func::FLAG_STATIC) !== 0) {
+                            $hasAbstractIfaceStatic = true;
+                        }
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return $hasAbstractIfaceStatic && $hasStaticCall;
+    }
+
+    /**
+     * ReflectionAttribute::newInstance() MCJIT execute segfaults (#4598); VM path matches Zend.
+     */
+    public static function containsReflectionAttributeNewInstanceOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_METHODCALL_INIT === $op->type) {
+                    $nameOp = $block->getOperand($op->arg2);
+                    if ($nameOp instanceof Operand\Literal && 'newinstance' === strtolower($nameOp->value)) {
+                        return true;
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     public static function requiresVmLowering(?self $root): bool
     {
         return self::containsGeneratorOpcodesInScriptScope($root)
@@ -1843,6 +1924,8 @@ class Block {
             || self::containsReadonlyClassOpcodes($root)
             || self::containsDynamicPropertyDeprecationOpcodes($root)
             || self::containsFiberSuspendOpcodes($root)
-            || self::containsTraitConstructorOpcodes($root);
+            || self::containsTraitConstructorOpcodes($root)
+            || self::containsReflectionAttributeNewInstanceOpcodes($root)
+            || self::containsInterfaceAbstractStaticMcjitDeferral($root);
     }
 }

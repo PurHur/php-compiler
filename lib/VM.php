@@ -322,6 +322,14 @@ class VM {
             $getLc = $meta?->getHookMethodLc
                 ?? strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($propName));
             if (isset($object->class->methods[$getLc])) {
+                // unset() clears backing storage; isset must not invoke get on uninitialized slot (#5191).
+                if (null !== $meta && null !== $meta->setHookMethodLc) {
+                    $props = $object->getRawProperties();
+                    if (isset($props[$propName])
+                        && VM\TypedPropertyCheck::isUninitialized($props[$propName])) {
+                        return false;
+                    }
+                }
                 $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
                 if (null !== $hookValue) {
                     $value = $hookValue->resolveIndirect();
@@ -3244,6 +3252,9 @@ restart:
                             $gen->yieldFromContainer->copyFrom($container);
                             $container->toObject()->generatorState->rewind();
                         } elseif (Variable::TYPE_OBJECT === $container->type) {
+                            if (!$this->yieldFromContainerIsTraversable($container)) {
+                                $this->throwYieldFromInvalidContainer($container);
+                            }
                             $iterable = VM\ForeachIterator::resolveTraversableObject($this, $frame, $container);
                             $gen->yieldFromContainer->copyFrom($iterable);
                             if ($this->variableIsGenerator($iterable)) {
@@ -3870,6 +3881,12 @@ restart:
             return $this->dispatchVmError($e->getMessage(), $callerFrame);
         } catch (VM\GeneratorUncaughtThrow $e) {
             return $this->dispatchUncaughtGeneratorThrow($e->thrown, $callerFrame);
+        } catch (\Exception $e) {
+            if ($e instanceof \LogicException) {
+                throw $e;
+            }
+
+            return $this->dispatchVmEngineException($e->getMessage(), $callerFrame);
         } catch (VM\MagicMethodInvocationAborted) {
             $this->clearTryCatchUnwindState();
             $callerFrame->call = null;
@@ -3885,6 +3902,19 @@ restart:
     private function dispatchUncaughtGeneratorThrow(Variable $thrown, Frame $callerFrame): ?Frame
     {
         $catchFrame = $this->findCatchFrameForThrow($callerFrame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /** Bridge native Exception from builtins (e.g. Generator::rewind after run, #5195). */
+    private function dispatchVmEngineException(string $message, Frame $frame): ?Frame
+    {
+        $thrown = $this->makeEngineError($message, 'Exception');
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
             return $catchFrame;
         }
@@ -5204,15 +5234,31 @@ restart:
     }
 
     /**
-     * @throws \Error|\TypeError zend_generators.c yield-from container validation (#4909)
+     * @throws \Error zend_generators.c yield-from container validation (#4909, #5195)
      */
     private function throwYieldFromInvalidContainer(VM\Variable $container): void
     {
-        if (VM\Variable::TYPE_STRING === $container->type) {
-            throw new \Error('Can use "yield from" only with arrays and Traversables');
+        throw new \Error('Can use "yield from" only with arrays and Traversables');
+    }
+
+    private function yieldFromContainerIsTraversable(VM\Variable $container): bool
+    {
+        $container = $container->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $container->type) {
+            return true;
+        }
+        if ($this->variableIsGenerator($container)) {
+            return true;
+        }
+        if (Variable::TYPE_OBJECT !== $container->type) {
+            return false;
+        }
+        $entry = $container->toObject()->class;
+        if (VM\InterfaceCheck::entryImplements($entry, 'iteratoraggregate', $this->context)) {
+            return true;
         }
 
-        throw new \TypeError('Can only use yield from on Traversable|array');
+        return VM\ForeachIterator::entryImplementsIteratorProtocol($entry, $this->context);
     }
 
     private function findGeneratorState(Frame $frame): ?GeneratorState
@@ -5337,6 +5383,7 @@ restart:
             $gen->frame->generatorState = $gen;
             $gen->frame->pos = 0;
         }
+        $gen->started = true;
         $savedStack = $this->context->swapRunStack(null);
         try {
             $this->context->push($gen->frame);
