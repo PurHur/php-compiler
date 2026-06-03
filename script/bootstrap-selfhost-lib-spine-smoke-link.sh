@@ -8,7 +8,10 @@ OUT="${ROOT}/build/selfhost-lib-spine-smoke"
 source "$(dirname "$0")/php-env.sh"
 # shellcheck source=bootstrap-resolve-compile-invoke.sh
 source "$(dirname "$0")/bootstrap-resolve-compile-invoke.sh"
+# shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+source "$(dirname "$0")/bootstrap-gen0-install-prelinked-driver.sh"
 ci_apply_llvm_memory_env
+ci_ensure_vendor_patches
 
 bootstrap_spine_emit_crash_diag() {
   local binary="$1"

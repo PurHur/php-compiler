@@ -39,6 +39,15 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
         $this->assertStringContainsString('bootstrap_spine_emit_crash_diag', $script);
     }
 
+    public function testLibSpineLinkScriptSeedsSidecarsAndGen0Fallback(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-lib-spine-smoke-link.sh');
+        $this->assertStringContainsString('bootstrap-gen0-install-prelinked-driver.sh', $script);
+        $this->assertStringContainsString('ci_ensure_vendor_patches', $script);
+        $this->assertStringContainsString('BOOTSTRAP_LIB_SPINE_SMOKE_GEN0_FALLBACK', $script);
+        $this->assertStringContainsString('gen-0 Zend fallback', $script);
+    }
+
     public function testSpineEntryBundlesBinVmPhp(): void
     {
         $entry = (string) file_get_contents(self::$root.'/test/selfhost/compiler_lib_spine_smoke/main.php');

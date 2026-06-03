@@ -152,6 +152,8 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_MODE=compile', $source);
         $this->assertStringContainsString('.m3_bin_compile_aot_blob', $source);
         $this->assertStringContainsString('PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1', $source);
+        $this->assertStringContainsString('BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED', $source);
+        $this->assertStringContainsString('#2930', $source);
     }
 
     /** Issue #2880: M4 full-revision probe script and native argv main for bin/compile.php. */

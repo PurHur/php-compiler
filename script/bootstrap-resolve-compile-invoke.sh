@@ -117,6 +117,11 @@ bootstrap_ensure_inventory_argv_driver() {
     return 1
   fi
   echo "bootstrap-ensure-inventory-argv-driver: building inventory argv driver ${out} (#3012)" >&2
+  if ! declare -F bootstrap_gen0_seed_prelinked_m3_sidecars >/dev/null 2>&1; then
+    # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-gen0-install-prelinked-driver.sh"
+  fi
+  bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
   if ! env PHP_COMPILER_M3_SOURCE="${root}/bin/compile.php" PHP_COMPILER_M3_OUT="${out}" \
     "${root}/script/bootstrap-selfhost-helloworld-compile-bin.sh"; then
     local prelink="${root}/prelinked/bootstrap-gen0/bin-compile-aot"
@@ -277,7 +282,12 @@ bootstrap_compile_invoke() {
         return 0
       fi
     fi
-    echo "bootstrap-compile-invoke: compiled driver ${BOOTSTRAP_COMPILE_DRIVER} failed (exit ${last_code})" >&2
+    if [[ "${last_code}" -eq 0 && ! -x "${out}" ]]; then
+      echo "bootstrap-compile-invoke: compiled driver ${BOOTSTRAP_COMPILE_DRIVER} exited 0 but missing ${out} (#3046)" >&2
+      last_code=1
+    else
+      echo "bootstrap-compile-invoke: compiled driver ${BOOTSTRAP_COMPILE_DRIVER} failed (exit ${last_code})" >&2
+    fi
     if [[ -n "${PHP_COMPILER_JIT_ENTRY_FILE:-}" && -f "${PHP_COMPILER_JIT_ENTRY_FILE}" ]]; then
       echo "bootstrap-compile-invoke: last entry: $(cat "${PHP_COMPILER_JIT_ENTRY_FILE}" 2>/dev/null || true)" >&2
     fi

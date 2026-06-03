@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+@@ -525,7 +525,7 @@ class Type
+             }
+         }
+         if (empty($new)) {
+-            throw new \LogicException('Unknown type encountered');
++            return self::mixed();
+         }
+         if (count($new) === 1) {
+             return $new[0];
