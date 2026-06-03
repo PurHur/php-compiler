@@ -3038,7 +3038,7 @@ class Object_ extends Type {
             return;
         }
         $classLabel = $this->classNameForId($classId);
-        if (!$this->isTraitClass(strtolower(ltrim($classLabel, '\\'))) {
+        if (!$this->isTraitClass(strtolower(ltrim($classLabel, '\\')))) {
             return;
         }
         ErrorRaise::ensureLinked($this->context);
