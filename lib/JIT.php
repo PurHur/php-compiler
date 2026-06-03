@@ -5582,7 +5582,12 @@ class JIT {
                                 break;
                             }
                             $value = $this->context->type->object->classConstFetch($classId, $nameOp->value);
-                            $this->assignOperand($block->getOperand($op->arg1), $value);
+                            $resultOp = $block->getOperand($op->arg1);
+                            if ($this->context->type->object->isEnumClassId($classId)
+                                && $classOp instanceof Operand\Literal) {
+                                $resultOp->type = Type::object($classOp->value);
+                            }
+                            $this->assignOperand($resultOp, $value);
                             break;
                         }
                         $nameVar = $this->context->getVariableFromOp($nameOp);

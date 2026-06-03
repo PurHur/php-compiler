@@ -3978,11 +3978,124 @@ class Object_ extends Type {
     public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name): Variable
     {
         $classId = $this->lookup('' !== $class ? $class : 'stdclass');
-        $className = $this->classNameForId($classId);
         $nameLc = strtolower($name);
         if ($this->isEnumClassId($classId) && ('name' === $nameLc || 'value' === $nameLc)) {
             return $this->enumCasePropertyFetch($obj, $classId, $nameLc);
         }
+        if (('name' === $nameLc || 'value' === $nameLc) && [] !== ($enumIds = $this->registeredEnumClassIds())) {
+            return $this->propertyFetchEnumCaseRuntimeDispatch($obj, $class, $name, $nameLc, $enumIds);
+        }
+
+        return $this->propertyFetchOrdinary($obj, $class, $name, $classId);
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function registeredEnumClassIds(): array
+    {
+        $ids = [];
+        foreach ($this->classIdToName as $id => $name) {
+            if ($this->isEnumClassId((int) $id)) {
+                $ids[] = (int) $id;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Enum case `->name` / `->value` when static declaring class is unknown (e.g. locals from E::Case, #4953).
+     *
+     * @param list<int> $enumIds
+     */
+    private function propertyFetchEnumCaseRuntimeDispatch(
+        PHPLLVM\Value $obj,
+        string $class,
+        string $name,
+        string $nameLc,
+        array $enumIds
+    ): Variable {
+        $map = $this->context->structFieldMap['__object__'];
+        $runtimeClassId = $this->context->builder->load(
+            $this->context->builder->structGep($obj, $map['class_id'])
+        );
+        $fn = BasicBlockHelper::parentFunction($this->context);
+        $entry = $this->context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock('enum_case_prop_fetch_done');
+        $exit = $fn->appendBasicBlock('enum_case_prop_fetch_exit');
+        $fallback = $fn->appendBasicBlock('enum_case_prop_fetch_fallback');
+        $isName = 'name' === $nameLc;
+        if ($isName) {
+            $destSlot = BasicBlockHelper::entryAlloca(
+                $this->context,
+                $this->context->getTypeFromString('__string__*')
+            );
+        } else {
+            $destSlot = JitValueBox::alloc($this->context);
+        }
+        $i64 = $this->context->getTypeFromString('int64');
+        $checkBlock = $entry;
+        $lastIdx = \count($enumIds) - 1;
+        foreach ($enumIds as $idx => $enumId) {
+            $this->context->builder->positionAtEnd($checkBlock);
+            $match = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $runtimeClassId,
+                $i64->constInt($enumId, false)
+            );
+            $caseBlock = $fn->appendBasicBlock('enum_case_prop_fetch_'.$enumId);
+            $nextBlock = $idx === $lastIdx
+                ? $fallback
+                : $fn->appendBasicBlock('enum_case_prop_fetch_try_'.($idx + 1));
+            $this->context->builder->branchIf($match, $caseBlock, $nextBlock);
+            $this->context->builder->positionAtEnd($caseBlock);
+            $fetched = $this->enumCasePropertyFetch($obj, $enumId, $nameLc);
+            if ($isName) {
+                $this->context->builder->store(
+                    $this->context->helper->loadValue($fetched),
+                    $destSlot
+                );
+            } else {
+                JitValueBox::copyFromPointer(
+                    $this->context,
+                    $destSlot,
+                    JitValueBox::valuePtrFromVariable($this->context, $fetched)
+                );
+            }
+            $this->context->builder->branch($done);
+            $checkBlock = $nextBlock;
+        }
+        $this->context->builder->positionAtEnd($fallback);
+        // Non-enum receivers on ->name/->value are undefined; enum cases always match a registered id.
+        $this->context->builder->call($this->context->lookupFunction('abort'));
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->branch($exit);
+        $this->context->builder->positionAtEnd($exit);
+        if ($isName) {
+            return new Variable(
+                $this->context,
+                Variable::TYPE_STRING,
+                Variable::KIND_VALUE,
+                $this->context->builder->load($destSlot)
+            );
+        }
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $destSlot
+        );
+    }
+
+    private function propertyFetchOrdinary(
+        PHPLLVM\Value $obj,
+        string $class,
+        string $name,
+        int $classId
+    ): Variable {
+        $className = $this->classNameForId($classId);
         $nameId = $this->propNameMap[$name] ?? null;
         $hasProp = false;
         if (null !== $nameId) {

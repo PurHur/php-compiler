@@ -134,10 +134,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'weakmap_offsetunset_jit')) {
                 continue;
             }
-            // enum case ->name / ->value is VM-only until JIT enum case objects (#3420).
-            if (str_contains($name, 'enum_case_name_value')) {
-                continue;
-            }
             // isset() scalar locals: compile IssetScalarJitCompileTest (#4081); MCJIT execute pending (#98).
             if (str_contains($name, 'isset_scalar_jit')) {
                 continue;
@@ -424,7 +420,9 @@ class JITTest extends BaseTest {
             }
             // User enum DECLARE_ENUM segfaults in MCJIT until enum lowering is stable (#3518).
             // enum_spaceship_jit: lowering fixed #4849; compliance JIT when jit-runtime-probe green (#98).
-            if (str_contains($name, 'enum_') || str_contains($name, 'abstract_enum')) {
+            // enum_case_name_value: ->name/->value JIT dispatch (#4953); compliance when jit-runtime-probe green (#98).
+            if ((str_contains($name, 'enum_') || str_contains($name, 'abstract_enum'))
+                && !str_contains($name, 'enum_case_name_value')) {
                 continue;
             }
             // ++/-- string increment_string is VM-only until JIT reads OpCode::isIncDec (#3469).
