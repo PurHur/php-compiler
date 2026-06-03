@@ -1686,7 +1686,16 @@ restart:
                 case OpCode::TYPE_BITWISE_NOT:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
-                    $arg1->unaryOp($op->type, $arg2, $this, $frame);
+                    try {
+                        $arg1->unaryOp($op->type, $arg2, $this, $frame);
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     break;
                 case OpCode::TYPE_CONCAT:
                     $arg1 = $frame->scope[$op->arg1];

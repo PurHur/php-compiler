@@ -43,4 +43,15 @@ final class BitwiseNotUnaryTest extends TestCase
         $this->expectExceptionMessage('Cannot perform bitwise not on bool');
         $result->unaryOp(OpCode::TYPE_BITWISE_NOT, $src);
     }
+
+    public function testFloatOperandThrowsTypeError(): void
+    {
+        $src = new Variable(Variable::TYPE_FLOAT);
+        $src->float(1.5);
+        $result = new Variable();
+
+        $this->expectException(\TypeError::class);
+        $this->expectExceptionMessage('Unsupported operand types: float');
+        $result->unaryOp(OpCode::TYPE_BITWISE_NOT, $src);
+    }
 }
