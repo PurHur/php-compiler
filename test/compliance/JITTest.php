@@ -214,10 +214,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'compact_float') || str_contains($name, 'extract_float')) {
                 continue;
             }
-            // round() precision/mode uses __compiler_round: VM + AOT (#3522); MCJIT until runtime link stable.
-            if (str_contains($name, 'round_precision_mode')) {
-                continue;
-            }
             // number_format() NAN/INF: VM + AOT (#4680); MCJIT execute segfault on INF/NAN constants until stable.
             if (str_contains($name, 'number_format_non_finite')) {
                 continue;

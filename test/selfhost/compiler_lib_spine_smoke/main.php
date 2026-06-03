@@ -895,6 +895,7 @@ require_once __DIR__.'/../../../ext/standard/JitQuotedPrintableEncode.php';
 require_once __DIR__.'/../../../ext/standard/JitReaddir.php';
 require_once __DIR__.'/../../../ext/standard/JitReadline.php';
 require_once __DIR__.'/../../../ext/standard/JitRound.php';
+require_once __DIR__.'/../../../ext/standard/JitRoundLowering.php';
 require_once __DIR__.'/../../../ext/standard/JitSettype.php';
 require_once __DIR__.'/../../../ext/standard/JitSscanf.php';
 require_once __DIR__.'/../../../ext/standard/JitStrIncdec.php';
