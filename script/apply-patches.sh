@@ -525,9 +525,6 @@ path = Path(sys.argv[1])
 text = path.read_text()
 if 'promotionSetVisibility' in text:
     raise SystemExit(0)
-if 'promotionFlags' in text:
-    # Newer php-cfg uses a single promotionFlags int instead of promotionReadonly/promotionSetVisibility.
-    raise SystemExit(0)
 insert_block = (
     "\n"
     + "    /** Constructor promotion: asymmetric set visibility (#3165). */\n"
@@ -540,7 +537,24 @@ for needle in (
     if needle in text:
         path.write_text(text.replace(needle, needle + insert_block, 1))
         raise SystemExit(0)
-sys.stderr.write("php-cfg-asymmetric-visibility: Param.php promotionReadonly anchor missing\n")
+for needle in (
+    "    public int $promotionFlags = 0;\n",
+    "    public $promotionFlags = 0;\n",
+):
+    if needle in text:
+        path.write_text(text.replace(needle, needle + insert_block, 1))
+        raise SystemExit(0)
+needle = "    public $declaredType;\n\n    // A helper\n    public $function;"
+if needle in text:
+    insert = (
+        "    public $declaredType;\n\n"
+        + "    /** Constructor promotion: asymmetric set visibility (#3165). */\n"
+        + "    public int $promotionSetVisibility = 0;\n\n"
+        + "    // A helper\n    public $function;"
+    )
+    path.write_text(text.replace(needle, insert, 1))
+    raise SystemExit(0)
+sys.stderr.write("php-cfg-asymmetric-visibility: Param.php anchor missing\n")
 raise SystemExit(1)
 PY
     echo "Applied php-cfg-asymmetric-visibility.patch (Param overlay)"
