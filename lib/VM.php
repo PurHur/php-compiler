@@ -3090,7 +3090,7 @@ restart:
                                 $this->invokeForeachInstanceMethod($frame, $iterable, 'rewind');
                             }
                         } else {
-                            throw new \TypeError('Can only use yield from on Traversable|array');
+                            $this->throwYieldFromInvalidContainer($container);
                         }
                     }
                     $container = $gen->yieldFromContainer->resolveIndirect();
@@ -3146,7 +3146,7 @@ restart:
                         $gen->yieldFromIteratorAdvance = false;
                         break;
                     }
-                    throw new \TypeError('Can only use yield from on Traversable|array');
+                    $this->throwYieldFromInvalidContainer($container);
                 case OpCode::TYPE_ITER_RESET:
                     $container = $frame->scope[$op->arg1]->resolveIndirect();
                     unset($this->context->foreachInvalidSlots[$op->arg1]);
@@ -5029,6 +5029,18 @@ restart:
         );
     }
 
+    /**
+     * @throws \Error|\TypeError zend_generators.c yield-from container validation (#4909)
+     */
+    private function throwYieldFromInvalidContainer(VM\Variable $container): void
+    {
+        if (VM\Variable::TYPE_STRING === $container->type) {
+            throw new \Error('Can use "yield from" only with arrays and Traversables');
+        }
+
+        throw new \TypeError('Can only use yield from on Traversable|array');
+    }
+
     private function findGeneratorState(Frame $frame): ?GeneratorState
     {
         while (null !== $frame) {
@@ -5156,8 +5168,10 @@ restart:
             $this->context->push($gen->frame);
             try {
                 $result = $this->runFrames();
-            } catch (\TypeError $e) {
-                $thrown = VM\BuiltinExceptionSupport::materializeTypeError($this->context, $e->getMessage());
+            } catch (\TypeError|\Error $e) {
+                $thrown = $e instanceof \TypeError
+                    ? VM\BuiltinExceptionSupport::materializeTypeError($this->context, $e->getMessage())
+                    : VM\BuiltinExceptionSupport::materializeError($this->context, $e->getMessage());
                 $catchFrame = $this->findCatchFrameForGeneratorThrow($gen, $thrown);
                 if (null !== $catchFrame) {
                     $catchFrame->generatorState = $gen;
