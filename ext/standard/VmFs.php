@@ -174,7 +174,7 @@ final class VmFs
 
     public static function unlink(string $path): bool
     {
-        return @unlink($path);
+        return VmFsUnlink::unlink($path);
     }
 
     public static function mkdir(string $path, int $mode = 0777, bool $recursive = false): bool
