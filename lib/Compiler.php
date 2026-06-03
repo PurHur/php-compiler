@@ -1003,6 +1003,9 @@ class Compiler {
                             ++$i;
                         }
                     } elseif ($child instanceof Op\Expr\NullsafePropertyFetch) {
+                        if ($this->isNullsafePropertyFetchInWriteContext($ops, $i)) {
+                            $this->throwCompileError("Can't use nullsafe operator in write context");
+                        }
                         $block = $this->compileNullsafePropertyFetch($child, $block);
                     } elseif ($child instanceof Op\Expr\NullsafeMethodCall) {
                         $block = $this->compileNullsafeMethodCall(
@@ -3819,6 +3822,7 @@ class Compiler {
         // php-cfg may clear write after SSA replace; read still names the lvalue (#4946).
         $write = $expr->write ?? $expr->read;
         $this->rejectThisReassignment($write);
+        $this->rejectNullsafeInWriteContext($write, $block);
 
         return [new OpCode(
             $opcode,
@@ -3898,6 +3902,7 @@ class Compiler {
             case Op\Expr\Assign::class:
                 if (null === $expr->listSpreadRhs) {
                     $this->rejectThisReassignment($expr->var);
+                    $this->rejectNullsafeInWriteContext($expr->var, $block);
                 }
                 if (null !== $expr->listSpreadRhs && null !== $expr->listSpreadFromIndex) {
                     $fromIndex = new Operand\Literal($expr->listSpreadFromIndex);
@@ -4229,6 +4234,7 @@ class Compiler {
                 return $this->compileIn($expr, $block);
             case Op\Expr\AssignRef::class:
                 $this->rejectThisReassignment($expr->var);
+                $this->rejectNullsafeInWriteContext($expr->var, $block);
                 $bindRefFlags = 0;
                 $dimFetch = $this->unwrapArrayDimFetch($expr->expr)
                     ?? $this->findArrayDimFetchForResult($expr->expr, $block);
@@ -7122,6 +7128,147 @@ class Compiler {
         }
         if ('this' === $this->baseVariableName($var)) {
             $this->throwCompileError('Cannot re-assign $this');
+        }
+    }
+
+    /**
+     * Zend zend_compile.c: nullsafe ?-> in l-value position is a compile-time fatal (#5323).
+     *
+     * @param Op[] $ops
+     */
+    private function isNullsafePropertyFetchInWriteContext(array $ops, int $index): bool
+    {
+        $fetch = $ops[$index] ?? null;
+        if (!$fetch instanceof Op\Expr\NullsafePropertyFetch) {
+            return false;
+        }
+
+        return $this->operandUsedInWriteContext($ops, $index + 1, $fetch->result);
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    private function operandUsedInWriteContext(array $ops, int $startIndex, Operand $operand): bool
+    {
+        for ($j = $startIndex, $count = count($ops); $j < $count; ++$j) {
+            $op = $ops[$j];
+            if ($this->isDirectWriteUseOfOperand($op, $operand)) {
+                return true;
+            }
+            if ($op instanceof Op\Expr\NullsafePropertyFetch
+                && $this->operandsChainEqual($op->var, $operand)) {
+                return $this->operandUsedInWriteContext($ops, $j + 1, $op->result);
+            }
+            if ($op instanceof Op\Expr\ArrayDimFetch
+                && $this->operandsChainEqual($op->var, $operand)) {
+                return $this->operandUsedInWriteContext($ops, $j + 1, $op->result);
+            }
+            if ($op instanceof Op\Expr\BinaryOp\Coalesce
+                && $this->operandsChainEqual($op->left, $operand)
+                && $j + 1 < $count
+                && $ops[$j + 1] instanceof Op\Expr\Assign
+                && $this->isCoalesceAssignTail($ops[$j + 1], $op)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isDirectWriteUseOfOperand(Op $op, Operand $operand): bool
+    {
+        if ($op instanceof Op\Expr\Assign && $this->operandsChainEqual($op->var, $operand)) {
+            return true;
+        }
+        if ($op instanceof Op\Expr\AssignRef && $this->operandsChainEqual($op->var, $operand)) {
+            return true;
+        }
+        if ($op instanceof Op\Expr\PostInc
+            || $op instanceof Op\Expr\PreInc
+            || $op instanceof Op\Expr\PostDec
+            || $op instanceof Op\Expr\PreDec) {
+            $write = $op->write ?? $op->read;
+
+            return $this->operandsChainEqual($write, $operand);
+        }
+
+        return false;
+    }
+
+    /**
+     * php-cfg result temps for Expr ops do not chain `original` back to the producer (#5323).
+     *
+     * @param Op[] $ops
+     */
+    private function operandIsNullsafePropertyFetchResult(?Operand $operand, array $ops): bool
+    {
+        if (null === $operand) {
+            return false;
+        }
+        foreach ($ops as $child) {
+            if (!$child instanceof Op\Expr\NullsafePropertyFetch) {
+                continue;
+            }
+            if ($this->operandsChainEqual($child->result, $operand)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function lvalueContainsNullsafePropertyFetch(?Operand $operand, ?Block $block = null): bool
+    {
+        if (null === $operand) {
+            return false;
+        }
+        while ($operand instanceof Temporary) {
+            if ($operand->original instanceof Op\Expr\NullsafePropertyFetch) {
+                return true;
+            }
+            if ($operand->original instanceof Op\Expr\ArrayDimFetch) {
+                return $this->lvalueContainsNullsafePropertyFetch($operand->original->var, $block);
+            }
+            if ($operand->original instanceof Op\Expr\PropertyFetch) {
+                return $this->lvalueContainsNullsafePropertyFetch($operand->original->var, $block);
+            }
+            if (null === $operand->original) {
+                break;
+            }
+            $operand = $operand->original;
+        }
+        if ($operand instanceof Op\Expr\NullsafePropertyFetch) {
+            return true;
+        }
+        if ($operand instanceof Op\Expr\ArrayDimFetch) {
+            return $this->lvalueContainsNullsafePropertyFetch($operand->var, $block);
+        }
+        if (null !== $block && null !== $block->orig) {
+            if ($this->operandIsNullsafePropertyFetchResult($operand, $block->orig->children)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Zend zend_compile.c: nullsafe ?-> in l-value position is a compile-time fatal (#5323).
+     *
+     * @return never
+     */
+    protected function rejectNullsafeInWriteContext(?Operand $var, ?Block $block = null): void
+    {
+        if ($this->lvalueContainsNullsafePropertyFetch($var, $block)) {
+            $this->throwCompileError("Can't use nullsafe operator in write context");
+        }
+        if (null !== $block && null !== $block->orig && null !== $var) {
+            $dimFetch = $this->unwrapArrayDimFetch($var);
+            if (null !== $dimFetch
+                && $this->operandIsNullsafePropertyFetchResult($dimFetch->var, $block->orig->children)) {
+                $this->throwCompileError("Can't use nullsafe operator in write context");
+            }
         }
     }
 
