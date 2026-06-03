@@ -38,6 +38,10 @@ final class get_mangled_object_vars_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('get_mangled_object_vars() is not implemented for JIT in this compiler build');
+        if (1 !== \count($args)) {
+            throw new \LogicException('get_mangled_object_vars() requires exactly one argument');
+        }
+
+        return JitGetObjectVars::invoke($context, $args[0], true);
     }
 }
