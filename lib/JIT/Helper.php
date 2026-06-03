@@ -197,6 +197,10 @@ return_string:
             if (Variable::TYPE_NATIVE_DOUBLE === $leftType || Variable::TYPE_NATIVE_DOUBLE === $rightType) {
                 return $this->emitShiftFloatOperandTypeError($opcode, $leftType, $rightType);
             }
+            if (Variable::TYPE_NATIVE_BOOL === $leftType || Variable::TYPE_NATIVE_BOOL === $rightType) {
+                $result = $this->emitShiftWithBoolOperands($opcode, $leftValue, $rightValue, $leftType, $rightType);
+                goto return_long;
+            }
         }
         if (OpCode::TYPE_LOGICAL_XOR === $opcode->type) {
             $zeroI64 = $this->context->getTypeFromString('int64')->constInt(0, false);
@@ -1832,6 +1836,33 @@ return_bool:
         );
     }
 
+    /** Zend shift_left/right_function: bool operands promote to int (false→0, true→1). */
+    private function emitShiftWithBoolOperands(
+        OpCode $opcode,
+        $leftValue,
+        $rightValue,
+        int $leftType,
+        int $rightType
+    ) {
+        $i64 = $this->context->getTypeFromString('int64');
+        if (Variable::TYPE_NATIVE_BOOL === $leftType) {
+            $leftLong = $this->context->builder->zExt($leftValue, $i64);
+        } else {
+            $leftLong = $leftValue;
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $rightType) {
+            $rightLong = $this->context->builder->zExt($rightValue, $i64);
+        } else {
+            $rightLong = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
+        }
+
+        if (OpCode::TYPE_SHIFT_LEFT === $opcode->type) {
+            return $this->context->builder->shl($leftLong, $rightLong);
+        }
+
+        return $this->context->builder->aShr($leftLong, $rightLong);
+    }
+
     private function emitShiftFloatOperandTypeError(OpCode $opcode, int $leftType, int $rightType): Variable
     {
         $opSym = OpCode::TYPE_SHIFT_LEFT === $opcode->type ? '<<' : '>>';
@@ -1868,13 +1899,19 @@ return_bool:
 
     private function tryResolveCoreIntConstant(Variable $var): ?int
     {
+        if (Variable::KIND_VALUE !== $var->kind) {
+            return null;
+        }
+        $lib = $this->context->llvm->lib;
         if (Variable::TYPE_NATIVE_LONG === $var->type
-            && Variable::KIND_VALUE === $var->kind
+            && null !== $lib->LLVMIsAConstantInt($var->value->value)
         ) {
-            $lib = $this->context->llvm->lib;
-            if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
-                return (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
-            }
+            return (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $var->type
+            && null !== $lib->LLVMIsAConstantInt($var->value->value)
+        ) {
+            return (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
         }
 
         $literal = $var->compileTimeString ?? null;
