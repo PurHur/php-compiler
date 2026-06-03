@@ -41,7 +41,6 @@ final class Linker
         __DIR__.'/runtime/phpc_str_getcsv.c',
         __DIR__.'/runtime/phpc_uniqid.c',
         __DIR__.'/runtime/phpc_strtok.c',
-        __DIR__.'/runtime/phpc_nl2br.c',
         __DIR__.'/runtime/compiler_wordwrap.c',
         __DIR__.'/runtime/password_crypto.c',
         __DIR__.'/runtime/crc32.c',
