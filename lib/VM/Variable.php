@@ -325,6 +325,8 @@ final class Variable {
                 return $this->bool ? 1.0 : 0.0;
             case self::TYPE_STRING:
                 return (float) $this->string;
+            case self::TYPE_ARRAY:
+                return $this->toArray()->getNumElements() > 0 ? 1.0 : 0.0;
             case self::TYPE_OBJECT:
                 return $this->objectToScalarString($vm, 'float')->toFloat($vm);
         }
