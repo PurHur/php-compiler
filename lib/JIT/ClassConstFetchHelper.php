@@ -615,6 +615,20 @@ final class ClassConstFetchHelper
                 );
                 break;
             case Variable::TYPE_HASHTABLE:
+                if (isset($entry['global'])) {
+                    $global = $context->module->getNamedGlobal($entry['global']);
+                    if (null === $global) {
+                        throw new \LogicException("Missing class constant hashtable global: {$entry['global']}");
+                    }
+                    $htPtr = $context->builder->load($global);
+                    $context->refcount->addref($htPtr);
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeHashtable'),
+                        JitValueBox::pointer($context, $slot),
+                        $htPtr
+                    );
+                    break;
+                }
                 if (!isset($entry['vmTable']) || !$entry['vmTable'] instanceof \PHPCompiler\VM\HashTable) {
                     throw new \LogicException('Missing VM table for class constant array');
                 }
@@ -635,6 +649,11 @@ final class ClassConstFetchHelper
                 if (null === $global) {
                     throw new \LogicException("Missing class constant object global: {$entry['global']}");
                 }
+                // Immortal module-global object: clear slot before writeObject (#3196, #4028).
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeNull'),
+                    JitValueBox::pointer($context, $slot)
+                );
                 $obj = $context->builder->load($global);
                 $context->builder->call(
                     $context->lookupFunction('__value__writeObject'),
