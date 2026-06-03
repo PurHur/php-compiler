@@ -572,6 +572,72 @@ final class JitValueCompare
         return $context->builder->icmp(Builder::INT_EQ, $cmp, $zero);
     }
 
+    /**
+     * Loose == on two compile-time native array literals (#5033, Zend zend_compare_arrays).
+     */
+    public static function looseEqualNativeArrayPair(
+        Context $context,
+        Variable $left,
+        Variable $right
+    ): Value {
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+        if ($left->nextFreeElement !== $right->nextFreeElement) {
+            return $falseVal;
+        }
+        if (0 === $left->nextFreeElement) {
+            return $i1->constInt(1, false);
+        }
+        $elemType = $left->type & ~Variable::IS_NATIVE_ARRAY;
+        $result = $i1->constInt(1, false);
+        for ($i = 0; $i < $left->nextFreeElement; ++$i) {
+            $idx = Variable::fromConstantInt($context, $i);
+            $lElem = $left->dimFetch($idx);
+            $rElem = $right->dimFetch($idx);
+            if (Variable::TYPE_NATIVE_LONG === $elemType) {
+                $eq = $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $context->helper->loadValue($lElem),
+                    $context->helper->loadValue($rElem)
+                );
+            } elseif (Variable::TYPE_NATIVE_BOOL === $elemType) {
+                $eq = $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $context->helper->loadValue($lElem),
+                    $context->helper->loadValue($rElem)
+                );
+            } elseif (Variable::TYPE_NATIVE_DOUBLE === $elemType) {
+                $eq = $context->builder->fcmp(
+                    Builder::REAL_OEQ,
+                    $context->helper->loadValue($lElem),
+                    $context->helper->loadValue($rElem)
+                );
+            } else {
+                return $falseVal;
+            }
+            $result = $context->builder->and($result, $eq);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Loose == on two {@see __hashtable__*} operands (#5033, Zend zend_compare_arrays / compare_function).
+     */
+    public static function looseEqualHashtablePair(Context $context, Value $leftHt, Value $rightHt): Value
+    {
+        Builtin\SpaceshipRuntime::ensureLinked($context);
+        $fn = $context->lookupFunction('__hashtable__compareSpaceship');
+        $cmp = $context->builder->call(
+            $fn,
+            $context->builder->pointerCast($leftHt, $fn->getParam(0)->typeOf()),
+            $context->builder->pointerCast($rightHt, $fn->getParam(1)->typeOf())
+        );
+        $zero = $cmp->typeOf()->constInt(0, false);
+
+        return $context->builder->icmp(Builder::INT_EQ, $cmp, $zero);
+    }
+
     /** {@see __value__*} with types accepted by linked runtime bitcode (#4766). */
     public static function runtimeValuePtr(Context $context, Variable $var): Value
     {
