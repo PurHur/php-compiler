@@ -336,7 +336,7 @@ final class HashTable {
     }
 
     /**
-     * php-src: null array keys coerce to empty string (zend_hash.c; #5269).
+     * php-src: null array keys coerce to empty string; bool keys to int (zend_hash.c; #5269, #5275).
      */
     public static function normalizeIndexKey(Variable $index): Variable
     {
@@ -348,6 +348,12 @@ final class HashTable {
             $empty->string('');
 
             return $empty;
+        }
+        if (Variable::TYPE_BOOLEAN === $index->type) {
+            $intKey = new Variable();
+            $intKey->int($index->toBool() ? 1 : 0);
+
+            return $intKey;
         }
 
         return $index;
