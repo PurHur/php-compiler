@@ -614,6 +614,34 @@ final class ClassConstFetchHelper
                     JitValueBox::pointer($context, $slot)
                 );
                 break;
+            case Variable::TYPE_HASHTABLE:
+                if (!isset($entry['vmTable']) || !$entry['vmTable'] instanceof \PHPCompiler\VM\HashTable) {
+                    throw new \LogicException('Missing VM table for class constant array');
+                }
+                $htVar = HashTableHelper::variableFromVmHashTable($context, $entry['vmTable']);
+                $htPtr = $context->helper->loadValue($htVar);
+                $context->refcount->addref($htPtr);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeHashtable'),
+                    JitValueBox::pointer($context, $slot),
+                    $htPtr
+                );
+                break;
+            case Variable::TYPE_OBJECT:
+                if (!isset($entry['global'])) {
+                    throw new \LogicException('Missing global for class constant object');
+                }
+                $global = $context->module->getNamedGlobal($entry['global']);
+                if (null === $global) {
+                    throw new \LogicException("Missing class constant object global: {$entry['global']}");
+                }
+                $obj = $context->builder->load($global);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeObject'),
+                    JitValueBox::pointer($context, $slot),
+                    $obj
+                );
+                break;
             default:
                 throw new \LogicException('Unsupported class constant type for dynamic JIT fetch');
         }

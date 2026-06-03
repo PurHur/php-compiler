@@ -7969,14 +7969,14 @@ class JIT {
                 case OpCode::TYPE_DECLARE_CLASS_CONST:
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
+                    $constNameLc = strtolower($name->value);
+                    $constValue = $this->jitClassConstDefineValue($block, $op, $constNameLc);
                     if (!isset($block->constants[$op->arg2])) {
                         if ($this->shouldSkipExternalClassBodyLowering($classId)) {
                             break;
                         }
-                        $vm = new VM($this->context->runtime->vmContext);
-                        $vmVar = VM\ClassConstMaterializer::materializeSlot($vm, $block, $op->arg2);
                         if ($this->context->type->object->isEnumClassId($classId) && $op->isEnumCaseDeclare) {
-                            $this->context->type->object->defineEnumCaseConst($classId, $name->value, $vmVar);
+                            $this->context->type->object->defineEnumCaseConst($classId, $name->value, $constValue);
                             break;
                         }
                         $enumCaseRef = $this->tryResolveEnumCaseClassConstInit($block, $op->arg2);
@@ -7992,7 +7992,7 @@ class JIT {
                         $this->context->type->object->defineClassConst(
                             $classId,
                             $name->value,
-                            $vmVar
+                            $constValue
                         );
                         break;
                     }
@@ -8000,14 +8000,14 @@ class JIT {
                         $this->context->type->object->defineEnumCaseConst(
                             $classId,
                             $name->value,
-                            $block->constants[$op->arg2]
+                            $constValue
                         );
                         break;
                     }
                     $this->context->type->object->defineClassConst(
                         $classId,
                         $name->value,
-                        $block->constants[$op->arg2]
+                        $constValue
                     );
                     if ([] !== $op->attributeNames) {
                         $classLc = '' !== $this->context->scope->className
@@ -10842,6 +10842,30 @@ class JIT {
             $defaults[$defaultIdx] = $this->jitVariableFromVmConstant($block->constants[$op->arg3]);
         }
         return $defaults;
+    }
+
+    /**
+     * Resolve a class constant initializer for JIT defineClassConst (#4900, zend_constants.c).
+     */
+    private function jitClassConstDefineValue(Block $block, OpCode $op, string $constNameLc): VM\Variable
+    {
+        if (!isset($block->constants[$op->arg2])) {
+            $vm = new VM($this->context->runtime->vmContext);
+            $value = VM\ClassConstMaterializer::materializeSlot($vm, $block, $op->arg2);
+        } else {
+            $value = $block->constants[$op->arg2];
+        }
+        if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
+            $constraint = $block->constants[$op->arg3]->typeConstraint;
+            if (null !== $constraint) {
+                $check = new VM\Variable();
+                $check->copyFrom($value);
+                VM\TypeCheck::assertClassConstantValue($check, $constraint, $constNameLc);
+                $value = $check;
+            }
+        }
+
+        return $value;
     }
 
     private function jitVariableFromVmConstant(VM\Variable $vm): Variable {
