@@ -48,6 +48,8 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertFileExists($resolver);
         $body = (string) file_get_contents($resolver);
         $this->assertStringContainsString('build/bin-compile-aot-inventory', $body);
+        $this->assertStringContainsString('exited 0 but missing', $body);
+        $this->assertStringContainsString('bootstrap_gen0_seed_prelinked_m3_sidecars', $body);
         $this->assertStringContainsString('build/selfhost-compile-driver', $body);
         $this->assertStringContainsString('build/bin-compile-aot', $body);
         $this->assertStringContainsString(

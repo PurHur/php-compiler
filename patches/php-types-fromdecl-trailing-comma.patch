@@ -1,0 +1,13 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+@@ -376,6 +376,10 @@ class Type
+             $trimmedDecl = rtrim(substr($trimmedDecl, 0, -1));
+             $decl = $trimmedDecl;
+         }
++        // Docblock union splits may leave a lone "string," fragment (M2 spine; #3012).
++        if (str_ends_with($trimmedDecl, ',') && !str_contains($trimmedDecl, '|') && !str_contains($trimmedDecl, '&')) {
++            return self::fromDecl(rtrim($trimmedDecl, ', '));
++        }
+         switch (strtolower($decl)) {
+             case 'boolean':
+             case 'bool';

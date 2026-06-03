@@ -81,7 +81,13 @@ patch_already_applied() {
       grep -q "stripTrailingDocText" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
     php-types-fromdecl-junk-fragments.patch)
-      grep -q "str_starts_with(\$trimmedDecl, '\\*/')" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      grep -q 'Malformed phpdoc fragments in vendor trees' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      ;;
+    php-types-fromdecl-trailing-comma.patch)
+      grep -q 'Docblock union splits may leave a lone' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      ;;
+    php-types-remove-type-empty-union.patch)
+      ! grep -q "throw new \\\\LogicException('Unknown type encountered')" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
     php-types-ns-func-call.patch)
       grep -q 'function resolveOp_Expr_NsFuncCall' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
@@ -2073,16 +2079,22 @@ if needle not in text:
     sys.stderr.write("php-types-fromdecl-junk-fragments: stripTrailingDocText line not found\n")
     raise SystemExit(1)
 
-insert = needle + (
-    "        $trimmedDecl = trim($decl);\n"
+junk = (
+    "        // Malformed phpdoc fragments in vendor trees (north-star5 prelink; #2743, #2745).\n"
     "        if ('' === $trimmedDecl || '*' === $trimmedDecl || '*/' === $trimmedDecl\n"
     "            || str_starts_with($trimmedDecl, '*/')) {\n"
     "            return self::mixed();\n"
     "        }\n"
 )
 
-if "$trimmedDecl" not in text:
-    text = text.replace(needle, insert, 1)
+if "Malformed phpdoc fragments in vendor trees" not in text:
+    if "$trimmedDecl = trim($decl);" not in text:
+        insert = needle + "        $trimmedDecl = trim($decl);\n" + junk
+        text = text.replace(needle, insert, 1)
+    else:
+        anchor = "        $trimmedDecl = trim($decl);\n"
+        if anchor in text:
+            text = text.replace(anchor, anchor + junk, 1)
     path.write_text(text)
 PY
   echo "Applied php-types-fromdecl-junk-fragments.patch (overlay)"
@@ -3006,6 +3018,8 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-docblock-trailing-text.patch"
   apply_patch "$PATCH_DIR/php-types-generic-null-tail.patch"
   apply_patch "$PATCH_DIR/php-types-fromdecl-junk-fragments.patch"
+  apply_patch "$PATCH_DIR/php-types-fromdecl-trailing-comma.patch"
+  apply_patch "$PATCH_DIR/php-types-remove-type-empty-union.patch"
   apply_patch "$PATCH_DIR/php-types-anonymous-class-type.patch"
   apply_patch "$PATCH_DIR/php-types-ns-func-call.patch"
   apply_patch "$PATCH_DIR/php-types-arrow-function.patch"

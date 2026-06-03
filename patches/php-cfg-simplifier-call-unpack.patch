@@ -21,12 +21,9 @@
          }
      }
 +
-+    /** Keep spread/named call metadata when SSA simplifier replaces operands (#4321). */
++    /** Keep named-call metadata when SSA simplifier replaces operands (#4321). */
 +    private function preserveCallSiteOperandMetadata(Operand $from, Operand $to): void
 +    {
-+        if ($from->callArgUnpack) {
-+            $to->callArgUnpack = true;
-+        }
 +        if (null !== $from->callArgName) {
 +            $to->callArgName = $from->callArgName;
 +        }
