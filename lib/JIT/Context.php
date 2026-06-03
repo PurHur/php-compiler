@@ -248,11 +248,19 @@ class Context {
     /** @var array<string, Variable> */
     public array $namedVariableBindings = [];
 
+    /**
+     * Undeclared instance property writes collected before JIT lowering (#5111).
+     *
+     * @var array<string, list<string>>
+     */
+    public array $jitUndeclaredInstancePropertyWrites = [];
+
     /** Clear per-script local name/ref bindings before lowering a new {main} TU (#4763). */
     public function resetScriptLocalBindings(): void
     {
         $this->namedVariableBindings = [];
         $this->refAliasNames = [];
+        $this->jitUndeclaredInstancePropertyWrites = [];
     }
 
     public function bindVariableByName(string $name, Variable $var): void

@@ -372,8 +372,11 @@ class Object_ extends Type {
 
         $slot = $fn->getParam(0);
         $dest = $fn->getParam(1);
-        $loaded = $this->context->builder->load($slot);
         $voidPtr = $this->context->getTypeFromString('void*');
+        $loaded = $this->context->builder->pointerCast(
+            $this->context->builder->load($slot),
+            $voidPtr
+        );
         $isNull = $this->context->builder->icmp(
             PHPLLVM\Builder::INT_EQ,
             $loaded,
@@ -985,8 +988,12 @@ class Object_ extends Type {
                 continue;
             }
             $slot = $this->propertySlotPtr($obj, $propset[3]);
-            $loaded = $this->context->builder->load($slot);
-            $nullPtr = $loaded->typeOf()->getElementType()->constNull();
+            $voidPtr = $this->context->getTypeFromString('void*');
+            $loaded = $this->context->builder->pointerCast(
+                $this->context->builder->load($slot),
+                $voidPtr
+            );
+            $nullPtr = $voidPtr->constNull();
             $isEmpty = $this->context->builder->icmp(
                 PHPLLVM\Builder::INT_EQ,
                 $loaded,
@@ -1027,8 +1034,11 @@ class Object_ extends Type {
                 continue;
             }
             $slot = $this->propertySlotPtr($obj, $propset[3]);
-            $loaded = $this->context->builder->load($slot);
-            $nullPtr = $loaded->typeOf()->getElementType()->constNull();
+            $loaded = $this->context->builder->pointerCast(
+                $this->context->builder->load($slot),
+                $voidPtr
+            );
+            $nullPtr = $voidPtr->constNull();
             $isEmpty = $this->context->builder->icmp(
                 PHPLLVM\Builder::INT_EQ,
                 $loaded,
@@ -2715,6 +2725,27 @@ class Object_ extends Type {
         $this->properties[$classId][] = [
             $this->propNameMap[$name], $name, $type, count($this->properties[$classId]),
         ];
+    }
+
+    /**
+     * After DECLARE_PROPERTY lowering, register dynamic writes so `new` allocates enough slots (#5111).
+     */
+    public function definePendingUndeclaredInstanceProperties(int $classId, string $className): void
+    {
+        if ('' === $className) {
+            return;
+        }
+        $pending = $this->context->jitUndeclaredInstancePropertyWrites[strtolower(ltrim($className, '\\'))] ?? [];
+        foreach ($pending as $propName) {
+            if ($this->hasProperty($classId, $propName)) {
+                continue;
+            }
+            // User classes: native slots avoid VALUE-box propertyStore IR that segfaults MCJIT (#5111).
+            $jitType = $this->isExternalOnlyClass($classId)
+                ? $this->externalPropertyJitType($className, $propName)
+                : Variable::TYPE_NATIVE_LONG;
+            $this->defineProperty($classId, $propName, $jitType);
+        }
     }
 
     /**

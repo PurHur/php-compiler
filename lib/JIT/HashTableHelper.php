@@ -40,7 +40,10 @@ final class HashTableHelper
         if (null !== $array->objectPropertySlot && Variable::TYPE_VALUE === ($array->objectPropertyType ?? null)) {
             $voidPtr = $context->getTypeFromString('void*');
             $slot = $array->objectPropertySlot;
-            $loaded = $context->builder->load($slot);
+            $loaded = $context->builder->pointerCast(
+                $context->builder->load($slot),
+                $voidPtr
+            );
             $slotEmpty = $context->builder->icmp(
                 Builder::INT_EQ,
                 $loaded,
