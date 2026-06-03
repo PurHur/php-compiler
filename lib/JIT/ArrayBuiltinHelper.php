@@ -6161,6 +6161,14 @@ final class ArrayBuiltinHelper
                 $context->builder->call($context->lookupFunction('__value__readDouble'), $needle->value)
             );
         }
+        if (Variable::TYPE_OBJECT === $targetType) {
+            return new Variable(
+                $context,
+                Variable::TYPE_OBJECT,
+                Variable::KIND_VALUE,
+                $context->builder->call($context->lookupFunction('__value__readObject'), $needle->value)
+            );
+        }
 
         return $needle;
     }
@@ -6190,6 +6198,8 @@ final class ArrayBuiltinHelper
         $bbDouble = BasicBlockHelper::append($context, 'entry_match_double');
         $bbCheckHashtable = BasicBlockHelper::append($context, 'entry_match_check_hashtable');
         $bbHashtable = BasicBlockHelper::append($context, 'entry_match_hashtable');
+        $bbCheckObject = BasicBlockHelper::append($context, 'entry_match_check_object');
+        $bbObject = BasicBlockHelper::append($context, 'entry_match_object');
         $bbNull = BasicBlockHelper::append($context, 'entry_match_null');
         $bbDone = BasicBlockHelper::append($context, 'entry_match_done');
 
@@ -6285,7 +6295,35 @@ final class ArrayBuiltinHelper
             $typeByte,
             $i8->constInt(Variable::TYPE_HASHTABLE, false)
         );
-        $context->builder->branchIf($isHashtable, $bbHashtable, $bbNull);
+        $context->builder->branchIf($isHashtable, $bbHashtable, $bbCheckObject);
+
+        $context->builder->positionAtEnd($bbCheckObject);
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_OBJECT, false)
+        );
+        $context->builder->branchIf($isObject, $bbObject, $bbNull);
+
+        $context->builder->positionAtEnd($bbObject);
+        $objCand = new Variable(
+            $context,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $context->builder->call($context->lookupFunction('__value__readObject'), $entry)
+        );
+        if (Variable::TYPE_VALUE === $needle->type) {
+            $objectMatch = JitValueCompare::identicalValueBoxToObject($context, $needle, $objCand);
+        } else {
+            $objectMatch = self::valuesEqual(
+                $context,
+                self::coerceNeedleForCompare($context, $needle, Variable::TYPE_OBJECT),
+                $objCand,
+                $strict
+            );
+        }
+        $context->builder->store($objectMatch, $resultSlot);
+        $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbHashtable);
         $htCand = new Variable(
@@ -6697,6 +6735,19 @@ final class ArrayBuiltinHelper
                     $context->helper->loadValue($left),
                     $context->helper->loadValue($right)
                 );
+            case Variable::TYPE_OBJECT:
+                $voidp = $context->getTypeFromString('void')->pointerType(0);
+                $sizeT = $context->getTypeFromString('size_t');
+                $leftPtr = $context->builder->ptrToInt(
+                    $context->builder->pointerCast($context->helper->loadValue($left), $voidp),
+                    $sizeT
+                );
+                $rightPtr = $context->builder->ptrToInt(
+                    $context->builder->pointerCast($context->helper->loadValue($right), $voidp),
+                    $sizeT
+                );
+
+                return $context->builder->icmp(Builder::INT_EQ, $leftPtr, $rightPtr);
             case Variable::TYPE_NULL:
                 return $context->constantFromBool(true);
             default:
