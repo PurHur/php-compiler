@@ -58,24 +58,115 @@ final class JitArrayKey
             $errBlock = BasicBlockHelper::append($context, 'array_key_req_err');
             $context->builder->branchIf($isArray, $okBlock, $errBlock);
             $context->builder->positionAtEnd($errBlock);
-            $isNull = $context->builder->icmp(
-                Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(Variable::TYPE_NULL, false)
-            );
-            $nullBlock = BasicBlockHelper::append($context, 'array_key_req_null');
-            $mixedBlock = BasicBlockHelper::append($context, 'array_key_req_mixed');
-            $context->builder->branchIf($isNull, $nullBlock, $mixedBlock);
-            $context->builder->positionAtEnd($nullBlock);
-            self::emitErrorAndAbort($context, \sprintf(self::TYPE_ERROR, $fn, 'null'));
-            $context->builder->positionAtEnd($mixedBlock);
-            self::emitErrorAndAbort($context, \sprintf(self::TYPE_ERROR, $fn, 'mixed'));
+            self::emitBoxedNonArrayTypeError($context, $fn, $typeByte);
             $context->builder->positionAtEnd($okBlock);
 
             return;
         }
 
+        self::emitErrorAndAbort(
+            $context,
+            \sprintf(self::TYPE_ERROR, $fn, self::jitGivenTypeName($array->type))
+        );
+    }
+
+    private static function emitBoxedNonArrayTypeError(Context $context, string $fn, Value $typeByte): void
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $nullBlock = BasicBlockHelper::append($context, 'array_key_req_null');
+        $stringBlock = BasicBlockHelper::append($context, 'array_key_req_string');
+        $objectBlock = BasicBlockHelper::append($context, 'array_key_req_object');
+        $intBlock = BasicBlockHelper::append($context, 'array_key_req_int');
+        $floatBlock = BasicBlockHelper::append($context, 'array_key_req_float');
+        $boolBlock = BasicBlockHelper::append($context, 'array_key_req_bool');
+        $mixedBlock = BasicBlockHelper::append($context, 'array_key_req_mixed');
+        $afterNull = BasicBlockHelper::append($context, 'array_key_req_after_null');
+        $afterString = BasicBlockHelper::append($context, 'array_key_req_after_string');
+        $afterObject = BasicBlockHelper::append($context, 'array_key_req_after_object');
+        $afterInt = BasicBlockHelper::append($context, 'array_key_req_after_int');
+        $afterFloat = BasicBlockHelper::append($context, 'array_key_req_after_float');
+
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $context->builder->branchIf($isNull, $nullBlock, $afterNull);
+        $context->builder->positionAtEnd($nullBlock);
+        self::emitErrorAndAbort($context, \sprintf(self::TYPE_ERROR, $fn, 'null'));
+
+        $context->builder->positionAtEnd($afterNull);
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+        $context->builder->positionAtEnd($stringBlock);
+        self::emitErrorAndAbort($context, \sprintf(self::TYPE_ERROR, $fn, 'string'));
+
+        $context->builder->positionAtEnd($afterString);
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_OBJECT, false)
+        );
+        $context->builder->branchIf($isObject, $objectBlock, $afterObject);
+        $context->builder->positionAtEnd($objectBlock);
+        self::emitErrorAndAbort($context, \sprintf(self::TYPE_ERROR, $fn, 'object'));
+
+        $context->builder->positionAtEnd($afterObject);
+        $isInt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_LONG, false)
+        );
+        $context->builder->branchIf($isInt, $intBlock, $afterInt);
+        $context->builder->positionAtEnd($intBlock);
+        self::emitErrorAndAbort($context, \sprintf(self::TYPE_ERROR, $fn, 'int'));
+
+        $context->builder->positionAtEnd($afterInt);
+        $isFloat = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_DOUBLE, false)
+        );
+        $context->builder->branchIf($isFloat, $floatBlock, $afterFloat);
+        $context->builder->positionAtEnd($floatBlock);
+        self::emitErrorAndAbort($context, \sprintf(self::TYPE_ERROR, $fn, 'float'));
+
+        $context->builder->positionAtEnd($afterFloat);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_BOOL, false)
+        );
+        $context->builder->branchIf($isBool, $boolBlock, $mixedBlock);
+        $context->builder->positionAtEnd($boolBlock);
+        self::emitErrorAndAbort($context, \sprintf(self::TYPE_ERROR, $fn, 'bool'));
+
+        $context->builder->positionAtEnd($mixedBlock);
         self::emitErrorAndAbort($context, \sprintf(self::TYPE_ERROR, $fn, 'mixed'));
+    }
+
+    private static function jitGivenTypeName(int $type): string
+    {
+        switch ($type) {
+            case JITVariable::TYPE_NATIVE_LONG:
+                return 'int';
+            case JITVariable::TYPE_NATIVE_DOUBLE:
+                return 'float';
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return 'bool';
+            case JITVariable::TYPE_STRING:
+                return 'string';
+            case JITVariable::TYPE_OBJECT:
+                return 'object';
+            case JITVariable::TYPE_NULL:
+                return 'null';
+            default:
+                return 'mixed';
+        }
     }
 
     private static function emitErrorAndAbort(Context $context, string $message): void
