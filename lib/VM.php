@@ -604,11 +604,11 @@ class VM {
             return $object->getProperty($name);
         }
         if ($object->class->readonly && !$this->hasInstanceMethod($object->class, '__set')) {
-            throw new \Error(sprintf(
-                'Cannot create dynamic property %s::$%s',
-                $object->class->name,
-                $name
-            ));
+            $thrown = VM\BuiltinExceptionSupport::materializeError(
+                $this->context,
+                sprintf('Cannot create dynamic property %s::$%s', $object->class->name, $name)
+            );
+            $this->raiseUncaughtException($thrown);
         }
         if ($this->hasInstanceMethod($object->class, '__set')) {
             $proxy = new Variable();
@@ -2698,6 +2698,11 @@ restart:
                         break;
                     }
                     if ($forWrite) {
+                        $catchFrame = $this->enforceReadonlyDynamicPropertyCreate($propertyObject, $name, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                         $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
                         break;
                     }
@@ -4538,6 +4543,34 @@ restart:
         $thrown = VM\BuiltinExceptionSupport::materializeError(
             $this->context,
             sprintf('Property %s::$%s is read-only', $className, $propName)
+        );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /**
+     * Reject dynamic property creation on readonly classes (Zend zend_objects.c).
+     * Returns catch frame or raises uncaught Error (#4799).
+     *
+     * @return ?Frame catch frame when handled; null when no violation or after uncaught raise
+     */
+    private function enforceReadonlyDynamicPropertyCreate(ObjectEntry $object, string $name, Frame $frame): ?Frame
+    {
+        if (!$object->class->readonly || $this->hasInstanceMethod($object->class, '__set')) {
+            return null;
+        }
+        if ($object->hasProperty($name)) {
+            return null;
+        }
+
+        $thrown = VM\BuiltinExceptionSupport::materializeError(
+            $this->context,
+            sprintf('Cannot create dynamic property %s::$%s', $object->class->name, $name)
         );
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
