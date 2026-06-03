@@ -8302,7 +8302,8 @@ class JIT {
                 $this->context,
                 $result,
                 $value,
-                $this->context->jitEnclosingBlock
+                $this->context->jitEnclosingBlock,
+                $this
             )) {
                 return;
             }

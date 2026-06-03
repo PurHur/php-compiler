@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\SourcePreprocessor\PropertyHooks;
 use PHPLLVM\Builder;
@@ -24,7 +25,8 @@ final class PropertyHookDispatch
         Context $context,
         Variable $lvalue,
         Variable $value,
-        ?Block $enclosingBlock
+        ?Block $enclosingBlock,
+        ?\PHPCompiler\JIT $jit = null
     ): bool {
         if (null === $lvalue->objectPropertySlot || null === $lvalue->objectPropertyName) {
             return false;
@@ -36,9 +38,14 @@ final class PropertyHookDispatch
             return false;
         }
         $className = $lvalue->objectPropertyClassName ?? 'stdclass';
-        $hookLc = strtolower(PropertyHooks::setHookMethodName($lvalue->objectPropertyName));
+        $propName = $lvalue->objectPropertyName;
+        $hookLc = strtolower(PropertyHooks::setHookMethodName($propName));
         $proxyName = self::resolveHookProxy($context, $className, $hookLc);
         if (null === $proxyName) {
+            if (self::emitGetOnlyVirtualWriteGuard($context, $jit, $className, $propName)) {
+                return true;
+            }
+
             return false;
         }
 
@@ -197,5 +204,39 @@ final class PropertyHookDispatch
         }
 
         return null;
+    }
+
+    /**
+     * Block stores to get-only virtual hooked properties (#4687).
+     *
+     * @return bool true when the store was blocked (caller must skip propertyStore)
+     */
+    private static function emitGetOnlyVirtualWriteGuard(
+        Context $context,
+        ?\PHPCompiler\JIT $jit,
+        string $className,
+        string $propertyName
+    ): bool {
+        $lcClass = strtolower(ltrim($className, '\\'));
+        $propLc = strtolower($propertyName);
+        $meta = $context->runtime->vmContext->propertyHookRegistry[$lcClass][$propertyName]
+            ?? $context->runtime->vmContext->propertyHookRegistry[$lcClass][$propLc]
+            ?? null;
+        if (!is_array($meta) || empty($meta['virtual']) || isset($meta['set'])) {
+            return false;
+        }
+        $getLc = strtolower(PropertyHooks::getHookMethodName($propertyName));
+        if (null === self::resolveHookProxy($context, $className, $getLc)) {
+            return false;
+        }
+
+        $message = sprintf('Property %s::$%s is read-only', $className, $propertyName);
+        if (null !== $jit && [] !== $context->tryCatch->handlerStack) {
+            TryCatchHelper::emitCatchableErrorMessage($context, $jit, $message);
+        } else {
+            ErrorRaise::emitRaise($context, $message);
+        }
+
+        return true;
     }
 }

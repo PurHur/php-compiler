@@ -293,7 +293,7 @@ class Runtime {
         $sealedPreprocessor = new SealedClassPreprocessor();
         [$code, $permitsByLine] = $sealedPreprocessor->preprocess($code);
         $this->sealedClassAnnotator->setPermitsByLine($permitsByLine);
-        [$code] = (new SourcePreprocessor\PropertyHooks())->process($code);
+        [$code, $this->vmContext->propertyHookRegistry] = (new SourcePreprocessor\PropertyHooks())->process($code);
         $code = SwitchCommaCaseRewriter::rewrite($code);
         $code = GenericArrayTypeSourceRewriter::rewrite($code);
         [$code, $abstractEnumLines] = AbstractEnumSourceRewriter::rewrite($code);

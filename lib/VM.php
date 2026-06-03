@@ -1037,6 +1037,11 @@ restart:
                         $this->context->propertyHookSetAborted = false;
                         break;
                     }
+                    $catchFrame = $this->enforceVirtualPropertyHookWrite($arg2, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $writeTarget = $arg2->resolveIndirect();
                     if (null !== $writeTarget->magicSetTarget && null !== $writeTarget->magicSetName) {
                         $this->invokeMagicSet($writeTarget->magicSetTarget, $writeTarget->magicSetName, $arg3);
@@ -4229,6 +4234,11 @@ restart:
                 $hooks['get'] = $getLc;
             }
             if ([] !== $hooks) {
+                $lcClass = strtolower($entry->name);
+                $propMeta = $this->context->propertyHookRegistry[$lcClass][$propLc] ?? null;
+                if (is_array($propMeta) && !empty($propMeta['virtual'])) {
+                    $hooks['virtual'] = true;
+                }
                 $entry->staticPropertyHooks[$propLc] = $hooks;
             }
         }
@@ -4319,6 +4329,13 @@ restart:
         if (isset($entry->methods[$getLc])) {
             $prop->getHookMethodLc = $getLc;
         }
+        $lcClass = strtolower($entry->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$prop->name]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($prop->name)]
+            ?? null;
+        if (is_array($propMeta) && !empty($propMeta['virtual'])) {
+            $prop->propertyHookVirtual = true;
+        }
     }
 
     private function classPropertyMeta(ObjectEntry $object, string $propertyName): ?VM\ClassProperty
@@ -4350,7 +4367,8 @@ restart:
             }
             $entry = $this->context->classes[$classLc];
             $propLc = strtolower($staticPropName);
-            $setLc = $entry->staticPropertyHooks[$propLc]['set'] ?? null;
+            $hooks = $entry->staticPropertyHooks[$propLc] ?? [];
+            $setLc = $hooks['set'] ?? null;
             if (null === $setLc || !isset($entry->methods[$setLc])) {
                 return false;
             }
@@ -4476,6 +4494,56 @@ restart:
         }
 
         return $this->enforceReadonlyPropertyWrite($lvalue, $frame);
+    }
+
+    /**
+     * Reject writes to get-only virtual hooked properties (#4687, Zend zend_object_handlers.c).
+     */
+    private function enforceVirtualPropertyHookWrite(Variable $lvalue, Frame $frame): ?Frame
+    {
+        $target = $lvalue->resolveIndirect();
+        $propName = $target->objectPropertyName;
+        if (null === $propName || $this->isPropertyHookRawWrite($frame, $propName)) {
+            return null;
+        }
+        $className = null;
+        $virtual = false;
+        $hasSetHook = false;
+        $classLc = $target->staticPropertyClassLc;
+        if (is_string($classLc) && isset($this->context->classes[$classLc])) {
+            $entry = $this->context->classes[$classLc];
+            $hooks = $entry->staticPropertyHooks[strtolower($propName)] ?? [];
+            $virtual = !empty($hooks['virtual']);
+            $hasSetHook = !empty($hooks['set']);
+            $className = $entry->name;
+        } else {
+            $owner = $target->objectPropertyOwner;
+            if (null === $owner) {
+                return null;
+            }
+            $meta = $this->classPropertyMeta($owner, $propName);
+            if (null === $meta) {
+                return null;
+            }
+            $virtual = $meta->propertyHookVirtual;
+            $hasSetHook = null !== $meta->setHookMethodLc;
+            $className = $owner->class->name;
+        }
+        if (!$virtual || $hasSetHook) {
+            return null;
+        }
+
+        $thrown = VM\BuiltinExceptionSupport::materializeError(
+            $this->context,
+            sprintf('Property %s::$%s is read-only', $className, $propName)
+        );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
     }
 
     /** Reject readonly property writes; returns catch frame or throws when uncaught. */
@@ -5738,6 +5806,7 @@ restart:
         );
         $cloned->getHookMethodLc = $property->getHookMethodLc;
         $cloned->setHookMethodLc = $property->setHookMethodLc;
+        $cloned->propertyHookVirtual = $property->propertyHookVirtual;
         $cloned->defaultInitBlock = $property->defaultInitBlock;
         $cloned->defaultInitResultSlot = $property->defaultInitResultSlot;
 
