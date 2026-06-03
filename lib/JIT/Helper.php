@@ -779,6 +779,17 @@ restart:
                 }
                 break;
             case TYPE_PAIR_STRING_STRING:
+                if (OpCode::TYPE_MODULO === $opcode->type) {
+                    $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
+                    $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
+                    JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                        $this->context,
+                        $rightLong,
+                        'Modulo by zero'
+                    );
+                    $result = $this->context->builder->signedRem($leftLong, $rightLong);
+                    goto return_long;
+                }
                 $result = JitStringCompare::binaryOp($this->context, $opcode, $leftValue, $rightValue);
                 goto return_bool;
         }
@@ -1543,6 +1554,17 @@ restart:
                 $result = $this->context->builder->aShr($leftLong, $__right);
                 goto return_long;
             }
+            if (OpCode::TYPE_MODULO === $opcode->type) {
+                $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
+                $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
+                JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                    $this->context,
+                    $__right,
+                    'Modulo by zero'
+                );
+                $result = $this->context->builder->signedRem($leftLong, $__right);
+                goto return_long;
+            }
         }
         if (Variable::TYPE_NATIVE_LONG === $leftType && Variable::TYPE_STRING === $rightType) {
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
@@ -1586,8 +1608,31 @@ restart:
                 $result = $this->context->builder->aShr($__left, $rightLong);
                 goto return_long;
             }
+            if (OpCode::TYPE_MODULO === $opcode->type) {
+                $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
+                $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
+                JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                    $this->context,
+                    $rightLong,
+                    'Modulo by zero'
+                );
+                $result = $this->context->builder->signedRem($__left, $rightLong);
+                goto return_long;
+            }
         }
         if (Variable::TYPE_STRING === $leftType && Variable::TYPE_NATIVE_DOUBLE === $rightType) {
+            if (OpCode::TYPE_MODULO === $opcode->type) {
+                $leftLong = JitLongArg::lowerStringValue($this->context, $leftValue);
+                $i64 = $this->context->getTypeFromString('int64');
+                $rightLong = $this->context->builder->fpToSi($rightValue, $i64);
+                JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                    $this->context,
+                    $rightLong,
+                    'Modulo by zero'
+                );
+                $result = $this->context->builder->signedRem($leftLong, $rightLong);
+                goto return_long;
+            }
             $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
             if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
                 $result = $falseVal;
@@ -1599,6 +1644,18 @@ restart:
             }
         }
         if (Variable::TYPE_NATIVE_DOUBLE === $leftType && Variable::TYPE_STRING === $rightType) {
+            if (OpCode::TYPE_MODULO === $opcode->type) {
+                $i64 = $this->context->getTypeFromString('int64');
+                $leftLong = $this->context->builder->fpToSi($leftValue, $i64);
+                $rightLong = JitLongArg::lowerStringValue($this->context, $rightValue);
+                JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                    $this->context,
+                    $rightLong,
+                    'Modulo by zero'
+                );
+                $result = $this->context->builder->signedRem($leftLong, $rightLong);
+                goto return_long;
+            }
             $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
             if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
                 $result = $falseVal;
