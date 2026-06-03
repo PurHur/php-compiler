@@ -420,12 +420,6 @@ final class Variable {
         if (self::TYPE_ARRAY === $left->type || self::TYPE_ARRAY === $right->type) {
             return false;
         }
-        if (self::TYPE_STRING === $left->type && !is_numeric($left->string)) {
-            return false;
-        }
-        if (self::TYPE_STRING === $right->type && !is_numeric($right->string)) {
-            return false;
-        }
         if (self::TYPE_STRING_OFFSET === $left->type
             || self::TYPE_STRING_OFFSET === $right->type
             || self::TYPE_UNDEFINED === $left->type
@@ -984,6 +978,92 @@ restart:
     }
 
     /**
+     * Zend convert_scalar_to_number for string operands in add_function / compound assign (#4892).
+     *
+     * @return array{0: int|float, 1: bool} numeric value and whether E_WARNING is needed
+     */
+    private static function parseStringForArithmetic(string $s): array
+    {
+        if (is_numeric($s)) {
+            if (((string) (int) $s) === $s) {
+                return [(int) $s, false];
+            }
+
+            return [(float) $s, false];
+        }
+        if (!preg_match('/^\s*[+-]?(?:(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)/', $s, $m)) {
+            throw new \LogicException('no_numeric_prefix');
+        }
+        $matched = $m[0];
+        if ('' === ltrim($matched) || !preg_match('/\d/', $matched)) {
+            throw new \LogicException('no_numeric_prefix');
+        }
+        $numPart = ltrim($matched, " \t\n\r\0\x0B");
+        if (((string) (int) $numPart) === $numPart
+            && !str_contains($numPart, '.')
+            && !str_contains(strtolower($numPart), 'e')) {
+            return [(int) $numPart, true];
+        }
+
+        return [(float) $numPart, true];
+    }
+
+    /**
+     * Numeric coercion for binary/compound arithmetic (zend_operators.c add_function, #4892).
+     */
+    public function toNumericForArithmetic(
+        ?\PHPCompiler\VM $vm = null,
+        ?\PHPCompiler\Frame $frame = null
+    ): int|float {
+        if (self::TYPE_INDIRECT === $this->type) {
+            return $this->indirect->toNumericForArithmetic($vm, $frame);
+        }
+        TypedPropertyCheck::assertReadable($this);
+        switch ($this->type) {
+            case self::TYPE_NULL:
+                return 0;
+            case self::TYPE_INTEGER:
+                return $this->integer;
+            case self::TYPE_FLOAT:
+                return $this->float;
+            case self::TYPE_BOOLEAN:
+                return $this->bool ? 1 : 0;
+            case self::TYPE_STRING:
+                try {
+                    [$value, $warn] = self::parseStringForArithmetic($this->string);
+                } catch (\LogicException) {
+                    throw new \TypeError(sprintf(
+                        'Unsupported operand types: %s',
+                        self::operandZendTypeName($this)
+                    ));
+                }
+                if ($warn) {
+                    self::warnNonNumericValue($vm, $frame);
+                }
+
+                return $value;
+            case self::TYPE_OBJECT:
+                return self::toNumericForArithmeticFromVariable(
+                    $this->objectToScalarString($vm, 'int'),
+                    $vm,
+                    $frame
+                );
+        }
+        throw new \TypeError(sprintf(
+            'Unsupported operand types: %s',
+            self::operandZendTypeName($this)
+        ));
+    }
+
+    private static function toNumericForArithmeticFromVariable(
+        Variable $var,
+        ?\PHPCompiler\VM $vm,
+        ?\PHPCompiler\Frame $frame
+    ): int|float {
+        return $var->toNumericForArithmetic($vm, $frame);
+    }
+
+    /**
      * Int↔string loose == prefers exact integer numeric strings; other numeric strings (e.g. '0e5')
      * fall back to {@see looseNumericFromString} (#4035, Zend zend_operators.c).
      *
@@ -1487,10 +1567,16 @@ restart:
         }
     }
 
-    public function numericOp(int $opCode, Variable $left, Variable $right): void {
+    public function numericOp(
+        int $opCode,
+        Variable $left,
+        Variable $right,
+        ?\PHPCompiler\VM $vm = null,
+        ?\PHPCompiler\Frame $frame = null
+    ): void {
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();
-            $result->numericOp($opCode, $left, $right);
+            $result->numericOp($opCode, $left, $right, $vm, $frame);
             $this->indirect->copyFrom($result);
 
             return;
@@ -1513,7 +1599,11 @@ restart:
         }
         // In-place ops (e.g. $i++ → PLUS($i,$i,1)) alias $this with an operand (#1228).
         if ($this === $left || $this === $right) {
-            $this->storeNumericOp($opCode, $left->toNumeric(), $right->toNumeric());
+            $this->storeNumericOp(
+                $opCode,
+                $left->toNumericForArithmetic($vm, $frame),
+                $right->toNumericForArithmetic($vm, $frame)
+            );
 
             return;
         }
@@ -1547,7 +1637,11 @@ restart:
             $right = $right->indirect;
             goto restart;
         } else {
-            $result = $this->_numericOp($opCode, $left->toNumeric(), $right->toNumeric());
+            $result = $this->_numericOp(
+                $opCode,
+                $left->toNumericForArithmetic($vm, $frame),
+                $right->toNumericForArithmetic($vm, $frame)
+            );
             if (is_int($result)) {
                 $this->int($result);
             } else {
