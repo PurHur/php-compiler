@@ -291,6 +291,11 @@ patch_already_applied() {
     php-cfg-enum-class-method.patch)
       grep -q 'elseif ($stmt instanceof Stmt\\ClassMethod)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
+    php-cfg-enum-class-const.patch)
+      grep -q 'public bool \\$isEnumCase = false' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php" 2>/dev/null \
+        && grep -q 'Stmt\\ClassConst' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        && grep -A30 'function parseStmt_Enum' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null | grep -q 'ClassConst'
+      ;;
     php-cfg-enum-abstract.patch)
       php_cfg_enum_flags_parser_applied
       ;;
@@ -750,6 +755,18 @@ apply_php_cfg_enum_class_method_parser_fix() {
   apply_patch "$PATCH_DIR/php-cfg-enum-class-method.patch"
 }
 
+apply_php_cfg_enum_class_const_parser_fix() {
+  local parser="${1:-$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php}"
+  if patch_already_applied "$PATCH_DIR/php-cfg-enum-class-const.patch"; then
+    return 0
+  fi
+  if ! grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-enum-class-const.patch (parseStmt_Enum missing)" >&2
+    return 1
+  fi
+  apply_patch "$PATCH_DIR/php-cfg-enum-class-const.patch"
+}
+
 apply_php_cfg_enum_overlay() {
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php"
@@ -784,6 +801,7 @@ PY
   fi
   apply_php_cfg_enum_implements_parser_fix "$parser"
   apply_php_cfg_enum_class_method_parser_fix "$parser"
+  apply_php_cfg_enum_class_const_parser_fix "$parser"
   php_cfg_sync_enum_flags_parser "$parser" "$op" || true
 }
 
@@ -865,6 +883,7 @@ apply_php_cfg_enum_early_chain() {
   apply_php_cfg_enum_overlay || true
   apply_php_cfg_enum_implements_overlay || true
   apply_php_cfg_enum_class_method_parser_fix || true
+  apply_php_cfg_enum_class_const_parser_fix || true
   apply_php_cfg_enum_abstract_overlay || true
   php_cfg_sync_enum_flags_parser || true
 }

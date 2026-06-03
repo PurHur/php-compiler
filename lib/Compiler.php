@@ -2749,6 +2749,9 @@ class Compiler {
             $typeSlot
         );
         $constOp->classConstVisibilityFlags = $child->flags;
+        if (property_exists($child, 'isEnumCase')) {
+            $constOp->isEnumCaseDeclare = $child->isEnumCase;
+        }
         $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $constOp->attributeNames = AttributeNames::fromOp($child);
         $this->assignAttributeMetadata($constOp, $child);
