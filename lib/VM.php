@@ -1669,7 +1669,16 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
-                    $arg1->bitwiseOp($op->type, $arg2, $arg3);
+                    try {
+                        $arg1->bitwiseOp($op->type, $arg2, $arg3);
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     break;
 
                 case OpCode::TYPE_UNARY_MINUS:
