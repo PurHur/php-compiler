@@ -41,7 +41,7 @@ final class PropertyHookDispatch
         $propName = $lvalue->objectPropertyName;
         $hookLc = strtolower(PropertyHooks::setHookMethodName($propName));
         $proxyName = self::resolveHookProxy($context, $className, $hookLc);
-        if (null === $proxyName) {
+        if (null === $proxyName || self::proxyIsStatic($context, $proxyName)) {
             if (self::emitGetOnlyVirtualWriteGuard($context, $jit, $className, $propName)) {
                 return true;
             }
@@ -79,7 +79,7 @@ final class PropertyHookDispatch
         }
         $hookLc = strtolower(PropertyHooks::getHookMethodName($propertyName));
         $proxyName = self::resolveHookProxy($context, $declaringClass, $hookLc);
-        if (null === $proxyName) {
+        if (null === $proxyName || self::proxyIsStatic($context, $proxyName)) {
             return null;
         }
 
@@ -120,6 +120,84 @@ final class PropertyHookDispatch
         }
 
         return self::compileIssetForHookValue($context, $hookValue);
+    }
+
+    /**
+     * Invoke static get hook instead of loading the backing global (#4807).
+     */
+    public static function tryEmitStaticPropertyGet(
+        Context $context,
+        string $declaringClass,
+        string $propertyName,
+        ?Block $enclosingBlock
+    ): ?Value {
+        if (self::isRawHookWrite($context, $propertyName, $enclosingBlock)) {
+            return null;
+        }
+        $hookLc = strtolower(PropertyHooks::getHookMethodName($propertyName));
+        $proxyName = self::resolveStaticHookProxy($context, $declaringClass, $hookLc);
+        if (null === $proxyName) {
+            return null;
+        }
+        $toCall = $context->resolveFunctionProxy($proxyName);
+        $prevStrict = $context->callerStrictTypes;
+        $context->callerStrictTypes = $enclosingBlock?->strictTypes ?? false;
+        $hookValue = $toCall->call($context);
+        $context->callerStrictTypes = $prevStrict;
+
+        return $hookValue;
+    }
+
+    /**
+     * Whether a static property has a lowered static set hook at compile time (#4807).
+     */
+    public static function staticPropertyHasSetHook(
+        Context $context,
+        string $declaringClass,
+        string $propertyName
+    ): bool {
+        $hookLc = strtolower(PropertyHooks::setHookMethodName($propertyName));
+
+        return null !== self::resolveStaticHookProxy($context, $declaringClass, $hookLc);
+    }
+
+    /**
+     * Invoke static set hook instead of storing the backing global (#4807).
+     */
+    public static function emitStaticSetHookIfNeeded(
+        Context $context,
+        Variable $lvalue,
+        Variable $value,
+        ?Block $enclosingBlock,
+        ?\PHPCompiler\JIT $jit = null
+    ): bool {
+        if (null === $lvalue->staticPropertyGlobal || null === $lvalue->staticPropertyHookClassLc) {
+            return false;
+        }
+        $propName = $lvalue->objectPropertyName;
+        if (null === $propName) {
+            return false;
+        }
+        if (self::isRawHookWrite($context, $propName, $enclosingBlock)) {
+            return false;
+        }
+        $className = $lvalue->staticPropertyHookClassLc;
+        $hookLc = strtolower(PropertyHooks::setHookMethodName($propName));
+        $proxyName = self::resolveStaticHookProxy($context, $className, $hookLc);
+        if (null === $proxyName) {
+            if (self::emitGetOnlyVirtualWriteGuard($context, $jit, $className, $propName, true)) {
+                return true;
+            }
+
+            return false;
+        }
+        $toCall = $context->resolveFunctionProxy($proxyName);
+        $prevStrict = $context->callerStrictTypes;
+        $context->callerStrictTypes = $enclosingBlock?->strictTypes ?? false;
+        $toCall->call($context, $value);
+        $context->callerStrictTypes = $prevStrict;
+
+        return true;
     }
 
     private static function compileIssetForHookValue(Context $context, Value $hookValue): Value
@@ -184,6 +262,30 @@ final class PropertyHookDispatch
         return false;
     }
 
+    private static function resolveStaticHookProxy(Context $context, string $className, string $hookMethodLc): ?string
+    {
+        $proxy = self::resolveHookProxy($context, $className, $hookMethodLc);
+        if (null === $proxy || !self::proxyIsStatic($context, $proxy)) {
+            return null;
+        }
+
+        return $proxy;
+    }
+
+    private static function proxyIsStatic(Context $context, string $proxyName): bool
+    {
+        $parts = explode('::', $proxyName, 2);
+        if (2 !== count($parts)) {
+            return false;
+        }
+        $objectType = $context->type->object;
+        assert($objectType instanceof Object_);
+        $classId = $objectType->lookup($parts[0]);
+        $flags = $objectType->methodVisibility($classId, $parts[1]);
+
+        return ($flags & \PHPCfg\Func::FLAG_STATIC) !== 0;
+    }
+
     private static function resolveHookProxy(Context $context, string $className, string $hookMethodLc): ?string
     {
         $objectType = $context->type->object;
@@ -215,7 +317,8 @@ final class PropertyHookDispatch
         Context $context,
         ?\PHPCompiler\JIT $jit,
         string $className,
-        string $propertyName
+        string $propertyName,
+        bool $staticProperty = false
     ): bool {
         $lcClass = strtolower(ltrim($className, '\\'));
         $propLc = strtolower($propertyName);
@@ -226,7 +329,10 @@ final class PropertyHookDispatch
             return false;
         }
         $getLc = strtolower(PropertyHooks::getHookMethodName($propertyName));
-        if (null === self::resolveHookProxy($context, $className, $getLc)) {
+        $getProxy = $staticProperty
+            ? self::resolveStaticHookProxy($context, $className, $getLc)
+            : self::resolveHookProxy($context, $className, $getLc);
+        if (null === $getProxy || (!$staticProperty && self::proxyIsStatic($context, $getProxy))) {
             return false;
         }
 

@@ -5518,8 +5518,33 @@ class JIT {
                     $classOp = $block->getOperand($op->arg2);
                     $nameOp = $block->getOperand($op->arg3);
                     $classId = $this->context->type->object->resolveClassId($classOp);
+                    $className = $this->context->type->object->classNameForId($classId);
                     if ($nameOp instanceof Operand\Literal) {
+                        $forWrite = $this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1);
+                        if (!$forWrite) {
+                            $hookFetched = JIT\PropertyHookDispatch::tryEmitStaticPropertyGet(
+                                $this->context,
+                                $className,
+                                $nameOp->value,
+                                $block
+                            );
+                            if (null !== $hookFetched) {
+                                $this->assignOperandValue($block->getOperand($op->arg1), $hookFetched);
+                                break;
+                            }
+                        }
                         $fetched = $this->context->type->object->staticPropertyFetch($classId, $nameOp->value);
+                        if (
+                            $forWrite
+                            && JIT\PropertyHookDispatch::staticPropertyHasSetHook(
+                                $this->context,
+                                $className,
+                                $nameOp->value
+                            )
+                        ) {
+                            $fetched->staticPropertyHookClassLc = strtolower(ltrim($className, '\\'));
+                            $fetched->objectPropertyName = $nameOp->value;
+                        }
                     } else {
                         $nameVar = $this->context->getVariableFromOp($nameOp);
                         $fetched = $this->context->type->object->staticPropertyFetchDynamic($classId, $nameVar);
@@ -7767,6 +7792,11 @@ class JIT {
                     if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
                         $visFlags = MethodVisibility::mask($block->constants[$op->arg3]->toInt());
                     }
+                    $methodBlock = $op->block1;
+                    if (null !== $methodBlock && null !== $methodBlock->func
+                        && (($methodBlock->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+                        $visFlags |= \PHPCfg\Func::FLAG_STATIC;
+                    }
                     $this->context->type->object->defineMethodVisibility(
                         $classId,
                         $methodLc,
@@ -8358,6 +8388,15 @@ class JIT {
         if (null !== $result->staticPropertyGlobal) {
             if (null === $result->staticPropertyType) {
                 throw new \LogicException('staticPropertyGlobal requires staticPropertyType');
+            }
+            if (JIT\PropertyHookDispatch::emitStaticSetHookIfNeeded(
+                $this->context,
+                $result,
+                $value,
+                $this->context->jitEnclosingBlock,
+                $this
+            )) {
+                return;
             }
             $this->context->type->object->staticPropertyStore(
                 $result->staticPropertyGlobal,
