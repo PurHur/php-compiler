@@ -2943,8 +2943,33 @@ restart:
                         $result->copyFrom($prop);
                         break;
                     }
-                    if ($var->type !== Variable::TYPE_OBJECT) {
-                        throw new \LogicException("Unsupported property fetch on non-object");
+                    if (TypeCheck::isNonObjectPropertyFetchReceiver($var)) {
+                        $resolved = $var->resolveIndirect();
+                        $typeName = TypeCheck::typeNameForConstraint($resolved->type);
+                        $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+                        $forWrite = $frame->pos < $frame->block->nOpCodes
+                            && OpCode::TYPE_ASSIGN === $frame->block->opCodes[$frame->pos]->type
+                            && (int) $frame->block->opCodes[$frame->pos]->arg2 === (int) $op->arg1;
+                        if ($forWrite) {
+                            $catchFrame = $this->dispatchVmError(
+                                sprintf('Attempt to assign property "%s" on %s', $name, $typeName),
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
+                        $this->context->errors->propertyReadOnNonObject(
+                            $name,
+                            $typeName,
+                            $this->context,
+                            $frame,
+                            $scriptFile
+                        );
+                        $result->null();
+                        break;
                     }
                     $propertyObject = $var->toObject();
                     VM\LazyObjectSupport::ensureInitialized($this, $propertyObject);
