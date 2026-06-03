@@ -5863,12 +5863,19 @@ class JIT {
                     break;
                 case OpCode::TYPE_UNARY_MINUS:
                 case OpCode::TYPE_BITWISE_NOT:
+                case OpCode::TYPE_UNARY_PLUS:
                     $this->assignOperand(
                         $block->getOperand($op->arg1),
-                        $this->context->helper->unaryOp(
-                            $op,
-                            $this->context->getVariableFromOp($block->getOperand($op->arg2)),
-                        )
+                        OpCode::TYPE_UNARY_PLUS === $op->type
+                            ? JIT\JitUnaryPlus::lower(
+                                $this->context,
+                                $op,
+                                $this->context->getVariableFromOp($block->getOperand($op->arg2)),
+                            )
+                            : $this->context->helper->unaryOp(
+                                $op,
+                                $this->context->getVariableFromOp($block->getOperand($op->arg2)),
+                            )
                     );
                     break;
                 case OpCode::TYPE_CASE:
