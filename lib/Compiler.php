@@ -1081,6 +1081,13 @@ class Compiler {
                     } elseif ($this->isUnreachableAfterNeverCall($child, $ops, $i)) {
                         break;
                     } elseif (
+                        $child instanceof Op\Expr\ArrayDimFetch
+                        && $i + 1 < $opCount
+                        && $this->isArrayDimFetchOnlyEmptyVar($child, $ops[$i + 1], $block)
+                    ) {
+                        // Lowered by compileExpr Empty_ via TYPE_ISSET + TYPE_BOOLEAN_NOT (#5307).
+                        break;
+                    } elseif (
                         $child instanceof Op\Expr\PropertyFetch
                         && $i + 1 < $opCount
                         && $this->isPropertyFetchOnlyEmptyVar($child, $ops[$i + 1], $block)
@@ -1915,6 +1922,37 @@ class Compiler {
         }
 
         return $this->findCoalescePropertyFetch($target, $block) === $fetch;
+    }
+
+    /**
+     * php-cfg emits ArrayDimFetch as its own stmt before Empty_; skip duplicate lowering (#5307).
+     */
+    private function isArrayDimFetchOnlyEmptyVar(
+        Op\Expr\ArrayDimFetch $fetch,
+        Op $next,
+        Block $block
+    ): bool {
+        if (!$next instanceof Op\Expr\Empty_) {
+            return false;
+        }
+        $target = $next->expr;
+        if ($target === $fetch || $target === $fetch->result) {
+            return true;
+        }
+        while ($target instanceof Temporary) {
+            if ($target === $fetch->result) {
+                return true;
+            }
+            if (null === $target->original) {
+                break;
+            }
+            $target = $target->original;
+        }
+        if ($target === $fetch->result) {
+            return true;
+        }
+
+        return $this->findCoalesceArrayDimFetch($target, $block) === $fetch;
     }
 
     private function isPropertyFetchOnlyUnsetVar(
