@@ -1,0 +1,91 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\Test\Unit;
+
+use PHPCompiler\Runtime;
+use PHPUnit\Framework\TestCase;
+
+/** @covers issue #4988 */
+final class MagicMethodReturnTypeCheckTest extends TestCase
+{
+    /**
+     * @dataProvider invalidMagicMethodProvider
+     */
+    public function testInvalidMagicMethodReturnTypeFailsAtCompileTime(string $code, string $message): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage($message);
+        $runtime->parseAndCompile($code, 'invalid_magic.php');
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function invalidMagicMethodProvider(): iterable
+    {
+        yield '__serialize int' => [
+            <<<'PHP'
+<?php
+class C1 { public function __serialize(): int { return 1; } }
+PHP,
+            'C1::__serialize(): Return type must be array when declared',
+        ];
+        yield '__unserialize int' => [
+            <<<'PHP'
+<?php
+class C2 { public function __unserialize(array $d): int { return 1; } }
+PHP,
+            'C2::__unserialize(): Return type must be void when declared',
+        ];
+        yield '__clone int' => [
+            <<<'PHP'
+<?php
+class C3 { public function __clone(): int { return 1; } }
+PHP,
+            'C3::__clone(): Return type must be void when declared',
+        ];
+        yield '__construct return type' => [
+            <<<'PHP'
+<?php
+class C4 { public function __construct(): int { return 1; } }
+PHP,
+            'Method C4::__construct() cannot declare a return type',
+        ];
+        yield '__debugInfo string' => [
+            <<<'PHP'
+<?php
+class C5 { public function __debugInfo(): string { return 'x'; } }
+PHP,
+            'C5::__debugInfo(): Return type must be ?array when declared',
+        ];
+        yield '__serialize nullable array' => [
+            <<<'PHP'
+<?php
+class C6 { public function __serialize(): ?array { return []; } }
+PHP,
+            'C6::__serialize(): Return type must be array when declared',
+        ];
+    }
+
+    public function testValidMagicMethodReturnTypesCompile(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Good {
+    public function __construct() {}
+    public function __serialize(): array { return []; }
+    public function __unserialize(array $d): void {}
+    public function __clone(): void {}
+    public function __debugInfo(): ?array { return null; }
+}
+echo Good::class, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'valid_magic.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("Good\n", ob_get_clean());
+    }
+}

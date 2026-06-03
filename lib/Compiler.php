@@ -30,6 +30,7 @@ use PHPCompiler\VM\ClassReadonly;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
+use PHPCompiler\Compiler\MagicMethodReturnTypeCheck;
 use PHPCompiler\Compiler\AttributeMetadata;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\DeprecatedMetadata;
@@ -332,6 +333,7 @@ class Compiler {
         FinalClassExtensionCheck::validate($script);
         FinalClassConstCheck::validate($script);
         AbstractMethodVisibilityCheck::validate($script);
+        MagicMethodReturnTypeCheck::validate($script);
         ReadonlyClassCompileCheck::validate($script);
 
         return $main;
