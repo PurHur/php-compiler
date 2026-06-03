@@ -492,6 +492,43 @@ class VM {
     }
 
     /**
+     * Zend zend_check_clone: private/protected __clone() rejects external-scope clone (#5077).
+     *
+     * @return null when clone is allowed, or a catch frame when Error was dispatched
+     */
+    protected function enforceCloneVisibility(ObjectEntry $object, Frame $frame): ?Frame
+    {
+        if (!$this->hasInstanceMethod($object->class, '__clone')) {
+            return null;
+        }
+        try {
+            [$declaringClass, $methodLc] = $this->resolveInstanceMethod($object->class, '__clone');
+            $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            $callerClassLc = $this->callerClassLc($frame);
+            $callerDisplay = null;
+            if (null !== $callerClassLc && isset($this->context->classes[$callerClassLc])) {
+                $callerDisplay = $this->context->classes[$callerClassLc]->name;
+            }
+            MethodVisibility::assertCallable(
+                $vis,
+                $callerClassLc,
+                strtolower($declaringClass->name),
+                $declaringClass->name,
+                '__clone',
+                false,
+                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
+                $callerDisplay
+            );
+        } catch (\LogicException $e) {
+            $message = 'Trying to clone an uncloneable object of class '.$object->class->name;
+
+            return $this->dispatchVmError($message, $frame);
+        }
+
+        return null;
+    }
+
+    /**
      * Zend zend_std_clone_object: shallow copy then user __clone() when defined (#3170).
      */
     protected function invokeCloneMagicMethod(ObjectEntry $object): void
@@ -2951,7 +2988,13 @@ restart:
                     if (Variable::TYPE_OBJECT !== $src->type) {
                         throw new \LogicException('clone requires an object');
                     }
-                    $cloned = $src->toObject()->cloneShallow();
+                    $srcObject = $src->toObject();
+                    $catchFrame = $this->enforceCloneVisibility($srcObject, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
+                    $cloned = $srcObject->cloneShallow();
                     $result->object($cloned);
                     $this->invokeCloneMagicMethod($cloned);
                     break;
