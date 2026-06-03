@@ -427,6 +427,7 @@ class JITTest extends BaseTest {
                 continue;
             }
             // User enum DECLARE_ENUM segfaults in MCJIT until enum lowering is stable (#3518).
+            // enum_spaceship_jit: lowering fixed #4849; compliance JIT when jit-runtime-probe green (#98).
             if (str_contains($name, 'enum_') || str_contains($name, 'abstract_enum')) {
                 continue;
             }

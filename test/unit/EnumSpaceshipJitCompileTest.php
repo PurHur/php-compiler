@@ -13,7 +13,7 @@ require_once __DIR__.'/../LlvmToolchain.php';
  *
  * php-src: Zend/zend_enum.c (zend_compare_enum), zend_operators.c
  *
- * MCJIT execute remains gated by jit-runtime-probe (#98).
+ * MCJIT execute: EnumSpaceshipJitExecuteTest (#4849); compliance JITTest when jit-runtime-probe green.
  *
  * @group llvm
  */

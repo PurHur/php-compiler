@@ -1469,11 +1469,33 @@ class Object_ extends Type {
             throw new \LogicException("Unknown enum case: {$caseKey}");
         }
 
-        return $this->allocEnumCaseSingletonIr(
-            $classId,
-            $this->enumCaseCanonicalName($classId, $caseKey),
-            $this->jitConstantFromEntry($this->classConstants[$classId][$caseKey])
-        );
+        $globalName = 'php_compiler_enum_case_jit_'.$classId.'_'.$caseKey;
+        if (!isset($this->classConstObjectGlobals[$globalName])) {
+            $objPtrType = $this->context->getTypeFromString('__object__*');
+            $global = $this->context->module->addGlobal($objPtrType, $globalName);
+            $global->setInitializer($objPtrType->constNull());
+            $this->classConstObjectGlobals[$globalName] = $global;
+            $canonicalName = $this->enumCaseCanonicalName($classId, $caseKey);
+            $backingEntry = $this->classConstants[$classId][$caseKey];
+            $this->context->emitInInit(function (Context $ctx) use (
+                $classId,
+                $canonicalName,
+                $backingEntry,
+                $global
+            ): void {
+                $alloc = $this->allocateClassConstantEnumCase(
+                    $classId,
+                    $canonicalName,
+                    $this->jitConstantFromEntry($backingEntry)
+                );
+                $ctx->builder->store($alloc, $global);
+            });
+        }
+
+        return $this->jitClassConstObjectFromGlobal([
+            'type' => Variable::TYPE_OBJECT,
+            'global' => $globalName,
+        ]);
     }
 
     public function allocEnumCaseSingletonIr(int $classId, string $caseName, Variable $backingJit): Variable
@@ -1527,7 +1549,7 @@ class Object_ extends Type {
         $this->context->builder->call(
             $this->context->lookupFunction('phpc_gc_register'),
             $this->context->builder->pointerCast($obj, $this->context->getTypeFromString('int8*')),
-            $this->context->constantFromInteger(0, 'int32')
+            $this->context->constantFromInteger(2, 'int32')
         );
 
         return new Variable(
@@ -3021,6 +3043,10 @@ class Object_ extends Type {
         $key = strtolower($constName);
         if (!isset($this->classConstants[$classId][$key])) {
             throw new \LogicException("Undefined class constant: {$constName}");
+        }
+
+        if ($this->isEnumClassId($classId)) {
+            return $this->jitEnumCaseFromBacking($classId, $key);
         }
 
         return $this->jitConstantFromEntry($this->classConstants[$classId][$key]);
