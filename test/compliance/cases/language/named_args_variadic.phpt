@@ -1,5 +1,5 @@
 --TEST--
-Language: variadic functions — named arguments populate $args (#4757)
+Language: named arguments with variadic parameters — pack order parity (#4808, #4757)
 --FILE--
 <?php
 function f(...$args) {
