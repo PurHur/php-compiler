@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * MCJIT IR compile for dynamic property writes (#5111); execute still VM-fallback until run() is green.
+ * MCJIT IR compile for dynamic property writes (#5111).
  */
 final class DynamicPropertyDeprecationJitCompileTest extends TestCase
 {

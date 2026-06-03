@@ -8071,10 +8071,19 @@ class JIT {
                             }
                         }
                     } else {
-                        $jitType = $this->context->type->object->externalPropertyJitType(
-                            $className,
-                            $name->value
-                        );
+                        $lcClass = strtolower(str_replace('/', '\\', ltrim($className, '\\')));
+                        if (
+                            !str_starts_with($lcClass, 'phpcfg\\')
+                            && !str_starts_with($lcClass, 'phpcompiler\\')
+                        ) {
+                            // User classes: native slots for declared scalars (VALUE-box fetch segfaults MCJIT, #5111).
+                            $jitType = $declaredJitType;
+                        } else {
+                            $jitType = $this->context->type->object->externalPropertyJitType(
+                                $className,
+                                $name->value
+                            );
+                        }
                     }
                     $this->context->type->object->defineProperty($classId, $name->value, $jitType);
                     if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {

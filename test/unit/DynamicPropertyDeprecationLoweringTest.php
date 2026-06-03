@@ -7,11 +7,11 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Block::containsDynamicPropertyDeprecationOpcodes; VM fallback until MCJIT execute green (#5111).
+ * Block::containsDynamicPropertyDeprecationOpcodes detects undeclared writes (#5111).
  */
 final class DynamicPropertyDeprecationLoweringTest extends TestCase
 {
-    public function testUndeclaredWriteRequiresVmLowering(): void
+    public function testUndeclaredWriteRequiresVmLoweringUntilMcjitExecuteGreen(): void
     {
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(

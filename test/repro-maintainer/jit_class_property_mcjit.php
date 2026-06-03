@@ -19,6 +19,13 @@ try {
     echo $e->getMessage(), "\n";
 }
 PHP,
+    'class_with_method' => <<<'PHP'
+<?php
+class C {
+    public function f(): int { return 1; }
+}
+echo C::f(), "\n";
+PHP,
     'untyped_prop' => <<<'PHP'
 <?php
 class C {
@@ -27,6 +34,32 @@ class C {
 $c = new C();
 echo $c->x, "\n";
 PHP,
+    'declare_untyped_only' => <<<'PHP'
+<?php
+class C {
+    public $x = 1;
+}
+echo "ok\n";
+PHP,
+    'declare_typed_only' => <<<'PHP'
+<?php
+class C {
+    public int $x = 1;
+}
+echo "ok\n";
+PHP,
+    'property_hooks' => <<<'PHP'
+<?php
+class Box {
+    public string $label {
+        get => strtoupper($this->label);
+        set => $value = trim($value);
+    }
+}
+$b = new Box();
+$b->label = " hi ";
+echo $b->label, "\n";
+PHP,
     'typed_prop' => <<<'PHP'
 <?php
 class C {
@@ -34,6 +67,23 @@ class C {
 }
 $c = new C();
 echo $c->x, "\n";
+PHP,
+    'new_ok' => <<<'PHP'
+<?php
+class C {
+    public int $x = 1;
+}
+new C();
+echo "ok\n";
+PHP,
+    'assign_declared' => <<<'PHP'
+<?php
+class C {
+    public int $x = 1;
+}
+$c = new C();
+$c->x = 2;
+echo "ok\n";
 PHP,
     'dynamic_write' => <<<'PHP'
 <?php

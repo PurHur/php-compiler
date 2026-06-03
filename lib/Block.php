@@ -1470,6 +1470,73 @@ class Block {
     }
 
     /**
+     * User-defined classes with declared instance properties — MCJIT link/execute segfaults (#5111).
+     * Vendor/compiler classes (phpcfg/phpcompiler) keep MCJIT lowering.
+     */
+    public static function containsUserClassDeclaredInstancePropertyOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_CLASS === $op->type && $op->block1 instanceof self) {
+                    $nameOp = $block->getOperand($op->arg1);
+                    if ($nameOp instanceof Literal) {
+                        $classLc = strtolower(ltrim($nameOp->value, '\\'));
+                        if (
+                            !str_starts_with($classLc, 'phpcfg\\')
+                            && !str_starts_with($classLc, 'phpcompiler\\')
+                            && self::classBodyDeclaresInstanceProperty($op->block1)
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static function classBodyDeclaresInstanceProperty(self $classBlock): bool
+    {
+        $seen = new \SplObjectStorage();
+        $stack = [$classBlock];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if ($seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_PROPERTY === $op->type) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Writes to undeclared instance properties on classes without #[\AllowDynamicProperties].
      * Detects undeclared writes for diagnostics; JIT emits E_DEPRECATED via DynamicPropertyDeprecationGuard (#4570, #5111).
      */
@@ -1922,6 +1989,7 @@ class Block {
             || self::containsTypedNonVoidReturnOpcodes($root)
             || self::containsReadonlyPropertyOpcodes($root)
             || self::containsReadonlyClassOpcodes($root)
+            || self::containsUserClassDeclaredInstancePropertyOpcodes($root)
             || self::containsDynamicPropertyDeprecationOpcodes($root)
             || self::containsFiberSuspendOpcodes($root)
             || self::containsTraitConstructorOpcodes($root)
