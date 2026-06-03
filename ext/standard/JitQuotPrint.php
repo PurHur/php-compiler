@@ -18,30 +18,40 @@ use PHPLLVM\Value;
 /** LLVM JIT/AOT string-arg lowering for quoted_printable_* (php-src ext/standard/quot_print.c, #4828). */
 final class JitQuotPrint
 {
-    public static function lowerStringSubject(Context $context, JITVariable $arg, string $function): Value
-    {
+    public static function lowerStringSubject(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex = 1,
+        string $paramName = 'string'
+    ): Value {
         if (JITVariable::TYPE_HASHTABLE === $arg->type) {
-            self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, 'array'));
+            self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, $argIndex, $paramName, 'array'));
 
             return self::unreachableStringPtr($context);
         }
         if (JITVariable::TYPE_OBJECT === $arg->type) {
-            self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, 'object'));
+            self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, $argIndex, $paramName, 'object'));
 
             return self::unreachableStringPtr($context);
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
-            return self::lowerBoxedStringSubject($context, $arg, $function);
+            return self::lowerBoxedStringSubject($context, $arg, $function, $argIndex, $paramName);
         }
         if ($context->callerStrictTypes) {
-            JitInternalStrictArg::requireString($context, $arg, $function, 'string', 1);
+            JitInternalStrictArg::requireString($context, $arg, $function, $paramName, $argIndex);
         }
 
-        return JitStringArg::lower($context, $arg, $function.'() argument #1');
+        return JitStringArg::lower($context, $arg, sprintf('%s() argument #%d', $function, $argIndex));
     }
 
-    private static function lowerBoxedStringSubject(Context $context, JITVariable $arg, string $function): Value
-    {
+    private static function lowerBoxedStringSubject(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
@@ -63,13 +73,13 @@ final class JitQuotPrint
         $context->builder->branchIf($isArray, $arrayBlock, $okBlock);
 
         $context->builder->positionAtEnd($arrayBlock);
-        self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, 'array'));
+        self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, $argIndex, $paramName, 'array'));
 
         $context->builder->positionAtEnd($okBlock);
         $context->builder->branchIf($isObject, $objectBlock, $strictBlock);
 
         $context->builder->positionAtEnd($objectBlock);
-        self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, 'object'));
+        self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, $argIndex, $paramName, 'object'));
 
         $context->builder->positionAtEnd($strictBlock);
         if ($context->callerStrictTypes) {
@@ -82,7 +92,7 @@ final class JitQuotPrint
             $strictErrBlock = BasicBlockHelper::append($context, 'quotprint_str_strict_err');
             $context->builder->branchIf($isString, $coerceBlock, $strictErrBlock);
             $context->builder->positionAtEnd($strictErrBlock);
-            self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, 'mixed'));
+            self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, $argIndex, $paramName, 'mixed'));
             $context->builder->positionAtEnd($coerceBlock);
         }
 
@@ -92,11 +102,17 @@ final class JitQuotPrint
         );
     }
 
-    private static function typeErrorMessage(string $function, string $given): string
-    {
+    private static function typeErrorMessage(
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $given
+    ): string {
         return sprintf(
-            '%s(): Argument #1 ($string) must be of type string, %s given',
+            '%s(): Argument #%d ($%s) must be of type string, %s given',
             $function,
+            $argIndex,
+            $paramName,
             $given
         );
     }
