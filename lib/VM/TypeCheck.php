@@ -14,7 +14,8 @@ final class TypeCheck
 {
     public static function variadicSlotNeedsElementChecks(Block $block, int $slot): bool
     {
-        return isset($block->paramVariadicElementTypeConstraints[$slot])
+        return isset($block->paramIterableSlots[$slot])
+            || isset($block->paramVariadicElementTypeConstraints[$slot])
             || isset($block->paramVariadicElementGenericArrayTypeSpecs[$slot])
             || isset($block->paramVariadicElementIntersectionConstraints[$slot])
             || isset($block->paramVariadicElementDnfConstraints[$slot]);
@@ -34,12 +35,18 @@ final class TypeCheck
         ?GenericArrayTypeSpec $arraySpec,
         ?array $intersection,
         ?array $dnfArms,
-        Context $context
+        Context $context,
+        bool $iterableElement = false
     ): void {
         foreach ($elements as $element) {
             $probe = new Variable();
             $probe->copyFrom($element);
             $resolved = $probe->resolveIndirect();
+            if ($iterableElement) {
+                IterableCheck::assertParameter($probe, $context);
+
+                continue;
+            }
             if (null !== $typeConstraint) {
                 $resolved->typeConstraint = $typeConstraint;
             }

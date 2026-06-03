@@ -25,6 +25,7 @@ use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\FiberState;
 use PHPCompiler\VM\GeneratorState;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\IterableCheck;
 use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ObjectLifetime;
@@ -2275,10 +2276,6 @@ restart:
                                     continue;
                                 }
                                 $slot = (int) $recv->arg1;
-                                $constraint = $calleeBlock->paramTypeConstraints[$slot] ?? null;
-                                if (null === $constraint) {
-                                    continue;
-                                }
                                 $arg = $calledArgs[$paramIdx];
                                 if (
                                     TypeCheck::skipParameterTypeCheckForImplicitNullable(
@@ -2287,6 +2284,25 @@ restart:
                                         $arg
                                     )
                                 ) {
+                                    continue;
+                                }
+                                if (isset($calleeBlock->paramIterableSlots[$slot])) {
+                                    if (!IterableCheck::isIterable($arg, $this->context)) {
+                                        $paramName = $calleeBlock->paramNames[$paramIdx] ?? 'param'.$paramIdx;
+                                        throw VM\ParamTypeError::forUserCallWithExpectedType(
+                                            $frame->call->getName(),
+                                            $paramIdx,
+                                            $paramName,
+                                            IterableCheck::TYPE_LABEL,
+                                            $arg,
+                                            $frame->scriptPath,
+                                            $callSiteLine
+                                        );
+                                    }
+                                    continue;
+                                }
+                                $constraint = $calleeBlock->paramTypeConstraints[$slot] ?? null;
+                                if (null === $constraint) {
                                     continue;
                                 }
                                 $literalBool = $calleeBlock->paramLiteralBoolTypes[$slot] ?? null;
@@ -2404,7 +2420,8 @@ restart:
                                     $frame->block->paramVariadicElementGenericArrayTypeSpecs[$variadicSlot] ?? null,
                                     $frame->block->paramVariadicElementIntersectionConstraints[$variadicSlot] ?? null,
                                     $frame->block->paramVariadicElementDnfConstraints[$variadicSlot] ?? null,
-                                    $this->context
+                                    $this->context,
+                                    isset($frame->block->paramIterableSlots[$variadicSlot])
                                 );
                             }
                             if (
@@ -2459,7 +2476,11 @@ restart:
                                 $arg1
                             )
                         ) {
-                            TypeCheck::coerceParameter($arg1, $strict, $arraySpec);
+                            if (isset($frame->block->paramIterableSlots[$op->arg1])) {
+                                IterableCheck::assertParameter($arg1, $this->context);
+                            } else {
+                                TypeCheck::coerceParameter($arg1, $strict, $arraySpec);
+                            }
                         }
                         if (isset($frame->block->paramIntersectionConstraints[$op->arg1])) {
                             TypeCheck::assertParamIntersection(
