@@ -45,6 +45,11 @@ final class get_debug_type extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        if (Variable::TYPE_ENUM_CASE === $v->type) {
+            $frame->returnVar->string($v->toEnumCase()->enumClass->name);
+
+            return;
+        }
         if (Variable::TYPE_OBJECT === $v->type) {
             $frame->returnVar->string($v->toObject()->class->name);
 
