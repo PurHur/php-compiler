@@ -16,16 +16,23 @@ use PHPCompiler\Web\ResponseContext;
  */
 final class VmSession
 {
+    /** Keep in sync with lib/AOT/runtime/phpc_session_state.c (#5694). */
+    public const MAX_ID_LEN = 128;
+
+    public const MAX_NAME_LEN = 128;
+
+    public const DEFAULT_NAME = 'PHPSESSID';
+
     private static bool $active = false;
 
-    private static string $name = 'PHPSESSID';
+    private static string $name = self::DEFAULT_NAME;
 
     private static string $id = '';
 
     public static function reset(): void
     {
         self::$active = false;
-        self::$name = 'PHPSESSID';
+        self::$name = self::DEFAULT_NAME;
         self::$id = '';
     }
 

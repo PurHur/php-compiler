@@ -39,7 +39,7 @@ final class SessionStart
 
         $context->builder->positionAtEnd($entry);
         $outPtr = $fn->getParam(0);
-        $active = $context->builder->load(SessionName::$activeGlobal);
+        $active = $context->builder->load(SessionStorageGlobals::$activeGlobal);
         $isActive = $context->builder->icmp(Builder::INT_NE, $active, $zeroI8);
         $context->builder->branchIf($isActive, $bbActive, $bbStart);
 
@@ -48,7 +48,7 @@ final class SessionStart
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbStart);
-        $context->builder->store($oneI8, SessionName::$activeGlobal);
+        $context->builder->store($oneI8, SessionStorageGlobals::$activeGlobal);
         self::emitWriteBool($context, $outPtr, true);
         $context->builder->branch($bbDone);
 

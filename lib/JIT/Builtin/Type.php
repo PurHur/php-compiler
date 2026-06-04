@@ -185,6 +185,7 @@ class Type extends Builtin {
         $fnStrrpos = $this->context->module->addFunction('__compiler_strrpos', $fntypeStrrpos);
         $this->context->registerFunction('__compiler_strrpos', $fnStrrpos);
         HttpResponseCode::implement($this->context);
+        SessionStorageGlobals::ensureGlobals($this->context);
         SessionId::implement($this->context);
         SessionName::implement($this->context);
         ObOutput::registerExternals($this->context);

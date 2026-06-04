@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\VmSession;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
@@ -17,36 +18,19 @@ use PHPLLVM\Value;
 
 final class SessionId
 {
-    public const MAX_LEN = 128;
-
-    public const GLOBAL_BUF = '__phpc_session_id_storage';
-
-    public const GLOBAL_LEN = '__phpc_session_id_len';
-
     public const APPLY_GET = 0;
 
     public const APPLY_SET = 1;
 
     public const APPLY_BOXED = 2;
 
-    /** @var \PHPLLVM\Value|null */
-    public static $bufGlobal = null;
-
-    /** @var \PHPLLVM\Value|null */
-    public static $lenGlobal = null;
-
     public static function implement(Context $context): void
     {
+        SessionStorageGlobals::ensureGlobals($context);
+
         $i8 = $context->getTypeFromString('int8');
         $i64 = $context->getTypeFromString('int64');
         $void = $context->context->voidType();
-        $bufType = $context->getTypeFromString('int8['.(self::MAX_LEN + 1).']');
-
-        self::$bufGlobal = $context->module->addGlobal($bufType, self::GLOBAL_BUF);
-        self::$lenGlobal = $context->module->addGlobal($i64, self::GLOBAL_LEN);
-        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
-            self::$lenGlobal->setInitializer($i64->constInt(0, false));
-        }
 
         $sig = $context->context->functionType(
             $void,
@@ -143,15 +127,15 @@ final class SessionId
 
     public static function emitResetForStandaloneMain(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType || null === self::$lenGlobal) {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType || null === SessionStorageGlobals::$idLenGlobal) {
             return;
         }
         $i64 = $context->getTypeFromString('int64');
         $i8 = $context->getTypeFromString('int8');
         $zero = $i64->constInt(0, false);
-        $context->builder->store($zero, self::$lenGlobal);
+        $context->builder->store($zero, SessionStorageGlobals::$idLenGlobal);
         $bufPtr = $context->builder->inBoundsGEP(
-            self::$bufGlobal,
+            SessionStorageGlobals::$idBufGlobal,
             $context->getTypeFromString('int32')->constInt(0, false),
             $zero
         );
@@ -163,9 +147,9 @@ final class SessionId
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
         $zero = $i64->constInt(0, false);
-        $len = $context->builder->load(self::$lenGlobal);
+        $len = $context->builder->load(SessionStorageGlobals::$idLenGlobal);
         $bufPtr = $context->builder->inBoundsGEP(
-            self::$bufGlobal,
+            SessionStorageGlobals::$idBufGlobal,
             $context->getTypeFromString('int32')->constInt(0, false),
             $zero
         );
@@ -189,7 +173,7 @@ final class SessionId
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
         $zero = $i64->constInt(0, false);
-        $maxLen = $i64->constInt(self::MAX_LEN, false);
+        $maxLen = $i64->constInt(VmSession::MAX_ID_LEN, false);
 
         self::emitWriteCurrentAsString($context, $outPtr);
 
@@ -208,10 +192,10 @@ final class SessionId
 
         $context->builder->positionAtEnd($bbCopy);
         $storeLen = $context->builder->select($tooLong, $maxLen, $newLen);
-        $context->builder->store($storeLen, self::$lenGlobal);
+        $context->builder->store($storeLen, SessionStorageGlobals::$idLenGlobal);
         $newBytes = $context->builder->structGep($newStr, $strMap['value']);
         $bufPtr = $context->builder->inBoundsGEP(
-            self::$bufGlobal,
+            SessionStorageGlobals::$idBufGlobal,
             $i32->constInt(0, false),
             $zero
         );

@@ -51,6 +51,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/Output.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/PendingHeaders.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Refcount.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ScriptExit.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/SessionStorageGlobals.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SessionId.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SessionName.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SessionStart.php';
