@@ -34,9 +34,11 @@ final class ReflectionClassGetReflectionConstant extends VmClassMethod
         if (null === VmReflection::findClassConstantKey($entry, $constant, $ctx)) {
             throw new \LogicException("Constant {$constant} does not exist on {$className}");
         }
-        $rcClass = $ctx->classes[ReflectionSupport::REFLECTION_CONSTANT] ?? null;
+        $rcClass = $ctx->classes[ReflectionSupport::REFLECTION_CLASS_CONSTANT]
+            ?? $ctx->classes[ReflectionSupport::REFLECTION_CONSTANT]
+            ?? null;
         if (null === $rcClass) {
-            throw new \LogicException('ReflectionConstant is not registered in this compiler build');
+            throw new \LogicException('ReflectionClassConstant is not registered in this compiler build');
         }
         $rc = new ObjectEntry($rcClass);
         $rc->constructed = true;

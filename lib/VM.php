@@ -6723,6 +6723,9 @@ restart:
                 if (isset($trait->constDeprecated[$name])) {
                     $entry->constDeprecated[$name] = $trait->constDeprecated[$name];
                 }
+                if (isset($trait->constDeclaredTypes[$name])) {
+                    $entry->constDeclaredTypes[$name] = $trait->constDeclaredTypes[$name];
+                }
             }
         }
 
@@ -7408,6 +7411,9 @@ restart:
                     }
                     if (null !== $op->deprecatedMetadata) {
                         $entry->constDeprecated[$name] = $op->deprecatedMetadata;
+                    }
+                    if (isset($block->classConstDeclaredTypes[$name])) {
+                        $entry->constDeclaredTypes[$name] = $block->classConstDeclaredTypes[$name];
                     }
                     break;
                 default:

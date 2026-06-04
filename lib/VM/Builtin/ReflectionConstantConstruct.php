@@ -31,8 +31,6 @@ final class ReflectionConstantConstruct extends VmClassMethod
         $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
         $receiver->getProperty(ReflectionSupport::PROP_CONSTANT_NAME)->string($constant);
         $receiver->constructed = true;
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->null();
-        }
+        // Do not touch returnVar: it may alias the `new ReflectionClassConstant()` result slot (#1885, #5954).
     }
 }
