@@ -1232,9 +1232,13 @@ restart:
                     }
                     $rhsSlot = $frame->scope[$op->arg2];
                     $rhs = $rhsSlot->resolveIndirect();
-                    // Iterator_Value(byRef) and object property slots are already live storage
-                    // (Zend FE_FETCH_R); re-wrapping breaks multi-element foreach (&$v) (#5245).
-                    if ($rhsSlot->isIndirect() || null !== $rhs->objectPropertyOwner) {
+                    // Object property / static / nested ref slots are live storage (Zend FE_FETCH_R,
+                    // #5245). Main-script globals use an indirect wrapper — still need a shared ref
+                    // cell so unset($a) does not destroy $b (#5368).
+                    if (
+                        null !== $rhs->objectPropertyOwner
+                        || ($rhsSlot->isIndirect() && !$this->context->isGlobalStorage($rhs))
+                    ) {
                         $lhs->indirect($rhs);
                         break;
                     }
