@@ -1092,10 +1092,15 @@ final class HashTable {
     }
 
     /**
-     * Copy a sub-range of a packed list array into a new list (non-negative offset).
+     * Copy a sub-range of an array (ext/standard/array.c php_array_slice).
+     *
+     * @param bool $preserveKeys when true, keep int/string keys; otherwise reindex packed lists
      */
-    public function sliceCopy(int $offset, ?int $length = null): HashTable
+    public function sliceCopy(int $offset, ?int $length = null, bool $preserveKeys = false): HashTable
     {
+        if ($preserveKeys) {
+            return $this->sliceCopyPreserveKeys($offset, $length);
+        }
         if (!$this->isWithoutHoles()) {
             throw new \LogicException('sliceCopy() only supports packed list arrays without holes');
         }
@@ -1121,6 +1126,21 @@ final class HashTable {
             $out->append($copy);
             ++$index;
             ++$taken;
+        }
+
+        return $out;
+    }
+
+    private function sliceCopyPreserveKeys(int $offset, ?int $length = null): HashTable
+    {
+        $pairs = iterator_to_array($this->iterateKeyed(true), false);
+        $num = \count($pairs);
+        [$offset, $takeLen] = $this->normalizeSpliceRange($offset, $length, $num);
+
+        $out = new self();
+        for ($i = $offset; $i < $offset + $takeLen; ++$i) {
+            [$key, $value] = $this->duplicateKeyedPair($pairs[$i]);
+            $this->copyKeyedEntry($out, $key, $value);
         }
 
         return $out;
