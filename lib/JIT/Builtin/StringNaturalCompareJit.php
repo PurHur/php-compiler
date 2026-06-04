@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -124,8 +125,8 @@ final class StringNaturalCompareJit
         LlvmFunction $fn,
         Value $paSlot,
         Value $pbSlot,
-        Value $digitBlock,
-        Value $continueBlock
+        BasicBlock $digitBlock,
+        BasicBlock $continueBlock
     ): void {
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
@@ -249,8 +250,8 @@ final class StringNaturalCompareJit
         LlvmFunction $fn,
         Value $paSlot,
         Value $pbSlot,
-        Value $charBlock,
-        Value $continueBlock,
+        BasicBlock $charBlock,
+        BasicBlock $continueBlock,
         bool $caseInsensitive,
         Value $cha,
         Value $chb

@@ -16,19 +16,67 @@ use PHPCompiler\VM as VmEngine;
  */
 final class ClassConstMaterializer
 {
-    public static function materializeSlot(VmEngine $vm, Block $bodyBlock, int $valueSlot): Variable
-    {
+    public static function materializeSlot(
+        VmEngine $vm,
+        Block $bodyBlock,
+        int $valueSlot,
+        ?string $declaringClassName = null
+    ): Variable {
         $frame = $bodyBlock->getFrame($vm->context);
+        $entry = self::declaringClassEntry($vm, $declaringClassName);
         foreach ($bodyBlock->opCodes as $op) {
             if (OpCode::TYPE_DECLARE_CLASS_CONST === $op->type && $valueSlot === $op->arg2) {
                 break;
             }
             if ($vm->isClassBodyConstInitOpcode($op->type)) {
                 $vm->executeClassBodyConstInitOpcode($frame, $op);
+                continue;
             }
+            if (null !== $entry && ClassConstExpr::isSupportedOpcode($op->type)) {
+                ClassConstExpr::execute($vm->context, $frame, $op, $entry);
+                continue;
+            }
+            if (null !== $entry && OpCode::TYPE_DECLARE_CLASS_CONST === $op->type) {
+                self::registerPriorClassConst($bodyBlock, $frame, $entry, $op);
+            }
+        }
+        if (!isset($frame->scope[$valueSlot])) {
+            throw new \LogicException('Class constant value must be a compile-time constant');
         }
 
         return self::detachConstantValue($frame->scope[$valueSlot]);
+    }
+
+    private static function declaringClassEntry(VmEngine $vm, ?string $declaringClassName): ?ClassEntry
+    {
+        if (null === $declaringClassName || '' === $declaringClassName) {
+            return null;
+        }
+        $name = ltrim($declaringClassName, '\\');
+        $lc = strtolower($name);
+        if (isset($vm->context->classes[$lc])) {
+            return $vm->context->classes[$lc];
+        }
+        $entry = new ClassEntry($name);
+        $vm->context->classes[$lc] = $entry;
+
+        return $entry;
+    }
+
+    private static function registerPriorClassConst(
+        Block $bodyBlock,
+        Frame $frame,
+        ClassEntry $entry,
+        OpCode $op
+    ): void {
+        $name = strtolower($frame->scope[$op->arg1]->toString());
+        if (isset($bodyBlock->constants[$op->arg2])) {
+            $value = new Variable();
+            $value->copyFrom($bodyBlock->constants[$op->arg2]);
+            $entry->constants[$name] = self::detachConstantValue($value);
+        } elseif (isset($frame->scope[$op->arg2])) {
+            $entry->constants[$name] = self::detachConstantValue($frame->scope[$op->arg2]);
+        }
     }
 
     /**
