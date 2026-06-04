@@ -2964,7 +2964,14 @@ restart:
                             $arg1->copyFrom($frame->calledArgs[$recvIdx]);
                         }
                     } elseif (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
-                        $arg1->copyFrom($frame->block->constants[$op->arg3]);
+                        $default = $frame->block->constants[$op->arg3];
+                        if (VM\EnumCaseSupport::isEnumCaseVariable($default)) {
+                            $arg1->copyFrom(
+                                VM\EnumCaseSupport::materializeConstantValue($this->context, $default)
+                            );
+                        } else {
+                            $arg1->copyFrom($default);
+                        }
                     } else {
                         throw new \LogicException('Missing required argument ' . $op->arg2);
                     }

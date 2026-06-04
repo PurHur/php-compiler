@@ -3617,7 +3617,7 @@ class Compiler {
             }
         }
         if ($expr instanceof Op\Expr\ClassConstFetch) {
-            $vm = $this->tryFoldClassConstFetchDefault($expr, $block);
+            $vm = $this->tryFoldClassConstFetchDefault($expr, $block, true);
             if (null !== $vm) {
                 return $block->registerConstant($param->defaultVar, $vm);
             }
@@ -3634,7 +3634,7 @@ class Compiler {
                 return $block->registerConstant($param->defaultVar, $vm);
             }
         }
-        $vm = $this->tryFoldCompileTimeExprDefault($expr, $block, $children);
+        $vm = $this->tryFoldCompileTimeExprDefault($expr, $block, $children, true);
         if (null !== $vm) {
             return $block->registerConstant($param->defaultVar, $vm);
         }
@@ -3645,13 +3645,17 @@ class Compiler {
     /**
      * @param list<Op> $defaultBlockChildren
      */
-    protected function tryFoldCompileTimeExprDefault(Op\Expr $expr, Block $block, array $defaultBlockChildren = []): ?Variable
-    {
+    protected function tryFoldCompileTimeExprDefault(
+        Op\Expr $expr,
+        Block $block,
+        array $defaultBlockChildren = [],
+        bool $materializeEnumCase = false
+    ): ?Variable {
         if ($expr instanceof Op\Expr\ConstFetch) {
             return $this->tryFoldGlobalConstFetch($expr);
         }
         if ($expr instanceof Op\Expr\ClassConstFetch) {
-            return $this->tryFoldClassConstFetchDefault($expr, $block);
+            return $this->tryFoldClassConstFetchDefault($expr, $block, $materializeEnumCase);
         }
         if ($expr instanceof Op\Expr\Array_) {
             return $this->tryBuildCompileTimeArrayFromExpr($expr, $block, $defaultBlockChildren);
@@ -3660,8 +3664,18 @@ class Compiler {
             return $this->tryFoldUnaryLiteralDefault($expr);
         }
         if ($expr instanceof Op\Expr\BinaryOp\BitwiseOr || $expr instanceof Op\Expr\BinaryOp\BitwiseAnd) {
-            $left = $this->tryFoldCompileTimeOperandDefault($expr->left, $block, $defaultBlockChildren);
-            $right = $this->tryFoldCompileTimeOperandDefault($expr->right, $block, $defaultBlockChildren);
+            $left = $this->tryFoldCompileTimeOperandDefault(
+                $expr->left,
+                $block,
+                $defaultBlockChildren,
+                $materializeEnumCase
+            );
+            $right = $this->tryFoldCompileTimeOperandDefault(
+                $expr->right,
+                $block,
+                $defaultBlockChildren,
+                $materializeEnumCase
+            );
             if (null === $left || null === $right || !$left->is(Variable::TYPE_INTEGER) || !$right->is(Variable::TYPE_INTEGER)) {
                 return null;
             }
@@ -3680,8 +3694,12 @@ class Compiler {
     /**
      * @param list<Op> $defaultBlockChildren
      */
-    protected function tryFoldCompileTimeOperandDefault(Operand $operand, Block $block, array $defaultBlockChildren = []): ?Variable
-    {
+    protected function tryFoldCompileTimeOperandDefault(
+        Operand $operand,
+        Block $block,
+        array $defaultBlockChildren = [],
+        bool $materializeEnumCase = false
+    ): ?Variable {
         $vm = $this->vmVariableFromCfgLiteralOperand($operand);
         if (null !== $vm) {
             return $vm;
@@ -3693,7 +3711,12 @@ class Compiler {
             if (!property_exists($child, 'result') || $child->result !== $operand) {
                 continue;
             }
-            $vm = $this->tryFoldCompileTimeExprDefault($child, $block, $defaultBlockChildren);
+            $vm = $this->tryFoldCompileTimeExprDefault(
+                $child,
+                $block,
+                $defaultBlockChildren,
+                $materializeEnumCase
+            );
             if (null !== $vm) {
                 return $vm;
             }
@@ -3768,8 +3791,11 @@ class Compiler {
         return null;
     }
 
-    protected function tryFoldClassConstFetchDefault(Op\Expr\ClassConstFetch $expr, Block $block): ?Variable
-    {
+    protected function tryFoldClassConstFetchDefault(
+        Op\Expr\ClassConstFetch $expr,
+        Block $block,
+        bool $materializeEnumCase = false
+    ): ?Variable {
         $constName = $this->staticNameFromOperand($expr->name);
         if (null !== $constName && 'class' === strtolower($constName)) {
             $enumFqcn = $this->tryFoldEnumCaseClassPseudoConstFqcn($expr->class, $block);
@@ -3804,7 +3830,19 @@ class Compiler {
             }
             // Defer enum case fetches to runtime so duplicate backing is caught on first use (#5773).
             if (Variable::TYPE_OBJECT === $stored->type && EnumCaseSupport::isEnumCase($stored->toObject())) {
-                return null;
+                if (!$materializeEnumCase) {
+                    return null;
+                }
+                $value = new Variable();
+                $value->copyFrom($stored);
+
+                return $value;
+            }
+            if ($materializeEnumCase && Variable::TYPE_ENUM_CASE === $stored->type) {
+                $value = new Variable();
+                $value->copyFrom($stored);
+
+                return $value;
             }
             $value = new Variable();
             $value->copyFrom($stored);
