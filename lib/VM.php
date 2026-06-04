@@ -4014,26 +4014,30 @@ restart:
         }
         $working = new Variable();
         $working->copyFrom($read->resolveIndirect());
-        if ($prefix) {
+        try {
+            if ($prefix) {
+                if ($increment) {
+                    $working->applyIncrement();
+                } else {
+                    $working->applyDecrement();
+                }
+                $write->copyFrom($working);
+                $result->copyFrom($working);
+
+                return null;
+            }
+            $old = new Variable();
+            $old->copyFrom($working);
             if ($increment) {
                 $working->applyIncrement();
             } else {
                 $working->applyDecrement();
             }
             $write->copyFrom($working);
-            $result->copyFrom($working);
-
-            return null;
+            $result->copyFrom($old);
+        } catch (\TypeError $e) {
+            return $this->dispatchVmTypeError($e, $frame);
         }
-        $old = new Variable();
-        $old->copyFrom($working);
-        if ($increment) {
-            $working->applyIncrement();
-        } else {
-            $working->applyDecrement();
-        }
-        $write->copyFrom($working);
-        $result->copyFrom($old);
 
         return null;
     }
