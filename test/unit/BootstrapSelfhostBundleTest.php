@@ -84,6 +84,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitBase64Encode.php',
         'ext/standard/JitBin2hex.php',
         'ext/standard/JitChunkSplit.php',
+        'ext/standard/JitCrcCore.php',
         'ext/standard/JitCrc32.php',
         'ext/standard/JitExplode.php',
         'ext/standard/JitChmod.php',

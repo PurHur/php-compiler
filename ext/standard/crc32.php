@@ -13,7 +13,7 @@ use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** crc32() — CRC32B (IEEE), signed 32-bit int (VM + JIT/AOT via __compiler_crc32). */
+/** crc32() — CRC32B (IEEE), signed 32-bit int (VM + JIT/AOT via ext/standard/VmCrc32.php). */
 final class crc32 extends Internal
 {
     public function execute(Frame $frame): void
