@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** time_nanosleep() — sub-second sleep (VM host; JIT/AOT via nanosleep, issue #5180). */
+/** time_nanosleep() — sub-second sleep (VM host; JIT/AOT via TimeSleepRuntime, #5180/#5406). */
 final class time_nanosleep extends Internal
 {
     public function __construct()

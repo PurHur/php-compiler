@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT\Builtin\StringTimeSleep;
+use PHPCompiler\JIT\Builtin\TimeSleepRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -41,7 +41,7 @@ final class JitSleep
 
     public static function timeNanosleep(Context $context, Value $seconds, Value $nanoseconds): Value
     {
-        StringTimeSleep::ensureLinked($context);
+        TimeSleepRuntime::ensureLinked($context);
 
         $ok = $context->builder->call(
             $context->lookupFunction('__compiler_time_nanosleep'),
@@ -59,7 +59,7 @@ final class JitSleep
 
     public static function timeSleepUntil(Context $context, JITVariable $arg): Value
     {
-        StringTimeSleep::ensureLinked($context);
+        TimeSleepRuntime::ensureLinked($context);
 
         $target = self::lowerDouble($context, $arg, 'time_sleep_until() timestamp');
         $ok = $context->builder->call(
