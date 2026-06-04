@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -27,9 +28,6 @@ final class md5 extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('md5() requires one or two arguments in this compiler build');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'md5', 0, 'string');
         $raw = false;
         if (2 === $argc) {
@@ -40,12 +38,14 @@ final class md5 extends Internal
             $raw = $rawArg->toBool();
         }
         $result = VmHash::hash('md5', $data, $raw);
-        if (false === $result) {
-            $frame->returnVar->bool(false);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
+            if (false === $result) {
+                $ret->bool(false);
 
-            return;
-        }
-        $frame->returnVar->string($result);
+                return;
+            }
+            $ret->string($result);
+        });
     }
 
     public function call(Context $context, JITVariable ...$args): Value

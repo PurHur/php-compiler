@@ -104,6 +104,25 @@ final class EnumCaseSupport
         return self::createCase($entry->enumClass, $entry->caseName, $entry->backingValue);
     }
 
+    /**
+     * property_exists() on enum case objects (#5612, ext/standard/basic_functions.c zif_property_exists).
+     */
+    public static function propertyExistsOnCase(ClassEntry $enum, string $property): bool
+    {
+        if (!$enum->isEnum) {
+            return false;
+        }
+        $lc = strtolower($property);
+        if ('name' === $lc) {
+            return true;
+        }
+        if ('value' === $lc) {
+            return null !== $enum->backedType;
+        }
+
+        return false;
+    }
+
     public static function getProperty(
         ObjectEntry $object,
         string $name,
@@ -395,6 +414,19 @@ final class EnumCaseSupport
         return null;
     }
 
+    public static function enumCaseNameForVariable(Variable $value): string
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_ENUM_CASE === $value->type) {
+            return $value->toEnumCase()->caseName;
+        }
+        if (Variable::TYPE_OBJECT === $value->type && self::isEnumCase($value->toObject())) {
+            return $value->toObject()->enumCaseName ?? '';
+        }
+
+        return '';
+    }
+
     private static function enumCaseEntryToVariable(EnumCaseEntry $entry): Variable
     {
         return self::createCase($entry->enumClass, $entry->caseName, $entry->backingValue);
@@ -474,7 +506,22 @@ final class EnumCaseSupport
     public static function materializeConstantValue(Context $context, Variable $src): Variable
     {
         $src = $src->resolveIndirect();
+        if ($src->is(Variable::TYPE_ARRAY)) {
+            return ClassConstMaterializer::detachConstantValue(
+                self::materializeConstantArrayDeep($context, $src)
+            );
+        }
         if (self::isEnumCaseVariable($src)) {
+            $enumClass = self::enumClassForCaseVariable($src);
+            $caseName = self::enumCaseNameForVariable($src);
+            if (null !== $enumClass && '' !== $caseName) {
+                $runtime = EnumSupport::resolveRuntimeEnumClass($context, $enumClass);
+                $canonical = BackedEnum::canonicalCaseVariable($runtime, $caseName);
+                if (null !== $canonical && self::isEnumCaseVariable($canonical)) {
+                    return ClassConstMaterializer::detachConstantValue($canonical);
+                }
+            }
+
             return ClassConstMaterializer::detachConstantValue($src);
         }
         if (!$src->is(Variable::TYPE_INTEGER) && !$src->is(Variable::TYPE_STRING)) {
@@ -502,6 +549,26 @@ final class EnumCaseSupport
         }
 
         return ClassConstMaterializer::detachConstantValue($src);
+    }
+
+    /**
+     * Class const array literals may contain backing scalars from compile-time fold (#5901, zend_constants.c).
+     */
+    private static function materializeConstantArrayDeep(Context $context, Variable $src): Variable
+    {
+        $newHt = new HashTable();
+        foreach ($src->toArray()->iterateKeyed(true) as [$key, $value]) {
+            $matValue = self::materializeConstantValue($context, $value);
+            if ($key->is(Variable::TYPE_INTEGER)) {
+                $newHt->addIndex($key->toInt(), $matValue);
+            } else {
+                $newHt->add($key->toString(), $matValue);
+            }
+        }
+        $out = new Variable(Variable::TYPE_ARRAY);
+        $out->array($newHt);
+
+        return $out;
     }
 
     /**

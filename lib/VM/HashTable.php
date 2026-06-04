@@ -70,6 +70,18 @@ final class HashTable {
         if ($this->flags & self::FLAG_UNINITIALIZED) {
             return $out;
         }
+        $maxIntKey = 0;
+        foreach ($this->iterateKeyed(true) as [$key, $value]) {
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $intKey = $key->toInt();
+                if ($intKey > $maxIntKey) {
+                    $maxIntKey = $intKey;
+                }
+            }
+        }
+        if ($maxIntKey > 0) {
+            $out->ensureHashSlotCapacity($maxIntKey);
+        }
         foreach ($this->iterateKeyed(true) as [$key, $value]) {
             $copy = new Variable();
             $copy->duplicateFrom($value);
@@ -1737,7 +1749,7 @@ final class HashTable {
                 return null;
             }
             $bucket = $this->buckets->read($idx);
-            if ($bucket->key === $key) {
+            if ($bucket->key === $key && (null !== $key || $bucket->hash === $hash)) {
                 return $bucket;
             }
             $idx = $bucket->value->next;

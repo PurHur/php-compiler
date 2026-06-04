@@ -72,6 +72,7 @@ final class array_count extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $this->context = $context;
         $argc = \count($args);
         TypeErrorRaise::ensureLinked($context);
         if ($argc < 1 || $argc > 2) {
@@ -136,9 +137,28 @@ final class array_count extends Internal
             case JITVariable::TYPE_STRING:
                 return 'string';
             case JITVariable::TYPE_OBJECT:
-                return 'object';
+                return $this->jitCompileTimeObjectLabel($arg);
             default:
                 return 'mixed';
         }
+    }
+
+    private function jitCompileTimeObjectLabel(JITVariable $arg): string
+    {
+        if (JITVariable::KIND_VALUE !== $arg->kind) {
+            return 'object';
+        }
+        $objMap = $this->context->structFieldMap['__object__'] ?? null;
+        if (null === $objMap || !isset($objMap['class_id'])) {
+            return 'object';
+        }
+        $classIdVal = $this->context->builder->load(
+            $this->context->builder->structGep($arg->value, $objMap['class_id'])
+        );
+        if (!method_exists($classIdVal, 'isConstant') || !$classIdVal->isConstant()) {
+            return 'object';
+        }
+
+        return $this->context->type->object->classNameForId((int) $classIdVal->getConstantValue());
     }
 }

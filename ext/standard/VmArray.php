@@ -747,6 +747,11 @@ final class VmArray
 
     private static function valueTypeLabel(Variable $value): string
     {
+        $value = $value->resolveIndirect();
+        $enumClass = EnumCaseSupport::enumClassForCaseVariable($value);
+        if (null !== $enumClass) {
+            return $enumClass->name;
+        }
         switch ($value->type) {
             case Variable::TYPE_INTEGER:
                 return 'int';

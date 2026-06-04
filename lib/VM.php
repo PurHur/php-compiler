@@ -225,7 +225,35 @@ class VM {
      */
     public function resolveInstanceMethod(ClassEntry $class, string $methodLc): array
     {
-        return $this->resolveStaticMethod(strtolower($class->name), strtolower($methodLc));
+        $methodLc = strtolower($methodLc);
+        $lcClass = strtolower($class->name);
+        $visited = [];
+        $abstractDecl = null;
+        while (!isset($visited[$lcClass])) {
+            $visited[$lcClass] = true;
+            if (!isset($this->context->classes[$lcClass])) {
+                break;
+            }
+            $entry = $this->context->classes[$lcClass];
+            if (isset($entry->methods[$methodLc])) {
+                return [$entry, $methodLc];
+            }
+            if (isset($entry->abstractMethods[$methodLc])) {
+                $abstractDecl ??= $entry;
+            }
+            if (null === $entry->parentLc) {
+                break;
+            }
+            $lcClass = $entry->parentLc;
+        }
+
+        if (null !== $abstractDecl) {
+            $declName = $abstractDecl->methodNames[$methodLc] ?? $methodLc;
+            throw new \LogicException("Cannot call abstract method {$abstractDecl->name}::{$declName}()");
+        }
+
+        $declName = $class->methodNames[$methodLc] ?? $methodLc;
+        throw new \LogicException("Call to undefined method {$class->name}::{$declName}()");
     }
 
     public function hasInstanceMethod(ClassEntry $class, string $methodLc): bool
@@ -2964,7 +2992,14 @@ restart:
                             $arg1->copyFrom($frame->calledArgs[$recvIdx]);
                         }
                     } elseif (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
-                        $arg1->copyFrom($frame->block->constants[$op->arg3]);
+                        $default = $frame->block->constants[$op->arg3];
+                        if (VM\EnumCaseSupport::isEnumCaseVariable($default)) {
+                            $arg1->copyFrom(
+                                VM\EnumCaseSupport::materializeConstantValue($this->context, $default)
+                            );
+                        } else {
+                            $arg1->copyFrom($default);
+                        }
                     } else {
                         throw new \LogicException('Missing required argument ' . $op->arg2);
                     }
@@ -6337,6 +6372,13 @@ restart:
 
                 return null;
             }
+            if (str_starts_with($e->getMessage(), 'Call to undefined method ')
+                || str_starts_with($e->getMessage(), 'Call to undefined static method ')) {
+                return $this->dispatchVmError(
+                    "Call to undefined method {$class->name}::{$methodName}()",
+                    $frame
+                );
+            }
             throw $e;
         }
         $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
@@ -7163,8 +7205,12 @@ restart:
         }
         $receiver = $table->findVariable($idx0, false)->resolveIndirect();
         $methodName = $table->findVariable($idx1, false)->resolveIndirect()->toString();
-        if (Variable::TYPE_OBJECT !== $receiver->type) {
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            && Variable::TYPE_ENUM_CASE !== $receiver->type) {
             throw new \LogicException('Invalid array callable');
+        }
+        if (Variable::TYPE_ENUM_CASE === $receiver->type) {
+            $receiver = VM\EnumCaseSupport::receiverForInstanceMethod($receiver);
         }
         $this->initMethodCall($frame, $receiver, $methodName);
     }

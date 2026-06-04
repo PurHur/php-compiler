@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -33,17 +34,15 @@ final class scandir extends Internal
             }
             $sortingOrder = $orderVar->toInt();
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
-
         $result = VmDir::scandir($pathVar->toString(), $sortingOrder);
-        if (false === $result) {
-            $frame->returnVar->bool(false);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
+            if (false === $result) {
+                $ret->bool(false);
 
-            return;
-        }
-        $frame->returnVar->array(VmFs::stringListToArray($result));
+                return;
+            }
+            $ret->array(VmFs::stringListToArray($result));
+        });
     }
 
     public function call(Context $context, JITVariable ...$args): Value

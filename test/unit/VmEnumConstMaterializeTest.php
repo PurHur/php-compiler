@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
@@ -62,5 +63,64 @@ PHP;
         $materialized = EnumCaseSupport::materializeConstantValue($runtime->vmContext, $scalar);
         $this->assertTrue(EnumCaseSupport::isEnumCaseVariable($materialized));
         $this->assertSame('A', $materialized->toObject()->enumCaseName);
+    }
+
+    public function testMaterializeConstantValueUpgradesLegacyBackingScalarsInsideArray(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int {
+    case X = 1;
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_array_scalar.php');
+        $runtime->run($block);
+        $enum = $runtime->vmContext->classes['e'];
+        $scalar = new Variable(Variable::TYPE_INTEGER);
+        $scalar->int(1);
+        $enum->constants['x'] = $scalar;
+
+        $ht = new HashTable();
+        $ht->append($scalar);
+        $arr = new Variable(Variable::TYPE_ARRAY);
+        $arr->array($ht);
+
+        $materialized = EnumCaseSupport::materializeConstantValue($runtime->vmContext, $arr);
+        $this->assertTrue($materialized->is(Variable::TYPE_ARRAY));
+        $idx = new Variable(Variable::TYPE_INTEGER);
+        $idx->int(0);
+        $elem = $materialized->toArray()->findVariable($idx, false);
+        $this->assertNotNull($elem);
+        $this->assertTrue(EnumCaseSupport::isEnumCaseVariable($elem->resolveIndirect()));
+    }
+
+    public function testClassConstArrayLiteralMaterializesEnumCases(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int {
+    case X = 1;
+    case Y = 2;
+}
+class C {
+    public const AR = [E::X, E::Y];
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'class_const_enum_array.php');
+        $runtime->run($block);
+        $ar = $runtime->vmContext->classes['c']->constants['ar'];
+        $this->assertTrue($ar->is(Variable::TYPE_ARRAY));
+        foreach ([0, 1] as $i) {
+            $idx = new Variable(Variable::TYPE_INTEGER);
+            $idx->int($i);
+            $elem = $ar->toArray()->findVariable($idx, false);
+            $this->assertNotNull($elem);
+            $this->assertTrue(
+                EnumCaseSupport::isEnumCaseVariable($elem->resolveIndirect()),
+                'AR['.$i.'] must be enum case object'
+            );
+        }
     }
 }

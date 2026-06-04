@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\Builtin\StringLevenshtein;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -14,6 +13,8 @@ use PHPLLVM\Value;
 
 /**
  * levenshtein() — edit distance between two strings (subset of PHP; issue #2406).
+ *
+ * VM: {@see VmString::levenshtein()}; JIT/AOT: {@see JitLevenshtein}.
  */
 final class levenshtein extends Internal
 {
@@ -68,7 +69,6 @@ final class levenshtein extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        StringLevenshtein::ensureLinked($context);
         $argc = \count($args);
         if ($argc < 2 || $argc > 5) {
             throw new \LogicException('levenshtein() accepts two to five arguments in this compiler build');
@@ -95,11 +95,14 @@ final class levenshtein extends Internal
             }
             $del = $this->jitLong($context, $args[4], 'levenshtein() deletion cost');
         }
-        $p0 = $this->stringDataPtr($context, $this->jitString($context, $args[0], 'levenshtein() argument #1'));
-        $p1 = $this->stringDataPtr($context, $this->jitString($context, $args[1], 'levenshtein() argument #2'));
-        $fn = $context->lookupFunction('phpc_levenshtein');
-        $raw = $context->builder->call($fn, $p0, $p1, $ins, $rep, $del);
 
-        return $context->builder->sExt($raw, $i64);
+        return JitLevenshtein::invoke(
+            $context,
+            $this->jitString($context, $args[0], 'levenshtein() argument #1'),
+            $this->jitString($context, $args[1], 'levenshtein() argument #2'),
+            $ins,
+            $rep,
+            $del
+        );
     }
 }

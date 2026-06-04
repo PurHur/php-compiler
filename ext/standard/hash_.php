@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -29,9 +30,6 @@ final class hash_ extends Internal
         }
         $algo = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hash', 0, 'algo');
         $data = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'hash', 1, 'data');
-        if (null === $frame->returnVar) {
-            return;
-        }
         $raw = false;
         if (3 === $argc) {
             $rawArg = $frame->calledArgs[2]->resolveIndirect();
@@ -41,12 +39,14 @@ final class hash_ extends Internal
             $raw = $rawArg->toBool();
         }
         $result = VmHash::hash($algo, $data, $raw);
-        if (false === $result) {
-            $frame->returnVar->bool(false);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
+            if (false === $result) {
+                $ret->bool(false);
 
-            return;
-        }
-        $frame->returnVar->string($result);
+                return;
+            }
+            $ret->string($result);
+        });
     }
 
     public function call(Context $context, JITVariable ...$args): Value

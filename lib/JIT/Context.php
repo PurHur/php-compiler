@@ -893,6 +893,7 @@ class Context {
         foreach ($this->builtins as $builtin) {
             $builtin->shutdown();
         }
+        Builtin\AttributeRegistryLowering::implementLookupFunctions($this);
         $this->builder->positionAtEnd($this->initBlock);
         $this->builder->returnVoid();
         $this->builder->positionAtEnd($this->shutdownBlock);

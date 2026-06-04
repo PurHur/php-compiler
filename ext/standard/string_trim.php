@@ -16,8 +16,8 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringTrimMask;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -41,22 +41,15 @@ final class string_trim extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('trim() requires one or two arguments');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
+        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'trim', 0, 'string');
+        $mask = VmString::TRIM_DEFAULT;
+        if (2 === $argc) {
+            $mask = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'trim', 1, 'characters');
+        }
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('trim() only supports strings in this compiler build');
-        }
-        $mask = VmString::TRIM_DEFAULT;
-        if (2 === $argc) {
-            $maskArg = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $maskArg->type) {
-                throw new \LogicException('trim() character mask must be a string in this compiler build');
-            }
-            $mask = $maskArg->toString();
-        }
-        $frame->returnVar->string(VmString::trim($v->toString(), $mask));
+        $frame->returnVar->string(VmString::trim($string, $mask));
     }
 
     public Context $context;
@@ -83,10 +76,10 @@ final class string_trim extends Internal
         if (2 === $argc) {
             StringTrimMask::ensureLinked($context);
         }
-        $str = $this->jitString($context, $args[0], 'string_trim() argument #1');
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'trim', 0, 'string');
         $str = $context->builder->call($context->lookupFunction('__string__separate'), $str);
         $maskStr = (2 === $argc)
-            ? $this->jitString($context, $args[1], 'string_trim() argument #2')
+            ? JitStringBuiltinArg::lower($context, $args[1], 'trim', 1, 'characters')
             : null;
         $structName = $str->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\str_getcsv;
+use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPUnit\Framework\TestCase;
 
@@ -46,5 +48,24 @@ final class StrGetcsvBuiltinTest extends TestCase
             $vals[] = $v->resolveIndirect()->toString();
         }
         $this->assertSame(['hello', 'world'], $vals);
+    }
+
+    public function testEnumCaseOperandTypeError(): void
+    {
+        $runtime = new Runtime();
+        $fn = new str_getcsv();
+        $enum = new ClassEntry('E');
+        $enum->isEnum = true;
+        $enum->backedType = 'string';
+        $backing = new VMVariable();
+        $backing->string('a,b');
+        $case = EnumCaseSupport::createCase($enum, 'A', $backing);
+
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->calledArgs = [$case];
+        $frame->returnVar = new VMVariable();
+        $this->expectException(\TypeError::class);
+        $this->expectExceptionMessage('str_getcsv(): Argument #1 ($string) must be of type string, E given');
+        $fn->execute($frame);
     }
 }

@@ -4,17 +4,61 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT MCJIT body for __compiler_getdate.
+ * LLVM implementation of __compiler_getdate — localtime + hashtable breakdown.
  *
- * Links {@see lib/AOT/runtime/phpc_getdate.c}.
+ * Mirrors ext/standard/VmDate::getdate() (issue #5256, #3510).
+ * php-src: ext/standard/datetime.c — PHP_FUNCTION(getdate)
  */
 final class StringGetdate
 {
-    private const RUNTIME_SOURCE = __DIR__.'/../../AOT/runtime/phpc_getdate.c';
+    private const TM_SEC = 0;
+
+    private const TM_MIN = 4;
+
+    private const TM_HOUR = 8;
+
+    private const TM_MDAY = 12;
+
+    private const TM_MON = 16;
+
+    private const TM_YEAR = 20;
+
+    private const TM_WDAY = 24;
+
+    private const TM_YDAY = 28;
+
+    /** @var list<string> */
+    private const WEEKDAYS = [
+        'Sunday',
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+    ];
+
+    /** @var list<string> */
+    private const MONTHS = [
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
+    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -23,10 +67,6 @@ final class StringGetdate
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__compiler_getdate');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -34,147 +74,222 @@ final class StringGetdate
             return;
         }
 
-        $bitcode = self::ensureBitcode();
-        $data = file_get_contents($bitcode);
-        if (false === $data || '' === $data) {
-            throw new \LogicException('Failed to read getdate JIT bitcode: '.$bitcode);
-        }
-        $buffer = $context->llvm->createMemoryBufferWithString($data, 'phpc_getdate.bc');
-        $runtimeModule = $buffer->parseBitcode($context->context);
-        if (!$context->module->link($runtimeModule)) {
-            throw new \LogicException('Failed to link getdate JIT runtime bitcode');
-        }
+        self::ensureHashtableHelpers($context);
+
+        $i64 = $context->getTypeFromString('int64');
+        $voidTy = $context->getTypeFromString('void');
+        $valuePtr = $context->getTypeFromString('__value__*');
+
+        $ft = $context->context->functionType($voidTy, false, $i64, $valuePtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction('__compiler_getdate', $ft);
+        self::implementGetdate($context, $fn);
 
         self::registerLinkedRuntime($context);
+    }
+
+    private static function implementGetdate(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('gd_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $timestamp = $fn->getParam(0);
+        $out = $fn->getParam(1);
+
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $one = $i64->constInt(1, false);
+        $yearBase = $i32->constInt(1900, false);
+        $idx0 = $sizeT->constInt(0, false);
+        $nullOut = $context->builder->icmp(Builder::INT_EQ, $out, $valuePtr->constNull());
+        $nullRetBb = $fn->appendBasicBlock('gd_null_out');
+        $localBb = $fn->appendBasicBlock('gd_localtime');
+        $context->builder->branchIf($nullOut, $nullRetBb, $localBb);
+
+        $context->builder->positionAtEnd($nullRetBb);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+
+        $context->builder->positionAtEnd($localBb);
+        $i64p = $context->getTypeFromString('int64*');
+        $tsSlot = $context->builder->alloca($i64, 1, 'gd_ts');
+        $context->builder->store($timestamp, $tsSlot);
+        $tsPtr = $context->builder->pointerCast($tsSlot, $i64p);
+        $tmPtr = $context->builder->call($context->lookupFunction('localtime'), $tsPtr);
+        $tmNull = $context->builder->icmp(Builder::INT_EQ, $tmPtr, $i8p->constNull());
+        $tmFailBb = $fn->appendBasicBlock('gd_tm_fail');
+        $fillBb = $fn->appendBasicBlock('gd_fill');
+        $context->builder->branchIf($tmNull, $tmFailBb, $fillBb);
+
+        $context->builder->positionAtEnd($tmFailBb);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+
+        $context->builder->positionAtEnd($fillBb);
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $htNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
+        $allocFailBb = $fn->appendBasicBlock('gd_alloc_fail');
+        $keysBb = $fn->appendBasicBlock('gd_keys');
+        $context->builder->branchIf($htNull, $allocFailBb, $keysBb);
+
+        $context->builder->positionAtEnd($allocFailBb);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+
+        $context->builder->positionAtEnd($keysBb);
+        $tmSec = self::loadTmField($context, $tmPtr, self::TM_SEC);
+        $tmMin = self::loadTmField($context, $tmPtr, self::TM_MIN);
+        $tmHour = self::loadTmField($context, $tmPtr, self::TM_HOUR);
+        $tmMday = self::loadTmField($context, $tmPtr, self::TM_MDAY);
+        $tmMon = self::loadTmField($context, $tmPtr, self::TM_MON);
+        $tmYear = self::loadTmField($context, $tmPtr, self::TM_YEAR);
+        $tmWday = self::loadTmField($context, $tmPtr, self::TM_WDAY);
+        $tmYday = self::loadTmField($context, $tmPtr, self::TM_YDAY);
+
+        $year = $context->builder->add(
+            $context->builder->zExt($tmYear, $i64),
+            $context->builder->zExt($yearBase, $i64)
+        );
+        $mon = $context->builder->addNoSignedWrap($context->builder->zExt($tmMon, $i64), $one);
+        $sec = $context->builder->zExt($tmSec, $i64);
+        $min = $context->builder->zExt($tmMin, $i64);
+        $hour = $context->builder->zExt($tmHour, $i64);
+        $mday = $context->builder->zExt($tmMday, $i64);
+        $wday = $context->builder->zExt($tmWday, $i64);
+        $yday = $context->builder->zExt($tmYday, $i64);
+
+        $weekdayStr = self::selectName($context, $tmWday, self::WEEKDAYS);
+        $monthStr = self::selectName($context, $tmMon, self::MONTHS);
+
+        $setLong = $context->lookupFunction('__hashtable__setStringKeyLong');
+        $setString = $context->lookupFunction('__hashtable__setStringKeyString');
+        $setAt = $context->lookupFunction('__hashtable__setLongAt');
+
+        foreach ([
+            'seconds' => $sec,
+            'minutes' => $min,
+            'hours' => $hour,
+            'mday' => $mday,
+            'wday' => $wday,
+            'mon' => $mon,
+            'year' => $year,
+            'yday' => $yday,
+        ] as $key => $val) {
+            $context->builder->call(
+                $setLong,
+                $ht,
+                self::literalString($context, $key),
+                $val
+            );
+        }
+        $context->builder->call(
+            $setString,
+            $ht,
+            self::literalString($context, 'weekday'),
+            $weekdayStr
+        );
+        $context->builder->call(
+            $setString,
+            $ht,
+            self::literalString($context, 'month'),
+            $monthStr
+        );
+        $context->builder->call($setAt, $ht, $idx0, $timestamp);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $out,
+            $ht
+        );
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function loadTmField(Context $context, Value $tmPtr, int $offset): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i32p = $context->getTypeFromString('int32*');
+        $tmFields = $context->builder->pointerCast($tmPtr, $i32p);
+
+        return $context->builder->load(
+            $context->builder->gep($tmFields, $i32->constInt((int) ($offset / 4), false))
+        );
+    }
+
+    /**
+     * @param list<string> $names
+     */
+    private static function selectName(Context $context, Value $indexI32, array $names): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $result = self::literalString($context, $names[0]);
+        for ($i = \count($names) - 1; $i >= 1; --$i) {
+            $eq = $context->builder->icmp(Builder::INT_EQ, $indexI32, $i32->constInt($i, false));
+            $candidate = self::literalString($context, $names[$i]);
+            $result = $context->builder->select($eq, $candidate, $result);
+        }
+
+        return $result;
+    }
+
+    private static function literalString(Context $context, string $text): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $cstr = $context->builder->pointerCast($context->constantFromString($text), $i8p);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $i64->constInt(\strlen($text), false),
+            $cstr
+        );
+    }
+
+    private static function ensureHashtableHelpers(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $voidTy = $context->getTypeFromString('void');
+
+        foreach ([
+            ['__hashtable__alloc', $htPtr, []],
+            ['__hashtable__setStringKeyLong', $voidTy, [$htPtr, $strPtr, $i64]],
+            ['__hashtable__setStringKeyString', $voidTy, [$htPtr, $strPtr, $strPtr]],
+            ['__hashtable__setLongAt', $voidTy, [$htPtr, $sizeT, $i64]],
+            ['__value__writeHashtable', $voidTy, [$valuePtr, $htPtr]],
+            ['__string__init', $strPtr, [$i64, $context->getTypeFromString('int8*')]],
+        ] as [$name, $ret, $params]) {
+            self::ensureExternal(
+                $context,
+                $name,
+                $context->context->functionType($ret, false, ...$params)
+            );
+        }
+    }
+
+    private static function ensureExternal(Context $context, string $name, $ft): void
+    {
+        try {
+            $context->lookupFunction($name);
+        } catch (\Throwable) {
+            $fn = $context->module->addFunction($name, $ft);
+            $context->registerFunction($name, $fn);
+        }
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
         $fn = $context->module->getNamedFunction('__compiler_getdate');
         if (null === $fn) {
-            throw new \LogicException('__compiler_getdate missing after getdate bitcode link');
+            throw new \LogicException('__compiler_getdate missing after StringGetdate LLVM implement');
         }
         $context->registerFunction('__compiler_getdate', $fn);
-    }
-
-    private static function ensureBitcode(): string
-    {
-        $source = realpath(self::RUNTIME_SOURCE);
-        if (false === $source || !is_file($source)) {
-            throw new \LogicException('getdate runtime source not found: '.self::RUNTIME_SOURCE);
-        }
-
-        $compiler = self::resolveCompiler();
-        $cacheDir = sys_get_temp_dir().'/phpc-jit-runtime';
-        if (!is_dir($cacheDir) && !mkdir($cacheDir, 0777, true) && !is_dir($cacheDir)) {
-            throw new \LogicException('Cannot create JIT runtime cache: '.$cacheDir);
-        }
-
-        $cache = $cacheDir.'/'.basename($source, '.c').'-'.substr(
-            sha1($source.filemtime($source).$compiler.'host'),
-            0,
-            16
-        ).'.bc';
-        if (is_file($cache) && filemtime($cache) >= filemtime($source)) {
-            return $cache;
-        }
-
-        $includes = self::hostLibcIncludeFlags();
-        $cmd = escapeshellarg($compiler)
-            .' -emit-llvm -c -fPIC -O2'.$includes.' '
-            .escapeshellarg($source).' -o '.escapeshellarg($cache).' 2>&1';
-        $output = shell_exec($cmd);
-        if (!is_file($cache)) {
-            throw new \LogicException(
-                'Failed to compile getdate JIT bitcode: '.trim((string) $output)
-            );
-        }
-
-        return $cache;
-    }
-
-    private static function resolveCompiler(): string
-    {
-        $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
-        if (false !== $llvmDir && '' !== $llvmDir) {
-            foreach (['clang-9', 'clang'] as $name) {
-                $candidate = $llvmDir.'/'.$name;
-                if (is_executable($candidate)) {
-                    return $candidate;
-                }
-            }
-        }
-
-        foreach (['clang-9', 'clang', 'gcc', 'cc'] as $name) {
-            $path = trim((string) shell_exec('command -v '.escapeshellarg($name).' 2>/dev/null'));
-            if ('' !== $path) {
-                return $path;
-            }
-        }
-
-        throw new \LogicException('No C compiler found for getdate JIT runtime bitcode');
-    }
-
-    private static function hostLibcIncludeFlags(): string
-    {
-        $flags = '';
-        foreach (self::discoverSystemIncludeDirs() as $dir) {
-            $flags .= ' -isystem '.escapeshellarg($dir);
-        }
-        if ('' === $flags && is_file('/usr/include/stdio.h')) {
-            $flags = ' -isystem /usr/include';
-        }
-
-        return $flags;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private static function discoverSystemIncludeDirs(): array
-    {
-        $dirs = [];
-        foreach (['gcc', 'cc', 'clang'] as $compiler) {
-            $path = trim((string) shell_exec('command -v '.escapeshellarg($compiler).' 2>/dev/null'));
-            if ('' === $path) {
-                continue;
-            }
-            $verbose = shell_exec(
-                escapeshellarg($path).' -E -Wp,-v -xc /dev/null 2>&1'
-            );
-            if (!is_string($verbose)) {
-                continue;
-            }
-            $capture = false;
-            foreach (explode("\n", $verbose) as $line) {
-                if (str_contains($line, '#include <...> search starts here:')) {
-                    $capture = true;
-
-                    continue;
-                }
-                if ($capture) {
-                    if (str_contains($line, 'End of search list')) {
-                        break;
-                    }
-                    $dir = trim($line);
-                    if ('' !== $dir && is_dir($dir)) {
-                        $dirs[$dir] = true;
-                    }
-                }
-            }
-            if ([] !== $dirs) {
-                break;
-            }
-        }
-
-        if ([] === $dirs) {
-            foreach (['/usr/include', '/usr/include/x86_64-linux-gnu'] as $fallback) {
-                if (is_dir($fallback)) {
-                    $dirs[$fallback] = true;
-                }
-            }
-        }
-
-        return array_keys($dirs);
     }
 }
