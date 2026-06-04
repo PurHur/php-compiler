@@ -16,7 +16,7 @@ use PHPCompiler\Web\ResponseContext;
  */
 final class VmSession
 {
-    /** Keep in sync with lib/AOT/runtime/phpc_session_state.c (#5694). */
+    /** Limits shared with {@see \PHPCompiler\JIT\Builtin\SessionStorageGlobals} (#5694, #5750). */
     public const MAX_ID_LEN = 128;
 
     public const MAX_NAME_LEN = 128;

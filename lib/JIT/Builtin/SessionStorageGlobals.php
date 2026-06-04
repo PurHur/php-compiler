@@ -10,10 +10,10 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\Value;
 
 /**
- * LLVM globals for JIT/AOT session_id() / session_name() buffers (issues #1183–#1184, #5694).
+ * LLVM globals for JIT/AOT session_id() / session_name() buffers (issues #1183–#1184, #5694, #5750).
  *
- * VM source of truth: {@see VmSession}. MCJIT defines globals here; standalone AOT links
- * the same symbols from {@see lib/AOT/runtime/phpc_session_state.c} until #5332.
+ * VM source of truth: {@see VmSession}. MCJIT defines these globals in LLVM; standalone AOT
+ * links storage from {@see lib/AOT/runtime/phpc_session_lifecycle.c} (merged #5750).
  * php-src: ext/session/session.c (PS(id), PS(session_name))
  */
 final class SessionStorageGlobals
@@ -49,6 +49,7 @@ final class SessionStorageGlobals
         $i64 = $context->getTypeFromString('int64');
         $idBufType = $i8->arrayType(VmSession::MAX_ID_LEN + 1);
         $nameBufType = $i8->arrayType(VmSession::MAX_NAME_LEN + 1);
+        $defaultNameLen = \strlen(VmSession::DEFAULT_NAME);
 
         if (null === $context->module->getNamedGlobal(self::GLOBAL_ID_BUF)) {
             self::$idBufGlobal = $context->module->addGlobal($idBufType, self::GLOBAL_ID_BUF);
@@ -56,9 +57,11 @@ final class SessionStorageGlobals
             self::$idBufGlobal = $context->module->getNamedGlobal(self::GLOBAL_ID_BUF);
         }
 
+        $standalone = Builtin::LOAD_TYPE_STANDALONE === $context->loadType;
+
         if (null === $context->module->getNamedGlobal(self::GLOBAL_ID_LEN)) {
             self::$idLenGlobal = $context->module->addGlobal($i64, self::GLOBAL_ID_LEN);
-            if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            if (!$standalone) {
                 self::$idLenGlobal->setInitializer($i64->constInt(0, false));
             }
         } else {
@@ -73,9 +76,8 @@ final class SessionStorageGlobals
 
         if (null === $context->module->getNamedGlobal(self::GLOBAL_NAME_LEN)) {
             self::$nameLenGlobal = $context->module->addGlobal($i64, self::GLOBAL_NAME_LEN);
-            if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
-                $defaultLen = \strlen(VmSession::DEFAULT_NAME);
-                self::$nameLenGlobal->setInitializer($i64->constInt($defaultLen, false));
+            if (!$standalone) {
+                self::$nameLenGlobal->setInitializer($i64->constInt($defaultNameLen, false));
             }
         } else {
             self::$nameLenGlobal = $context->module->getNamedGlobal(self::GLOBAL_NAME_LEN);
@@ -83,11 +85,86 @@ final class SessionStorageGlobals
 
         if (null === $context->module->getNamedGlobal(self::GLOBAL_ACTIVE)) {
             self::$activeGlobal = $context->module->addGlobal($i8, self::GLOBAL_ACTIVE);
-            if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            if (!$standalone) {
                 self::$activeGlobal->setInitializer($i8->constInt(0, false));
             }
         } else {
             self::$activeGlobal = $context->module->getNamedGlobal(self::GLOBAL_ACTIVE);
         }
+    }
+
+    /**
+     * Idempotent seed of default session name (replaces phpc_session_state.c buffer init, #5750).
+     */
+    public static function implementEnsureDefaults(Context $context): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction('__phpc_session_ensure_defaults');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction('__phpc_session_ensure_defaults', $probe);
+
+            return;
+        }
+
+        if (null === self::$nameLenGlobal) {
+            self::ensureGlobals($context);
+        }
+
+        $void = $context->context->voidType();
+        $fn = $context->module->addFunction(
+            '__phpc_session_ensure_defaults',
+            $context->context->functionType($void, false)
+        );
+        $context->registerFunction('__phpc_session_ensure_defaults', $fn);
+
+        $entry = $fn->appendBasicBlock('sess_defaults_entry');
+        $bbSeed = $fn->appendBasicBlock('sess_defaults_seed');
+        $bbDone = $fn->appendBasicBlock('sess_defaults_done');
+        $context->builder->positionAtEnd($entry);
+
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $zero = $i64->constInt(0, false);
+        $defaultLen = $i64->constInt(\strlen(VmSession::DEFAULT_NAME), false);
+
+        $curLen = $context->builder->load(self::$nameLenGlobal);
+        $needsSeed = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $curLen,
+            $zero
+        );
+        $context->builder->branchIf($needsSeed, $bbSeed, $bbDone);
+
+        $context->builder->positionAtEnd($bbSeed);
+        $context->builder->store($defaultLen, self::$nameLenGlobal);
+        $bufPtr = $context->builder->inBoundsGEP(
+            self::$nameBufGlobal,
+            $i32->constInt(0, false),
+            $zero
+        );
+        foreach (str_split(VmSession::DEFAULT_NAME) as $i => $ch) {
+            $charPtr = $context->builder->inBoundsGEP($bufPtr, $i64->constInt($i, false));
+            $context->builder->store($i8->constInt(\ord($ch), false), $charPtr);
+        }
+        $nulPtr = $context->builder->inBoundsGEP($bufPtr, $defaultLen);
+        $context->builder->store($i8->constInt(0, false), $nulPtr);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+    }
+
+    public static function emitCallEnsureDefaults(Context $context): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            return;
+        }
+        self::ensureGlobals($context);
+        $context->builder->call($context->lookupFunction('__phpc_session_ensure_defaults'));
     }
 }
