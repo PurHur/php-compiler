@@ -1170,6 +1170,7 @@ class JIT {
                     $block->variadicParamIndex,
                     $this->paramImplicitNullableForNativeCall($block)
                 );
+                JIT\NoDiscardCallGuard::registerCallee($this->context, $funcName, $block);
             }
             if ($returnsByRef) {
                 $this->markFunctionReturnsByRef($lcname, $funcName ?? '');
@@ -4480,6 +4481,9 @@ class JIT {
             $args,
             $this->collectParamDefaults($block)
         );
+        if (null !== $logicalName) {
+            JIT\NoDiscardCallGuard::registerCallee($this->context, $logicalName, $block);
+        }
 
         return $func;
     }
@@ -6708,6 +6712,7 @@ class JIT {
                     $this->context->callerStrictTypes = $block->strictTypes;
                     $this->emitJitLateStaticCallSiteBinding($callArgs);
                     $this->context->scope->toCall->call($this->context, ...$callArgs);
+                    JIT\NoDiscardCallGuard::emitAfterDiscardedReturn($this->context, $this->context->scope->toCall);
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
                     $this->context->callerStrictTypes = $prevStrict;
                     break;
