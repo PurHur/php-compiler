@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** scandir() — list directory entries (VM via host PHP; JIT defers to VM). */
+/** scandir() — list directory entries (VM via VmDir; JIT via __phpc_scandir_vec). */
 final class scandir extends Internal
 {
     public function execute(Frame $frame): void
@@ -37,7 +37,7 @@ final class scandir extends Internal
             return;
         }
 
-        $result = \scandir($pathVar->toString(), $sortingOrder);
+        $result = VmDir::scandir($pathVar->toString(), $sortingOrder);
         if (false === $result) {
             $frame->returnVar->bool(false);
 

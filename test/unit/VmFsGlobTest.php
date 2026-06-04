@@ -22,6 +22,23 @@ final class VmFsGlobTest extends TestCase
         $this->assertStringContainsString('VmFsGlob::glob', $source);
     }
 
+    public function testScandirBuiltinDoesNotCallHostScandir(): void
+    {
+        $source = (string) file_get_contents(self::$root.'/ext/standard/scandir.php');
+        $this->assertStringNotContainsString('\\scandir(', $source);
+        $this->assertStringContainsString('VmDir::scandir', $source);
+    }
+
+    public function testVmDirScandirMatchesFixture(): void
+    {
+        $dir = self::$root.'/test/compliance/cases/stdlib/glob_scandir_fixture';
+        $entries = \PHPCompiler\ext\standard\VmDir::scandir($dir);
+        $this->assertIsArray($entries);
+        $this->assertTrue(\in_array('a.php', $entries, true));
+        $this->assertTrue(\in_array('readme.txt', $entries, true));
+        $this->assertFalse(\PHPCompiler\ext\standard\VmDir::scandir('/nonexistent/path/for/php-compiler'));
+    }
+
     public function testVmFsGlobMatchesFixturePhpFiles(): void
     {
         $dir = self::$root.'/test/compliance/cases/stdlib/glob_scandir_fixture';
