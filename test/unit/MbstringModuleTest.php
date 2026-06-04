@@ -1,0 +1,35 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler;
+
+use PHPCompiler\ext\standard\VmReflection;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * mbstring module skeleton registration (issue #5695).
+ *
+ * @group mbstring_module_skeleton
+ */
+final class MbstringModuleTest extends TestCase
+{
+    public function test_mbstring_module_skeleton_function(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+
+        self::assertTrue(VmReflection::functionExists($ctx, 'mb_strlen'));
+
+        $code = <<<'PHP'
+<?php
+echo (int) function_exists('mb_strlen');
+echo mb_strlen('é', 'UTF-8');
+echo mb_strlen('hello', 'UTF-8');
+PHP;
+        $block = $runtime->parseAndCompile($code, 'mbstring_module.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('115', ob_get_clean());
+    }
+}

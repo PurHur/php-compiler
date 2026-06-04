@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\ext\types;
+namespace PHPCompiler\ext\mbstring;
 
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\JIT\Context;
@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT helpers for mb_strlen() UTF-8 counting (issue #158).
+ * LLVM JIT/AOT helpers for mb_strlen() UTF-8 counting (issue #158, #5695).
  */
 final class JitMbStrlen
 {

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\ext\types;
+namespace PHPCompiler\ext\mbstring;
 
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
@@ -13,7 +13,9 @@ use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM\Value;
 
 /**
- * mb_strlen() — UTF-8 character count for web forms (issue #158).
+ * mb_strlen() — UTF-8 character count (php-src ext/mbstring/mbstring.c; #158, #5695).
+ *
+ * Full mbstring parity (additional encodings, mb_substr, …) tracked in #4405, #3239.
  */
 final class mb_strlen extends Internal
 {
