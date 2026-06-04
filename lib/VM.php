@@ -3028,6 +3028,7 @@ restart:
                     $classEntry->interfaces = $op->classImplements;
                     $classEntry->isAbstract = $op->classIsAbstract;
                     self::defineClass($classEntry, $op->block1);
+                    $this->inheritFromInterfaces($classEntry);
                     VM\EnumSupport::ensureBuiltinCasesMethod($classEntry);
                     VM\EnumSupport::ensureBuiltinEnumInterfaces($classEntry);
                     $this->context->classes[$lcname] = $classEntry;
