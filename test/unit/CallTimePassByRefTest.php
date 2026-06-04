@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #5354 — call-time pass-by-reference removed in PHP 8 */
+/** @covers issue #5354, #5505 — call-time pass-by-reference removed in PHP 8 */
 final class CallTimePassByRefTest extends TestCase
 {
     public function testFunctionCallAmpersandArgFailsAtParse(): void

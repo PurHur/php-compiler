@@ -37,7 +37,11 @@ function run(string $filename, string $code, array $options): void
             array_values(array_map('strval', $scriptArgv))
         );
     }
-    $block = $runtime->parseAndCompile($code, $filename);
+    try {
+        $block = $runtime->parseAndCompile($code, $filename);
+    } catch (\CompileError $e) {
+        exit(255);
+    }
     if (! isset($options['-l'])) {
         try {
             $runtime->run($block);

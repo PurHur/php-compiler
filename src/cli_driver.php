@@ -302,6 +302,9 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                 run($execFile, $execCode, $options);
             } catch (PHPCompiler\VM\ScriptExit $e) {
                 exit($e->status);
+            } catch (\CompileError $e) {
+                // parseAndCompile already logged; mirror Zend compile/parse exit 255 (#5354, #5505).
+                exit(255);
             } catch (\LogicException $e) {
                 echo $e->getMessage(), "\n";
                 exit(255);
