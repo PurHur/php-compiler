@@ -675,6 +675,18 @@ class Compiler {
         return null;
     }
 
+    /** Foreach loop heads use Iterator_Valid — not ?: merge blocks (#5657). */
+    private function isForeachIteratorHeaderCfgBlock(CfgBlock $cfg): bool
+    {
+        foreach ($cfg->children as $child) {
+            if ($child instanceof Op\Iterator\Valid) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** Both ?: arms jump to the same CFG merge block (echo/assign phi, #3790, #5510). */
     private function jumpIfTargetsTernaryMerge(Op\Stmt\JumpIf $stmt): bool
     {
@@ -788,6 +800,9 @@ class Compiler {
             return null;
         }
         $mergeCfg = $this->branchJumpMergeTarget($branch->orig);
+        if (null !== $mergeCfg && $this->isForeachIteratorHeaderCfgBlock($mergeCfg)) {
+            return null;
+        }
         if (null !== $mergeCfg && $this->seen->contains($mergeCfg)) {
             // Echo/return ?: phi temporaries must still target the merge ECHO/RETURN slot (#3787, #4280, #5506).
             if ($assign->var instanceof Temporary && null === $this->mergeReturnSlot($this->seen[$mergeCfg])) {
