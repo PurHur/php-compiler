@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 final class ReflectionClassGetMethod implements Call
@@ -19,20 +17,12 @@ final class ReflectionClassGetMethod implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
-        $sizeT = $context->getTypeFromString('size_t');
-        $i8p = $context->getTypeFromString('int8*');
-        $objArg = $context->builder->pointerCast($obj, $i8p);
-
-        $outClassLen = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $classCstr = $context->builder->call($context->lookupFunction('phpc_reflect_get_class_name'), $objArg, $outClassLen);
-        $classLen = $context->builder->load($outClassLen);
-        $classNull = $context->builder->icmp(Builder::INT_EQ, $classCstr, $classCstr->typeOf()->constNull());
-        $empty = $context->builder->pointerCast($context->constantFromString(''), $i8p);
-        $classSafe = $context->builder->select($classNull, $empty, $classCstr);
-        $classLen = $context->builder->select($classNull, $sizeT->constInt(0, false), $classLen);
+        [$classSafe, $classLen] = ReflectionSetup::reflectionClassNameAsCstr($context, $obj);
 
         $methodVar = JitNativeString::coerce($context, $args[1]);
         $methodStr = $context->helper->loadValue($methodVar);
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
         $raw = $context->builder->pointerCast($methodStr, $i8p);
         $lenPtr = $context->builder->pointerCast(
             $context->builder->gep($raw, $context->constantFromInteger(8, 'size_t')),
@@ -44,14 +34,23 @@ final class ReflectionClassGetMethod implements Call
 
         $rmClassId = $context->type->object->lookup('ReflectionMethod');
         $rmObj = $context->type->object->allocate($rmClassId);
-        $context->builder->call(
-            $context->lookupFunction('phpc_reflect_set_method'),
-            $context->builder->pointerCast($rmObj, $i8p),
+        ReflectionSetup::emitSetStringPropertyFromCstr(
+            $context,
+            $rmObj,
+            'ReflectionMethod',
+            'name',
             $classSafe,
-            $classLen,
+            $classLen
+        );
+        ReflectionSetup::emitSetStringPropertyFromCstr(
+            $context,
+            $rmObj,
+            'ReflectionMethod',
+            'method',
             $context->builder->pointerCast($methodData, $i8p),
             $methodLen
         );
+        ReflectionSetup::markConstructed($context, $rmObj);
 
         $slot = JitValueBox::alloc($context);
         $context->builder->call(

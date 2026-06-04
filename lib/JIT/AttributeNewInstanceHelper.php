@@ -63,49 +63,12 @@ final class AttributeNewInstanceHelper
         return self::readPositionalArgAt($context, $argsVar, 0);
     }
 
-    /** Ctor arg from attribute owner registry (skips args hashtable MCJIT path, #4598). */
+    /** First ctor arg from ReflectionAttribute::args property (VM parity, #4598, #5816). */
     public static function emitReadCtorArgFromAttrOwner(Context $context, \PHPLLVM\Value $attrObj): Variable
     {
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $attrObjArg = $context->builder->pointerCast($attrObj, $i8p);
-        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $ownerPtr = $context->builder->call(
-            $context->lookupFunction('phpc_reflect_get_attr_owner'),
-            $attrObjArg,
-            $idxSlot
-        );
-        $ownerIdx = $context->builder->load($idxSlot);
-        $argPtr = $context->builder->call(
-            $context->lookupFunction('phpc_attr_class_string_arg'),
-            $ownerPtr,
-            $ownerIdx,
-            $sizeT->constInt(0, false)
-        );
-        $isNull = $context->builder->icmp(
-            \PHPLLVM\Builder::INT_EQ,
-            $argPtr,
-            $argPtr->typeOf()->constNull()
-        );
-        $empty = $context->builder->pointerCast($context->constantFromString(''), $i8p);
-        $safe = $context->builder->select($isNull, $empty, $argPtr);
-        $len = $context->builder->call(
-            $context->lookupFunction('strlen'),
-            $context->builder->pointerCast($safe, $i8p)
-        );
-        $str = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $context->builder->zExt($len, $context->getTypeFromString('int64')),
-            $safe
-        );
-        $slot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            JitValueBox::pointer($context, $slot),
-            $str
-        );
+        $argsVar = $context->type->object->propertyFetch($attrObj, 'ReflectionAttribute', 'args');
 
-        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+        return self::readFirstPositionalArg($context, $argsVar);
     }
 
     public static function readPositionalArgAt(Context $context, Variable $argsVar, int $index): Variable
