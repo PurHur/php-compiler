@@ -5,11 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\StringStrWordCount as StrWordCountRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -17,7 +15,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT helper for str_word_count() (format 0 LLVM; formats 1/2 via C runtime — issue #3584).
+ * LLVM JIT helper for str_word_count() (all formats; issue #2382, #3584, #5516).
  */
 final class JitStrWordCount
 {
@@ -43,6 +41,7 @@ final class JitStrWordCount
         $context->builder->store($zero, $countSlot);
         $context->builder->store($i8->constInt(0, false), $inWordSlot);
 
+        $extraSlot = self::allocExtraMask($context, null);
         $head = BasicBlockHelper::append($context, 'str_word_count_head_'.$id);
         $body = BasicBlockHelper::append($context, 'str_word_count_body_'.$id);
         $done = BasicBlockHelper::append($context, 'str_word_count_done_'.$id);
@@ -58,19 +57,12 @@ final class JitStrWordCount
         $ch = $context->builder->load($chPtr);
         $chI64 = $context->builder->zExt($ch, $i64);
         $inWord = $context->builder->load($inWordSlot);
-        $inWordI64 = $context->builder->zExt($inWord, $i64);
-
-        $isLetter = self::isLetter($context, $chI64);
-        $isApostrophe = $context->builder->icmp(Builder::INT_EQ, $chI64, $i64->constInt(39, false));
-        $isHyphen = $context->builder->icmp(Builder::INT_EQ, $chI64, $i64->constInt(45, false));
-        $inWordBool = $context->builder->icmp(Builder::INT_NE, $inWordI64, $zero);
-        $innerPunct = $context->builder->or(
-            $context->builder->and($inWordBool, $isApostrophe),
-            $context->builder->and($inWordBool, $isHyphen)
+        $isWordChar = self::isWordChar($context, $chI64, $inWord, $extraSlot);
+        $wasInWord = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->zExt($inWord, $i64),
+            $zero
         );
-        $isWordChar = $context->builder->or($isLetter, $innerPunct);
-
-        $wasInWord = $inWordBool;
         $context->builder->store(
             $context->builder->zExt($isWordChar, $i8),
             $inWordSlot
@@ -97,6 +89,265 @@ final class JitStrWordCount
         $context->builder->positionAtEnd($done);
 
         return $context->builder->load($countSlot);
+    }
+
+    /**
+     * Build word list (format 1) or offset map (format 2) at JIT time.
+     */
+    public static function wordHashTable(
+        Context $context,
+        Value $str,
+        Value $format,
+        ?Value $chars
+    ): Value {
+        $map = $context->structFieldMap['__string__'];
+        $len = $context->builder->load(
+            $context->builder->structGep($str, $map['length'])
+        );
+        $data = $context->builder->structGep($str, $map['value']);
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i8p = $context->getTypeFromString('int8*');
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+
+        $ht = HashTableHelper::alloc($context);
+        $extraSlot = self::allocExtraMask($context, $chars);
+        $id = (string) (++self::$blockSerial);
+        $posSlot = $context->builder->alloca($i64, 1, 'swc_pos_'.$id);
+        $wordStartSlot = $context->builder->alloca($i64, 1, 'swc_ws_'.$id);
+        $inWordSlot = $context->builder->alloca($i8, 1, 'swc_in_'.$id);
+        $listIdxSlot = $context->builder->alloca($sizeT, 1, 'swc_li_'.$id);
+        $context->builder->store($zero, $posSlot);
+        $context->builder->store($zero, $wordStartSlot);
+        $context->builder->store($i8->constInt(0, false), $inWordSlot);
+        $context->builder->store($sizeT->constInt(0, false), $listIdxSlot);
+
+        $head = BasicBlockHelper::append($context, 'swc_head_'.$id);
+        $body = BasicBlockHelper::append($context, 'swc_body_'.$id);
+        $flush = BasicBlockHelper::append($context, 'swc_flush_'.$id);
+        $advance = BasicBlockHelper::append($context, 'swc_adv_'.$id);
+        $done = BasicBlockHelper::append($context, 'swc_done_'.$id);
+
+        $context->builder->branch($head);
+        $context->builder->positionAtEnd($head);
+        $pos = $context->builder->load($posSlot);
+        $pastEnd = $context->builder->icmp(Builder::INT_SGE, $pos, $len);
+        $context->builder->branchIf($pastEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $chPtr = $context->builder->inBoundsGEP($data, $pos);
+        $ch = $context->builder->load($chPtr);
+        $chI64 = $context->builder->zExt($ch, $i64);
+        $inWord = $context->builder->load($inWordSlot);
+        $isWordChar = self::isWordChar($context, $chI64, $inWord, $extraSlot);
+        $wasInWord = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->zExt($inWord, $i64),
+            $zero
+        );
+        $endWord = $context->builder->and(
+            $context->builder->not($isWordChar),
+            $wasInWord
+        );
+        $context->builder->branchIf($endWord, $flush, $advance);
+
+        $context->builder->positionAtEnd($flush);
+        self::appendWord(
+            $context,
+            $ht,
+            $str,
+            $context->builder->load($wordStartSlot),
+            $pos,
+            $format,
+            $listIdxSlot,
+            $wordStartSlot
+        );
+        $context->builder->store($i8->constInt(0, false), $inWordSlot);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $startWord = $context->builder->and(
+            $isWordChar,
+            $context->builder->not($wasInWord)
+        );
+        $startBlock = BasicBlockHelper::append($context, 'swc_start_'.$id);
+        $afterStart = BasicBlockHelper::append($context, 'swc_after_start_'.$id);
+        $context->builder->branchIf($startWord, $startBlock, $afterStart);
+        $context->builder->positionAtEnd($startBlock);
+        $context->builder->store($pos, $wordStartSlot);
+        $context->builder->store($i8->constInt(1, false), $inWordSlot);
+        $context->builder->branch($afterStart);
+        $context->builder->positionAtEnd($afterStart);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($pos, $one),
+            $posSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+        $inWordEnd = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->zExt($context->builder->load($inWordSlot), $i64),
+            $zero
+        );
+        $finalFlush = BasicBlockHelper::append($context, 'swc_final_flush_'.$id);
+        $finalDone = BasicBlockHelper::append($context, 'swc_final_done_'.$id);
+        $context->builder->branchIf($inWordEnd, $finalFlush, $finalDone);
+        $context->builder->positionAtEnd($finalFlush);
+        self::appendWord(
+            $context,
+            $ht,
+            $str,
+            $context->builder->load($wordStartSlot),
+            $len,
+            $format,
+            $listIdxSlot,
+            $wordStartSlot
+        );
+        $context->builder->branch($finalDone);
+        $context->builder->positionAtEnd($finalDone);
+
+        return $ht;
+    }
+
+    private static function appendWord(
+        Context $context,
+        Value $ht,
+        Value $str,
+        Value $wordStart,
+        Value $wordEnd,
+        Value $format,
+        Value $listIdxSlot,
+        Value $_wordStartSlot
+    ): void {
+        $map = $context->structFieldMap['__string__'];
+        $data = $context->builder->structGep($str, $map['value']);
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i8p = $context->getTypeFromString('int8*');
+        $one = $i64->constInt(1, false);
+        $wordLen = $context->builder->subNoSignedWrap($wordEnd, $wordStart);
+        $slicePtr = $context->builder->inBoundsGEP($data, $wordStart);
+        $sliceCast = $context->builder->pointerCast($slicePtr, $i8p);
+        $word = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $wordLen,
+            $sliceCast
+        );
+        $isFmt1 = $context->builder->icmp(Builder::INT_EQ, $format, $one);
+        $listIdx = $context->builder->load($listIdxSlot);
+        $offsetIdx = $context->builder->truncOrBitCast($wordStart, $sizeT);
+        $index = $context->builder->select($isFmt1, $listIdx, $offsetIdx);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $ht,
+            $index,
+            $word
+        );
+        $nextList = $context->builder->addNoSignedWrap($listIdx, $sizeT->constInt(1, false));
+        $context->builder->store(
+            $context->builder->select($isFmt1, $nextList, $listIdx),
+            $listIdxSlot
+        );
+    }
+
+    /**
+     * @return Value alloca i8[256] extra-char bitmask
+     */
+    private static function allocExtraMask(Context $context, ?Value $chars): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i8->constInt(0, false);
+        $extra = $context->builder->alloca($i8, 256, 'str_word_count_extra');
+        $id = (string) (++self::$blockSerial);
+        $iSlot = $context->builder->alloca($i64, 1, 'swc_extra_i_'.$id);
+        $context->builder->store($i64->constInt(0, false), $iSlot);
+        $initHead = BasicBlockHelper::append($context, 'swc_extra_init_head_'.$id);
+        $initBody = BasicBlockHelper::append($context, 'swc_extra_init_body_'.$id);
+        $initDone = BasicBlockHelper::append($context, 'swc_extra_init_done_'.$id);
+        $context->builder->branch($initHead);
+        $context->builder->positionAtEnd($initHead);
+        $i = $context->builder->load($iSlot);
+        $at256 = $context->builder->icmp(Builder::INT_SGE, $i, $i64->constInt(256, false));
+        $context->builder->branchIf($at256, $initDone, $initBody);
+        $context->builder->positionAtEnd($initBody);
+        $context->builder->store($zero, $context->builder->inBoundsGEP($extra, $i));
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($i, $i64->constInt(1, false)),
+            $iSlot
+        );
+        $context->builder->branch($initHead);
+        $context->builder->positionAtEnd($initDone);
+
+        if (null === $chars) {
+            return $extra;
+        }
+
+        $map = $context->structFieldMap['__string__'];
+        $clen = $context->builder->load(
+            $context->builder->structGep($chars, $map['length'])
+        );
+        $cdata = $context->builder->structGep($chars, $map['value']);
+        $jSlot = $context->builder->alloca($i64, 1, 'swc_extra_j_'.$id);
+        $context->builder->store($i64->constInt(0, false), $jSlot);
+        $fillHead = BasicBlockHelper::append($context, 'swc_extra_fill_head_'.$id);
+        $fillBody = BasicBlockHelper::append($context, 'swc_extra_fill_body_'.$id);
+        $fillDone = BasicBlockHelper::append($context, 'swc_extra_fill_done_'.$id);
+        $context->builder->branch($fillHead);
+        $context->builder->positionAtEnd($fillHead);
+        $j = $context->builder->load($jSlot);
+        $past = $context->builder->icmp(Builder::INT_SGE, $j, $clen);
+        $context->builder->branchIf($past, $fillDone, $fillBody);
+        $context->builder->positionAtEnd($fillBody);
+        $c = $context->builder->load($context->builder->inBoundsGEP($cdata, $j));
+        $cI64 = $context->builder->zExt($c, $i64);
+        $context->builder->store(
+            $i8->constInt(1, false),
+            $context->builder->inBoundsGEP($extra, $cI64)
+        );
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($j, $i64->constInt(1, false)),
+            $jSlot
+        );
+        $context->builder->branch($fillHead);
+        $context->builder->positionAtEnd($fillDone);
+
+        return $extra;
+    }
+
+    private static function isWordChar(
+        Context $context,
+        Value $chI64,
+        Value $inWord,
+        Value $extraSlot
+    ): Value {
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $isLetter = self::isLetter($context, $chI64);
+        $extraByte = $context->builder->load(
+            $context->builder->inBoundsGEP($extraSlot, $chI64)
+        );
+        $hasExtra = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->zExt($extraByte, $i64),
+            $zero
+        );
+        $isApostrophe = $context->builder->icmp(Builder::INT_EQ, $chI64, $i64->constInt(39, false));
+        $isHyphen = $context->builder->icmp(Builder::INT_EQ, $chI64, $i64->constInt(45, false));
+        $inWordBool = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->zExt($inWord, $i64),
+            $zero
+        );
+        $innerPunct = $context->builder->or(
+            $context->builder->and($inWordBool, $isApostrophe),
+            $context->builder->and($inWordBool, $isHyphen)
+        );
+
+        return $context->builder->or($isLetter, $context->builder->or($hasExtra, $innerPunct));
     }
 
     private static function isLetter(Context $context, Value $ord): Value
@@ -136,27 +387,6 @@ final class JitStrWordCount
         $jit = HashTableHelper::variableFromVmHashTable($context, $ht);
 
         return $jit->value;
-    }
-
-    /**
-     * Runtime lowering for format 1/2 (and optional $chars) via phpc_str_word_count.c.
-     */
-    public static function wordHashTableRuntime(
-        Context $context,
-        Value $str,
-        Value $format,
-        ?Value $chars
-    ): Value {
-        StrWordCountRuntime::ensureLinked($context);
-        $empty = $context->builder->load($context->constantStringFromString(''));
-        $charsArg = $chars ?? $empty;
-
-        return $context->builder->call(
-            $context->lookupFunction('__compiler_str_word_count_words'),
-            $str,
-            $format,
-            $charsArg
-        );
     }
 
     public static function compileTimeFormat(JITVariable $arg): int

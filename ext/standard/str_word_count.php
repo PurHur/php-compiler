@@ -16,7 +16,7 @@ use PHPLLVM\Value;
  * str_word_count() — count words or return word list (subset of PHP; issue #2382, #3584).
  *
  * VM: all formats via {@see VmString::str_word_count()}.
- * JIT/AOT: format 0 via {@see JitStrWordCount} LLVM lowering; formats 1/2 via C runtime.
+ * JIT/AOT: all formats via {@see JitStrWordCount} LLVM lowering (#5516).
  */
 final class str_word_count extends Internal
 {
@@ -118,10 +118,6 @@ final class str_word_count extends Internal
                 ? $context->getTypeFromString('int64')->constInt((int) $formatCt, false)
                 : JitStrWordCount::jitFormatArg($context, $args[1]));
 
-        if (null !== $formatCt && 0 === (int) $formatCt && $argc < 3) {
-            return JitStrWordCount::count($context, $str);
-        }
-
         $charsVal = null;
         if (3 === $argc) {
             $charsVal = null !== $charsCt
@@ -129,6 +125,13 @@ final class str_word_count extends Internal
                 : $this->jitString($context, $args[2], 'str_word_count() argument #3');
         }
 
-        return JitStrWordCount::wordHashTableRuntime($context, $str, $formatVal, $charsVal);
+        if (1 === $argc) {
+            return JitStrWordCount::count($context, $str);
+        }
+        if (null !== $formatCt && 0 === (int) $formatCt) {
+            return JitStrWordCount::count($context, $str);
+        }
+
+        return JitStrWordCount::wordHashTable($context, $str, $formatVal, $charsVal);
     }
 }
