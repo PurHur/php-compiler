@@ -44,6 +44,13 @@ class Context {
     public array $functions = [];
     public array $functionProxies = [];
 
+    /**
+     * Lowercase logical callee => optional #[\NoDiscard] message (#5663).
+     *
+     * @var array<string, string|null>
+     */
+    public array $noDiscardCalleeMessages = [];
+
     /** @var array<int, Call> lazy initializer proxies keyed by __object__.lazy_init_index (#4940, #5318) */
     public array $lazyInitProxies = [];
     /** @var array<string, true> JIT stubs registered for external Class::method (issue #579). */
