@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** time() — Unix timestamp (VM host clock; JIT/AOT via libc time(3)). */
+/** time() — Unix timestamp (VM via VmDate FFI time(3); JIT/AOT via libc time(3), #5045). */
 final class time extends Internal
 {
     public function execute(Frame $frame): void
