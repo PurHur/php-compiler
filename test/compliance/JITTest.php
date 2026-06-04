@@ -298,6 +298,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'exit_status_coercion')) {
                 continue;
             }
+            // exit([]) array-to-string warning — VM (#5441); JIT TYPE_EXIT deferred.
+            if (str_contains($name, 'exit_array_status')) {
+                continue;
+            }
             // class const scalar expressions — VM defineClass eval (#3567); JIT deferred.
             if (str_contains($name, 'class_const_scalar_expr')) {
                 continue;

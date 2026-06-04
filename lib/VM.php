@@ -1976,7 +1976,7 @@ restart:
                         $exitArg = $frame->scope[$op->arg2];
                     }
                     try {
-                        ext\standard\VmExit::terminate($exitArg);
+                        ext\standard\VmExit::terminate($exitArg, $frame);
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
