@@ -40,6 +40,7 @@ final class EnumVMTest extends BaseTest
                 'enum_case_fetch_object_int.phpt',
                 'enum_strval.phpt',
                 'clone_enum_case.phpt',
+                'enum_bitwise_shift_unary_typeerror.phpt',
                 'enum_case_incdec_type_error.phpt',
                 'enum_case_attributes.phpt',
                 'enum_in_operator.phpt',

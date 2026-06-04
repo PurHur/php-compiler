@@ -1740,6 +1740,9 @@ restart:
             goto restart;
         }
         if (OpCode::TYPE_SHIFT_LEFT === $opCode || OpCode::TYPE_SHIFT_RIGHT === $opCode) {
+            if (!self::operandsValidForBitwiseOp($left, $right)) {
+                self::throwUnsupportedOperandTypes($opCode, $left, $right);
+            }
             $this->int($this->_bitwiseOp($opCode, $left->toNumeric(), $right->toNumeric()));
 
             return;
@@ -2150,18 +2153,25 @@ restart:
 
                 return;
             case OpCode::TYPE_UNARY_MINUS:
-                if ($expr->type === Variable::TYPE_INTEGER) {
-                    $this->copyFrom($expr);
+                $resolved = $expr->resolveIndirect();
+                if (self::isEnumCaseOperand($resolved)) {
+                    throw new \TypeError(sprintf(
+                        'Unsupported operand types: %s * int',
+                        self::operandZendTypeName($resolved)
+                    ));
+                }
+                if ($resolved->type === Variable::TYPE_INTEGER) {
+                    $this->copyFrom($resolved);
                     $this->integer *= -1;
                     return;
                 }
-                if ($expr->type === Variable::TYPE_FLOAT) {
-                    $this->copyFrom($expr);
+                if ($resolved->type === Variable::TYPE_FLOAT) {
+                    $this->copyFrom($resolved);
                     $this->float *= -1.0;
 
                     return;
                 }
-                $number = self::coerceUnaryPlusOperand($expr->resolveIndirect(), $vm, $frame);
+                $number = self::coerceUnaryPlusOperand($resolved, $vm, $frame);
                 if (is_int($number)) {
                     $this->int(-$number);
                 } else {
@@ -2170,18 +2180,25 @@ restart:
 
                 return;
             case OpCode::TYPE_BITWISE_NOT:
-                if ($expr->type === self::TYPE_INTEGER) {
-                    $this->int(~$expr->integer);
+                $resolved = $expr->resolveIndirect();
+                if (self::isEnumCaseOperand($resolved)) {
+                    throw new \TypeError(sprintf(
+                        'Cannot perform bitwise not on %s',
+                        self::operandEnumClassName($resolved)
+                    ));
+                }
+                if ($resolved->type === self::TYPE_INTEGER) {
+                    $this->int(~$resolved->integer);
 
                     return;
                 }
-                if ($expr->type === self::TYPE_FLOAT) {
-                    $this->int(~(int) $expr->float);
+                if ($resolved->type === self::TYPE_FLOAT) {
+                    $this->int(~(int) $resolved->float);
 
                     return;
                 }
-                if ($expr->type === self::TYPE_STRING) {
-                    $bytes = $expr->string;
+                if ($resolved->type === self::TYPE_STRING) {
+                    $bytes = $resolved->string;
                     $out = '';
                     for ($i = 0, $len = strlen($bytes); $i < $len; $i++) {
                         $out .= chr((~ord($bytes[$i])) & 0xFF);
@@ -2190,13 +2207,13 @@ restart:
 
                     return;
                 }
-                if ($expr->type === self::TYPE_BOOLEAN || $expr->type === self::TYPE_NULL) {
+                if ($resolved->type === self::TYPE_BOOLEAN || $resolved->type === self::TYPE_NULL) {
                     throw new \TypeError(sprintf(
                         'Cannot perform bitwise not on %s',
-                        self::TYPE_BOOLEAN === $expr->type ? 'bool' : 'null'
+                        self::TYPE_BOOLEAN === $resolved->type ? 'bool' : 'null'
                     ));
                 }
-                $this->castFrom(self::CAST_NUMERIC, $expr);
+                $this->castFrom(self::CAST_NUMERIC, $resolved);
                 goto restart;
         }
         throw new \LogicException("UnaryOp $opCode not implemented for type $expr->type");
