@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\Frame;
+use PHPCompiler\ext\standard\NativeLastError;
 use PHPCompiler\ext\standard\VmErrorHandler;
 
 /**
@@ -42,9 +43,6 @@ final class ErrorReporter
 
     /** @var list<array{0: Variable, 1: int}> */
     private array $handlerStack = [];
-
-    /** @var array{type: int, message: string, file: string, line: int}|null */
-    private ?array $lastError = null;
 
     public function __construct(
         int $errorReporting = E_ALL,
@@ -99,53 +97,19 @@ final class ErrorReporter
         return $this->silenceDepth > 0;
     }
 
-    /**
-     * @return array{type: int, message: string, file: string, line: int}|null
-     */
-    public function getLastError(): ?array
-    {
-        return $this->lastError;
-    }
-
     public function clearLastError(): void
     {
-        $this->lastError = null;
+        NativeLastError::clear();
     }
 
     public function recordLastError(int $type, string $message, ?string $file, int $line): void
     {
-        $this->lastError = [
-            'type' => $type,
-            'message' => $message,
-            'file' => null !== $file ? $file : '',
-            'line' => $line,
-        ];
+        NativeLastError::record($type, $message, $file, $line);
     }
 
     public function getLastErrorVariable(): Variable
     {
-        $out = new Variable();
-        if (null === $this->lastError) {
-            $out->null();
-
-            return $out;
-        }
-        $ht = new HashTable();
-        $typeVar = new Variable(Variable::TYPE_INTEGER);
-        $typeVar->int($this->lastError['type']);
-        $ht->add('type', $typeVar);
-        $messageVar = new Variable(Variable::TYPE_STRING);
-        $messageVar->string($this->lastError['message']);
-        $ht->add('message', $messageVar);
-        $fileVar = new Variable(Variable::TYPE_STRING);
-        $fileVar->string($this->lastError['file']);
-        $ht->add('file', $fileVar);
-        $lineVar = new Variable(Variable::TYPE_INTEGER);
-        $lineVar->int($this->lastError['line']);
-        $ht->add('line', $lineVar);
-        $out->array($ht);
-
-        return $out;
+        return NativeLastError::getLastErrorVariable();
     }
 
     public function pushHandler(Variable $callback, int $mask): ?Variable

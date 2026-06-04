@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\LastErrorRuntime;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -15,6 +16,7 @@ final class JitErrorGetLast
 {
     public static function invoke(Context $context): Value
     {
+        LastErrorRuntime::ensureLinked($context);
         $resultSlot = JitValueBox::alloc($context);
         $resultPtr = JitValueBox::pointer($context, $resultSlot);
         $i32 = $context->getTypeFromString('int32');
@@ -53,6 +55,7 @@ final class JitErrorGetLast
 
     public static function clear(Context $context): void
     {
+        LastErrorRuntime::ensureLinked($context);
         $context->builder->call($context->lookupFunction('__phpc_last_error_clear'));
     }
 }
