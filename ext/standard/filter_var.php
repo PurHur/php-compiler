@@ -14,7 +14,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /** filter_var() subset — FILTER_VALIDATE_INT and FILTER_VALIDATE_EMAIL (issue #104). */
-final class filter_var extends Internal
+class filter_var extends Internal
 {
     public function execute(Frame $frame): void
     {
