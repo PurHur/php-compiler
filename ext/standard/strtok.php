@@ -32,7 +32,12 @@ final class strtok extends Internal
             return;
         }
         $arg0 = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $arg0->type) {
+        $str = null;
+        if (Variable::TYPE_NULL === $arg0->type) {
+            $str = null;
+        } elseif (Variable::TYPE_STRING === $arg0->type) {
+            $str = $arg0->toString();
+        } else {
             throw new \LogicException('strtok() argument #1 must be a string in this compiler build');
         }
         $tok = null;
@@ -43,7 +48,7 @@ final class strtok extends Internal
             }
             $tok = $arg1->toString();
         }
-        $result = VmString::strtok($arg0->toString(), $tok);
+        $result = VmString::strtok($str, $tok);
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {
@@ -66,10 +71,15 @@ final class strtok extends Internal
             );
         }
 
+        $tok = $this->jitString($context, $args[1], 'strtok() token');
+        if (JITVariable::TYPE_NULL === $args[0]->type) {
+            return JitStrtok::tokenize($context, null, $tok);
+        }
+
         return JitStrtok::tokenize(
             $context,
             $this->jitString($context, $args[0], 'strtok() string'),
-            $this->jitString($context, $args[1], 'strtok() token')
+            $tok
         );
     }
 }

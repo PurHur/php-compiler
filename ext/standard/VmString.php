@@ -3798,9 +3798,14 @@ final class VmString
      *
      * @return string|false
      */
-    public static function strtok(string $str, ?string $tok = null): string|false
+    public static function strtok(?string $str, ?string $tok = null): string|false
     {
-        if (null !== $tok) {
+        if (null === $str) {
+            if (null === $tok || null === self::$strtokString) {
+                return false;
+            }
+            $delimiter = $tok;
+        } elseif (null !== $tok) {
             self::$strtokString = $str;
             self::$strtokLast = 0;
             $delimiter = $tok;
