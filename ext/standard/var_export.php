@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ValueEchoHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -136,6 +137,11 @@ final class var_export extends Internal
         if (Variable::TYPE_ARRAY === $v->type) {
             return self::exportVmArray($v->toArray(), $level);
         }
+        if (Variable::TYPE_ENUM_CASE === $v->type) {
+            $case = $v->toEnumCase();
+
+            return self::exportVmEnumCaseLiteral($case->enumClass->name, $case->caseName);
+        }
         if (Variable::TYPE_OBJECT === $v->type) {
             return self::exportVmObject($v, $level);
         }
@@ -143,9 +149,20 @@ final class var_export extends Internal
         throw new \LogicException('var_export() does not support this value type in this compiler build');
     }
 
+    /**
+     * Zend var_export() for enum cases: {@code \EnumName::Case} (zend_enum.c / var.c).
+     */
+    private static function exportVmEnumCaseLiteral(string $enumClassName, string $caseName): string
+    {
+        return '\\'.ltrim($enumClassName, '\\').'::'.$caseName;
+    }
+
     private static function exportVmObject(Variable $v, int $level): string
     {
         $object = $v->resolveIndirect()->toObject();
+        if (EnumCaseSupport::isEnumCase($object)) {
+            return self::exportVmEnumCaseLiteral($object->class->name, $object->enumCaseName ?? '');
+        }
         $className = $object->class->name;
         $props = VmReflection::getObjectVars($v);
         $exported = self::exportVmArray($props->toArray(), $level);
