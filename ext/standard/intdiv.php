@@ -20,7 +20,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * intdiv() — integer division (php-src ext/standard/math.c; #4982 numeric-string parity).
+ * intdiv() — integer division (php-src ext/standard/math.c; #4982 numeric-string, #5360 float truncation).
  */
 final class intdiv extends Internal
 {

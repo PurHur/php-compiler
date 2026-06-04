@@ -15,7 +15,7 @@ use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for intdiv() operand coercion (php-src math.c; #4982). */
+/** LLVM lowering for intdiv() operand coercion (php-src math.c; #4982, #5360). */
 final class JitIntdiv
 {
     public static function lowerOperands(Context $context, JITVariable $num1, JITVariable $num2): array
@@ -46,9 +46,7 @@ final class JitIntdiv
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
-            self::emitIntTypeErrorAndAbort($context, $argIndex, $paramName, 'float');
-
-            return $context->getTypeFromString('int64')->constInt(0, false);
+            return self::lowerNativeDoubleOperand($context, $arg, $argIndex, $paramName);
         }
         if (JITVariable::TYPE_STRING === $arg->type) {
             return self::lowerStringOperand($context, $arg, $argIndex, $paramName);
@@ -136,7 +134,10 @@ final class JitIntdiv
         $context->builder->branchIf($isDouble, $doubleBlock, $stringBlock);
 
         $context->builder->positionAtEnd($doubleBlock);
-        self::emitIntTypeErrorAndAbort($context, $argIndex, $paramName, 'float');
+        $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr);
+        $truncated = self::lowerFiniteDoubleToLong($context, $doubleVal, $argIndex, $paramName);
+        $doubleEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($stringBlock);
         $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringTy);
@@ -157,10 +158,45 @@ final class JitIntdiv
         $context->builder->positionAtEnd($mergeBlock);
         $phi = $context->builder->phi($i64, 'intdiv_box_phi');
         $phi->addIncoming($zero, $nullBlock);
+        $phi->addIncoming($truncated, $doubleEnd);
         $phi->addIncoming($strLong, $stringEnd);
         $phi->addIncoming($longVal, $coerceEnd);
 
         return $phi;
+    }
+
+    private static function lowerNativeDoubleOperand(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        $doubleVal = $context->helper->loadValue($arg);
+
+        return self::lowerFiniteDoubleToLong($context, $doubleVal, $argIndex, $paramName);
+    }
+
+    private static function lowerFiniteDoubleToLong(
+        Context $context,
+        Value $doubleVal,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        $i32 = $context->getTypeFromString('int32');
+        $finite = $context->builder->call($context->lookupFunction('isfinite'), $doubleVal);
+        $isFinite = $context->builder->icmp(
+            Builder::INT_NE,
+            $finite,
+            $i32->constInt(0, false)
+        );
+        $okBlock = BasicBlockHelper::append($context, 'intdiv_dbl_ok');
+        $errBlock = BasicBlockHelper::append($context, 'intdiv_dbl_err');
+        $context->builder->branchIf($isFinite, $okBlock, $errBlock);
+        $context->builder->positionAtEnd($errBlock);
+        self::emitIntTypeErrorAndAbort($context, $argIndex, $paramName, 'float');
+        $context->builder->positionAtEnd($okBlock);
+
+        return $context->builder->fptosi($doubleVal, $context->getTypeFromString('int64'));
     }
 
     private static function lowerStringOperandFromPtr(
