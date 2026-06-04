@@ -16,7 +16,6 @@ final class Linker
         __DIR__.'/runtime/superglobals_refresh.c',
         __DIR__.'/runtime/phpc_env_local.c',
         __DIR__.'/runtime/phpc_pending_headers.c',
-        __DIR__.'/runtime/superglobal_name.c',
         __DIR__.'/runtime/function_exists.c',
         __DIR__.'/runtime/phpc_get_defined_functions.c',
         __DIR__.'/runtime/hash_crypto.c',
