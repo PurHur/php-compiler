@@ -3051,8 +3051,14 @@ class Compiler {
         $constOp->classConstVisibilityFlags = property_exists($child, 'flags')
             ? (int) $child->flags
             : CfgFunc::FLAG_PUBLIC;
-        if (property_exists($child, 'isEnumCase')) {
-            $constOp->isEnumCaseDeclare = $child->isEnumCase;
+        if (property_exists($child, 'isEnumCase') && $child->isEnumCase) {
+            $constOp->isEnumCaseDeclare = true;
+        } elseif (
+            null !== $this->compilingClassLc
+            && \array_key_exists($this->compilingClassLc, $this->compileTimeEnumBackedTypes)
+        ) {
+            // Enum body constants are always cases (php-cfg isEnumCase optional; #5514, #5570).
+            $constOp->isEnumCaseDeclare = true;
         }
         $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $constOp->attributeNames = AttributeNames::fromOp($child);

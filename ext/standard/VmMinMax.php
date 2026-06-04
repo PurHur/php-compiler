@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -22,6 +23,22 @@ final class VmMinMax
         self::reduce($frame, 'max', false);
     }
 
+    /**
+     * Two-argument fast path for enum case operands (#5570).
+     */
+    public static function tryReduceEnumCasesTwoArg(Frame $frame, bool $pickMin): bool
+    {
+        if (2 !== \count($frame->calledArgs) || null === $frame->returnVar) {
+            return false;
+        }
+        $values = [
+            $frame->calledArgs[0]->resolveIndirect(),
+            $frame->calledArgs[1]->resolveIndirect(),
+        ];
+
+        return self::finishEnumCaseReduce($frame, $values, $pickMin);
+    }
+
     private static function reduce(Frame $frame, string $name, bool $pickMin): void
     {
         $argc = \count($frame->calledArgs);
@@ -37,6 +54,10 @@ final class VmMinMax
         }
 
         if (null === $frame->returnVar) {
+            return;
+        }
+
+        if (self::finishEnumCaseReduce($frame, $values, $pickMin)) {
             return;
         }
 
@@ -83,6 +104,46 @@ final class VmMinMax
         } else {
             $frame->returnVar->int($bestInt ?? 0);
         }
+    }
+
+    /**
+     * @param list<Variable> $values
+     */
+    private static function finishEnumCaseReduce(Frame $frame, array $values, bool $pickMin): bool
+    {
+        $context = $frame->vmContext;
+        if (null === $context) {
+            return false;
+        }
+
+        $enumClass = null;
+        $normalized = [];
+        foreach ($values as $raw) {
+            $case = EnumCaseSupport::normalizeEnumCaseOperand($raw, $context, $enumClass);
+            if (null === $case) {
+                return false;
+            }
+            $class = EnumCaseSupport::enumClassForCaseVariable($case);
+            if (null === $class) {
+                return false;
+            }
+            if (null !== $enumClass && $enumClass !== $class) {
+                return false;
+            }
+            $enumClass = $class;
+            $normalized[] = $case;
+        }
+
+        $best = $normalized[0];
+        foreach (\array_slice($normalized, 1) as $candidate) {
+            $cmp = EnumCaseSupport::compareEnumCasesForMinMax($candidate, $best);
+            if ($pickMin ? $cmp < 0 : $cmp > 0) {
+                $best = $candidate;
+            }
+        }
+        $frame->returnVar->copyFrom($best);
+
+        return true;
     }
 
     /**
