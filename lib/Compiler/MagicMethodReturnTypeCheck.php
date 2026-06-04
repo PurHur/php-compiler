@@ -43,6 +43,22 @@ final class MagicMethodReturnTypeCheck
                         );
                     }
                     break;
+                case '__sleep':
+                    if ($this->hasExplicitReturnType($returnType) && !$this->isExactArrayType($returnType)) {
+                        $this->fatal(
+                            $member,
+                            "{$classDisplay}::__sleep(): Return type must be array when declared"
+                        );
+                    }
+                    break;
+                case '__wakeup':
+                    if ($this->hasExplicitReturnType($returnType) && !$this->isVoidType($returnType)) {
+                        $this->fatal(
+                            $member,
+                            "{$classDisplay}::__wakeup(): Return type must be void when declared"
+                        );
+                    }
+                    break;
                 case '__serialize':
                     if ($this->hasExplicitReturnType($returnType) && !$this->isExactArrayType($returnType)) {
                         $this->fatal(

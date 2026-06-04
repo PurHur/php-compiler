@@ -24,6 +24,23 @@ final class MagicMethodReturnTypeCheckTest extends TestCase
     /** @return iterable<string, array{0: string, 1: string}> */
     public static function invalidMagicMethodProvider(): iterable
     {
+        yield '__sleep int' => [
+            <<<'PHP'
+<?php
+class C0 { public function __sleep(): int { return 0; } }
+PHP,
+            'C0::__sleep(): Return type must be array when declared',
+        ];
+        yield '__wakeup stdClass' => [
+            <<<'PHP'
+<?php
+class C0b {
+    public function __sleep(): array { return []; }
+    public function __wakeup(): stdClass {}
+}
+PHP,
+            'C0b::__wakeup(): Return type must be void when declared',
+        ];
         yield '__serialize int' => [
             <<<'PHP'
 <?php
@@ -75,6 +92,8 @@ PHP,
 <?php
 class Good {
     public function __construct() {}
+    public function __sleep(): array { return []; }
+    public function __wakeup(): void {}
     public function __serialize(): array { return []; }
     public function __unserialize(array $d): void {}
     public function __clone(): void {}
