@@ -1448,6 +1448,17 @@ restart:
                         break;
                     }
                     $arg3 = $frame->scope[$op->arg3];
+                    if (Variable::TYPE_STRING_OFFSET === $container->type) {
+                        $catchFrame = $this->dispatchVmError(
+                            'Cannot use string offset as an array',
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     if ($container->type === Variable::TYPE_STRING) {
                         $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
                         $byteIndex = Variable::stringOffsetIndexFromDim(
