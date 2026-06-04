@@ -69,10 +69,11 @@ final class array_combine extends Internal
             $key = $keys[$i];
             $stored = new Variable();
             $stored->copyFrom($values[$i]);
+            // Zend array_combine: duplicate keys keep the last value (ext/standard/array.c).
             if (Variable::TYPE_INTEGER === $key->type) {
-                $ht->addIndex($key->toInt(), $stored);
+                $ht->updateIndex($key->toInt(), $stored);
             } elseif (Variable::TYPE_STRING === $key->type) {
-                $ht->add($key->toString(), $stored);
+                $ht->update($key->toString(), $stored);
             } else {
                 throw new \LogicException('array_combine() keys must be integers or strings in this compiler build');
             }
