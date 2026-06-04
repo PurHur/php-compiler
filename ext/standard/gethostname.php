@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** gethostname() — local hostname (VM via host; JIT/AOT via __compiler_gethostname, issue #3465). */
+/** gethostname() — local hostname (VM via VmHost; JIT/AOT via libc gethostname(2), #3465/#5952). */
 final class gethostname extends Internal
 {
     public function __construct()
