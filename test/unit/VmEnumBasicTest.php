@@ -77,6 +77,35 @@ PHP;
         $this->assertSame('D', $ctx->classes['suit']->enumCases[1]['value']->toString());
     }
 
+    public function testBackedEnumCasesCallUnpack(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int {
+    case A = 1;
+    case B = 2;
+}
+function names(...$args): void {
+    foreach ($args as $case) {
+        if (!$case instanceof E) {
+            echo '?';
+            continue;
+        }
+        echo $case->name;
+    }
+}
+names(...E::cases());
+names(...[E::A, E::B]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_cases_call_unpack.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame('ABAB', $output);
+    }
+
     public function testBackedEnumCasesSpread(): void
     {
         $code = <<<'PHP'
