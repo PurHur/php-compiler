@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -56,6 +56,11 @@ final class hash_ extends Internal
         }
         $raw = $context->getTypeFromString('int1')->constInt(0, false);
         if (isset($args[2])) { $raw = JitBoolArg::lower($context, $args[2], 'hash() raw_output'); }
-        return JitHash::hash($context, JitStringArg::lower($context, $args[0], 'hash() algorithm'), JitStringArg::lower($context, $args[1], 'hash() data'), $raw);
+        return JitHash::hash(
+            $context,
+            JitStringBuiltinArg::lower($context, $args[0], 'hash', 0, 'algo'),
+            JitStringBuiltinArg::lower($context, $args[1], 'hash', 1, 'data'),
+            $raw
+        );
     }
 }

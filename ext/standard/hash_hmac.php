@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -25,16 +25,9 @@ final class hash_hmac extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $algo = $frame->calledArgs[0]->resolveIndirect();
-        $data = $frame->calledArgs[1]->resolveIndirect();
-        $key = $frame->calledArgs[2]->resolveIndirect();
-        if (
-            Variable::TYPE_STRING !== $algo->type
-            || Variable::TYPE_STRING !== $data->type
-            || Variable::TYPE_STRING !== $key->type
-        ) {
-            throw new \LogicException('hash_hmac() requires string algorithm, data, and key in this compiler build');
-        }
+        $algo = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hash_hmac', 0, 'algo');
+        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'hash_hmac', 1, 'data');
+        $key = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'hash_hmac', 2, 'key');
         $raw = false;
         if (4 === $argc) {
             $rawArg = $frame->calledArgs[3]->resolveIndirect();
@@ -43,7 +36,7 @@ final class hash_hmac extends Internal
             }
             $raw = $rawArg->toBool();
         }
-        $result = VmHash::hashHmac($algo->toString(), $data->toString(), $key->toString(), $raw);
+        $result = VmHash::hashHmac($algo, $data, $key, $raw);
         if (false === $result) {
             $frame->returnVar->bool(false);
 
@@ -59,6 +52,12 @@ final class hash_hmac extends Internal
         }
         $raw = $context->getTypeFromString('int1')->constInt(0, false);
         if (isset($args[3])) { $raw = JitBoolArg::lower($context, $args[3], 'hash_hmac() raw_output'); }
-        return JitHash::hashHmac($context, JitStringArg::lower($context, $args[0], 'hash_hmac() algorithm'), JitStringArg::lower($context, $args[1], 'hash_hmac() data'), JitStringArg::lower($context, $args[2], 'hash_hmac() key'), $raw);
+        return JitHash::hashHmac(
+            $context,
+            JitStringBuiltinArg::lower($context, $args[0], 'hash_hmac', 0, 'algo'),
+            JitStringBuiltinArg::lower($context, $args[1], 'hash_hmac', 1, 'data'),
+            JitStringBuiltinArg::lower($context, $args[2], 'hash_hmac', 2, 'key'),
+            $raw
+        );
     }
 }

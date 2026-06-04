@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -29,10 +30,7 @@ final class md5 extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $data = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $data->type) {
-            throw new \LogicException('md5() only supports strings in this compiler build');
-        }
+        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'md5', 0, 'string');
         $raw = false;
         if (2 === $argc) {
             $rawArg = $frame->calledArgs[1]->resolveIndirect();
@@ -41,7 +39,7 @@ final class md5 extends Internal
             }
             $raw = $rawArg->toBool();
         }
-        $result = VmHash::hash('md5', $data->toString(), $raw);
+        $result = VmHash::hash('md5', $data, $raw);
         if (false === $result) {
             $frame->returnVar->bool(false);
 
@@ -60,6 +58,10 @@ final class md5 extends Internal
             $raw = JitBoolArg::lower($context, $args[1], 'md5() raw_output');
         }
 
-        return JitMd5::digest($context, $this->jitString($context, $args[0], 'md5() argument #1'), $raw);
+        return JitMd5::digest(
+            $context,
+            JitStringBuiltinArg::lower($context, $args[0], 'md5', 0, 'string'),
+            $raw
+        );
     }
 }
