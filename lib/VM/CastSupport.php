@@ -23,9 +23,23 @@ final class CastSupport
             return $result;
         }
 
-        if (Variable::TYPE_OBJECT === $src->type) {
+        if (Variable::TYPE_ENUM_CASE === $src->type) {
             $result->newArray();
-            self::objectToArray($src->toObject(), $result->toArray(), $classesByLc ?? []);
+            self::enumCaseEntryToArray($src->toEnumCase(), $result->toArray());
+
+            return $result;
+        }
+
+        if (Variable::TYPE_OBJECT === $src->type) {
+            $obj = $src->toObject();
+            if (EnumCaseSupport::isEnumCase($obj)) {
+                $result->newArray();
+                self::enumCaseObjectToArray($obj, $result->toArray());
+
+                return $result;
+            }
+            $result->newArray();
+            self::objectToArray($obj, $result->toArray(), $classesByLc ?? []);
 
             return $result;
         }
@@ -48,6 +62,31 @@ final class CastSupport
         $result->toArray()->append($copy);
 
         return $result;
+    }
+
+    /** Zend {@see zend_enum_to_array()} — unit/backed enum case (array) cast (#5536). */
+    private static function enumCaseEntryToArray(EnumCaseEntry $entry, HashTable $ht): void
+    {
+        $nameVar = new Variable(Variable::TYPE_STRING);
+        $nameVar->string($entry->caseName);
+        $ht->add('name', $nameVar);
+        if (null !== $entry->enumClass->backedType) {
+            $valueVar = new Variable();
+            $valueVar->copyFrom($entry->backingValue);
+            $ht->add('value', $valueVar);
+        }
+    }
+
+    private static function enumCaseObjectToArray(ObjectEntry $obj, HashTable $ht): void
+    {
+        $nameVar = new Variable(Variable::TYPE_STRING);
+        $nameVar->string($obj->enumCaseName ?? '');
+        $ht->add('name', $nameVar);
+        if (null !== $obj->class->backedType && null !== $obj->enumCaseValue) {
+            $valueVar = new Variable();
+            $valueVar->copyFrom($obj->enumCaseValue);
+            $ht->add('value', $valueVar);
+        }
     }
 
     /**
