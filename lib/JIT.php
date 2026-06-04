@@ -6935,6 +6935,16 @@ class JIT {
                         $this->context->runtime->vmContext->enums[strtolower($nameOp->value)] = true;
                     }
                     $this->compileClass($op->block1, $this->context->scope->classId);
+                    if ([] !== $op->classImplements) {
+                        $this->context->type->object->setClassInterfaces(
+                            $nameOp->value,
+                            $op->classImplements
+                        );
+                    }
+                    $this->context->type->object->inheritInterfaceConstants(
+                        $this->context->scope->classId,
+                        $nameOp->value
+                    );
                     $this->context->type->object->finishEnumClass($this->context->scope->classId);
                     $this->context->popScope();
                     break;
