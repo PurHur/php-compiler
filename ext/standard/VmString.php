@@ -3347,7 +3347,7 @@ final class VmString
     public static function strrpos(string $haystack, string $needle, int $offset = 0)
     {
         if ('' === $needle) {
-            throw new \LogicException('strrpos(): Argument #2 ($needle) cannot be empty');
+            throw new \ValueError('strrpos(): Argument #2 ($needle) must not be empty');
         }
         $hayLen = self::byteLength($haystack);
         $minStart = 0;
