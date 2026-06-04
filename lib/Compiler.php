@@ -6462,6 +6462,92 @@ class Compiler {
     }
 
     /**
+     * php-cfg lowers `return null` to ConstFetch + Temporary; trailing include/call
+     * may appear as Terminal_Return with a non-literal operand (#5367, #739).
+     */
+    private function voidFunctionReturnIsPhpCfgArtifact(Op\Terminal\Return_ $terminal, Block $block): bool
+    {
+        $expr = $terminal->expr;
+        if (null === $expr) {
+            return true;
+        }
+        if (null !== $this->funcCallExecReturnSlotForReturn($block, $expr)) {
+            return true;
+        }
+        if ($expr instanceof Operand\Literal || $expr instanceof Operand\Variable) {
+            return false;
+        }
+        if ($expr instanceof Operand\Temporary) {
+            $producer = $this->findCfgProducerForReturnOperand($block->orig, $expr);
+
+            return $producer instanceof Op\Expr\Include_;
+        }
+
+        return true;
+    }
+
+    private function voidFunctionReturnValueErrorMessage(?Operand $expr, Block $block): string
+    {
+        $base = 'A void function must not return a value';
+        if (null === $expr) {
+            return $base;
+        }
+        if ($expr instanceof Operand\Literal && $this->isNullLiteralOperand($expr)) {
+            return $base.' (did you mean "return;" instead of "return null;"?)';
+        }
+        if (
+            ($expr instanceof Operand\Temporary || $expr instanceof Operand\Variable)
+            && $this->isNullConstFetchReturnTemporary($block->orig, $expr)
+        ) {
+            return $base.' (did you mean "return;" instead of "return null;"?)';
+        }
+
+        return $base;
+    }
+
+    private function isNullLiteralOperand(Operand\Literal $literal): bool
+    {
+        if (null !== $literal->type && Type::TYPE_NULL === $literal->type->type) {
+            return true;
+        }
+
+        return 'null' === strtolower((string) ($literal->value ?? ''));
+    }
+
+    private function isNullConstFetchReturnTemporary(CfgBlock $cfgBlock, Operand $returnExpr): bool
+    {
+        $producer = $this->findCfgProducerForReturnOperand($cfgBlock, $returnExpr);
+        if (!$producer instanceof Op\Expr\ConstFetch) {
+            return false;
+        }
+        $name = $this->staticNameFromOperand($producer->name);
+
+        return 'null' === strtolower((string) $name);
+    }
+
+    private function findCfgProducerForReturnOperand(CfgBlock $cfgBlock, Operand $returnExpr): ?Op
+    {
+        $returnRoot = Block::cfgVarRoot($returnExpr);
+        foreach ($cfgBlock->children as $child) {
+            if (!($child instanceof Op\Expr)) {
+                continue;
+            }
+            $result = $child->result;
+            if (!$result instanceof Operand) {
+                continue;
+            }
+            if ($result === $returnExpr) {
+                return $child;
+            }
+            if (null !== $returnRoot && Block::cfgVarRoot($result) === $returnRoot) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @return list<OpCode>
      */
     protected function compileTerminal(Op\Terminal $terminal, Block $block): array {
@@ -6496,16 +6582,14 @@ class Compiler {
                     )];
                 }
                 if ($block->returnTypeVoid) {
-                    if (
-                        !$terminal->expr instanceof Operand\Literal
-                        && !$terminal->expr instanceof Operand\Variable
-                    ) {
-                        // php-cfg may lower trailing include/call expr as return in void bodies.
+                    if ($this->voidFunctionReturnIsPhpCfgArtifact($terminal, $block)) {
                         return [new OpCode(
                             OpCode::TYPE_RETURN_VOID
                         )];
                     }
-                    $this->throwCompileError('A void function must not return a value');
+                    $this->throwCompileError(
+                        $this->voidFunctionReturnValueErrorMessage($terminal->expr, $block)
+                    );
                 }
 
                 $callResultSlot = $this->funcCallExecReturnSlotForReturn($block, $terminal->expr);
