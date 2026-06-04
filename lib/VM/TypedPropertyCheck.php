@@ -9,6 +9,19 @@ namespace PHPCompiler\VM;
  */
 final class TypedPropertyCheck
 {
+    /**
+     * Zend php_get_object_vars / convert_to_array: skip null and uninitialized typed slots.
+     */
+    public static function omitFromPropertyEnumeration(Variable $var): bool
+    {
+        $target = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $target->type) {
+            return true;
+        }
+
+        return self::isUninitialized($target);
+    }
+
     public static function isUninitialized(Variable $var): bool
     {
         $target = $var->resolveIndirect();

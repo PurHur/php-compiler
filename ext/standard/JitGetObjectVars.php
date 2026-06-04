@@ -179,11 +179,18 @@ final class JitGetObjectVars
         );
         $i8 = $context->getTypeFromString('int8');
 
-        return $context->builder->icmp(
+        $notNull = $context->builder->icmp(
             Builder::INT_NE,
             $typeByte,
             $i8->constInt(JITVariable::TYPE_NULL, false)
         );
+        $notUndefined = $context->builder->icmp(
+            Builder::INT_NE,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED, false)
+        );
+
+        return $context->builder->and($notNull, $notUndefined);
     }
 
     private static function storePropertyAtStringKey(
