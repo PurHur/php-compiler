@@ -5,23 +5,32 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Func\Internal as FuncInternal;
-use PHPCompiler\JIT\Builtin\GetDefinedFunctionsRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for get_defined_functions() (issue #3128). */
+/** LLVM lowering for get_defined_functions() / get_declared_functions() (issue #3128). */
 final class JitGetDefinedFunctions
 {
     public static function invoke(Context $context): Value
     {
-        GetDefinedFunctionsRuntime::ensureLinked($context);
-        $userNames = self::collectUserFunctionNames($context);
-        $userHt = self::emitUserFunctionNames($context, $userNames);
-        $rootHt = $context->builder->call(
-            $context->lookupFunction('__compiler_get_defined_functions_merge'),
+        $internalHt = self::emitFunctionNames($context, VmReflection::internalFunctionNameList());
+        $userHt = self::emitFunctionNames($context, self::collectUserFunctionNames($context));
+
+        $rootHt = HashTableHelper::alloc($context);
+        $setHashtable = $context->lookupFunction('__hashtable__setStringKeyHashtable');
+        $context->builder->call(
+            $setHashtable,
+            $rootHt,
+            $context->builder->load($context->constantStringFromString('internal')),
+            $internalHt
+        );
+        $context->builder->call(
+            $setHashtable,
+            $rootHt,
+            $context->builder->load($context->constantStringFromString('user')),
             $userHt
         );
 
@@ -52,7 +61,7 @@ final class JitGetDefinedFunctions
     /**
      * @param list<string> $names
      */
-    private static function emitUserFunctionNames(Context $context, array $names): Value
+    private static function emitFunctionNames(Context $context, array $names): Value
     {
         $ht = HashTableHelper::alloc($context);
         foreach ($names as $index => $name) {
