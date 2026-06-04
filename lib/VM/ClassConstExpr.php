@@ -35,7 +35,8 @@ final class ClassConstExpr
             OpCode::TYPE_BOOLEAN_NOT,
             OpCode::TYPE_CONCAT,
             OpCode::TYPE_CONST_FETCH,
-            OpCode::TYPE_CLASS_CONST_FETCH => true,
+            OpCode::TYPE_CLASS_CONST_FETCH,
+            OpCode::TYPE_ARRAY_DIM_FETCH => true,
             default => false,
         };
     }
@@ -83,6 +84,9 @@ final class ClassConstExpr
                 break;
             case OpCode::TYPE_CLASS_CONST_FETCH:
                 self::executeClassConstFetch($context, $frame, $op, $entry);
+                break;
+            case OpCode::TYPE_ARRAY_DIM_FETCH:
+                self::executeArrayDimFetch($context, $frame, $block, $op);
                 break;
             default:
                 throw new \LogicException(
@@ -191,6 +195,47 @@ final class ClassConstExpr
             );
         }
         $frame->scope[$op->arg1]->copyFrom($entry->constants[$constName]);
+    }
+
+    private static function executeArrayDimFetch(
+        Context $context,
+        Frame $frame,
+        Block $block,
+        OpCode $op
+    ): void {
+        if (null === $op->arg3) {
+            throw new \LogicException('[] append is not supported in class constant expressions');
+        }
+        $container = self::resolveValue($frame, $block, $op->arg2);
+        if (Variable::TYPE_ARRAY !== $container->type) {
+            $msg = TypeCheck::cannotUseBracketOn($container);
+            if (null !== $msg) {
+                throw new \TypeError($msg);
+            }
+            throw new \LogicException('[] is only supported for arrays in class constant expressions');
+        }
+        $dim = self::resolveValue($frame, $block, $op->arg3);
+        $dimVar = new Variable();
+        $dimVar->copyFrom($dim);
+        $table = $container->toArray();
+        if (!$table->keyExists($dimVar)) {
+            $context->errors->undefinedArrayKey(
+                $dimVar,
+                $context,
+                $frame,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null
+            );
+            $frame->scope[$op->arg1]->null();
+
+            return;
+        }
+        $elem = $table->findVariable($dimVar, false);
+        if (null === $elem) {
+            $frame->scope[$op->arg1]->null();
+
+            return;
+        }
+        $frame->scope[$op->arg1]->copyFrom($elem->resolveIndirect());
     }
 
     private static function resolveClassName(Context $context, ClassEntry $entry, string $className): string

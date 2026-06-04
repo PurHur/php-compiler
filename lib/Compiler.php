@@ -2981,6 +2981,20 @@ class Compiler {
                     return $block->registerConstant(new Operand\Temporary(), $vm);
                 }
             }
+            if (
+                2 === \count($children)
+                && $children[0] instanceof Op\Expr\ClassConstFetch
+                && $children[1] instanceof Op\Expr\ArrayDimFetch
+            ) {
+                $vm = $this->tryFoldClassConstArraySubscriptExpr(
+                    $children[0],
+                    $children[1],
+                    $block
+                );
+                if (null !== $vm) {
+                    return $block->registerConstant(new Operand\Temporary(), $vm);
+                }
+            }
         }
         $vm = $this->vmVariableFromCfgLiteralOperand($terminal->value);
         if (null === $vm) {
@@ -2988,6 +3002,39 @@ class Compiler {
         }
 
         return $block->registerConstant(new Operand\Temporary(), $vm);
+    }
+
+    /**
+     * Fold {@code self::ARR[1]} in class constant scalar expressions (#5465, zend_compile.c).
+     */
+    protected function tryFoldClassConstArraySubscriptExpr(
+        Op\Expr\ClassConstFetch $fetch,
+        Op\Expr\ArrayDimFetch $dimFetch,
+        Block $block
+    ): ?Variable {
+        if (null === $dimFetch->dim) {
+            return null;
+        }
+        $base = $this->tryFoldClassConstFetchDefault($fetch, $block);
+        if (null === $base || !$base->is(Variable::TYPE_ARRAY)) {
+            return null;
+        }
+        $dimVm = $this->vmVariableFromCfgLiteralOperand($dimFetch->dim);
+        if (null === $dimVm) {
+            return null;
+        }
+        $table = $base->toArray();
+        if (!$table->keyExists($dimVm)) {
+            return null;
+        }
+        $elem = $table->findVariable($dimVm, false);
+        if (null === $elem) {
+            return null;
+        }
+        $value = new Variable();
+        $value->copyFrom($elem->resolveIndirect());
+
+        return $value;
     }
 
     protected function verifyClassConstCompileTimeType(Operand $nameOp, Variable $value, Type $declared): void
