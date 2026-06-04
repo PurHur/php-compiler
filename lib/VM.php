@@ -1247,6 +1247,11 @@ restart:
                     // ArrayDimFetch / property fetch temps are indirect to live storage; write the
                     // reference into that cell instead of redirecting the temp (#5349).
                     $writeTarget = $lhs->isIndirect() ? $lhs->directIndirectTarget() : $lhs;
+                    // Zend: Class::$prop = &Class::$prop stores NULL, not a circular ref (#5405).
+                    if ($writeTarget === $rhs && $this->isStaticPropertyStorageCell($writeTarget)) {
+                        $writeTarget->null();
+                        break;
+                    }
                     // Object property / static / nested ref slots are live storage (Zend FE_FETCH_R,
                     // #5245). Main-script globals use an indirect wrapper — still need a shared ref
                     // cell so unset($a) does not destroy $b (#5368).
@@ -5914,6 +5919,20 @@ restart:
         }
 
         return null;
+    }
+
+    /** True when $cell is a class static property slot (not a frame local). */
+    private function isStaticPropertyStorageCell(Variable $cell): bool
+    {
+        foreach ($this->context->classes as $entry) {
+            foreach ($entry->staticProperties as $storage) {
+                if ($storage === $cell) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     protected function resolveClassScopeName(string $className, Frame $frame): string
