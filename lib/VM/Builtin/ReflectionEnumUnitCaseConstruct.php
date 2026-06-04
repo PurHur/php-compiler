@@ -38,8 +38,6 @@ final class ReflectionEnumUnitCaseConstruct extends VmClassMethod
             $enumEntry->enumCaseCanonicalNames[$caseLc]
         );
         $receiver->constructed = true;
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->null();
-        }
+        // Do not touch returnVar: it may alias the `new ReflectionEnumUnitCase()` result slot (#1885, #5699).
     }
 }
