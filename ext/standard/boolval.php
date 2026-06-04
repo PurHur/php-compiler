@@ -147,6 +147,7 @@ final class boolval extends Internal
             case Variable::TYPE_ARRAY:
                 return $v->toArray()->getNumElements() > 0;
             case Variable::TYPE_OBJECT:
+            case Variable::TYPE_ENUM_CASE:
                 return true;
             default:
                 throw new \LogicException('boolval() does not support this value type in this compiler build');

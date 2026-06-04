@@ -557,6 +557,8 @@ final class Variable {
                 }
 
                 return $this->objectToScalarString($vm, 'bool')->toBool($vm);
+            case self::TYPE_ENUM_CASE:
+                return true;
         }
         throw new \LogicException("Cannot convert type {$this->type} to bool");
     }
