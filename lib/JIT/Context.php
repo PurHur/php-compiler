@@ -634,6 +634,7 @@ class Context {
         if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
             Builtin\TypeErrorRaise::ensureStandaloneBodies($this);
             Builtin\ErrorRaise::ensureStandaloneBodies($this);
+            Builtin\ReadonlyRaise::ensureStandaloneBodies($this);
         }
 
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();
