@@ -81,6 +81,22 @@ PHP;
         $this->assertSame("2\n", ob_get_clean());
     }
 
+    public function testClassCannotOverrideFinalTraitConstant(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T { final public const X = 1; }
+class C { use T; public const X = 2; }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(
+            'C and T define the same constant (X) in the composition of C. '
+            .'However, the definition differs and is considered incompatible. Class was composed'
+        );
+        $runtime->parseAndCompile($code, 'trait_final_const_override.php');
+    }
+
     public function testInheritedFinalFromGrandparentBlocksChild(): void
     {
         $runtime = new Runtime();

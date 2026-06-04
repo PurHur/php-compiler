@@ -10,15 +10,17 @@ use PHPCfg\Script;
 use PhpParser\Node\Stmt\Class_ as ClassNode;
 
 /**
- * Compile-time check: cannot override parent/interface final class constants (#4455).
+ * Compile-time check: cannot override parent/interface final class constants (#4455);
+ * class cannot redefine final trait constants at composition (#5426).
  *
  * php-src: Zend/zend_compile.c — zend_compile_const_decl;
- * Zend/zend_inheritance.c — constant override checks
+ * Zend/zend_inheritance.c — constant override checks;
+ * Zend/zend_traits.c — zend_traits_compile_role_constants
  */
 final class FinalClassConstCheck
 {
     /**
-     * @var array<string, array{display: string, constants: array<string, array{final: bool, display: string}>, extends: ?string, implements: list<string>, ifaceExtends: list<string>}>
+     * @var array<string, array{display: string, constants: array<string, array{final: bool, display: string}>, extends: ?string, implements: list<string>, ifaceExtends: list<string>, traitUses: list<string>}>
      */
     private array $types = [];
 
@@ -67,6 +69,7 @@ final class FinalClassConstCheck
             'extends' => $parentLc,
             'implements' => $implements,
             'ifaceExtends' => [],
+            'traitUses' => $this->collectTraitUses($class->stmts->children),
         ];
     }
 
@@ -89,6 +92,7 @@ final class FinalClassConstCheck
             'extends' => null,
             'implements' => [],
             'ifaceExtends' => $extends,
+            'traitUses' => [],
         ];
     }
 
@@ -104,6 +108,7 @@ final class FinalClassConstCheck
             'extends' => null,
             'implements' => [],
             'ifaceExtends' => [],
+            'traitUses' => $this->collectTraitUses($trait->stmts->children),
         ];
     }
 
@@ -126,7 +131,31 @@ final class FinalClassConstCheck
             'extends' => null,
             'implements' => $implements,
             'ifaceExtends' => [],
+            'traitUses' => $this->collectTraitUses($enum->stmts->children),
         ];
+    }
+
+    /**
+     * @param list<Op> $members
+     *
+     * @return list<string>
+     */
+    private function collectTraitUses(array $members): array
+    {
+        $traits = [];
+        foreach ($members as $member) {
+            if (!$member instanceof Op\Stmt\TraitUse) {
+                continue;
+            }
+            foreach ($member->traits as $traitOperand) {
+                $traitLc = $this->operandLcName($traitOperand);
+                if (null !== $traitLc) {
+                    $traits[] = $traitLc;
+                }
+            }
+        }
+
+        return $traits;
     }
 
     /**
@@ -189,6 +218,36 @@ final class FinalClassConstCheck
                     $constInfo['display'],
                     $inheritedFinals[$constLc]['ownerDisplay'],
                     $inheritedFinals[$constLc]['constDisplay']
+                ));
+            }
+            $this->verifyTraitFinalConstantOverrides($type);
+        }
+    }
+
+    /**
+     * @param array{display: string, constants: array<string, array{final: bool, display: string}>, traitUses: list<string>} $type
+     */
+    private function verifyTraitFinalConstantOverrides(array $type): void
+    {
+        if ([] === $type['traitUses']) {
+            return;
+        }
+        foreach ($type['traitUses'] as $traitLc) {
+            if (!isset($this->types[$traitLc])) {
+                continue;
+            }
+            $trait = $this->types[$traitLc];
+            foreach ($trait['constants'] as $constLc => $traitConst) {
+                if (!$traitConst['final'] || !isset($type['constants'][$constLc])) {
+                    continue;
+                }
+                throw new \CompileError(sprintf(
+                    '%s and %s define the same constant (%s) in the composition of %s. '
+                    .'However, the definition differs and is considered incompatible. Class was composed',
+                    $type['display'],
+                    $trait['display'],
+                    $traitConst['display'],
+                    $type['display']
                 ));
             }
         }
