@@ -859,6 +859,11 @@ final class Variable {
                 break;
             case Variable::TYPE_STRING:
                 $src = $var->resolveIndirect();
+                if (self::TYPE_ENUM_CASE === $src->type) {
+                    throw new \Error(
+                        'Object of class '.$src->toEnumCase()->enumClass->name.' could not be converted to string'
+                    );
+                }
                 if (self::TYPE_OBJECT === $src->type && null !== $vm) {
                     $this->string = $vm->castObjectToString($src->toObject());
                 } else {
