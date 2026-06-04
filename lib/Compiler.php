@@ -99,6 +99,9 @@ class Compiler {
     /** @var array<string, ?string> lowercase enum name => backing type (`int`/`string`) while compiling enum body */
     private array $compileTimeEnumBackedTypes = [];
 
+    /** @var array<string, array<string, true>> lowercase enum => lowercase `case` names (#5054) */
+    private array $compileTimeEnumCaseConstNames = [];
+
     /** @var array<string, array<string, true>> lowercase class => declared static property names (#3814). */
     private array $compiledClassStaticProperties = [];
 
@@ -317,6 +320,7 @@ class Compiler {
         $this->abstractClasses = [];
         $this->abstractEnums = [];
         $this->compileTimeEnumBackedTypes = [];
+        $this->compileTimeEnumCaseConstNames = [];
         $this->haltCompilerRemaining = null;
         $this->haltCompilerOffset = null;
         $this->compiledClassStaticProperties = [];
@@ -2317,6 +2321,9 @@ class Compiler {
             if (!isset($this->compileTimeEnumBackedTypes[$this->compilingClassLc])) {
                 $this->compileTimeEnumBackedTypes[$this->compilingClassLc] = null;
             }
+            if (!isset($this->compileTimeEnumCaseConstNames[$this->compilingClassLc])) {
+                $this->compileTimeEnumCaseConstNames[$this->compilingClassLc] = [];
+            }
         } else {
             $this->compilingClassDisplayName = null;
         }
@@ -3078,12 +3085,12 @@ class Compiler {
             : CfgFunc::FLAG_PUBLIC;
         if (property_exists($child, 'isEnumCase') && $child->isEnumCase) {
             $constOp->isEnumCaseDeclare = true;
-        } elseif (
-            null !== $this->compilingClassLc
-            && \array_key_exists($this->compilingClassLc, $this->compileTimeEnumBackedTypes)
-        ) {
-            // Enum body constants are always cases (php-cfg isEnumCase optional; #5514, #5570).
-            $constOp->isEnumCaseDeclare = true;
+            if (null !== $this->compilingClassLc) {
+                $constName = $this->staticNameFromOperand($child->name);
+                if (null !== $constName) {
+                    $this->compileTimeEnumCaseConstNames[$this->compilingClassLc][strtolower($constName)] = true;
+                }
+            }
         }
         $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $constOp->attributeNames = AttributeNames::fromOp($child);
@@ -3128,9 +3135,15 @@ class Compiler {
         return EnumCaseSupport::createCase($entry, $caseName, $backing);
     }
 
-    private function compileTimeStoredValueIsEnumCaseBackingScalar(string $lcClass, Variable $stored): bool
-    {
+    private function compileTimeStoredValueIsEnumCaseBackingScalar(
+        string $lcClass,
+        string $lcConst,
+        Variable $stored
+    ): bool {
         if (!array_key_exists($lcClass, $this->compileTimeEnumBackedTypes)) {
+            return false;
+        }
+        if (!isset($this->compileTimeEnumCaseConstNames[$lcClass][$lcConst])) {
             return false;
         }
         if (Variable::TYPE_OBJECT === $stored->type && EnumCaseSupport::isEnumCase($stored->toObject())) {
@@ -3740,7 +3753,7 @@ class Compiler {
         $lcConst = strtolower($constName);
         if (isset($this->compileTimeClassConsts[$lcClass][$lcConst])) {
             $stored = $this->compileTimeClassConsts[$lcClass][$lcConst];
-            if ($this->compileTimeStoredValueIsEnumCaseBackingScalar($lcClass, $stored)) {
+            if ($this->compileTimeStoredValueIsEnumCaseBackingScalar($lcClass, $lcConst, $stored)) {
                 return $this->compileTimeEnumCaseVar(
                     $className,
                     $constName,
