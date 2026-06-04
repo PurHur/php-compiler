@@ -38,6 +38,9 @@ final class int_min extends Internal
             if (null === $frame->returnVar) {
                 return;
             }
+            if (VmMinMax::tryReduceEnumCasesTwoArg($frame, true)) {
+                return;
+            }
             if (Variable::TYPE_INTEGER === $a->type && Variable::TYPE_INTEGER === $b->type) {
                 $ai = $a->toInt();
                 $bi = $b->toInt();

@@ -211,6 +211,118 @@ final class EnumCaseSupport
         return $stored->is(Variable::TYPE_INTEGER) || $stored->is(Variable::TYPE_STRING);
     }
 
+    /**
+     * Ordering for min()/max() on enum case operands (php-src ext/standard/array.c php_min_max).
+     *
+     * Backed enums: compare backing scalars. Unit enums: declaration order in enumCases.
+     *
+     * @return int spaceship (-1, 0, 1)
+     */
+    public static function compareEnumCasesForMinMax(Variable $left, Variable $right): int
+    {
+        [$leftClass, $leftName] = self::resolveEnumCaseIdentity($left);
+        [$rightClass, $rightName] = self::resolveEnumCaseIdentity($right);
+        if (null === $leftClass || null === $rightClass || $leftClass !== $rightClass) {
+            throw new \LogicException('compareEnumCasesForMinMax requires same-enum case operands');
+        }
+        if (null !== $leftClass->backedType) {
+            $leftBacking = self::backingValueForMinMax($left);
+            $rightBacking = self::backingValueForMinMax($right);
+
+            return Variable::spaceshipCompare($leftBacking, $rightBacking);
+        }
+
+        return self::enumCaseDeclarationOrdinal($leftClass, $leftName)
+            <=> self::enumCaseDeclarationOrdinal($rightClass, $rightName);
+    }
+
+    /**
+     * Normalize operand to a canonical enum case variable when possible (#5570).
+     *
+     * @param ClassEntry|null $expectedEnum when set, scalars are resolved only for this enum
+     */
+    public static function normalizeEnumCaseOperand(
+        Variable $value,
+        Context $context,
+        ?ClassEntry $expectedEnum = null
+    ): ?Variable {
+        $value = $value->resolveIndirect();
+        if (self::isEnumCaseVariable($value)) {
+            return $value;
+        }
+        if (null === $expectedEnum || null === $expectedEnum->backedType) {
+            return null;
+        }
+        $match = BackedEnum::caseForValue($expectedEnum, $value);
+        if (null === $match) {
+            return null;
+        }
+
+        return BackedEnum::canonicalCaseVariable($expectedEnum, $match->caseName) ?? self::enumCaseEntryToVariable($match);
+    }
+
+    public static function isEnumCaseVariable(Variable $value): bool
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_ENUM_CASE === $value->type) {
+            return true;
+        }
+
+        return Variable::TYPE_OBJECT === $value->type && self::isEnumCase($value->toObject());
+    }
+
+    public static function enumClassForCaseVariable(Variable $value): ?ClassEntry
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_ENUM_CASE === $value->type) {
+            return $value->toEnumCase()->enumClass;
+        }
+        if (Variable::TYPE_OBJECT === $value->type && self::isEnumCase($value->toObject())) {
+            return $value->toObject()->class;
+        }
+
+        return null;
+    }
+
+    private static function enumCaseEntryToVariable(EnumCaseEntry $entry): Variable
+    {
+        return self::createCase($entry->enumClass, $entry->caseName, $entry->backingValue);
+    }
+
+    private static function backingValueForMinMax(Variable $value): Variable
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_ENUM_CASE === $value->type) {
+            $backing = new Variable();
+            $backing->copyFrom($value->toEnumCase()->backingValue);
+
+            return $backing;
+        }
+        if (Variable::TYPE_OBJECT === $value->type && self::isEnumCase($value->toObject())) {
+            $object = $value->toObject();
+            if (null === $object->enumCaseValue) {
+                throw new \LogicException('Backed enum case object missing backing value');
+            }
+            $backing = new Variable();
+            $backing->copyFrom($object->enumCaseValue);
+
+            return $backing;
+        }
+
+        throw new \LogicException('backingValueForMinMax requires enum case variable');
+    }
+
+    private static function enumCaseDeclarationOrdinal(ClassEntry $enum, string $caseName): int
+    {
+        foreach ($enum->enumCases as $index => $case) {
+            if ($case['name'] === $caseName) {
+                return $index;
+            }
+        }
+
+        return -1;
+    }
+
     /** Loose/identical == for TYPE_OBJECT / TYPE_ENUM_CASE enum operands (#4700). */
     public static function enumCaseVariablesEqual(Variable $left, Variable $right): bool
     {
