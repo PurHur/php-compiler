@@ -190,6 +190,7 @@ class Type extends Builtin {
         ObOutput::registerExternals($this->context);
         PowIntRuntime::ensureLinked($this->context);
         GethostbynamelRuntime::ensureLinked($this->context);
+        TimeSleepRuntime::ensureLinked($this->context);
         ErrorHandlerOutput::registerExternals($this->context);
         StreamContextOutput::registerExternals($this->context);
         CallArgv::implement($this->context);
