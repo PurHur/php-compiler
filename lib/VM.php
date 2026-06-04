@@ -4908,6 +4908,11 @@ restart:
      */
     private function assertMethodCallableStatically(ClassEntry $declaringClass, string $methodLc): void
     {
+        if ($declaringClass->isEnum && 'cases' === $methodLc) {
+            VM\EnumSupport::ensureBuiltinCasesMethod($declaringClass);
+
+            return;
+        }
         $vis = $declaringClass->methodVisibility[$methodLc] ?? 0;
         if (($vis & \PHPCfg\Func::FLAG_STATIC) !== 0) {
             return;
@@ -6157,6 +6162,14 @@ restart:
         $class = $this->context->classes[$lcClass];
         $frame->staticCallClass = $class->name;
         $methodLc = strtolower($methodName);
+        if ($class->isEnum && 'cases' === $methodLc) {
+            VM\EnumSupport::ensureBuiltinCasesMethod($class);
+            $frame->call = $class->methods['cases'];
+            $frame->callArgs = [];
+            $frame->callArgEntries = [];
+
+            return;
+        }
         if ($class->isEnum && null !== $class->backedType && ('from' === $methodLc || 'tryfrom' === $methodLc)) {
             $frame->call = new VM\EnumFromHandler($class, 'tryfrom' === $methodLc);
             $frame->callArgs = [];
@@ -7134,6 +7147,9 @@ restart:
             $this->linkPropertyHooks($entry, $prop);
         }
         $this->linkStaticPropertyHooks($entry);
+        if ($entry->isEnum) {
+            VM\EnumSupport::ensureBuiltinCasesMethod($entry);
+        }
     }
 
     private function resolveClassConstDefineValue(Frame $frame, Block $block, OpCode $op): Variable

@@ -12,11 +12,12 @@ final class EnumSupport
 {
     public static function ensureBuiltinCasesMethod(ClassEntry $entry): void
     {
-        if (isset($entry->methods['cases'])) {
+        if (!$entry->isEnum) {
             return;
         }
         $entry->methods['cases'] = new EnumCases($entry);
         $entry->methodVisibility['cases'] = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;
+        $entry->methodNames['cases'] ??= 'cases';
     }
 
     /** Zend implicit UnitEnum / BackedEnum on all enums (#3550). */

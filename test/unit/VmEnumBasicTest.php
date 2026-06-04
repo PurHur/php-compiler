@@ -76,4 +76,24 @@ PHP;
         $this->assertSame('Hearts', $ctx->classes['suit']->enumCases[0]['name']);
         $this->assertSame('D', $ctx->classes['suit']->enumCases[1]['value']->toString());
     }
+
+    public function testBackedEnumCasesSpread(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int {
+    case A = 1;
+    case B = 2;
+}
+echo count(E::cases());
+echo count([...E::cases()]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_cases_spread.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame('22', $output);
+    }
 }
