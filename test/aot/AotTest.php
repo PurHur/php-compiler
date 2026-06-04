@@ -51,6 +51,17 @@ class AotTest extends BaseTest
         return self::$llvmReady;
     }
 
+    public static function providePHPTests(): \Generator
+    {
+        foreach (parent::providePHPTests() as $name => $case) {
+            if (!CompilerVersion::supportsStrIncrement()
+                && (str_contains($name, 'str_increment') || str_contains($name, 'str_decrement'))) {
+                continue;
+            }
+            yield $name => $case;
+        }
+    }
+
     /**
      * @dataProvider providePHPTests
      */
