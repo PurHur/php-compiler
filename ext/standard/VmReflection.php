@@ -12,6 +12,7 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\EnumSupport;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\TypedPropertyCheck;
@@ -222,7 +223,18 @@ final class VmReflection
 
     public static function methodExistsOnClass(ClassEntry $class, string $method): bool
     {
-        return isset($class->methods[strtolower($method)]);
+        $methodLc = strtolower($method);
+        if ($class->isEnum) {
+            EnumSupport::ensureBuiltinCasesMethod($class);
+            if ('cases' === $methodLc) {
+                return true;
+            }
+            if (null !== $class->backedType && ('from' === $methodLc || 'tryfrom' === $methodLc)) {
+                return true;
+            }
+        }
+
+        return isset($class->methods[$methodLc]);
     }
 
     public static function propertyExistsOnClass(ClassEntry $class, string $property): bool
@@ -573,7 +585,15 @@ final class VmReflection
             return $entry;
         }
         if (Variable::TYPE_OBJECT === $arg->type) {
-            return $arg->toObject()->class;
+            $object = $arg->toObject();
+            if (EnumCaseSupport::isEnumCase($object)) {
+                return EnumSupport::resolveRuntimeEnumClass($ctx, $object->class);
+            }
+
+            return $object->class;
+        }
+        if (Variable::TYPE_ENUM_CASE === $arg->type) {
+            return EnumSupport::resolveRuntimeEnumClass($ctx, $arg->toEnumCase()->enumClass);
         }
         throw new \LogicException('Expected object or class name string in this compiler build');
     }
