@@ -909,7 +909,6 @@
         "lib/JIT/Builtin/SplAutoloadOutput.php",
         "lib/JIT/Builtin/StreamContextOutput.php",
         "lib/JIT/Builtin/StringAddslashes.php",
-        "lib/JIT/Builtin/StringCountChars.php",
         "lib/JIT/Builtin/StringCslashes.php",
         "lib/JIT/Builtin/StringDateTime.php",
         "lib/JIT/Builtin/StringDeployPath.php",

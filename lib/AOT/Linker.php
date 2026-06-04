@@ -40,7 +40,6 @@ final class Linker
         __DIR__.'/runtime/filter_validate.c',
         __DIR__.'/runtime/phpc_fs_dir.c',
         __DIR__.'/runtime/phpc_dir.c',
-        __DIR__.'/runtime/phpc_count_chars.c',
         __DIR__.'/runtime/phpc_gethostname.c',
         __DIR__.'/runtime/phpc_network_services.c',
         __DIR__.'/runtime/phpc_getrusage.c',

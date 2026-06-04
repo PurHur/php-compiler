@@ -1123,7 +1123,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/MathBaseConvert.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MemoryManager/EmbedMcjit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MethodRegistry.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringCountChars.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringCslashes.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringCslashesJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringDir.php';
