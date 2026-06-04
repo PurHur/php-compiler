@@ -3193,7 +3193,7 @@ class Compiler {
         if (null !== $terminal->valueBlock && [] !== $terminal->valueBlock->children) {
             $children = $terminal->valueBlock->children;
             if (1 === \count($children) && $children[0] instanceof Op\Expr\Array_) {
-                $vm = $this->tryBuildCompileTimeArrayFromExpr($children[0]);
+                $vm = $this->tryBuildCompileTimeArrayFromExpr($children[0], $block, $children, true);
                 if (null !== $vm) {
                     return $block->registerConstant(new Operand\Temporary(), $vm);
                 }
@@ -6014,7 +6014,8 @@ class Compiler {
     protected function tryBuildCompileTimeArrayFromExpr(
         Op\Expr\Array_ $expr,
         ?Block $block = null,
-        array $defaultBlockChildren = []
+        array $defaultBlockChildren = [],
+        bool $materializeEnumCase = false
     ): ?Variable
     {
         $unpackFlags = property_exists($expr, 'unpack') ? $expr->unpack : [];
@@ -6025,7 +6026,8 @@ class Compiler {
                 $spreadVm = $this->compileTimeVariableFromCfgArrayElement(
                     $expr->values[$i],
                     $block,
-                    $defaultBlockChildren
+                    $defaultBlockChildren,
+                    $materializeEnumCase
                 );
                 if (null === $spreadVm || !$spreadVm->is(Variable::TYPE_ARRAY)) {
                     return null;
@@ -6037,7 +6039,8 @@ class Compiler {
             $valueVm = $this->compileTimeVariableFromCfgArrayElement(
                 $expr->values[$i],
                 $block,
-                $defaultBlockChildren
+                $defaultBlockChildren,
+                $materializeEnumCase
             );
             if (null === $valueVm) {
                 return null;
@@ -6080,21 +6083,32 @@ class Compiler {
     protected function compileTimeVariableFromCfgArrayElement(
         Operand $operand,
         ?Block $block = null,
-        array $defaultBlockChildren = []
+        array $defaultBlockChildren = [],
+        bool $materializeEnumCase = false
     ): ?Variable {
         $vm = $this->vmVariableFromCfgLiteralOperand($operand);
         if (null !== $vm) {
             return $vm;
         }
         if (null !== $block && [] !== $defaultBlockChildren) {
-            $vm = $this->tryFoldCompileTimeOperandDefault($operand, $block, $defaultBlockChildren);
+            $vm = $this->tryFoldCompileTimeOperandDefault(
+                $operand,
+                $block,
+                $defaultBlockChildren,
+                $materializeEnumCase
+            );
             if (null !== $vm) {
                 return $vm;
             }
         }
         $nested = $this->unwrapCfgArrayExprOperand($operand);
         if (null !== $nested) {
-            return $this->tryBuildCompileTimeArrayFromExpr($nested, $block, $defaultBlockChildren);
+            return $this->tryBuildCompileTimeArrayFromExpr(
+                $nested,
+                $block,
+                $defaultBlockChildren,
+                $materializeEnumCase
+            );
         }
 
         return null;
