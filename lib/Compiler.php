@@ -73,6 +73,9 @@ class Compiler {
     /** Trailing source bytes after __halt_compiler(); (issue #3479). */
     private ?string $haltCompilerRemaining = null;
 
+    /** Byte offset where halt trailing data starts; null when no __halt_compiler() (#5455). */
+    private ?int $haltCompilerOffset = null;
+
     /** Lowercase class name while compiling a class body (#3803). */
     private ?string $compilingClassLc = null;
 
@@ -252,6 +255,12 @@ class Compiler {
         return $this->haltCompilerRemaining;
     }
 
+    /** Byte offset of halt trailing data; null when the unit has no __halt_compiler() (#5455). */
+    public function getHaltCompilerOffset(): ?int
+    {
+        return $this->haltCompilerOffset;
+    }
+
     /**
      * Marks the CFG construct that halted compilation before throwing LogicException (#2642).
      *
@@ -300,6 +309,7 @@ class Compiler {
         $this->abstractClasses = [];
         $this->abstractEnums = [];
         $this->haltCompilerRemaining = null;
+        $this->haltCompilerOffset = null;
         $this->compiledClassStaticProperties = [];
         $this->currentClassStaticPropertyCompile = null;
         $this->neverFunctionNames = [];
@@ -343,6 +353,10 @@ class Compiler {
         EnumMagicMethodCheck::validate($script);
         ReadonlyClassCompileCheck::validate($script);
         GeneratorStaticMethodCompileCheck::validate($script);
+
+        if (null !== $this->haltCompilerOffset) {
+            $main->haltCompilerOffset = $this->haltCompilerOffset;
+        }
 
         return $main;
     }
@@ -3860,6 +3874,7 @@ class Compiler {
         } elseif ($stmt instanceof Op\Stmt\HaltCompiler) {
             if (null === $this->haltCompilerRemaining) {
                 $this->haltCompilerRemaining = $stmt->remaining;
+                $this->haltCompilerOffset = $stmt->haltOffset;
             }
             $block->addOpCode(new OpCode(OpCode::TYPE_RETURN_VOID));
         } else {
@@ -4395,7 +4410,9 @@ class Compiler {
                     OpCode::TYPE_SCRIPT_MAGIC,
                     $this->compileOperand($expr->result, $block, false),
                     $line,
-                    $expr->kind,
+                    Op\Expr\MagicScriptConst::KIND_HALT_OFFSET === $expr->kind
+                        ? OpCode::SCRIPT_MAGIC_HALT_OFFSET
+                        : $expr->kind,
                 )];
             case Op\Expr\Include_::class:
                 return [$this->compileIncludeOp($expr, $block)];

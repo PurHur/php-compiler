@@ -113,6 +113,9 @@ class OpCode {
 
     public const SCRIPT_MAGIC_LINE = 3;
 
+    /** __COMPILER_HALT_OFFSET__ — byte offset of halt trailing data (#5455). */
+    public const SCRIPT_MAGIC_HALT_OFFSET = 4;
+
     /** include/require kind encoded for TYPE_INCLUDE (issue #4426). */
     public const INCLUDE_KIND_INCLUDE = 1;
     public const INCLUDE_KIND_INCLUDE_ONCE = 2;
