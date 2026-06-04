@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
 final class VmString
@@ -45,9 +46,16 @@ final class VmString
         if (Variable::TYPE_ARRAY === $var->type) {
             throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'array'));
         }
-        if (Variable::TYPE_ENUM_CASE === $var->type) {
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
+
             throw new \TypeError(
-                self::stringBuiltinTypeError($function, $argIndex, $paramName, $var->toEnumCase()->enumClass->name)
+                self::stringBuiltinTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    null !== $enumClass ? $enumClass->name : 'object'
+                )
             );
         }
         if (Variable::TYPE_OBJECT === $var->type) {
