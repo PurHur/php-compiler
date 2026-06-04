@@ -1,0 +1,39 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler;
+
+use PHPCompiler\ext\standard\VmReflection;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * intl module skeleton registration (issue #5774).
+ *
+ * @group intl_module_skeleton
+ */
+final class IntlModuleTest extends TestCase
+{
+    public function test_intl_module_skeleton_classes_and_function(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+
+        self::assertTrue(VmReflection::classExists($ctx, 'IntlDateFormatter'));
+        self::assertTrue(VmReflection::classExists($ctx, 'Collator'));
+        self::assertTrue(VmReflection::classExists($ctx, 'IntlException'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'intl_get_error_code'));
+
+        $code = <<<'PHP'
+<?php
+echo (int) class_exists('IntlDateFormatter', false);
+echo (int) class_exists('Collator', false);
+echo (int) function_exists('intl_get_error_code');
+echo intl_get_error_code();
+PHP;
+        $block = $runtime->parseAndCompile($code, 'intl_module.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('1110', ob_get_clean());
+    }
+}
