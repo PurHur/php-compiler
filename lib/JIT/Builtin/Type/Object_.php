@@ -954,10 +954,10 @@ class Object_ extends Type {
         }
         foreach ($this->propertyDefaults[$classId] as $slotIndex => $entry) {
             $slot = $this->propertySlotPtr($obj, $slotIndex);
-            $var = $this->jitConstantFromEntry([
-                'type' => $entry['type'],
-                'value' => $entry['value'],
-            ]);
+            $constEntry = isset($entry['global'])
+                ? ['type' => $entry['type'], 'global' => $entry['global']]
+                : ['type' => $entry['type'], 'value' => $entry['value']];
+            $var = $this->jitConstantFromEntry($constEntry);
             $this->propertyStore($slot, $var, $entry['propertyType']);
         }
     }
@@ -2862,6 +2862,22 @@ class Object_ extends Type {
             if ($propset[1] !== $name) {
                 continue;
             }
+            if (EnumCaseSupport::isEnumCaseVariable($value)) {
+                $enumClass = EnumCaseSupport::enumClassForCaseVariable($value);
+                if (null === $enumClass) {
+                    throw new \LogicException('Enum case property default requires enum class');
+                }
+                $enumClassId = $this->lookup(strtolower($enumClass->name));
+                $caseKey = strtolower(EnumCaseSupport::enumCaseNameForVariable($value));
+                $globalName = $this->ensureEnumCaseSingletonGlobal($enumClassId, $caseKey);
+                $this->propertyDefaults[$classId][$propset[3]] = [
+                    'propertyType' => $propset[2],
+                    'type' => Variable::TYPE_OBJECT,
+                    'global' => $globalName,
+                ];
+
+                return;
+            }
             $this->propertyDefaults[$classId][$propset[3]] = [
                 'propertyType' => $propset[2],
                 'type' => Variable::fromVMVariable($value->type),
@@ -2947,6 +2963,26 @@ class Object_ extends Type {
             $enumLc = $this->classNameForId($enumClassId);
             throw new \LogicException("Unknown enum case for class constant: {$enumLc}::{$caseKey}");
         }
+        $globalName = $this->ensureEnumCaseSingletonGlobal($enumClassId, $caseKey);
+        $this->classConstants[$holdingClassId][$constKey] = [
+            'type' => Variable::TYPE_OBJECT,
+            'global' => $globalName,
+        ];
+    }
+
+    /**
+     * Module-global enum case singleton used by class const / property default inits (#5891).
+     */
+    public function ensureEnumCaseSingletonGlobal(int $enumClassId, string $caseKey): string
+    {
+        $caseKey = strtolower($caseKey);
+        if (!$this->isEnumClassId($enumClassId)) {
+            throw new \LogicException('Enum case singleton requires an enum class id');
+        }
+        if ('' === $caseKey || !isset($this->classConstants[$enumClassId][$caseKey])) {
+            $enumLc = $this->classNameForId($enumClassId);
+            throw new \LogicException("Unknown enum case singleton: {$enumLc}::{$caseKey}");
+        }
         $globalName = 'php_compiler_enum_case_singleton_'.$enumClassId.'_'.$caseKey;
         if (!isset($this->classConstObjectGlobals[$globalName])) {
             $objPtrType = $this->context->getTypeFromString('__object__*');
@@ -2969,10 +3005,8 @@ class Object_ extends Type {
                 $ctx->builder->store($alloc, $global);
             });
         }
-        $this->classConstants[$holdingClassId][$constKey] = [
-            'type' => Variable::TYPE_OBJECT,
-            'global' => $globalName,
-        ];
+
+        return $globalName;
     }
 
     public function inheritInterfaceConstants(int $classId, string $className): void
@@ -3299,7 +3333,9 @@ class Object_ extends Type {
         if (Variable::TYPE_STRING === $jitType && null !== $default) {
             $this->initStaticStringPropertyDefault($global, $default);
         }
-        if (Variable::TYPE_VALUE === $jitType && (null === $default || VMVariable::TYPE_NULL === $default->type)) {
+        if (Variable::TYPE_VALUE === $jitType && null !== $default && EnumCaseSupport::isEnumCaseVariable($default)) {
+            $this->initStaticValuePropertyEnumCase($global, $default);
+        } elseif (Variable::TYPE_VALUE === $jitType && (null === $default || VMVariable::TYPE_NULL === $default->type)) {
             $this->initStaticValuePropertyNull($global);
         }
     }
@@ -3362,6 +3398,37 @@ class Object_ extends Type {
         );
         $this->context->builder->store($heapPtr, $global);
         $this->context->builder->positionAtEnd($restore);
+    }
+
+    /** Box a compile-time enum case singleton into a typed static {@see __value__} property (#5891). */
+    private function initStaticValuePropertyEnumCase(\PHPLLVM\Value $global, VMVariable $default): void
+    {
+        $enumClass = EnumCaseSupport::enumClassForCaseVariable($default);
+        if (null === $enumClass) {
+            throw new \LogicException('Static enum case property default requires enum class');
+        }
+        $enumClassId = $this->lookup(strtolower($enumClass->name));
+        $caseKey = strtolower(EnumCaseSupport::enumCaseNameForVariable($default));
+        $globalName = $this->ensureEnumCaseSingletonGlobal($enumClassId, $caseKey);
+        $this->context->emitInInit(function (Context $ctx) use ($global, $globalName): void {
+            $objGlobal = $ctx->module->getNamedGlobal($globalName);
+            if (null === $objGlobal) {
+                throw new \LogicException("Missing enum case singleton global: {$globalName}");
+            }
+            $valueType = $ctx->getTypeFromString('__value__');
+            $heapVal = $ctx->memory->malloc($valueType);
+            $heapPtr = $ctx->builder->pointerCast(
+                $heapVal,
+                $ctx->getTypeFromString('__value__*')
+            );
+            $obj = $ctx->builder->load($objGlobal);
+            $ctx->builder->call(
+                $ctx->lookupFunction('__value__writeObject'),
+                $heapPtr,
+                $obj
+            );
+            $ctx->builder->store($heapPtr, $global);
+        });
     }
 
     public function staticPropertyUnset(int $classId, string $name): void
