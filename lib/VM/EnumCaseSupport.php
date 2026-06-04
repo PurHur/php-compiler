@@ -133,6 +133,7 @@ final class EnumCaseSupport
         $entry = self::entryForInstanceOfCheck($value);
         if (null !== $entry) {
             $className = strtolower(ltrim($className, '\\'));
+            $entry = self::canonicalEnumClassEntryForInstanceOf($entry, $context);
 
             return InterfaceCheck::entryIsInstanceOf($entry, $className, $context)
                 || InterfaceCheck::entryImplements($entry, $className, $context);
@@ -171,6 +172,19 @@ final class EnumCaseSupport
         }
 
         return null;
+    }
+
+    /**
+     * Folded enum cases use a compile-time ClassEntry stub; use the declared entry when registered (#5711).
+     */
+    public static function canonicalEnumClassEntryForInstanceOf(ClassEntry $entry, Context $context): ClassEntry
+    {
+        if (!$entry->isEnum) {
+            return $entry;
+        }
+        $lc = strtolower($entry->name);
+
+        return $context->classes[$lc] ?? $entry;
     }
 
     /**
