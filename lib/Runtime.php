@@ -178,6 +178,7 @@ class Runtime {
         $this->load(new ext\types\Module);
         $this->load(new ext\spl\Module);
         $this->load(new ext\intl\Module);
+        $this->load(new ext\zip\Module);
         $this->load(new ext\mbstring\Module);
         $this->load(new ext\filter\Module);
         $this->load(new ext\bcmath\Module);
