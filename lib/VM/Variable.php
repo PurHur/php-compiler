@@ -498,6 +498,7 @@ final class Variable {
         TypedPropertyCheck::assertReadable($this);
         switch ($this->type) {
             case self::TYPE_NULL:
+            case self::TYPE_UNDEFINED:
                 return false;
             case self::TYPE_INTEGER:
                 return 0 !== $this->integer;
