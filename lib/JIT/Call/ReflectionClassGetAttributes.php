@@ -24,13 +24,7 @@ final class ReflectionClassGetAttributes implements Call
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
-        $objArg = $context->builder->pointerCast($obj, $i8p);
-
-        $outLen = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $classCstr = $context->builder->call($context->lookupFunction('phpc_reflect_get_class_name'), $objArg, $outLen);
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $classCstr, $classCstr->typeOf()->constNull());
-        $empty = $context->builder->pointerCast($context->constantFromString(''), $i8p);
-        $classSafe = $context->builder->select($isNull, $empty, $classCstr);
+        [$classSafe] = ReflectionSetup::reflectionClassNameAsCstr($context, $obj);
 
         $count = $context->builder->call($context->lookupFunction('phpc_attr_class_count'), $classSafe);
         $ht = HashTableHelper::alloc($context);
@@ -74,8 +68,12 @@ final class ReflectionClassGetAttributes implements Call
             $context->builder->pointerCast($namePtr, $i8p),
             $nameLen
         );
-        $emptyHt = HashTableHelper::alloc($context);
-        $argsVar = new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $emptyHt);
+        $argsHt = $context->builder->call(
+            $context->lookupFunction('phpc_attr_class_args_hashtable'),
+            $classSafe,
+            $i
+        );
+        $argsVar = new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $argsHt);
         $argsSlot = $context->type->object->propertySlotFor($attrObj, 'ReflectionAttribute', 'args');
         $context->type->object->propertyStore($argsSlot, $argsVar, Variable::TYPE_HASHTABLE);
         HashTableHelper::setAtIndex(

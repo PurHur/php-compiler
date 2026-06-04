@@ -24,18 +24,7 @@ final class ReflectionMethodGetAttributes implements Call
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
-        $objArg = $context->builder->pointerCast($obj, $i8p);
-
-        $outClassLen = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $classCstr = $context->builder->call($context->lookupFunction('phpc_reflect_get_method_class'), $objArg, $outClassLen);
-        $outMethodLen = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $methodCstr = $context->builder->call($context->lookupFunction('phpc_reflect_get_method_name'), $objArg, $outMethodLen);
-        $classNull = $context->builder->icmp(Builder::INT_EQ, $classCstr, $classCstr->typeOf()->constNull());
-        $methodNull = $context->builder->icmp(Builder::INT_EQ, $methodCstr, $methodCstr->typeOf()->constNull());
-        $anyNull = $context->builder->or($classNull, $methodNull);
-        $empty = $context->builder->pointerCast($context->constantFromString(''), $i8p);
-        $classSafe = $context->builder->select($anyNull, $empty, $classCstr);
-        $methodSafe = $context->builder->select($anyNull, $empty, $methodCstr);
+        [$classSafe, , $methodSafe] = ReflectionSetup::reflectionMethodClassAndMethodAsCstr($context, $obj);
 
         $count = $context->builder->call(
             $context->lookupFunction('phpc_attr_method_count'),

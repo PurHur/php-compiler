@@ -15,7 +15,6 @@ final class ReflectionRuntime
     /** @var list<string> */
     private const RUNTIME_SOURCES = [
         __DIR__.'/../../AOT/runtime/phpc_attr_registry.c',
-        __DIR__.'/../../AOT/runtime/phpc_reflection_attr.c',
     ];
 
     public static function ensureLinked(Context $context): void
@@ -32,7 +31,7 @@ final class ReflectionRuntime
             return;
         }
 
-        $probe = $context->module->getNamedFunction('phpc_reflect_set_class');
+        $probe = $context->module->getNamedFunction('phpc_attr_register_class_attrs');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             return;
         }
@@ -50,21 +49,12 @@ final class ReflectionRuntime
             }
         }
 
-        if (null === $context->module->getNamedFunction('phpc_reflect_set_class')) {
-            throw new \LogicException('phpc_reflect_set_class missing after reflection runtime link');
+        if (null === $context->module->getNamedFunction('phpc_attr_register_class_attrs')) {
+            throw new \LogicException('phpc_attr_register_class_attrs missing after reflection runtime link');
         }
 
         foreach (
             [
-                'phpc_reflect_set_class',
-                'phpc_reflect_get_class_name',
-                'phpc_reflect_set_method',
-                'phpc_reflect_get_method_class',
-                'phpc_reflect_get_method_name',
-                'phpc_reflect_set_attr_name',
-                'phpc_reflect_get_attr_name',
-                'phpc_reflect_set_attr_owner',
-                'phpc_reflect_get_attr_owner',
                 'phpc_attr_register_class_attrs',
                 'phpc_attr_register_method_attrs',
                 'phpc_attr_class_count',

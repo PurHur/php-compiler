@@ -436,22 +436,13 @@ final class ClosureBindHelper
 
     private static function runtimeClassNameFromObject(Context $context, Value $obj): Variable
     {
-        Builtin\ReflectionNative::registerDeclarations($context);
-        $i8p = $context->getTypeFromString('int8*');
         $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-        $lenSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $namePtr = $context->builder->call(
-            $context->lookupFunction('phpc_reflect_get_class_name'),
-            $context->builder->pointerCast($obj, $i8p),
-            $lenSlot
-        );
-        $len = $context->builder->load($lenSlot);
+        [$cstr, $len] = Builtin\ReflectionSetup::reflectionClassNameAsCstr($context, $obj);
         $len64 = $context->builder->zExt($len, $i64);
         $str = $context->builder->call(
             $context->lookupFunction('__string__init'),
             $len64,
-            $namePtr
+            $cstr
         );
         $var = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $str);
         $var->addref();

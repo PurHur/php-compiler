@@ -8,6 +8,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\ReflectionSupport;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -80,22 +81,47 @@ final class ReflectionSetup
 
     public static function emitSetClassFromStringVar(Context $context, Value $obj, Variable $nameVar): void
     {
-        $nameVar = JitNativeString::coerce($context, $nameVar);
-        $strPtr = $context->helper->loadValue($nameVar);
-        $i8p = $context->getTypeFromString('int8*');
-        $raw = $context->builder->pointerCast($strPtr, $i8p);
-        $lenPtr = $context->builder->pointerCast(
-            $context->builder->gep($raw, $context->constantFromInteger(8, 'size_t')),
-            $context->getTypeFromString('int64*')
+        self::emitSetStringPropertyFromVar(
+            $context,
+            $obj,
+            'ReflectionClass',
+            ReflectionSupport::PROP_CLASS_NAME,
+            $nameVar
         );
-        $len = $context->builder->load($lenPtr);
-        $data = $context->builder->gep($raw, $context->constantFromInteger(16, 'size_t'));
-        $context->builder->call(
-            $context->lookupFunction('phpc_reflect_set_class'),
-            $context->builder->pointerCast($obj, $i8p),
-            $context->builder->pointerCast($data, $i8p),
-            $context->builder->zExt($len, $context->getTypeFromString('size_t'))
+    }
+
+    /**
+     * @return array{0: Value, 1: Value} cstr pointer and byte length (size_t)
+     */
+    public static function reflectionClassNameAsCstr(Context $context, Value $obj): array
+    {
+        return self::stringPropertyAsCstr(
+            $context,
+            $obj,
+            'ReflectionClass',
+            ReflectionSupport::PROP_CLASS_NAME
         );
+    }
+
+    /**
+     * @return array{0: Value, 1: Value, 2: Value, 3: Value} class cstr/len, method cstr/len
+     */
+    public static function reflectionMethodClassAndMethodAsCstr(Context $context, Value $obj): array
+    {
+        [$classCstr, $classLen] = self::stringPropertyAsCstr(
+            $context,
+            $obj,
+            'ReflectionMethod',
+            ReflectionSupport::PROP_CLASS_NAME
+        );
+        [$methodCstr, $methodLen] = self::stringPropertyAsCstr(
+            $context,
+            $obj,
+            'ReflectionMethod',
+            ReflectionSupport::PROP_METHOD_NAME
+        );
+
+        return [$classCstr, $classLen, $methodCstr, $methodLen];
     }
 
     public static function emitSetStringPropertyFromVar(

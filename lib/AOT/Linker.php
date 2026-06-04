@@ -66,7 +66,6 @@ final class Linker
         __DIR__.'/runtime/phpc_stream_context.c',
         __DIR__.'/runtime/phpc_attr_registry.c',
         __DIR__.'/runtime/phpc_class_methods.c',
-        __DIR__.'/runtime/phpc_reflection_attr.c',
         __DIR__.'/runtime/phpc_cli_argv.c',
         __DIR__.'/runtime/phpc_gc.c',
     ];

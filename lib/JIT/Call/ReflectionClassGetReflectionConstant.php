@@ -25,14 +25,7 @@ final class ReflectionClassGetReflectionConstant implements Call
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
-        $objArg = $context->builder->pointerCast($obj, $i8p);
-        $outClassLen = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $classCstr = $context->builder->call($context->lookupFunction('phpc_reflect_get_class_name'), $objArg, $outClassLen);
-        $classLen = $context->builder->load($outClassLen);
-        $classNull = $context->builder->icmp(Builder::INT_EQ, $classCstr, $classCstr->typeOf()->constNull());
-        $empty = $context->builder->pointerCast($context->constantFromString(''), $i8p);
-        $classSafe = $context->builder->select($classNull, $empty, $classCstr);
-        $classLen = $context->builder->select($classNull, $sizeT->constInt(0, false), $classLen);
+        [$classSafe, $classLen] = ReflectionSetup::reflectionClassNameAsCstr($context, $obj);
 
         $constVar = JitNativeString::coerce($context, $args[1]);
         $rcClassId = $context->type->object->lookup('ReflectionConstant');

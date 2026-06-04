@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\JIT\Builtin\ReflectionNative;
-use PHPCompiler\JIT\Builtin\ReflectionRuntime;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -17,8 +15,6 @@ final class ReflectionClassConstruct implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
-        ReflectionRuntime::ensureLinked($context);
-        ReflectionNative::registerDeclarations($context);
         if (count($args) < 2) {
             throw new \LogicException('ReflectionClass::__construct() expects a class name argument');
         }
