@@ -545,6 +545,8 @@ final class Variable {
                 return $this->bool;
             case self::TYPE_STRING:
                 return '' !== $this->string && '0' !== $this->string;
+            case self::TYPE_ARRAY:
+                return $this->toArray()->getNumElements() > 0;
             case self::TYPE_OBJECT:
                 if (null === $vm) {
                     return true;
