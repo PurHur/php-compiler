@@ -1,5 +1,5 @@
 --TEST--
-Language: enum case ++/-- throws TypeError with Zend message (zend_operators.c, #5525)
+Language: enum case ++/-- throws TypeError with Zend message (zend_operators.c, #5525, #5606)
 --FILE--
 <?php
 enum E { case A; }
