@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\Variable;
@@ -261,6 +262,13 @@ final class VmArray
         foreach ($keys->iterateKeyed(true) as [, $keyValue]) {
             $stored = new Variable();
             $stored->copyFrom($value);
+            $keyValue = $keyValue->resolveIndirect();
+            if (EnumCaseSupport::isEnumCaseVariable($keyValue)) {
+                $enumClass = EnumCaseSupport::enumClassForCaseVariable($keyValue);
+                throw new \Error(
+                    'Object of class '.($enumClass->name ?? 'enum').' could not be converted to string'
+                );
+            }
             if (Variable::TYPE_INTEGER === $keyValue->type) {
                 $dest->addIndex($keyValue->toInt(), $stored);
             } elseif (Variable::TYPE_STRING === $keyValue->type) {

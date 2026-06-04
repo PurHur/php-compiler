@@ -17,6 +17,10 @@ final class ArrayFillKeysVMTest extends BaseTest
             __DIR__.'/cases/stdlib/array_fill_keys.phpt',
             'array_fill_keys.phpt'
         );
+        yield 'array_fill_keys_enum.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_fill_keys_enum.phpt',
+            'array_fill_keys_enum.phpt'
+        );
     }
 
     public function setUp(): void
