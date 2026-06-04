@@ -7,8 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -25,14 +26,10 @@ final class escapeshellcmd extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('escapeshellcmd() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('escapeshellcmd() requires a string argument in this compiler build');
-        }
-        $frame->returnVar->string(\escapeshellcmd($v->toString()));
+        $command = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'escapeshellcmd', 0, 'command');
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($command): void {
+            $ret->string(\escapeshellcmd($command));
+        });
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -43,7 +40,7 @@ final class escapeshellcmd extends Internal
 
         return JitEscapeshellcmd::invoke(
             $context,
-            JitStringArg::lower($context, $args[0], 'escapeshellcmd() argument')
+            JitStringBuiltinArg::lower($context, $args[0], 'escapeshellcmd', 0, 'command')
         );
     }
 }
