@@ -1,17 +1,19 @@
 /*
  * JIT/AOT output buffering for ob_start / ob_get_clean / ob_end_flush (issue #118, #1056).
+ * Stack storage lives here until #5314; limits mirror PHP ObStackLimits (#5582).
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+/* Keep in sync with PHPCompiler\VM\ObStackLimits (issue #5582). */
 #define PHPC_OB_MAX_DEPTH 8
 #define PHPC_OB_BUF_SIZE 65536
 
-extern int __phpc_ob_level;
-extern char __phpc_ob_storage[PHPC_OB_MAX_DEPTH][PHPC_OB_BUF_SIZE];
-extern unsigned long __phpc_ob_len[PHPC_OB_MAX_DEPTH];
+int __phpc_ob_level = 0;
+char __phpc_ob_storage[PHPC_OB_MAX_DEPTH][PHPC_OB_BUF_SIZE];
+unsigned long __phpc_ob_len[PHPC_OB_MAX_DEPTH];
 
 struct __value__;
 struct __string__;

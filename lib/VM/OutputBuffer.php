@@ -49,6 +49,9 @@ final class OutputBuffer
 
     public static function start(): void
     {
+        if (self::getLevel() >= ObStackLimits::MAX_DEPTH) {
+            return;
+        }
         self::$stack[] = '';
     }
 
