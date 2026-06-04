@@ -440,6 +440,31 @@ class Context {
         $this->syncGlobalEntryInGlobalsTable($name, $global);
     }
 
+    /**
+     * unset($GLOBALS['name']) — drop symbol table entry and $GLOBALS offset (#5868, zend_hash.c).
+     */
+    public function unsetGlobalsTableKey(string $name): void
+    {
+        if (isset($this->globalVars[$name])) {
+            $global = $this->globalVars[$name];
+            if (Variable::TYPE_OBJECT === $global->resolveIndirect()->type) {
+                WeakRefRegistry::clearForObject($global->resolveIndirect()->toObject()->id);
+            }
+            unset($this->globalVars[$name]);
+        }
+        if (null === $this->globalsSuperglobal) {
+            return;
+        }
+        $table = $this->globalsSuperglobal->toArray();
+        $key = new Variable(Variable::TYPE_STRING);
+        $key->string($name);
+        $table->offsetUnset($key);
+        $slot = $table->find($name);
+        if (null !== $slot) {
+            $slot->type = Variable::TYPE_UNDEFINED;
+        }
+    }
+
     public function ensureGlobalsTable(): Variable
     {
         if (null === $this->globalsSuperglobal) {

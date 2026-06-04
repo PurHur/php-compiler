@@ -2482,7 +2482,9 @@ restart:
                     }
                     $containerSlot = $frame->scope[$op->arg2];
                     $container = $containerSlot->resolveIndirect();
-                    $key = $frame->scope[$op->arg3];
+                    $key = isset($frame->block->constants[$op->arg3])
+                        ? $frame->block->constants[$op->arg3]
+                        : $frame->scope[$op->arg3];
                     if (Variable::TYPE_OBJECT === $container->type) {
                         $object = $container->toObject();
                         if ($this->objectImplementsArrayAccess($object)) {
@@ -2499,6 +2501,15 @@ restart:
                         break;
                     }
                     if (Variable::TYPE_ARRAY === $container->type) {
+                        $keyResolved = $key->resolveIndirect();
+                        if (
+                            Variable::TYPE_STRING === $keyResolved->type
+                            && null !== $frame->block
+                            && $this->isGlobalsSuperglobalUnset($frame, (int) $op->arg2, $keyResolved->toString())
+                        ) {
+                            $this->context->unsetGlobalsTableKey($keyResolved->toString());
+                            break;
+                        }
                         $container->separateArrayForWrite();
                         $container = $containerSlot->resolveIndirect();
                         $container->toArray()->offsetUnset($key);
@@ -5303,6 +5314,19 @@ restart:
      *
      * @return Frame|null catch frame when try/catch (Error) handles the throw
      */
+    /**
+     * unset($GLOBALS['name']) on the script $GLOBALS operand (#5868).
+     */
+    private function isGlobalsSuperglobalUnset(Frame $frame, int $containerSlot, string $name): bool
+    {
+        if ('' === $name) {
+            return false;
+        }
+        $globalsSlot = $frame->block->slotIndexForVariableName('GLOBALS');
+
+        return null !== $globalsSlot && $globalsSlot === $containerSlot;
+    }
+
     private function dispatchUnsetDimNonContainerError(Frame $frame, string $message): ?Frame
     {
         $thrown = VM\BuiltinExceptionSupport::materializeError($this->context, $message);
