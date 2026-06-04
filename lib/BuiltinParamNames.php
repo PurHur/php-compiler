@@ -20,6 +20,20 @@ final class BuiltinParamNames
                 return ['string'];
             case 'parse_str':
                 return ['string', 'array'];
+            case 'sort':
+            case 'rsort':
+            case 'asort':
+            case 'arsort':
+            case 'ksort':
+            case 'krsort':
+            case 'natsort':
+            case 'natcasesort':
+            case 'usort':
+            case 'uasort':
+            case 'uksort':
+                return ['array', 'flags'];
+            case 'array_push':
+                return ['array'];
             case 'similar_text':
                 return ['string1', 'string2', 'percent'];
             case 'settype':

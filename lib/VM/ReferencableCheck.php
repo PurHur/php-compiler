@@ -1,0 +1,144 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\VM;
+
+use PHPCompiler\Block;
+use PHPCompiler\BuiltinByRefParams;
+use PHPCompiler\BuiltinParamNames;
+use PHPCompiler\Frame;
+use PHPCompiler\Func;
+
+/**
+ * Whether a call argument may bind to an &-parameter (Zend zend_execute.c ZEND_SEND_REF).
+ */
+final class ReferencableCheck
+{
+    /**
+     * @param list<Variable> $calledArgs
+     */
+    public static function assertOutgoingCallArgs(Func $call, Frame $caller, array $calledArgs): void
+    {
+        if ($call instanceof Func\PHP) {
+            self::assertUserFunctionArgs($call->getName(), $call->block, $calledArgs, $caller);
+
+            return;
+        }
+        if ($call instanceof Func\Internal) {
+            self::assertInternalFunctionArgs($call->getName(), $calledArgs, $caller);
+        }
+    }
+
+    /**
+     * @param list<Variable> $calledArgs
+     */
+    private static function assertUserFunctionArgs(
+        string $fn,
+        Block $calleeBlock,
+        array $calledArgs,
+        Frame $caller
+    ): void {
+        if ([] === $calleeBlock->paramByRef) {
+            return;
+        }
+        foreach ($calleeBlock->paramByRef as $paramIdx => $_) {
+            $idx = (int) $paramIdx;
+            if (!array_key_exists($idx, $calledArgs)) {
+                continue;
+            }
+            $paramName = $calleeBlock->paramNames[$idx] ?? 'param'.$idx;
+            self::assertArgument($fn, $idx, $paramName, $calledArgs[$idx], $caller);
+        }
+    }
+
+    /**
+     * @param list<Variable> $calledArgs
+     */
+    private static function assertInternalFunctionArgs(string $fn, array $calledArgs, Frame $caller): void
+    {
+        $indices = BuiltinByRefParams::forFunction($fn);
+        $variadicFrom = BuiltinByRefParams::variadicByRefFromIndex($fn);
+        if ([] === $indices && null === $variadicFrom) {
+            return;
+        }
+        $paramNames = BuiltinParamNames::forFunction($fn) ?? [];
+        foreach ($indices as $paramIdx) {
+            if (!array_key_exists($paramIdx, $calledArgs)) {
+                continue;
+            }
+            $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
+            self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
+        }
+        if (null === $variadicFrom) {
+            return;
+        }
+        $n = \count($calledArgs);
+        for ($paramIdx = $variadicFrom; $paramIdx < $n; ++$paramIdx) {
+            if (!isset($calledArgs[$paramIdx])) {
+                continue;
+            }
+            $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
+            self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
+        }
+    }
+
+    private static function assertArgument(
+        string $fn,
+        int $paramIdx,
+        string $paramName,
+        Variable $arg,
+        Frame $caller
+    ): void {
+        if (self::isReferenceable($arg, $caller)) {
+            return;
+        }
+        throw new \Error(\sprintf(
+            '%s(): Argument #%d ($%s) cannot be passed by reference',
+            $fn,
+            $paramIdx + 1,
+            $paramName
+        ));
+    }
+
+    public static function isReferenceable(Variable $arg, Frame $caller): bool
+    {
+        if ($arg->isIndirect()) {
+            return true;
+        }
+        $resolved = $arg->resolveIndirect();
+        if (null !== $resolved->objectPropertyOwner) {
+            return true;
+        }
+        if (
+            Variable::TYPE_STRING_OFFSET === $resolved->type
+            || Variable::TYPE_ARRAYACCESS_OFFSET === $resolved->type
+        ) {
+            return true;
+        }
+        $slot = self::scopeSlotForVariable($caller, $arg);
+        if (null === $slot) {
+            return false;
+        }
+        if (isset($caller->block->constants[$slot])) {
+            return false;
+        }
+        $operand = $caller->block->operandForScopeSlot($slot);
+        if (null === $operand) {
+            return false;
+        }
+
+        return null !== Block::resolveVariableName($operand);
+    }
+
+    private static function scopeSlotForVariable(Frame $frame, Variable $var): ?int
+    {
+        foreach ($frame->scope as $slot => $v) {
+            if ($v === $var) {
+                return (int) $slot;
+            }
+        }
+
+        return null;
+    }
+}
