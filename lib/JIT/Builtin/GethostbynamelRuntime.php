@@ -141,7 +141,7 @@ final class GethostbynamelRuntime
         $rc = $context->builder->call(
             $context->lookupFunction('getaddrinfo'),
             $hostbuf,
-            $voidPtr->constNull(),
+            $i8p->constNull(),
             $hintsVoid,
             $resSlot
         );
