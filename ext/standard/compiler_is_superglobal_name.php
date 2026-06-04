@@ -38,7 +38,7 @@ final class compiler_is_superglobal_name extends Internal
                 '__compiler_is_superglobal_name() requires a string name in this compiler build'
             );
         }
-        $frame->returnVar->bool(\PHPCompiler\Web\Superglobals::isSuperglobalNameVm($name->toString()));
+        $frame->returnVar->bool(SuperglobalNames::isSuperglobalName($name->toString()));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

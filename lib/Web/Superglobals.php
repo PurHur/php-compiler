@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Web;
 
+use PHPCompiler\ext\standard\SuperglobalNames;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmParseStr;
 use PHPCompiler\VM\Context;
@@ -43,40 +44,18 @@ final class Superglobals
     /** Maximum JSON decode depth for POST bodies (issue #52). */
     public const MAX_JSON_DECODE_DEPTH = 512;
 
-    public const NAMES = [
-        '_GET',
-        '_POST',
-        '_SERVER',
-        '_REQUEST',
-        '_COOKIE',
-        '_ENV',
-        '_FILES',
-        '_SESSION',
-    ];
+    /** @var list<string> */
+    public const NAMES = SuperglobalNames::ALL;
 
     public static function isSuperglobalName(string $name): bool
     {
-        // Compile-time switch for self-host AOT: avoid class-const NAMES fetch in JIT (#816).
-        switch ($name) {
-            case 'GLOBALS':
-            case '_GET':
-            case '_POST':
-            case '_SERVER':
-            case '_REQUEST':
-            case '_COOKIE':
-            case '_ENV':
-            case '_FILES':
-            case '_SESSION':
-                return true;
-            default:
-                return false;
-        }
+        return SuperglobalNames::isSuperglobalName($name);
     }
 
     /** VM implementation shared with {@see compiler_is_superglobal_name} execute(). */
     public static function isSuperglobalNameVm(string $name): bool
     {
-        return self::isSuperglobalName($name);
+        return SuperglobalNames::isSuperglobalName($name);
     }
 
     /**

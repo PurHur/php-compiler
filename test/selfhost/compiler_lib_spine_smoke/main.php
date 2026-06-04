@@ -75,6 +75,8 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringRandomBytes.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringReadfile.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSerialize.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStripslashes.php';
+require_once __DIR__.'/../../../ext/standard/SuperglobalNames.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/SuperglobalNameRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSuperglobalName.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUcwords.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUnserialize.php';

@@ -64,6 +64,8 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/JIT/Builtin/StringHttpBuildQuery.php',
         'lib/JIT/Builtin/StringSerialize.php',
         'lib/JIT/Builtin/StringSuperglobalName.php',
+        'lib/JIT/Builtin/SuperglobalNameRuntime.php',
+        'ext/standard/SuperglobalNames.php',
         'lib/JIT/ErrorHandlerCallbackPolicy.php',
         'lib/JIT/UsortCallbackPolicy.php',
         'lib/JIT/PregReplaceCallbackPolicy.php',
