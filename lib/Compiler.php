@@ -5707,7 +5707,7 @@ class Compiler {
         }
         if ($op instanceof Op\Expr\New_) {
             foreach ($op->args as $arg) {
-                if ($this->functionStaticInitOperandReferencesLocal($arg->value)) {
+                if ($this->functionStaticInitOperandReferencesLocal($arg)) {
                     return true;
                 }
             }
