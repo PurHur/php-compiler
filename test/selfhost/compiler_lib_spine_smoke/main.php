@@ -722,6 +722,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetValue.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantGetType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodConstruct.php';

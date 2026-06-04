@@ -25,6 +25,8 @@ final class ReflectionSupport
 
     public const REFLECTION_CONSTANT = 'reflectionconstant';
 
+    public const REFLECTION_CLASS_CONSTANT = 'reflectionclassconstant';
+
     public const REFLECTION_ATTRIBUTE = 'reflectionattribute';
 
     public const REFLECTION_ENUM = 'reflectionenum';
@@ -515,13 +517,19 @@ final class ReflectionSupport
 
     public static function requireReflectionConstant(Frame $frame, Variable $receiver): ObjectEntry
     {
+        return self::requireReflectionClassConstant($frame, $receiver);
+    }
+
+    public static function requireReflectionClassConstant(Frame $frame, Variable $receiver): ObjectEntry
+    {
         $receiver = $receiver->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $receiver->type) {
-            throw new \LogicException('ReflectionConstant method called without object');
+            throw new \LogicException('ReflectionClassConstant method called without object');
         }
         $obj = $receiver->toObject();
-        if (strtolower($obj->class->name) !== self::REFLECTION_CONSTANT) {
-            throw new \LogicException('Expected ReflectionConstant instance');
+        $classLc = strtolower($obj->class->name);
+        if (self::REFLECTION_CLASS_CONSTANT !== $classLc && self::REFLECTION_CONSTANT !== $classLc) {
+            throw new \LogicException('Expected ReflectionClassConstant instance');
         }
 
         return $obj;

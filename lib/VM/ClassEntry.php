@@ -104,6 +104,8 @@ class ClassEntry {
     public array $methodDeprecated = [];
     /** @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata> constant (lowercase) => deprecation (#3569). */
     public array $constDeprecated = [];
+    /** @var array<string, \PHPCfg\Op\Type> constant (lowercase) => declared type for reflection (#5954). */
+    public array $constDeclaredTypes = [];
 
     public function __construct(string $name) {
         $this->name = $name;

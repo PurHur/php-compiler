@@ -92,6 +92,9 @@ class Block {
     /** @var array<int, Op\Type> declared parameter types for reflection (#3355). */
     public array $paramDeclaredTypes = [];
 
+    /** @var array<string, Op\Type> lowercase class const name => declared type (#5954). */
+    public array $classConstDeclaredTypes = [];
+
     /** Declared return type AST for reflection (#3355), or null when untyped. */
     public ?Op\Type $returnDeclaredType = null;
 

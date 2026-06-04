@@ -29,6 +29,7 @@ use PHPCompiler\VM\Builtin\FiberThrow;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetArguments;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetName;
 use PHPCompiler\VM\Builtin\ReflectionAttributeNewInstance;
+use PHPCompiler\VM\Builtin\ReflectionClassConstantGetType;
 use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethod;
@@ -324,7 +325,25 @@ final class BuiltinClasses
         $rconst->methodVisibility['getvalue'] = $pub;
         $rconst->methods['getattributes'] = new ReflectionConstantGetAttributes();
         $rconst->methodVisibility['getattributes'] = $pub;
+        $rconst->methods['gettype'] = new ReflectionClassConstantGetType();
+        $rconst->methodVisibility['gettype'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_CONSTANT] = $rconst;
+
+        $rcc = new ClassEntry('ReflectionClassConstant');
+        $rcc->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
+        $rcc->properties[] = new ClassProperty(ReflectionSupport::PROP_CONSTANT_NAME, null, $strProto);
+        $rcc->constructor = new ReflectionConstantConstruct();
+        $rcc->methods['__construct'] = $rcc->constructor;
+        $rcc->methodVisibility['__construct'] = $pub;
+        $rcc->methods['getname'] = new ReflectionConstantGetName();
+        $rcc->methodVisibility['getname'] = $pub;
+        $rcc->methods['getvalue'] = new ReflectionConstantGetValue();
+        $rcc->methodVisibility['getvalue'] = $pub;
+        $rcc->methods['getattributes'] = new ReflectionConstantGetAttributes();
+        $rcc->methodVisibility['getattributes'] = $pub;
+        $rcc->methods['gettype'] = new ReflectionClassConstantGetType();
+        $rcc->methodVisibility['gettype'] = $pub;
+        $ctx->classes[ReflectionSupport::REFLECTION_CLASS_CONSTANT] = $rcc;
 
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS] = $rc;
 

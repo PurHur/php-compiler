@@ -3076,6 +3076,11 @@ class Compiler {
             $valueSlot = $this->compileOperand($child->value, $result, true);
         }
         $typeSlot = null;
+        if (property_exists($child, 'declaredType') && null !== $child->declaredType) {
+            if (null !== $constName) {
+                $result->classConstDeclaredTypes[strtolower($constName)] = $child->declaredType;
+            }
+        }
         if (
             property_exists($child, 'declaredType')
             && null !== $child->declaredType
