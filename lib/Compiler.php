@@ -673,6 +673,33 @@ class Compiler {
         return null;
     }
 
+    /** Both ?: arms jump to the same CFG merge block (echo/assign phi, #3790, #5510). */
+    private function jumpIfTargetsTernaryMerge(Op\Stmt\JumpIf $stmt): bool
+    {
+        $ifMerge = $this->branchJumpMergeTarget($stmt->if);
+        $elseMerge = $this->branchJumpMergeTarget($stmt->else);
+        if (null === $ifMerge || $ifMerge !== $elseMerge) {
+            return false;
+        }
+        if (\count($ifMerge->parents) < 2) {
+            return false;
+        }
+
+        return $this->mergeCfgBlockUsesEchoPhi($ifMerge);
+    }
+
+    /** `?:` in `echo`/concat merge uses echo phi slots; `return ?:` uses RETURN (#4280). */
+    private function mergeCfgBlockUsesEchoPhi(CfgBlock $merge): bool
+    {
+        foreach ($merge->children as $child) {
+            if ($child instanceof Op\Terminal\Echo_) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function recordTernaryMergeVarSlots(CfgBlock $branchCfg, Block $compiled): void
     {
         foreach ($this->ternaryMergeTargets($branchCfg) as $mergeCfg) {
@@ -3935,8 +3962,14 @@ class Compiler {
                 $block->addOpCode(new OpCode(OpCode::TYPE_END_SILENCE));
             }
             $op = new OpCode(OpCode::TYPE_JUMPIF, $this->compileOperand($stmt->cond, $block, true));
-            $op->block1 = $this->compileCfgBranch($stmt->if, $block);
-            $op->block2 = $this->compileCfgBranch($stmt->else, $block);
+            if ($this->jumpIfTargetsTernaryMerge($stmt)) {
+                // Lower else before if so merge blocks record both branch phi slots (#3790, #5510).
+                $op->block2 = $this->compileCfgBranch($stmt->else, $block);
+                $op->block1 = $this->compileCfgBranch($stmt->if, $block);
+            } else {
+                $op->block1 = $this->compileCfgBranch($stmt->if, $block);
+                $op->block2 = $this->compileCfgBranch($stmt->else, $block);
+            }
             $block->addOpCode($op);
         } elseif ($stmt instanceof Op\Stmt\TryCatch) {
             $merge = $this->compileCfgBranch($stmt->end, $block);
