@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\Builtin\StringCslashes;
+use PHPCompiler\JIT\Builtin\StringStripcslashesRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -35,11 +35,8 @@ final class stripcslashes extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('stripcslashes() requires exactly one argument in this compiler build');
         }
-        StringCslashes::ensureLinked($context);
+        StringStripcslashesRuntime::ensureLinked($context);
 
-        return JitStripcslashes::unescape(
-            $context,
-            $this->jitString($context, $args[0], 'stripcslashes() argument #1')
-        );
+        return JitStripcslashes::unescape($context, $args[0]);
     }
 }

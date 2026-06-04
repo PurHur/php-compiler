@@ -2591,6 +2591,12 @@ final class VmString
         return $out;
     }
 
+    /** @return array<int, bool> escape mask for addcslashes charlist (JIT/AOT lowering). */
+    public static function addcslashesEscapeMask(string $charlist): array
+    {
+        return self::buildAddcslashesCharMask($charlist);
+    }
+
     /**
      * stripcslashes() — unescape C-style sequences (php-src string.c php_stripcslashes).
      */
