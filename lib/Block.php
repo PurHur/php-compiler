@@ -421,6 +421,14 @@ class Block {
         }
     }
 
+    /** Ensure a ?: merge phi slot is present in this branch frame (#5506). */
+    public function bindScopeSlot(Operand $operand, int $slot): void
+    {
+        if (!$this->scope->contains($operand)) {
+            $this->scope[$operand] = $slot;
+        }
+    }
+
     private function isArgSlot(int $slot): bool
     {
         foreach ($this->args as $op) {

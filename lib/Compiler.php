@@ -789,9 +789,12 @@ class Compiler {
         }
         $mergeCfg = $this->branchJumpMergeTarget($branch->orig);
         if (null !== $mergeCfg && $this->seen->contains($mergeCfg)) {
-            // Match `default => expr` uses echo-merge; return ?: phi may be an unnamed Temporary (#3787, #4280).
+            // Echo/return ?: phi temporaries must still target the merge ECHO/RETURN slot (#3787, #4280, #5506).
             if ($assign->var instanceof Temporary && null === $this->mergeReturnSlot($this->seen[$mergeCfg])) {
-                return null;
+                $phiSlot = $this->mergePhiResultSlot($this->seen[$mergeCfg]);
+                if (null !== $phiSlot) {
+                    return $phiSlot;
+                }
             }
         }
         if (null === Block::cfgVarRoot($assign->var) && !$assign->var instanceof Temporary) {
@@ -810,12 +813,18 @@ class Compiler {
             }
         }
         foreach ($this->ternaryMergeTargets($branch->orig) as $mergeCfg) {
-            if (!$this->seen->contains($mergeCfg)) {
-                continue;
+            if ($this->seen->contains($mergeCfg)) {
+                $phiSlot = $this->mergePhiResultSlot($this->seen[$mergeCfg]);
+                if (null !== $phiSlot) {
+                    return $phiSlot;
+                }
             }
-            $phiSlot = $this->mergePhiResultSlot($this->seen[$mergeCfg]);
-            if (null !== $phiSlot) {
-                return $phiSlot;
+            if ($this->ternaryMergeVarSlots->contains($mergeCfg)) {
+                /** @var SplObjectStorage<CfgVariable, int> $map */
+                $map = $this->ternaryMergeVarSlots[$mergeCfg];
+                foreach ($map as $root) {
+                    return $map[$root];
+                }
             }
         }
 
@@ -4329,6 +4338,14 @@ class Compiler {
                 }
 
                 $mergeAssignSlot = $this->branchMergeAssignSlot($block, $expr);
+                if (null !== $mergeAssignSlot) {
+                    $root = Block::cfgVarRoot($expr->var);
+                    if ($root instanceof Operand\Variable) {
+                        $block->prebindCfgVarRoot($root, $mergeAssignSlot);
+                    } else {
+                        $block->bindScopeSlot($expr->var, $mergeAssignSlot);
+                    }
+                }
                 $destSlot = null !== $mergeAssignSlot
                     ? $mergeAssignSlot
                     : $this->compileOperand($expr->var, $block, false);
@@ -4528,13 +4545,35 @@ class Compiler {
                 );
                 return $return;
             case Op\Expr\MethodCall::class:
-                return $this->compileMethodCallOpcodes(
-                    $this->compileOperand($expr->var, $block, true),
-                    $this->compileOperand($expr->name, $block, true),
-                    $expr->args,
-                    $expr->result,
-                    $block,
-                    max(0, $expr->getLine())
+                $mergeEcho = $this->mergeEchoSlotForBranch($block);
+                $receiverSlot = $this->compileOperand($expr->var, $block, true);
+                $nameSlot = $this->compileOperand($expr->name, $block, true);
+                $prefix = [];
+                if (null !== $mergeEcho && $nameSlot === $mergeEcho) {
+                    $nameSlot = $this->freshLiteralConstantSlot($expr->name, $block);
+                }
+                if (null !== $mergeEcho) {
+                    $resultSlot = $this->compileOperand($expr->result, $block, false);
+                    if ($resultSlot === $mergeEcho) {
+                        $block->forceFreshVarSlot($expr->result);
+                    }
+                    // Receiver must not alias ?: echo phi (condition var is often reused, #5506).
+                    $recvTemp = new Operand\Temporary();
+                    $recvSlot = $block->forceFreshVarSlot($recvTemp);
+                    $prefix[] = new OpCode(OpCode::TYPE_ASSIGN, $recvSlot, $recvSlot, $receiverSlot);
+                    $receiverSlot = $recvSlot;
+                }
+
+                return array_merge(
+                    $prefix,
+                    $this->compileMethodCallOpcodes(
+                        $receiverSlot,
+                        $nameSlot,
+                        $expr->args,
+                        $expr->result,
+                        $block,
+                        max(0, $expr->getLine())
+                    )
                 );
             case Op\Expr\PropertyFetch::class:
                 return [new OpCode(
@@ -6605,6 +6644,55 @@ class Compiler {
         }
 
         return $this->compileOperand($name, $block, true);
+    }
+
+    /**
+     * ?: echo merge phi must not share a slot with method-name literals (#3790, #5506).
+     */
+    private function freshLiteralConstantSlot(Operand $operand, Block $block): int
+    {
+        if (!$operand instanceof Operand\Literal) {
+            return $block->forceFreshVarSlot($operand);
+        }
+        $mappedType = null !== $operand->type
+            ? Variable::mapFromType($operand->type)
+            : Variable::TYPE_UNDEFINED;
+        if ($mappedType === Variable::TYPE_UNDEFINED) {
+            if (is_int($operand->value)) {
+                $mappedType = Variable::TYPE_INTEGER;
+            } elseif (is_float($operand->value)) {
+                $mappedType = Variable::TYPE_FLOAT;
+            } elseif (is_string($operand->value)) {
+                $mappedType = Variable::TYPE_STRING;
+            } elseif (is_bool($operand->value)) {
+                $mappedType = Variable::TYPE_BOOLEAN;
+            } elseif (null === $operand->value) {
+                $mappedType = Variable::TYPE_NULL;
+            }
+        }
+        $const = new Variable($mappedType);
+        switch ($mappedType) {
+            case Variable::TYPE_STRING:
+                $const->string($operand->value);
+                break;
+            case Variable::TYPE_INTEGER:
+                $const->int($operand->value);
+                break;
+            case Variable::TYPE_FLOAT:
+                $const->float($operand->value);
+                break;
+            case Variable::TYPE_BOOLEAN:
+                $const->bool($operand->value);
+                break;
+            case Variable::TYPE_NULL:
+                break;
+            default:
+                $this->throwCompileLogic('Unknown Literal Operand Type: ' . ($operand->type ?? 'untyped'));
+        }
+        $slot = $block->forceFreshVarSlot($operand);
+        $block->constants[$slot] = $const;
+
+        return $slot;
     }
 
     protected function compileOperand(?Operand $operand, Block $block, bool $isRead): ?int {
