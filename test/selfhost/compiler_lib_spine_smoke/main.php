@@ -784,6 +784,8 @@ require_once __DIR__.'/../../../ext/standard/JitClassParents.php';
 require_once __DIR__.'/../../../ext/standard/JitConstant.php';
 require_once __DIR__.'/../../../ext/standard/JitCountChars.php';
 require_once __DIR__.'/../../../ext/standard/JitCrc32c.php';
+require_once __DIR__.'/../../../ext/standard/NativeLastError.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/LastErrorRuntime.php';
 require_once __DIR__.'/../../../ext/standard/JitErrorGetLast.php';
 require_once __DIR__.'/../../../ext/standard/JitEscapeshellcmd.php';
 require_once __DIR__.'/../../../ext/standard/JitFlock.php';
