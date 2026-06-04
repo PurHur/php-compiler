@@ -13,6 +13,7 @@ use PHPCompiler\JIT\ValueEchoHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -117,7 +118,12 @@ final class var_export extends Internal
         if (Variable::TYPE_BOOLEAN === $v->type) {
             return $v->toBool() ? 'true' : 'false';
         }
-        if (Variable::TYPE_NULL === $v->type || Variable::TYPE_UNDEFINED === $v->type) {
+        if (Variable::TYPE_UNDEFINED === $v->type) {
+            TypedPropertyCheck::assertReadable($v);
+
+            return 'NULL';
+        }
+        if (Variable::TYPE_NULL === $v->type) {
             return 'NULL';
         }
         if (Variable::TYPE_INTEGER === $v->type) {

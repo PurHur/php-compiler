@@ -216,6 +216,17 @@ final class TypeCheck
             return;
         }
         $value = $target;
+        if (Variable::TYPE_OBJECT === $constraint && null !== $target->classConstraint) {
+            if (self::matchesClassTypeHint($value, $target->classConstraint)) {
+                return;
+            }
+            $expected = $target->declaredTypeLabel ?? self::normalizeClassLabel($target->classConstraint);
+            if ($propertyWrite && 'Property' === $kind) {
+                throw self::propertyTypeError($target, $expected, $value);
+            }
+
+            throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite, null, $expected);
+        }
         if ($strict) {
             if (!self::isExactType($value, $constraint)) {
                 throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite);
@@ -451,17 +462,48 @@ final class TypeCheck
         throw new \TypeError("{$kind} must be of type bool");
     }
 
+    private static function matchesClassTypeHint(Variable $value, string $classConstraint): bool
+    {
+        $resolved = $value->resolveIndirect();
+        $classLc = strtolower(ltrim($classConstraint, '\\'));
+        $vm = \PHPCompiler\VM::running();
+        $context = $vm?->context;
+        if (Variable::TYPE_ENUM_CASE === $resolved->type) {
+            $entry = $resolved->toEnumCase()->enumClass;
+            if (null === $context) {
+                return strtolower($entry->name) === $classLc;
+            }
+
+            return InterfaceCheck::entryIsInstanceOf($entry, $classLc, $context);
+        }
+        if (Variable::TYPE_OBJECT !== $resolved->type) {
+            return false;
+        }
+        if (null === $context) {
+            return strtolower($resolved->toObject()->class->name) === $classLc;
+        }
+
+        return InterfaceCheck::entryIsInstanceOf($resolved->toObject()->class, $classLc, $context);
+    }
+
+    private static function normalizeClassLabel(string $classConstraint): string
+    {
+        return ltrim($classConstraint, '\\');
+    }
+
     private static function typedSlotError(
         Variable $target,
         int $constraint,
         Variable $value,
         string $kind,
         bool $propertyWrite,
-        ?string $literalBoolType = null
+        ?string $literalBoolType = null,
+        ?string $expectedOverride = null
     ): \TypeError {
-        $expected = null !== $literalBoolType
-            ? $literalBoolType
-            : self::typeName($constraint);
+        $expected = $expectedOverride
+            ?? (null !== $literalBoolType
+                ? $literalBoolType
+                : ($target->declaredTypeLabel ?? self::typeName($constraint)));
         if ($propertyWrite && 'Property' === $kind) {
             return self::propertyTypeError($target, $expected, $value);
         }
@@ -479,7 +521,7 @@ final class TypeCheck
         if (null !== $owner) {
             return new \TypeError(sprintf(
                 'Cannot assign %s to property %s::$%s of type %s',
-                self::typeName($value->type),
+                self::valueTypeLabel($value),
                 $owner->class->name,
                 $propName,
                 $expectedType
@@ -489,7 +531,8 @@ final class TypeCheck
         return new \TypeError(self::strictMessage(
             $target->typeConstraint ?? Variable::TYPE_INTEGER,
             $value,
-            'Property'
+            'Property',
+            $expected
         ));
     }
 
@@ -508,6 +551,9 @@ final class TypeCheck
     private static function valueTypeLabel(Variable $value): string
     {
         $resolved = $value->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $resolved->type) {
+            return $resolved->toObject()->class->name;
+        }
 
         return self::typeName($resolved->type);
     }
@@ -558,6 +604,8 @@ final class TypeCheck
             case Variable::TYPE_ARRAY:
                 return 'array';
             case Variable::TYPE_OBJECT:
+                return 'object';
+            case Variable::TYPE_ENUM_CASE:
                 return 'object';
             default:
                 return 'mixed';
