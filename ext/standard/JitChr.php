@@ -29,7 +29,7 @@ final class JitChr
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (JITVariable::TYPE_OBJECT === $arg->type) {
-            self::emitIntTypeErrorAndAbort($context, 'object');
+            self::emitIntTypeErrorAndAbort($context, self::compileTimeObjectGivenLabel($context, $arg));
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
@@ -69,7 +69,8 @@ final class JitChr
         $nullTy = $i8->constInt(VmVariable::TYPE_NULL, false);
         $arrayTy = $i8->constInt(VmVariable::TYPE_ARRAY, false);
         $objectTy = $i8->constInt(VmVariable::TYPE_OBJECT, false);
-        $doubleTy = $i8->constInt(VmVariable::TYPE_NATIVE_DOUBLE, false);
+        $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
+        $doubleTy = $i8->constInt(VmVariable::TYPE_FLOAT, false);
         $stringTy = $i8->constInt(VmVariable::TYPE_STRING, false);
 
         $nullBlock = BasicBlockHelper::append($context, 'chr_box_null');
@@ -106,6 +107,15 @@ final class JitChr
         self::emitIntTypeErrorAndAbort($context, 'object');
 
         $context->builder->positionAtEnd($afterObject);
+        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTy);
+        $enumErrBlock = BasicBlockHelper::append($context, 'chr_box_enum_err');
+        $afterEnum = BasicBlockHelper::append($context, 'chr_box_after_enum');
+        $context->builder->branchIf($isEnumCase, $enumErrBlock, $afterEnum);
+
+        $context->builder->positionAtEnd($enumErrBlock);
+        self::emitIntTypeErrorAndAbort($context, self::compileTimeEnumCaseGivenLabel($context, $arg));
+
+        $context->builder->positionAtEnd($afterEnum);
         $isDouble = $context->builder->icmp(Builder::INT_EQ, $typeByte, $doubleTy);
         $context->builder->branchIf($isDouble, $doubleBlock, $stringBlock);
 
@@ -199,6 +209,31 @@ final class JitChr
         );
 
         return $context->builder->trunc($raw, $context->getTypeFromString('int64'));
+    }
+
+    private static function compileTimeObjectGivenLabel(Context $context, JITVariable $arg): string
+    {
+        if (JITVariable::KIND_VALUE !== $arg->kind) {
+            return 'object';
+        }
+        $objMap = $context->structFieldMap['__object__'] ?? null;
+        if (null === $objMap || !isset($objMap['class_id'])) {
+            return 'object';
+        }
+        $classIdVal = $context->builder->load(
+            $context->builder->structGep($arg->value, $objMap['class_id'])
+        );
+        if (!method_exists($classIdVal, 'isConstant') || !$classIdVal->isConstant()) {
+            return 'object';
+        }
+        $classId = (int) $classIdVal->getConstantValue();
+
+        return $context->type->object->classNameForId($classId);
+    }
+
+    private static function compileTimeEnumCaseGivenLabel(Context $context, JITVariable $arg): string
+    {
+        return self::compileTimeObjectGivenLabel($context, $arg);
     }
 
     private static function intTypeError(string $given): string

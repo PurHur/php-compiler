@@ -26,7 +26,7 @@ final class JitOrd
             return self::unreachableStringPtr($context);
         }
         if (JITVariable::TYPE_OBJECT === $arg->type) {
-            self::emitTypeErrorAndAbort($context, self::typeErrorMessage('object'));
+            self::emitTypeErrorAndAbort($context, self::typeErrorMessage(self::compileTimeObjectGivenLabel($context, $arg)));
 
             return self::unreachableStringPtr($context);
         }
@@ -50,32 +50,36 @@ final class JitOrd
             $context->builder->structGep($valuePtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
+        $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $arrayTy = $i8->constInt(VmVariable::TYPE_ARRAY, false);
         $objectTy = $i8->constInt(VmVariable::TYPE_OBJECT, false);
+        $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
 
         $okBlock = BasicBlockHelper::append($context, 'ord_str_ok');
         $arrayBlock = BasicBlockHelper::append($context, 'ord_str_array');
-        $objectBlock = BasicBlockHelper::append($context, 'ord_str_object');
+        $rejectBlock = BasicBlockHelper::append($context, 'ord_str_reject');
         $strictBlock = BasicBlockHelper::append($context, 'ord_str_strict');
 
-        $isArray = $context->builder->icmp(Builder::INT_EQ, $typeByte, $arrayTy);
-        $isObject = $context->builder->icmp(Builder::INT_EQ, $typeByte, $objectTy);
+        $isArray = $context->builder->icmp(Builder::INT_EQ, $typeKind, $arrayTy);
+        $isObject = $context->builder->icmp(Builder::INT_EQ, $typeKind, $objectTy);
+        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeKind, $enumCaseTy);
         $context->builder->branchIf($isArray, $arrayBlock, $okBlock);
 
         $context->builder->positionAtEnd($arrayBlock);
         self::emitTypeErrorAndAbort($context, self::typeErrorMessage('array'));
 
         $context->builder->positionAtEnd($okBlock);
-        $context->builder->branchIf($isObject, $objectBlock, $strictBlock);
+        $isObjOrEnum = $context->builder->or($isObject, $isEnumCase);
+        $context->builder->branchIf($isObjOrEnum, $rejectBlock, $strictBlock);
 
-        $context->builder->positionAtEnd($objectBlock);
-        self::emitTypeErrorAndAbort($context, self::typeErrorMessage('object'));
+        $context->builder->positionAtEnd($rejectBlock);
+        self::emitTypeErrorAndAbort($context, self::typeErrorMessage(self::compileTimeEnumCaseGivenLabel($context, $arg)));
 
         $context->builder->positionAtEnd($strictBlock);
         if ($context->callerStrictTypes) {
             $isString = $context->builder->icmp(
                 Builder::INT_EQ,
-                $typeByte,
+                $typeKind,
                 $i8->constInt(VmVariable::TYPE_STRING, false)
             );
             $coerceBlock = BasicBlockHelper::append($context, 'ord_str_coerce');
@@ -90,6 +94,31 @@ final class JitOrd
             $context->lookupFunction('__value__readString'),
             $valuePtr
         );
+    }
+
+    private static function compileTimeObjectGivenLabel(Context $context, JITVariable $arg): string
+    {
+        if (JITVariable::KIND_VALUE !== $arg->kind) {
+            return 'object';
+        }
+        $objMap = $context->structFieldMap['__object__'] ?? null;
+        if (null === $objMap || !isset($objMap['class_id'])) {
+            return 'object';
+        }
+        $classIdVal = $context->builder->load(
+            $context->builder->structGep($arg->value, $objMap['class_id'])
+        );
+        if (!method_exists($classIdVal, 'isConstant') || !$classIdVal->isConstant()) {
+            return 'object';
+        }
+        $classId = (int) $classIdVal->getConstantValue();
+
+        return $context->type->object->classNameForId($classId);
+    }
+
+    private static function compileTimeEnumCaseGivenLabel(Context $context, JITVariable $arg): string
+    {
+        return self::compileTimeObjectGivenLabel($context, $arg);
     }
 
     private static function typeErrorMessage(string $given): string
