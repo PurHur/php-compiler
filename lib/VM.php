@@ -3617,8 +3617,7 @@ restart:
                             $frame->generatorYield = true;
                             break;
                         }
-                        $gen->yieldFromActive = false;
-                        $gen->yieldFromIteratorAdvance = false;
+                        $this->completeYieldFromDelegation($gen, $frame, $op, null);
                         break;
                     }
                     if ($this->variableIsGenerator($container)) {
@@ -3632,8 +3631,8 @@ restart:
                             $frame->generatorYield = true;
                             break;
                         }
-                        $gen->yieldFromActive = false;
-                        $gen->yieldFromIteratorAdvance = false;
+                        $delegatedReturn = $inner->hasReturned ? $inner->returnValue : null;
+                        $this->completeYieldFromDelegation($gen, $frame, $op, $delegatedReturn);
                         break;
                     }
                     if (Variable::TYPE_OBJECT === $container->type) {
@@ -3655,8 +3654,7 @@ restart:
                             $frame->generatorYield = true;
                             break;
                         }
-                        $gen->yieldFromActive = false;
-                        $gen->yieldFromIteratorAdvance = false;
+                        $this->completeYieldFromDelegation($gen, $frame, $op, null);
                         break;
                     }
                     $this->throwYieldFromInvalidContainer($container);
@@ -5695,6 +5693,29 @@ restart:
     private function throwYieldFromInvalidContainer(VM\Variable $container): void
     {
         throw new \Error('Can use "yield from" only with arrays and Traversables');
+    }
+
+    /**
+     * Zend ZEND_YIELD_FROM completion: assign delegated return to the yield-from expression slot.
+     */
+    private function completeYieldFromDelegation(
+        GeneratorState $gen,
+        Frame $frame,
+        OpCode $op,
+        ?Variable $delegatedReturn,
+    ): void {
+        $gen->yieldFromActive = false;
+        $gen->yieldFromIteratorAdvance = false;
+        if (null === $op->arg1 || !isset($frame->scope[$op->arg1])) {
+            return;
+        }
+        $slot = (int) $op->arg1;
+        $gen->yieldResultSlot = $slot;
+        if (null !== $delegatedReturn) {
+            $frame->scope[$slot]->copyFrom($delegatedReturn->resolveIndirect());
+        } else {
+            $frame->scope[$slot]->null();
+        }
     }
 
     private function yieldFromContainerIsTraversable(VM\Variable $container): bool

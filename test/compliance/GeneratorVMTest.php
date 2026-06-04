@@ -29,6 +29,7 @@ final class GeneratorVMTest extends BaseTest
                 'generator_get_return_unreachable_yield.phpt',
                 'generator_try_catch_jit.phpt',
                 'generator_current_enum_case.phpt',
+                'generator_yield_from_enum.phpt',
             ] as $file
         ) {
             yield $file => self::parsePHPT(

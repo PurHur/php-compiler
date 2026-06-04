@@ -4752,7 +4752,9 @@ class Compiler {
                 $this->markFunctionGenerator($block);
                 return [new OpCode(
                     OpCode::TYPE_YIELD_FROM,
-                    null,
+                    [] !== $expr->result->usages
+                        ? $this->compileOperand($expr->result, $block, false)
+                        : null,
                     $this->compileOperand($expr->expr, $block, true),
                 )];
             case Op\Expr\NullsafePropertyFetch::class:
