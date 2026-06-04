@@ -76,6 +76,36 @@ final class VmDir
         return null !== $slot && isset(self::$handles[$slot]);
     }
 
+    /**
+     * scandir() for VM — opendir/readdir/closedir stack, no host \\scandir() (#5048, php-src dir.c).
+     *
+     * @return list<string>|false
+     */
+    public static function scandir(string $path, int $sortingOrder = \SCANDIR_SORT_ASCENDING)
+    {
+        $handle = self::opendir($path);
+        if (false === $handle) {
+            return false;
+        }
+        $names = [];
+        while (true) {
+            $entry = self::readdir($handle);
+            if (false === $entry) {
+                break;
+            }
+            $names[] = $entry;
+        }
+        self::closedir($handle);
+        if (\SCANDIR_SORT_NONE !== $sortingOrder) {
+            \sort($names, \SORT_STRING);
+            if (\SCANDIR_SORT_DESCENDING === $sortingOrder) {
+                $names = \array_reverse($names, false);
+            }
+        }
+
+        return $names;
+    }
+
     /** @return int|null */
     private static function slot(int $handle): ?int
     {
