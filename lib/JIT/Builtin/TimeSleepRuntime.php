@@ -125,19 +125,19 @@ final class TimeSleepRuntime
         $tvSec = self::loadI64At($context, $tv, self::TIMEVAL_OFF_TV_SEC);
         $tvUsec = self::loadI64At($context, $tv, self::TIMEVAL_OFF_TV_USEC);
         $targetNsD = $context->builder->fmul($targetSecs, $nsPerSecD);
-        $targetNs = $context->builder->fptoui($targetNsD, $i64);
+        $targetNs = $context->builder->fpToUi($targetNsD, $i64);
         $currentNs = $context->builder->add(
             $context->builder->mul($tvSec, $nsPerSecI64),
             $context->builder->mul($tvUsec, $usecScale)
         );
-        $inPast = $context->builder->icmp(Builder::INT_ULT, $targetNs, $currentNs);
+        $inPast = $context->builder->icmp(Builder::INT_SLT, $targetNs, $currentNs);
         $sleepBb = $fn->appendBasicBlock('tsu_sleep');
         $context->builder->branchIf($inPast, $failBb, $sleepBb);
 
         $context->builder->positionAtEnd($sleepBb);
         $diffNs = $context->builder->sub($targetNs, $currentNs);
-        $sleepSec = $context->builder->udiv($diffNs, $nsPerSecI64);
-        $sleepNsec = $context->builder->urem($diffNs, $nsPerSecI64);
+        $sleepSec = $context->builder->unsignedDiv($diffNs, $nsPerSecI64);
+        $sleepNsec = $context->builder->unsigendRem($diffNs, $nsPerSecI64);
 
         $req = $context->builder->alloca($i8, self::TIMESPEC_SIZE, 'tsu_req');
         $rem = $context->builder->alloca($i8, self::TIMESPEC_SIZE, 'tsu_rem');

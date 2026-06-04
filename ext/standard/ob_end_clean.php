@@ -12,7 +12,7 @@ use PHPCompiler\VM\OutputBuffer;
 use PHPLLVM\Value;
 
 /**
- * ob_end_clean() — discard active buffer and pop level (ext/standard/output.c, issue #3236).
+ * ob_end_clean() — discard active buffer and pop level (ext/standard/output.c, issue #3236; JIT {@see JitObEndClean}).
  */
 final class ob_end_clean extends Internal
 {
@@ -36,6 +36,6 @@ final class ob_end_clean extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ob_end_clean() is VM-only in this compiler build');
+        return JitObEndClean::invoke($context, ...$args);
     }
 }

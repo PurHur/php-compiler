@@ -17,6 +17,7 @@ struct __value__;
 struct __string__;
 
 void __value__writeBool(struct __value__ *out, int value);
+void __value__writeLong(struct __value__ *out, long long value);
 void __value__writeString(struct __value__ *out, struct __string__ *str);
 struct __string__ *__string__init(long long len, const char *value);
 
@@ -110,6 +111,73 @@ void __phpc_ob_echo_substr(const char *s, unsigned long len)
         return;
     }
     ob_append_bytes(s, (size_t) len);
+}
+
+static int ob_copy_active_buffer(struct __value__ *out)
+{
+    int idx = ob_active_index();
+    if (idx < 0) {
+        if (out) {
+            __value__writeBool(out, 0);
+        }
+        return 0;
+    }
+    unsigned long len = __phpc_ob_len[idx];
+    if (len > 0) {
+        char *copy = (char *) malloc((size_t) len + 1);
+        if (copy) {
+            memcpy(copy, __phpc_ob_storage[idx], (size_t) len);
+            copy[len] = '\0';
+            __value__writeString(out, __string__init((long long) len, copy));
+            free(copy);
+        } else {
+            __value__writeString(out, __string__init(0, ""));
+        }
+    } else {
+        __value__writeString(out, __string__init(0, ""));
+    }
+    return 1;
+}
+
+/* ob_get_contents() — read active buffer without ending (ext/standard/output.c, #3236). */
+int __phpc_ob_get_contents(struct __value__ *out)
+{
+    if (!out) {
+        return 0;
+    }
+    return ob_copy_active_buffer(out);
+}
+
+/* ob_get_length() — byte length of active buffer (#3236). */
+int __phpc_ob_get_length(struct __value__ *out)
+{
+    if (!out) {
+        return 0;
+    }
+    int idx = ob_active_index();
+    if (idx < 0) {
+        __value__writeBool(out, 0);
+        return 0;
+    }
+    __value__writeLong(out, (long long) __phpc_ob_len[idx]);
+    return 1;
+}
+
+/* ob_end_clean() — discard active buffer and pop level (#3236). */
+int __phpc_ob_end_clean(struct __value__ *out)
+{
+    if (!out || __phpc_ob_level <= 0) {
+        if (out) {
+            __value__writeBool(out, 0);
+        }
+        return 0;
+    }
+    __phpc_ob_level--;
+    int idx = __phpc_ob_level;
+    __phpc_ob_len[idx] = 0;
+    __phpc_ob_storage[idx][0] = '\0';
+    __value__writeBool(out, 1);
+    return 1;
 }
 
 int __phpc_ob_get_clean(struct __value__ *out)
