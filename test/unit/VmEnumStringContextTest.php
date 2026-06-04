@@ -79,4 +79,53 @@ PHP;
             $output
         );
     }
+
+    public function testBackedEnumPrintThrowsError(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum S: string { case A = 'a'; }
+try {
+    print S::A;
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_print_backed.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame(
+            "Object of class S could not be converted to string\n",
+            $output
+        );
+    }
+
+    public function testHeredocEnumInterpolationThrowsError(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: string { case X = 'x'; }
+$e = E::X;
+try {
+    echo <<<HD
+e=$e
+HD;
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_heredoc_backed.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame(
+            "Object of class E could not be converted to string\n",
+            $output
+        );
+    }
 }

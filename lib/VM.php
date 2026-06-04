@@ -437,6 +437,11 @@ class VM {
     public function valueToPrintString(Variable $var, ?Frame $frame = null): string
     {
         $var = $var->resolveIndirect();
+        if (Variable::TYPE_ENUM_CASE === $var->type) {
+            throw new \Error(
+                'Object of class '.$var->toEnumCase()->enumClass->name.' could not be converted to string'
+            );
+        }
         if (Variable::TYPE_OBJECT !== $var->type) {
             return $var->toString($this, $frame);
         }
