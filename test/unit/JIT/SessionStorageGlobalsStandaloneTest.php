@@ -42,5 +42,7 @@ final class SessionStorageGlobalsStandaloneTest extends TestCase
             $this->assertNotNull($fn);
             $this->assertGreaterThan(0, $fn->countBasicBlocks());
         }
+
+        $this->assertNull($ctx->module->getNamedFunction('__phpc_session_ensure_defaults'));
     }
 }

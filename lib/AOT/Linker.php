@@ -48,7 +48,6 @@ final class Linker
         __DIR__.'/runtime/phpc_network_services.c',
         __DIR__.'/runtime/phpc_getrusage.c',
         __DIR__.'/runtime/phpc_upload_temp.c',
-        __DIR__.'/runtime/phpc_session_state.c',
         __DIR__.'/runtime/phpc_value_box.c',
         __DIR__.'/runtime/phpc_session_lifecycle.c',
         __DIR__.'/runtime/phpc_session_storage.c',

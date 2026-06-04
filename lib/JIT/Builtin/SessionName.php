@@ -27,6 +27,7 @@ final class SessionName
     public static function implement(Context $context): void
     {
         SessionStorageGlobals::ensureGlobals($context);
+        SessionStorageGlobals::implementEnsureDefaults($context);
 
         $i8 = $context->getTypeFromString('int8');
         $i64 = $context->getTypeFromString('int64');
@@ -55,6 +56,7 @@ final class SessionName
         $bbBadOpc = $fn->appendBasicBlock('sname_bad_opc');
 
         $context->builder->positionAtEnd($entry);
+        SessionStorageGlobals::emitCallEnsureDefaults($context);
         $opc = $fn->getParam(0);
         $strArg = $fn->getParam(1);
         $boxedPtr = $fn->getParam(2);

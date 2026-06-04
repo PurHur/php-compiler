@@ -12,11 +12,15 @@ typedef struct __value__ __value__;
 #define PHPC_SESSION_ID_MAX 128
 #define PHPC_SESSION_NAME_MAX 128
 
-extern char __phpc_session_id_storage[PHPC_SESSION_ID_MAX + 1];
-extern char __phpc_session_name_storage[PHPC_SESSION_NAME_MAX + 1];
-extern int64_t __phpc_session_id_len;
-extern int64_t __phpc_session_name_len;
-extern char __phpc_session_active;
+/*
+ * Scalar session state (VmSession limits). JIT/AOT declare matching LLVM globals;
+ * this TU is the AOT link definition until lifecycle moves to PHP (#5332, #5750).
+ */
+char __phpc_session_id_storage[PHPC_SESSION_ID_MAX + 1];
+char __phpc_session_name_storage[PHPC_SESSION_NAME_MAX + 1] = "PHPSESSID";
+int64_t __phpc_session_id_len = 0;
+int64_t __phpc_session_name_len = 9;
+char __phpc_session_active = 0;
 
 extern __hashtable__ *sg_SESSION;
 
