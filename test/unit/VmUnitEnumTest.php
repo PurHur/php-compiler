@@ -40,5 +40,6 @@ PHP;
         $this->assertSame(Variable::TYPE_OBJECT, $case->type);
         $this->assertTrue(EnumCaseSupport::isEnumCase($case->toObject()));
         $this->assertSame('A', $case->toObject()->enumCaseName);
+        $this->assertNull($case->toObject()->enumCaseValue);
     }
 }

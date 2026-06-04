@@ -2,6 +2,8 @@
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Frame;
+
 /**
  * Zend-style enum case object for E::Case fetches (#3420, #3554, #3114).
  */
@@ -18,8 +20,11 @@ final class EnumCaseEntry
         $this->backingValue = $backingValue;
     }
 
-    public function fetchProperty(string $name): Variable
-    {
+    public function fetchProperty(
+        string $name,
+        ?Context $context = null,
+        ?Frame $frame = null
+    ): Variable {
         EnumSupport::ensureBackedEnumValuesUnique($this->enumClass);
         $lc = strtolower($name);
         if ('name' === $lc) {
@@ -30,17 +35,21 @@ final class EnumCaseEntry
         }
         if ('value' === $lc) {
             if (null === $this->enumClass->backedType) {
-                throw new \LogicException(
-                    'Attempt to read property "value" on unit enum case '.$this->enumClass->name.'::'.$this->caseName
-                );
+                EnumCaseSupport::warnUndefinedEnumProperty($this->enumClass, 'value', $context, $frame);
+                $var = new Variable();
+                $var->null();
+
+                return $var;
             }
             $var = new Variable();
             $var->copyFrom($this->backingValue);
 
             return $var;
         }
-        throw new \LogicException(
-            'Undefined property: '.$this->enumClass->name.'::$'.$name
-        );
+        EnumCaseSupport::warnUndefinedEnumProperty($this->enumClass, $name, $context, $frame);
+        $var = new Variable();
+        $var->null();
+
+        return $var;
     }
 }

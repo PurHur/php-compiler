@@ -24,7 +24,7 @@ final class EnumCaseSupport
         $object = new ObjectEntry($enum);
         $object->isEnumCase = true;
         $object->enumCaseName = $caseName;
-        $object->enumCaseValue = clone $backedValue;
+        $object->enumCaseValue = null === $enum->backedType ? null : clone $backedValue;
         $object->constructed = true;
 
         $var = new Variable(Variable::TYPE_OBJECT);
@@ -33,8 +33,12 @@ final class EnumCaseSupport
         return $var;
     }
 
-    public static function getProperty(ObjectEntry $object, string $name): Variable
-    {
+    public static function getProperty(
+        ObjectEntry $object,
+        string $name,
+        ?Context $context = null,
+        ?Frame $frame = null
+    ): Variable {
         if (!$object->isEnumCase) {
             throw new \LogicException('getProperty called on non-enum-case object');
         }
@@ -47,14 +51,44 @@ final class EnumCaseSupport
             return $result;
         }
         if ('value' === $lc) {
+            if (null === $object->class->backedType) {
+                self::warnUndefinedEnumProperty($object->class, 'value', $context, $frame);
+                $result->null();
+
+                return $result;
+            }
             if (null === $object->enumCaseValue) {
-                throw new \LogicException('Cannot read value on a unit enum case');
+                throw new \LogicException('Backed enum case object missing backing value');
             }
             $result->copyFrom($object->enumCaseValue);
 
             return $result;
         }
-        throw new \LogicException("Undefined property: {$name}");
+        self::warnUndefinedEnumProperty($object->class, $name, $context, $frame);
+        $result->null();
+
+        return $result;
+    }
+
+    /**
+     * Zend read_property on enum cases — E_WARNING + null (#5731, zend_enum.c).
+     */
+    public static function warnUndefinedEnumProperty(
+        ClassEntry $enum,
+        string $propertyName,
+        ?Context $context,
+        ?Frame $frame
+    ): void {
+        if (null === $context) {
+            return;
+        }
+        $context->errors->languageWarning(
+            'Undefined property: '.$enum->name.'::$'.$propertyName,
+            null,
+            0,
+            $context,
+            $frame
+        );
     }
 
     /** Zend rejects implicit string conversion of enum case objects (#4819, #5508). */

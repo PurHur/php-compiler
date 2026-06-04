@@ -3163,7 +3163,7 @@ restart:
                     $name = $frame->scope[$op->arg3]->toString();
                     if (Variable::TYPE_ENUM_CASE === $var->type) {
                         try {
-                            $prop = $var->toEnumCase()->fetchProperty($name);
+                            $prop = $var->toEnumCase()->fetchProperty($name, $this->context, $frame);
                         } catch (\LogicException $e) {
                             return $this->raise($e->getMessage(), $frame);
                         } catch (\Error $e) {
@@ -3210,7 +3210,12 @@ restart:
                     VM\LazyObjectSupport::ensureInitialized($this, $propertyObject);
                     if (EnumCaseSupport::isEnumCase($propertyObject)) {
                         try {
-                            $result->copyFrom(EnumCaseSupport::getProperty($propertyObject, $name));
+                            $result->copyFrom(EnumCaseSupport::getProperty(
+                                $propertyObject,
+                                $name,
+                                $this->context,
+                                $frame
+                            ));
                         } catch (\Error $e) {
                             $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                             if (null !== $catchFrame) {
@@ -7251,19 +7256,20 @@ restart:
                         if (!isset($block->constants[$op->arg2])) {
                             throw new \LogicException('Class constant value must be a compile-time constant');
                         }
-                        $entry->constants[$name] = EnumCaseSupport::createCase(
-                            $entry,
-                            $canonical,
-                            $block->constants[$op->arg2]
-                        );
-                        $entry->enumCaseCanonicalNames[$name] = $canonical;
-                        $caseBacking = clone $block->constants[$op->arg2];
+                        $caseBacking = new Variable(Variable::TYPE_NULL);
+                        $caseBacking->null();
                         if (null !== $entry->backedType) {
                             $caseBacking = clone VM\BackedEnum::caseBackingScalar(
                                 $entry->backedType,
                                 $block->constants[$op->arg2]
                             );
                         }
+                        $entry->constants[$name] = EnumCaseSupport::createCase(
+                            $entry,
+                            $canonical,
+                            $caseBacking
+                        );
+                        $entry->enumCaseCanonicalNames[$name] = $canonical;
                         $entry->enumCases[] = [
                             'name' => $canonical,
                             'value' => $caseBacking,
@@ -7793,13 +7799,19 @@ restart:
             if ($classEntry->isEnum && isset($classEntry->enumCaseCanonicalNames[$memberLc])) {
                 $canonical = $classEntry->enumCaseCanonicalNames[$memberLc];
                 $stored = $classEntry->constants[$memberLc]->resolveIndirect();
-                $backing = new Variable();
-                if (Variable::TYPE_OBJECT === $stored->type && EnumCaseSupport::isEnumCase($stored->toObject())) {
-                    $backing->copyFrom($stored->toObject()->enumCaseValue);
-                } elseif (Variable::TYPE_ENUM_CASE === $stored->type) {
-                    $backing->copyFrom($stored->toEnumCase()->backingValue);
-                } else {
-                    $backing->copyFrom($classEntry->constants[$memberLc]);
+                $backing = new Variable(Variable::TYPE_NULL);
+                $backing->null();
+                if (null !== $classEntry->backedType) {
+                    if (Variable::TYPE_OBJECT === $stored->type && EnumCaseSupport::isEnumCase($stored->toObject())) {
+                        $caseValue = $stored->toObject()->enumCaseValue;
+                        if (null !== $caseValue) {
+                            $backing->copyFrom($caseValue);
+                        }
+                    } elseif (Variable::TYPE_ENUM_CASE === $stored->type) {
+                        $backing->copyFrom($stored->toEnumCase()->backingValue);
+                    } else {
+                        $backing->copyFrom($classEntry->constants[$memberLc]);
+                    }
                 }
                 $dest->enumCase(new EnumCaseEntry($classEntry, $canonical, $backing));
 
