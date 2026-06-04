@@ -8,7 +8,7 @@ namespace PHPCompiler\ext\standard;
  * VM memory introspection without host Zend memory_get_* (issue #4862, #3134).
  *
  * php-src: ext/standard/basic_functions.c, Zend/zend_alloc.c (emalloc subset).
- * AOT/JIT: lib/AOT/runtime/phpc_memory.c (__compiler_memory_get_*).
+ * JIT/AOT: ext/standard/JitMemory.php + lib/JIT/Builtin/MemoryRuntime.php.
  */
 final class VmMemory
 {
@@ -60,7 +60,7 @@ final class VmMemory
     }
 
     /**
-     * Zend emalloc usage approximation (mirrors phpc_memory.c mallinfo uordblks).
+     * Zend emalloc usage approximation (RSS via /proc/self/statm like JIT path).
      */
     private static function readEmallocApprox(): int
     {
