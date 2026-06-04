@@ -6,6 +6,7 @@ namespace PHPCompiler\Compiler;
 
 use PHPCfg\Op;
 use PHPCfg\Operand;
+use PHPCfg\Operand\Literal as OperandLiteral;
 use PHPCfg\Script;
 
 /**
@@ -38,7 +39,7 @@ final class EnumBackedCaseCheck
             if (property_exists($member, 'isEnumCase') && !$member->isEnumCase) {
                 continue;
             }
-            if ($this->enumCaseHasExplicitValue($member)) {
+            if ($this->enumCaseHasExplicitValue($member, $enum)) {
                 continue;
             }
             $caseName = $this->operandDisplayName($member->name, 'case');
@@ -50,13 +51,46 @@ final class EnumBackedCaseCheck
         }
     }
 
-    private function enumCaseHasExplicitValue(Op\Terminal\Const_ $member): bool
+    private function enumCaseHasExplicitValue(Op\Terminal\Const_ $member, Op\Stmt\Enum_ $enum): bool
     {
         if (property_exists($member, 'enumCaseHasExplicitValue') && $member->enumCaseHasExplicitValue) {
             return true;
         }
 
-        return [] !== $member->valueBlock->children;
+        if ([] !== $member->valueBlock->children) {
+            return true;
+        }
+
+        return $this->valueOperandImpliesExplicitEnumCaseValue($member);
+    }
+
+    /**
+     * When php-cfg #5397 overlay is missing, parseEnumCase still stores the initializer in
+     * {@see Op\Terminal\Const_::$value} but leaves {@see Op\Terminal\Const_::$valueBlock} empty
+     * and does not set enumCaseHasExplicitValue. Infer explicit `= expr` from the value operand.
+     */
+    private function valueOperandImpliesExplicitEnumCaseValue(Op\Terminal\Const_ $member): bool
+    {
+        $value = $member->value;
+        if (!$value instanceof OperandLiteral) {
+            return true;
+        }
+
+        $literal = $value->value;
+        if (is_int($literal) || is_float($literal) || is_bool($literal)) {
+            return true;
+        }
+
+        if (!is_string($literal)) {
+            return true;
+        }
+
+        $caseName = $this->operandDisplayName($member->name, '');
+        if ('' !== $caseName && $literal === $caseName) {
+            return false;
+        }
+
+        return true;
     }
 
     private function operandDisplayName(Operand $op, string $fallback): string

@@ -3232,6 +3232,16 @@ verify_critical_language_patches() {
   if ! grep -qE 'parseExpr_Throw|Op\\Expr\\Throw_' "$parser" 2>/dev/null; then
     missing+=("php-cfg-throw-expr")
   fi
+  if grep -q 'function parseEnumCase' "$parser" 2>/dev/null \
+    && ! grep -q 'enumCaseHasExplicitValue' "$parser" 2>/dev/null; then
+    missing+=("php-cfg-enum-case-explicit-value")
+  fi
+  local const_file="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php"
+  if [[ -f "$const_file" ]] \
+    && grep -q 'function parseEnumCase' "$parser" 2>/dev/null \
+    && ! grep -q 'enumCaseHasExplicitValue' "$const_file" 2>/dev/null; then
+    missing+=("php-cfg-enum-case-explicit-value-Const_")
+  fi
   if ! grep -q 'instanceof Op\\Type\\Union_' "$recon" 2>/dev/null; then
     missing+=("php-types-union-type")
   elif ! php -l "$recon" >/dev/null 2>&1; then

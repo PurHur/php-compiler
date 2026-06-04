@@ -70,6 +70,21 @@ PHP,
         $this->assertNotNull($block);
     }
 
+    public function testIntBackedEnumCaseWithValueCompiles(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+enum E: int {
+    case A = 1;
+}
+echo E::A->value;
+PHP,
+            'enum_backed_int_value.php'
+        );
+        $this->assertNotNull($block);
+    }
+
     public function testStringBackedEnumCaseWithSameNameValueCompiles(): void
     {
         $runtime = new Runtime();
