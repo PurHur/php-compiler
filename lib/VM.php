@@ -3001,12 +3001,15 @@ restart:
                 case OpCode::TYPE_DECLARE_GLOBAL_CONST:
                     $name = $frame->scope[$op->arg1]->toString();
                     if (isset($frame->block->constants[$op->arg2])) {
-                        $constValue = $frame->block->constants[$op->arg2];
+                        $constValue = new Variable();
+                        $constValue->copyFrom($frame->block->constants[$op->arg2]);
                     } elseif (isset($frame->scope[$op->arg2])) {
-                        $constValue = VM\ClassConstMaterializer::detachConstantValue($frame->scope[$op->arg2]);
+                        $constValue = new Variable();
+                        $constValue->copyFrom($frame->scope[$op->arg2]);
                     } else {
                         throw new \LogicException('Global constant value must be a compile-time constant');
                     }
+                    $constValue = VM\EnumCaseSupport::materializeConstantValue($this->context, $constValue);
                     if (!$this->context->defineConstant($name, $constValue)) {
                         throw new \LogicException("Cannot redefine constant {$name}");
                     }
@@ -7332,13 +7335,14 @@ restart:
         if (isset($block->constants[$op->arg2])) {
             $value = new Variable();
             $value->copyFrom($block->constants[$op->arg2]);
+        } elseif (isset($frame->scope[$op->arg2])) {
+            $value = new Variable();
+            $value->copyFrom($frame->scope[$op->arg2]);
+        } else {
+            throw new \LogicException('Class constant value must be a compile-time constant');
+        }
 
-            return $value;
-        }
-        if (isset($frame->scope[$op->arg2])) {
-            return VM\ClassConstMaterializer::detachConstantValue($frame->scope[$op->arg2]);
-        }
-        throw new \LogicException('Class constant value must be a compile-time constant');
+        return VM\EnumCaseSupport::materializeConstantValue($this->context, $value);
     }
 
     /**

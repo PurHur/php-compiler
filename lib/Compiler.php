@@ -3163,6 +3163,12 @@ class Compiler {
                     return $block->registerConstant(new Operand\Temporary(), $vm);
                 }
             }
+            if (1 === \count($children) && $children[0] instanceof Op\Expr\ClassConstFetch) {
+                $vm = $this->tryFoldClassConstFetchDefault($children[0], $block);
+                if (null !== $vm) {
+                    return $block->registerConstant(new Operand\Temporary(), $vm);
+                }
+            }
             if (
                 2 === \count($children)
                 && $children[0] instanceof Op\Expr\ClassConstFetch
@@ -7310,6 +7316,12 @@ class Compiler {
             $children = $terminal->valueBlock->children;
             if (1 === \count($children) && $children[0] instanceof Op\Expr\Array_) {
                 $vm = $this->tryBuildCompileTimeArrayFromExpr($children[0]);
+                if (null !== $vm) {
+                    return $block->registerConstant(new Operand\Temporary(), $vm);
+                }
+            }
+            if (1 === \count($children) && $children[0] instanceof Op\Expr\ClassConstFetch) {
+                $vm = $this->tryFoldClassConstFetchDefault($children[0], $block);
                 if (null !== $vm) {
                     return $block->registerConstant(new Operand\Temporary(), $vm);
                 }
