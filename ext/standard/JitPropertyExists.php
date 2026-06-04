@@ -169,8 +169,44 @@ final class JitPropertyExists
         $classId = $context->builder->load(
             $context->builder->structGep($obj, $objMap['class_id'])
         );
+        $propLc = strtolower($propLiteral);
+        if ('name' === $propLc || 'value' === $propLc) {
+            $enumExists = self::existsForEnumCasePropertyLiteral($context, $classId, $propLc);
+            $regularExists = self::existsForClassIdLiteralProperty($context, $classId, $propLiteral);
+
+            return $context->builder->or($enumExists, $regularExists);
+        }
 
         return self::existsForClassIdLiteralProperty($context, $classId, $propLiteral);
+    }
+
+    private static function existsForEnumCasePropertyLiteral(
+        Context $context,
+        Value $classId,
+        string $propLc
+    ): Value {
+        $i1 = $context->getTypeFromString('int1');
+        $object = $context->type->object;
+        $exists = $i1->constInt(0, false);
+        foreach ($object->allClassNamesById() as $id => $className) {
+            if (!$object->isEnumClassId($id)) {
+                continue;
+            }
+            $isClass = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $context->constantFromInteger($id, 'int64')
+            );
+            $classExists = $i1->constInt(0, false);
+            if ('name' === $propLc) {
+                $classExists = $i1->constInt(1, false);
+            } elseif ('value' === $propLc && $object->enumHasBacking($id)) {
+                $classExists = $i1->constInt(1, false);
+            }
+            $exists = $context->builder->select($isClass, $classExists, $exists);
+        }
+
+        return $exists;
     }
 
     private static function forClassLiteralRuntimeProperty(

@@ -104,6 +104,25 @@ final class EnumCaseSupport
         return self::createCase($entry->enumClass, $entry->caseName, $entry->backingValue);
     }
 
+    /**
+     * property_exists() on enum case objects (#5612, ext/standard/basic_functions.c zif_property_exists).
+     */
+    public static function propertyExistsOnCase(ClassEntry $enum, string $property): bool
+    {
+        if (!$enum->isEnum) {
+            return false;
+        }
+        $lc = strtolower($property);
+        if ('name' === $lc) {
+            return true;
+        }
+        if ('value' === $lc) {
+            return null !== $enum->backedType;
+        }
+
+        return false;
+    }
+
     public static function getProperty(
         ObjectEntry $object,
         string $name,

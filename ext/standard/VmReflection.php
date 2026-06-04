@@ -348,7 +348,18 @@ final class VmReflection
             return self::propertyExistsOnClass($class, $property);
         }
         if (Variable::TYPE_OBJECT === $objectOrClass->type) {
-            return self::propertyExistsOnClass($objectOrClass->toObject()->class, $property);
+            $object = $objectOrClass->toObject();
+            if (EnumCaseSupport::isEnumCase($object)) {
+                return EnumCaseSupport::propertyExistsOnCase($object->class, $property);
+            }
+
+            return self::propertyExistsOnClass($object->class, $property);
+        }
+        if (Variable::TYPE_ENUM_CASE === $objectOrClass->type) {
+            return EnumCaseSupport::propertyExistsOnCase(
+                $objectOrClass->toEnumCase()->enumClass,
+                $property
+            );
         }
         throw new \TypeError('property_exists(): Argument #1 ($object_or_class) must be of type object|string, '
             .self::propertyExistsInvalidTypeName($objectOrClass->type).' given');
