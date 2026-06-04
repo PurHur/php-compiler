@@ -1552,15 +1552,23 @@ restart:
                             break;
                         }
                         $table = $container->toArray();
-                        if (!$forWrite && !$table->keyExists($arg3)) {
-                            $this->context->errors->undefinedArrayKey(
-                                $arg3,
-                                $this->context,
-                                $frame,
-                                '' !== $frame->scriptPath ? $frame->scriptPath : null
-                            );
+                        try {
+                            if (!$forWrite && !$table->keyExists($arg3)) {
+                                $this->context->errors->undefinedArrayKey(
+                                    $arg3,
+                                    $this->context,
+                                    $frame,
+                                    '' !== $frame->scriptPath ? $frame->scriptPath : null
+                                );
+                            }
+                            $arg1->indirect($table->findVariable($arg3, $forWrite));
+                        } catch (\TypeError $e) {
+                            $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
                         }
-                        $arg1->indirect($table->findVariable($arg3, $forWrite));
                     } elseif (
                         Variable::TYPE_OBJECT === $container->type
                         && $this->objectImplementsArrayAccess($container->toObject())
@@ -3224,6 +3232,7 @@ restart:
                         if ($key->is(Variable::TYPE_OBJECT) || $key->is(Variable::TYPE_ARRAY)) {
                             throw new \TypeError('Illegal offset type');
                         }
+                        VM\EnumCaseSupport::rejectIllegalArrayOffset($key);
                         if ($key->is(Variable::TYPE_INTEGER) || $key->is(Variable::TYPE_FLOAT)) {
                             $ht->updateIndex($key->toInt(), $value);
                         } elseif ($key->is(Variable::TYPE_STRING)) {

@@ -343,6 +343,7 @@ final class HashTable {
         if (Variable::TYPE_INDIRECT === $index->type) {
             $index = $index->resolveIndirect();
         }
+        EnumCaseSupport::rejectIllegalArrayOffset($index);
         if (Variable::TYPE_NULL === $index->type) {
             $empty = new Variable();
             $empty->string('');
