@@ -40,8 +40,8 @@ final class addcslashes extends Internal
 
         return JitAddcslashes::escape(
             $context,
-            $this->jitString($context, $args[0], 'addcslashes() argument #1'),
-            $this->jitString($context, $args[1], 'addcslashes() argument #2')
+            $args[0],
+            $args[1]
         );
     }
 }

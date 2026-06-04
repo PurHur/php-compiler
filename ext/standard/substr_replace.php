@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\Builtin\StringCslashes;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -57,7 +56,6 @@ final class substr_replace extends Internal
         if ($argc < 3 || $argc > 4) {
             throw new \LogicException('substr_replace() requires three or four arguments in this compiler build');
         }
-        StringCslashes::ensureLinked($context);
         if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
             throw new \LogicException('substr_replace() offset must be an integer in this compiler build');
         }
