@@ -513,6 +513,7 @@ class Module extends ModuleAbstract
             new getmyinode(),
             new getlastmod(),
             new getrusage(),
+            new proc_nice(),
             new memory_get_peak_usage(),
             new memory_get_usage(),
             new microtime(),

@@ -344,6 +344,7 @@ static const char *phpc_builtin_functions[] = {
     "preg_replace_callback",
     "preg_split",
     "print_r",
+    "proc_nice",
     "printf",
     "property_exists",
     "putenv",
