@@ -146,6 +146,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'class_alias_interface_trait')) {
                 continue;
             }
+            // class_alias() on enums: VM (#5765); MCJIT LLVM verify (class_alias lowering).
+            if (str_contains($name, 'class_alias_enum')) {
+                continue;
+            }
             // get_defined_functions()/get_declared_functions() MCJIT: VM + dedicated PHPT (#3128/#3739); jit.php execute segfaults on merge runtime.
             if (str_contains($name, 'get_defined_functions') || str_contains($name, 'get_declared_functions')) {
                 continue;
