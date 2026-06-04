@@ -44,7 +44,7 @@ class Context {
     public array $functions = [];
     public array $functionProxies = [];
 
-    /** @var array<int, Call> lazy initializer proxies for phpc_lazy registry (#4940) */
+    /** @var array<int, Call> lazy initializer proxies keyed by __object__.lazy_init_index (#4940, #5318) */
     public array $lazyInitProxies = [];
     /** @var array<string, true> JIT stubs registered for external Class::method (issue #579). */
     public array $externalMethodStubs = [];

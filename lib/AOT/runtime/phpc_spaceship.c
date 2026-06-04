@@ -63,6 +63,9 @@ typedef struct {
     phpc_ref_head ref;
     int64_t class_id;
     int8_t constructed;
+    int8_t lazy_pending;
+    int8_t lazy_ghost;
+    int32_t lazy_init_index;
 } phpc_object_header;
 
 extern long long __value__readLong(__value__ *v);

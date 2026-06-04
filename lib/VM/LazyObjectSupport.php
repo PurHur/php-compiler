@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 /**
- * PHP 8.4 lazy proxy and ghost initialization (#3317, #4026).
+ * PHP 8.4 lazy proxy and ghost initialization (#3317, #4026, #5318).
+ *
+ * VM stores lazy state on {@see ObjectEntry}; JIT/AOT use matching {@code __object__} header fields.
  *
  * @see Zend/zend_lazy_objects.c
  */
