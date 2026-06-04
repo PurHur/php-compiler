@@ -37,7 +37,6 @@ final class Linker
         __DIR__.'/runtime/strtr.c',
         __DIR__.'/runtime/phpc_array_merge_recursive.c',
         __DIR__.'/runtime/phpc_array_replace_recursive.c',
-        __DIR__.'/runtime/phpc_uuencode.c',
         __DIR__.'/runtime/phpc_quot_print.c',
         __DIR__.'/runtime/phpc_utf8_latin1.c',
         __DIR__.'/runtime/phpc_string_cslashes.c',

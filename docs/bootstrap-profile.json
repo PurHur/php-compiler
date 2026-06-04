@@ -925,6 +925,7 @@
         "lib/JIT/Builtin/StringGetrusage.php",
         "lib/JIT/Builtin/StringGettimeofday.php",
         "lib/JIT/Builtin/StringHashCrypto.php",
+        "lib/JIT/Builtin/ConvertUuRuntime.php",
         "lib/JIT/Builtin/StringHrtime.php",
         "lib/JIT/Builtin/StringHtmlspecialchars.php",
         "lib/JIT/Builtin/StringHtmlspecialcharsDecode.php",
