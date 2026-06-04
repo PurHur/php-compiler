@@ -1,5 +1,5 @@
 --TEST--
-Backed enum bitwise/shift/unary operators throw TypeError (#5789, zend_operators.c)
+Backed enum bitwise/shift/unary operators throw TypeError (#5803, zend_operators.c)
 --FILE--
 <?php
 enum E: int { case A = 1; case B = 2; }

@@ -11,6 +11,18 @@ namespace PHPCompiler\VM;
  */
 final class BackedEnum
 {
+    /**
+     * Like {@see caseForValue()} but returns null when the operand cannot coerce to a backing scalar (#5803).
+     */
+    public static function tryCaseForValue(ClassEntry $enum, Variable $value): ?EnumCaseEntry
+    {
+        try {
+            return self::caseForValue($enum, $value);
+        } catch (\TypeError) {
+            return null;
+        }
+    }
+
     public static function caseForValue(ClassEntry $enum, Variable $value): ?EnumCaseEntry
     {
         if (!$enum->isEnum || null === $enum->backedType) {
