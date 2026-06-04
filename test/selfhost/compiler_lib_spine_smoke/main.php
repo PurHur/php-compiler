@@ -769,6 +769,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringStreamCsv.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNaturalCompareJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrnatcasecmp.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrnatcmp.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringSubstrCompareJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSubstrCompare.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionAttributeGetName.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionClassConstruct.php';

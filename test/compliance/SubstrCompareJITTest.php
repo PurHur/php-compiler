@@ -21,4 +21,9 @@ final class SubstrCompareJITTest extends BaseTest
             'substr_compare_jit.phpt'
         );
     }
+
+    public function setUp(): void
+    {
+        $this->BIN = realpath(__DIR__.'/../../bin/jit.php');
+    }
 }
