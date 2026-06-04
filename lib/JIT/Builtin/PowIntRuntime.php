@@ -56,7 +56,7 @@ final class PowIntRuntime
         $nullOut = $context->builder->icmp(
             Builder::INT_EQ,
             $out,
-            $out->typeOf()->pointerType(0)->constNull()
+            $out->typeOf()->constNull()
         );
 
         $resultSlot = $context->builder->alloca($i64, 1, 'pow_result');

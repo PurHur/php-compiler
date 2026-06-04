@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
-use PHPCompiler\JIT\Builtin\ReadonlyRaise;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPLLVM\Builder;
 
@@ -90,13 +90,8 @@ final class ReadonlyClassGuard
                 $declaringClass,
                 $propName
             );
-            $msgLen = $context->constantFromInteger(strlen($message), 'size_t');
-            $msgCStr = self::stringDataPtrFromLiteral($context, $message);
-            $context->builder->call(
-                $context->lookupFunction('__compiler_jit_raise_logic_exception'),
-                $msgCStr,
-                $msgLen
-            );
+            ErrorRaise::ensureLinked($context);
+            ErrorRaise::emitRaise($context, $message);
             // Merge with allow path: pending flag + skip store (#3149, #4875). Avoid returnVoid here —
             // it breaks AOT LLVM verify and MCJIT uncaught readonly inc/dec (#4082).
             $context->builder->branch($exitBlock);
@@ -109,13 +104,13 @@ final class ReadonlyClassGuard
     }
 
     /**
-     * Run $emitStore only when no pending readonly LogicException was recorded (#4875).
+     * Run $emitStore only when no pending readonly Error was recorded (#4875, #5720).
      * Call immediately after {@see emitBeforePropertyStore()} and before propertyStore.
      */
     public static function emitStoreUnlessPending(Context $context, callable $emitStore): void
     {
-        ReadonlyRaise::ensureLinked($context);
-        ReadonlyRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::registerDeclarations($context);
 
         $fn = BasicBlockHelper::parentFunction($context);
         $doStore = $fn->appendBasicBlock('readonly_store_do');
@@ -124,7 +119,7 @@ final class ReadonlyClassGuard
         $entry = $context->builder->getInsertBlock();
 
         $hasPending = $context->builder->call(
-            $context->lookupFunction('phpc_jit_has_pending_exception')
+            $context->lookupFunction('phpc_jit_error_has_pending')
         );
         $i32 = $context->getTypeFromString('int32');
         $isPending = $context->builder->icmp(

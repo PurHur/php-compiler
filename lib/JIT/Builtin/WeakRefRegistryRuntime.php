@@ -174,10 +174,11 @@ final class WeakRefRegistryRuntime
         $context->builder->store($target, $context->builder->structGep($entryPtr, 0));
         $context->builder->store($ht, $context->builder->structGep($entryPtr, 1));
         $keyField = $context->builder->structGep($entryPtr, 2);
+        $keyBuf = $context->builder->pointerCast($keyField, $i8p);
         $sizeT = $context->getTypeFromString('size_t');
         $context->builder->call(
             $context->lookupFunction('snprintf'),
-            $keyField,
+            $keyBuf,
             $sizeT->constInt(self::MAP_KEY_BYTES, false),
             self::literalCstr($context, '%s'),
             $key
@@ -234,11 +235,12 @@ final class WeakRefRegistryRuntime
         $storedTarget = $context->builder->load($context->builder->structGep($entryPtr, 0));
         $storedHt = $context->builder->load($context->builder->structGep($entryPtr, 1));
         $keyField = $context->builder->structGep($entryPtr, 2);
+        $keyBuf = $context->builder->pointerCast($keyField, $i8p);
         $targetMatch = $context->builder->icmp(Builder::INT_EQ, $storedTarget, $target);
         $htMatch = $context->builder->icmp(Builder::INT_EQ, $storedHt, $ht);
         $keyMatch = $context->builder->icmp(
             Builder::INT_EQ,
-            $context->builder->call($context->lookupFunction('strcmp'), $keyField, $key),
+            $context->builder->call($context->lookupFunction('strcmp'), $keyBuf, $key),
             $i32->constInt(0, false)
         );
         $allMatch = $context->builder->and($targetMatch, $context->builder->and($htMatch, $keyMatch));
@@ -249,7 +251,7 @@ final class WeakRefRegistryRuntime
         $context->builder->store($null, $context->builder->structGep($entryPtr, 0));
         $context->builder->store($null, $context->builder->structGep($entryPtr, 1));
         $i8 = $context->getTypeFromString('int8');
-        $context->builder->store($i8->constInt(0, false), $keyField);
+        $context->builder->store($i8->constInt(0, false), $keyBuf);
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($loopInc);
@@ -468,11 +470,12 @@ final class WeakRefRegistryRuntime
         $context->builder->branchIf($doClear, $clearBb, $loopInc);
 
         $context->builder->positionAtEnd($clearBb);
-        $keyLen = $context->builder->call($context->lookupFunction('strlen'), $keyField);
+        $keyBuf = $context->builder->pointerCast($keyField, $i8p);
+        $keyLen = $context->builder->call($context->lookupFunction('strlen'), $keyBuf);
         $keyStr = $context->builder->call(
             $strInit,
             $context->builder->sext($keyLen, $i64),
-            $keyField
+            $keyBuf
         );
         $context->builder->call(
             $unsetKey,
@@ -482,7 +485,7 @@ final class WeakRefRegistryRuntime
         $context->builder->store($null, $context->builder->structGep($entryPtr, 0));
         $context->builder->store($null, $context->builder->structGep($entryPtr, 1));
         $i8 = $context->getTypeFromString('int8');
-        $context->builder->store($i8->constInt(0, false), $keyField);
+        $context->builder->store($i8->constInt(0, false), $keyBuf);
         $context->builder->branch($loopInc);
 
         $context->builder->positionAtEnd($loopInc);
