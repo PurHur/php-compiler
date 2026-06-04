@@ -2063,6 +2063,13 @@ restart:
                             $callableName = $this->context->classes[$lcClass]->name.'::'.$staticCallMethodName;
                         }
                         $this->initStaticCallable($frame, $callableName, $parentKeywordScope);
+                    } catch (\Error $e) {
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        return self::EXCEPTION;
                     } catch (\LogicException $e) {
                         if ($instanceScopeCall && str_starts_with($e->getMessage(), 'Call to undefined static method ')) {
                             $catchFrame = $this->dispatchVmError(
@@ -2466,7 +2473,23 @@ restart:
                     }
                     $name = $callee->toString();
                     if (str_contains($name, '::')) {
-                        $this->initStaticCallable($frame, $name);
+                        try {
+                            $this->initStaticCallable($frame, $name);
+                        } catch (\Error $e) {
+                            $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            return self::EXCEPTION;
+                        } catch (\LogicException $e) {
+                            $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            return self::EXCEPTION;
+                        }
                         break;
                     }
                     $lcname = strtolower($name);
@@ -4790,6 +4813,29 @@ restart:
     }
 
     /**
+     * Zend zend_std_get_static_method: instance methods are not callable via Class::name() (#5339).
+     */
+    private function assertMethodCallableStatically(ClassEntry $declaringClass, string $methodLc): void
+    {
+        $func = $declaringClass->methods[$methodLc];
+        if ($this->methodIsStatic($func)) {
+            return;
+        }
+        $declaringName = $declaringClass->name;
+        $declaredName = $declaringClass->methodNames[$methodLc] ?? $methodLc;
+        if ($func instanceof Func\PHP && null !== $func->block->func && null !== $func->block->func->class) {
+            $declaringName = $func->block->func->class->value;
+            $declLc = strtolower($declaringName);
+            if (isset($this->context->classes[$declLc]->methodNames[$methodLc])) {
+                $declaredName = $this->context->classes[$declLc]->methodNames[$methodLc];
+            }
+        }
+        throw new \Error(
+            'Non-static method '.$declaringName.'::'.$declaredName.'() cannot be called statically'
+        );
+    }
+
+    /**
      * @return array{get?: string, set?: string}|null
      */
     private function resolveStaticPropertyHooks(string $classLc, string $propLc): ?array
@@ -6011,6 +6057,7 @@ restart:
         }
         try {
             [$class, $methodLc] = $this->resolveStaticMethod($lcClass, $methodLc);
+            $this->assertMethodCallableStatically($class, $methodLc);
         } catch (\LogicException $e) {
             $magicClass = $this->findMagicCallStaticClass($lcClass);
             if (null === $magicClass) {
