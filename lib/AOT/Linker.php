@@ -19,7 +19,6 @@ final class Linker
         __DIR__.'/runtime/function_exists.c',
         __DIR__.'/runtime/hash_crypto.c',
         __DIR__.'/runtime/phpc_microtime.c',
-        __DIR__.'/runtime/phpc_getdate.c',
         __DIR__.'/runtime/phpc_gettimeofday.c',
         __DIR__.'/runtime/phpc_info.c',
         __DIR__.'/runtime/phpc_spaceship.c',
