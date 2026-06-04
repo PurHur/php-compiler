@@ -294,6 +294,7 @@ static const char *phpc_builtin_functions[] = {
     "md5_file",
     "memory_get_peak_usage",
     "memory_get_usage",
+    "memory_reset_peak_usage",
     "metaphone",
     "method_exists",
     "microtime",

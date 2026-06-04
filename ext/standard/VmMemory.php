@@ -36,6 +36,17 @@ final class VmMemory
         return $realUsage ? self::$peakReal : self::$peakEmalloc;
     }
 
+    /** php-src: zend_reset_peak_memory_usage — baseline peak at current usage. */
+    public static function resetPeakUsage(bool $realUsage = false): void
+    {
+        $usage = self::getUsage($realUsage);
+        if ($realUsage) {
+            self::$peakReal = $usage;
+        } else {
+            self::$peakEmalloc = $usage;
+        }
+    }
+
     /**
      * Current heap bytes (emalloc subset or RSS when $realUsage).
      */

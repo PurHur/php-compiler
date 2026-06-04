@@ -1,5 +1,6 @@
 /*
- * memory_get_usage() / memory_get_peak_usage() runtime for JIT/AOT (issue #3134).
+ * memory_get_usage() / memory_get_peak_usage() / memory_reset_peak_usage() for JIT/AOT.
+ * Issues #3134, #5539.
  * php-src reference: ext/standard/basic_functions.c PHP_FUNCTION(memory_get_usage)
  */
 
@@ -63,4 +64,14 @@ void __compiler_memory_get_peak_usage(long long real_usage, __value__ *out)
     }
     (void) phpc_heap_usage((int) real_usage);
     __value__writeLong(out, real_usage ? g_peak_real : g_peak_emalloc);
+}
+
+void __compiler_memory_reset_peak_usage(long long real_usage)
+{
+    long long usage = phpc_heap_usage((int) real_usage);
+    if (real_usage) {
+        g_peak_real = usage;
+    } else {
+        g_peak_emalloc = usage;
+    }
 }
