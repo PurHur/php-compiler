@@ -7,13 +7,12 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** Property default `new` expressions (issue #3391). */
+/** Property default `new` expressions (issues #3391, #5362). */
 final class PropertyDefaultNewTest extends TestCase
 {
     public function testInstancePropertyDefaultNewIsPerInstance(): void
     {
-        $runtime = new Runtime();
-        $code = <<<'PHP'
+        $this->assertOutput(<<<'PHP'
 <?php
 class Box {
     public stdClass $inner = new stdClass();
@@ -22,10 +21,56 @@ $a = new Box();
 $b = new Box();
 echo ($a->inner instanceof stdClass) ? "1\n" : "0\n";
 echo ($a->inner !== $b->inner) ? "1\n" : "0\n";
-PHP;
+PHP, "1\n1\n");
+    }
+
+    public function testStaticPropertyDefaultNewIsShared(): void
+    {
+        $this->assertOutput(<<<'PHP'
+<?php
+class C {
+    public static $x = new stdClass();
+}
+echo (C::$x instanceof stdClass) ? "1\n" : "0\n";
+$a = C::$x;
+$b = C::$x;
+echo ($a === $b) ? "same\n" : "diff\n";
+PHP, "1\nsame\n");
+    }
+
+    public function testPropertyDefaultNewWithConstructorArgs(): void
+    {
+        $this->assertOutput(<<<'PHP'
+<?php
+class Box {
+    public function __construct(public array $items = []) {}
+}
+class C {
+    public $y = new Box([]);
+}
+$c = new C();
+echo ($c->y instanceof Box && $c->y->items === []) ? "1\n" : "0\n";
+PHP, "1\n");
+    }
+
+    public function testVarExportStaticPropertyDefaultNew(): void
+    {
+        $this->assertOutput(<<<'PHP'
+<?php
+class C {
+    public static $x = new stdClass();
+}
+var_export(C::$x);
+echo "\n";
+PHP, "(object) array (\n)\n");
+    }
+
+    private function assertOutput(string $code, string $expected): void
+    {
+        $runtime = new Runtime();
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'property_default_new.php'));
         $out = ob_get_clean();
-        $this->assertSame("1\n1\n", $out);
+        $this->assertSame($expected, $out);
     }
 }
