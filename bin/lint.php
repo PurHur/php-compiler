@@ -58,7 +58,7 @@ while ([] !== $args) {
         }
         $snippet = array_shift($args);
         $code = str_starts_with(ltrim($snippet), '<?') ? $snippet : '<?php '.$snippet;
-        $filename = 'Command line code';
+        $filename = 'Standard input code';
         $mode = 'file';
         continue;
     }

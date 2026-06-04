@@ -14,7 +14,7 @@ function vm_unit_probe_run(string $filename, string $code, array $options): stri
     $queryString = $options['-q'] ?? null;
     $postBody = $options['-p'] ?? null;
     $scriptFilename = null;
-    if ('-' !== $filename && 'Command line code' !== $filename) {
+    if ('-' !== $filename && 'Standard input code' !== $filename && 'Command line code' !== $filename) {
         $resolved = realpath($filename);
         if (false !== $resolved) {
             $scriptFilename = $resolved;

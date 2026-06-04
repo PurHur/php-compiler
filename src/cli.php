@@ -75,13 +75,32 @@ if (!function_exists('php_compiler_cli_note_invocation_cwd')) {
     }
 }
 
+if (!function_exists('php_compiler_cli_standard_input_code_filename')) {
+    /** Virtual filename for {@code php -r} snippets (Zend sapi/cli, issue #4374). */
+    function php_compiler_cli_standard_input_code_filename(): string
+    {
+        return 'Standard input code';
+    }
+}
+
+if (!function_exists('php_compiler_cli_is_virtual_code_filename')) {
+    /** True when {@param $path} is a synthetic eval/stdin label, not a filesystem path. */
+    function php_compiler_cli_is_virtual_code_filename(string $path): bool
+    {
+        return '' === $path
+            || '-' === $path
+            || php_compiler_cli_standard_input_code_filename() === $path
+            || 'Command line code' === $path;
+    }
+}
+
 if (!function_exists('php_compiler_cli_resolve_user_path')) {
     /**
      * Resolve a user-supplied relative path against the pre-chdir invocation cwd.
      */
     function php_compiler_cli_resolve_user_path(string $path): string
     {
-        if ('' === $path || '-' === $path || 'Command line code' === $path) {
+        if (php_compiler_cli_is_virtual_code_filename($path)) {
             return $path;
         }
         if ('/' === $path[0]) {

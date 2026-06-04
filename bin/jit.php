@@ -32,7 +32,7 @@ function run(string $filename, string $code, array $options): void
     $queryString = $options['-q'] ?? null;
     $postBody = $options['-p'] ?? null;
     $scriptFilename = null;
-    if ('-' !== $filename && 'Command line code' !== $filename) {
+    if (!php_compiler_cli_is_virtual_code_filename($filename)) {
         $resolved = realpath($filename);
         if (false !== $resolved) {
             $scriptFilename = $resolved;

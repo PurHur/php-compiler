@@ -17,7 +17,7 @@ function vm_run_smoke(string $filename, string $code, array $options): string
     $queryString = $options['-q'] ?? null;
     $postBody = $options['-p'] ?? null;
     $scriptFilename = null;
-    if ('-' !== $filename && 'Command line code' !== $filename) {
+    if ('-' !== $filename && 'Standard input code' !== $filename && 'Command line code' !== $filename) {
         $resolved = realpath($filename);
         if (false !== $resolved) {
             $scriptFilename = $resolved;

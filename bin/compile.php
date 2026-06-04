@@ -20,7 +20,9 @@ use PHPCompiler\Web\Superglobals;
  */
 function phpc_compile_is_user_script_aot(string $normalized): bool
 {
-    if ('' === $normalized || '-' === $normalized || 'Command line code' === $normalized) {
+    if ('' === $normalized || '-' === $normalized
+        || 'Standard input code' === $normalized
+        || 'Command line code' === $normalized) {
         return true;
     }
     if (str_contains($normalized, 'bootstrap-aot/')) {
@@ -157,7 +159,9 @@ function run(string $filename, string $code, array $options): void
         }
     }
     $scriptFilename = null;
-    if ('-' !== $filename && 'Command line code' !== $filename) {
+    if (\function_exists('php_compiler_cli_is_virtual_code_filename')
+        ? !php_compiler_cli_is_virtual_code_filename($filename)
+        : ('-' !== $filename && 'Standard input code' !== $filename && 'Command line code' !== $filename)) {
         $resolved = realpath($filename);
         if (false !== $resolved) {
             $scriptFilename = $resolved;
