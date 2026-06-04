@@ -288,8 +288,9 @@ class Runtime {
         }
     }
 
-    public function preprocessSourceForParse(string $code): array
+    public function preprocessSourceForParse(string $code, string $filename = 'unknown'): array
     {
+        CurlyBraceOffsetRejector::reject($code, $filename);
         $sealedPreprocessor = new SealedClassPreprocessor();
         [$code, $permitsByLine] = $sealedPreprocessor->preprocess($code);
         $this->sealedClassAnnotator->setPermitsByLine($permitsByLine);
@@ -315,7 +316,7 @@ class Runtime {
     }
 
     public function parse(string $code, string $filename): Script {
-        [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code);
+        [$code, $bareRethrowLines] = $this->preprocessSourceForParse($code, $filename);
         $this->compiler->setBareRethrowLines($bareRethrowLines);
         $code = $this->rewriteSourceBeforeParser($code);
         $fileStrictTypes = $this->detectFileStrictTypes($code);
