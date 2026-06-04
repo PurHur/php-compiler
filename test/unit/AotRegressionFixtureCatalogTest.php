@@ -102,6 +102,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
             'ord_empty_4324.php' => ['ord_empty_4324.php'],
             'array_union_plus.php' => ['array_union_plus.php'],
             'match_guard.php' => ['match_guard.php'],
+            'str_getcsv_enum_typeerror.php' => ['str_getcsv_enum_typeerror.php'],
         ];
     }
 
