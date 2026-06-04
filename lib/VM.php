@@ -1098,7 +1098,7 @@ class VM {
 
         return $this->makeEngineError(
             VM\ExceptionSupport::THROW_NON_THROWABLE_MESSAGE,
-            'TypeError'
+            VM\ExceptionSupport::CLASS_ERROR
         );
     }
 

@@ -47,7 +47,7 @@ final class ExceptionSupport
     /** Zend zend_exceptions.c — chained Throwable (#5104, #5486). */
     public const PROP_PREVIOUS = 'previous';
 
-    /** Zend zend_exceptions.c — throw non-Throwable (#5223). */
+    /** Zend zend_exceptions.c — throw non-Throwable raises Error (#5223, #5727). */
     public const THROW_NON_THROWABLE_MESSAGE = 'Cannot throw objects that do not implement Throwable';
 
     public static function requireThrowableObject(Variable $var, string $label, ?Context $ctx = null): ObjectEntry
