@@ -49,10 +49,13 @@
         }
         $this->block = $tmp;
 
-        $this->block->children[] = new Op\Terminal\Const_(
+        $constOp = new Op\Terminal\Const_(
             $this->parseExprNode($node->name),
             $value,
             $valueBlock,
             $this->mapAttributes($node)
         );
+        $constOp->isEnumCase = true;
+        $constOp->enumCaseHasExplicitValue = null !== $node->expr;
+        $this->block->children[] = $constOp;
     }
