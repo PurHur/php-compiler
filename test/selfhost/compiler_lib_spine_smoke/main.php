@@ -356,6 +356,7 @@ require_once __DIR__.'/../../../ext/standard/VmNumberFormat.php';
 require_once __DIR__.'/../../../ext/standard/VmPack.php';
 require_once __DIR__.'/../../../ext/standard/VmParseStr.php';
 require_once __DIR__.'/../../../ext/standard/VmPassword.php';
+require_once __DIR__.'/../../../ext/standard/VmPregNative.php';
 require_once __DIR__.'/../../../ext/standard/VmPreg.php';
 require_once __DIR__.'/../../../ext/standard/VmPregReplaceCallback.php';
 require_once __DIR__.'/../../../ext/standard/VmReflection.php';
