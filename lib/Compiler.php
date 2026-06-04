@@ -5285,12 +5285,14 @@ class Compiler {
         $fetchBlock = new Block($block->orig);
         $fetchBlock->inheritUndefinedLocals = true;
         $fetchBlock->inheritScopeFrom($block);
-        $fetchBlock->addOpCode(new OpCode(
+        $nullsafePropertyFetch = new OpCode(
             OpCode::TYPE_PROPERTY_FETCH,
             $this->compileOperand($expr->result, $fetchBlock, false),
             $this->compileOperand($expr->var, $fetchBlock, true),
             $this->compileOperand($expr->name, $fetchBlock, true)
-        ));
+        );
+        $nullsafePropertyFetch->nullsafeFetchPropertyRead = true;
+        $fetchBlock->addOpCode($nullsafePropertyFetch);
         $fetchJump = new OpCode(OpCode::TYPE_JUMP);
         $fetchJump->block1 = $endBlock;
         $fetchBlock->addOpCode($fetchJump);

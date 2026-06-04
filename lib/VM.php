@@ -3154,7 +3154,11 @@ restart:
                         if (null !== $hookValue) {
                             $result->copyFrom($hookValue);
                         } else {
-                            $result->indirect($propertyObject->getProperty($name));
+                            $propSlot = $propertyObject->getProperty($name);
+                            if ($op->nullsafeFetchPropertyRead) {
+                                VM\TypedPropertyCheck::assertReadable($propSlot);
+                            }
+                            $result->indirect($propSlot);
                         }
                         break;
                     }
