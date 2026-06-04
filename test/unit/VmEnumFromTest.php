@@ -14,6 +14,7 @@ final class VmEnumFromTest extends TestCase
 <?php
 enum Color: string { case Red = 'red'; case Blue = 'blue'; }
 echo Color::from('red')->name;
+echo Color::tryFrom('red')->name;
 echo Color::tryFrom('nope') === null ? 'null' : 'bad';
 PHP;
         $runtime = new Runtime();
@@ -22,7 +23,23 @@ PHP;
         $runtime->run($block);
         $output = ob_get_clean();
 
-        $this->assertSame('Rednull', $output);
+        $this->assertSame('RedRednull', $output);
+    }
+
+    public function testBackedEnumTryFromInTernaryWithSecondCall(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum Color: string { case Red = 'red'; case Blue = 'blue'; }
+echo Color::tryFrom('red') === null ? 'NULL' : Color::tryFrom('red')->name;
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_try_from_ternary.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame('Red', $output);
     }
 
     public function testBackedEnumFromInvalidUncaught(): void
