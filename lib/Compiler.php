@@ -3099,7 +3099,7 @@ class Compiler {
         $constOp->classConstVisibilityFlags = property_exists($child, 'flags')
             ? (int) $child->flags
             : CfgFunc::FLAG_PUBLIC;
-        if (property_exists($child, 'isEnumCase') && $child->isEnumCase) {
+        if ($this->cfgTerminalConstIsEnumCase($child)) {
             $constOp->isEnumCaseDeclare = true;
             if (null !== $this->compilingClassLc) {
                 $constName = $this->staticNameFromOperand($child->name);
@@ -3132,6 +3132,25 @@ class Compiler {
                 $this->compileTimeClassConsts[$this->compilingClassLc][strtolower($constName)] = $stored;
             }
         }
+    }
+
+    /**
+     * Distinguish enum `case` from user `const` when php-cfg isEnumCase is missing (#5832).
+     */
+    private function cfgTerminalConstIsEnumCase(Op\Terminal\Const_ $child): bool
+    {
+        if (property_exists($child, 'isEnumCase') && $child->isEnumCase) {
+            return true;
+        }
+        if (null === $this->compilingClassLc
+            || !array_key_exists($this->compilingClassLc, $this->compileTimeEnumBackedTypes)) {
+            return false;
+        }
+        if (property_exists($child, 'declaredType') && null !== $child->declaredType) {
+            return false;
+        }
+
+        return 0 === (property_exists($child, 'flags') ? (int) $child->flags : 0);
     }
 
     /**

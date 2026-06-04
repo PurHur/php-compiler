@@ -16,6 +16,44 @@ final class EnumCaseSupport
         return $object->isEnumCase;
     }
 
+    /**
+     * Class const fetch on enum cases — upgrade legacy backing scalars to TYPE_ENUM_CASE (#5832, #5798).
+     */
+    public static function tryMaterializeEnumCaseConstantFetch(
+        ClassEntry $enum,
+        string $memberLc,
+        Variable $dest
+    ): bool {
+        if (!isset($enum->constants[$memberLc])) {
+            return false;
+        }
+        $canonical = EnumSupport::enumCaseNameForConstantMember($enum, $memberLc);
+        if (null === $canonical) {
+            return false;
+        }
+        if (null !== $enum->backedType) {
+            EnumSupport::ensureBackedEnumValuesUnique($enum);
+        }
+        $stored = $enum->constants[$memberLc]->resolveIndirect();
+        $backing = new Variable(Variable::TYPE_NULL);
+        $backing->null();
+        if (null !== $enum->backedType) {
+            if (Variable::TYPE_OBJECT === $stored->type && self::isEnumCase($stored->toObject())) {
+                $caseValue = $stored->toObject()->enumCaseValue;
+                if (null !== $caseValue) {
+                    $backing->copyFrom($caseValue);
+                }
+            } elseif (Variable::TYPE_ENUM_CASE === $stored->type) {
+                $backing->copyFrom($stored->toEnumCase()->backingValue);
+            } else {
+                $backing->copyFrom($enum->constants[$memberLc]);
+            }
+        }
+        $dest->enumCase(new EnumCaseEntry($enum, $canonical, $backing));
+
+        return true;
+    }
+
     public static function createCase(ClassEntry $enum, string $caseName, Variable $backedValue): Variable
     {
         if (!$enum->isEnum) {

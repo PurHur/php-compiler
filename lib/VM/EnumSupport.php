@@ -85,4 +85,24 @@ final class EnumSupport
         }
         $entry->backedEnumTableBuilt = true;
     }
+
+    /**
+     * Enum `case` member name for a constants-table key, or null for user `const` (#5832, #5054).
+     */
+    public static function enumCaseNameForConstantMember(ClassEntry $enum, string $memberLc): ?string
+    {
+        if (!$enum->isEnum) {
+            return null;
+        }
+        if (isset($enum->enumCaseCanonicalNames[$memberLc])) {
+            return $enum->enumCaseCanonicalNames[$memberLc];
+        }
+        foreach ($enum->enumCases as $case) {
+            if (strtolower($case['name']) === $memberLc) {
+                return $case['name'];
+            }
+        }
+
+        return null;
+    }
 }
