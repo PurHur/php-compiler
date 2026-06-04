@@ -15,7 +15,7 @@ use PHPLLVM\Value;
 /**
  * json_validate() — PHP 8.3 syntax check without building values (issue #3101).
  *
- * VM: host json_validate(); JIT/AOT: __compiler_json_validate (ext/json parity subset).
+ * VM: VmJsonScanner (ext/json parity subset); JIT/AOT: __compiler_json_validate.
  * Unsupported $flags throw LogicException; depth ValueError on VM when nesting exceeds limit.
  */
 final class json_validate extends Internal

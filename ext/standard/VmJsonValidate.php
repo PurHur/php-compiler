@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * json_validate() VM helper — host json_validate (PHP 8.3+) or json_decode depth fallback.
+ * json_validate() VM helper — native scanner (VmJsonScanner), no host json_validate/json_decode.
  */
 final class VmJsonValidate
 {
@@ -14,19 +14,17 @@ final class VmJsonValidate
         if ($depth < 1) {
             throw new \ValueError('json_validate(): Argument #2 ($depth) must be greater than 0');
         }
-        if (\function_exists('json_validate')) {
-            $ok = \json_validate($json, $depth);
-            VmJson::syncLastErrorFromHost();
-
-            return $ok;
-        }
-        \json_decode($json, true, $depth);
-        VmJson::syncLastErrorFromHost();
-        $err = VmJson::lastError();
-        if (\JSON_ERROR_DEPTH === $err) {
+        $result = VmJsonScanner::validate($json, $depth);
+        if (VmJsonScanner::RESULT_DEPTH === $result) {
             throw new \ValueError('json_validate(): Argument #1 ($json) depth exceeds the maximum allowed depth of '.$depth);
         }
+        if (VmJsonScanner::RESULT_VALID === $result) {
+            VmJson::setLastError(0);
 
-        return \JSON_ERROR_NONE === $err;
+            return true;
+        }
+        VmJson::setLastError(4);
+
+        return false;
     }
 }

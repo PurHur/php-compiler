@@ -36,6 +36,28 @@ final class JsonValidateBuiltinTest extends TestCase
         $fn->execute($frame);
     }
 
+    public function testValidEmptyArray(): void
+    {
+        $this->assertTrue($this->runValidate('[]'));
+    }
+
+    public function testDepthExceededThrows(): void
+    {
+        $nested = '{"a":{"b":{"c":{"d":1}}}}';
+        $runtime = new Runtime();
+        $fn = new json_validate();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $jsonVar = new VMVariable();
+        $jsonVar->string($nested);
+        $depthVar = new VMVariable();
+        $depthVar->int(2);
+        $frame->calledArgs = [$jsonVar, $depthVar];
+        $frame->returnVar = new VMVariable();
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage('depth exceeds');
+        $fn->execute($frame);
+    }
+
     private function runValidate(string $json, int $depth = 512): bool
     {
         $runtime = new Runtime();
