@@ -7603,6 +7603,7 @@ restart:
                 if ($key->is(Variable::TYPE_OBJECT) || $key->is(Variable::TYPE_ARRAY)) {
                     throw new \TypeError('Illegal offset type');
                 }
+                VM\EnumCaseSupport::rejectIllegalArrayOffset($key);
                 if ($key->is(Variable::TYPE_INTEGER) || $key->is(Variable::TYPE_FLOAT)) {
                     $ht->updateIndex($key->toInt(), $value);
                 } elseif ($key->is(Variable::TYPE_STRING)) {
