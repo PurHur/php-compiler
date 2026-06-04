@@ -15,4 +15,15 @@ final class VmSleep
     {
         \usleep($microseconds);
     }
+
+    /** @return true|array{seconds: int, nanoseconds: int}|false */
+    public static function timeNanosleep(int $seconds, int $nanoseconds): mixed
+    {
+        return \time_nanosleep($seconds, $nanoseconds);
+    }
+
+    public static function timeSleepUntil(float $timestamp): bool
+    {
+        return \time_sleep_until($timestamp);
+    }
 }
