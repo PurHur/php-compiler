@@ -34,7 +34,19 @@ final class VmMath
     }
 
     /**
-     * Z_PARAM_LONG-style coercion for int-only builtins (php-src math.c; #4982 intdiv).
+     * Truncate a finite float toward zero like Zend Z_PARAM_LONG (no PHP 8.4 implicit-cast deprecation).
+     */
+    public static function floatToZendLong(float $value): int
+    {
+        if ($value >= 0.0) {
+            return (int) floor($value);
+        }
+
+        return (int) ceil($value);
+    }
+
+    /**
+     * Z_PARAM_LONG-style coercion for int-only builtins (php-src math.c; #4982 intdiv, #5360 float truncation).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
@@ -52,7 +64,12 @@ final class VmMath
             throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'object'));
         }
         if (Variable::TYPE_FLOAT === $var->type) {
-            throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'float'));
+            $f = $var->toFloat();
+            if (!\is_finite($f)) {
+                throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'float'));
+            }
+
+            return self::floatToZendLong($f);
         }
 
         return self::parseLongBuiltinArgCore($var, $function, $argIndex, $paramName);
@@ -79,7 +96,7 @@ final class VmMath
             throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'object'));
         }
         if (Variable::TYPE_FLOAT === $var->type) {
-            return (int) $var->toFloat();
+            return self::floatToZendLong($var->toFloat());
         }
 
         return self::parseLongBuiltinArgCore($var, $function, $argIndex, $paramName);
