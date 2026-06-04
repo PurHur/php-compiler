@@ -3351,7 +3351,7 @@ class Compiler {
             }
         }
         if ($expr instanceof Op\Expr\Array_) {
-            $vm = $this->tryBuildCompileTimeArrayFromExpr($expr);
+            $vm = $this->tryBuildCompileTimeArrayFromExpr($expr, $block, $children);
             if (null !== $vm) {
                 return $block->registerConstant($param->defaultVar, $vm);
             }
@@ -3382,7 +3382,7 @@ class Compiler {
             return $this->tryFoldClassConstFetchDefault($expr, $block);
         }
         if ($expr instanceof Op\Expr\Array_) {
-            return $this->tryBuildCompileTimeArrayFromExpr($expr);
+            return $this->tryBuildCompileTimeArrayFromExpr($expr, $block, $defaultBlockChildren);
         }
         if ($expr instanceof Op\Expr\UnaryMinus || $expr instanceof Op\Expr\UnaryPlus) {
             return $this->tryFoldUnaryLiteralDefault($expr);
@@ -3600,6 +3600,51 @@ class Compiler {
         return null !== $default && Variable::TYPE_NULL === $default->type;
     }
 
+    /**
+     * Zend zend_compile.c: scalar/object typed parameters cannot default to array literals (#5347).
+     */
+    protected function assertParamDefaultMatchesDeclaredType(Op\Expr\Param $param, ?int $defaultSlot, Block $block): void
+    {
+        if (null === $defaultSlot || null === $param->declaredType) {
+            return;
+        }
+        $default = $block->constants[$defaultSlot] ?? null;
+        if (null === $default || !$default->is(Variable::TYPE_ARRAY)) {
+            return;
+        }
+        if ($param->declaredType instanceof Op\Type\Nullable) {
+            $inner = $param->declaredType->type;
+            if ($inner instanceof Op\Type\Literal && 'array' === strtolower($inner->name)) {
+                return;
+            }
+        }
+        if ($param->declaredType instanceof Op\Type\Literal && 'array' === strtolower($param->declaredType->name)) {
+            return;
+        }
+        if (null !== $this->genericArraySpecFromCfgType($param->declaredType)) {
+            return;
+        }
+        if ($param->declaredType instanceof Op\Type\Literal && 'mixed' === strtolower($param->declaredType->name)) {
+            return;
+        }
+        if ($param->declaredType instanceof Op\Type\Literal && 'iterable' === strtolower($param->declaredType->name)) {
+            return;
+        }
+        if ($param->declaredType instanceof Op\Type\Mixed_) {
+            return;
+        }
+        $paramName = '?';
+        if ($param->name instanceof Operand\Literal && is_string($param->name->value)) {
+            $paramName = '$'.$param->name->value;
+        }
+        $typeLabel = $param->declaredType instanceof Op\Type\Literal
+            ? $param->declaredType->name
+            : 'mixed';
+        $this->throwCompileError(
+            'Cannot use array as default value for parameter '.$paramName.' of type '.$typeLabel
+        );
+    }
+
     protected function compileParam(Op\Expr\Param $param, Block $block, int $paramIdx): OpCode {
         if ($param->byRef) {
             $block->paramByRef[$paramIdx] = true;
@@ -3620,6 +3665,7 @@ class Compiler {
             $block->paramSensitive[$paramIdx] = true;
         }
         $this->applyParamDeclaredType($param, $block, $slot, $param->variadic);
+        $this->assertParamDefaultMatchesDeclaredType($param, $defaultConst, $block);
         if ($this->paramIsImplicitNullable($param, $defaultConst, $block)) {
             $block->paramImplicitNullable[$slot] = true;
         }
@@ -5513,16 +5559,34 @@ class Compiler {
         return $block->registerConstant($operand, $vm);
     }
 
-    protected function tryBuildCompileTimeArrayFromExpr(Op\Expr\Array_ $expr): ?Variable
+    protected function tryBuildCompileTimeArrayFromExpr(
+        Op\Expr\Array_ $expr,
+        ?Block $block = null,
+        array $defaultBlockChildren = []
+    ): ?Variable
     {
         $unpackFlags = property_exists($expr, 'unpack') ? $expr->unpack : [];
         $ht = new HashTable();
         $n = \count($expr->values);
         for ($i = 0; $i < $n; ++$i) {
             if (!empty($unpackFlags[$i])) {
-                return null;
+                $spreadVm = $this->compileTimeVariableFromCfgArrayElement(
+                    $expr->values[$i],
+                    $block,
+                    $defaultBlockChildren
+                );
+                if (null === $spreadVm || !$spreadVm->is(Variable::TYPE_ARRAY)) {
+                    return null;
+                }
+                $ht->spreadFrom($spreadVm->toArray());
+
+                continue;
             }
-            $valueVm = $this->compileTimeVariableFromCfgArrayElement($expr->values[$i]);
+            $valueVm = $this->compileTimeVariableFromCfgArrayElement(
+                $expr->values[$i],
+                $block,
+                $defaultBlockChildren
+            );
             if (null === $valueVm) {
                 return null;
             }
@@ -5531,8 +5595,11 @@ class Compiler {
                 $ht->append($valueVm);
                 continue;
             }
-            if ($keyOp instanceof Operand\NullOperand
-                || ($keyOp instanceof Operand\Literal && null === $keyOp->value)) {
+            if ($keyOp instanceof Operand\NullOperand) {
+                $ht->append($valueVm);
+                continue;
+            }
+            if ($keyOp instanceof Operand\Literal && null === $keyOp->value) {
                 $ht->update('', $valueVm);
                 continue;
             }
@@ -5558,15 +5625,24 @@ class Compiler {
         return $vmArray;
     }
 
-    protected function compileTimeVariableFromCfgArrayElement(Operand $operand): ?Variable
-    {
+    protected function compileTimeVariableFromCfgArrayElement(
+        Operand $operand,
+        ?Block $block = null,
+        array $defaultBlockChildren = []
+    ): ?Variable {
         $vm = $this->vmVariableFromCfgLiteralOperand($operand);
         if (null !== $vm) {
             return $vm;
         }
+        if (null !== $block && [] !== $defaultBlockChildren) {
+            $vm = $this->tryFoldCompileTimeOperandDefault($operand, $block, $defaultBlockChildren);
+            if (null !== $vm) {
+                return $vm;
+            }
+        }
         $nested = $this->unwrapCfgArrayExprOperand($operand);
         if (null !== $nested) {
-            return $this->tryBuildCompileTimeArrayFromExpr($nested);
+            return $this->tryBuildCompileTimeArrayFromExpr($nested, $block, $defaultBlockChildren);
         }
 
         return null;
