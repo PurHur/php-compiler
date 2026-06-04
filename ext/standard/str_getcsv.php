@@ -7,9 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -30,26 +29,23 @@ final class str_getcsv extends Internal
         if ($argc < 1 || $argc > 4) {
             throw new \LogicException('str_getcsv() accepts one to four arguments in this compiler build');
         }
-        $string = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $string->type) {
-            throw new \LogicException('str_getcsv() argument #1 must be a string in this compiler build');
-        }
+        $input = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'str_getcsv', 0, 'string');
         $separator = ',';
         $enclosure = '"';
         $escape = '\\';
         if ($argc >= 2) {
-            $separator = VmReflection::stringArg($frame->calledArgs[1], 'str_getcsv() separator');
+            $separator = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'str_getcsv', 1, 'separator');
         }
         if ($argc >= 3) {
-            $enclosure = VmReflection::stringArg($frame->calledArgs[2], 'str_getcsv() enclosure');
+            $enclosure = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'str_getcsv', 2, 'enclosure');
         }
         if ($argc >= 4) {
-            $escape = VmReflection::stringArg($frame->calledArgs[3], 'str_getcsv() escape');
+            $escape = VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'str_getcsv', 3, 'escape');
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $row = VmCsv::parseLine($string->toString(), $separator, $enclosure, $escape);
+        $row = VmCsv::parseLine($input, $separator, $enclosure, $escape);
         $frame->returnVar->array(VmFs::stringListToArray($row));
     }
 
@@ -60,18 +56,18 @@ final class str_getcsv extends Internal
             throw new \LogicException('str_getcsv() accepts one to four arguments in this compiler build');
         }
         $strPtr = $context->getTypeFromString('__string__*');
-        $input = JitStringArg::lower($context, $args[0], 'str_getcsv() argument #1');
+        $input = JitStringBuiltinArg::lower($context, $args[0], 'str_getcsv', 0, 'string');
         $separator = $strPtr->constNull();
         $enclosure = $strPtr->constNull();
         $escape = $strPtr->constNull();
         if ($argc >= 2) {
-            $separator = JitStringArg::lower($context, $args[1], 'str_getcsv() separator');
+            $separator = JitStringBuiltinArg::lower($context, $args[1], 'str_getcsv', 1, 'separator');
         }
         if ($argc >= 3) {
-            $enclosure = JitStringArg::lower($context, $args[2], 'str_getcsv() enclosure');
+            $enclosure = JitStringBuiltinArg::lower($context, $args[2], 'str_getcsv', 2, 'enclosure');
         }
         if ($argc >= 4) {
-            $escape = JitStringArg::lower($context, $args[3], 'str_getcsv() escape');
+            $escape = JitStringBuiltinArg::lower($context, $args[3], 'str_getcsv', 3, 'escape');
         }
 
         return JitStrGetcsv::invoke($context, $input, $separator, $enclosure, $escape);
