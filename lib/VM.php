@@ -1115,6 +1115,13 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
+                    if (!isset($frame->block->constants[$op->arg3])) {
+                        $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg3);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                    }
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = isset($frame->block->constants[$op->arg3])
@@ -1229,6 +1236,11 @@ restart:
                             $frame = $catchFrame;
                             goto restart;
                         }
+                    }
+                    $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg2);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
                     }
                     $rhsSlot = $frame->scope[$op->arg2];
                     $rhs = $rhsSlot->resolveIndirect();
@@ -2394,6 +2406,11 @@ restart:
                     goto return_void_complete;
                 case OpCode::TYPE_RETURN:
                     if (isset($frame->scope[$op->arg1])) {
+                        $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg1);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                         $returnValue = $frame->scope[$op->arg1]->resolveIndirect();
                     } elseif (isset($frame->block->constants[$op->arg1])) {
                         $returnValue = $frame->block->constants[$op->arg1];
@@ -2450,6 +2467,11 @@ restart:
                     $frame->callArgEntries = [];
                     break;
                 case OpCode::TYPE_METHODCALL_INIT:
+                    $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg1);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $receiver = $frame->scope[$op->arg1]->resolveIndirect();
                     if ($receiver->type !== Variable::TYPE_OBJECT) {
                         throw new \LogicException('Method call on non-object');
@@ -2468,6 +2490,11 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_ARG_SEND:
+                    $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg1);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $value = $frame->scope[$op->arg1];
                     if (null !== $op->arg3) {
                         $frame->callArgEntries[] = ['u', $value];
@@ -2625,20 +2652,6 @@ restart:
                         && $frame->call === $closureState->func
                     ) {
                         $this->applyClosureBinding($new, $closureState);
-                    }
-                    if (null !== $new->block && null !== $new->block->func && (int) ($new->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) {
-                        $thisIdx = $new->block->slotIndexForVariableName('this');
-                        if (null !== $thisIdx) {
-                            $catchFrame = $this->dispatchVmError(
-                                'Using $this when not in object context',
-                                $frame
-                            );
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
-                            }
-                            break;
-                        }
                     }
                     if (null === $new->calledClass || '' === $new->calledClass) {
                         $new->calledClass = $this->inferCalledClass($frame);
@@ -2973,6 +2986,11 @@ restart:
                     break;
                 case OpCode::TYPE_PROPERTY_FETCH:
                     $result = $frame->scope[$op->arg1];
+                    $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg2);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $var = $frame->scope[$op->arg2]->resolveIndirect();
                     $name = $frame->scope[$op->arg3]->toString();
                     if (Variable::TYPE_ENUM_CASE === $var->type) {
@@ -3152,11 +3170,19 @@ restart:
                     $dst->bool($value);
                     break;
                 case OpCode::TYPE_EMPTY:
+                    if ($this->isUnboundThisSlot($frame, (int) $op->arg2)) {
+                        $frame->scope[$op->arg1]->bool(true);
+                        break;
+                    }
                     $v = $frame->scope[$op->arg2]->resolveIndirect();
                     $frame->scope[$op->arg1]->bool(!ext\standard\boolval::isTruthy($v));
                     break;
                 case OpCode::TYPE_ISSET:
                     $dst = $frame->scope[$op->arg1];
+                    if (null === $op->arg3 && $this->isUnboundThisSlot($frame, (int) $op->arg2)) {
+                        $dst->bool(false);
+                        break;
+                    }
                     if (null !== $op->arg3) {
                         $container = $frame->scope[$op->arg2]->resolveIndirect();
                         if (Variable::TYPE_ARRAY === $container->type) {
@@ -3832,6 +3858,36 @@ restart:
         }
 
         return $this->dispatchVmError('Cannot re-assign $this', $frame);
+    }
+
+    /**
+     * isset($this) / empty($this) in static or non-object scope — false / true without Error (#5411).
+     */
+    private function isUnboundThisSlot(Frame $frame, int $slot): bool
+    {
+        $thisIdx = $frame->block->slotIndexForVariableName('this');
+        if (null === $thisIdx || $thisIdx !== $slot) {
+            return false;
+        }
+        $func = $frame->block->func;
+        if (null === $func || null === $func->class) {
+            return false;
+        }
+        if ((($func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+            return true;
+        }
+
+        return !isset($frame->scope[$thisIdx]);
+    }
+
+    /** Runtime Error when $this is evaluated outside object context (not isset/empty). */
+    private function guardUnboundThisRead(Frame $frame, int $slot): ?Frame
+    {
+        if (!$this->isUnboundThisSlot($frame, $slot)) {
+            return null;
+        }
+
+        return $this->dispatchVmError('Using $this when not in object context', $frame);
     }
 
     /**
