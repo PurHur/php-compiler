@@ -642,6 +642,8 @@ class Context {
             Builtin\TypeErrorRaise::ensureStandaloneBodies($this);
             Builtin\ErrorRaise::ensureStandaloneBodies($this);
             Builtin\ReadonlyRaise::ensureStandaloneBodies($this);
+            Builtin\JitThrow::ensureStandaloneBodies($this);
+            Builtin\JitReturnPending::ensureStandaloneBodies($this);
         }
 
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();
