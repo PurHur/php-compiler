@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * http_build_query() — query string builder (subset; VM via PHP; JIT/AOT via __compiler_http_build_query).
+ * http_build_query() — query string builder (VM via VmHttpBuildQuery; JIT/AOT via __compiler_http_build_query).
  */
 final class http_build_query extends Internal
 {
@@ -68,11 +68,12 @@ final class http_build_query extends Internal
         }
 
         $exported = VmHttpBuildQuery::export($data);
-        $built = \http_build_query($exported, $prefix, $separator, $encoding);
-        if (false === $built) {
-            throw new \LogicException('http_build_query() failed');
+        if (!\is_array($exported)) {
+            throw new \LogicException('http_build_query() argument #1 must be an array in this compiler build');
         }
-        $frame->returnVar->string($built);
+        $frame->returnVar->string(
+            VmHttpBuildQuery::build($exported, $prefix, $separator, $encoding)
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
