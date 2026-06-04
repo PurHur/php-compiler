@@ -60,6 +60,12 @@ final class floatval extends Internal
 
             return;
         }
+        $enumFloat = VmScalarType::tryEnumCaseToFloat($frame, $v);
+        if (null !== $enumFloat) {
+            $frame->returnVar->float($enumFloat);
+
+            return;
+        }
         throw new \LogicException('floatval() only supports integers, floats, booleans, strings, and null in this compiler build');
     }
 
@@ -163,6 +169,28 @@ final class floatval extends Internal
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterDouble);
+        $objectEnumBlock = BasicBlockHelper::append($context, 'floatval_value_object_enum');
+        $afterEnumDispatch = BasicBlockHelper::append($context, 'floatval_value_after_enum_dispatch');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_OBJECT, false)),
+            $objectEnumBlock,
+            $afterEnumDispatch
+        );
+        $enumDouble = null;
+        $enumEndBlock = null;
+        $context->builder->positionAtEnd($objectEnumBlock);
+        $objPtr = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
+        $enumDouble = JitScalarEnumCoerce::tryEmitObjectEnumCaseToDouble(
+            $context,
+            $objPtr,
+            'floatval',
+            $afterEnumDispatch
+        );
+        if (null !== $enumDouble) {
+            $enumEndBlock = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBlock);
+        }
+        $context->builder->positionAtEnd($afterEnumDispatch);
         $fallbackBlock = BasicBlockHelper::append($context, 'floatval_value_fallback');
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false)),
@@ -188,6 +216,9 @@ final class floatval extends Internal
         $phi->addIncoming($boolFloat, $boolEndBlock);
         $phi->addIncoming($doubleVal, $doubleEndBlock);
         $phi->addIncoming($stringFloat, $stringEndBlock);
+        if (null !== $enumDouble && null !== $enumEndBlock) {
+            $phi->addIncoming($enumDouble, $enumEndBlock);
+        }
         $phi->addIncoming($zero, $fallbackBlock);
 
         return $phi;
