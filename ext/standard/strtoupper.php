@@ -14,8 +14,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -29,11 +30,16 @@ final class strtoupper extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('strtoupper() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $frame->returnVar->string(VmString::asciiUpper(VmString::coerceOperand($v)));
+        $subject = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'strtoupper',
+            0,
+            'string'
+        );
+        BuiltinExecute::writeReturn(
+            $frame,
+            static fn (Variable $ret) => $ret->string(VmString::asciiUpper($subject))
+        );
     }
 
     public Context $context;
@@ -44,7 +50,7 @@ final class strtoupper extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('strtoupper() requires exactly one argument');
         }
-        $str = JitStringArg::lower($context, $args[0], 'strtoupper() string');
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'strtoupper', 0, 'string');
         $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
         lcfirst::transformAllAscii($context, $copy, ord('a'), ord('z'), -32);
 
