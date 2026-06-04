@@ -4100,6 +4100,14 @@ restart:
             return $this->dispatchVmError($e->getMessage(), $callerFrame);
         } catch (VM\GeneratorUncaughtThrow $e) {
             return $this->dispatchUncaughtGeneratorThrow($e->thrown, $callerFrame);
+        } catch (TypedPropertyReadSignal $signal) {
+            $catchFrame = $this->findCatchFrameForThrow($callerFrame, $signal->errorObject);
+            if (null !== $catchFrame) {
+                return $catchFrame;
+            }
+            $this->raiseUncaughtException($signal->errorObject);
+
+            return null;
         } catch (\Exception $e) {
             if ($e instanceof \LogicException) {
                 throw $e;
