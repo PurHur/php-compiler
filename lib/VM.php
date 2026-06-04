@@ -2045,6 +2045,12 @@ restart:
                             $frame = $catchFrame;
                             goto restart;
                         }
+                    } catch (\Error $e) {
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                     }
                     break;
                 case OpCode::TYPE_JUMP:
