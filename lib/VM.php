@@ -6356,12 +6356,23 @@ restart:
                         continue;
                     }
                     $prevTrait = $entry->traitConstSources[$name] ?? $entry->name;
-                    throw new \LogicException(
-                        "Trait constant {$trait->name}::{$name} conflicts with {$prevTrait}::{$name}"
-                    );
+                    $constDisplay = $entry->constNames[$name]
+                        ?? $trait->constNames[$name]
+                        ?? $name;
+                    throw new \LogicException(sprintf(
+                        '%s and %s define the same constant (%s) in the composition of %s. '
+                        .'However, the definition differs and is considered incompatible. Class was composed',
+                        $prevTrait,
+                        $trait->name,
+                        $constDisplay,
+                        $entry->name
+                    ));
                 }
                 $entry->constants[$name] = $value;
                 $entry->traitConstSources[$name] = $trait->name;
+                if (isset($trait->constNames[$name])) {
+                    $entry->constNames[$name] = $trait->constNames[$name];
+                }
                 if (isset($trait->constVisibility[$name])) {
                     $entry->constVisibility[$name] = $trait->constVisibility[$name];
                 }
@@ -7023,6 +7034,7 @@ restart:
                         }
                     }
                     $entry->constants[$name] = $value;
+                    $entry->constNames[$name] = $canonical;
                     $entry->constVisibility[$name] = ClassConstVisibility::mask($op->classConstVisibilityFlags);
                     unset($entry->traitConstSources[$name]);
                     if ([] !== $op->attributeNames) {
