@@ -762,7 +762,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionNative.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionSetup.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamContextRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHtmlspecialcharsDecode.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringLevenshtein.php';
+require_once __DIR__.'/../../../ext/standard/JitLevenshtein.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringMetaphone.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSimilarText.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSoundex.php';
