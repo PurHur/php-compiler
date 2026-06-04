@@ -268,7 +268,7 @@ final class EnumCaseSupport
         if (!$value->is(Variable::TYPE_INTEGER) && !$value->is(Variable::TYPE_STRING)) {
             return false;
         }
-        $match = BackedEnum::caseForValue($enum, $value);
+        $match = BackedEnum::tryCaseForValue($enum, $value);
         if (null === $match) {
             return false;
         }
@@ -326,7 +326,7 @@ final class EnumCaseSupport
         if (null === $expectedEnum || null === $expectedEnum->backedType) {
             return null;
         }
-        $match = BackedEnum::caseForValue($expectedEnum, $value);
+        $match = BackedEnum::tryCaseForValue($expectedEnum, $value);
         if (null === $match) {
             return null;
         }
@@ -449,7 +449,7 @@ final class EnumCaseSupport
             if (!self::scalarIsLegacyEnumCaseForClass($src, $entry)) {
                 continue;
             }
-            $match = BackedEnum::caseForValue($entry, $src);
+            $match = BackedEnum::tryCaseForValue($entry, $src);
             if (null === $match) {
                 continue;
             }
@@ -491,7 +491,7 @@ final class EnumCaseSupport
             if (!$entry->isEnum || null === $entry->backedType) {
                 continue;
             }
-            $match = BackedEnum::caseForValue($entry, $src);
+            $match = BackedEnum::tryCaseForValue($entry, $src);
             if (null === $match) {
                 continue;
             }
