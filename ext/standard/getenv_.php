@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -34,14 +35,11 @@ final class getenv_ extends Internal
         if (2 === $argc) {
             $localOnly = $frame->calledArgs[1]->resolveIndirect()->toBool();
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('getenv() requires a string name in this compiler build');
-        }
         if (null === $frame->returnVar) {
             return;
         }
-        $result = VmEnv::getenv($v->toString(), $localOnly);
+        $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'getenv', 0, 'name');
+        $result = VmEnv::getenv($name, $localOnly);
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {
@@ -55,9 +53,6 @@ final class getenv_ extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('getenv() requires one or two arguments');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('getenv() requires a string name in this compiler build');
-        }
         $i8 = $context->getTypeFromString('int8');
         $localOnlyI8 = $i8->constInt(0, false);
         if (2 === $argc) {
@@ -69,7 +64,7 @@ final class getenv_ extends Internal
 
         return JitEnv::getenv(
             $context,
-            $this->jitString($context, $args[0], 'getenv() name'),
+            JitStringBuiltinArg::lower($context, $args[0], 'getenv', 0, 'name'),
             $localOnlyI8
         );
     }
