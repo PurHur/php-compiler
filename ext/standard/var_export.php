@@ -136,8 +136,24 @@ final class var_export extends Internal
         if (Variable::TYPE_ARRAY === $v->type) {
             return self::exportVmArray($v->toArray(), $level);
         }
+        if (Variable::TYPE_OBJECT === $v->type) {
+            return self::exportVmObject($v, $level);
+        }
 
         throw new \LogicException('var_export() does not support this value type in this compiler build');
+    }
+
+    private static function exportVmObject(Variable $v, int $level): string
+    {
+        $object = $v->resolveIndirect()->toObject();
+        $className = $object->class->name;
+        $props = VmReflection::getObjectVars($v);
+        $exported = self::exportVmArray($props->toArray(), $level);
+        if ('stdClass' === $className) {
+            return '(object) '.$exported;
+        }
+
+        return $className.'::__set_state('.$exported.')';
     }
 
     private static function exportVmArray(HashTable $ht, int $level): string

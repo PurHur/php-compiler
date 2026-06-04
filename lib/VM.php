@@ -6992,7 +6992,10 @@ restart:
         $pendingNewDefaultOps = [];
         /** @var list<string> */
         $pendingTraits = [];
-        foreach ($block->opCodes as $op) {
+        $classBodyOps = $block->opCodes;
+        $classBodyOpCount = \count($classBodyOps);
+        for ($classBodyOpIndex = 0; $classBodyOpIndex < $classBodyOpCount; ++$classBodyOpIndex) {
+            $op = $classBodyOps[$classBodyOpIndex];
             if ([] !== $pendingNewDefaultOps) {
                 if (OpCode::TYPE_DECLARE_PROPERTY === $op->type || OpCode::TYPE_DECLARE_STATIC_PROPERTY === $op->type) {
                     $this->finalizePendingNewPropertyDefault($frame, $block, $entry, $op, $pendingNewDefaultOps);
@@ -7011,6 +7014,7 @@ restart:
                     continue;
                 }
             } elseif (OpCode::TYPE_NEW === $op->type) {
+                $pendingNewDefaultOps = $this->collectPropertyDefaultNewPreludeOps($classBodyOps, $classBodyOpIndex);
                 $pendingNewDefaultOps[] = $op;
 
                 continue;
@@ -7020,6 +7024,9 @@ restart:
                 continue;
             }
             if ($this->isClassBodyDefaultInitOpcode($op->type)) {
+                if ($this->opcodePrecedesPropertyDefaultNew($classBodyOps, $classBodyOpIndex)) {
+                    continue;
+                }
                 $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
                 $pendingTraits = [];
                 $this->executeClassBodyDefaultInitOpcode($frame, $op);
@@ -7305,6 +7312,51 @@ restart:
         return OpCode::TYPE_INIT_ARRAY === $type
             || OpCode::TYPE_ADD_ARRAY_ELEMENT === $type
             || OpCode::TYPE_ARRAY_SPREAD === $type;
+    }
+
+    /**
+     * INIT_ARRAY (etc.) emitted before property/class-const `new` defaults — defer to the pending fragment (#5362).
+     *
+     * @param list<OpCode> $classBodyOps
+     */
+    private function opcodePrecedesPropertyDefaultNew(array $classBodyOps, int $index): bool
+    {
+        $count = \count($classBodyOps);
+        for ($i = $index + 1; $i < $count; ++$i) {
+            $type = $classBodyOps[$i]->type;
+            if (OpCode::TYPE_NEW === $type) {
+                return true;
+            }
+            if (
+                OpCode::TYPE_DECLARE_PROPERTY === $type
+                || OpCode::TYPE_DECLARE_STATIC_PROPERTY === $type
+                || OpCode::TYPE_DECLARE_CLASS_CONST === $type
+            ) {
+                return false;
+            }
+            if (!$this->isClassBodyDefaultInitOpcode($type)) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<OpCode> $classBodyOps
+     * @return list<OpCode>
+     */
+    private function collectPropertyDefaultNewPreludeOps(array $classBodyOps, int $newIndex): array
+    {
+        $prelude = [];
+        for ($i = $newIndex - 1; $i >= 0; --$i) {
+            if (!$this->isClassBodyDefaultInitOpcode($classBodyOps[$i]->type)) {
+                break;
+            }
+            array_unshift($prelude, $classBodyOps[$i]);
+        }
+
+        return $prelude;
     }
 
     /**
