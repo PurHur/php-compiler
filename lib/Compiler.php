@@ -5690,6 +5690,9 @@ class Compiler {
 
     protected function functionStaticInitReferencesLocal(Op $op): bool
     {
+        if ($op instanceof Op\Expr\Closure || $op instanceof Op\Expr\ArrowFunction) {
+            return true;
+        }
         if ($op instanceof Op\Expr\FuncCall || $op instanceof Op\Expr\MethodCall) {
             return true;
         }
