@@ -2962,6 +2962,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-enum-class-method.patch"
   apply_patch "$PATCH_DIR/php-cfg-enum-abstract.patch"
   apply_patch "$PATCH_DIR/php-cfg-named-args.patch"
+  apply_patch "$PATCH_DIR/php-cfg-call-time-pass-by-ref.patch"
   apply_patch "$PATCH_DIR/php-cfg-spread.patch"
   apply_patch "$PATCH_DIR/php-cfg-never-type.patch"
   apply_patch "$PATCH_DIR/php-cfg-intersection-type.patch"
