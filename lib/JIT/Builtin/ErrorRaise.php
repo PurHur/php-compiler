@@ -21,18 +21,20 @@ final class ErrorRaise
 
     public static function ensureLinked(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
+        self::registerPendingGlobals($context);
+        self::registerDeclarations($context);
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            self::implementBodies($context);
         }
-        self::implement($context);
     }
 
-    public static function implement(Context $context): void
+    public static function ensureStandaloneBodies(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
+        self::implementBodies($context);
+    }
 
+    private static function implementBodies(Context $context): void
+    {
         $fn = $context->module->getNamedFunction('__compiler_jit_raise_error');
         if (null === $fn || $fn->countBasicBlocks() > 0) {
             self::registerPendingGlobals($context);
@@ -43,6 +45,7 @@ final class ErrorRaise
         self::registerPendingGlobals($context);
         self::implementRaiseFunction($context);
         self::implementPendingHelpers($context);
+        self::implementAbortIfPending($context);
     }
 
     public static function emitRaise(Context $context, string $message): void
@@ -189,6 +192,101 @@ final class ErrorRaise
             $context->builder->returnVoid();
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    private static function implementAbortIfPending(Context $context): void
+    {
+        if (null === $context->module->getNamedFunction('phpc_jit_abort_if_pending_error')
+            || 0 < $context->module->getNamedFunction('phpc_jit_abort_if_pending_error')->countBasicBlocks()
+        ) {
+            return;
+        }
+
+        self::ensureAbortLibcDecls($context);
+
+        $abortFn = $context->lookupFunction('phpc_jit_abort_if_pending_error');
+        $entry = $abortFn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+
+        $has = $context->builder->call($context->lookupFunction('phpc_jit_error_has_pending'));
+        $noPending = $context->builder->icmp(PHPLLVM\Builder::INT_EQ, $has, $i32->constInt(0, false));
+        $retBlock = $abortFn->appendBasicBlock('no_pending');
+        $fatalBlock = $abortFn->appendBasicBlock('fatal');
+        $context->builder->branchIf($noPending, $retBlock, $fatalBlock);
+
+        $context->builder->positionAtEnd($fatalBlock);
+        $msgBuf = $context->builder->alloca($i8->arrayType(512), 1, 'pending_msg');
+        $msgPtr = $context->builder->pointerCast($msgBuf, $i8p);
+        $context->builder->call(
+            $context->lookupFunction('phpc_jit_error_copy_pending'),
+            $msgPtr,
+            $context->constantFromInteger(512, 'size_t')
+        );
+
+        $lineBuf = $context->builder->alloca($i8->arrayType(512), 1, 'fatal_line');
+        $linePtr = $context->builder->pointerCast($lineBuf, $i8p);
+        $stderr = $context->module->getNamedGlobal('stderr');
+        $stderrPtr = $context->builder->pointerCast($stderr, $i8p);
+        $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $linePtr,
+            $context->constantFromInteger(512, 'size_t'),
+            $context->builder->pointerCast(
+                $context->constantFromString('PHP Fatal error:  Uncaught Error: %s\n'),
+                $i8p
+            ),
+            $msgPtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('fprintf'),
+            $stderrPtr,
+            $context->builder->pointerCast(
+                $context->constantFromString('%s'),
+                $i8p
+            ),
+            $linePtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('exit'),
+            $i32->constInt(255, false)
+        );
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($retBlock);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function ensureAbortLibcDecls(Context $context): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $void = $context->context->voidType();
+        $sizeT = $context->getTypeFromString('size_t');
+
+        if (null === $context->module->getNamedGlobal('stderr')) {
+            $context->module->addGlobal($i8p, 'stderr');
+        }
+
+        TypeErrorRaise::ensureDeclInScope(
+            $context,
+            'fprintf',
+            $context->context->functionType($i32, true, $i8p, $i8p)
+        );
+        TypeErrorRaise::ensureDeclInScope(
+            $context,
+            'snprintf',
+            $context->context->functionType($i32, true, $i8p, $sizeT, $i8p)
+        );
+        TypeErrorRaise::ensureDeclInScope(
+            $context,
+            'exit',
+            $context->context->functionType($void, false, $i32)
+        );
     }
 
     public static function emitClearForStandaloneMain(Context $context): void
