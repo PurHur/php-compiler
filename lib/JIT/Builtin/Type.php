@@ -560,6 +560,19 @@ class Type extends Builtin {
         $fntypeHrtimePair = $this->context->context->functionType($htPtr, false);
         $fnHrtimePair = $this->context->module->addFunction('__compiler_hrtime_pair', $fntypeHrtimePair);
         $this->context->registerFunction('__compiler_hrtime_pair', $fnHrtimePair);
+        $i32 = $this->context->getTypeFromString('int32');
+        $fntypeTimeNanosleep = $this->context->context->functionType($i32, false, $i64, $i64);
+        $fnTimeNanosleep = $this->context->module->addFunction(
+            '__compiler_time_nanosleep',
+            $fntypeTimeNanosleep
+        );
+        $this->context->registerFunction('__compiler_time_nanosleep', $fnTimeNanosleep);
+        $fntypeTimeSleepUntil = $this->context->context->functionType($i32, false, $double);
+        $fnTimeSleepUntil = $this->context->module->addFunction(
+            '__compiler_time_sleep_until',
+            $fntypeTimeSleepUntil
+        );
+        $this->context->registerFunction('__compiler_time_sleep_until', $fnTimeSleepUntil);
         $fntypePasswordHash = $this->context->context->functionType($strPtr, false, $strPtr, $i64);
         $fnPasswordHash = $this->context->module->addFunction('__compiler_password_hash', $fntypePasswordHash);
         $this->context->registerFunction('__compiler_password_hash', $fnPasswordHash);

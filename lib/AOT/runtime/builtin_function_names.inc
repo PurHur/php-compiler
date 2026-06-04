@@ -459,6 +459,8 @@ static const char *phpc_builtin_functions[] = {
     "tanh",
     "tempnam",
     "time",
+    "time_nanosleep",
+    "time_sleep_until",
     "tmpfile",
     "touch",
     "trait_exists",

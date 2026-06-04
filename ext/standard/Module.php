@@ -529,6 +529,8 @@ class Module extends ModuleAbstract
             new getdate(),
             new sleep(),
             new spl_autoload_register(),
+            new time_nanosleep(),
+            new time_sleep_until(),
             new usleep(),
         ];
     }
