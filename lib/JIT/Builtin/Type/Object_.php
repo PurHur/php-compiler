@@ -1482,6 +1482,12 @@ class Object_ extends Type {
     {
         if ($this->isEnumClassId($classId)) {
             EnumCasesHelper::registerCasesMethod($this->context, $this, $classId);
+            $this->defineMethodVisibility(
+                $classId,
+                'cases',
+                \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC,
+                'cases'
+            );
         }
     }
 

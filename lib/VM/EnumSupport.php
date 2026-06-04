@@ -16,7 +16,7 @@ final class EnumSupport
             return;
         }
         $entry->methods['cases'] = new EnumCases($entry);
-        $entry->methodVisibility['cases'] = CfgFunc::FLAG_PUBLIC;
+        $entry->methodVisibility['cases'] = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;
     }
 
     /** Zend implicit UnitEnum / BackedEnum on all enums (#3550). */
