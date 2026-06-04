@@ -125,4 +125,23 @@ PHP;
 
         $this->assertSame('22', $output);
     }
+
+    /** Folded compile-time enum case must satisfy instanceof UnitEnum/BackedEnum (#5711). */
+    public function testEnumCaseInstanceofBuiltinEnumInterfaces(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: string { case A = 'a'; }
+echo (E::A instanceof UnitEnum) ? '1' : '0';
+echo (E::A instanceof BackedEnum) ? '1' : '0';
+echo (E::A instanceof E) ? '1' : '0';
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_instanceof_builtin.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame('111', $output);
+    }
 }

@@ -25,6 +25,7 @@ use PHPCfg\Script;
 use PHPTypes\Type;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\EnumSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\Variable;
@@ -3122,6 +3123,7 @@ class Compiler {
         $entry = new ClassEntry(ltrim($enumName, '\\'));
         $entry->isEnum = true;
         $entry->backedType = $backedType;
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
 
         return EnumCaseSupport::createCase($entry, $caseName, $backing);
     }
