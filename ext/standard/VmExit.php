@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ScriptExit;
 use PHPCompiler\VM\ShutdownQueue;
 use PHPCompiler\VM\TypeCheck;
@@ -52,6 +53,16 @@ final class VmExit
             echo null !== $vm ? $vm->coerceVariableToString($v, $frame) : 'Array';
 
             return 0;
+        }
+        if (Variable::TYPE_ENUM_CASE === $v->type) {
+            throw new \Error(
+                'Object of class '.$v->toEnumCase()->enumClass->name.' could not be converted to string'
+            );
+        }
+        if (Variable::TYPE_OBJECT === $v->type && EnumCaseSupport::isEnumCase($v->toObject())) {
+            throw new \Error(
+                'Object of class '.$v->toObject()->class->name.' could not be converted to string'
+            );
         }
 
         throw self::typeErrorForStatus($v);
