@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -28,9 +29,6 @@ final class preg_grep extends Internal
         $argc = \count($frame->calledArgs);
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('preg_grep() requires two or three arguments in this compiler build');
-        }
-        if (null === $frame->returnVar) {
-            return;
         }
         $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_grep() pattern');
         $array = $frame->calledArgs[1]->resolveIndirect();
@@ -53,14 +51,13 @@ final class preg_grep extends Internal
         $src = $array->toArray();
         $out = new HashTable();
         foreach ($src->iterateKeyed(true) as [$key, $value]) {
-            if (Variable::TYPE_STRING !== $value->type) {
-                throw new \LogicException(
-                    'preg_grep() array values must be strings in this compiler build'
-                );
-            }
+            $value = $value->resolveIndirect();
+            self::rejectNonStringHaystackValue($value);
             $match = VmPreg::pregMatch($pattern, $value->toString());
             if (false === $match) {
-                $frame->returnVar->bool(false);
+                if (null !== $frame->returnVar) {
+                    $frame->returnVar->bool(false);
+                }
 
                 return;
             }
@@ -72,7 +69,27 @@ final class preg_grep extends Internal
                 array_map::appendKeyedCopy($out, $key, $value);
             }
         }
-        $frame->returnVar->array($out);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->array($out);
+        }
+    }
+
+    /**
+     * Zend php_preg_grep: haystack elements must convert to string (#5639).
+     */
+    private static function rejectNonStringHaystackValue(Variable $value): void
+    {
+        if (EnumCaseSupport::isEnumCaseVariable($value)) {
+            $enumClass = EnumCaseSupport::enumClassForCaseVariable($value);
+            throw new \Error(
+                'Object of class '.($enumClass->name ?? 'enum').' could not be converted to string'
+            );
+        }
+        if (Variable::TYPE_STRING !== $value->type) {
+            throw new \LogicException(
+                'preg_grep() array values must be strings in this compiler build'
+            );
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value
