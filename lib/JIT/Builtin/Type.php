@@ -192,6 +192,7 @@ class Type extends Builtin {
         GethostbynamelRuntime::ensureLinked($this->context);
         TimeSleepRuntime::ensureLinked($this->context);
         LastErrorRuntime::ensureLinked($this->context);
+        MemoryRuntime::ensureLinked($this->context);
         ErrorHandlerOutput::registerExternals($this->context);
         StreamContextOutput::registerExternals($this->context);
         CallArgv::implement($this->context);
@@ -890,21 +891,6 @@ class Type extends Builtin {
             $this->context->context->functionType($void, false, $i64, $valuePtr)
         );
         $this->context->registerFunction('__compiler_getrusage', $fnGetrusage);
-        $fnMemoryUsage = $this->context->module->addFunction(
-            '__compiler_memory_get_usage',
-            $this->context->context->functionType($void, false, $i64, $valuePtr)
-        );
-        $this->context->registerFunction('__compiler_memory_get_usage', $fnMemoryUsage);
-        $fnMemoryPeak = $this->context->module->addFunction(
-            '__compiler_memory_get_peak_usage',
-            $this->context->context->functionType($void, false, $i64, $valuePtr)
-        );
-        $this->context->registerFunction('__compiler_memory_get_peak_usage', $fnMemoryPeak);
-        $fnMemoryResetPeak = $this->context->module->addFunction(
-            '__compiler_memory_reset_peak_usage',
-            $this->context->context->functionType($void, false, $i64)
-        );
-        $this->context->registerFunction('__compiler_memory_reset_peak_usage', $fnMemoryResetPeak);
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
         $fnGetDefinedFunctions = $this->context->module->addFunction(
             '__compiler_get_defined_functions_merge',

@@ -1130,7 +1130,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringGetrusage.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGettimeofday.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHrtime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringInfo.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringMemory.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/MemoryRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNetworkServices.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringQuotPrint.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrIncdec.php';

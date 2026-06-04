@@ -932,7 +932,7 @@
         "lib/JIT/Builtin/StringInfo.php",
         "lib/JIT/Builtin/StringJsonEncode.php",
         "lib/JIT/Builtin/StringLevenshtein.php",
-        "lib/JIT/Builtin/StringMemory.php",
+        "lib/JIT/Builtin/MemoryRuntime.php",
         "lib/JIT/Builtin/StringMetaphone.php",
         "lib/JIT/Builtin/StringMicrotime.php",
         "lib/JIT/Builtin/StringNetworkServices.php",
