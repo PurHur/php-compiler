@@ -62,14 +62,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'fiber_jit')) {
                 continue;
             }
-            // strspn()/strcspn() offset/length: VM + AOT lint (#3734); MCJIT phpc_strspn_ex execute pending.
-            if (str_contains($name, 'strspn_strcspn_offset')) {
-                continue;
-            }
-            // strspn()/strcspn() empty mask: VM + AOT (#4119); MCJIT phpc_strspn_ex execute pending.
-            if (str_contains($name, 'strspn_empty_mask')) {
-                continue;
-            }
             // substr_count() offset/length: VM + AOT via inline LLVM (#4105, #5188); MCJIT execute pending.
             if (str_contains($name, 'substr_count')) {
                 continue;

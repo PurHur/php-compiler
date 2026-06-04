@@ -25,7 +25,6 @@ final class Linker
         __DIR__.'/runtime/phpc_info.c',
         __DIR__.'/runtime/phpc_spaceship.c',
         __DIR__.'/runtime/phpc_levenshtein.c',
-        __DIR__.'/runtime/phpc_strspn.c',
         __DIR__.'/runtime/phpc_similar_text.c',
         __DIR__.'/runtime/phpc_soundex.c',
         __DIR__.'/runtime/phpc_str_incdec.c',

@@ -954,6 +954,7 @@
         "lib/JIT/Builtin/StringStrnatcasecmp.php",
         "lib/JIT/Builtin/StringStrnatcmp.php",
         "lib/JIT/Builtin/StringStrspn.php",
+        "lib/JIT/Builtin/StringStrspnJit.php",
         "lib/JIT/Builtin/StringStrtok.php",
         "lib/JIT/Builtin/StringSubstrCompareJit.php",
         "lib/JIT/Builtin/StringSubstrCompare.php",
