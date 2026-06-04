@@ -13,6 +13,8 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\ArrayFindCallbackPolicy;
+use PHPCompiler\JIT\ArrayFindHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -51,8 +53,16 @@ final class array_find_key extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'array_find_key() with a callback is not implemented for JIT in this build'
-        );
+        if (2 !== \count($args)) {
+            throw new \LogicException('array_find_key() requires exactly two arguments in this compiler build');
+        }
+        if (!ArrayFindCallbackPolicy::isJitLowerable($args[1])) {
+            throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
+        }
+        if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
+            $this->jitString($context, $args[1], 'array_find_key() callback');
+        }
+
+        return ArrayFindHelper::buildFindKeyArray($context, $args[0], $args[1]);
     }
 }
