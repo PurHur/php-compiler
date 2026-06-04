@@ -3259,13 +3259,10 @@ restart:
                 case OpCode::TYPE_CLONE:
                     $result = $frame->scope[$op->arg1];
                     $src = $frame->scope[$op->arg2]->resolveIndirect();
-                    $uncloneableEnumClass = null;
-                    if (Variable::TYPE_ENUM_CASE === $src->type) {
-                        $uncloneableEnumClass = $src->toEnumCase()->enumClass->name;
-                    } elseif (Variable::TYPE_OBJECT === $src->type
-                        && VM\EnumCaseSupport::isEnumCase($src->toObject())) {
-                        $uncloneableEnumClass = $src->toObject()->class->name;
-                    }
+                    $uncloneableEnumClass = VM\EnumCaseSupport::uncloneableEnumClassForClone(
+                        $src,
+                        $this->context
+                    );
                     if (null !== $uncloneableEnumClass) {
                         $message = 'Trying to clone an uncloneable object of class '.$uncloneableEnumClass;
                         $catchFrame = $this->dispatchVmError($message, $frame);
