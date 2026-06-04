@@ -177,6 +177,7 @@ class Runtime {
     private function loadCoreModules(): void {
         $this->load(new ext\types\Module);
         $this->load(new ext\spl\Module);
+        $this->load(new ext\intl\Module);
         $this->load(new ext\standard\Module);
     }
 
