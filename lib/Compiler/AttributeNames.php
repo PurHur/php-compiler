@@ -56,6 +56,23 @@ final class AttributeNames
         return false;
     }
 
+    /**
+     * Zend compile-time target guard (zend_attributes.c, issue #5137).
+     * `#[\AllowDynamicProperties]` is only valid on classes.
+     *
+     * @param list<string> $names
+     */
+    public static function assertAllowDynamicPropertiesClassTargetOnly(array $names, string $target): void
+    {
+        if (!self::hasAllowDynamicProperties($names)) {
+            return;
+        }
+
+        throw new \CompileError(
+            'Attribute "'.self::messageName('AllowDynamicProperties').'" cannot target '.$target.' (allowed targets: class)'
+        );
+    }
+
     /** PHP 8.2 #[\SensitiveParameter] on parameters (issue #3351, Zend zend_attributes.c). */
     public static function isSensitiveParameter(array $names): bool
     {
