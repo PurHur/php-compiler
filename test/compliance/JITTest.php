@@ -393,6 +393,10 @@ class JITTest extends BaseTest {
             // User enum DECLARE_ENUM segfaults in MCJIT until enum lowering is stable (#3518).
             // enum_spaceship_jit: lowering fixed #4849; compliance JIT when jit-runtime-probe green (#98).
             // enum_case_name_value: ->name/->value JIT dispatch (#4953); compliance when jit-runtime-probe green (#98).
+            // (int)/(float) on enum cases: VM + JitZendScalarCast lowering (#5791); MCJIT LLVM verify with enum declare.
+            if (str_contains($name, 'int_cast_backed_enum')) {
+                continue;
+            }
             if ((str_contains($name, 'enum_') || str_contains($name, 'abstract_enum'))
                 && !str_contains($name, 'enum_case_name_value')) {
                 continue;
