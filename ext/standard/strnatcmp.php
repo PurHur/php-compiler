@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringStrnatcmp;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -41,6 +42,7 @@ final class strnatcmp extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('strnatcmp() requires exactly two arguments');
         }
+        StringStrnatcmp::ensureLinked($context);
         $p0 = $this->stringDataPtr($context, $this->jitString($context, $args[0], 'strnatcmp() argument #1'));
         $p1 = $this->stringDataPtr($context, $this->jitString($context, $args[1], 'strnatcmp() argument #2'));
         $fn = $context->lookupFunction('strnatcmp');

@@ -764,6 +764,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringMetaphone.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSimilarText.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSoundex.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStreamCsv.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringNaturalCompareJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrnatcasecmp.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrnatcmp.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSubstrCompare.php';

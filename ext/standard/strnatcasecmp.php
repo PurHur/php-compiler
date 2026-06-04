@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringStrnatcasecmp;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -41,6 +42,7 @@ final class strnatcasecmp extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('strnatcasecmp() requires exactly two arguments');
         }
+        StringStrnatcasecmp::ensureLinked($context);
         $p0 = $this->stringDataPtr($context, $this->jitString($context, $args[0], 'strnatcasecmp() argument #1'));
         $p1 = $this->stringDataPtr($context, $this->jitString($context, $args[1], 'strnatcasecmp() argument #2'));
         $fn = $context->lookupFunction('strnatcasecmp');
