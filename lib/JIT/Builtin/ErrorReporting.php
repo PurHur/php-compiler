@@ -6,9 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 
-/**
- * __compiler_error_reporting JIT MCJIT body — link shared AOT runtime (#3220).
- */
+/** __compiler_error_reporting LLVM body — {@see IniRuntime} (#5736, #3220). */
 final class ErrorReporting
 {
     public static function implement(Context $context): void

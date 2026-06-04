@@ -10,7 +10,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** error_reporting() JIT/AOT lowering — shared phpc_ini_set.c state (#3220). */
+/** error_reporting() JIT/AOT lowering — {@see \PHPCompiler\JIT\Builtin\IniRuntime} (#5736, #3220). */
 final class JitErrorReporting
 {
     public static function invoke(Context $context, ?JITVariable $levelArg): Value

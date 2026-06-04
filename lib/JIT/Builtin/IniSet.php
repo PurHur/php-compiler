@@ -6,10 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 
-/**
- * __compiler_ini_set LLVM body for non-standalone JIT (issue #1374).
- * Standalone AOT uses lib/AOT/runtime/phpc_ini_set.c.
- */
+/** __compiler_ini_set LLVM body — {@see IniRuntime} (#5736, #1374). */
 final class IniSet
 {
     public static function implement(Context $context): void

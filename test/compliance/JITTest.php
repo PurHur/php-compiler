@@ -202,7 +202,7 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'password_get_info')) {
                 continue;
             }
-            // error_reporting() MCJIT: VM + AOT (#3220); phpc_ini_set.c __value__* mismatch until stable.
+            // error_reporting() MCJIT: VM + AOT (#3220); IniRuntime LLVM (#5736).
             if (str_contains($name, 'error_reporting')) {
                 continue;
             }

@@ -4,187 +4,809 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPLLVM\BasicBlock;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
 
 /**
- * JIT MCJIT bodies for __compiler_ini_get / __compiler_ini_set — link shared AOT runtime (#1374, #1492).
+ * LLVM ini_set()/ini_get()/error_reporting/@ silence state (issue #5736, #1374, #4070).
+ *
+ * Replaces {@see lib/AOT/runtime/phpc_ini_set.c}. Semantics match {@see \PHPCompiler\ext\standard\VmIni}.
+ * php-src: ext/standard/ini.c, main/php_ini.c
  */
 final class IniRuntime
 {
-    private const RUNTIME_SOURCE = __DIR__.'/../../AOT/runtime/phpc_ini_set.c';
+    private static int $blockSuffix = 0;
+
+    private const G_ERROR_REPORTING = 'phpc_ini_error_reporting';
+
+    private const G_DISPLAY_ERRORS = 'phpc_ini_display_errors';
+
+    private const G_MEMORY_LIMIT = 'phpc_ini_memory_limit';
+
+    private const G_SILENCE_DEPTH = 'phpc_ini_silence_depth';
+
+    private const G_SILENCE_SAVED_ER = 'phpc_ini_silence_saved_error_reporting';
+
+    private const MEMORY_LIMIT_CAP = 64;
+
+    private const MEMORY_LIMIT_DEFAULT = '128M';
+
+    private const SNPRINTF_BUF = 64;
 
     public static function ensureLinked(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+        self::implement($context);
+    }
+
+    public static function implement(Context $context): void
+    {
+        self::$blockSuffix = 0;
+        $probe = $context->module->getNamedFunction('__compiler_ini_get');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
+
             return;
         }
 
-        $get = $context->module->getNamedFunction('__compiler_ini_get');
-        $set = $context->module->getNamedFunction('__compiler_ini_set');
-        $errorReporting = $context->module->getNamedFunction('__compiler_error_reporting');
-        $beginSilence = $context->module->getNamedFunction('__compiler_begin_silence');
-        $endSilence = $context->module->getNamedFunction('__compiler_end_silence');
-        if (
-            null !== $get && $get->countBasicBlocks() > 0
-            && null !== $set && $set->countBasicBlocks() > 0
-            && null !== $errorReporting && $errorReporting->countBasicBlocks() > 0
-            && null !== $beginSilence && $beginSilence->countBasicBlocks() > 0
-            && null !== $endSilence && $endSilence->countBasicBlocks() > 0
+        $restoreBlock = self::captureInsertBlock($context);
+        self::ensureGlobals($context);
+        self::ensureLibc($context);
+        self::ensureValueWriters($context);
+
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $valPtr = $context->getTypeFromString('__value__*');
+        $voidTy = $context->getTypeFromString('void');
+
+        $levelProbe = $context->module->getNamedFunction('__compiler_phpc_error_level_enabled');
+        $ftLevel = $context->context->functionType($i32, false, $i32);
+        $fnLevel = null !== $levelProbe
+            ? $levelProbe
+            : $context->module->addFunction('__compiler_phpc_error_level_enabled', $ftLevel);
+        self::implementErrorLevelEnabled($context, $fnLevel);
+
+        $getProbe = $context->module->getNamedFunction('__compiler_ini_get');
+        $ftGet = $context->context->functionType($voidTy, false, $strPtr, $valPtr);
+        $fnGet = null !== $getProbe
+            ? $getProbe
+            : $context->module->addFunction('__compiler_ini_get', $ftGet);
+        self::implementIniGet($context, $fnGet);
+
+        $setProbe = $context->module->getNamedFunction('__compiler_ini_set');
+        $ftSet = $context->context->functionType($voidTy, false, $strPtr, $strPtr, $valPtr);
+        $fnSet = null !== $setProbe
+            ? $setProbe
+            : $context->module->addFunction('__compiler_ini_set', $ftSet);
+        self::implementIniSet($context, $fnSet);
+
+        $erProbe = $context->module->getNamedFunction('__compiler_error_reporting');
+        $ftEr = $context->context->functionType($voidTy, false, $i32, $i64, $valPtr);
+        $fnEr = null !== $erProbe
+            ? $erProbe
+            : $context->module->addFunction('__compiler_error_reporting', $ftEr);
+        self::implementErrorReporting($context, $fnEr);
+
+        $beginProbe = $context->module->getNamedFunction('__compiler_begin_silence');
+        $ftSilence = $context->context->functionType($voidTy, false);
+        $fnBegin = null !== $beginProbe
+            ? $beginProbe
+            : $context->module->addFunction('__compiler_begin_silence', $ftSilence);
+        self::implementBeginSilence($context, $fnBegin);
+
+        $endProbe = $context->module->getNamedFunction('__compiler_end_silence');
+        $fnEnd = null !== $endProbe
+            ? $endProbe
+            : $context->module->addFunction('__compiler_end_silence', $ftSilence);
+        self::implementEndSilence($context, $fnEnd);
+
+        self::registerLinkedRuntime($context);
+        self::restoreInsertBlock($context, $restoreBlock);
+    }
+
+    private static function implementErrorLevelEnabled(Context $context, Value $fn): void
+    {
+        $entry = $fn->appendBasicBlock('iel_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $level = $fn->getParam(0);
+        $i32 = $context->getTypeFromString('int32');
+        $er = $context->builder->load(self::globalPtr($context, self::G_ERROR_REPORTING, $i32));
+        $masked = $context->builder->and($er, $level);
+        $enabled = $context->builder->icmp(Builder::INT_NE, $masked, $i32->constInt(0, false));
+        $context->builder->returnValue($context->builder->zext($enabled, $i32));
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementIniGet(Context $context, Value $fn): void
+    {
+        $entry = $fn->appendBasicBlock('ig_entry');
+        $failBb = $fn->appendBasicBlock('ig_fail');
+        $erBb = $fn->appendBasicBlock('ig_er');
+        $deBb = $fn->appendBasicBlock('ig_de');
+        $mlBb = $fn->appendBasicBlock('ig_ml');
+        $testEr = $fn->appendBasicBlock('ig_test_er');
+        $testDe = $fn->appendBasicBlock('ig_test_de');
+        $testMl = $fn->appendBasicBlock('ig_test_ml');
+
+        $context->builder->positionAtEnd($entry);
+        self::ensureMemoryLimitBuffer($context, $fn);
+        $option = $fn->getParam(0);
+        $out = $fn->getParam(1);
+        $optCstr = self::copyStringObjectToCstr($context, $fn, $option);
+        $optOk = $context->builder->icmp(
+            Builder::INT_NE,
+            $optCstr,
+            $context->getTypeFromString('int8*')->constNull()
+        );
+        $context->builder->branchIf($optOk, $testEr, $failBb);
+
+        self::branchIfKey($context, $testEr, $optCstr, 'error_reporting', $erBb, $testDe);
+        self::branchIfKey($context, $testDe, $optCstr, 'display_errors', $deBb, $testMl);
+        self::branchIfKey($context, $testMl, $optCstr, 'memory_limit', $mlBb, $failBb);
+
+        $context->builder->positionAtEnd($erBb);
+        self::writeValueStringFromErGlobal($context, $out);
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($deBb);
+        self::writeValueStringFromDisplayErrorsGlobal($context, $fn, $out);
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($mlBb);
+        self::writeValueStringFromMemoryLimitGlobal($context, $out);
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($failBb);
+        self::writeValueBoolFalse($context, $out);
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementIniSet(Context $context, Value $fn): void
+    {
+        $entry = $fn->appendBasicBlock('is_entry');
+        $failBb = $fn->appendBasicBlock('is_fail');
+        $erBb = $fn->appendBasicBlock('is_er');
+        $deBb = $fn->appendBasicBlock('is_de');
+        $mlBb = $fn->appendBasicBlock('is_ml');
+        $mlRejectBb = $fn->appendBasicBlock('is_ml_reject');
+        $mlApplyBb = $fn->appendBasicBlock('is_ml_apply');
+        $testEr = $fn->appendBasicBlock('is_test_er');
+        $testDe = $fn->appendBasicBlock('is_test_de');
+        $testMl = $fn->appendBasicBlock('is_test_ml');
+
+        $context->builder->positionAtEnd($entry);
+        self::ensureMemoryLimitBuffer($context, $fn);
+        $option = $fn->getParam(0);
+        $newValue = $fn->getParam(1);
+        $out = $fn->getParam(2);
+        $optCstr = self::copyStringObjectToCstr($context, $fn, $option);
+        $valCstr = self::copyStringObjectToCstr($context, $fn, $newValue);
+        $i8p = $context->getTypeFromString('int8*');
+        $bothOk = $context->builder->and(
+            $context->builder->icmp(Builder::INT_NE, $optCstr, $i8p->constNull()),
+            $context->builder->icmp(Builder::INT_NE, $valCstr, $i8p->constNull())
+        );
+        $context->builder->branchIf($bothOk, $testEr, $failBb);
+
+        self::branchIfKey($context, $testEr, $optCstr, 'error_reporting', $erBb, $testDe);
+        self::branchIfKey($context, $testDe, $optCstr, 'display_errors', $deBb, $testMl);
+        self::branchIfKey($context, $testMl, $optCstr, 'memory_limit', $mlBb, $failBb);
+
+        $i32 = $context->getTypeFromString('int32');
+
+        $context->builder->positionAtEnd($erBb);
+        self::writeValueStringFromErGlobal($context, $out);
+        $endPtrSlot = $context->builder->alloca($i8p, 1, 'ini_strtol_end');
+        $context->builder->store($i8p->constNull(), $endPtrSlot);
+        $context->builder->store(
+            $context->builder->trunc(
+                $context->builder->call(
+                    $context->lookupFunction('strtol'),
+                    $valCstr,
+                    $endPtrSlot,
+                    $i32->constInt(10, false)
+                ),
+                $i32
+            ),
+            self::globalPtr($context, self::G_ERROR_REPORTING, $i32)
+        );
+        self::freeCstrPair($context, $fn, $optCstr, $valCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($deBb);
+        self::writeValueStringFromDisplayErrorsGlobal($context, $fn, $out);
+        $context->builder->store(
+            self::emitParseBoolIni($context, $fn, $valCstr),
+            self::globalPtr($context, self::G_DISPLAY_ERRORS, $i32)
+        );
+        self::freeCstrPair($context, $fn, $optCstr, $valCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($mlBb);
+        $minusOnePtr = $context->builder->pointerCast($context->constantFromString('-1'), $i8p);
+        $isUnlimited = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->call($context->lookupFunction('strcmp'), $valCstr, $minusOnePtr),
+            $i32->constInt(0, false)
+        );
+        $context->builder->branchIf($isUnlimited, $mlRejectBb, $mlApplyBb);
+
+        $context->builder->positionAtEnd($mlApplyBb);
+        self::writeValueStringFromMemoryLimitGlobal($context, $out);
+        self::storeMemoryLimitFromCstr($context, $valCstr);
+        self::freeCstrPair($context, $fn, $optCstr, $valCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($mlRejectBb);
+        self::writeValueBoolFalse($context, $out);
+        self::freeCstrPair($context, $fn, $optCstr, $valCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($failBb);
+        self::writeValueBoolFalse($context, $out);
+        self::freeCstrPair($context, $fn, $optCstr, $valCstr);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementErrorReporting(Context $context, Value $fn): void
+    {
+        $entry = $fn->appendBasicBlock('ier_entry');
+        $applyBb = $fn->appendBasicBlock('ier_apply');
+        $doneBb = $fn->appendBasicBlock('ier_done');
+        $context->builder->positionAtEnd($entry);
+
+        $hasNew = $fn->getParam(0);
+        $newLevel = $fn->getParam(1);
+        $out = $fn->getParam(2);
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+
+        $old = $context->builder->load(self::globalPtr($context, self::G_ERROR_REPORTING, $i32));
+        $apply = $context->builder->icmp(Builder::INT_NE, $hasNew, $i32->constInt(0, false));
+        $context->builder->branchIf($apply, $applyBb, $doneBb);
+
+        $context->builder->positionAtEnd($applyBb);
+        $context->builder->store(
+            $context->builder->trunc($newLevel, $i32),
+            self::globalPtr($context, self::G_ERROR_REPORTING, $i32)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $out,
+            $context->builder->sext($old, $i64)
+        );
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementBeginSilence(Context $context, Value $fn): void
+    {
+        $entry = $fn->appendBasicBlock('ibs_entry');
+        $saveBb = $fn->appendBasicBlock('ibs_save');
+        $incBb = $fn->appendBasicBlock('ibs_inc');
+        $context->builder->positionAtEnd($entry);
+
+        $i32 = $context->getTypeFromString('int32');
+        $depthPtr = self::globalPtr($context, self::G_SILENCE_DEPTH, $i32);
+        $depth = $context->builder->load($depthPtr);
+        $isZero = $context->builder->icmp(Builder::INT_EQ, $depth, $i32->constInt(0, false));
+        $context->builder->branchIf($isZero, $saveBb, $incBb);
+
+        $context->builder->positionAtEnd($saveBb);
+        $er = $context->builder->load(self::globalPtr($context, self::G_ERROR_REPORTING, $i32));
+        $context->builder->store($er, self::globalPtr($context, self::G_SILENCE_SAVED_ER, $i32));
+        $context->builder->store($i32->constInt(0, false), self::globalPtr($context, self::G_ERROR_REPORTING, $i32));
+        $context->builder->branch($incBb);
+
+        $context->builder->positionAtEnd($incBb);
+        $context->builder->store(
+            $context->builder->add($depth, $i32->constInt(1, false)),
+            $depthPtr
+        );
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementEndSilence(Context $context, Value $fn): void
+    {
+        $entry = $fn->appendBasicBlock('ies_entry');
+        $skipBb = $fn->appendBasicBlock('ies_skip');
+        $decBb = $fn->appendBasicBlock('ies_dec');
+        $restoreBb = $fn->appendBasicBlock('ies_restore');
+        $doneBb = $fn->appendBasicBlock('ies_done');
+        $context->builder->positionAtEnd($entry);
+
+        $i32 = $context->getTypeFromString('int32');
+        $depthPtr = self::globalPtr($context, self::G_SILENCE_DEPTH, $i32);
+        $depth = $context->builder->load($depthPtr);
+        $positive = $context->builder->icmp(Builder::INT_SGT, $depth, $i32->constInt(0, false));
+        $context->builder->branchIf($positive, $decBb, $skipBb);
+
+        $context->builder->positionAtEnd($decBb);
+        $newDepth = $context->builder->sub($depth, $i32->constInt(1, false));
+        $context->builder->store($newDepth, $depthPtr);
+        $isZero = $context->builder->icmp(Builder::INT_EQ, $newDepth, $i32->constInt(0, false));
+        $context->builder->branchIf($isZero, $restoreBb, $doneBb);
+
+        $context->builder->positionAtEnd($restoreBb);
+        $saved = $context->builder->load(self::globalPtr($context, self::G_SILENCE_SAVED_ER, $i32));
+        $context->builder->store($saved, self::globalPtr($context, self::G_ERROR_REPORTING, $i32));
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($skipBb);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($doneBb);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function branchIfKey(
+        Context $context,
+        BasicBlock $testBb,
+        Value $optCstr,
+        string $key,
+        BasicBlock $matchBb,
+        BasicBlock $elseBb
+    ): void {
+        $context->builder->positionAtEnd($testBb);
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $lit = $context->builder->pointerCast($context->constantFromString($key), $i8p);
+        $cmp = $context->builder->call($context->lookupFunction('strcasecmp'), $optCstr, $lit);
+        $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+        $context->builder->branchIf($isMatch, $matchBb, $elseBb);
+    }
+
+    private static function emitParseBoolIni(Context $context, Value $fn, Value $valCstr): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8 = $context->getTypeFromString('int8');
+        $sizeT = $context->getTypeFromString('size_t');
+        $valLen = $context->builder->call($context->lookupFunction('strlen'), $valCstr);
+
+        $falseVal = $i32->constInt(0, false);
+        $trueVal = $i32->constInt(1, false);
+        $falseBb = $fn->appendBasicBlock('pbi_false');
+        $trueBb = $fn->appendBasicBlock('pbi_true');
+        $doneBb = $fn->appendBasicBlock('pbi_done');
+        $checkBb = $fn->appendBasicBlock('pbi_check');
+        $maybeBb = $fn->appendBasicBlock('pbi_maybe');
+
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $valLen, $sizeT->constInt(0, false));
+        $context->builder->branchIf($isEmpty, $falseBb, $checkBb);
+
+        $context->builder->positionAtEnd($checkBb);
+        $first = $context->builder->load($valCstr);
+        $lenOne = $context->builder->icmp(Builder::INT_EQ, $valLen, $sizeT->constInt(1, false));
+        $isZero = $context->builder->icmp(Builder::INT_EQ, $first, $i8->constInt(ord('0'), false));
+        $isOne = $context->builder->icmp(Builder::INT_EQ, $first, $i8->constInt(ord('1'), false));
+        $litOff = self::matchLit($context, $valCstr, $valLen, 'off', 3);
+        $litFalse = self::matchLit($context, $valCstr, $valLen, 'false', 5);
+        $isFalse = $context->builder->or(
+            $context->builder->and($lenOne, $isZero),
+            $context->builder->or($litOff, $litFalse)
+        );
+        $context->builder->branchIf($isFalse, $falseBb, $maybeBb);
+
+        $context->builder->positionAtEnd($maybeBb);
+        $litOn = self::matchLit($context, $valCstr, $valLen, 'on', 2);
+        $litTrue = self::matchLit($context, $valCstr, $valLen, 'true', 4);
+        $isTrue = $context->builder->or(
+            $context->builder->and($lenOne, $isOne),
+            $context->builder->or($litOn, $litTrue)
+        );
+        $context->builder->branchIf($isTrue, $trueBb, $trueBb);
+
+        $context->builder->positionAtEnd($falseBb);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($trueBb);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($i32);
+        $phi->addIncoming($falseVal, $falseBb);
+        $phi->addIncoming($trueVal, $trueBb);
+
+        return $phi;
+    }
+
+    private static function matchLit(
+        Context $context,
+        Value $valCstr,
+        Value $valLen,
+        string $lit,
+        int $len
+    ): Value {
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $lenOk = $context->builder->icmp(Builder::INT_EQ, $valLen, $sizeT->constInt($len, false));
+        $litPtr = $context->builder->pointerCast($context->constantFromString($lit), $context->getTypeFromString('int8*'));
+        $cmp = $context->builder->call(
+            $context->lookupFunction('strncmp'),
+            $valCstr,
+            $litPtr,
+            $sizeT->constInt($len, false)
+        );
+
+        return $context->builder->and(
+            $lenOk,
+            $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false))
+        );
+    }
+
+    private static function writeValueBoolFalse(Context $context, Value $out): void
+    {
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            $out,
+            $context->getTypeFromString('int32')->constInt(0, false)
+        );
+    }
+
+    private static function writeValueStringFromCstr(Context $context, Value $out, Value $cstr): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
+        $str = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->sext($len, $i64),
+            $cstr
+        );
+        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $str);
+    }
+
+    private static function writeValueStringFromErGlobal(Context $context, Value $out): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $buf = self::snprintfAlloca(
+            $context,
+            '%d',
+            [$context->builder->load(self::globalPtr($context, self::G_ERROR_REPORTING, $i32))]
+        );
+        self::writeValueStringFromCstr($context, $out, $buf);
+    }
+
+    private static function writeValueStringFromDisplayErrorsGlobal(Context $context, Value $fn, Value $out): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $de = $context->builder->load(self::globalPtr($context, self::G_DISPLAY_ERRORS, $i32));
+        $isOn = $context->builder->icmp(Builder::INT_NE, $de, $i32->constInt(0, false));
+        $oneBb = $fn->appendBasicBlock('ig_de_one');
+        $zeroBb = $fn->appendBasicBlock('ig_de_zero');
+        $doneBb = $fn->appendBasicBlock('ig_de_done');
+        $context->builder->branchIf($isOn, $oneBb, $zeroBb);
+        $context->builder->positionAtEnd($oneBb);
+        $onePtr = $context->builder->pointerCast($context->constantFromString('1'), $i8p);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($zeroBb);
+        $zeroPtr = $context->builder->pointerCast($context->constantFromString('0'), $i8p);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($i8p);
+        $phi->addIncoming($onePtr, $oneBb);
+        $phi->addIncoming($zeroPtr, $zeroBb);
+        self::writeValueStringFromCstr($context, $out, $phi);
+    }
+
+    private static function writeValueStringFromMemoryLimitGlobal(Context $context, Value $out): void
+    {
+        self::writeValueStringFromCstr($context, $out, self::memoryLimitPtr($context));
+    }
+
+    private static function storeMemoryLimitFromCstr(Context $context, Value $src): void
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $sizeT = $context->getTypeFromString('size_t');
+        $mlPtr = self::memoryLimitPtr($context);
+        $maxCopy = $sizeT->constInt(self::MEMORY_LIMIT_CAP - 1, false);
+        $srcLen = $context->builder->call($context->lookupFunction('strlen'), $src);
+        $useSrc = $context->builder->icmp(Builder::INT_ULT, $srcLen, $maxCopy);
+        $copyLen = $context->builder->select($useSrc, $srcLen, $maxCopy);
+        $voidPtr = $context->getTypeFromString('void*');
+        $context->builder->call(
+            $context->lookupFunction('memcpy'),
+            $context->builder->pointerCast($mlPtr, $voidPtr),
+            $context->builder->pointerCast($src, $voidPtr),
+            $copyLen
+        );
+        $end = $context->builder->gep($mlPtr, $copyLen);
+        $context->builder->store($i8->constInt(0, false), $end);
+    }
+
+    /** @param list<Value> $extraArgs */
+    private static function snprintfAlloca(Context $context, string $fmt, array $extraArgs): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $buf = $context->builder->alloca($i8, self::SNPRINTF_BUF, 'ini_snprintf');
+        $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        $fmtPtr = $context->builder->pointerCast($context->constantFromString($fmt), $i8p);
+        $args = [$bufPtr, $context->getTypeFromString('size_t')->constInt(self::SNPRINTF_BUF, false), $fmtPtr];
+        foreach ($extraArgs as $arg) {
+            $args[] = $arg;
+        }
+        $context->builder->call($context->lookupFunction('snprintf'), ...$args);
+
+        return $bufPtr;
+    }
+
+    private static function memoryLimitPtr(Context $context): Value
+    {
+        $i8p = $context->getTypeFromString('int8*');
+
+        return $context->builder->load(self::globalPtr($context, self::G_MEMORY_LIMIT, $i8p));
+    }
+
+    private static function ensureMemoryLimitBuffer(Context $context, Value $fn): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $voidPtr = $context->getTypeFromString('void*');
+        $slot = self::globalPtr($context, self::G_MEMORY_LIMIT, $i8p);
+        $cur = $context->builder->load($slot);
+        $needsInit = $context->builder->icmp(Builder::INT_EQ, $cur, $i8p->constNull());
+        $initBb = $fn->appendBasicBlock('ini_ml_init');
+        $doneBb = $fn->appendBasicBlock('ini_ml_ready');
+        $context->builder->branchIf($needsInit, $initBb, $doneBb);
+
+        $context->builder->positionAtEnd($initBb);
+        $buf = $context->builder->call(
+            $context->lookupFunction('malloc'),
+            $sizeT->constInt(self::MEMORY_LIMIT_CAP, false)
+        );
+        $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        $defPtr = $context->builder->pointerCast(
+            $context->constantFromString(self::MEMORY_LIMIT_DEFAULT),
+            $i8p
+        );
+        $defLen = $context->builder->call($context->lookupFunction('strlen'), $defPtr);
+        $context->builder->call(
+            $context->lookupFunction('memcpy'),
+            $context->builder->pointerCast($bufPtr, $voidPtr),
+            $context->builder->pointerCast($defPtr, $voidPtr),
+            $defLen
+        );
+        $end = $context->builder->gep($bufPtr, $defLen);
+        $context->builder->store(
+            $context->getTypeFromString('int8')->constInt(0, false),
+            $end
+        );
+        $context->builder->store($bufPtr, $slot);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+    }
+
+    private static function copyStringObjectToCstr(Context $context, Value $fn, Value $strObj): Value
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $nullBb = $fn->appendBasicBlock('ics_null');
+        $workBb = $fn->appendBasicBlock('ics_work');
+        $doneBb = $fn->appendBasicBlock('ics_done');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $strObj, $strPtrTy->constNull());
+        $context->builder->branchIf($isNull, $nullBb, $workBb);
+
+        $context->builder->positionAtEnd($nullBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($workBb);
+        $map = $context->structFieldMap['__string__'];
+        $len = $context->builder->load($context->builder->structGep($strObj, $map['length']));
+        $bytes = $context->builder->structGep($strObj, $map['value']);
+        $dup = self::dupBuffer($context, $bytes, $context->builder->zext($len, $context->getTypeFromString('size_t')));
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($i8p);
+        $phi->addIncoming($i8p->constNull(), $nullBb);
+        $phi->addIncoming($dup, $workBb);
+
+        return $phi;
+    }
+
+    private static function dupBuffer(Context $context, Value $src, Value $len): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $voidPtr = $context->getTypeFromString('void*');
+        $allocSize = $context->builder->add($len, $sizeT->constInt(1, false));
+        $raw = $context->builder->call($context->lookupFunction('malloc'), $allocSize);
+        $out = $context->builder->pointerCast($raw, $i8p);
+        $context->builder->call(
+            $context->lookupFunction('memcpy'),
+            $context->builder->pointerCast($out, $voidPtr),
+            $context->builder->pointerCast($src, $voidPtr),
+            $len
+        );
+        $end = $context->builder->gep($out, $len);
+        $context->builder->store($i8->constInt(0, false), $end);
+
+        return $out;
+    }
+
+    private static function freeCstr(Context $context, Value $fn, Value $ptr): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $nonNull = $context->builder->icmp(Builder::INT_NE, $ptr, $i8p->constNull());
+        $suffix = (string) ++self::$blockSuffix;
+        $freeBb = $fn->appendBasicBlock('ini_free_'.$suffix);
+        $skipBb = $fn->appendBasicBlock('ini_skip_'.$suffix);
+        $contBb = $fn->appendBasicBlock('ini_cont_'.$suffix);
+        $context->builder->branchIf($nonNull, $freeBb, $skipBb);
+        $context->builder->positionAtEnd($freeBb);
+        $context->builder->call($context->lookupFunction('free'), $ptr);
+        $context->builder->branch($contBb);
+        $context->builder->positionAtEnd($skipBb);
+        $context->builder->branch($contBb);
+        $context->builder->positionAtEnd($contBb);
+    }
+
+    private static function freeCstrPair(Context $context, Value $fn, Value $opt, Value $val): void
+    {
+        self::freeCstr($context, $fn, $opt);
+        self::freeCstr($context, $fn, $val);
+    }
+
+    private static function globalPtr(Context $context, string $name, $llvmType): Value
+    {
+        $global = $context->module->getNamedGlobal($name);
+        if (null === $global) {
+            throw new \LogicException('IniRuntime global missing: '.$name);
+        }
+
+        return $context->builder->pointerCast($global, $llvmType->pointerType(0));
+    }
+
+    private static function ensureGlobals(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+
+        if (null === $context->module->getNamedGlobal(self::G_ERROR_REPORTING)) {
+            $g = $context->module->addGlobal($i32, self::G_ERROR_REPORTING);
+            $g->setInitializer($i32->constInt(32767, false));
+        }
+        if (null === $context->module->getNamedGlobal(self::G_DISPLAY_ERRORS)) {
+            $g = $context->module->addGlobal($i32, self::G_DISPLAY_ERRORS);
+            $g->setInitializer($i32->constInt(1, false));
+        }
+        if (null === $context->module->getNamedGlobal(self::G_MEMORY_LIMIT)) {
+            $g = $context->module->addGlobal($i8p, self::G_MEMORY_LIMIT);
+            $g->setInitializer($i8p->constNull());
+        }
+        if (null === $context->module->getNamedGlobal(self::G_SILENCE_DEPTH)) {
+            $g = $context->module->addGlobal($i32, self::G_SILENCE_DEPTH);
+            $g->setInitializer($i32->constInt(0, false));
+        }
+        if (null === $context->module->getNamedGlobal(self::G_SILENCE_SAVED_ER)) {
+            $g = $context->module->addGlobal($i32, self::G_SILENCE_SAVED_ER);
+            $g->setInitializer($i32->constInt(0, false));
+        }
+    }
+
+    private static function ensureLibc(Context $context): void
+    {
+        $voidPtr = $context->getTypeFromString('void*');
+        $voidTy = $context->getTypeFromString('void');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+
+        self::ensureExternal($context, 'malloc', $context->context->functionType($voidPtr, false, $sizeT));
+        self::ensureExternal($context, 'free', $context->context->functionType($voidTy, false, $i8p));
+        self::ensureExternal(
+            $context,
+            'memcpy',
+            $context->context->functionType($voidPtr, false, $voidPtr, $voidPtr, $sizeT)
+        );
+        self::ensureExternal($context, 'strlen', $context->context->functionType($sizeT, false, $i8p));
+        self::ensureExternal($context, 'strcmp', $context->context->functionType($i32, false, $i8p, $i8p));
+        self::ensureExternal($context, 'strncmp', $context->context->functionType($i32, false, $i8p, $i8p, $sizeT));
+        self::ensureExternal($context, 'strcasecmp', $context->context->functionType($i32, false, $i8p, $i8p));
+        $i8pp = $i8p->pointerType(0);
+        self::ensureExternal(
+            $context,
+            'strtol',
+            $context->context->functionType($i64, false, $i8p, $i8pp, $i32)
+        );
+        self::ensureExternal(
+            $context,
+            'snprintf',
+            $context->context->functionType($i32, false, $i8p, $sizeT, $i8p, $i32)
+        );
+    }
+
+    private static function ensureValueWriters(Context $context): void
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $valPtr = $context->getTypeFromString('__value__*');
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $voidTy = $context->getTypeFromString('void');
+
+        self::ensureExternal(
+            $context,
+            '__string__init',
+            $context->context->functionType($strPtr, false, $i64, $context->getTypeFromString('int8*'))
+        );
+        self::ensureExternal(
+            $context,
+            '__value__writeString',
+            $context->context->functionType($voidTy, false, $valPtr, $strPtr)
+        );
+        self::ensureExternal(
+            $context,
+            '__value__writeLong',
+            $context->context->functionType($voidTy, false, $valPtr, $i64)
+        );
+        self::ensureExternal(
+            $context,
+            '__value__writeBool',
+            $context->context->functionType($voidTy, false, $valPtr, $i32)
+        );
+    }
+
+    private static function ensureExternal(Context $context, string $name, $ft): void
+    {
+        try {
+            $context->lookupFunction($name);
+        } catch (\Throwable $e) {
+            $fn = $context->module->addFunction($name, $ft);
+            $context->registerFunction($name, $fn);
+        }
+    }
+
+    private static function registerLinkedRuntime(Context $context): void
+    {
+        foreach (
+            [
+                '__compiler_phpc_error_level_enabled',
+                '__compiler_ini_get',
+                '__compiler_ini_set',
+                '__compiler_error_reporting',
+                '__compiler_begin_silence',
+                '__compiler_end_silence',
+            ] as $name
         ) {
-            return;
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn) {
+                throw new \LogicException($name.' missing after IniRuntime LLVM implement');
+            }
+            $context->registerFunction($name, $fn);
         }
-
-        $bitcode = self::ensureBitcode();
-        $data = file_get_contents($bitcode);
-        if (false === $data || '' === $data) {
-            throw new \LogicException('Failed to read ini JIT bitcode: '.$bitcode);
-        }
-        $buffer = $context->llvm->createMemoryBufferWithString($data, 'ini.bc');
-        $runtimeModule = $buffer->parseBitcode($context->context);
-        if (!$context->module->link($runtimeModule)) {
-            throw new \LogicException('Failed to link ini JIT runtime bitcode');
-        }
-
-        $get = $context->module->getNamedFunction('__compiler_ini_get');
-        $set = $context->module->getNamedFunction('__compiler_ini_set');
-        $errorReporting = $context->module->getNamedFunction('__compiler_error_reporting');
-        $beginSilence = $context->module->getNamedFunction('__compiler_begin_silence');
-        $endSilence = $context->module->getNamedFunction('__compiler_end_silence');
-        if (null === $get || null === $set || null === $errorReporting || null === $beginSilence || null === $endSilence) {
-            throw new \LogicException('__compiler_ini_get/set/error_reporting/silence missing after ini runtime bitcode link');
-        }
-        $context->registerFunction('__compiler_ini_get', $get);
-        $context->registerFunction('__compiler_ini_set', $set);
-        $context->registerFunction('__compiler_error_reporting', $errorReporting);
-        $context->registerFunction('__compiler_begin_silence', $beginSilence);
-        $context->registerFunction('__compiler_end_silence', $endSilence);
     }
 
-    private static function ensureBitcode(): string
+    private static function captureInsertBlock(Context $context): ?BasicBlock
     {
-        $source = realpath(self::RUNTIME_SOURCE);
-        if (false === $source || !is_file($source)) {
-            throw new \LogicException('ini runtime source not found: '.self::RUNTIME_SOURCE);
+        try {
+            return $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+            return null;
         }
-
-        $compiler = self::resolveCompiler();
-        $cacheDir = sys_get_temp_dir().'/phpc-jit-runtime';
-        if (!is_dir($cacheDir) && !mkdir($cacheDir, 0777, true) && !is_dir($cacheDir)) {
-            throw new \LogicException('Cannot create JIT runtime cache: '.$cacheDir);
-        }
-
-        $namesInc = dirname($source).'/builtin_function_names.inc';
-        $cache = $cacheDir.'/ini-'.substr(
-            sha1($source.filemtime($source).filemtime($namesInc).$compiler),
-            0,
-            16
-        ).'.bc';
-        if (is_file($cache) && filemtime($cache) >= filemtime($source) && filemtime($cache) >= filemtime($namesInc)) {
-            return $cache;
-        }
-
-        $includes = self::includeFlags();
-        $runtimeDir = dirname($source);
-        $cmd = escapeshellarg($compiler)
-            .' -emit-llvm -c -fPIC -O2'.$includes.' -I'.escapeshellarg($runtimeDir).' '
-            .escapeshellarg($source).' -o '.escapeshellarg($cache).' 2>&1';
-        $output = shell_exec($cmd);
-        if (!is_file($cache)) {
-            throw new \LogicException(
-                'Failed to compile ini JIT bitcode: '.trim((string) $output)
-            );
-        }
-
-        return $cache;
     }
 
-    private static function resolveCompiler(): string
+    private static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
     {
-        $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
-        if (false !== $llvmDir && '' !== $llvmDir) {
-            foreach (['clang-9', 'clang'] as $name) {
-                $candidate = $llvmDir.'/'.$name;
-                if (is_executable($candidate)) {
-                    return $candidate;
-                }
-            }
+        if (null !== $block) {
+            $context->builder->positionAtEnd($block);
+        } else {
+            $context->builder->clearInsertionPosition();
         }
-
-        foreach (['clang-9', 'clang', 'gcc', 'cc'] as $name) {
-            $path = trim((string) shell_exec('command -v '.escapeshellarg($name).' 2>/dev/null'));
-            if ('' !== $path) {
-                return $path;
-            }
-        }
-
-        throw new \LogicException('No C compiler found for ini JIT runtime bitcode');
-    }
-
-    private static function includeFlags(): string
-    {
-        $flags = '';
-        $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
-        if (false !== $llvmDir && '' !== $llvmDir) {
-            $flags .= ' -I'.escapeshellarg($llvmDir.'/include');
-        }
-        foreach (self::discoverSystemIncludeDirs() as $dir) {
-            $flags .= ' -isystem '.escapeshellarg($dir);
-        }
-        if (!str_contains($flags, '-isystem') && is_file('/usr/include/stdio.h')) {
-            $flags .= ' -isystem /usr/include';
-        }
-
-        return $flags;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private static function discoverSystemIncludeDirs(): array
-    {
-        $dirs = [];
-        foreach (['gcc', 'cc', 'clang'] as $compiler) {
-            $path = trim((string) shell_exec('command -v '.escapeshellarg($compiler).' 2>/dev/null'));
-            if ('' === $path) {
-                continue;
-            }
-            $verbose = shell_exec(
-                escapeshellarg($path).' -E -Wp,-v -xc /dev/null 2>&1'
-            );
-            if (!is_string($verbose)) {
-                continue;
-            }
-            $capture = false;
-            foreach (explode("\n", $verbose) as $line) {
-                if (str_contains($line, '#include <...> search starts here:')) {
-                    $capture = true;
-
-                    continue;
-                }
-                if ($capture) {
-                    if (str_contains($line, 'End of search list')) {
-                        break;
-                    }
-                    $dir = trim($line);
-                    if ('' !== $dir && is_dir($dir)) {
-                        $dirs[$dir] = true;
-                    }
-                }
-            }
-            if ([] !== $dirs) {
-                break;
-            }
-        }
-
-        if ([] === $dirs) {
-            foreach (['/usr/include', '/usr/include/x86_64-linux-gnu'] as $fallback) {
-                if (is_dir($fallback)) {
-                    $dirs[$fallback] = true;
-                }
-            }
-        }
-
-        return array_keys($dirs);
     }
 }
