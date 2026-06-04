@@ -1689,7 +1689,99 @@ class Compiler {
             }
         }
 
-        return $this->compileCoalesce($coalesce, $block, $resultOverride);
+        $block = $this->compileCoalesce($coalesce, $block, $resultOverride);
+
+        // php-cfg keeps a separate coalesce result temp when ??= is an expression (#5337).
+        // Skip when echo reads resultOverride directly — syncing would null the override slot (TYPE_ASSIGN).
+        if ($this->coalesceAssignNeedsResultTempSync($coalesce, $resultOverride, $block)) {
+            $resultSlot = $this->compileOperand($coalesce->result, $block, false);
+            $overrideSlot = $this->compileOperand($resultOverride, $block, false);
+            $block->addOpCode(new OpCode(
+                OpCode::TYPE_ASSIGN,
+                $resultSlot,
+                $resultSlot,
+                $overrideSlot
+            ));
+        }
+
+        return $block;
+    }
+
+    /**
+     * True when ??= coalesce->result is read outside echo/tail-assign paths (#5337).
+     */
+    private function coalesceAssignNeedsResultTempSync(
+        Op\Expr\BinaryOp\Coalesce $coalesce,
+        ?Operand $resultOverride,
+        Block $block
+    ): bool {
+        if (
+            null === $resultOverride
+            || $this->operandsChainEqual($resultOverride, $coalesce->result)
+        ) {
+            return false;
+        }
+        if (null === $block->orig) {
+            return true;
+        }
+
+        $ops = $block->orig->children;
+        $tailAssign = null;
+        foreach ($ops as $idx => $op) {
+            if ($op !== $coalesce) {
+                continue;
+            }
+            if (
+                isset($ops[$idx + 1])
+                && $ops[$idx + 1] instanceof Op\Expr\Assign
+                && $this->isCoalesceAssignTail($ops[$idx + 1], $coalesce)
+            ) {
+                $tailAssign = $ops[$idx + 1];
+            }
+            break;
+        }
+
+        foreach ($ops as $op) {
+            if ($op instanceof Op\Expr\Assign) {
+                if ($op === $tailAssign) {
+                    continue;
+                }
+                if ($this->operandsChainEqual($op->expr, $coalesce->result)) {
+                    return true;
+                }
+            }
+            if ($op instanceof Op\Terminal\Echo) {
+                if ($this->operandsChainEqual($op->expr, $coalesce->result)) {
+                    continue;
+                }
+            }
+            if ($op instanceof Op\Expr\FuncCall || $op instanceof Op\Expr\NsFuncCall) {
+                foreach ($op->args as $arg) {
+                    if ($this->operandsChainEqual($arg, $coalesce->result)) {
+                        return true;
+                    }
+                }
+            }
+            if ($op instanceof Op\Expr\MethodCall || $op instanceof Op\Expr\StaticCall) {
+                foreach ($op->args as $arg) {
+                    if ($this->operandsChainEqual($arg, $coalesce->result)) {
+                        return true;
+                    }
+                }
+            }
+            if ($op instanceof Op\Terminal\Return_ && null !== $op->expr) {
+                if ($this->operandsChainEqual($op->expr, $coalesce->result)) {
+                    return true;
+                }
+            }
+            if ($op instanceof Op\Expr\BinaryOp\Coalesce && $op !== $coalesce) {
+                if ($this->operandsChainEqual($op->right, $coalesce->result)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

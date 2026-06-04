@@ -124,6 +124,38 @@ echo "\n";
         );
     }
 
+    /** Issue #5337: ??= expression value must match assigned value (zend_compile.c). */
+    public function testNullCoalesceAssignExpressionValue(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+$a = null;
+ob_start();
+var_dump($a ??= 5, $a);
+$out = ob_get_clean();
+echo $out;
+
+$b = null;
+$b = $b ??= 7;
+echo $b, "\n";
+
+$x = null;
+$y = null;
+ob_start();
+var_dump($x ??= $y ??= 1, $x, $y);
+$chain = ob_get_clean();
+echo $chain;
+',
+            "int(5)
+int(5)
+7
+int(1)
+int(1)
+int(1)
+"
+        );
+    }
+
     /** Issue #3462: ($x ?? throw new Ex()) — RHS only when LHS is null. */
     public function testNullCoalesceNestedInCast(): void
     {
