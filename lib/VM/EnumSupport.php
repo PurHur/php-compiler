@@ -32,6 +32,22 @@ final class EnumSupport
     }
 
     /**
+     * Map compile-time enum case stubs to the live {@see ClassEntry} in VM context (#5773).
+     */
+    public static function resolveRuntimeEnumClass(?Context $context, ClassEntry $entry): ClassEntry
+    {
+        if (null === $context) {
+            return $entry;
+        }
+        $lc = strtolower(ltrim($entry->name, '\\'));
+        if (isset($context->classes[$lc]) && $context->classes[$lc]->isEnum) {
+            return $context->classes[$lc];
+        }
+
+        return $entry;
+    }
+
+    /**
      * Zend {@see zend_enum_build_backed_enum_table()} — lazy on first case use (#5672).
      *
      * @throws \Error duplicate backing scalar

@@ -10,8 +10,8 @@ use PHPCfg\Operand\Literal as OperandLiteral;
 use PHPCfg\Script;
 
 /**
- * Compile-time check: backed enum cases must declare an explicit scalar value (#5397)
- * and backing scalars must be unique (#5710).
+ * Compile-time check: backed enum cases must declare an explicit scalar value (#5397).
+ * Duplicate backing values are detected at first case use (#5773, zend_enum.c).
  *
  * php-src: Zend/zend_enum.c — zend_register_enum_case
  */
@@ -37,8 +37,6 @@ final class EnumBackedCaseCheck
             return;
         }
         $enumDisplay = $this->operandDisplayName($enum->name, 'enum');
-        /** @var array<int|string, string> */
-        $seenBacking = [];
         foreach ($enum->stmts->children as $member) {
             if (!$member instanceof Op\Terminal\Const_) {
                 continue;
@@ -54,51 +52,7 @@ final class EnumBackedCaseCheck
                     "Enum case {$enumDisplay}::{$caseName} must have a value"
                 );
             }
-            $backingKey = $this->compileTimeEnumCaseBackingKey($member, $backedType);
-            if (null === $backingKey) {
-                continue;
-            }
-            if (isset($seenBacking[$backingKey])) {
-                throw new CompileFatal(
-                    $member->getFile(),
-                    $member->getLine(),
-                    sprintf(
-                        'Duplicate value in enum %s for cases %s and %s',
-                        $enumDisplay,
-                        $seenBacking[$backingKey],
-                        $caseName
-                    )
-                );
-            }
-            $seenBacking[$backingKey] = $caseName;
         }
-    }
-
-    /**
-     * @return int|string|null backing scalar when known at compile time
-     */
-    private function compileTimeEnumCaseBackingKey(Op\Terminal\Const_ $member, string $backedType): int|string|null
-    {
-        $value = $member->value;
-        if (!$value instanceof OperandLiteral) {
-            return null;
-        }
-        $literal = $value->value;
-        if ('int' === $backedType) {
-            if (is_int($literal)) {
-                return $literal;
-            }
-            if (is_float($literal) && (float) (int) $literal === $literal) {
-                return (int) $literal;
-            }
-
-            return null;
-        }
-        if (is_string($literal)) {
-            return $literal;
-        }
-
-        return null;
     }
 
     private function enumCaseHasExplicitValue(Op\Terminal\Const_ $member, Op\Stmt\Enum_ $enum): bool

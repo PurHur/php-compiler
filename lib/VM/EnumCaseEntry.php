@@ -25,7 +25,9 @@ final class EnumCaseEntry
         ?Context $context = null,
         ?Frame $frame = null
     ): Variable {
-        EnumSupport::ensureBackedEnumValuesUnique($this->enumClass);
+        EnumSupport::ensureBackedEnumValuesUnique(
+            EnumSupport::resolveRuntimeEnumClass($context, $this->enumClass)
+        );
         $lc = strtolower($name);
         if ('name' === $lc) {
             $var = new Variable(Variable::TYPE_STRING);

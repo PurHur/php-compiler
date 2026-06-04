@@ -3781,6 +3781,10 @@ class Compiler {
                     $this->compileTimeEnumBackedTypes[$lcClass] ?? null
                 );
             }
+            // Defer enum case fetches to runtime so duplicate backing is caught on first use (#5773).
+            if (Variable::TYPE_OBJECT === $stored->type && EnumCaseSupport::isEnumCase($stored->toObject())) {
+                return null;
+            }
             $value = new Variable();
             $value->copyFrom($stored);
 
