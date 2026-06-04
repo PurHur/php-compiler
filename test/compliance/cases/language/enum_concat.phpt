@@ -1,5 +1,5 @@
 --TEST--
-Language: string concat with backed enum case — Error (zend_enum.c, #5508)
+Language: string concat with backed enum case — Error (zend_operators.c, #5508, #5806)
 --FILE--
 <?php
 enum E: string { case A = 'a'; }
