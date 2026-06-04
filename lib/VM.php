@@ -7831,25 +7831,7 @@ restart:
             if ($classEntry->isEnum && null !== $classEntry->backedType) {
                 VM\EnumSupport::ensureBackedEnumValuesUnique($classEntry);
             }
-            if ($classEntry->isEnum && isset($classEntry->enumCaseCanonicalNames[$memberLc])) {
-                $canonical = $classEntry->enumCaseCanonicalNames[$memberLc];
-                $stored = $classEntry->constants[$memberLc]->resolveIndirect();
-                $backing = new Variable(Variable::TYPE_NULL);
-                $backing->null();
-                if (null !== $classEntry->backedType) {
-                    if (Variable::TYPE_OBJECT === $stored->type && EnumCaseSupport::isEnumCase($stored->toObject())) {
-                        $caseValue = $stored->toObject()->enumCaseValue;
-                        if (null !== $caseValue) {
-                            $backing->copyFrom($caseValue);
-                        }
-                    } elseif (Variable::TYPE_ENUM_CASE === $stored->type) {
-                        $backing->copyFrom($stored->toEnumCase()->backingValue);
-                    } else {
-                        $backing->copyFrom($classEntry->constants[$memberLc]);
-                    }
-                }
-                $dest->enumCase(new EnumCaseEntry($classEntry, $canonical, $backing));
-
+            if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($classEntry, $memberLc, $dest)) {
                 return true;
             }
             $dest->copyFrom($classEntry->constants[$memberLc]);

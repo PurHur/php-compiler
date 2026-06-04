@@ -165,14 +165,7 @@ final class ClassConstExpr
         if (!isset($classEntry->constants[$constName])) {
             throw new \LogicException("Undefined class constant {$className}::{$constName}");
         }
-        if ($classEntry->isEnum && isset($classEntry->enumCaseCanonicalNames[$constName])) {
-            $canonical = $classEntry->enumCaseCanonicalNames[$constName];
-            $backing = new Variable();
-            $backing->copyFrom($classEntry->constants[$constName]);
-            $frame->scope[$op->arg1]->enumCase(
-                new EnumCaseEntry($classEntry, $canonical, $backing)
-            );
-
+        if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($classEntry, $constName, $frame->scope[$op->arg1])) {
             return;
         }
         $frame->scope[$op->arg1]->copyFrom($classEntry->constants[$constName]);
