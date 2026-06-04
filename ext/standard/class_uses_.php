@@ -52,6 +52,20 @@ final class class_uses_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('class_uses() is not supported in JIT in this compiler build; use bin/vm.php');
+        if (\count($args) < 1 || \count($args) > 2) {
+            throw new \LogicException('class_uses() requires one or two arguments in this compiler build');
+        }
+        $autoload = true;
+        if (\count($args) >= 2) {
+            if (JITVariable::TYPE_NATIVE_BOOL !== $args[1]->type) {
+                throw new \LogicException('class_uses() autoload flag must be a boolean in this compiler build');
+            }
+            $autoloadConst = $args[1]->value;
+            if ($autoloadConst instanceof \PHPLLVM\Value\ConstantInt) {
+                $autoload = 0 !== $autoloadConst->getValue();
+            }
+        }
+
+        return JitClassUses::invoke($context, $args[0], $autoload);
     }
 }

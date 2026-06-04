@@ -779,6 +779,7 @@ require_once __DIR__.'/../../../lib/JIT/VariableTypeMapNative.php';
 require_once __DIR__.'/../../../lib/VM/GeneratorState.php';
 require_once __DIR__.'/../../../ext/standard/JitAssert.php';
 require_once __DIR__.'/../../../ext/standard/JitClassImplements.php';
+require_once __DIR__.'/../../../ext/standard/JitClassUses.php';
 require_once __DIR__.'/../../../ext/standard/JitClassParents.php';
 require_once __DIR__.'/../../../ext/standard/JitConstant.php';
 require_once __DIR__.'/../../../ext/standard/JitCountChars.php';

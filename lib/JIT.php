@@ -8463,6 +8463,7 @@ class JIT {
                 $perTraitMethods[$traitLc] = [];
             }
             $usedTraitNameByLc[$traitLc] = $traitName;
+            $object->recordClassUsedTrait($classLc, $traitName);
             foreach ($object->declaredMethodNames($traitId) as $methodLc) {
                 $perTraitMethods[$traitLc][$methodLc] = [
                     'traitId' => $traitId,
