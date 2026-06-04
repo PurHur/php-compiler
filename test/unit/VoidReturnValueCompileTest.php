@@ -24,6 +24,22 @@ PHP;
         $runtime->parseAndCompile($code, 'void_value_return.php');
     }
 
+    public function testVoidRejectsNullReturnAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function f(): void {
+    return null;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(
+            'A void function must not return a value (did you mean "return;" instead of "return null;"?)'
+        );
+        $runtime->parseAndCompile($code, 'void_null_return.php');
+    }
+
     public function testVoidAllowsBareReturn(): void
     {
         $runtime = new Runtime();
