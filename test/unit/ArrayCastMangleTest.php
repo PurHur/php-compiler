@@ -22,5 +22,9 @@ final class ArrayCastMangleTest extends BaseTest
             __DIR__.'/../compliance/cases/language/array_cast_visibility_mangle.phpt',
             'array_cast_visibility_mangle.phpt'
         );
+        yield 'array_cast_uninit_typed_property.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/language/array_cast_uninit_typed_property.phpt',
+            'array_cast_uninit_typed_property.phpt'
+        );
     }
 }

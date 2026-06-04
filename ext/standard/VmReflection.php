@@ -13,6 +13,7 @@ use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -664,7 +665,7 @@ final class VmReflection
         $ht = $result->toArray();
         foreach ($object->toObject()->getProperties(0) as $name => $prop) {
             $value = $prop->resolveIndirect();
-            if (Variable::TYPE_NULL === $value->type) {
+            if (TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
                 continue;
             }
             $copy = new Variable();
@@ -695,7 +696,7 @@ final class VmReflection
                 continue;
             }
             $value = $obj->getProperty($meta->name)->resolveIndirect();
-            if (Variable::TYPE_NULL === $value->type) {
+            if (TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
                 continue;
             }
             $key = self::manglePropertyKey($meta, $ctx);

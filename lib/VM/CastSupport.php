@@ -67,7 +67,7 @@ final class CastSupport
                 continue;
             }
             $value = $obj->getProperty($meta->name)->resolveIndirect();
-            if (Variable::TYPE_NULL === $value->type) {
+            if (TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
                 continue;
             }
             $declared[$meta->name] = true;
@@ -89,7 +89,7 @@ final class CastSupport
                 continue;
             }
             $value = $prop->resolveIndirect();
-            if (Variable::TYPE_NULL === $value->type) {
+            if (TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
                 continue;
             }
             $copy = new Variable();
