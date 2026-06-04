@@ -29,6 +29,10 @@ final class next extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        return JitArrayPointer::unsupported($context, 'next');
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError('next() expects exactly 1 argument, '.\count($args).' given');
+        }
+
+        return JitArrayPointer::next($context, $args[0]);
     }
 }

@@ -29,6 +29,10 @@ final class prev extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        return JitArrayPointer::unsupported($context, 'prev');
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError('prev() expects exactly 1 argument, '.\count($args).' given');
+        }
+
+        return JitArrayPointer::prev($context, $args[0]);
     }
 }
