@@ -1,5 +1,5 @@
 --TEST--
-stdlib intval()/floatval() on backed enum cases — E_WARNING + backing scalar (#5623)
+stdlib intval()/floatval() on backed enum cases — E_WARNING + 1 (#5623, #5714)
 --FILE--
 <?php
 enum E: int
@@ -24,4 +24,4 @@ echo 'intval S: ', @intval($s), "\n";
 intval: 1
 warning: Object of class E could not be converted to int
 floatval: 1
-intval S: 42
+intval S: 1

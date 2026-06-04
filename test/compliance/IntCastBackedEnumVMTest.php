@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 require_once __DIR__.'/../BaseTest.php';
 
-/** VM compliance for (int) cast on backed enum cases (#5653). */
+/** VM compliance for (int)/(float) cast on backed enum cases (#5714). */
 final class IntCastBackedEnumVMTest extends BaseTest
 {
     protected static string $DIR = __DIR__;

@@ -9,7 +9,7 @@ use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
 /**
- * Zend scalar casts on enum case operands for intval/floatval (issue #5623, ext/standard/type.c).
+ * Zend scalar casts on enum case operands for intval/floatval (#5623, #5714, ext/standard/type.c).
  */
 final class VmScalarType
 {

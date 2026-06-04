@@ -405,9 +405,9 @@ final class EnumCaseSupport
     }
 
     /**
-     * Zend scalar (int) cast on enum case operands — backing coerce + E_WARNING (#5653, zend_operators.c).
+     * Zend scalar (int) cast on enum case operands — E_WARNING + legacy object cast 1 (#5714, zend_operators.c).
      *
-     * @return int|null backing int, 1 for unit enum, or null when $value is not an enum case
+     * @return int|null 1 when $value is an enum case, or null otherwise
      */
     public static function tryCastToInt(Variable $value, ?Context $context = null, ?Frame $frame = null): ?int
     {
@@ -416,18 +416,14 @@ final class EnumCaseSupport
             return null;
         }
         self::emitScalarCastWarning($context, $frame, $enumClass->name, 'int');
-        $backing = self::backingValueForScalarCast($value);
-        if (null === $backing) {
-            return 1;
-        }
 
-        return self::coerceBackingToInt($backing);
+        return 1;
     }
 
     /**
-     * Zend scalar (float) cast on enum case operands (#5623 parity, zend_operators.c).
+     * Zend scalar (float) cast on enum case operands — E_WARNING + 1.0 (#5714, #5623, zend_operators.c).
      *
-     * @return float|null backing float, 1.0 for unit enum, or null when $value is not an enum case
+     * @return float|null 1.0 when $value is an enum case, or null otherwise
      */
     public static function tryCastToFloat(Variable $value, ?Context $context = null, ?Frame $frame = null): ?float
     {
@@ -436,71 +432,8 @@ final class EnumCaseSupport
             return null;
         }
         self::emitScalarCastWarning($context, $frame, $enumClass->name, 'float');
-        $backing = self::backingValueForScalarCast($value);
-        if (null === $backing) {
-            return 1.0;
-        }
 
-        return self::coerceBackingToFloat($backing);
-    }
-
-    private static function backingValueForScalarCast(Variable $value): ?Variable
-    {
-        $value = $value->resolveIndirect();
-        if (Variable::TYPE_ENUM_CASE === $value->type) {
-            $entry = $value->toEnumCase();
-            if (null === $entry->enumClass->backedType) {
-                return null;
-            }
-            $backing = new Variable();
-            $backing->copyFrom($entry->backingValue);
-
-            return $backing;
-        }
-        if (Variable::TYPE_OBJECT === $value->type && self::isEnumCase($value->toObject())) {
-            $object = $value->toObject();
-            if (null === $object->class->backedType || null === $object->enumCaseValue) {
-                return null;
-            }
-            $backing = new Variable();
-            $backing->copyFrom($object->enumCaseValue);
-
-            return $backing;
-        }
-
-        return null;
-    }
-
-    private static function coerceBackingToInt(Variable $backing): int
-    {
-        $backing = $backing->resolveIndirect();
-        if (Variable::TYPE_INTEGER === $backing->type) {
-            return $backing->toInt();
-        }
-        if (Variable::TYPE_FLOAT === $backing->type) {
-            return (int) $backing->toFloat();
-        }
-        if (Variable::TYPE_STRING === $backing->type) {
-            return (int) $backing->toString();
-        }
-
-        throw new \LogicException('Backed enum case value must be int, float, or string');
-    }
-
-    private static function coerceBackingToFloat(Variable $backing): float
-    {
-        $backing = $backing->resolveIndirect();
-        if (Variable::TYPE_INTEGER === $backing->type) {
-            return (float) $backing->toInt();
-        }
-        if (Variable::TYPE_FLOAT === $backing->type) {
-            return $backing->toFloat();
-        }
-        if (Variable::TYPE_STRING === $backing->type) {
-            return (float) $backing->toString();
-        }
-
-        throw new \LogicException('Backed enum case value must be int, float, or string');
+        return 1.0;
     }
 
     private static function emitScalarCastWarning(
