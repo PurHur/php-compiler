@@ -14,10 +14,31 @@ final class BuiltinByRefParams
     public static function forFunction(string $name): array
     {
         switch (strtolower($name)) {
+            case 'array_push':
+            case 'array_pop':
+            case 'array_shift':
+            case 'array_unshift':
+            case 'asort':
+            case 'arsort':
+            case 'ksort':
+            case 'krsort':
+            case 'natcasesort':
+            case 'natsort':
+            case 'rsort':
+            case 'shuffle':
+            case 'sort':
+            case 'uasort':
+            case 'uksort':
+            case 'usort':
+                return [0];
             case 'modf':
                 return [1];
             case 'frexp':
                 return [1];
+            case 'parse_str':
+                return [1];
+            case 'settype':
+                return [0];
             case 'similar_text':
                 return [2];
         }

@@ -31,6 +31,7 @@ use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ObjectLifetime;
 use PHPCompiler\VM\ObjectPropertyIterator;
+use PHPCompiler\VM\ReferencableCheck;
 use PHPCompiler\VM\ScriptExit;
 use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\TypedPropertyReadSignal;
@@ -2490,6 +2491,7 @@ restart:
                     if ($frame->call instanceof Func\PHP && $frame->call->block->isGenerator) {
                         try {
                             $calledArgs = $this->resolveOutgoingCallArgs($frame);
+                            ReferencableCheck::assertOutgoingCallArgs($frame->call, $frame, $calledArgs);
                         } catch (\TypeError $e) {
                             $catchFrame = $this->dispatchVmTypeError($e, $frame);
                             if (null !== $catchFrame) {
@@ -2518,6 +2520,7 @@ restart:
                     }
                     try {
                         $calledArgs = $this->resolveOutgoingCallArgs($frame);
+                        ReferencableCheck::assertOutgoingCallArgs($frame->call, $frame, $calledArgs);
                         // Zend strict_types is a *caller* (call-site) rule; enforce scalar param checks
                         // before entering the callee so exceptions abort argument evaluation correctly.
                         if (

@@ -14,4 +14,10 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([2], BuiltinByRefParams::forFunction('similar_text'));
         $this->assertSame([2], BuiltinByRefParams::forFunction('SIMILAR_TEXT'));
     }
+
+    public function testSortFirstArgument(): void
+    {
+        $this->assertSame([0], BuiltinByRefParams::forFunction('sort'));
+        $this->assertSame([0], BuiltinByRefParams::forFunction('SORT'));
+    }
 }
