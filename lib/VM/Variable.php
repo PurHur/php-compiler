@@ -2132,8 +2132,11 @@ restart:
         $str = $parent->string;
         $rawIndex = $this->stringOffsetIndex;
         $len = strlen($str);
-        $index = $this->resolveStringOffsetByteIndex($rawIndex, $len);
-        if (null === $index) {
+        $index = $rawIndex;
+        if ($index < 0) {
+            $index += $len;
+        }
+        if ($index < 0) {
             if (null !== $this->stringOffsetReporter) {
                 $this->stringOffsetReporter->illegalStringOffset(
                     $rawIndex,
@@ -2146,10 +2149,18 @@ restart:
             return;
         }
         $byte = self::byteFromAssignValue($value);
-        if ($index >= $len) {
-            $str .= str_repeat("\0", $index - $len + 1);
+        if ($index > $len) {
+            $str .= str_repeat(' ', $index - $len);
         }
-        $str[$index] = $byte;
+        if ($index >= $len) {
+            if ($index === strlen($str)) {
+                $str .= $byte;
+            } else {
+                $str[$index] = $byte;
+            }
+        } else {
+            $str[$index] = $byte;
+        }
         $parent->string($str);
     }
 
