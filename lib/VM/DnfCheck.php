@@ -43,7 +43,7 @@ final class DnfCheck
     {
         return match ($arm['kind']) {
             'null' => Variable::TYPE_NULL === $value->type,
-            'literal' => self::matchesLiteralArm($value, $arm['name']),
+            'literal' => self::matchesLiteralArm($value, $arm['name'], $context),
             'intersection' => self::matchesIntersectionArm($value, $arm['interfaces'], $context),
             default => false,
         };
@@ -67,7 +67,7 @@ final class DnfCheck
         return true;
     }
 
-    private static function matchesLiteralArm(Variable $value, string $name): bool
+    private static function matchesLiteralArm(Variable $value, string $name, Context $context): bool
     {
         if ('null' === $name) {
             return Variable::TYPE_NULL === $value->type;
@@ -80,7 +80,8 @@ final class DnfCheck
                 'string' => Variable::TYPE_STRING === $value->type,
                 'array' => Variable::TYPE_ARRAY === $value->type,
                 'object' => Variable::TYPE_OBJECT === $value->type,
-                default => false,
+                default => Variable::TYPE_OBJECT === $value->type
+                    && InterfaceCheck::entryIsInstanceOf($value->toObject()->class, $name, $context),
             };
         }
 

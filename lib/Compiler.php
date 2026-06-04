@@ -432,7 +432,8 @@ class Compiler {
             $dnfArms = DnfType::armsFromCfgType(
                 $returnType,
                 fn (Op\Type\Intersection $t) => $this->intersectionNamesFromCfgType($t),
-                fn (Op\Type\Intersection $t) => $this->intersectionDisplayFromCfgType($t)
+                fn (Op\Type\Intersection $t) => $this->intersectionDisplayFromCfgType($t),
+                fn (Op\Type\Reference $t) => $this->staticNameFromCfgType($t)
             );
             if (DnfType::hasConstraints($dnfArms)) {
                 $block->returnDnfConstraints = $dnfArms;
@@ -2509,7 +2510,8 @@ class Compiler {
         return DnfType::labelFromCfgType(
             $declared,
             fn (Op\Type\Intersection $t) => $this->intersectionNamesFromCfgType($t),
-            fn (Op\Type\Intersection $t) => $this->intersectionDisplayFromCfgType($t)
+            fn (Op\Type\Intersection $t) => $this->intersectionDisplayFromCfgType($t),
+            fn (Op\Type\Reference $t) => $this->staticNameFromCfgType($t)
         );
     }
 
@@ -2579,7 +2581,8 @@ class Compiler {
             $dnfArms = DnfType::armsFromCfgType(
                 $declared,
                 fn (Op\Type\Intersection $t) => $this->intersectionNamesFromCfgType($t),
-                fn (Op\Type\Intersection $t) => $this->intersectionDisplayFromCfgType($t)
+                fn (Op\Type\Intersection $t) => $this->intersectionDisplayFromCfgType($t),
+                fn (Op\Type\Reference $t) => $this->staticNameFromCfgType($t)
             );
             if (DnfType::hasConstraints($dnfArms)) {
                 if ($variadicElement) {
@@ -3112,7 +3115,8 @@ class Compiler {
             $dnfArms = DnfType::armsFromCfgType(
                 $cfgType,
                 fn (Op\Type\Intersection $t) => $this->intersectionNamesFromCfgType($t),
-                fn (Op\Type\Intersection $t) => $this->intersectionDisplayFromCfgType($t)
+                fn (Op\Type\Intersection $t) => $this->intersectionDisplayFromCfgType($t),
+                fn (Op\Type\Reference $t) => $this->staticNameFromCfgType($t)
             );
             if (DnfType::hasConstraints($dnfArms)) {
                 $var->dnfArms = $dnfArms;
