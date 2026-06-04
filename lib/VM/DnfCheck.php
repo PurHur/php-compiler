@@ -80,8 +80,7 @@ final class DnfCheck
                 'string' => Variable::TYPE_STRING === $value->type,
                 'array' => Variable::TYPE_ARRAY === $value->type,
                 'object' => Variable::TYPE_OBJECT === $value->type,
-                default => Variable::TYPE_OBJECT === $value->type
-                    && InterfaceCheck::entryIsInstanceOf($value->toObject()->class, $name, $context),
+                default => self::matchesClassNameArm($value, $name, $context),
             };
         }
 
@@ -102,9 +101,30 @@ final class DnfCheck
             Variable::TYPE_BOOLEAN => 'bool',
             Variable::TYPE_STRING => 'string',
             Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_ENUM_CASE => self::enumCaseClassLabel($value),
             Variable::TYPE_OBJECT => self::objectClassLabel($value),
             default => 'mixed',
         };
+    }
+
+    private static function matchesClassNameArm(Variable $value, string $name, Context $context): bool
+    {
+        $enumMatch = EnumCaseSupport::valueMatchesInstanceOfClassName($value, $name, $context);
+        if (null !== $enumMatch) {
+            return $enumMatch;
+        }
+
+        return Variable::TYPE_OBJECT === $value->type
+            && InterfaceCheck::entryIsInstanceOf($value->toObject()->class, $name, $context);
+    }
+
+    private static function enumCaseClassLabel(Variable $value): string
+    {
+        if (Variable::TYPE_ENUM_CASE !== $value->type) {
+            return 'object';
+        }
+
+        return strtolower(ltrim($value->toEnumCase()->enumClass->name, '\\'));
     }
 
     private static function objectClassLabel(Variable $value): string
