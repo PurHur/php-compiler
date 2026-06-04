@@ -47,6 +47,20 @@ PHP;
         $this->assertSame("ok\n", ob_get_clean());
     }
 
+    public function testOverrideOnTraitComposedMethodCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T { public function f(): void {} }
+class C { use T; #[\Override] public function f(): void {} }
+echo "ok\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'override_trait.php'));
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
     public function testOverrideSignatureMismatchFailsAtCompileTime(): void
     {
         $runtime = new Runtime();
