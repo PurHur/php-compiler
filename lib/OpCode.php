@@ -249,6 +249,8 @@ class OpCode {
     public bool $isIncDec = false;
     /** isset()/empty() on PropertyFetch, not ArrayDimFetch (issue #5117, zend_hash.c). */
     public bool $issetOnProperty = false;
+    /** TYPE_PROPERTY_FETCH in a ?-> fetch arm must read typed slots (#5361, zend_object_handlers.c). */
+    public bool $nullsafeFetchPropertyRead = false;
     /**
      * Trait use adaptation entries for TYPE_TRAIT_USE_ADAPTATION (#3238).
      *

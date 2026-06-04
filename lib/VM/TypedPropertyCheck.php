@@ -134,7 +134,9 @@ final class TypedPropertyCheck
     }
 
     /**
-     * ?-> receiver short-circuit: PHP null or uninitialized nullable typed slot (zend_execute.c ZEND_NULLSAFE).
+     * ?-> receiver short-circuit: PHP null, or uninitialized nullable typed slot after a
+     * standalone PropertyFetch (e.g. $a->b?->v, #5220). Chained $x?->y reads y in the
+     * nullsafe fetch arm and must throw via nullsafeFetchPropertyRead (#5361).
      */
     public static function nullsafeShortCircuitReceiver(Variable $receiver): bool
     {
