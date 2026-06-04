@@ -1796,6 +1796,14 @@ class Block {
                     }
                     continue;
                 }
+                if (null === $op->arg3 || null === $op->arg2) {
+                    foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                        if ($sub instanceof self) {
+                            $stack[] = $sub;
+                        }
+                    }
+                    continue;
+                }
                 $nameOp = $block->getOperand($op->arg3);
                 $objOp = $block->getOperand($op->arg2);
                 if (!$nameOp instanceof Literal || null === $objOp->type || null === $objOp->type->userType) {

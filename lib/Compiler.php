@@ -1010,12 +1010,16 @@ class Compiler {
                             $i + 1 < $opCount
                             && $ops[$i + 1] instanceof Op\Expr\Assign
                             && $this->isCoalesceAssignTail($ops[$i + 1], $child)
+                            && null !== $child->left
+                            && $this->operandsChainEqual($ops[$i + 1]->var, $child->left)
                         ) {
                             /** @var Op\Expr\Assign $tailAssign */
                             $tailAssign = $ops[$i + 1];
                             $resultOverride = $tailAssign->var;
                         }
-                        $block = $this->compileCoalesceForAssign($child, $block, $resultOverride);
+                        $block = null !== $resultOverride
+                            ? $this->compileCoalesceForAssign($child, $block, $resultOverride)
+                            : $this->compileCoalesce($child, $block);
                         if (null !== $resultOverride) {
                             ++$i;
                         }
@@ -1181,6 +1185,9 @@ class Compiler {
         }
         /** @var Op\Expr\ArrayDimFetch $fetch */
         $fetch = $ops[$index];
+        if (null === $fetch->var) {
+            return false;
+        }
         if (!$fetch->dim instanceof Literal || !is_string($fetch->dim->value)) {
             return false;
         }
@@ -1271,6 +1278,9 @@ class Compiler {
         }
         /** @var Op\Expr\ArrayDimFetch $fetch */
         $fetch = $ops[$index];
+        if (null === $fetch->var) {
+            return false;
+        }
         if (!$fetch->dim instanceof Operand\Literal || !is_int($fetch->dim->value)) {
             return false;
         }
@@ -4498,6 +4508,14 @@ class Compiler {
                     null,
                     $this->compileOperand($expr->expr, $block, true),
                 )];
+            case Op\Expr\NullsafePropertyFetch::class:
+                $this->compileNullsafePropertyFetch($expr, $block);
+
+                return [];
+            case Op\Expr\NullsafeMethodCall::class:
+                $this->compileNullsafeMethodCall($expr, $block);
+
+                return [];
         }
         $this->throwCompileLogicForOp($expr, 'Unsupported expression: '.$expr->getType());
     }
@@ -5034,8 +5052,13 @@ class Compiler {
         if ($resultOperand instanceof Operand\Temporary && [] === $resultOperand->usages) {
             $resultOperand->usages[] = $resultOperand;
         }
-        $propFetch = $this->findCoalescePropertyFetch($expr->left, $block);
-        $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($expr->left, $block);
+        if (null === $expr->left) {
+            $propFetch = null;
+            $dimFetch = null;
+        } else {
+            $propFetch = $this->findCoalescePropertyFetch($expr->left, $block);
+            $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($expr->left, $block);
+        }
         // ??= on $arr['key']: dim fetch temp is read on the left branch (#3792).
         if (
             null !== $dimFetch
@@ -5051,7 +5074,9 @@ class Compiler {
             ? $this->resolveIssetTargetFromPropertyFetch($propFetch, $block)
             : (null !== $dimFetch
                 ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
-                : $this->resolveCoalesceIssetTarget($expr->left, $block));
+                : (null !== $expr->left
+                    ? $this->resolveCoalesceIssetTarget($expr->left, $block)
+                    : null));
         if (null !== $issetTarget) {
             [$containerSlot, $dimSlot] = $issetTarget;
             $block->addOpCode($this->makeIssetOpCode(
@@ -5060,7 +5085,7 @@ class Compiler {
                 $dimSlot,
                 null !== $propFetch
             ));
-        } else {
+        } elseif (null !== $expr->left) {
             $leftSlot = $this->compileOperand($expr->left, $block, true);
             $block->addOpCode(new OpCode(
                 OpCode::TYPE_ASSIGN,
@@ -5068,6 +5093,13 @@ class Compiler {
                 $resultSlot,
                 $leftSlot
             ));
+            $block->addOpCode(new OpCode(
+                OpCode::TYPE_ISSET,
+                $checkSlot,
+                $resultSlot,
+                null
+            ));
+        } else {
             $block->addOpCode(new OpCode(
                 OpCode::TYPE_ISSET,
                 $checkSlot,
@@ -5110,7 +5142,7 @@ class Compiler {
                 $this->compileArrayDimFetchRead($dimFetch, $leftBlock);
                 $leftSlot = $this->compileOperand($dimFetch->result, $leftBlock, true);
                 // ??= left branch: skip store when result is the assign lvalue (php-src: no write when set).
-                if (!$this->operandsChainEqual($resultOperand, $expr->left)) {
+                if (null !== $expr->left && !$this->operandsChainEqual($resultOperand, $expr->left)) {
                     $leftBlock->addOpCode(new OpCode(
                         OpCode::TYPE_ASSIGN,
                         $resultSlot,
@@ -5118,7 +5150,7 @@ class Compiler {
                         $leftSlot
                     ));
                 }
-            } else {
+            } elseif (null !== $expr->left) {
                 $leftSlot = $this->compileOperand($expr->left, $leftBlock, true);
                 if (!$this->operandsChainEqual($resultOperand, $expr->left)) {
                     $leftBlock->addOpCode(new OpCode(
@@ -7497,7 +7529,8 @@ class Compiler {
                 && $this->operandsChainEqual($op->left, $operand)
                 && $j + 1 < $count
                 && $ops[$j + 1] instanceof Op\Expr\Assign
-                && $this->isCoalesceAssignTail($ops[$j + 1], $op)) {
+                && $this->isCoalesceAssignTail($ops[$j + 1], $op)
+                && $this->operandsChainEqual($ops[$j + 1]->var, $op->left)) {
                 return true;
             }
         }
