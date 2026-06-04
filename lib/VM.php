@@ -21,6 +21,7 @@ use PHPCompiler\VM\CastSupport;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\DnfCheck;
 use PHPCompiler\VM\ClosureState;
+use PHPCompiler\VM\EnumCaseEntry;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\FiberState;
@@ -7691,6 +7692,21 @@ restart:
                     ),
                     $frame
                 );
+            }
+            if ($classEntry->isEnum && isset($classEntry->enumCaseCanonicalNames[$memberLc])) {
+                $canonical = $classEntry->enumCaseCanonicalNames[$memberLc];
+                $stored = $classEntry->constants[$memberLc]->resolveIndirect();
+                $backing = new Variable();
+                if (Variable::TYPE_OBJECT === $stored->type && EnumCaseSupport::isEnumCase($stored->toObject())) {
+                    $backing->copyFrom($stored->toObject()->enumCaseValue);
+                } elseif (Variable::TYPE_ENUM_CASE === $stored->type) {
+                    $backing->copyFrom($stored->toEnumCase()->backingValue);
+                } else {
+                    $backing->copyFrom($classEntry->constants[$memberLc]);
+                }
+                $dest->enumCase(new EnumCaseEntry($classEntry, $canonical, $backing));
+
+                return true;
             }
             $dest->copyFrom($classEntry->constants[$memberLc]);
 

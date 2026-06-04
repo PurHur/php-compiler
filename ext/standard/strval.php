@@ -17,6 +17,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -33,15 +34,19 @@ final class strval extends Internal
             throw new \LogicException('strval() requires exactly one argument');
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
+        // Zend runs strval() side effects even when the return value is discarded (#5615).
+        $vm = VM::running();
+        if (null !== $vm) {
+            $result = $vm->coerceVariableToString($v, $frame);
+        } elseif (Variable::TYPE_NULL === $v->type) {
+            $result = '';
+        } else {
+            $result = $v->toString(null, $frame);
+        }
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_NULL === $v->type) {
-            $frame->returnVar->string('');
-
-            return;
-        }
-        $frame->returnVar->string($v->toString(null, $frame));
+        $frame->returnVar->string($result);
     }
 
     public Context $context;
