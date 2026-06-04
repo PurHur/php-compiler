@@ -2729,16 +2729,25 @@ restart:
                                 ? (int) ($op->arg2 ?? 0)
                                 : (int) ($op->arg1 ?? 0);
                             $calleeBlock = $frame->call->block;
+                            $thisArgOffset = 0;
+                            if (
+                                null !== $calleeBlock->func
+                                && null !== $calleeBlock->func->class
+                                && !(($calleeBlock->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC)
+                            ) {
+                                $thisArgOffset = 1;
+                            }
                             foreach ($calleeBlock->opCodes as $recv) {
                                 if (OpCode::TYPE_ARG_RECV !== $recv->type) {
                                     continue;
                                 }
                                 $paramIdx = (int) $recv->arg2;
-                                if (!array_key_exists($paramIdx, $calledArgs)) {
+                                $argIndex = $paramIdx + $thisArgOffset;
+                                if (!array_key_exists($argIndex, $calledArgs)) {
                                     continue;
                                 }
                                 $slot = (int) $recv->arg1;
-                                $arg = $calledArgs[$paramIdx];
+                                $arg = $calledArgs[$argIndex];
                                 if (
                                     TypeCheck::skipParameterTypeCheckForImplicitNullable(
                                         $calleeBlock,
