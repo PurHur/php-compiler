@@ -544,7 +544,9 @@ class Compiler {
     protected function assertNoDuplicateParameterAttributes(array $params): void
     {
         foreach ($params as $param) {
-            AttributeNames::assertNoDuplicates(AttributeNames::fromOp($param));
+            $names = AttributeNames::fromOp($param);
+            AttributeNames::assertAllowDynamicPropertiesClassTargetOnly($names, 'parameter');
+            AttributeNames::assertNoDuplicates($names);
         }
     }
 
