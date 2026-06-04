@@ -4,17 +4,29 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT MCJIT bodies for __compiler_hrtime_ns / __compiler_hrtime_pair.
+ * LLVM implementation of __compiler_hrtime_ns / __compiler_hrtime_pair.
  *
- * Links {@see lib/AOT/runtime/phpc_hrtime.c}.
+ * Mirrors ext/standard/VmHrtime.php (issue #5634, #3195).
+ * php-src: ext/standard/hrtime.c — clock_gettime(CLOCK_MONOTONIC)
  */
 final class StringHrtime
 {
-    private const RUNTIME_SOURCE = __DIR__.'/../../AOT/runtime/phpc_hrtime.c';
+    private const TIMESPEC_SIZE = 16;
+
+    private const TIMESPEC_OFF_TV_SEC = 0;
+
+    private const TIMESPEC_OFF_TV_NSEC = 8;
+
+    private const NS_PER_SEC = 1_000_000_000;
+
+    /** Linux CLOCK_MONOTONIC; matches VmHrtime::CLOCK_MONOTONIC_LINUX. */
+    private const CLOCK_MONOTONIC = 1;
 
     public static function ensureLinked(Context $context): void
     {
@@ -23,29 +35,151 @@ final class StringHrtime
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
-        $probe = $context->module->getNamedFunction('__compiler_hrtime_ns');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        $nsProbe = $context->module->getNamedFunction('__compiler_hrtime_ns');
+        if (null !== $nsProbe && $nsProbe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
 
             return;
         }
 
-        $bitcode = self::ensureBitcode();
-        $data = file_get_contents($bitcode);
-        if (false === $data || '' === $data) {
-            throw new \LogicException('Failed to read hrtime JIT bitcode: '.$bitcode);
-        }
-        $buffer = $context->llvm->createMemoryBufferWithString($data, 'phpc_hrtime.bc');
-        $runtimeModule = $buffer->parseBitcode($context->context);
-        if (!$context->module->link($runtimeModule)) {
-            throw new \LogicException('Failed to link hrtime JIT runtime bitcode');
-        }
+        self::ensureLibcClock($context);
+
+        $i64 = $context->getTypeFromString('int64');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+
+        $ftNs = $context->context->functionType($i64, false);
+        $fnNs = null !== $nsProbe
+            ? $nsProbe
+            : $context->module->addFunction('__compiler_hrtime_ns', $ftNs);
+        self::implementHrtimeNs($context, $fnNs);
+
+        $pairProbe = $context->module->getNamedFunction('__compiler_hrtime_pair');
+        $ftPair = $context->context->functionType($htPtr, false);
+        $fnPair = null !== $pairProbe
+            ? $pairProbe
+            : $context->module->addFunction('__compiler_hrtime_pair', $ftPair);
+        self::implementHrtimePair($context, $fnPair);
 
         self::registerLinkedRuntime($context);
+    }
+
+    private static function implementHrtimeNs(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('hr_ns_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        [$sec, $nsec, $ok] = self::readMonotonic($context, $fn);
+
+        $failBb = $fn->appendBasicBlock('hr_ns_fail');
+        $calcBb = $fn->appendBasicBlock('hr_ns_calc');
+        $context->builder->branchIf($ok, $calcBb, $failBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($zero);
+        $context->builder->clearInsertionPosition();
+
+        $context->builder->positionAtEnd($calcBb);
+        $nsPerSec = $i64->constInt(self::NS_PER_SEC, false);
+        $total = $context->builder->add(
+            $context->builder->mul($sec, $nsPerSec),
+            $nsec
+        );
+        $context->builder->returnValue($total);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementHrtimePair(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('hr_pair_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i64 = $context->getTypeFromString('int64');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $i64->constInt(0, false);
+        $idx0 = $sizeT->constInt(0, false);
+        $idx1 = $sizeT->constInt(1, false);
+
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $nullHt = $htPtr->constNull();
+        $allocFailBb = $fn->appendBasicBlock('hr_pair_alloc_fail');
+        $fillBb = $fn->appendBasicBlock('hr_pair_fill');
+        $htNull = $context->builder->icmp(Builder::INT_EQ, $ht, $nullHt);
+        $context->builder->branchIf($htNull, $allocFailBb, $fillBb);
+
+        $context->builder->positionAtEnd($allocFailBb);
+        $context->builder->returnValue($nullHt);
+        $context->builder->clearInsertionPosition();
+
+        $context->builder->positionAtEnd($fillBb);
+        [$sec, $nsec, $ok] = self::readMonotonic($context, $fn);
+        $setLong = $context->lookupFunction('__hashtable__setLongAt');
+        $secVal = $context->builder->select($ok, $sec, $zero);
+        $nsecVal = $context->builder->select($ok, $nsec, $zero);
+        $context->builder->call($setLong, $ht, $idx0, $secVal);
+        $context->builder->call($setLong, $ht, $idx1, $nsecVal);
+        $context->builder->returnValue($ht);
+        $context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * @return array{0: Value, 1: Value, 2: Value} sec, nsec, ok (i1)
+     */
+    private static function readMonotonic(Context $context, LlvmFunction $fn): array
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $zeroI32 = $i32->constInt(0, false);
+        $clockId = $i32->constInt(self::CLOCK_MONOTONIC, false);
+
+        $ts = $context->builder->alloca($i8, self::TIMESPEC_SIZE, 'hr_ts');
+        $tsPtr = $context->builder->pointerCast($ts, $i8p);
+        $cgRet = $context->builder->call(
+            $context->lookupFunction('clock_gettime'),
+            $clockId,
+            $tsPtr
+        );
+        $ok = $context->builder->icmp(Builder::INT_EQ, $cgRet, $zeroI32);
+        $sec = self::loadI64At($context, $ts, self::TIMESPEC_OFF_TV_SEC);
+        $nsec = self::loadI64At($context, $ts, self::TIMESPEC_OFF_TV_NSEC);
+
+        return [$sec, $nsec, $ok];
+    }
+
+    private static function loadI64At(Context $context, Value $base, int $offset): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $ptr = $context->builder->gep($base, $i8->constInt($offset, false));
+        $slot = $context->builder->pointerCast($ptr, $i64->pointerType(0));
+
+        return $context->builder->load($slot);
+    }
+
+    private static function ensureLibcClock(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+
+        self::ensureExternal(
+            $context,
+            'clock_gettime',
+            $context->context->functionType($i32, false, $i32, $i8p)
+        );
+    }
+
+    private static function ensureExternal(Context $context, string $name, $ft): void
+    {
+        try {
+            $context->lookupFunction($name);
+        } catch (\Throwable $e) {
+            $fn = $context->module->addFunction($name, $ft);
+            $context->registerFunction($name, $fn);
+        }
     }
 
     private static function registerLinkedRuntime(Context $context): void
@@ -53,130 +187,9 @@ final class StringHrtime
         foreach (['__compiler_hrtime_ns', '__compiler_hrtime_pair'] as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after hrtime bitcode link');
+                throw new \LogicException($name.' missing after StringHrtime LLVM implement');
             }
             $context->registerFunction($name, $fn);
         }
-    }
-
-    private static function ensureBitcode(): string
-    {
-        $source = realpath(self::RUNTIME_SOURCE);
-        if (false === $source || !is_file($source)) {
-            throw new \LogicException('hrtime runtime source not found: '.self::RUNTIME_SOURCE);
-        }
-
-        $compiler = self::resolveCompiler();
-        $cacheDir = sys_get_temp_dir().'/phpc-jit-runtime';
-        if (!is_dir($cacheDir) && !mkdir($cacheDir, 0777, true) && !is_dir($cacheDir)) {
-            throw new \LogicException('Cannot create JIT runtime cache: '.$cacheDir);
-        }
-
-        $cache = $cacheDir.'/'.basename($source, '.c').'-'.substr(
-            sha1($source.filemtime($source).$compiler.'host'),
-            0,
-            16
-        ).'.bc';
-        if (is_file($cache) && filemtime($cache) >= filemtime($source)) {
-            return $cache;
-        }
-
-        $includes = self::hostLibcIncludeFlags();
-        $cmd = escapeshellarg($compiler)
-            .' -emit-llvm -c -fPIC -O2'.$includes.' '
-            .escapeshellarg($source).' -o '.escapeshellarg($cache).' 2>&1';
-        $output = shell_exec($cmd);
-        if (!is_file($cache)) {
-            throw new \LogicException(
-                'Failed to compile hrtime JIT bitcode: '.trim((string) $output)
-            );
-        }
-
-        return $cache;
-    }
-
-    private static function resolveCompiler(): string
-    {
-        $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
-        if (false !== $llvmDir && '' !== $llvmDir) {
-            foreach (['clang-9', 'clang'] as $name) {
-                $candidate = $llvmDir.'/'.$name;
-                if (is_executable($candidate)) {
-                    return $candidate;
-                }
-            }
-        }
-
-        foreach (['clang-9', 'clang', 'gcc', 'cc'] as $name) {
-            $path = trim((string) shell_exec('command -v '.escapeshellarg($name).' 2>/dev/null'));
-            if ('' !== $path) {
-                return $path;
-            }
-        }
-
-        throw new \LogicException('No C compiler found for hrtime JIT runtime bitcode');
-    }
-
-    private static function hostLibcIncludeFlags(): string
-    {
-        $flags = '';
-        foreach (self::discoverSystemIncludeDirs() as $dir) {
-            $flags .= ' -isystem '.escapeshellarg($dir);
-        }
-        if ('' === $flags && is_file('/usr/include/stdio.h')) {
-            $flags = ' -isystem /usr/include';
-        }
-
-        return $flags;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private static function discoverSystemIncludeDirs(): array
-    {
-        $dirs = [];
-        foreach (['gcc', 'cc', 'clang'] as $compiler) {
-            $path = trim((string) shell_exec('command -v '.escapeshellarg($compiler).' 2>/dev/null'));
-            if ('' === $path) {
-                continue;
-            }
-            $verbose = shell_exec(
-                escapeshellarg($path).' -E -Wp,-v -xc /dev/null 2>&1'
-            );
-            if (!is_string($verbose)) {
-                continue;
-            }
-            $capture = false;
-            foreach (explode("\n", $verbose) as $line) {
-                if (str_contains($line, '#include <...> search starts here:')) {
-                    $capture = true;
-
-                    continue;
-                }
-                if ($capture) {
-                    if (str_contains($line, 'End of search list')) {
-                        break;
-                    }
-                    $dir = trim($line);
-                    if ('' !== $dir && is_dir($dir)) {
-                        $dirs[$dir] = true;
-                    }
-                }
-            }
-            if ([] !== $dirs) {
-                break;
-            }
-        }
-
-        if ([] === $dirs) {
-            foreach (['/usr/include', '/usr/include/x86_64-linux-gnu'] as $fallback) {
-                if (is_dir($fallback)) {
-                    $dirs[$fallback] = true;
-                }
-            }
-        }
-
-        return array_keys($dirs);
     }
 }

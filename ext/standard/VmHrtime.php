@@ -8,13 +8,13 @@ namespace PHPCompiler\ext\standard;
  * hrtime() for VM without host Zend \hrtime() (issue #5174, #3195).
  *
  * php-src: ext/standard/hrtime.c — clock_gettime(CLOCK_MONOTONIC).
- * JIT/AOT: lib/AOT/runtime/phpc_hrtime.c (__compiler_hrtime_*).
+ * JIT/AOT: lib/JIT/Builtin/StringHrtime.php (__compiler_hrtime_*).
  */
 final class VmHrtime
 {
     private const NS_PER_SEC = 1_000_000_000;
 
-    /** Linux CLOCK_MONOTONIC; mirrors phpc_hrtime.c when time.h omits the macro. */
+    /** Linux CLOCK_MONOTONIC; mirrors StringHrtime when time.h omits the macro. */
     private const CLOCK_MONOTONIC_LINUX = 1;
 
     private static ?\FFI $ffi = null;
