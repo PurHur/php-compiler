@@ -9,7 +9,10 @@ namespace PHPCompiler\VM;
  */
 final class CastSupport
 {
-    public static function toArray(Variable $src): Variable
+    /**
+     * @param array<string, ClassEntry>|null $classesByLc
+     */
+    public static function toArray(Variable $src, ?array $classesByLc = null): Variable
     {
         $src = $src->resolveIndirect();
         $result = new Variable();
@@ -22,16 +25,7 @@ final class CastSupport
 
         if (Variable::TYPE_OBJECT === $src->type) {
             $result->newArray();
-            $ht = $result->toArray();
-            foreach ($src->toObject()->getRawProperties() as $name => $prop) {
-                $value = $prop->resolveIndirect();
-                if (Variable::TYPE_NULL === $value->type) {
-                    continue;
-                }
-                $copy = new Variable();
-                $copy->copyFrom($value);
-                $ht->add($name, $copy);
-            }
+            self::objectToArray($src->toObject(), $result->toArray(), $classesByLc ?? []);
 
             return $result;
         }
@@ -54,5 +48,53 @@ final class CastSupport
         $result->toArray()->append($copy);
 
         return $result;
+    }
+
+    /**
+     * @param array<string, ClassEntry> $classesByLc
+     */
+    private static function objectToArray(ObjectEntry $obj, HashTable $ht, array $classesByLc): void
+    {
+        if ('stdClass' === $obj->class->name) {
+            self::appendRawProperties($obj, $ht, null);
+
+            return;
+        }
+
+        $declared = [];
+        foreach ($obj->class->properties as $meta) {
+            if (!$obj->hasProperty($meta->name)) {
+                continue;
+            }
+            $value = $obj->getProperty($meta->name)->resolveIndirect();
+            if (Variable::TYPE_NULL === $value->type) {
+                continue;
+            }
+            $declared[$meta->name] = true;
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $ht->add(PropertyMangle::propertyKey($meta, $classesByLc), $copy);
+        }
+
+        self::appendRawProperties($obj, $ht, $declared);
+    }
+
+    /**
+     * @param array<string, true>|null $skipNames
+     */
+    private static function appendRawProperties(ObjectEntry $obj, HashTable $ht, ?array $skipNames): void
+    {
+        foreach ($obj->getRawProperties() as $name => $prop) {
+            if (null !== $skipNames && isset($skipNames[$name])) {
+                continue;
+            }
+            $value = $prop->resolveIndirect();
+            if (Variable::TYPE_NULL === $value->type) {
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $ht->add($name, $copy);
+        }
     }
 }
