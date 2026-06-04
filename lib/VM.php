@@ -540,6 +540,40 @@ class VM {
     }
 
     /**
+     * Zend object construction: private/protected inherited __construct() rejects external scope (#5382).
+     *
+     * @return null when construction may proceed, or a catch frame when Error was dispatched
+     */
+    protected function enforceNewConstructorVisibility(ClassEntry $class, Frame $frame): ?Frame
+    {
+        if (null === $class->constructor && !$this->hasInstanceMethod($class, '__construct')) {
+            return null;
+        }
+        try {
+            [$declaringClass, $methodLc] = $this->resolveInstanceMethod($class, '__construct');
+            $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            $callerClassLc = $this->callerClassLc($frame);
+            $callerDisplay = null;
+            if (null !== $callerClassLc && isset($this->context->classes[$callerClassLc])) {
+                $callerDisplay = $this->context->classes[$callerClassLc]->name;
+            }
+            MethodVisibility::assertConstructorCallable(
+                $vis,
+                $callerClassLc,
+                strtolower($declaringClass->name),
+                $declaringClass->name,
+                false,
+                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
+                $callerDisplay
+            );
+        } catch (\LogicException $e) {
+            return $this->dispatchVmError($e->getMessage(), $frame);
+        }
+
+        return null;
+    }
+
+    /**
      * Zend zend_std_clone_object: shallow copy then user __clone() when defined (#3170).
      */
     protected function invokeCloneMagicMethod(ObjectEntry $object): void
@@ -3025,6 +3059,11 @@ restart:
                             goto restart;
                         }
                         break;
+                    }
+                    $catchFrame = $this->enforceNewConstructorVisibility($class, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
                     }
                     $object = new ObjectEntry($class);
                     $this->initInstancePropertyDefaults($object);
@@ -7235,6 +7274,7 @@ restart:
                 if ($class->isEnum) {
                     throw new \Error("Cannot instantiate enum {$class->name}");
                 }
+                $this->enforceNewConstructorVisibility($class, $frame);
                 $object = new VM\ObjectEntry($class);
                 $result->object($object);
                 $frame->call = $object->constructor;
