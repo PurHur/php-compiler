@@ -2734,11 +2734,19 @@ restart:
                                     continue;
                                 }
                                 $paramIdx = (int) $recv->arg2;
-                                if (!array_key_exists($paramIdx, $calledArgs)) {
+                                $calledArgIdx = $paramIdx;
+                                if (
+                                    null !== $calleeBlock->func
+                                    && null !== $calleeBlock->func->class
+                                    && !(($calleeBlock->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC)
+                                ) {
+                                    ++$calledArgIdx;
+                                }
+                                if (!array_key_exists($calledArgIdx, $calledArgs)) {
                                     continue;
                                 }
                                 $slot = (int) $recv->arg1;
-                                $arg = $calledArgs[$paramIdx];
+                                $arg = $calledArgs[$calledArgIdx];
                                 if (
                                     TypeCheck::skipParameterTypeCheckForImplicitNullable(
                                         $calleeBlock,
