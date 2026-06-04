@@ -775,6 +775,18 @@ apply_php_cfg_enum_class_method_parser_fix() {
   apply_patch "$PATCH_DIR/php-cfg-enum-class-method.patch"
 }
 
+apply_php_cfg_enum_trait_use_parser_fix() {
+  local parser="${1:-$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php}"
+  if grep -A30 'function parseStmt_Enum' "$parser" 2>/dev/null | grep -q 'Stmt\\TraitUse'; then
+    return 0
+  fi
+  if ! grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-enum-trait-use.patch (parseStmt_Enum missing)" >&2
+    return 1
+  fi
+  apply_patch "$PATCH_DIR/php-cfg-enum-trait-use.patch"
+}
+
 apply_php_cfg_enum_class_const_overlay() {
   local const_file="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php"
   local parser="${1:-$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php}"
@@ -922,6 +934,7 @@ PY
   fi
   apply_php_cfg_enum_implements_parser_fix "$parser"
   apply_php_cfg_enum_class_method_parser_fix "$parser"
+  apply_php_cfg_enum_trait_use_parser_fix "$parser"
   apply_php_cfg_enum_class_const_parser_fix "$parser"
   php_cfg_sync_enum_flags_parser "$parser" "$op" || true
 }
@@ -1004,6 +1017,7 @@ apply_php_cfg_enum_early_chain() {
   apply_php_cfg_enum_overlay || true
   apply_php_cfg_enum_implements_overlay || true
   apply_php_cfg_enum_class_method_parser_fix || true
+  apply_php_cfg_enum_trait_use_parser_fix || true
   apply_php_cfg_enum_class_const_parser_fix || true
   apply_php_cfg_enum_abstract_overlay || true
   php_cfg_sync_enum_flags_parser || true

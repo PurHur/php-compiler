@@ -2332,6 +2332,20 @@ class Compiler {
                 $this->compileClassConstDeclaration($child, $result);
                 continue;
             }
+            if ($child instanceof Op\Stmt\TraitUse) {
+                foreach ($child->traits as $traitOperand) {
+                    $result->addOpCode(new OpCode(
+                        OpCode::TYPE_USE_TRAIT,
+                        $this->compileOperand($traitOperand, $result, true)
+                    ));
+                }
+                $adaptOp = new OpCode(OpCode::TYPE_TRAIT_USE_ADAPTATION);
+                $adaptOp->traitAdaptations = [] !== $child->adaptations
+                    ? $this->compileTraitAdaptations($child->adaptations)
+                    : [];
+                $result->addOpCode($adaptOp);
+                continue;
+            }
             if ($child instanceof Op\Stmt\ClassMethod) {
                 $this->compileClassMethodDeclaration($child, $result);
 
