@@ -44,7 +44,7 @@ final class is_a_ extends Internal
         $subject = $frame->calledArgs[0]->resolveIndirect();
         self::requireValidSubject($subject, $allowString);
         $matches = false;
-        if (Variable::TYPE_OBJECT === $subject->type) {
+        if (Variable::TYPE_OBJECT === $subject->type || Variable::TYPE_ENUM_CASE === $subject->type) {
             $matches = VmReflection::isInstanceOfObject($ctx, $subject, $className);
         } elseif ($allowString && Variable::TYPE_STRING === $subject->type) {
             $child = VmReflection::resolveClassEntry($ctx, $subject->toString());
@@ -110,7 +110,7 @@ final class is_a_ extends Internal
 
     private static function requireValidSubject(Variable $subject, bool $allowString): void
     {
-        if (Variable::TYPE_OBJECT === $subject->type) {
+        if (Variable::TYPE_OBJECT === $subject->type || Variable::TYPE_ENUM_CASE === $subject->type) {
             return;
         }
         if ($allowString && Variable::TYPE_STRING === $subject->type) {
@@ -168,6 +168,8 @@ final class is_a_ extends Internal
             case Variable::TYPE_ARRAY:
                 return 'array';
             case Variable::TYPE_OBJECT:
+                return 'object';
+            case Variable::TYPE_ENUM_CASE:
                 return 'object';
             default:
                 return 'mixed';
