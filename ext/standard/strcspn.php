@@ -12,7 +12,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * strcspn() — length of initial segment not matching a character mask (LLVM via libc).
+ * strcspn() — length of initial segment not matching a character mask (LLVM via StringStrspnJit).
  */
 final class strcspn extends Internal
 {
