@@ -32,7 +32,7 @@ final class SessionRegenerateId
 
         $context->builder->positionAtEnd($entry);
         $outPtr = $fn->getParam(0);
-        $active = $context->builder->load(SessionName::$activeGlobal);
+        $active = $context->builder->load(SessionStorageGlobals::$activeGlobal);
         $isActive = $context->builder->icmp(Builder::INT_NE, $active, $zeroI8);
         $context->builder->branchIf($isActive, $bbRotate, $bbInactive);
 

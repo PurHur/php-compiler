@@ -35,7 +35,7 @@ final class SessionDestroy
 
         $context->builder->positionAtEnd($entry);
         $outPtr = $fn->getParam(0);
-        $active = $context->builder->load(SessionName::$activeGlobal);
+        $active = $context->builder->load(SessionStorageGlobals::$activeGlobal);
         $isActive = $context->builder->icmp(Builder::INT_NE, $active, $zeroI8);
         $context->builder->branchIf($isActive, $bbDestroy, $bbInactive);
 
@@ -44,8 +44,8 @@ final class SessionDestroy
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDestroy);
-        $context->builder->store($zeroI8, SessionName::$activeGlobal);
-        $context->builder->store($zeroI64, SessionId::$lenGlobal);
+        $context->builder->store($zeroI8, SessionStorageGlobals::$activeGlobal);
+        $context->builder->store($zeroI64, SessionStorageGlobals::$idLenGlobal);
         $empty = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         if (isset(SuperglobalInit::$globals['_SESSION'])) {
             $context->builder->store($empty, SuperglobalInit::$globals['_SESSION']);

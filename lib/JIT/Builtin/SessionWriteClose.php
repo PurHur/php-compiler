@@ -35,7 +35,7 @@ final class SessionWriteClose
 
         $context->builder->positionAtEnd($entry);
         $outPtr = $fn->getParam(0);
-        $active = $context->builder->load(SessionName::$activeGlobal);
+        $active = $context->builder->load(SessionStorageGlobals::$activeGlobal);
         $isActive = $context->builder->icmp(Builder::INT_NE, $active, $zeroI8);
         $context->builder->branchIf($isActive, $bbClose, $bbInactive);
 
@@ -44,7 +44,7 @@ final class SessionWriteClose
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbClose);
-        $context->builder->store($zeroI8, SessionName::$activeGlobal);
+        $context->builder->store($zeroI8, SessionStorageGlobals::$activeGlobal);
         SessionStart::emitWriteBool($context, $outPtr, true);
         $context->builder->branch($bbDone);
 
