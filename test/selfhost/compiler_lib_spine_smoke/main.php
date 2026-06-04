@@ -1093,6 +1093,7 @@ require_once __DIR__.'/../../../lib/Compiler/InheritanceVariance.php';
 require_once __DIR__.'/../../../lib/Compiler/InterfaceImplementationCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/MagicMethodReturnTypeCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/EnumMagicMethodCheck.php';
+require_once __DIR__.'/../../../lib/Compiler/EnumParentCompileCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/OverrideValidator.php';
 require_once __DIR__.'/../../../lib/Compiler/ReadonlyClassCompileCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/TraitCollisionCheck.php';
