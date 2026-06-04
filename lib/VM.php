@@ -6726,6 +6726,7 @@ restart:
     protected function resolveStaticMethod(string $lcClass, string $methodLc): array
     {
         $visited = [];
+        $abstractDecl = null;
         while (!isset($visited[$lcClass])) {
             $visited[$lcClass] = true;
             if (!isset($this->context->classes[$lcClass])) {
@@ -6735,10 +6736,18 @@ restart:
             if (isset($class->methods[$methodLc])) {
                 return [$class, $methodLc];
             }
+            if (isset($class->abstractMethods[$methodLc])) {
+                $abstractDecl ??= $class;
+            }
             if (null === $class->parentLc) {
                 break;
             }
             $lcClass = $class->parentLc;
+        }
+
+        if (null !== $abstractDecl) {
+            $declName = $abstractDecl->methodNames[$methodLc] ?? $methodLc;
+            throw new \LogicException("Cannot call abstract method {$abstractDecl->name}::{$declName}()");
         }
 
         throw new \LogicException("Call to undefined static method {$lcClass}::{$methodLc}()");
