@@ -16,6 +16,7 @@ final class BackedEnum
         if (!$enum->isEnum || null === $enum->backedType) {
             return null;
         }
+        EnumSupport::ensureBackedEnumValuesUnique($enum);
         $normalized = self::normalizeBackingArgument($enum, $value->resolveIndirect());
         foreach ($enum->enumCases as $case) {
             $backing = self::caseBackingScalar($enum->backedType, $case['value']);

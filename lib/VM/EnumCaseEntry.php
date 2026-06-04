@@ -20,6 +20,7 @@ final class EnumCaseEntry
 
     public function fetchProperty(string $name): Variable
     {
+        EnumSupport::ensureBackedEnumValuesUnique($this->enumClass);
         $lc = strtolower($name);
         if ('name' === $lc) {
             $var = new Variable(Variable::TYPE_STRING);

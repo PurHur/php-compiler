@@ -7,6 +7,7 @@ namespace PHPCompiler\VM\Builtin;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\EnumCaseEntry;
+use PHPCompiler\VM\EnumSupport;
 use PHPCompiler\VM\Variable;
 
 /** Synthetic Enum::cases() — Zend zend_enum_list_cases parity (#3308). */
@@ -22,6 +23,7 @@ final class EnumCases extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
+        EnumSupport::ensureBackedEnumValuesUnique($this->enumClass);
         $result = new Variable();
         $result->newArray();
         $ht = $result->toArray();

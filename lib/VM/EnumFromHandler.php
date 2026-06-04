@@ -24,6 +24,7 @@ final class EnumFromHandler extends Internal
 
     public function execute(Frame $frame): void
     {
+        EnumSupport::ensureBackedEnumValuesUnique($this->enum);
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException(
                 $this->getName().'() requires exactly 1 argument in this compiler build'

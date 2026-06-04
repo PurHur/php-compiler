@@ -60,6 +60,8 @@ class ClassEntry {
     public array $enumCaseCanonicalNames = [];
     /** @var list<array{name: string, value: Variable}> enum cases in declaration order (#3308) */
     public array $enumCases = [];
+    /** True after {@see EnumSupport::ensureBackedEnumValuesUnique()} succeeds (#5672). */
+    public bool $backedEnumTableBuilt = false;
     /** @var array<string, Variable> static property name (lowercase) => shared storage */
     public array $staticProperties = [];
     /** @var array<string, array{get?: string, set?: string}> static prop (lowercase) => hook method lc (#4751) */
