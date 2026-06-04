@@ -14,8 +14,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -29,14 +30,16 @@ final class strtolower extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('strtolower() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('strtolower() only supports strings in this compiler build');
-        }
-        $frame->returnVar->string(VmString::asciiLower($v->toString()));
+        $subject = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'strtolower',
+            0,
+            'string'
+        );
+        BuiltinExecute::writeReturn(
+            $frame,
+            static fn (Variable $ret) => $ret->string(VmString::asciiLower($subject))
+        );
     }
 
     public Context $context;
@@ -47,7 +50,7 @@ final class strtolower extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('strtolower() requires exactly one argument');
         }
-        $str = JitStringArg::lower($context, $args[0], 'strtolower() string');
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'strtolower', 0, 'string');
         $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
         lcfirst::transformAllAscii($context, $copy, ord('A'), ord('Z'), 32);
 
