@@ -10567,6 +10567,10 @@ class JIT {
         string $calledClassName,
         string $methodDisplay
     ): void {
+        if ($this->context->type->object->isEnumClassLc(strtolower(ltrim($calledClassLc, '\\')))
+            && 'cases' === $methodLc) {
+            return;
+        }
         $visited = [];
         $current = strtolower(ltrim($calledClassLc, '\\'));
         while (!isset($visited[$current])) {
