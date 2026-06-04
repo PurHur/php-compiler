@@ -3320,7 +3320,15 @@ restart:
                                 $dst->bool(false);
                                 break;
                             }
-                            $dst->bool($container->toArray()->offsetIsSet($frame->scope[$op->arg3]));
+                            try {
+                                $dst->bool($container->toArray()->offsetIsSet($frame->scope[$op->arg3]));
+                            } catch (\TypeError $e) {
+                                $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                            }
                             break;
                         }
                         if (Variable::TYPE_OBJECT === $container->type) {
