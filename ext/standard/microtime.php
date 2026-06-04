@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** microtime() — sub-second clock (VM host; JIT/AOT via gettimeofday, issue #2186). */
+/** microtime() — sub-second clock (VM VmDate gettimeofday; JIT/AOT phpc_microtime.c, #5045/#2186). */
 final class microtime extends Internal
 {
     public function __construct()
