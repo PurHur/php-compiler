@@ -4,17 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\UnpackJitRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM JIT/AOT helper for unpack() via __compiler_unpack (issue #3188). */
+/** LLVM JIT/AOT helper for unpack() via __compiler_unpack (issue #3188, #5442). */
 final class JitUnpack
 {
     public static function unpack(Context $context, JITVariable ...$args): Value
     {
+        UnpackJitRuntime::ensureLinked($context);
         $argc = \count($args);
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('unpack() requires two or three arguments in this compiler build');

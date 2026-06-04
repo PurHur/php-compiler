@@ -1,5 +1,5 @@
 /*
- * unpack() runtime for AOT/JIT (issue #3188).
+ * unpack() JIT/AOT bitcode runtime (issue #3188, #5442 — VM uses ext/standard/UnpackEngine.php).
  * Subset aligned with PHP 8.2 unpack(): c, C, s, S, n, N, v, V, a, A, h, H, x, X, @.
  * php-src reference: ext/standard/pack.c — php_unpack()
  */

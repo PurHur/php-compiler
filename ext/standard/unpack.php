@@ -13,7 +13,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** unpack() — binary decode (VM via host PHP; JIT/AOT via __compiler_unpack, issue #3188). */
+/** unpack() — binary decode (VM via UnpackEngine; JIT/AOT via __compiler_unpack, #3188/#5442). */
 final class unpack extends Internal
 {
     public function execute(Frame $frame): void
