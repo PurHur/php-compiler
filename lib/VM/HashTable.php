@@ -162,6 +162,12 @@ final class HashTable {
         if ($byRef) {
             return $bucket->value;
         }
+        // Zend ZEND_FE_FETCH_R: by-value foreach copies referenced slots in place (#5419).
+        if ($bucket->value->isIndirect()) {
+            $unref = new Variable();
+            $unref->copyFrom($bucket->value->resolveIndirect());
+            $bucket->value->copyFrom($unref);
+        }
         $result = new Variable();
         $result->copyFrom($bucket->value->resolveIndirect());
 
