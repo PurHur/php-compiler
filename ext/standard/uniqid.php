@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** uniqid() — time-based unique string (VM host; JIT/AOT via gettimeofday, issue #2219). */
+/** uniqid() — time-based unique string (VmString; JIT via JitUniqid, no phpc_uniqid.c, #2219 #5233). */
 final class uniqid extends Internal
 {
     public function __construct()
