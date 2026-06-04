@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** convert_uuencode() — Unix-to-Unix encoding (php-src ext/standard/uuencode.c). */
+/** convert_uuencode() — Unix-to-Unix encoding (VmString; JIT via ConvertUuRuntime, #5277). */
 final class convert_uuencode extends Internal
 {
     public function __construct()
