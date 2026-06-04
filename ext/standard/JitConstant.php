@@ -24,7 +24,7 @@ final class JitConstant
             throw new \LogicException('constant() requires VM context');
         }
         $name = $nameArg->compileTimeString;
-        $phpVar = $context->runtime->vmContext->constantFetch($name);
+        $phpVar = VmConstants::constantLookup($context->runtime->vmContext, $name);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         if (null !== $phpVar) {
