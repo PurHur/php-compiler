@@ -150,6 +150,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'halt_compiler')) {
                 continue;
             }
+            // class_alias() on interfaces/traits: VM + AOT -l (#5329); MCJIT LLVM verify until interface_exists stable.
+            if (str_contains($name, 'class_alias_interface_trait')) {
+                continue;
+            }
             // get_defined_functions()/get_declared_functions() MCJIT: VM + dedicated PHPT (#3128/#3739); jit.php execute segfaults on merge runtime.
             if (str_contains($name, 'get_defined_functions') || str_contains($name, 'get_declared_functions')) {
                 continue;

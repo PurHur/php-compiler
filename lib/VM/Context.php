@@ -316,7 +316,7 @@ class Context {
     /**
      * Register an alternate name for a user-defined class (ext/standard class_alias, #3095).
      *
-     * php-src: zend_register_class_alias_ex — v1: user classes only, no alias chains.
+     * php-src: zend_register_class_alias_ex — user classes/interfaces/traits; no alias chains or enums.
      */
     public function registerClassAlias(string $original, string $alias, bool $autoload = true): bool
     {
@@ -341,7 +341,7 @@ class Context {
         }
 
         $entry = $this->classes[$originalLc];
-        if ($entry->isEnum || $entry->isInterface || $entry->isTrait) {
+        if ($entry->isEnum) {
             return false;
         }
 
