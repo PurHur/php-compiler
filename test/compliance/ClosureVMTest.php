@@ -16,7 +16,7 @@ class ClosureVMTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
-        foreach (['closure_simple.phpt', 'closure_arrow.phpt', 'arrow_fn_byref.phpt', 'nested_arrow_function.phpt', 'closure_in_array.phpt', 'closure_array_element_call.phpt', 'closure_use.phpt', 'closure_use_byref.phpt', 'closure_use_byref_mutate.phpt', 'closure_this_binding.phpt', 'closure_auto_bind_private.phpt', 'closure_array_map.phpt', 'closure_from_callable.phpt', 'closure_from_callable_method.phpt', 'closure_bind_to.phpt', 'closure_bind_static.phpt', 'closure_bind_null_this_static.phpt', 'closure_bind_invalid_scope.phpt', 'static_arrow_fn.phpt', 'static_closure_fn.phpt', 'static_closure_bind.phpt', 'closure_static_var.phpt'] as $file) {
+        foreach (['closure_simple.phpt', 'closure_arrow.phpt', 'arrow_fn_byref.phpt', 'nested_arrow_function.phpt', 'closure_in_array.phpt', 'closure_array_element_call.phpt', 'closure_use.phpt', 'closure_use_byref.phpt', 'closure_use_byref_mutate.phpt', 'closure_this_binding.phpt', 'closure_auto_bind_private.phpt', 'closure_array_map.phpt', 'closure_from_callable.phpt', 'closure_from_callable_method.phpt', 'closure_bind_to.phpt', 'closure_bind_static.phpt', 'closure_bind_null_this_static.phpt', 'closure_bind_invalid_scope.phpt', 'static_arrow_fn.phpt', 'static_closure_fn.phpt', 'static_closure_bind.phpt', 'static_call_unbound_closure.phpt', 'closure_static_var.phpt'] as $file) {
             $path = __DIR__ . '/cases/language/' . $file;
             $name = preg_replace('/\.phpt$/', '', $file) ?: $file;
             yield $name => self::parsePHPT($path, $file);

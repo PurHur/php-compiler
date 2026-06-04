@@ -6100,6 +6100,9 @@ restart:
             return strtolower($frame->calledClass);
         }
 
+        if ('static' === $scopeKeyword) {
+            PseudoClassScope::fatalNoActiveClassScope('static');
+        }
         PseudoClassScope::fatalInGlobalScope($scopeKeyword);
     }
 
