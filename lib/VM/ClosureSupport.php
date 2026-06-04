@@ -383,7 +383,7 @@ final class ClosureSupport
                 return strtolower($frame->calledClass);
             }
             if (null === $frame->block->func || null === $frame->block->func->class) {
-                PseudoClassScope::fatalInGlobalScope('static');
+                PseudoClassScope::fatalNoActiveClassScope('static');
             }
 
             return strtolower($frame->block->func->class->value);

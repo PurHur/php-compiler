@@ -13,4 +13,10 @@ final class PseudoClassScope
     {
         throw new \LogicException('Cannot use "'.$keyword.'" in the global scope');
     }
+
+    /** Runtime static:: when no active class scope (zend_execute.c; issue #5434). */
+    public static function fatalNoActiveClassScope(string $keyword): never
+    {
+        throw new \LogicException('Cannot access "'.$keyword.'" when no class scope is active');
+    }
 }
