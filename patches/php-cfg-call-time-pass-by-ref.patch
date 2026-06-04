@@ -1,0 +1,12 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -1125,6 +1125,9 @@
+ 
+     protected function parseArg(Node\Arg $expr)
+     {
++        if ($expr->byRef) {
++            throw new \CompileError('syntax error, unexpected token "&"');
++        }
+         $op = $this->readVariable($this->parseExprNode($expr->value));
+         if (null !== $expr->name) {
+             $op->callArgName = $expr->name->toString();
