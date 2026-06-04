@@ -82,7 +82,13 @@ final class JitStringBuiltinArg
         $context->builder->branchIf($isObjOrEnum, $rejectBlock, $coerceBlock);
 
         $context->builder->positionAtEnd($rejectBlock);
-        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'object');
+        self::emitTypeErrorAndAbort(
+            $context,
+            $function,
+            $argIndex,
+            $paramName,
+            self::compileTimeObjectGivenLabel($context, $arg)
+        );
 
         $context->builder->positionAtEnd($coerceBlock);
         if ($context->callerStrictTypes) {
