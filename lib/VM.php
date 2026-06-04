@@ -2643,9 +2643,11 @@ restart:
                         goto restart;
                     }
                     $receiver = $frame->scope[$op->arg1]->resolveIndirect();
-                    if ($receiver->type !== Variable::TYPE_OBJECT) {
+                    if (Variable::TYPE_OBJECT !== $receiver->type
+                        && Variable::TYPE_ENUM_CASE !== $receiver->type) {
                         throw new \LogicException('Method call on non-object');
                     }
+                    $receiver = VM\EnumCaseSupport::receiverForInstanceMethod($receiver);
                     $methodName = $frame->scope[$op->arg2]->toString();
                     $catchFrame = $this->initMethodCall($frame, $receiver, $methodName);
                     if (null !== $catchFrame) {

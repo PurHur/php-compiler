@@ -23,4 +23,14 @@ final class AttributeNamesDuplicateTest extends TestCase
         AttributeNames::assertNoDuplicates(['AllowDynamicProperties', 'SensitiveParameter']);
         $this->addToAssertionCount(1);
     }
+
+    public function testRejectsAllowDynamicPropertiesOnParameter(): void
+    {
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(
+            'Attribute "AllowDynamicProperties" cannot target parameter (allowed targets: class)'
+        );
+
+        AttributeNames::assertAllowDynamicPropertiesClassTargetOnly(['AllowDynamicProperties'], 'parameter');
+    }
 }
