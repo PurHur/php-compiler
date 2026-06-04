@@ -7,7 +7,7 @@ namespace PHPCompiler\SourcePreprocessor;
 /**
  * Strip PHP 8.4 property-hook blocks for nikic/php-parser v4 and inject hook methods.
  *
- * php-src: Zend/zend_compile.c property hook lowering (issue #3145).
+ * php-src: Zend/zend_compile.c property hook lowering (issue #3145, #5404 short get/set =>).
  */
 final class PropertyHooks
 {

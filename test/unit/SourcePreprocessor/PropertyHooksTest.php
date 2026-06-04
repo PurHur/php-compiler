@@ -61,6 +61,24 @@ PHP;
         self::assertTrue($registry['box']['name']['virtual'] ?? false);
     }
 
+    public function testLowersShortGetHookOnTypedProperty(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public int $p {
+        get => 1;
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$p {', $out);
+        self::assertStringContainsString('public int $p;', $out);
+        self::assertStringContainsString('function __phpc_property_get_p', $out);
+        self::assertStringContainsString('{ return 1; }', $out);
+        self::assertSame('__phpc_property_get_p', $registry['c']['p']['get'] ?? null);
+    }
+
     public function testLowersStaticPropertyHooksAsStaticMethods(): void
     {
         $src = <<<'PHP'
