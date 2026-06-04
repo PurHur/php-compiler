@@ -948,7 +948,6 @@
         "lib/JIT/Builtin/StringSimilarText.php",
         "lib/JIT/Builtin/StringSoundex.php",
         "lib/JIT/Builtin/StringStrIncdec.php",
-        "lib/JIT/Builtin/StringStrWordCount.php",
         "lib/JIT/Builtin/StringStreamCsv.php",
         "lib/JIT/Builtin/StringStripslashes.php",
         "lib/JIT/Builtin/StringStrnatcasecmp.php",
