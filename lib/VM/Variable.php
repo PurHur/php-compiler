@@ -159,6 +159,17 @@ final class Variable {
         return self::TYPE_INDIRECT === $this->type;
     }
 
+    /**
+     * By-value foreach must not write through a leftover by-ref loop variable (#5419).
+     */
+    public function assignForeachByValue(self $value): void
+    {
+        if (self::TYPE_INDIRECT === $this->type) {
+            $this->reset();
+        }
+        $this->copyFrom($value);
+    }
+
     public function newArray(): HashTable {
         $this->array(new HashTable);
         return $this->array;

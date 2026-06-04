@@ -3749,7 +3749,7 @@ restart:
                                 $this->objectForeachIterator($op->arg2)->currentValue(true)
                             );
                         } else {
-                            $frame->scope[$op->arg1]->copyFrom(
+                            $frame->scope[$op->arg1]->assignForeachByValue(
                                 $this->objectForeachIterator($op->arg2)->currentValue(false)
                             );
                         }
@@ -3764,7 +3764,7 @@ restart:
                             $container->toArray()->iterCurrentValue(true)
                         );
                     } else {
-                        $frame->scope[$op->arg1]->copyFrom(
+                        $frame->scope[$op->arg1]->assignForeachByValue(
                             $container->toArray()->iterCurrentValue(false)
                         );
                     }
