@@ -5922,19 +5922,9 @@ class JIT {
                     break;
                 case OpCode::TYPE_CAST_INT:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    if (Variable::TYPE_VALUE === $value->type) {
-                        $ptr = Variable::KIND_VARIABLE === $value->kind
-                            ? $value->value
-                            : $this->context->helper->loadValue($value);
-                        $long = $this->context->builder->call(
-                            $this->context->lookupFunction('__value__readLong'),
-                            $ptr
-                        );
-                        $this->assignOperandValue($block->getOperand($op->arg1), $long);
-                    } else {
-                        $long = (new ext\standard\intval())->call($this->context, $value);
-                        $this->assignOperandValue($block->getOperand($op->arg1), $long);
-                    }
+                    // Zend (int) cast + enum backing coerce via intval lowering (#5653, #5623).
+                    $long = (new ext\standard\intval())->call($this->context, $value);
+                    $this->assignOperandValue($block->getOperand($op->arg1), $long);
                     break;
                 case OpCode::TYPE_CAST_STRING:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
