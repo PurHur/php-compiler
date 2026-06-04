@@ -955,6 +955,7 @@
         "lib/JIT/Builtin/StringStrnatcmp.php",
         "lib/JIT/Builtin/StringStrspn.php",
         "lib/JIT/Builtin/StringStrtok.php",
+        "lib/JIT/Builtin/StringSubstrCompareJit.php",
         "lib/JIT/Builtin/StringSubstrCompare.php",
         "lib/JIT/Builtin/StringSubstrCount.php",
         "lib/JIT/Builtin/StringSuperglobalName.php",

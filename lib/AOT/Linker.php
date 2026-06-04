@@ -24,7 +24,6 @@ final class Linker
         __DIR__.'/runtime/phpc_getdate.c',
         __DIR__.'/runtime/phpc_gettimeofday.c',
         __DIR__.'/runtime/phpc_info.c',
-        __DIR__.'/runtime/phpc_substr_compare.c',
         __DIR__.'/runtime/phpc_spaceship.c',
         __DIR__.'/runtime/phpc_levenshtein.c',
         __DIR__.'/runtime/phpc_strspn.c',
