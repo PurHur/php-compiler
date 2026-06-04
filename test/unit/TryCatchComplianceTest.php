@@ -126,6 +126,27 @@ echo f(), "\n";
         );
     }
 
+    /** Issue #5486: finally throw must chain pending try exception (zend_exceptions.c). */
+    public function testFinallyThrowChainsPendingException(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+try {
+    try {
+        throw new Exception("inner");
+    } finally {
+        throw new Exception("finally");
+    }
+} catch (Exception $e) {
+    echo $e->getMessage(), "\n";
+    $p = $e->getPrevious();
+    echo $p ? $p->getMessage() : "null", "\n";
+}
+',
+            "finally\ninner\n"
+        );
+    }
+
     /** Issue #5331: finally throw must discard pending return, not relaunch finally. */
     public function testFinallyThrowOverridesPendingReturn(): void
     {

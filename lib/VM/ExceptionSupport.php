@@ -44,6 +44,8 @@ final class ExceptionSupport
     public const PROP_CODE = 'code';
     public const PROP_FILE = 'file';
     public const PROP_LINE = 'line';
+    /** Zend zend_exceptions.c — chained Throwable (#5104, #5486). */
+    public const PROP_PREVIOUS = 'previous';
 
     /** Zend zend_exceptions.c — throw non-Throwable (#5223). */
     public const THROW_NON_THROWABLE_MESSAGE = 'Cannot throw objects that do not implement Throwable';
@@ -160,6 +162,12 @@ final class ExceptionSupport
             $line = self::throwSiteLine($frame);
         }
         $lineProp->int($line);
+        if (array_key_exists($messageArgIndex + 2, $frame->calledArgs)) {
+            $prevArg = $frame->calledArgs[$messageArgIndex + 2]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $prevArg->type) {
+                self::setExceptionPrevious($receiver, $prevArg);
+            }
+        }
         $receiver->constructed = true;
         if (null !== $frame->returnVar) {
             $ret = $frame->returnVar->resolveIndirect();
@@ -218,13 +226,41 @@ final class ExceptionSupport
     }
 
     /**
+     * Zend zend_exception_set_previous — link $previous when outer has none (#5486).
+     */
+    public static function setExceptionPrevious(ObjectEntry $receiver, Variable $previous): void
+    {
+        $previous = $previous->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $previous->type) {
+            throw new \LogicException('Exception previous must be an object');
+        }
+        if (!self::objectImplementsThrowable($previous->toObject())) {
+            throw new \LogicException('Exception previous must implement Throwable');
+        }
+        $slot = $receiver->getProperty(self::PROP_PREVIOUS)->resolveIndirect();
+        if (Variable::TYPE_NULL !== $slot->type) {
+            return;
+        }
+        $receiver->getProperty(self::PROP_PREVIOUS)->copyFrom($previous);
+    }
+
+    /** Chain pending try exception onto a throw from finally (zend_exceptions.c, #5486). */
+    public static function chainPendingExceptionOnFinallyThrow(Variable $thrown, Variable $pending): void
+    {
+        $thrown = $thrown->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $thrown->type) {
+            return;
+        }
+        self::setExceptionPrevious($thrown->toObject(), $pending);
+    }
+
+    /**
      * Map a materialized VM Throwable object to a native PHP exception for PHPUnit / uncaught exit (#3114, #195).
      */
     public static function nativeUncaughtThrowable(ObjectEntry $entry, string $message): \Throwable
     {
         $lc = strtolower($entry->class->name);
-
-        return match ($lc) {
+        $native = match ($lc) {
             self::CLASS_VALUE_ERROR => new \ValueError($message),
             self::CLASS_TYPE_ERROR => new \TypeError($message),
             self::CLASS_DIVISION_BY_ZERO_ERROR => new \DivisionByZeroError($message),
@@ -252,5 +288,24 @@ final class ExceptionSupport
             self::CLASS_EXCEPTION => new \Exception($message),
             default => new \Exception($message),
         };
+        $prevVar = $entry->getProperty(self::PROP_PREVIOUS)->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $prevVar->type) {
+            return $native;
+        }
+        $prevEntry = $prevVar->toObject();
+        try {
+            $prevMessage = $prevEntry->getProperty(self::PROP_MESSAGE)->toString();
+        } catch (\LogicException) {
+            $prevMessage = 'Exception';
+        }
+        $prevNative = self::nativeUncaughtThrowable($prevEntry, $prevMessage);
+        if ($native instanceof \Exception && $prevNative instanceof \Throwable) {
+            return new \Exception($message, $native->getCode(), $prevNative);
+        }
+        if ($native instanceof \Error && $prevNative instanceof \Throwable) {
+            return new \Error($message, $native->getCode(), $prevNative);
+        }
+
+        return $native;
     }
 }

@@ -15,6 +15,7 @@ use PHPCompiler\VM\Builtin\ExceptionGetCode;
 use PHPCompiler\VM\Builtin\ExceptionGetFile;
 use PHPCompiler\VM\Builtin\ExceptionGetLine;
 use PHPCompiler\VM\Builtin\ExceptionGetMessage;
+use PHPCompiler\VM\Builtin\ExceptionGetPrevious;
 use PHPCompiler\VM\Builtin\FiberConstruct;
 use PHPCompiler\VM\Builtin\FiberGetCurrent;
 use PHPCompiler\VM\Builtin\FiberIsRunning;
@@ -588,10 +589,12 @@ final class BuiltinClasses
         } else {
             $entry->interfaces = [ExceptionSupport::CLASS_THROWABLE];
         }
+        $nullProto = new Variable(Variable::TYPE_NULL);
         $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_MESSAGE, null, $strProto);
         $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_CODE, null, $intProto);
         $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_FILE, null, $strProto);
         $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_LINE, null, $intProto);
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_PREVIOUS, null, $nullProto);
         $entry->constructor = new ExceptionConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
@@ -601,6 +604,7 @@ final class BuiltinClasses
                 'getcode' => new ExceptionGetCode(),
                 'getfile' => new ExceptionGetFile(),
                 'getline' => new ExceptionGetLine(),
+                'getprevious' => new ExceptionGetPrevious(),
             ] as $methodName => $method
         ) {
             $entry->methods[$methodName] = $method;
