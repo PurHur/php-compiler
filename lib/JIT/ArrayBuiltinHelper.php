@@ -2790,6 +2790,174 @@ final class ArrayBuiltinHelper
     }
 
     /**
+     * array_walk_recursive() in-place with compile-time string builtin callbacks (issue #3111).
+     */
+    public static function walkRecursiveInPlace(Context $context, Variable $array, Variable $callback): Value
+    {
+        if (!ArrayMapCallbackPolicy::isJitLowerable($callback)) {
+            throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
+        }
+        if (self::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'array_walk_recursive() cannot compile fixed-size literal arrays in JIT/AOT yet; assign to a variable first'
+            );
+        }
+        $handler = self::resolveMapCallback($callback);
+        $resultType = self::mapCallbackResultType($handler);
+        $ht = self::loadHashTable($context, $array);
+        self::walkRecursiveInPlaceHashTable($context, $ht, $handler, $resultType);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+
+        return $context->getTypeFromString('int1')->constInt(1, false);
+    }
+
+    private static function walkRecursiveInPlaceHashTable(
+        Context $context,
+        Value $ht,
+        Internal $handler,
+        int $resultType
+    ): void {
+        self::walkInPlaceHashTable($context, $ht, $handler, $resultType);
+        self::walkRecursiveStringKeys($context, $ht, $handler, $resultType);
+    }
+
+    private static function walkRecursiveStringKeys(
+        Context $context,
+        Value $ht,
+        Internal $handler,
+        int $resultType
+    ): void {
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_walk_rec_str_walk');
+        $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+
+        $strHead = BasicBlockHelper::append($context, 'array_walk_rec_str_head');
+        $strBody = BasicBlockHelper::append($context, 'array_walk_rec_str_body');
+        $strNext = BasicBlockHelper::append($context, 'array_walk_rec_str_next');
+        $strDone = BasicBlockHelper::append($context, 'array_walk_rec_str_done');
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $strDone, $strBody);
+
+        $context->builder->positionAtEnd($strBody);
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        self::walkRecursiveStringValueEntry($context, $ht, $valEntry, $handler, $resultType);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strNext);
+        $node = $context->builder->load($walkSlot);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strDone);
+    }
+
+    private static function walkRecursiveStringValueEntry(
+        Context $context,
+        Value $ht,
+        Value $valEntry,
+        Internal $handler,
+        int $resultType
+    ): void {
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+
+        $recurseBlock = BasicBlockHelper::append($context, 'array_walk_rec_recurse');
+        $leafBlock = BasicBlockHelper::append($context, 'array_walk_rec_leaf');
+        $doneBlock = BasicBlockHelper::append($context, 'array_walk_rec_entry_done');
+        $context->builder->branchIf($isHt, $recurseBlock, $leafBlock);
+
+        $context->builder->positionAtEnd($recurseBlock);
+        $child = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valEntry
+        );
+        self::walkRecursiveInPlaceHashTable($context, $child, $handler, $resultType);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($leafBlock);
+        $elemSlot = JitValueBox::alloc($context);
+        JitValueBox::copyFromPointer($context, $elemSlot, $valEntry);
+        $elem = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $elemSlot);
+        $mapped = $handler->call($context, $elem);
+        self::storeMappedVariableToValuePtr(
+            $context,
+            $valEntry,
+            new Variable($context, $resultType, Variable::KIND_VALUE, $mapped),
+            $resultType
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+    }
+
+    private static function storeMappedVariableToValuePtr(
+        Context $context,
+        Value $valPtr,
+        Variable $mapped,
+        int $resultType
+    ): void {
+        switch ($resultType) {
+            case Variable::TYPE_NATIVE_LONG:
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeLong'),
+                    $valPtr,
+                    $context->helper->loadValue($mapped)
+                );
+                break;
+            case Variable::TYPE_STRING:
+                $owned = $context->builder->call(
+                    $context->lookupFunction('__string__separate'),
+                    $context->helper->loadValue($mapped)
+                );
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeString'),
+                    $valPtr,
+                    $owned
+                );
+                break;
+            case Variable::TYPE_NATIVE_BOOL:
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeBool'),
+                    $valPtr,
+                    $context->builder->truncOrBitCast(
+                        $context->helper->loadValue($mapped),
+                        $context->getTypeFromString('int1')
+                    )
+                );
+                break;
+            case Variable::TYPE_NATIVE_DOUBLE:
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeDouble'),
+                    $valPtr,
+                    $context->helper->loadValue($mapped)
+                );
+                break;
+            default:
+                throw new \LogicException(
+                    'array_walk_recursive() mapped value type not supported for JIT: '
+                    .Variable::getStringType($resultType)
+                );
+        }
+    }
+
+    /**
      * array_multisort() for homogeneous packed string or integer arrays (issue #1212).
      *
      * @param list<Variable> $arrays
