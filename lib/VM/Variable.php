@@ -307,7 +307,20 @@ final class Variable {
             case self::TYPE_ARRAY:
                 return $this->toArray()->getNumElements() > 0 ? 1 : 0;
             case self::TYPE_OBJECT:
+                if (EnumCaseSupport::isEnumCase($this->toObject())) {
+                    $enumInt = EnumCaseSupport::tryCastToInt($this, $vm?->context);
+                    if (null !== $enumInt) {
+                        return $enumInt;
+                    }
+                }
+
                 return $this->objectToScalarString($vm, 'int')->toInt($vm);
+            case self::TYPE_ENUM_CASE:
+                $enumInt = EnumCaseSupport::tryCastToInt($this, $vm?->context);
+                if (null !== $enumInt) {
+                    return $enumInt;
+                }
+                break;
             case self::TYPE_ARRAYACCESS_OFFSET:
                 return $this->arrayAccessDimension->read()->toInt($vm);
         }
@@ -339,7 +352,20 @@ final class Variable {
             case self::TYPE_ARRAY:
                 return $this->toArray()->getNumElements() > 0 ? 1.0 : 0.0;
             case self::TYPE_OBJECT:
+                if (EnumCaseSupport::isEnumCase($this->toObject())) {
+                    $enumFloat = EnumCaseSupport::tryCastToFloat($this, $vm?->context);
+                    if (null !== $enumFloat) {
+                        return $enumFloat;
+                    }
+                }
+
                 return $this->objectToScalarString($vm, 'float')->toFloat($vm);
+            case self::TYPE_ENUM_CASE:
+                $enumFloat = EnumCaseSupport::tryCastToFloat($this, $vm?->context);
+                if (null !== $enumFloat) {
+                    return $enumFloat;
+                }
+                break;
         }
         throw new \LogicException("Cannot convert type {$this->type} to float");
     }
@@ -810,9 +836,21 @@ final class Variable {
                 }
                 break;
             case Variable::TYPE_INTEGER:
+                $src = $var->resolveIndirect();
+                $enumInt = EnumCaseSupport::tryCastToInt($src, $vm?->context, $frame);
+                if (null !== $enumInt) {
+                    $this->integer = $enumInt;
+                    break;
+                }
                 $this->integer = $var->toInt($vm);
                 break;
             case Variable::TYPE_FLOAT:
+                $src = $var->resolveIndirect();
+                $enumFloat = EnumCaseSupport::tryCastToFloat($src, $vm?->context, $frame);
+                if (null !== $enumFloat) {
+                    $this->float = $enumFloat;
+                    break;
+                }
                 $this->float = $var->toFloat($vm);
                 break;
             case Variable::TYPE_STRING:

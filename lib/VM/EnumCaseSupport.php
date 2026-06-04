@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Frame;
+
 /**
  * Backed enum case singleton objects (#3518, Zend zend_enum.c parity).
  */
@@ -385,5 +387,125 @@ final class EnumCaseSupport
         }
 
         return null;
+    }
+
+    /**
+     * Zend scalar (int) cast on enum case operands — backing coerce + E_WARNING (#5653, zend_operators.c).
+     *
+     * @return int|null backing int, 1 for unit enum, or null when $value is not an enum case
+     */
+    public static function tryCastToInt(Variable $value, ?Context $context = null, ?Frame $frame = null): ?int
+    {
+        $enumClass = self::enumClassForCaseVariable($value);
+        if (null === $enumClass) {
+            return null;
+        }
+        self::emitScalarCastWarning($context, $frame, $enumClass->name, 'int');
+        $backing = self::backingValueForScalarCast($value);
+        if (null === $backing) {
+            return 1;
+        }
+
+        return self::coerceBackingToInt($backing);
+    }
+
+    /**
+     * Zend scalar (float) cast on enum case operands (#5623 parity, zend_operators.c).
+     *
+     * @return float|null backing float, 1.0 for unit enum, or null when $value is not an enum case
+     */
+    public static function tryCastToFloat(Variable $value, ?Context $context = null, ?Frame $frame = null): ?float
+    {
+        $enumClass = self::enumClassForCaseVariable($value);
+        if (null === $enumClass) {
+            return null;
+        }
+        self::emitScalarCastWarning($context, $frame, $enumClass->name, 'float');
+        $backing = self::backingValueForScalarCast($value);
+        if (null === $backing) {
+            return 1.0;
+        }
+
+        return self::coerceBackingToFloat($backing);
+    }
+
+    private static function backingValueForScalarCast(Variable $value): ?Variable
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_ENUM_CASE === $value->type) {
+            $entry = $value->toEnumCase();
+            if (null === $entry->enumClass->backedType) {
+                return null;
+            }
+            $backing = new Variable();
+            $backing->copyFrom($entry->backingValue);
+
+            return $backing;
+        }
+        if (Variable::TYPE_OBJECT === $value->type && self::isEnumCase($value->toObject())) {
+            $object = $value->toObject();
+            if (null === $object->class->backedType || null === $object->enumCaseValue) {
+                return null;
+            }
+            $backing = new Variable();
+            $backing->copyFrom($object->enumCaseValue);
+
+            return $backing;
+        }
+
+        return null;
+    }
+
+    private static function coerceBackingToInt(Variable $backing): int
+    {
+        $backing = $backing->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $backing->type) {
+            return $backing->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $backing->type) {
+            return (int) $backing->toFloat();
+        }
+        if (Variable::TYPE_STRING === $backing->type) {
+            return (int) $backing->toString();
+        }
+
+        throw new \LogicException('Backed enum case value must be int, float, or string');
+    }
+
+    private static function coerceBackingToFloat(Variable $backing): float
+    {
+        $backing = $backing->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $backing->type) {
+            return (float) $backing->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $backing->type) {
+            return $backing->toFloat();
+        }
+        if (Variable::TYPE_STRING === $backing->type) {
+            return (float) $backing->toString();
+        }
+
+        throw new \LogicException('Backed enum case value must be int, float, or string');
+    }
+
+    private static function emitScalarCastWarning(
+        ?Context $context,
+        ?Frame $frame,
+        string $className,
+        string $kind
+    ): void {
+        if (null === $context) {
+            return;
+        }
+        $message = 'int' === $kind
+            ? "Object of class {$className} could not be converted to int"
+            : "Object of class {$className} could not be converted to float";
+        $context->errors->triggerError(
+            $message,
+            ErrorReporter::E_WARNING,
+            null !== $frame && '' !== ($frame->scriptPath ?? '') ? $frame->scriptPath : null,
+            $context,
+            $frame
+        );
     }
 }
