@@ -34,6 +34,15 @@ class is_type extends Internal {
         }
         $var = $frame->calledArgs[0]->resolveIndirect();
         if (!is_null($frame->returnVar)) {
+            if (Variable::TYPE_OBJECT === $this->type) {
+                // Zend is_object(): enum case operands are objects (zend_enum.c, #5448).
+                $frame->returnVar->bool(
+                    Variable::TYPE_OBJECT === $var->type
+                    || Variable::TYPE_ENUM_CASE === $var->type
+                );
+
+                return;
+            }
             $frame->returnVar->bool($var->type === $this->type);
         }
     }

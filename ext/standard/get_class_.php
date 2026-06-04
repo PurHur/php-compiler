@@ -29,6 +29,11 @@ final class get_class_ extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        if (Variable::TYPE_ENUM_CASE === $value->type) {
+            $frame->returnVar->string($value->toEnumCase()->enumClass->name);
+
+            return;
+        }
         if (Variable::TYPE_OBJECT !== $value->type) {
             $frame->returnVar->bool(false);
 
