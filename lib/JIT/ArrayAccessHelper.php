@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Call\RuntimeIndirectInstanceMethodCall;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPTypes\Type;
@@ -45,9 +46,16 @@ final class ArrayAccessHelper
     ): ?Variable {
         if ($container->isArrayAccessWritableOffset) {
             if ($forWrite) {
-                self::emitIndirectModifyError($context);
+                $receiver = $container->writableArrayAccessReceiver;
+                if (null === $receiver) {
+                    throw new \LogicException('ArrayAccess writable offset missing receiver');
+                }
+                self::emitIndirectModifyNotice(
+                    $context,
+                    self::resolveContainerClassLc($receiver, $containerOp) ?? 'ArrayAccess'
+                );
 
-                return null;
+                return self::discardAssignTarget($context);
             }
 
             return self::offsetGet($context, $container->writableArrayAccessReceiver, $dim);
@@ -131,14 +139,35 @@ final class ArrayAccessHelper
         );
     }
 
-    public static function emitIndirectModifyError(Context $context): void
+    public static function emitIndirectModifyNotice(Context $context, string $className): void
     {
-        $message = 'Cannot indirectly modify an element of ArrayAccess';
-        $context->builder->call(
-            $context->lookupFunction('__compiler_jit_raise_logic_exception'),
-            self::stringDataPtrFromLiteral($context, $message),
-            $context->constantFromInteger(strlen($message), 'size_t')
+        $message = sprintf(
+            'Indirect modification of overloaded element of %s has no effect',
+            $className
         );
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $msgLen = $sizeT->constInt(\strlen($message), false);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $msgLen,
+            $i32->constInt(ErrorReporter::E_NOTICE, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
+    }
+
+    private static function discardAssignTarget(Context $context): Variable
+    {
+        $slot = JitValueBox::alloc($context);
+        $var = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VALUE, $slot);
+        $var->addref();
+
+        return $var;
     }
 
     public static function assignWritableOffset(Context $context, Variable $lvalue, Variable $value): void

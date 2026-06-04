@@ -1461,7 +1461,14 @@ restart:
                     }
                     if ($container->isArrayAccessOffset()) {
                         if ($forWrite || is_null($op->arg3)) {
-                            throw new \Error('Cannot indirectly modify an element of ArrayAccess');
+                            $this->context->errors->indirectModificationOfOverloadedElement(
+                                $container->arrayAccessOffsetClassName(),
+                                $this->context,
+                                $frame,
+                                '' !== $frame->scriptPath ? $frame->scriptPath : null
+                            );
+                            $arg1->null();
+                            break;
                         }
                         $container = $container->readArrayAccessOffsetValue();
                     }

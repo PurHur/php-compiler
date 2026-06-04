@@ -277,6 +277,43 @@ final class ErrorReporter
         $this->emitWarning($message, $context, $frame, $file, $line);
     }
 
+    /**
+     * Zend E_NOTICE for nested write through ArrayAccess offsetGet (zend_object_handlers.c, #5460).
+     */
+    public function indirectModificationOfOverloadedElement(
+        string $className,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        $this->emitNotice(
+            sprintf('Indirect modification of overloaded element of %s has no effect', $className),
+            $context,
+            $frame,
+            $file
+        );
+    }
+
+    private function emitNotice(
+        string $message,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null,
+        int $line = 0
+    ): void {
+        [$file, $line] = $this->resolveDisplayLocation($frame, $file, $line);
+        $this->recordLastError(self::E_NOTICE, $message, $file, $line);
+        if (0 === ($this->errorReporting & self::E_NOTICE)) {
+            return;
+        }
+        if ($this->dispatchUserHandler($context, $frame, self::E_NOTICE, $message, $file, $line)) {
+            return;
+        }
+        if ($this->displayErrors) {
+            fwrite(STDERR, $this->formatCliError(self::E_NOTICE, $message, $file, $line));
+        }
+    }
+
     private function emitWarning(
         string $message,
         ?Context $context = null,
