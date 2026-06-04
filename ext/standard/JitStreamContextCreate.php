@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StreamContextRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
@@ -33,6 +34,8 @@ final class JitStreamContextCreate
         if (2 === $argc) {
             $paramsHt = self::loadArrayArg($context, $args[1], 2);
         }
+
+        StreamContextRuntime::ensureLinked($context);
 
         $ht = $context->builder->call(
             $context->lookupFunction('__phpc_stream_context_create'),
