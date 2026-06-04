@@ -4299,6 +4299,10 @@ restart:
 
     private function findCatchFrameForThrow(Frame $frame, Variable $thrown): ?Frame
     {
+        $pending = $this->context->pendingException;
+        if (null !== $pending && $this->frameIsInFinallyBody($frame)) {
+            VM\ExceptionSupport::chainPendingExceptionOnFinallyThrow($thrown, $pending);
+        }
         $this->context->pendingException = $thrown;
         $handlers = $this->context->activeTryHandlerFrames;
         for ($i = \count($handlers) - 1; $i >= 0; --$i) {
