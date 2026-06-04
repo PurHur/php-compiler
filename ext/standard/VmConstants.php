@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\ClassConstVisibility;
+use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -15,6 +18,93 @@ final class VmConstants
 {
     /** @var list<string>|null */
     private static ?array $coreFetchNames = null;
+
+    /**
+     * constant() lookup — user/core constants and Class::CONST (#5926, basic_functions.c).
+     */
+    public static function constantLookup(Context $ctx, string $name): ?Variable
+    {
+        if (str_contains($name, '::')) {
+            return self::lookupClassConstant($ctx, $name);
+        }
+
+        return $ctx->constantFetch($name);
+    }
+
+    /**
+     * @see Zend zif_constant — zend_fetch_class + class constant table
+     */
+    private static function lookupClassConstant(Context $ctx, string $qualifiedName): ?Variable
+    {
+        $pos = strrpos($qualifiedName, '::');
+        if (false === $pos) {
+            return null;
+        }
+        $className = substr($qualifiedName, 0, $pos);
+        $constName = substr($qualifiedName, $pos + 2);
+        if ('' === $className || '' === $constName) {
+            return null;
+        }
+        $classLc = strtolower(ltrim($className, '\\'));
+        if (!isset($ctx->classes[$classLc])) {
+            $ctx->autoloadClass($className);
+        }
+        if (!isset($ctx->classes[$classLc])) {
+            return null;
+        }
+        $classEntry = $ctx->classes[$classLc];
+        if ($classEntry->isTrait) {
+            throw new \Error(
+                "Cannot access trait constant {$classEntry->name}::{$constName} directly"
+            );
+        }
+        $constLc = strtolower($constName);
+        $constKey = VmReflection::findClassConstantKey($classEntry, $constName, $ctx);
+        if (null === $constKey) {
+            return null;
+        }
+        $vis = $classEntry->constVisibility[$constLc] ?? CfgFunc::FLAG_PUBLIC;
+        try {
+            ClassConstVisibility::assertAccessible(
+                $vis,
+                null,
+                $classLc,
+                $classEntry->name,
+                $constName,
+                static fn (string $callerLc, string $ancestorLc): bool => isset($ctx->classes[$callerLc])
+                    && self::isClassSameOrSubclassOf($ctx, $callerLc, $ancestorLc)
+            );
+        } catch (\LogicException $e) {
+            throw new \Error($e->getMessage(), 0, $e);
+        }
+        $result = new Variable();
+        if ($classEntry->isEnum && null !== $classEntry->backedType) {
+            \PHPCompiler\VM\EnumSupport::ensureBackedEnumValuesUnique($classEntry);
+        }
+        if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($classEntry, $constKey, $result)) {
+            return $result;
+        }
+        $result->copyFrom($classEntry->constants[$constKey]);
+
+        return $result;
+    }
+
+    private static function isClassSameOrSubclassOf(Context $ctx, string $classLc, string $ancestorLc): bool
+    {
+        $current = $classLc;
+        while (isset($ctx->classes[$current])) {
+            if ($current === $ancestorLc) {
+                return true;
+            }
+            $parent = $ctx->classes[$current]->parentLc;
+            if (null === $parent) {
+                return false;
+            }
+            $current = $parent;
+        }
+
+        return false;
+    }
 
     /**
      * Names resolved by VM\Context::constantFetch() (Core category).
