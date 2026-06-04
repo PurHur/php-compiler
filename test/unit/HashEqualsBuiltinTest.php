@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\hash_equals;
+use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPUnit\Framework\TestCase;
 
@@ -41,5 +43,27 @@ final class HashEqualsBuiltinTest extends TestCase
         $lenFrame->returnVar = new VMVariable();
         $fn->execute($lenFrame);
         $this->assertFalse($lenFrame->returnVar->resolveIndirect()->toBool());
+    }
+
+    public function testEnumCaseOperandTypeError(): void
+    {
+        $runtime = new Runtime();
+        $fn = new hash_equals();
+        $enum = new ClassEntry('E');
+        $enum->isEnum = true;
+        $enum->backedType = 'string';
+        $backing = new VMVariable();
+        $backing->string('x');
+        $case = EnumCaseSupport::createCase($enum, 'A', $backing);
+
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->calledArgs = [$case, (new VMVariable())->string('x')];
+        $frame->returnVar = new VMVariable();
+
+        $this->expectException(\TypeError::class);
+        $this->expectExceptionMessage(
+            'hash_equals(): Argument #1 ($known_string) must be of type string, E given'
+        );
+        $fn->execute($frame);
     }
 }
