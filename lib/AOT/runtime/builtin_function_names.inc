@@ -283,6 +283,7 @@ static const char *phpc_builtin_functions[] = {
     "json_last_error_msg",
     "json_validate",
     "key",
+    "key_exists",
     "krsort",
     "ksort",
     "lcfirst",
@@ -507,4 +508,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 506;
+static const size_t phpc_builtin_functions_count = 507;

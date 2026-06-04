@@ -24,20 +24,26 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * array_key_exists() for arrays with int, float, or string keys (php-src subset).
+ * array_key_exists() / key_exists() for arrays with int, float, or string keys (php-src subset).
  */
 final class array_key_exists extends Internal
 {
+    public function __construct(string $name = 'array_key_exists')
+    {
+        parent::__construct($name);
+    }
+
     public function execute(Frame $frame): void
     {
+        $fn = $this->getName();
         if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('array_key_exists() requires exactly two arguments');
+            throw new \LogicException($fn.'() requires exactly two arguments');
         }
         $key = $frame->calledArgs[0]->resolveIndirect();
         EnumCaseSupport::rejectIllegalArrayOffset($key);
         $array = VmArray::requireArrayParam(
             $frame->calledArgs[1],
-            'array_key_exists',
+            $fn,
             2,
             'array'
         );
@@ -51,7 +57,7 @@ final class array_key_exists extends Internal
         } elseif (Variable::TYPE_INTEGER !== $key->type
             && Variable::TYPE_STRING !== $key->type
             && Variable::TYPE_FLOAT !== $key->type) {
-            throw new \LogicException('array_key_exists() key must be an integer or string in this compiler build');
+            throw new \LogicException($fn.'() key must be an integer or string in this compiler build');
         }
         $frame->returnVar->bool($array->hasKey($key));
     }
@@ -60,8 +66,9 @@ final class array_key_exists extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $fn = $this->getName();
         if (2 !== \count($args)) {
-            throw new \LogicException('array_key_exists() requires exactly two arguments');
+            throw new \LogicException($fn.'() requires exactly two arguments');
         }
         $key = $args[0];
         $array = $args[1];
@@ -69,14 +76,15 @@ final class array_key_exists extends Internal
             && !($array->type & JITVariable::IS_NATIVE_ARRAY)
         ) {
             if (JITVariable::TYPE_VALUE === $array->type) {
-                JitArrayElem::requireArrayParam($context, $array, 'array_key_exists', 2, 'array');
+                JitArrayElem::requireArrayParam($context, $array, $fn, 2, 'array');
             } else {
                 TypeErrorRaise::ensureLinked($context);
                 TypeErrorRaise::registerDeclarations($context);
                 TypeErrorRaise::emitRaise(
                     $context,
                     \sprintf(
-                        'array_key_exists(): Argument #2 ($array) must be of type array, %s given',
+                        '%s(): Argument #2 ($array) must be of type array, %s given',
+                        $fn,
                         self::jitArgTypeLabel($array)
                     )
                 );
@@ -88,7 +96,7 @@ final class array_key_exists extends Internal
         if (JITVariable::TYPE_HASHTABLE === $array->type) {
             $ht = $context->helper->loadValue($array);
 
-            return self::jitKeyExistsOnHashTable($context, $ht, $key);
+            return self::jitKeyExistsOnHashTable($context, $ht, $key, $fn);
         }
         if ($array->type & JITVariable::IS_NATIVE_ARRAY) {
             if (JITVariable::TYPE_NULL === $key->type
@@ -98,10 +106,10 @@ final class array_key_exists extends Internal
             }
             if (JITVariable::TYPE_NATIVE_LONG !== $key->type) {
                 throw new \LogicException(
-                    'array_key_exists() on native arrays only supports integer keys in this compiler build'
+                    $fn.'() on native arrays only supports integer keys in this compiler build'
                 );
             }
-            $index = JitLongArg::lower($context, $key, 'array_key_exists() key');
+            $index = JitLongArg::lower($context, $key, $fn.'() key');
             $size = $context->constantFromInteger($array->nextFreeElement, 'int32');
             $i32 = $context->getTypeFromString('int32');
             $inRange = $context->builder->icmp(Builder::INT_SLT, $index, $size);
@@ -132,8 +140,12 @@ final class array_key_exists extends Internal
     /**
      * php-src: null lookup key coerces to empty string (ext/standard/array.c).
      */
-    private static function jitKeyExistsOnHashTable(Context $context, Value $ht, JITVariable $key): Value
-    {
+    private static function jitKeyExistsOnHashTable(
+        Context $context,
+        Value $ht,
+        JITVariable $key,
+        string $function
+    ): Value {
         if (JITVariable::TYPE_NULL === $key->type) {
             return self::jitEmptyStringKeyExists($context, $ht);
         }
@@ -141,7 +153,7 @@ final class array_key_exists extends Internal
             return $context->builder->call(
                 $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
                 $ht,
-                (new self())->jitString($context, $key, 'array_key_exists() key')
+                (new self($function))->jitString($context, $key, $function.'() key')
             );
         }
         if (JITVariable::TYPE_NATIVE_LONG === $key->type) {
@@ -173,7 +185,7 @@ final class array_key_exists extends Internal
         }
 
         throw new \LogicException(
-            'array_key_exists() key must be an integer or string in this compiler build'
+            $function.'() key must be an integer or string in this compiler build'
         );
     }
 
