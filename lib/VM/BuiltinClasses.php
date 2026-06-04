@@ -628,6 +628,8 @@ final class BuiltinClasses
         $entry->constructor = new FiberConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
+        // Zend: Fiber::suspend / Fiber::getCurrent are statically invokable (#5485).
+        $staticCallable = ['suspend', 'getcurrent'];
         foreach (
             [
                 'start' => new FiberStart(),
@@ -642,7 +644,9 @@ final class BuiltinClasses
             ] as $name => $method
         ) {
             $entry->methods[$name] = $method;
-            $entry->methodVisibility[$name] = $pub;
+            $entry->methodVisibility[$name] = in_array($name, $staticCallable, true)
+                ? ($pub | CfgFunc::FLAG_STATIC)
+                : $pub;
         }
         $ctx->classes[FiberSupport::CLASS_FIBER] = $entry;
     }
