@@ -3292,6 +3292,14 @@ restart:
                     break;
                 case OpCode::TYPE_SCRIPT_MAGIC:
                     $dst = $frame->scope[$op->arg1];
+                    if (OpCode::SCRIPT_MAGIC_HALT_OFFSET === $op->arg3) {
+                        $offset = $this->context->runtime->compiler->getHaltCompilerOffset();
+                        if (null === $offset) {
+                            return $this->raise('Undefined constant "__COMPILER_HALT_OFFSET__"', $frame);
+                        }
+                        $dst->int($offset);
+                        break;
+                    }
                     if (OpCode::SCRIPT_MAGIC_LINE === $op->arg3) {
                         $line = null !== $op->arg2 ? (int) $op->arg2 : 0;
                         if ($line < 1) {

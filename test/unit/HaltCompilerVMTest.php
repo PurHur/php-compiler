@@ -34,4 +34,24 @@ PHP;
         $out = (string) ob_get_clean();
         $this->assertSame("exists\nbefore halt\n", $out);
     }
+
+    public function testCompilerHaltOffsetMatchesTrailingBoundary(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo __COMPILER_HALT_OFFSET__, "\n";
+__halt_compiler();
+TRAILING
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'halt_offset_probe.php');
+        $this->assertNotNull($block);
+        $this->assertSame(61, $runtime->compiler->getHaltCompilerOffset());
+        $this->assertSame(61, $block->haltCompilerOffset);
+
+        ob_start();
+        $runtime->run($block);
+        $out = (string) ob_get_clean();
+        $this->assertSame("61\n", $out);
+    }
 }

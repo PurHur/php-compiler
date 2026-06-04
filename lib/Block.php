@@ -62,6 +62,9 @@ class Block {
     /** File-level declare(strict_types=1) for this function body (issue #156). */
     public bool $strictTypes = false;
 
+    /** __COMPILER_HALT_OFFSET__ when the script contains __halt_compiler() (#5455). */
+    public ?int $haltCompilerOffset = null;
+
     /** @var array<int, int> scope slot index => Variable::TYPE_* for typed parameters */
     public array $paramTypeConstraints = [];
 

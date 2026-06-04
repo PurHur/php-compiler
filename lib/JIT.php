@@ -5569,7 +5569,16 @@ class JIT {
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
                 case OpCode::TYPE_SCRIPT_MAGIC:
-                    if (OpCode::SCRIPT_MAGIC_LINE === (int) $op->arg3) {
+                    if (OpCode::SCRIPT_MAGIC_HALT_OFFSET === (int) $op->arg3) {
+                        $offset = $block->haltCompilerOffset;
+                        if (null === $offset) {
+                            throw new \LogicException('Undefined constant "__COMPILER_HALT_OFFSET__"');
+                        }
+                        $this->assignOperand(
+                            $block->getOperand($op->arg1),
+                            JIT\Variable::fromConstantInt($this->context, $offset)
+                        );
+                    } elseif (OpCode::SCRIPT_MAGIC_LINE === (int) $op->arg3) {
                         $line = null !== $op->arg2 ? (int) $op->arg2 : 1;
                         if ($line < 1) {
                             $line = 1;

@@ -2342,6 +2342,142 @@ PY
   echo "Applied php-cfg-halt-compiler.patch (overlay)"
 }
 
+# __COMPILER_HALT_OFFSET__ magic constant + halt byte offset on Stmt\HaltCompiler (#5455).
+apply_php_cfg_compiler_halt_offset_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local msc="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MagicScriptConst.php"
+  local halt="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/HaltCompiler.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg"
+  if grep -q 'KIND_HALT_OFFSET' "$msc" 2>/dev/null \
+    && grep -q 'parseSourceCode' "$parser" 2>/dev/null \
+    && grep -q 'haltOffset' "$halt" 2>/dev/null; then
+    echo "Skip php-cfg-compiler-halt-offset overlay (already applied)"
+    return 0
+  fi
+  if [[ ! -f "$overlay/Op/Expr/MagicScriptConst.php" \
+    || ! -f "$overlay/Op/Stmt/HaltCompiler.php" \
+    || ! -f "$overlay/halt-compiler-parser-method.php" \
+    || ! -f "$overlay/parser-compiler-halt-offset.php" ]]; then
+    echo "Skip php-cfg-compiler-halt-offset overlay (files missing)" >&2
+    return 1
+  fi
+  cp "$overlay/Op/Expr/MagicScriptConst.php" "$msc"
+  cp "$overlay/Op/Stmt/HaltCompiler.php" "$halt"
+  python3 - "$parser" "$overlay/halt-compiler-parser-method.php" "$overlay/parser-compiler-halt-offset.php" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+property_path = Path(sys.argv[3])
+text = parser_path.read_text()
+prop = property_path.read_text().rstrip("\n")
+if "parseSourceCode" not in text:
+    anchor = "    protected $anonId = 0;\n"
+    if anchor not in text:
+        sys.stderr.write("php-cfg-compiler-halt-offset: Parser anonId anchor not found\n")
+        raise SystemExit(1)
+    text = text.replace(anchor, anchor + "\n" + prop + "\n", 1)
+    old_parse = """    public function parse($code, $fileName)
+    {
+        return $this->parseAst($this->astParser->parse($code), $fileName);
+    }"""
+    new_parse = """    public function parse($code, $fileName)
+    {
+        $this->parseSourceCode = $code;
+
+        return $this->parseAst($this->astParser->parse($code), $fileName);
+    }"""
+    if old_parse not in text:
+        sys.stderr.write("php-cfg-compiler-halt-offset: Parser::parse anchor not found\n")
+        raise SystemExit(1)
+    text = text.replace(old_parse, new_parse, 1)
+old_halt = """    protected function parseStmt_HaltCompiler(Stmt\\HaltCompiler $node)
+    {
+        $attrs = $this->mapAttributes($node);
+        $this->block->children[] = new Op\\Stmt\\HaltCompiler(
+            $node->remaining,
+            $attrs
+        );
+        $this->block = new Block();
+        $this->block->dead = true;
+    }"""
+new_halt = method_path.read_text().rstrip("\n")
+if old_halt in text:
+    text = text.replace(old_halt, new_halt, 1)
+elif new_halt not in text:
+    sys.stderr.write("php-cfg-compiler-halt-offset: parseStmt_HaltCompiler anchor not found\n")
+    raise SystemExit(1)
+const_anchor = """    protected function parseExpr_ConstFetch(Expr\\ConstFetch $expr)
+    {
+        if ($expr->name->isUnqualified()) {"""
+const_new = """    protected function parseExpr_ConstFetch(Expr\\ConstFetch $expr)
+    {
+        $lcConstName = strtolower(ltrim($expr->name->toString(), '\\\\'));
+        if ('__compiler_halt_offset__' === $lcConstName) {
+            $op = new Op\\Expr\\MagicScriptConst(
+                Op\\Expr\\MagicScriptConst::KIND_HALT_OFFSET,
+                $this->mapAttributes($expr)
+            );
+            $this->block->children[] = $op;
+
+            return $op->result;
+        }
+
+        if ($expr->name->isUnqualified()) {"""
+if const_anchor not in text:
+    sys.stderr.write("php-cfg-compiler-halt-offset: parseExpr_ConstFetch anchor not found\n")
+    raise SystemExit(1)
+text = text.replace(const_anchor, const_new, 1)
+# Upgrade path when the in-switch case was applied on a prior run.
+text = text.replace(
+    """                case '__compiler_halt_offset__':
+                    $op = new Op\\Expr\\MagicScriptConst(
+                        Op\\Expr\\MagicScriptConst::KIND_HALT_OFFSET,
+                        $this->mapAttributes($expr)
+                    );
+                    $this->block->children[] = $op;
+
+                    return $op->result;
+""",
+    "",
+    1,
+)
+parser_path.write_text(text)
+PY
+  echo "Applied php-cfg-compiler-halt-offset overlay (#5455)"
+}
+
+apply_php_types_compiler_halt_offset_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  if grep -q 'KIND_HALT_OFFSET' "$target" 2>/dev/null; then
+    echo "Skip php-types-compiler-halt-offset overlay (already applied)"
+    return 0
+  fi
+  if ! grep -q 'MagicScriptConst::KIND_LINE' "$target" 2>/dev/null; then
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+old = """                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }"""
+new = """                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind
+                    || \\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_HALT_OFFSET === $op->kind) {
+                    return [Type::int()];
+                }"""
+if old not in text:
+    sys.stderr.write("php-types-compiler-halt-offset: TypeReconstructor anchor not found\n")
+    raise SystemExit(1)
+path.write_text(text.replace(old, new, 1))
+PY
+  echo "Applied php-types-compiler-halt-offset overlay (#5455)"
+}
+
 # Per-property MODIFIER_READONLY: Property.propertyFlags + Parser assignment (#3149, #4230).
 apply_php_cfg_property_readonly_overlay() {
   local prop="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php"
@@ -2953,6 +3089,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-yield-keyed.patch"
   apply_patch "$PATCH_DIR/php-cfg-match.patch"
   apply_patch "$PATCH_DIR/php-cfg-halt-compiler.patch"
+  apply_php_cfg_compiler_halt_offset_overlay
   apply_patch "$PATCH_DIR/php-cfg-assignop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-cfg-list-destruct-byref.patch"
   apply_patch "$PATCH_DIR/php-cfg-empty-list-assignment.patch"
@@ -3030,6 +3167,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-arrow-function.patch"
   apply_patch "$PATCH_DIR/php-types-closure-unbound-this.patch"
   apply_patch "$PATCH_DIR/php-types-magic-script-const.patch"
+  apply_php_types_compiler_halt_offset_overlay
   apply_patch "$PATCH_DIR/php-types-first-class-callable.patch"
   apply_patch "$PATCH_DIR/php-types-incdec-type.patch"
   apply_patch "$PATCH_DIR/php-types-never-type.patch"

@@ -10,9 +10,15 @@ use PHPCompiler\OpCode;
 /**
  * Compile-time __DIR__ / __FILE__ for JIT using the unit's script path (#707).
  * __LINE__ uses per-site line on TYPE_SCRIPT_MAGIC arg2 (#715).
+ * __COMPILER_HALT_OFFSET__ is per-unit on Block::haltCompilerOffset (#5455).
  */
 final class ScriptMagic
 {
+    public static function haltOffsetForBlock(Block $block): ?int
+    {
+        return $block->haltCompilerOffset;
+    }
+
     public static function stringForBlock(Block $block, int $kind): string
     {
         $path = $block->scriptPath();
