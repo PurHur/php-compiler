@@ -209,6 +209,7 @@ require_once __DIR__.'/../../../ext/standard/JitClassAlias.php';
 require_once __DIR__.'/../../../ext/standard/JitClassExists.php';
 require_once __DIR__.'/../../../ext/standard/JitClearstatcache.php';
 require_once __DIR__.'/../../../ext/standard/JitCopy.php';
+require_once __DIR__.'/../../../ext/standard/JitCrcCore.php';
 require_once __DIR__.'/../../../ext/standard/JitCrc32.php';
 require_once __DIR__.'/../../../ext/standard/JitDate.php';
 require_once __DIR__.'/../../../ext/standard/JitDebugBacktrace.php';

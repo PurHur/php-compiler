@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** crc32c() — CRC32C (Castagnoli), signed 32-bit int (VM + JIT/AOT via __compiler_crc32c). */
+/** crc32c() — CRC32C (Castagnoli), signed 32-bit int (VM + JIT/AOT via ext/standard/VmCrc32c.php). */
 final class crc32c extends Internal
 {
     public function execute(Frame $frame): void

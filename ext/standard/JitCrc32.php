@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
@@ -14,16 +15,12 @@ use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM JIT helper for crc32() — delegates to __compiler_crc32. */
+/** LLVM JIT helper for crc32() — table-driven CRC32B from ext/standard/VmCrc32.php (#5389). */
 final class JitCrc32
 {
     public static function compute(Context $context, Value $subject, Value $seed): Value
     {
-        $checksum = $context->builder->call(
-            $context->lookupFunction('__compiler_crc32'),
-            $subject,
-            $seed
-        );
+        $checksum = JitCrcCore::computeCrc32($context, $subject, $seed);
         $slot = JitValueBox::alloc($context);
         JitValueBox::writeLong($context, $slot, $checksum);
 
