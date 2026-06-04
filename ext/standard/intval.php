@@ -43,9 +43,18 @@ final class intval extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING === $v->type && 10 !== $base) {
-            $result = VmMath::baseToZval($v->toString(), $base);
-            $frame->returnVar->int((int) $result);
+        if (Variable::TYPE_STRING === $v->type) {
+            $str = $v->toString();
+            if (0 === $base) {
+                $base = VmMath::autodetectBase($str);
+            }
+            if (10 !== $base) {
+                $result = VmMath::baseToZval($str, $base);
+                $frame->returnVar->int((int) $result);
+
+                return;
+            }
+            $frame->returnVar->int((int) $str);
 
             return;
         }
@@ -61,11 +70,6 @@ final class intval extends Internal
         }
         if (Variable::TYPE_BOOLEAN === $v->type) {
             $frame->returnVar->int($v->toBool() ? 1 : 0);
-
-            return;
-        }
-        if (Variable::TYPE_STRING === $v->type) {
-            $frame->returnVar->int((int) $v->toString());
 
             return;
         }

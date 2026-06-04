@@ -252,6 +252,34 @@ final class VmMath
     }
 
     /**
+     * Radix for intval() / zend_strtol when $base === 0 (prefix autodetect).
+     *
+     * php-src: Zend/zend_operators.c — zend_strtol()
+     */
+    public static function autodetectBase(string $str): int
+    {
+        $len = \strlen($str);
+        $start = 0;
+        while ($start < $len && \ctype_space($str[$start])) {
+            ++$start;
+        }
+        if ($start >= $len || '0' !== $str[$start]) {
+            return 10;
+        }
+        if ($start + 1 < $len) {
+            $c1 = $str[$start + 1];
+            if ('x' === $c1 || 'X' === $c1) {
+                return 16;
+            }
+            if ('b' === $c1 || 'B' === $c1) {
+                return 2;
+            }
+        }
+
+        return 8;
+    }
+
+    /**
      * @return int|float
      */
     public static function baseToZval(string $str, int $base): int|float
