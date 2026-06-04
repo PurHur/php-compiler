@@ -2280,17 +2280,21 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_STATIC_PROPERTY_FETCH:
-                    $rawClass = $frame->scope[$op->arg2]->toString();
-                    $lcClass = $this->resolveStaticClassName(
-                        $rawClass,
-                        $frame
-                    );
+                    $classOperand = $frame->scope[$op->arg2]->resolveIndirect();
+                    $lcClass = $this->resolveStaticPropertyClassLc($frame->scope[$op->arg2], $frame);
                     if (!isset($this->context->classes[$lcClass])) {
+                        $rawClass = Variable::TYPE_OBJECT === $classOperand->type
+                            ? $classOperand->toObject()->class->name
+                            : $classOperand->toString();
                         if ('self' !== strtolower($rawClass) && 'static' !== strtolower($rawClass)) {
                             $this->context->autoloadClass($rawClass);
                         }
                     }
                     if (!isset($this->context->classes[$lcClass])) {
+                        $rawClass = Variable::TYPE_OBJECT === $classOperand->type
+                            ? $classOperand->toObject()->class->name
+                            : $classOperand->toString();
+
                         return $this->raise("Unknown class for static property fetch: {$rawClass}", $frame);
                     }
                     $propNameRaw = $frame->scope[$op->arg3]->toString();
@@ -2332,14 +2336,21 @@ restart:
                     $frame->scope[$op->arg1]->indirect($storage);
                     break;
                 case OpCode::TYPE_STATIC_PROPERTY_UNSET:
-                    $rawClass = $frame->scope[$op->arg2]->toString();
-                    $lcClass = $this->resolveStaticClassName($rawClass, $frame);
+                    $classOperand = $frame->scope[$op->arg2]->resolveIndirect();
+                    $lcClass = $this->resolveStaticPropertyClassLc($frame->scope[$op->arg2], $frame);
                     if (!isset($this->context->classes[$lcClass])) {
+                        $rawClass = Variable::TYPE_OBJECT === $classOperand->type
+                            ? $classOperand->toObject()->class->name
+                            : $classOperand->toString();
                         if ('self' !== strtolower($rawClass) && 'static' !== strtolower($rawClass)) {
                             $this->context->autoloadClass($rawClass);
                         }
                     }
                     if (!isset($this->context->classes[$lcClass])) {
+                        $rawClass = Variable::TYPE_OBJECT === $classOperand->type
+                            ? $classOperand->toObject()->class->name
+                            : $classOperand->toString();
+
                         return $this->raise("Unknown class for static property unset: {$rawClass}", $frame);
                     }
                     $propNameRaw = $frame->scope[$op->arg3]->toString();
@@ -5989,6 +6000,19 @@ restart:
     protected function resolveStaticClassName(string $className, Frame $frame): string
     {
         return $this->resolveClassScopeName($className, $frame);
+    }
+
+    /**
+     * Resolve the class for $operand::$prop when the left side is a class name or instance (#5477).
+     */
+    protected function resolveStaticPropertyClassLc(Variable $classOperand, Frame $frame): string
+    {
+        $classOperand = $classOperand->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $classOperand->type) {
+            return strtolower($classOperand->toObject()->class->name);
+        }
+
+        return $this->resolveStaticClassName($classOperand->toString(), $frame);
     }
 
     /**
