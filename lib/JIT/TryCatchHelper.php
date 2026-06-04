@@ -399,7 +399,7 @@ final class TryCatchHelper
         ) {
             self::emitCatchableClassError(
                 $context,
-                'TypeError',
+                \PHPCompiler\VM\ExceptionSupport::CLASS_ERROR,
                 \PHPCompiler\VM\ExceptionSupport::THROW_NON_THROWABLE_MESSAGE,
                 $jit
             );
@@ -426,7 +426,7 @@ final class TryCatchHelper
         $builder->positionAtEnd($invalidThrow);
         self::emitCatchableClassError(
             $context,
-            'TypeError',
+            \PHPCompiler\VM\ExceptionSupport::CLASS_ERROR,
             \PHPCompiler\VM\ExceptionSupport::THROW_NON_THROWABLE_MESSAGE,
             $jit
         );
