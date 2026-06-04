@@ -395,6 +395,19 @@ final class EnumCaseSupport
         return null;
     }
 
+    public static function enumCaseNameForVariable(Variable $value): string
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_ENUM_CASE === $value->type) {
+            return $value->toEnumCase()->caseName;
+        }
+        if (Variable::TYPE_OBJECT === $value->type && self::isEnumCase($value->toObject())) {
+            return $value->toObject()->enumCaseName ?? '';
+        }
+
+        return '';
+    }
+
     private static function enumCaseEntryToVariable(EnumCaseEntry $entry): Variable
     {
         return self::createCase($entry->enumClass, $entry->caseName, $entry->backingValue);
@@ -475,6 +488,16 @@ final class EnumCaseSupport
     {
         $src = $src->resolveIndirect();
         if (self::isEnumCaseVariable($src)) {
+            $enumClass = self::enumClassForCaseVariable($src);
+            $caseName = self::enumCaseNameForVariable($src);
+            if (null !== $enumClass && '' !== $caseName) {
+                $runtime = EnumSupport::resolveRuntimeEnumClass($context, $enumClass);
+                $canonical = BackedEnum::canonicalCaseVariable($runtime, $caseName);
+                if (null !== $canonical && self::isEnumCaseVariable($canonical)) {
+                    return ClassConstMaterializer::detachConstantValue($canonical);
+                }
+            }
+
             return ClassConstMaterializer::detachConstantValue($src);
         }
         if (!$src->is(Variable::TYPE_INTEGER) && !$src->is(Variable::TYPE_STRING)) {
