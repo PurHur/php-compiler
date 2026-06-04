@@ -1008,6 +1008,10 @@ final class Variable {
         if (self::isEnumCaseOperand($self) && self::isEnumCaseOperand($other)) {
             return EnumCaseSupport::enumCaseVariablesEqual($self, $other);
         }
+        // Zend compare_function: enum case vs backing scalar is never equal (#5798).
+        if (self::isEnumCaseOperand($self) || self::isEnumCaseOperand($other)) {
+            return false;
+        }
         if ($self->type !== $other->type) {
             return false;
         }
@@ -1061,6 +1065,8 @@ restart:
                     goto restart;
                 } elseif (self::isEnumCaseOperand($self) && self::isEnumCaseOperand($other)) {
                     return EnumCaseSupport::enumCaseVariablesEqual($self, $other);
+                } elseif (self::isEnumCaseOperand($self) || self::isEnumCaseOperand($other)) {
+                    return false;
                 }
                 return $this->looseEqual($self, $other);
         }
