@@ -33,6 +33,39 @@ final class EnumCaseSupport
         return $var;
     }
 
+    /**
+     * Enum case fetches use TYPE_ENUM_CASE; instance method dispatch needs an object receiver (#5781, #5676).
+     */
+    public static function receiverForInstanceMethod(Variable $receiver): Variable
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $receiver->type) {
+            return $receiver;
+        }
+        if (Variable::TYPE_ENUM_CASE !== $receiver->type) {
+            throw new \LogicException('Method call on non-object');
+        }
+        $entry = $receiver->toEnumCase();
+        $canonical = BackedEnum::canonicalCaseVariable($entry->enumClass, $entry->caseName);
+        if (null !== $canonical) {
+            $canonical = $canonical->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $canonical->type && self::isEnumCase($canonical->toObject())) {
+                return $canonical;
+            }
+            if (Variable::TYPE_ENUM_CASE === $canonical->type) {
+                return self::receiverForInstanceMethod($canonical);
+            }
+        }
+        if (null === $entry->enumClass->backedType) {
+            $null = new Variable();
+            $null->null();
+
+            return self::createCase($entry->enumClass, $entry->caseName, $null);
+        }
+
+        return self::createCase($entry->enumClass, $entry->caseName, $entry->backingValue);
+    }
+
     public static function getProperty(
         ObjectEntry $object,
         string $name,
