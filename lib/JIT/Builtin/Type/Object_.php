@@ -1648,7 +1648,7 @@ class Object_ extends Type {
     /**
      * Register an alternate name for a JIT-declared user class (class_alias, #3178).
      *
-     * php-src: zend_register_class_alias_ex — user classes/interfaces/traits; no alias chains or enums.
+     * php-src: zend_register_class_alias_ex — user classes/interfaces/traits/enums; no alias chains.
      */
     public function registerClassAlias(string $original, string $alias): bool
     {
@@ -1662,9 +1662,6 @@ class Object_ extends Type {
             return false;
         }
         if (isset($this->classAliasToOriginalLc[$originalLc])) {
-            return false;
-        }
-        if (isset($this->enums[$originalLc])) {
             return false;
         }
 
@@ -1690,6 +1687,9 @@ class Object_ extends Type {
         }
         if (isset($this->classUsedTraitNames[$originalLc])) {
             $this->classUsedTraitNames[$aliasLc] = $this->classUsedTraitNames[$originalLc];
+        }
+        if (isset($this->enums[$originalLc])) {
+            $this->enums[$aliasLc] = true;
         }
 
         return true;
