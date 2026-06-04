@@ -828,6 +828,7 @@ require_once __DIR__.'/../../../ext/standard/VmEval.php';
 require_once __DIR__.'/../../../ext/standard/VmFnmatch.php';
 require_once __DIR__.'/../../../ext/standard/VmHost.php';
 require_once __DIR__.'/../../../ext/standard/VmInfo.php';
+require_once __DIR__.'/../../../ext/standard/VmJsonScanner.php';
 require_once __DIR__.'/../../../ext/standard/VmJsonValidate.php';
 require_once __DIR__.'/../../../ext/standard/VmMath.php';
 require_once __DIR__.'/../../../ext/standard/VmPhpCoreConstants.php';
