@@ -2950,7 +2950,9 @@ class Compiler {
             $valueSlot,
             $typeSlot
         );
-        $constOp->classConstVisibilityFlags = $child->flags;
+        $constOp->classConstVisibilityFlags = property_exists($child, 'flags')
+            ? (int) $child->flags
+            : CfgFunc::FLAG_PUBLIC;
         if (property_exists($child, 'isEnumCase')) {
             $constOp->isEnumCaseDeclare = $child->isEnumCase;
         }
