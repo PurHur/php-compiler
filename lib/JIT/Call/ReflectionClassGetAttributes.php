@@ -73,6 +73,12 @@ final class ReflectionClassGetAttributes implements Call
             $classSafe,
             $i
         );
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        $voidPtr = $context->getTypeFromString('void*');
+        $nullHt = $context->builder->pointerCast($voidPtr->constNull(), $htPtrTy);
+        $argsIsNull = $context->builder->icmp(Builder::INT_EQ, $argsHt, $nullHt);
+        $emptyArgsHt = HashTableHelper::alloc($context);
+        $argsHt = $context->builder->select($argsIsNull, $emptyArgsHt, $argsHt);
         $argsVar = new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $argsHt);
         $argsSlot = $context->type->object->propertySlotFor($attrObj, 'ReflectionAttribute', 'args');
         $context->type->object->propertyStore($argsSlot, $argsVar, Variable::TYPE_HASHTABLE);

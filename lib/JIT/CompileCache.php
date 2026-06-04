@@ -295,6 +295,7 @@ final class CompileCache
         }
         $parts[] = $llvmDir;
         $parts[] = hash_file('sha256', __DIR__.'/../JIT/Context.php') ?: '';
+        $parts[] = hash_file('sha256', __DIR__.'/Builtin/AttributeRegistryLowering.php') ?: '';
         $parts[] = hash_file('sha256', __DIR__.'/../Runtime.php') ?: '';
         $parts[] = LazyBuiltins::fingerprintSegment();
 
