@@ -2430,6 +2430,13 @@ class Object_ extends Type {
         if ('fiber' === $lcname) {
             $this->defineProperty($id, FiberHelper::TARGET_PROPERTY, Variable::TYPE_STRING);
             $this->defineProperty($id, FiberHelper::STATE_PROPERTY, Variable::TYPE_NATIVE_LONG);
+            foreach (['suspend', 'getcurrent'] as $fiberStaticMethod) {
+                $this->defineMethodVisibility(
+                    $id,
+                    $fiberStaticMethod,
+                    \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC
+                );
+            }
         }
         if ('generator' === $lcname) {
             $this->defineProperty($id, GeneratorHelper::TARGET_PROPERTY, Variable::TYPE_STRING);
