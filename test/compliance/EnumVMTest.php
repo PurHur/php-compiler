@@ -35,6 +35,7 @@ final class EnumVMTest extends BaseTest
                 'enum_illegal_array_offset_write.phpt',
                 'enum_illegal_array_offset.phpt',
                 'enum_case_fetch_object_int.phpt',
+                'enum_strval.phpt',
                 'clone_enum_case.phpt',
                 'enum_case_incdec_type_error.phpt',
                 'enum_in_operator.phpt',
