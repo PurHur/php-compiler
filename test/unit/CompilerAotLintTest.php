@@ -104,4 +104,20 @@ final class CompilerAotLintTest extends TestCase
         $block = $runtime->parseAndCompile((string) file_get_contents($path), $path);
         $this->assertNotNull($block);
     }
+
+    /** Issue #5310: chained ?-> in read context with ?? must compile (lib/JIT.php pattern). */
+    public function testNullsafePropertyFetchCoalesceReadContextCompiles(): void
+    {
+        $code = <<<'PHP'
+<?php
+class T { public ?object $type = null; }
+class B { public function getOperand(int $i): object { return new T(); } }
+function probe(B $block, int $argOffset): void {
+    $classHint = $block->getOperand($argOffset)->type?->userType ?? null;
+}
+PHP;
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $block = $runtime->parseAndCompile($code, 'nullsafe_coalesce_read.php');
+        $this->assertNotNull($block);
+    }
 }
