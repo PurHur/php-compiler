@@ -30,6 +30,7 @@ final class EnumVMTest extends BaseTest
                 'enum_from_invalid.phpt',
                 'enum_try_from.phpt',
                 'enum_instanceof.phpt',
+                'instanceof_enum_case.phpt',
                 'enum_case_fetch_object_int.phpt',
                 'clone_enum_case.phpt',
                 'enum_case_incdec_type_error.phpt',

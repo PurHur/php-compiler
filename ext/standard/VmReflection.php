@@ -11,6 +11,7 @@ use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\TypedPropertyCheck;
@@ -624,6 +625,10 @@ final class VmReflection
     public static function isInstanceOfObject(Context $ctx, Variable $object, string $className): bool
     {
         $object = $object->resolveIndirect();
+        $enumMatch = EnumCaseSupport::valueMatchesInstanceOfClassName($object, $className, $ctx);
+        if (null !== $enumMatch) {
+            return $enumMatch;
+        }
         if (Variable::TYPE_OBJECT !== $object->type) {
             return false;
         }

@@ -130,6 +130,73 @@ final class EnumCaseSupport
         return ($left->enumCaseName ?? '') === ($right->enumCaseName ?? '');
     }
 
+    /**
+     * instanceof / is_a on enum case operands (#5548, zend_enum.c).
+     *
+     * @return bool|null true/false when handled; null to fall through to ordinary object checks
+     */
+    public static function valueMatchesInstanceOfClassName(
+        Variable $value,
+        string $className,
+        Context $context
+    ): ?bool {
+        $entry = self::entryForInstanceOfCheck($value);
+        if (null !== $entry) {
+            $className = strtolower(ltrim($className, '\\'));
+
+            return InterfaceCheck::entryIsInstanceOf($entry, $className, $context)
+                || InterfaceCheck::entryImplements($entry, $className, $context);
+        }
+        $classLc = strtolower(ltrim($className, '\\'));
+        $target = $context->classes[$classLc] ?? null;
+        if (null !== $target && self::scalarIsLegacyEnumCaseForClass($value, $target)) {
+            return true;
+        }
+
+        return null;
+    }
+
+    public static function entryForInstanceOfCheck(Variable $value): ?ClassEntry
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_ENUM_CASE === $value->type) {
+            return $value->toEnumCase()->enumClass;
+        }
+        if (Variable::TYPE_OBJECT === $value->type && self::isEnumCase($value->toObject())) {
+            return $value->toObject()->class;
+        }
+
+        return null;
+    }
+
+    /**
+     * Backing scalar that stands in for a case when constants were materialized as scalars (#5514).
+     */
+    public static function scalarIsLegacyEnumCaseForClass(Variable $value, ClassEntry $enum): bool
+    {
+        if (!$enum->isEnum || null === $enum->backedType) {
+            return false;
+        }
+        $value = $value->resolveIndirect();
+        if (!$value->is(Variable::TYPE_INTEGER) && !$value->is(Variable::TYPE_STRING)) {
+            return false;
+        }
+        $match = BackedEnum::caseForValue($enum, $value);
+        if (null === $match) {
+            return false;
+        }
+        $caseLc = strtolower($match->caseName);
+        if (!isset($enum->constants[$caseLc])) {
+            return false;
+        }
+        $stored = $enum->constants[$caseLc]->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $stored->type && self::isEnumCase($stored->toObject())) {
+            return false;
+        }
+
+        return $stored->is(Variable::TYPE_INTEGER) || $stored->is(Variable::TYPE_STRING);
+    }
+
     /** Loose/identical == for TYPE_OBJECT / TYPE_ENUM_CASE enum operands (#4700). */
     public static function enumCaseVariablesEqual(Variable $left, Variable $right): bool
     {

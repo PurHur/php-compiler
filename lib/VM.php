@@ -4825,16 +4825,18 @@ restart:
     private function valueInstanceOfClassName(Variable $value, string $className): bool
     {
         $resolved = $value->resolveIndirect();
-        $className = strtolower(ltrim($className, '\\'));
-        if (Variable::TYPE_ENUM_CASE === $resolved->type) {
-            $enumClass = $resolved->toEnumCase()->enumClass;
-
-            return VM\InterfaceCheck::entryIsInstanceOf($enumClass, $className, $this->context)
-                || VM\InterfaceCheck::entryImplements($enumClass, $className, $this->context);
+        $enumMatch = VM\EnumCaseSupport::valueMatchesInstanceOfClassName(
+            $value,
+            $className,
+            $this->context
+        );
+        if (null !== $enumMatch) {
+            return $enumMatch;
         }
         if (Variable::TYPE_OBJECT !== $resolved->type) {
             return false;
         }
+        $className = strtolower(ltrim($className, '\\'));
         $entry = $resolved->toObject()->class;
         $target = $this->context->classes[$className] ?? null;
         if (null !== $target && $target->isInterface) {
