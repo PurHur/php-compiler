@@ -12,6 +12,8 @@ final class ObOutput
 {
     public static function registerExternals(Context $context): void
     {
+        ObStorageGlobals::ensureGlobals($context);
+
         $void = $context->context->voidType();
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
