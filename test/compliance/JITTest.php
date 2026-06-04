@@ -114,10 +114,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'intval_base')) {
                 continue;
             }
-            // class_uses() is VM-only until JIT lowering (#3119).
-            if (str_contains($name, 'class_uses_runtime')) {
-                continue;
-            }
             // class_implements() on trait: VM + JitClassImplements lowering (#5248); MCJIT DECLARE_TRAIT LLVM verify (#3609).
             if (str_contains($name, 'class_implements_trait')) {
                 continue;

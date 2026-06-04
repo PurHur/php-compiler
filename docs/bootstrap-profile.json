@@ -34,6 +34,7 @@
         "ext/standard/JitClassAlias.php",
         "ext/standard/JitClassExists.php",
         "ext/standard/JitClassImplements.php",
+        "ext/standard/JitClassUses.php",
         "ext/standard/JitClassParents.php",
         "ext/standard/JitClearstatcache.php",
         "ext/standard/JitConstant.php",

@@ -62,6 +62,8 @@ class Object_ extends Type {
     private array $classParentLc = [];
     /** @var array<string, list<string>> class lc => interface lc names (#1357, #3077) */
     private array $classInterfacesLc = [];
+    /** @var array<string, list<string>> class lc => trait FQCNs from USE TRAIT (#3119) */
+    private array $classUsedTraitNames = [];
     /** @var array<string, list<string>> interface lc => parent interface lc names */
     private array $interfaceExtendsLc = [];
     /** @var array<string, true> interface lc => registered */
@@ -1355,6 +1357,23 @@ class Object_ extends Type {
         unset($this->classAllInterfacesLc[$lc]);
     }
 
+    public function recordClassUsedTrait(string $classLc, string $traitName): void
+    {
+        $lc = strtolower(ltrim($classLc, '\\'));
+        $this->classUsedTraitNames[$lc] ??= [];
+        if (!in_array($traitName, $this->classUsedTraitNames[$lc], true)) {
+            $this->classUsedTraitNames[$lc][] = $traitName;
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function usedTraitNamesForClassLc(string $classLc): array
+    {
+        return $this->classUsedTraitNames[strtolower(ltrim($classLc, '\\'))] ?? [];
+    }
+
     /**
      * @param list<string> $extendsLcs lowercase parent interface names
      */
@@ -1663,6 +1682,9 @@ class Object_ extends Type {
         }
         if (isset($this->traitClassLcs[$originalLc])) {
             $this->traitClassLcs[$aliasLc] = true;
+        }
+        if (isset($this->classUsedTraitNames[$originalLc])) {
+            $this->classUsedTraitNames[$aliasLc] = $this->classUsedTraitNames[$originalLc];
         }
 
         return true;
