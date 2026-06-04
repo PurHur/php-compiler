@@ -5926,9 +5926,13 @@ class JIT {
                     break;
                 case OpCode::TYPE_CAST_INT:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    // Zend (int) cast + enum backing coerce via intval lowering (#5653, #5623).
-                    $long = (new ext\standard\intval())->call($this->context, $value);
+                    $long = ext\standard\JitZendScalarCast::emitIntCast($this->context, $value);
                     $this->assignOperandValue($block->getOperand($op->arg1), $long);
+                    break;
+                case OpCode::TYPE_CAST_FLOAT:
+                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $double = ext\standard\JitZendScalarCast::emitFloatCast($this->context, $value);
+                    $this->assignOperandValue($block->getOperand($op->arg1), $double);
                     break;
                 case OpCode::TYPE_CAST_STRING:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));

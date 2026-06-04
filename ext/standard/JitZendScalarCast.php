@@ -1,0 +1,338 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
+
+/**
+ * JIT lowering for Zend scalar (int)/(float) casts (#5714, #5791, zend_operators.c).
+ *
+ * Distinct from intval/floatval (#5623): enum cases warn and yield legacy 1 / 1.0, not backing.
+ */
+final class JitZendScalarCast
+{
+    public static function emitIntCast(Context $context, JITVariable $arg): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $v = $context->helper->loadValue($arg);
+        switch ($arg->type) {
+            case JITVariable::TYPE_NATIVE_LONG:
+                return $v;
+            case JITVariable::TYPE_NATIVE_DOUBLE:
+                return $context->builder->fpToSi($v, $i64);
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return $context->builder->zExt($v, $i64);
+            case JITVariable::TYPE_STRING:
+                return self::stringToInt(
+                    $context,
+                    JitStringArg::lower($context, $arg, '(int) cast')
+                );
+            case JITVariable::TYPE_NULL:
+                return $i64->constInt(0, false);
+            case JITVariable::TYPE_VALUE:
+                return self::valueBoxToInt($context, $arg);
+            default:
+                throw new \LogicException('(int) cast unsupported operand type in JIT');
+        }
+    }
+
+    public static function emitFloatCast(Context $context, JITVariable $arg): Value
+    {
+        $double = $context->getTypeFromString('double');
+        $v = $context->helper->loadValue($arg);
+        switch ($arg->type) {
+            case JITVariable::TYPE_NATIVE_LONG:
+                return $context->builder->siToFp($v, $double);
+            case JITVariable::TYPE_NATIVE_DOUBLE:
+                return $v;
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return $context->builder->uiToFp($v, $double);
+            case JITVariable::TYPE_STRING:
+                $ptr = self::stringDataPtr(
+                    $context,
+                    JitStringArg::lower($context, $arg, '(float) cast')
+                );
+                $endPtr = $context->getTypeFromString('int8**')->constNull();
+
+                return $context->builder->call($context->lookupFunction('strtod'), $ptr, $endPtr);
+            case JITVariable::TYPE_NULL:
+                return $double->constReal(0.0);
+            case JITVariable::TYPE_VALUE:
+                return self::valueBoxToFloat($context, $arg);
+            default:
+                throw new \LogicException('(float) cast unsupported operand type in JIT');
+        }
+    }
+
+    private static function valueBoxToInt(Context $context, JITVariable $arg): Value
+    {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+
+        $nullBlock = BasicBlockHelper::append($context, 'int_cast_value_null');
+        $longBlock = BasicBlockHelper::append($context, 'int_cast_value_long');
+        $boolBlock = BasicBlockHelper::append($context, 'int_cast_value_bool');
+        $doubleBlock = BasicBlockHelper::append($context, 'int_cast_value_double');
+        $stringBlock = BasicBlockHelper::append($context, 'int_cast_value_string');
+        $doneBlock = BasicBlockHelper::append($context, 'int_cast_value_done');
+
+        $afterNull = BasicBlockHelper::append($context, 'int_cast_value_after_null');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NULL, false)),
+            $nullBlock,
+            $afterNull
+        );
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterNull);
+        $afterLong = BasicBlockHelper::append($context, 'int_cast_value_after_long');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_LONG, false)),
+            $longBlock,
+            $afterLong
+        );
+
+        $context->builder->positionAtEnd($longBlock);
+        $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $longEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterLong);
+        $afterBool = BasicBlockHelper::append($context, 'int_cast_value_after_bool');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false)),
+            $boolBlock,
+            $afterBool
+        );
+
+        $context->builder->positionAtEnd($boolBlock);
+        $boolVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $boolInt = $context->builder->zExt($boolVal, $i64);
+        $boolEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterBool);
+        $afterDouble = BasicBlockHelper::append($context, 'int_cast_value_after_double');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false)),
+            $doubleBlock,
+            $afterDouble
+        );
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr);
+        $doubleInt = $context->builder->fpToSi($doubleVal, $i64);
+        $doubleEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $objectEnumBlock = BasicBlockHelper::append($context, 'int_cast_value_object_enum');
+        $afterEnumDispatch = BasicBlockHelper::append($context, 'int_cast_value_after_enum_dispatch');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_OBJECT, false)),
+            $objectEnumBlock,
+            $afterEnumDispatch
+        );
+        $enumLong = null;
+        $enumEndBlock = null;
+        $context->builder->positionAtEnd($objectEnumBlock);
+        $objPtr = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
+        $enumLong = JitScalarEnumCoerce::tryEmitObjectEnumCaseLegacyCastToLong(
+            $context,
+            $objPtr,
+            'int_cast',
+            $afterEnumDispatch
+        );
+        if (null !== $enumLong) {
+            $enumEndBlock = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBlock);
+        }
+        $context->builder->positionAtEnd($afterEnumDispatch);
+        $fallbackBlock = BasicBlockHelper::append($context, 'int_cast_value_fallback');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false)),
+            $stringBlock,
+            $fallbackBlock
+        );
+
+        $context->builder->positionAtEnd($stringBlock);
+        $stringVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
+        $stringInt = self::stringToInt($context, $stringVal);
+        $stringEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($fallbackBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i64, 'int_cast_value_phi');
+        $phi->addIncoming($zero, $nullBlock);
+        $phi->addIncoming($longVal, $longEndBlock);
+        $phi->addIncoming($boolInt, $boolEndBlock);
+        $phi->addIncoming($doubleInt, $doubleEndBlock);
+        $phi->addIncoming($stringInt, $stringEndBlock);
+        if (null !== $enumLong && null !== $enumEndBlock) {
+            $phi->addIncoming($enumLong, $enumEndBlock);
+        }
+        $phi->addIncoming($zero, $fallbackBlock);
+
+        return $phi;
+    }
+
+    private static function valueBoxToFloat(Context $context, JITVariable $arg): Value
+    {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $double = $context->getTypeFromString('double');
+        $zero = $double->constReal(0.0);
+
+        $nullBlock = BasicBlockHelper::append($context, 'float_cast_value_null');
+        $longBlock = BasicBlockHelper::append($context, 'float_cast_value_long');
+        $boolBlock = BasicBlockHelper::append($context, 'float_cast_value_bool');
+        $nativeDoubleBlock = BasicBlockHelper::append($context, 'float_cast_value_double');
+        $stringBlock = BasicBlockHelper::append($context, 'float_cast_value_string');
+        $doneBlock = BasicBlockHelper::append($context, 'float_cast_value_done');
+
+        $afterNull = BasicBlockHelper::append($context, 'float_cast_value_after_null');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NULL, false)),
+            $nullBlock,
+            $afterNull
+        );
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterNull);
+        $afterLong = BasicBlockHelper::append($context, 'float_cast_value_after_long');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_LONG, false)),
+            $longBlock,
+            $afterLong
+        );
+
+        $context->builder->positionAtEnd($longBlock);
+        $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $longFloat = $context->builder->siToFp($longVal, $double);
+        $longEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterLong);
+        $afterBool = BasicBlockHelper::append($context, 'float_cast_value_after_bool');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false)),
+            $boolBlock,
+            $afterBool
+        );
+
+        $context->builder->positionAtEnd($boolBlock);
+        $boolVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $boolFloat = $context->builder->uiToFp($boolVal, $double);
+        $boolEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterBool);
+        $afterDouble = BasicBlockHelper::append($context, 'float_cast_value_after_double');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false)),
+            $nativeDoubleBlock,
+            $afterDouble
+        );
+
+        $context->builder->positionAtEnd($nativeDoubleBlock);
+        $nativeDoubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr);
+        $nativeDoubleEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $objectEnumBlock = BasicBlockHelper::append($context, 'float_cast_value_object_enum');
+        $afterEnumDispatch = BasicBlockHelper::append($context, 'float_cast_value_after_enum_dispatch');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_OBJECT, false)),
+            $objectEnumBlock,
+            $afterEnumDispatch
+        );
+        $enumDouble = null;
+        $enumEndBlock = null;
+        $context->builder->positionAtEnd($objectEnumBlock);
+        $objPtr = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
+        $enumDouble = JitScalarEnumCoerce::tryEmitObjectEnumCaseLegacyCastToDouble(
+            $context,
+            $objPtr,
+            'float_cast',
+            $afterEnumDispatch
+        );
+        if (null !== $enumDouble) {
+            $enumEndBlock = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBlock);
+        }
+        $context->builder->positionAtEnd($afterEnumDispatch);
+        $fallbackBlock = BasicBlockHelper::append($context, 'float_cast_value_fallback');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false)),
+            $stringBlock,
+            $fallbackBlock
+        );
+
+        $context->builder->positionAtEnd($stringBlock);
+        $stringVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
+        $ptr = self::stringDataPtr($context, $stringVal);
+        $endPtr = $context->getTypeFromString('int8**')->constNull();
+        $stringFloat = $context->builder->call($context->lookupFunction('strtod'), $ptr, $endPtr);
+        $stringEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($fallbackBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($double, 'float_cast_value_phi');
+        $phi->addIncoming($zero, $nullBlock);
+        $phi->addIncoming($longFloat, $longEndBlock);
+        $phi->addIncoming($boolFloat, $boolEndBlock);
+        $phi->addIncoming($nativeDoubleVal, $nativeDoubleEndBlock);
+        $phi->addIncoming($stringFloat, $stringEndBlock);
+        if (null !== $enumDouble && null !== $enumEndBlock) {
+            $phi->addIncoming($enumDouble, $enumEndBlock);
+        }
+        $phi->addIncoming($zero, $fallbackBlock);
+
+        return $phi;
+    }
+
+    private static function stringToInt(Context $context, Value $strPtr): Value
+    {
+        $ptr = self::stringDataPtr($context, $strPtr);
+        $endPtr = $context->getTypeFromString('int8**')->constNull();
+        $i64 = $context->getTypeFromString('int64');
+        $base = $context->builder->trunc($i64->constInt(10, false), $context->getTypeFromString('int32'));
+        $raw = $context->builder->call($context->lookupFunction('strtol'), $ptr, $endPtr, $base);
+
+        return $context->builder->trunc($raw, $i64);
+    }
+
+    private static function stringDataPtr(Context $context, Value $strPtr): Value
+    {
+        $off = $context->structFieldIndex($strPtr, 'value');
+
+        return $context->builder->structGep($strPtr, $off);
+    }
+}

@@ -32,7 +32,7 @@ final class JitScalarEnumCoerce
         string $function,
         BasicBlock $nonEnumTarget
     ): ?Value {
-        return self::tryEmitObjectEnumCaseToScalar($context, $objPtr, $function, 'int', $nonEnumTarget);
+        return self::tryEmitObjectEnumCaseToScalar($context, $objPtr, $function, 'int', $nonEnumTarget, false);
     }
 
     public static function tryEmitObjectEnumCaseToDouble(
@@ -41,7 +41,28 @@ final class JitScalarEnumCoerce
         string $function,
         BasicBlock $nonEnumTarget
     ): ?Value {
-        return self::tryEmitObjectEnumCaseToScalar($context, $objPtr, $function, 'float', $nonEnumTarget);
+        return self::tryEmitObjectEnumCaseToScalar($context, $objPtr, $function, 'float', $nonEnumTarget, false);
+    }
+
+    /**
+     * Zend (int)/(float) cast on enum case — E_WARNING + legacy 1 / 1.0 (#5714, #5791, zend_operators.c).
+     */
+    public static function tryEmitObjectEnumCaseLegacyCastToLong(
+        Context $context,
+        Value $objPtr,
+        string $function,
+        BasicBlock $nonEnumTarget
+    ): ?Value {
+        return self::tryEmitObjectEnumCaseToScalar($context, $objPtr, $function, 'int', $nonEnumTarget, true);
+    }
+
+    public static function tryEmitObjectEnumCaseLegacyCastToDouble(
+        Context $context,
+        Value $objPtr,
+        string $function,
+        BasicBlock $nonEnumTarget
+    ): ?Value {
+        return self::tryEmitObjectEnumCaseToScalar($context, $objPtr, $function, 'float', $nonEnumTarget, true);
     }
 
     private static function tryEmitObjectEnumCaseToScalar(
@@ -49,7 +70,8 @@ final class JitScalarEnumCoerce
         Value $objPtr,
         string $function,
         string $kind,
-        BasicBlock $nonEnumTarget
+        BasicBlock $nonEnumTarget,
+        bool $legacyObjectCast
     ): ?Value {
         $jitObject = $context->type->object;
         if (!$jitObject instanceof JitObjectType) {
@@ -92,7 +114,7 @@ final class JitScalarEnumCoerce
             $context->builder->branchIf($match, $caseBlock, $nextBlock);
             $context->builder->positionAtEnd($caseBlock);
             self::emitObjectScalarWarning($context, $jitObject->classNameForId($enumId), $kind);
-            $scalar = self::enumCaseBackingScalar($context, $objPtr, $enumId, $jitObject, $kind);
+            $scalar = self::enumCaseBackingScalar($context, $objPtr, $enumId, $jitObject, $kind, $legacyObjectCast);
             $context->builder->store($scalar, $destSlot);
             $context->builder->branch($matchedBlock);
             $checkBlock = $nextBlock;
@@ -112,11 +134,12 @@ final class JitScalarEnumCoerce
         Value $objPtr,
         int $enumId,
         JitObjectType $jitObject,
-        string $kind
+        string $kind,
+        bool $legacyObjectCast
     ): Value {
         $i64 = $context->getTypeFromString('int64');
         $double = $context->getTypeFromString('double');
-        if (!$jitObject->enumHasBacking($enumId)) {
+        if ($legacyObjectCast || !$jitObject->enumHasBacking($enumId)) {
             return 'int' === $kind
                 ? $i64->constInt(1, false)
                 : $double->constReal(1.0);
