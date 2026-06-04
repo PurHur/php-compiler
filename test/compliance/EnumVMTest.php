@@ -21,6 +21,7 @@ final class EnumVMTest extends BaseTest
                 'enum_case_file_const.phpt',
                 'enum_case_define_const.phpt',
                 'get_debug_type_enum.phpt',
+                'enum_case_list_8_4.phpt',
                 'enum_cases.phpt',
                 'enum_cases_static.phpt',
                 'enum_cases_backed_spread.phpt',
