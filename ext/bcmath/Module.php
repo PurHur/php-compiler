@@ -9,7 +9,7 @@ use PHPCompiler\ModuleAbstract;
 /**
  * bcmath extension module entry (php-src ext/bcmath/bcmath.c; issue #5924).
  *
- * Arithmetic bodies land with libbcmath parity (#3365).
+ * Arithmetic in {@see VmBcmath} (issue #3365 / #5969).
  */
 class Module extends ModuleAbstract
 {
