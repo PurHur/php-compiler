@@ -7247,7 +7247,7 @@ restart:
                     $pendingTraits = [];
                     $canonical = $frame->scope[$op->arg1]->toString();
                     $name = strtolower($canonical);
-                    if ($entry->isEnum) {
+                    if ($entry->isEnum && $op->isEnumCaseDeclare) {
                         if (!isset($block->constants[$op->arg2])) {
                             throw new \LogicException('Class constant value must be a compile-time constant');
                         }
