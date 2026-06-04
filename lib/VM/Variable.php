@@ -1286,7 +1286,7 @@ restart:
         if ($other->type === self::TYPE_NULL) {
             return $this->looseEqual($other, $self);
         }
-        // Zend: enum case loose == with backing scalar is false (#5798, #5819 switch labels).
+        // Zend: enum case loose == with backing scalar is false (#5798, #5819/#5835 switch labels).
         if (self::isEnumCaseOperand($self) || self::isEnumCaseOperand($other)) {
             if (self::isEnumCaseOperand($self) && self::isEnumCaseOperand($other)) {
                 return EnumCaseSupport::enumCaseVariablesEqual($self, $other);
