@@ -129,6 +129,9 @@ return_bool:
     }
 
     public function binaryOp(OpCode $opcode, Variable $left, Variable $right): Variable {
+        if (OpCode::TYPE_MODULO === $opcode->type) {
+            JitEnumNumericOperandGuard::guardModulo($this->context, $left, $right);
+        }
         $leftValue = $this->loadValue($left);
         $rightValue = $this->loadValue($right);
         $leftType = $this->operandJitType($left);
