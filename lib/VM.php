@@ -1203,8 +1203,15 @@ restart:
                             goto restart;
                         }
                     }
-                    $arg2->copyFrom($arg3);
-                    $arg1->copyFrom($arg3);
+                    $writeTarget = $arg2->resolveIndirect();
+                    if ($this->context->isGlobalStorage($writeTarget)) {
+                        $stored = VM\EnumCaseSupport::materializeConstantValue($this->context, $arg3);
+                        $arg2->copyFrom($stored);
+                        $arg1->copyFrom($stored);
+                    } else {
+                        $arg2->copyFrom($arg3);
+                        $arg1->copyFrom($arg3);
+                    }
                     if (
                         $op->arg2 !== $op->arg3
                         && !isset($frame->block->constants[$op->arg3])
