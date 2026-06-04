@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\Builtin\StringQuotPrint;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -41,11 +40,10 @@ final class quoted_printable_encode extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('quoted_printable_encode() requires exactly one argument in this compiler build');
         }
-        StringQuotPrint::ensureLinked($context);
-
         return JitQuotedPrintableEncode::encode(
             $context,
-            JitQuotPrint::lowerStringSubject($context, $args[0], 'quoted_printable_encode')
+            JitQuotPrint::lowerStringSubject($context, $args[0], 'quoted_printable_encode'),
+            $args[0]
         );
     }
 }
