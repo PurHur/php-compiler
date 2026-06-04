@@ -1118,7 +1118,9 @@ class VM {
         if (null !== $catchFrame) {
             return $catchFrame;
         }
-        $this->raiseUncaughtException($thrown);
+        // Zend: uncaught outer throw is pendingException (finally over try); scope operand may alias try value (#5867).
+        $uncaught = $this->context->pendingException ?? $thrown;
+        $this->raiseUncaughtException($uncaught);
 
         return null;
     }
@@ -4483,7 +4485,6 @@ restart:
                 return $catchFrame;
             }
         }
-        $this->clearTryCatchUnwindState();
 
         return null;
     }
