@@ -1596,7 +1596,7 @@ restart:
                     break;
                 case OpCode::TYPE_CAST_ARRAY:
                     $frame->scope[$op->arg1]->copyFrom(
-                        CastSupport::toArray($frame->scope[$op->arg2])
+                        CastSupport::toArray($frame->scope[$op->arg2], $this->context->classes)
                     );
                     break;
                 case OpCode::TYPE_CAST_OBJECT:
