@@ -114,7 +114,7 @@ final class VmDate
      */
     public static function hrtime(bool $asNumber = false)
     {
-        return \hrtime($asNumber);
+        return VmHrtime::hrtime($asNumber);
     }
 
     public static function getdate(?int $timestamp = null): HashTable
