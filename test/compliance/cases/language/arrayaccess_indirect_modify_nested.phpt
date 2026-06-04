@@ -1,5 +1,5 @@
 --TEST--
-Language: nested ArrayAccess dim write throws Error (VM, #3446)
+Language: nested ArrayAccess dim write — E_NOTICE (#5460)
 --FILE--
 <?php
 class C implements ArrayAccess {
@@ -11,5 +11,8 @@ class C implements ArrayAccess {
 }
 $c = new C();
 $c[0][1] = 2;
---EXPECT_EXIT--
-255
+var_dump($c[0]);
+--EXPECTF--
+PHP Notice:  Indirect modification of overloaded element of C has no effect
+array(0) {
+}

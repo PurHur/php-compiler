@@ -702,6 +702,15 @@ final class Variable {
         return $this->arrayAccessDimension->read()->resolveIndirect();
     }
 
+    public function arrayAccessOffsetClassName(): string
+    {
+        if (self::TYPE_ARRAYACCESS_OFFSET !== $this->type) {
+            throw new \LogicException('Not an ArrayAccess offset');
+        }
+
+        return $this->arrayAccessDimension->declaringClassName();
+    }
+
     /**
      * Zend string offset index: float emits "String offset cast occurred" then truncates.
      */

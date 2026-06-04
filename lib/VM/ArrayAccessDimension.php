@@ -29,4 +29,9 @@ final class ArrayAccessDimension
     {
         $this->vm->invokeArrayAccessOffsetSet($this->object, $this->key, $value);
     }
+
+    public function declaringClassName(): string
+    {
+        return $this->object->class->name;
+    }
 }

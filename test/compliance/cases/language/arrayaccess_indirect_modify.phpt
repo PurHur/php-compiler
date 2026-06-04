@@ -1,5 +1,5 @@
 --TEST--
-Language: indirect modification of ArrayAccess element throws Error (VM, #3446)
+Language: indirect modification of ArrayAccess element — E_NOTICE (#5460)
 --FILE--
 <?php
 class C implements ArrayAccess {
@@ -11,5 +11,7 @@ class C implements ArrayAccess {
 }
 $c = new C();
 $c[0][] = 1;
---EXPECT_EXIT--
-255
+echo "ok\n";
+--EXPECTF--
+PHP Notice:  Indirect modification of overloaded element of C has no effect
+ok
