@@ -6,6 +6,7 @@ namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\array_fill_keys;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPUnit\Framework\TestCase;
@@ -49,6 +50,29 @@ final class ArrayFillKeysBuiltinTest extends TestCase
             $list[$key->toInt()] = $val->toString();
         }
         $this->assertSame([0 => 'x', 1 => 'x'], $list);
+    }
+
+    public function testFillKeysEnumCaseThrowsError(): void
+    {
+        $runtime = new Runtime();
+        $fn = new array_fill_keys();
+        $enumClass = $runtime->vmContext->classes['e'] ?? null;
+        if (null === $enumClass) {
+            $enumClass = new \PHPCompiler\VM\ClassEntry('E');
+            $enumClass->isEnum = true;
+            $enumClass->backedType = 'int';
+            $runtime->vmContext->classes['e'] = $enumClass;
+        }
+        $backing = new VMVariable();
+        $backing->int(1);
+        $case = EnumCaseSupport::createCase($enumClass, 'A', $backing);
+        $keys = new HashTable();
+        $keys->addIndex(0, $case);
+        $fill = new VMVariable();
+        $fill->string('x');
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Object of class E could not be converted to string');
+        $this->runFill($fn, $runtime, $keys, $fill);
     }
 
     private function runFill(Internal $fn, Runtime $runtime, HashTable $keys, VMVariable $value): HashTable
