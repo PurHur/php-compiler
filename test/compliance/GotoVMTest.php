@@ -22,6 +22,8 @@ class GotoVMTest extends BaseTest
             'goto_invalid_into_loop.phpt',
             'goto_invalid_into_finally.phpt',
             'goto_invalid_out_of_finally.phpt',
+            'break_outside_loop_fatal.phpt',
+            'continue_outside_loop_fatal.phpt',
         ] as $file) {
             $path = __DIR__ . '/cases/language/' . $file;
             $name = preg_replace('/\.phpt$/', '', $file) ?: $file;
