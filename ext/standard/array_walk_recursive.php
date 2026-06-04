@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -18,7 +19,7 @@ use PHPLLVM\Value;
  *
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_walk_recursive)
  *
- * JIT/AOT: compile-time string builtin callbacks; VM closure callbacks (#3086).
+ * JIT/AOT: compile-time string builtin callbacks (#3111); VM closure callbacks (#3086).
  */
 final class array_walk_recursive extends Internal
 {
@@ -42,6 +43,7 @@ final class array_walk_recursive extends Internal
                 .self::valueTypeName($array).' given'
             );
         }
+        $array->separateArrayForWrite();
         if (3 === $argc) {
             throw new \LogicException(
                 'array_walk_recursive() userdata is not supported in this compiler build'
@@ -80,16 +82,21 @@ final class array_walk_recursive extends Internal
                 'array_walk_recursive() requires exactly two arguments in this compiler build'
             );
         }
+        if (!ArrayMapCallbackPolicy::isJitLowerable($args[1])) {
+            throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
+        }
+        if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
+            $this->jitString($context, $args[1], 'array_walk_recursive() callback');
+        }
 
-        throw new \LogicException(
-            'array_walk_recursive() not implemented for JIT in this build (#3111)'
-        );
+        return ArrayBuiltinHelper::walkRecursiveInPlace($context, $args[0], $args[1]);
     }
 
     private static function walkString(HashTable $table, Internal $fn): bool
     {
         foreach ($table->iterateKeyed(true) as [$key, $value]) {
             if (Variable::TYPE_ARRAY === $value->type) {
+                $value->separateArrayForWrite();
                 if (!self::walkString($value->toArray(), $fn)) {
                     return false;
                 }
@@ -114,6 +121,7 @@ final class array_walk_recursive extends Internal
     ): bool {
         foreach ($table->iterateKeyed(true) as [$key, $value]) {
             if (Variable::TYPE_ARRAY === $value->type) {
+                $value->separateArrayForWrite();
                 if (!self::walkClosure($context, $value->toArray(), $closure)) {
                     return false;
                 }

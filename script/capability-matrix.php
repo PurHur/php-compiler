@@ -96,7 +96,7 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
         $notes[] = 'callbacks: string builtins/user functions; VM closure callbacks (#3073)';
     }
     if ('array_walk_recursive' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
-        $notes[] = 'callbacks: VM closure + string builtins; JIT/AOT recursive walk deferred (#3111)';
+        $notes[] = 'callbacks: string builtins JIT/AOT (#3111); VM closure callbacks (#3086)';
     }
     if ('array_walk' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
         $notes[] = 'callbacks: string builtins JIT/AOT; VM closure + optional userdata (#3627)';
