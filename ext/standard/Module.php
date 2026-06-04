@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
@@ -136,8 +137,7 @@ class Module extends ModuleAbstract
             new substr_replace(),
             new strrev(),
             new str_rot13(),
-            new str_increment(),
-            new str_decrement(),
+            ...(CompilerVersion::supportsStrIncrement() ? [new str_increment(), new str_decrement()] : []),
             new str_shuffle(),
             new strpos(),
             new strstr(),

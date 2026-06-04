@@ -18,4 +18,10 @@ final class CompilerVersion
     {
         return version_compare(self::VERSION, '8.3.0', '>=');
     }
+
+    /** PHP 8.3+ str_increment() / str_decrement() (ext/standard/string.c, issue #5697). */
+    public static function supportsStrIncrement(): bool
+    {
+        return version_compare(self::VERSION, '8.3.0', '>=');
+    }
 }

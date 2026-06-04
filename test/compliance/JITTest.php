@@ -18,6 +18,10 @@ class JITTest extends BaseTest {
     public static function providePHPTests(): \Generator
     {
         foreach (parent::providePHPTests() as $name => $case) {
+            if (!CompilerVersion::supportsStrIncrement()
+                && (str_contains($name, 'str_increment') || str_contains($name, 'str_decrement'))) {
+                continue;
+            }
             // ?-> LLVM lowering verified in NullsafeJitCompileTest (#3219); MCJIT execute needs jit-runtime-probe (#98).
             if (str_contains(strtolower($case[0]), 'nullsafe')) {
                 continue;

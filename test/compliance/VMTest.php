@@ -13,6 +13,10 @@ class VMTest extends BaseTest {
     public static function providePHPTests(): \Generator
     {
         foreach (parent::providePHPTests() as $name => $case) {
+            if (!CompilerVersion::supportsStrIncrement()
+                && (str_contains($name, 'str_increment') || str_contains($name, 'str_decrement'))) {
+                continue;
+            }
             if (str_contains(strtolower($case[0]), 'splobjectstorage')) {
                 continue;
             }
