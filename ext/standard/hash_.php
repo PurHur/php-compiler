@@ -27,13 +27,10 @@ final class hash_ extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('hash() requires two or three arguments in this compiler build');
         }
+        $algo = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hash', 0, 'algo');
+        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'hash', 1, 'data');
         if (null === $frame->returnVar) {
             return;
-        }
-        $algo = $frame->calledArgs[0]->resolveIndirect();
-        $data = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $algo->type || Variable::TYPE_STRING !== $data->type) {
-            throw new \LogicException('hash() requires string algorithm and data in this compiler build');
         }
         $raw = false;
         if (3 === $argc) {
@@ -43,7 +40,7 @@ final class hash_ extends Internal
             }
             $raw = $rawArg->toBool();
         }
-        $result = VmHash::hash($algo->toString(), $data->toString(), $raw);
+        $result = VmHash::hash($algo, $data, $raw);
         if (false === $result) {
             $frame->returnVar->bool(false);
 
