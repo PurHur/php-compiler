@@ -189,7 +189,6 @@ class Type extends Builtin {
         MemoryRuntime::ensureLinked($this->context);
         IniRuntime::ensureLinked($this->context);
         ErrorHandlerOutput::registerExternals($this->context);
-        StreamContextOutput::registerExternals($this->context);
         CallArgv::implement($this->context);
         $i8p = $this->context->getTypeFromString('int8*');
         $i32 = $this->context->getTypeFromString('int32');

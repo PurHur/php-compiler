@@ -760,7 +760,7 @@ require_once __DIR__.'/../../../ext/standard/substr_compare.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/AttributeRegistry.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionNative.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionSetup.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StreamContextOutput.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StreamContextRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHtmlspecialcharsDecode.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringLevenshtein.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringMetaphone.php';
