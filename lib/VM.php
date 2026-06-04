@@ -1232,6 +1232,9 @@ restart:
                     }
                     $rhsSlot = $frame->scope[$op->arg2];
                     $rhs = $rhsSlot->resolveIndirect();
+                    // ArrayDimFetch / property fetch temps are indirect to live storage; write the
+                    // reference into that cell instead of redirecting the temp (#5349).
+                    $writeTarget = $lhs->isIndirect() ? $lhs->directIndirectTarget() : $lhs;
                     // Object property / static / nested ref slots are live storage (Zend FE_FETCH_R,
                     // #5245). Main-script globals use an indirect wrapper — still need a shared ref
                     // cell so unset($a) does not destroy $b (#5368).
@@ -1239,7 +1242,7 @@ restart:
                         null !== $rhs->objectPropertyOwner
                         || ($rhsSlot->isIndirect() && !$this->context->isGlobalStorage($rhs))
                     ) {
-                        $lhs->indirect($rhs);
+                        $writeTarget->indirect($rhs);
                         break;
                     }
                     if (Variable::TYPE_INDIRECT !== $rhs->type) {
@@ -1247,7 +1250,7 @@ restart:
                         $ref->copyFrom($rhs);
                         $rhs->indirect($ref);
                     }
-                    $lhs->indirect($rhs->resolveIndirect());
+                    $writeTarget->indirect($rhs->resolveIndirect());
                     break;
                 case OpCode::TYPE_VAR_FETCH:
                     $dest = $frame->scope[$op->arg1];
