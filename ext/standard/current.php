@@ -29,6 +29,10 @@ final class current extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        return JitArrayPointer::unsupported($context, 'current');
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError('current() expects exactly 1 argument, '.\count($args).' given');
+        }
+
+        return JitArrayPointer::current($context, $args[0]);
     }
 }

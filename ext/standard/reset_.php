@@ -29,6 +29,10 @@ final class reset_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        return JitArrayPointer::unsupported($context, 'reset');
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError('reset() expects exactly 1 argument, '.\count($args).' given');
+        }
+
+        return JitArrayPointer::reset($context, $args[0]);
     }
 }

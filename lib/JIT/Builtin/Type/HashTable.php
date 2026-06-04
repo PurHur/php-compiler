@@ -66,6 +66,7 @@ class HashTable extends Type
             $this->context->getTypeFromString('__value__')->pointerType(0),
             $this->context->getTypeFromString('__strkey_node__*'),
             $this->context->getTypeFromString('__objkey_node__*'),
+            $this->context->getTypeFromString('int64'),
         );
         $this->context->structFieldMap['__hashtable__'] = [
             'ref' => 0,
@@ -75,6 +76,8 @@ class HashTable extends Type
             'values' => 4,
             'strKeys' => 5,
             'objKeys' => 6,
+            /** Zend HT internal pointer for key/current/next (#4967, #5504). */
+            'internalPointer' => 7,
         ];
 
         $this->registerFn('__hashtable__alloc', '__hashtable__*', []);
@@ -260,6 +263,11 @@ class HashTable extends Type
         $this->context->builder->store(
             $nullObjKeys,
             $this->context->builder->structGep($ht, $map['objKeys'])
+        );
+        $invalidPtr = $this->context->getTypeFromString('int64')->constInt(-1, true);
+        $this->context->builder->store(
+            $invalidPtr,
+            $this->context->builder->structGep($ht, $map['internalPointer'])
         );
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_MASKED_ARRAY | Refcount::TYPE_INFO_REFCOUNTED,

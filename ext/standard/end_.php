@@ -29,6 +29,10 @@ final class end_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        return JitArrayPointer::unsupported($context, 'end');
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError('end() expects exactly 1 argument, '.\count($args).' given');
+        }
+
+        return JitArrayPointer::end($context, $args[0]);
     }
 }

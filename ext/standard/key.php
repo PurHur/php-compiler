@@ -29,6 +29,10 @@ final class key extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        return JitArrayPointer::unsupported($context, 'key');
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError('key() expects exactly 1 argument, '.\count($args).' given');
+        }
+
+        return JitArrayPointer::key($context, $args[0]);
     }
 }
