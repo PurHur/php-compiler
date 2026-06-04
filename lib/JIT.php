@@ -5684,7 +5684,7 @@ class JIT {
                             $this->assignOperand($block->getOperand($op->arg1), $bundleConst);
                             break;
                         }
-                        throw new \RuntimeException('Unknown constant fetch: '.$label);
+                        throw new \RuntimeException('Undefined constant "'.$label.'"');
                     }
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
