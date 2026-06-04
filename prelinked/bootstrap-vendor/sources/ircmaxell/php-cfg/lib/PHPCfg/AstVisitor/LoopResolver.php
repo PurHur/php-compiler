@@ -90,6 +90,13 @@ class LoopResolver extends NodeVisitorAbstract
      */
     protected function resolveStack(Node $node, array $stack)
     {
+        if ([] === $stack) {
+            $keyword = 'Stmt_Break' === $node->getType() ? 'break' : 'continue';
+
+            throw new \LogicException(
+                sprintf("'%s' not in the 'loop' or 'switch' context", $keyword)
+            );
+        }
         if (! $node->num) {
             return new Goto_(end($stack), $node->getAttributes());
         }
