@@ -43,7 +43,7 @@ final class InterfaceCheck
 
     public static function entryImplements(ClassEntry $entry, string $ifaceLc, Context $context): bool
     {
-        $ifaceLc = strtolower(ltrim($ifaceLc, '\\'));
+        $ifaceLc = self::resolveClassAliasLc(strtolower(ltrim($ifaceLc, '\\')), $context);
         $visited = [];
         $current = $entry;
         while (null !== $current) {
@@ -74,7 +74,7 @@ final class InterfaceCheck
 
     public static function entryIsInstanceOf(ClassEntry $entry, string $classLc, Context $context): bool
     {
-        $classLc = strtolower(ltrim($classLc, '\\'));
+        $classLc = self::resolveClassAliasLc(strtolower(ltrim($classLc, '\\')), $context);
         $visited = [];
         $current = $entry;
         while (null !== $current) {
@@ -84,6 +84,10 @@ final class InterfaceCheck
             }
             $visited[$lc] = true;
             if ($lc === $classLc) {
+                return true;
+            }
+            $wantEntry = $context->classes[$classLc] ?? null;
+            if (null !== $wantEntry && $current === $wantEntry) {
                 return true;
             }
             foreach ($current->interfaces as $impl) {
@@ -112,7 +116,7 @@ final class InterfaceCheck
     public static function interfaceLcExtends(string $ifaceLc, string $wantLc, Context $context): bool
     {
         $ifaceLc = strtolower(ltrim($ifaceLc, '\\'));
-        $wantLc = strtolower(ltrim($wantLc, '\\'));
+        $wantLc = self::resolveClassAliasLc(strtolower(ltrim($wantLc, '\\')), $context);
         if ($ifaceLc === $wantLc) {
             return true;
         }
@@ -140,6 +144,15 @@ final class InterfaceCheck
         }
 
         return false;
+    }
+
+    private static function resolveClassAliasLc(string $lc, Context $context): string
+    {
+        while (isset($context->classAliases[$lc])) {
+            $lc = $context->classAliases[$lc];
+        }
+
+        return $lc;
     }
 
     /**
