@@ -2273,10 +2273,16 @@ restart:
                                 $frame->scope[$op->arg1],
                                 $frame
                             )) {
-                                return $this->raise(
+                                $catchFrame = $this->dispatchVmError(
                                     "Undefined class constant {$classEntry->name}::{$memberNameRaw}",
                                     $frame
                                 );
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+
+                                return self::EXCEPTION;
                             }
                         } catch (\Error $e) {
                             $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
@@ -2344,7 +2350,16 @@ restart:
                             $frame->scope[$op->arg1],
                             $frame
                         )) {
-                            return $this->raise("Undefined class constant {$className}::{$memberNameRaw}", $frame);
+                            $catchFrame = $this->dispatchVmError(
+                                "Undefined class constant {$className}::{$memberNameRaw}",
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+
+                            return self::EXCEPTION;
                         }
                     } catch (\Error $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
