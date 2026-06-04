@@ -1965,6 +1965,8 @@ restart:
                 $this->float += 1;
 
                 return;
+            case self::TYPE_ARRAY:
+                throw new \TypeError('Cannot increment array');
             default:
                 $one = new self();
                 $one->int(1);
@@ -2000,6 +2002,8 @@ restart:
                 $this->float -= 1;
 
                 return;
+            case self::TYPE_ARRAY:
+                throw new \TypeError('Cannot decrement array');
             default:
                 $one = new self();
                 $one->int(1);
