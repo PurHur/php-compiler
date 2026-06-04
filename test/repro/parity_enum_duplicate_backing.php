@@ -3,10 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Repro for #5710 — duplicate backed enum values must not compile (zend_enum.c).
- *
- * Zend: Fatal error: Duplicate value in enum E for cases A and B
- * VM:   CompileError at parseAndCompile time (exit 255 via bin/vm.php)
+ * Repro for #5773 — duplicate backed enum values compile; Error at first use (zend_enum.c).
  */
 
 enum E: int
@@ -15,4 +12,10 @@ enum E: int
     case B = 1;
 }
 
-var_export(E::A === E::B);
+echo "before\n";
+try {
+    echo E::A->name, "\n";
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
+echo "after\n";
