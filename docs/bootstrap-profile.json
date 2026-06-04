@@ -281,6 +281,7 @@
         "ext/standard/VmForwardStaticCall.php",
         "ext/standard/VmFs.php",
         "ext/standard/VmHash.php",
+        "ext/standard/VmHashNative.php",
         "ext/standard/VmHashFile.php",
         "ext/standard/VmHighlight.php",
         "ext/standard/VmHost.php",

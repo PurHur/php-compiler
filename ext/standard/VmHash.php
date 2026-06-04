@@ -5,28 +5,18 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * VM hash() / hash_hmac() — delegates to host PHP for reference-compatible digests (issue #179).
+ * VM hash() / hash_hmac() — native digests via VmHashNative (issue #4790, lib/AOT/runtime/hash_crypto.c).
  */
 final class VmHash
 {
-    private const SUPPORTED = ['sha256', 'sha1', 'md5'];
-
-    public static function hash(string $algo, string $data, bool $raw = false) {
-        $algo = strtolower($algo);
-        if (!\in_array($algo, self::SUPPORTED, true)) {
-            return false;
-        }
-
-        return \hash($algo, $data, $raw);
+    public static function hash(string $algo, string $data, bool $raw = false): string|false
+    {
+        return VmHashNative::hash($algo, $data, $raw);
     }
 
-    public static function hashHmac(string $algo, string $data, string $key, bool $raw = false) {
-        $algo = strtolower($algo);
-        if (!\in_array($algo, self::SUPPORTED, true)) {
-            return false;
-        }
-
-        return \hash_hmac($algo, $data, $key, $raw);
+    public static function hashHmac(string $algo, string $data, string $key, bool $raw = false): string|false
+    {
+        return VmHashNative::hashHmac($algo, $data, $key, $raw);
     }
 
     /**
