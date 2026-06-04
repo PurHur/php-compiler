@@ -2045,7 +2045,20 @@ restart:
                         $value = $this->context->constantFetch($frame->scope[$op->arg2]->toString());
                     }
                     if (is_null($value)) {
-                        return $this->raise('Unknown constant fetch', $frame);
+                        $constName = $frame->scope[$op->arg2]->toString();
+                        if (null !== $op->arg3) {
+                            $constName = $frame->scope[$op->arg3]->toString().'\\'.$constName;
+                        }
+                        $catchFrame = $this->dispatchVmError(
+                            sprintf('Undefined constant "%s"', $constName),
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+
+                        return self::EXCEPTION;
                     }
                     $frame->scope[$op->arg1]->copyFrom($value);
                     break;
