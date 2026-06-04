@@ -10,7 +10,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for getdate() via __compiler_getdate (JIT/AOT, issue #3510). */
+/** LLVM lowering for getdate() via StringGetdate (__compiler_getdate, #5256). */
 final class JitGetdate
 {
     public static function invoke(Context $context, ?JITVariable $timestamp = null): Value
