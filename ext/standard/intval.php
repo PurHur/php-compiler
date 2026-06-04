@@ -78,6 +78,12 @@ final class intval extends Internal
 
             return;
         }
+        $enumInt = VmScalarType::tryEnumCaseToInt($frame, $v);
+        if (null !== $enumInt) {
+            $frame->returnVar->int($enumInt);
+
+            return;
+        }
         throw new \LogicException('intval() only supports integers, floats, booleans, strings, and null in this compiler build');
     }
 
@@ -245,6 +251,28 @@ final class intval extends Internal
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterDouble);
+        $objectEnumBlock = BasicBlockHelper::append($context, 'intval_value_object_enum');
+        $afterEnumDispatch = BasicBlockHelper::append($context, 'intval_value_after_enum_dispatch');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_OBJECT, false)),
+            $objectEnumBlock,
+            $afterEnumDispatch
+        );
+        $enumLong = null;
+        $enumEndBlock = null;
+        $context->builder->positionAtEnd($objectEnumBlock);
+        $objPtr = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
+        $enumLong = JitScalarEnumCoerce::tryEmitObjectEnumCaseToLong(
+            $context,
+            $objPtr,
+            'intval',
+            $afterEnumDispatch
+        );
+        if (null !== $enumLong) {
+            $enumEndBlock = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBlock);
+        }
+        $context->builder->positionAtEnd($afterEnumDispatch);
         $fallbackBlock = BasicBlockHelper::append($context, 'intval_value_fallback');
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false)),
@@ -268,6 +296,9 @@ final class intval extends Internal
         $phi->addIncoming($boolInt, $boolEndBlock);
         $phi->addIncoming($doubleInt, $doubleEndBlock);
         $phi->addIncoming($stringInt, $stringEndBlock);
+        if (null !== $enumLong && null !== $enumEndBlock) {
+            $phi->addIncoming($enumLong, $enumEndBlock);
+        }
         $phi->addIncoming($zero, $fallbackBlock);
 
         return $phi;

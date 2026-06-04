@@ -1481,6 +1481,11 @@ class Object_ extends Type {
         return null !== $lc && isset($this->enums[$lc]);
     }
 
+    public function enumHasBacking(int $classId): bool
+    {
+        return null !== ($this->enumBackedType[$classId] ?? null);
+    }
+
     public function isEnumClassLc(string $classLc): bool
     {
         return isset($this->enums[strtolower(ltrim($classLc, '\\'))]);
