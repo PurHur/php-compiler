@@ -12,6 +12,8 @@ use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -31,9 +33,6 @@ final class fputcsv extends Internal
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $fieldsVar = $frame->calledArgs[1]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_INTEGER !== $handleVar->type) {
             throw new \LogicException('fputcsv() handle must be an integer in this compiler build');
         }
@@ -55,10 +54,20 @@ final class fputcsv extends Internal
         $fields = [];
         foreach ($fieldsVar->toArray()->iterate(true) as $value) {
             $value = $value->resolveIndirect();
+            if (EnumCaseSupport::isEnumCaseVariable($value)) {
+                $enumClass = EnumCaseSupport::enumClassForCaseVariable($value);
+                throw new \Error(
+                    'Object of class '.($enumClass->name ?? 'enum').' could not be converted to string'
+                );
+            }
             if (Variable::TYPE_STRING === $value->type) {
                 $fields[] = $value->toString();
             } elseif (Variable::TYPE_INTEGER === $value->type) {
                 $fields[] = (string) $value->toInt();
+            } elseif (Variable::TYPE_OBJECT === $value->type) {
+                throw new \Error(
+                    'Object of class '.$value->toObject()->class->name.' could not be converted to string'
+                );
             } else {
                 throw new \LogicException(
                     'fputcsv() fields must be a list of strings or integers in this compiler build'
@@ -72,12 +81,14 @@ final class fputcsv extends Internal
             $enclosure,
             $escape
         );
-        if (false === $written) {
-            $frame->returnVar->bool(false);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($written): void {
+            if (false === $written) {
+                $ret->bool(false);
 
-            return;
-        }
-        $frame->returnVar->int($written);
+                return;
+            }
+            $ret->int($written);
+        });
     }
 
     public function call(Context $context, JITVariable ...$args): Value

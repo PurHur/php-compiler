@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -22,13 +23,7 @@ final class strip_tags extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('strip_tags() requires one or two arguments in this compiler build');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('strip_tags() only supports strings in this compiler build');
-        }
+        $subject = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strip_tags', 0, 'string');
         $allowed = null;
         if (2 === $argc) {
             $allowVar = $frame->calledArgs[1]->resolveIndirect();
@@ -40,7 +35,10 @@ final class strip_tags extends Internal
                 throw new \LogicException('strip_tags() allowed_tags must be a string or null in this compiler build');
             }
         }
-        $frame->returnVar->string(VmString::stripTags($v->toString(), $allowed));
+        BuiltinExecute::writeReturn(
+            $frame,
+            static fn (Variable $ret) => $ret->string(VmString::stripTags($subject, $allowed))
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
