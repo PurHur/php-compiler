@@ -646,10 +646,11 @@ require_once __DIR__.'/../../../ext/standard/web_bool.php';
 require_once __DIR__.'/../../../ext/standard/web_int.php';
 require_once __DIR__.'/../../../ext/standard/web_string.php';
 require_once __DIR__.'/../../../ext/standard/wordwrap.php';
-require_once __DIR__.'/../../../ext/types/JitMbStrlen.php';
+require_once __DIR__.'/../../../ext/mbstring/Module.php';
+require_once __DIR__.'/../../../ext/mbstring/JitMbStrlen.php';
+require_once __DIR__.'/../../../ext/mbstring/mb_strlen.php';
 require_once __DIR__.'/../../../ext/types/Module.php';
 require_once __DIR__.'/../../../ext/types/is_type.php';
-require_once __DIR__.'/../../../ext/types/mb_strlen.php';
 require_once __DIR__.'/../../../ext/types/strlen.php';
 require_once __DIR__.'/../../../src/tokenizer-compat.php';
 if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
