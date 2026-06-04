@@ -20,11 +20,6 @@ final class VmPack
      */
     public static function unpack(string $format, string $data, int $offset = 0): array|false
     {
-        $result = @\unpack($format, $data, $offset);
-        if (false === $result) {
-            return false;
-        }
-
-        return $result;
+        return UnpackEngine::unpack($format, $data, $offset);
     }
 }
