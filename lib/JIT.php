@@ -10549,6 +10549,41 @@ class JIT {
         return strtolower(ltrim($classLc, '\\')).'::'.$methodLc;
     }
 
+    /**
+     * Zend zend_std_get_static_method: reject instance methods on Class::name() (#5339).
+     */
+    private function assertJitStaticMethodCallable(
+        string $calledClassLc,
+        string $methodLc,
+        string $calledClassName,
+        string $methodDisplay
+    ): void {
+        $visited = [];
+        $current = strtolower(ltrim($calledClassLc, '\\'));
+        while (!isset($visited[$current])) {
+            $visited[$current] = true;
+            if ($this->context->type->object->hasDeclaredClass($current)) {
+                $classId = $this->context->type->object->lookup($current);
+                if ($this->context->type->object->hasMethod($classId, $methodLc)) {
+                    $vis = $this->context->type->object->methodVisibility($classId, $methodLc);
+                    if (0 === ($vis & \PHPCfg\Func::FLAG_STATIC)) {
+                        $declaringName = $this->context->type->object->classNameForId($classId);
+                        throw new \LogicException(
+                            'Non-static method '.$declaringName.'::'.$methodDisplay.'() cannot be called statically'
+                        );
+                    }
+
+                    return;
+                }
+            }
+            $parent = $this->context->type->object->parentClassLc($current);
+            if (null === $parent) {
+                break;
+            }
+            $current = $parent;
+        }
+    }
+
     private function initJitStaticCall(Block $block, int $classOpIdx, int $nameOpIdx): void
     {
         $classOp = $block->getOperand($classOpIdx);
@@ -10567,6 +10602,7 @@ class JIT {
             return;
         }
         $declaringClassId = $this->context->type->object->lookup($className);
+        $this->assertJitStaticMethodCallable($declaringClassLc, $methodLc, $className, $nameOp->value);
         $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
         $callerClassLc = null;
         if (null !== $block->func && null !== $block->func->class) {

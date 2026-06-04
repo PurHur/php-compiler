@@ -2040,7 +2040,196 @@ class Block {
             || self::containsFiberSuspendOpcodes($root)
             || self::containsTraitConstructorOpcodes($root)
             || self::containsReflectionAttributeNewInstanceOpcodes($root)
-            || self::containsInterfaceAbstractStaticMcjitDeferral($root);
+            || self::containsInterfaceAbstractStaticMcjitDeferral($root)
+            || self::containsNonStaticStaticCallOpcodes($root);
+    }
+
+    /**
+     * Static call to an instance method: MCJIT lacks zend_std_get_static_method guard (#5339).
+     */
+    public static function containsNonStaticStaticCallOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        /** @var array<string, array<string, bool>> $methodIsStatic */
+        $methodIsStatic = [];
+        /** @var array<string, string|null> $parents */
+        $parents = [];
+        self::collectNonStaticStaticCallClassMetadata($root, $methodIsStatic, $parents);
+
+        return self::scanNonStaticStaticCallSites($root, $methodIsStatic, $parents);
+    }
+
+    /**
+     * @param array<string, array<string, bool>> $methodIsStatic
+     * @param array<string, string|null>         $parents
+     */
+    private static function collectNonStaticStaticCallClassMetadata(
+        ?self $root,
+        array &$methodIsStatic,
+        array &$parents
+    ): void {
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_CLASS === $op->type) {
+                    $className = self::literalStringFromOperand($block, $op->arg1);
+                    if (null !== $className) {
+                        $classLc = strtolower(ltrim($className, '\\'));
+                        $parentName = self::literalStringFromOperand($block, $op->arg2);
+                        $parents[$classLc] = null !== $parentName
+                            ? strtolower(ltrim($parentName, '\\'))
+                            : null;
+                        if ($op->block1 instanceof self) {
+                            self::collectMethodStaticFlagsFromClassBody($op->block1, $classLc, $methodIsStatic);
+                        }
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @param array<string, array<string, bool>> $methodIsStatic
+     */
+    private static function collectMethodStaticFlagsFromClassBody(
+        self $body,
+        string $classLc,
+        array &$methodIsStatic
+    ): void {
+        $seen = new \SplObjectStorage();
+        $stack = [$body];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if ($seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_METHOD === $op->type) {
+                    $name = $block->getOperand($op->arg1);
+                    if ($name instanceof Literal) {
+                        $methodLc = strtolower($name->value);
+                        $isStatic = false;
+                        if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
+                            $isStatic = 0 !== ($block->constants[$op->arg3]->toInt() & Func::FLAG_STATIC);
+                        }
+                        if (!$isStatic && null !== $op->block1 && null !== $op->block1->func) {
+                            $isStatic = 0 !== (($op->block1->func->flags ?? 0) & Func::FLAG_STATIC);
+                        }
+                        $methodIsStatic[$classLc][$methodLc] = $isStatic;
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @param array<string, array<string, bool>> $methodIsStatic
+     * @param array<string, string|null>         $parents
+     */
+    private static function scanNonStaticStaticCallSites(
+        ?self $root,
+        array $methodIsStatic,
+        array $parents
+    ): bool {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_STATICCALL_INIT === $op->type) {
+                    $classOp = $block->getOperand($op->arg1);
+                    $nameOp = $block->getOperand($op->arg2);
+                    if ($classOp instanceof Literal && $nameOp instanceof Literal) {
+                        $calledLc = strtolower(ltrim($classOp->value, '\\'));
+                        $methodLc = strtolower($nameOp->value);
+                        $isStatic = self::resolveMethodStaticInHierarchy(
+                            $methodIsStatic,
+                            $parents,
+                            $calledLc,
+                            $methodLc
+                        );
+                        if (false === $isStatic) {
+                            return true;
+                        }
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<string, array<string, bool>> $methodIsStatic
+     * @param array<string, string|null>         $parents
+     */
+    private static function resolveMethodStaticInHierarchy(
+        array $methodIsStatic,
+        array $parents,
+        string $calledClassLc,
+        string $methodLc
+    ): ?bool {
+        $current = $calledClassLc;
+        $visited = [];
+        while (!isset($visited[$current])) {
+            $visited[$current] = true;
+            if (isset($methodIsStatic[$current][$methodLc])) {
+                return $methodIsStatic[$current][$methodLc];
+            }
+            $current = $parents[$current] ?? null;
+            if (null === $current) {
+                break;
+            }
+        }
+
+        return null;
+    }
+
+    private static function literalStringFromOperand(self $block, ?int $operandIdx): ?string
+    {
+        if (null === $operandIdx) {
+            return null;
+        }
+        $operand = $block->getOperand($operandIdx);
+        if ($operand instanceof Literal && is_string($operand->value)) {
+            return $operand->value;
+        }
+        if (isset($block->constants[$operandIdx])) {
+            return $block->constants[$operandIdx]->toString();
+        }
+
+        return null;
     }
 
     private function isStaticMethodBlock(): bool

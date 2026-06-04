@@ -156,6 +156,12 @@ final class VmForwardStaticCall
                         "{$calledScopeClass}::{$methodName}() must be a user method in this compiler build"
                     );
                 }
+                $decl = $func->block->func;
+                if (null === $decl || 0 === (($decl->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC)) {
+                    throw new \Error(
+                        'Non-static method '.$class->name.'::'.$methodName.'() cannot be called statically'
+                    );
+                }
 
                 return $func;
             }
