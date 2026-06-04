@@ -6,7 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 
-/** Native weakref registry symbols for JIT (#3667). */
+/** Declarations for weakref registry symbols; bodies from WeakRefRegistryRuntime (#5684). */
 final class WeakRefNative
 {
     public static function registerDeclarations(Context $context): void

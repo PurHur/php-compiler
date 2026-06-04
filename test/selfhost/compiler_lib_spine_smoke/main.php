@@ -1143,6 +1143,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrtok.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringTrimMask.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/TypeErrorRaise.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/WeakRefNative.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/WeakRefRegistryRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/WeakRefRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/WeakRefSetup.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureBind.php';
