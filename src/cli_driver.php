@@ -214,9 +214,13 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                     }
                     $execCode = '<?php '.$argv[$i];
                     ++$i;
-                    $execFile = 'Command line code';
-                    // Mirror Zend CLI: user-level $argv[0] is "Command line code" and remaining args follow.
-                    $scriptArgv = array_merge([$execFile], array_slice($argv, $i));
+                    $execFile = php_compiler_cli_standard_input_code_filename();
+                    // Zend CLI: $argv[0] is "Standard input code"; args after "--" are user args (not "--" itself).
+                    $rest = array_slice($argv, $i);
+                    if (isset($rest[0]) && '--' === $rest[0]) {
+                        $rest = array_slice($rest, 1);
+                    }
+                    $scriptArgv = array_merge([$execFile], $rest);
                     // Do not parse trailing args as compiler options; they belong to user code.
                     $i = $argc;
 

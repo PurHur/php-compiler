@@ -45,7 +45,7 @@ final class AotDebugSymbols
             return null;
         }
         $path = $block->scriptPath();
-        if ('' === $path || '-' === $path || 'Command line code' === $path) {
+        if ('' === $path || '-' === $path || 'Standard input code' === $path || 'Command line code' === $path) {
             return 'phpc_src_command_line_code';
         }
 

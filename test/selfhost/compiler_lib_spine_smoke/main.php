@@ -1293,7 +1293,7 @@ require_once __DIR__.'/../../../test/bootstrap-aot/macro_functions_spine_shim.ph
 $vmDriverExecute = getenv('PHP_COMPILER_VM_DRIVER_EXECUTE');
 if (is_string($vmDriverExecute) && ('1' === $vmDriverExecute || 'true' === strtolower($vmDriverExecute))) {
     // Dispatch bin/vm.php run() (native LLVM echo bridge; main fallback until link wires run — #2201).
-    run('Command line code', '<?php echo "vm driver ok\n";', []);
+    run('Standard input code', '<?php echo "vm driver ok\n";', []);
     echo "vm driver ok\n";
     exit(0);
 }

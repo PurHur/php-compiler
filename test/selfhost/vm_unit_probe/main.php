@@ -122,6 +122,6 @@ echo "vm_unit_probe bundle OK\n";
 
 $vmUnitProbeExecute = getenv('PHP_COMPILER_VM_UNIT_PROBE_EXECUTE');
 if (is_string($vmUnitProbeExecute) && ('1' === $vmUnitProbeExecute || 'true' === strtolower($vmUnitProbeExecute))) {
-    $result = vm_unit_probe_run('Command line code', 'echo 1;', []);
+    $result = vm_unit_probe_run('Standard input code', 'echo 1;', []);
     echo $result."\n";
 }
