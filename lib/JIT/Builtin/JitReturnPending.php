@@ -20,10 +20,15 @@ final class JitReturnPending
 
     public static function ensureLinked(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
         self::implement($context);
+    }
+
+    /** LLVM bodies for standalone AOT (replaces phpc_jit_return.c — #5724). */
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::registerPendingGlobals($context);
+        self::registerDeclarations($context);
+        self::implementPendingHelpers($context);
     }
 
     public static function registerDeclarations(Context $context): void
@@ -78,10 +83,6 @@ final class JitReturnPending
 
     private static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         self::registerPendingGlobals($context);
         self::implementPendingHelpers($context);
     }
