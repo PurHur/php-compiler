@@ -1662,10 +1662,16 @@ restart:
         return self::spaceshipNumeric($left, $right);
     }
 
-    public function bitwiseOp(int $opCode, Variable $left, Variable $right): void {
+    public function bitwiseOp(
+        int $opCode,
+        Variable $left,
+        Variable $right,
+        ?\PHPCompiler\VM $vm = null,
+        ?\PHPCompiler\Frame $frame = null
+    ): void {
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();
-            $result->bitwiseOp($opCode, $left, $right);
+            $result->bitwiseOp($opCode, $left, $right, $vm, $frame);
             $this->indirect->copyFrom($result);
 
             return;
@@ -1685,6 +1691,20 @@ restart:
 
             return;
         }
+        if (!self::operandsValidForBitwiseOp($left, $right)) {
+            self::throwUnsupportedOperandTypes($opCode, $left, $right);
+        }
+        if ($this === $left || $this === $right) {
+            $this->storeBitwiseOp(
+                $opCode,
+                $left,
+                $right,
+                $vm,
+                $frame
+            );
+
+            return;
+        }
         $pair = type_pair($left->type, $right->type);
         if ($pair === TYPE_PAIR_INTEGER_INTEGER) {
             $result = $this->_bitwiseOp($opCode, $left->integer, $right->integer);        
@@ -1699,11 +1719,37 @@ restart:
             $this->float($this->_bitwiseOp($opCode, $left->float, $right->integer));
         } elseif ($pair === TYPE_PAIR_FLOAT_FLOAT) {
             $this->float($this->_bitwiseOp($opCode, $left->float, $right->float));
-        } else {
-            if (!self::operandsValidForBitwiseOp($left, $right)) {
-                self::throwUnsupportedOperandTypes($opCode, $left, $right);
-            }
+        } elseif ($pair === TYPE_PAIR_STRING_STRING) {
             $this->string($this->_bitwiseOp($opCode, $left->toString(), $right->toString()));
+        } else {
+            $this->storeBitwiseOp($opCode, $left, $right, $vm, $frame);
+        }
+    }
+
+    /**
+     * Zend bitwise ops: string-by-string only when both operands are strings (#5428).
+     */
+    private function storeBitwiseOp(
+        int $opCode,
+        Variable $left,
+        Variable $right,
+        ?\PHPCompiler\VM $vm = null,
+        ?\PHPCompiler\Frame $frame = null
+    ): void {
+        if (self::TYPE_STRING === $left->type && self::TYPE_STRING === $right->type) {
+            $this->string($this->_bitwiseOp($opCode, $left->toString(), $right->toString()));
+
+            return;
+        }
+        $result = $this->_bitwiseOp(
+            $opCode,
+            $left->toNumericForArithmetic($vm, $frame),
+            $right->toNumericForArithmetic($vm, $frame)
+        );
+        if (is_int($result)) {
+            $this->int($result);
+        } else {
+            $this->float($result);
         }
     }
 

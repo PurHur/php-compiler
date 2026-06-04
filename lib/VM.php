@@ -1855,7 +1855,7 @@ restart:
                         goto restart;
                     }
                     try {
-                        $arg1->bitwiseOp($op->type, $arg2, $arg3);
+                        $arg1->bitwiseOp($op->type, $arg2, $arg3, $this, $frame);
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
