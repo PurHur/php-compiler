@@ -21,6 +21,7 @@ final class EmbedObOutput
         self::ensureWriteDecl($context);
         self::implementNoop($context, '__phpc_ob_start');
         self::implementReturnZero($context, '__phpc_ob_get_level');
+        self::implementReturnZero($context, '__phpc_ob_buffer_used_at');
         self::implementReturnZero($context, '__phpc_ob_get_clean');
         self::implementReturnZero($context, '__phpc_ob_get_contents');
         self::implementReturnZero($context, '__phpc_ob_get_length');

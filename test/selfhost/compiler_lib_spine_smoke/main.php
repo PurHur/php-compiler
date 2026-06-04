@@ -220,6 +220,8 @@ require_once __DIR__.'/../../../ext/standard/JitObGetLevel.php';
 require_once __DIR__.'/../../../ext/standard/JitObGetClean.php';
 require_once __DIR__.'/../../../ext/standard/JitObGetContents.php';
 require_once __DIR__.'/../../../ext/standard/JitObGetLength.php';
+require_once __DIR__.'/../../../ext/standard/JitObGetStatus.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ObStatusRuntime.php';
 require_once __DIR__.'/../../../ext/standard/JitObEndClean.php';
 require_once __DIR__.'/../../../ext/standard/JitObEndFlush.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObOutput.php';

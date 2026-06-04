@@ -76,6 +76,14 @@ int __phpc_ob_get_level(void)
     return __phpc_ob_level;
 }
 
+unsigned long __phpc_ob_buffer_used_at(int idx)
+{
+    if (idx < 0 || idx >= __phpc_ob_level) {
+        return 0;
+    }
+    return __phpc_ob_len[idx];
+}
+
 void __phpc_ob_echo_cstr(const char *s)
 {
     if (!s) {

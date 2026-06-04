@@ -26,6 +26,7 @@ final class ObOutput
         $decls = [
             '__phpc_ob_start' => [$void, false, []],
             '__phpc_ob_get_level' => [$i32, false, []],
+            '__phpc_ob_buffer_used_at' => [$i64, false, [$i64]],
             '__phpc_ob_get_clean' => [$i32, false, [$valuePtr]],
             '__phpc_ob_get_contents' => [$i32, false, [$valuePtr]],
             '__phpc_ob_get_length' => [$i32, false, [$valuePtr]],
