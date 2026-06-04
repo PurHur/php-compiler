@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\Compiler\AttributeEntry;
+use PHPCompiler\Compiler\CompileTimeNew;
 use PHPCompiler\Frame;
+use PHPCompiler\VM as VmEngine;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -108,7 +110,7 @@ final class ReflectionSupport
             $obj = new ObjectEntry($attrClass);
             $obj->constructed = true;
             $obj->getProperty(self::PROP_ATTR_NAME)->string($entry->name);
-            $obj->getProperty(self::PROP_ATTR_ARGS)->copyFrom(self::argsToVariable($entry->args));
+            $obj->getProperty(self::PROP_ATTR_ARGS)->copyFrom(self::argsToVariable($entry->args, $ctx));
             $slot = new Variable(Variable::TYPE_OBJECT);
             $slot->object($obj);
             $ht->append($slot);
@@ -120,7 +122,7 @@ final class ReflectionSupport
     /**
      * @param list<array{name: ?string, value: mixed}> $args
      */
-    public static function argsToVariable(array $args): Variable
+    public static function argsToVariable(array $args, ?Context $ctx = null): Variable
     {
         $arr = new Variable();
         $arr->newArray();
@@ -136,7 +138,7 @@ final class ReflectionSupport
                 $nameVal->string($spec['name']);
             }
             $entryHt->add('name', $nameVal);
-            $entryHt->add('value', self::scalarToVariable($spec['value']));
+            $entryHt->add('value', self::attributeValueToVariable($spec['value'], $ctx));
             $ht->append($entry);
         }
 
@@ -148,13 +150,13 @@ final class ReflectionSupport
      *
      * @param list<array{name: ?string, value: mixed}> $args
      */
-    public static function argumentsArray(array $args): Variable
+    public static function argumentsArray(array $args, ?Context $ctx = null): Variable
     {
         $result = new Variable();
         $result->newArray();
         $ht = $result->toArray();
         foreach ($args as $spec) {
-            $val = self::scalarToVariable($spec['value']);
+            $val = self::attributeValueToVariable($spec['value'], $ctx);
             if (null !== $spec['name']) {
                 $ht->add($spec['name'], $val);
             } else {
@@ -163,6 +165,27 @@ final class ReflectionSupport
         }
 
         return $result;
+    }
+
+    public static function attributeValueToVariable(mixed $value, ?Context $ctx = null): Variable
+    {
+        if ($value instanceof CompileTimeNew) {
+            if (null === $ctx) {
+                throw new \LogicException(
+                    'Compile-time new in attribute args requires VM context to materialize'
+                );
+            }
+
+            return self::materializeCompileTimeNew($ctx, $value);
+        }
+        if ($value instanceof Variable) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+
+            return $copy;
+        }
+
+        return self::scalarToVariable($value);
     }
 
     public static function scalarToVariable(mixed $value): Variable
@@ -185,6 +208,42 @@ final class ReflectionSupport
         return $var;
     }
 
+    public static function materializeCompileTimeNew(Context $ctx, CompileTimeNew $spec): Variable
+    {
+        $className = $spec->className;
+        $lc = strtolower(ltrim($className, '\\'));
+        if (!isset($ctx->classes[$lc])) {
+            $ctx->autoloadClass($className);
+        }
+        if (!isset($ctx->classes[$lc])) {
+            throw new \Error('Class "'.$className.'" not found');
+        }
+        $classEntry = $ctx->classes[$lc];
+        if ($classEntry->isEnum) {
+            throw new \Error("Cannot instantiate enum {$classEntry->name}");
+        }
+        $object = new ObjectEntry($classEntry);
+        $result = new Variable();
+        $result->object($object);
+        if (null === $classEntry->constructor) {
+            $object->constructed = true;
+
+            return $result;
+        }
+        $vm = VmEngine::running();
+        if (null === $vm) {
+            throw new \LogicException('Cannot materialize attribute new expression without active VM');
+        }
+        $thisVar = new Variable();
+        $thisVar->object($object);
+        $invokeArgs = self::constructorInvokeVariables($classEntry->constructor, $spec->args, $ctx);
+        $vm->invokePhpFunction($classEntry->constructor, $thisVar, ...$invokeArgs);
+        self::applyConstructorPropertyArgs($object, $classEntry->constructor, $spec->args, $ctx);
+        $object->constructed = true;
+
+        return $result;
+    }
+
     /**
      * Map stored attribute ctor args to invokePhpFunction arguments in parameter order (#3216).
      *
@@ -192,8 +251,11 @@ final class ReflectionSupport
      *
      * @return list<Variable>
      */
-    public static function constructorInvokeVariables(\PHPCompiler\Func\PHP $ctor, array $argSpecs): array
-    {
+    public static function constructorInvokeVariables(
+        \PHPCompiler\Func\PHP $ctor,
+        array $argSpecs,
+        ?Context $ctx = null,
+    ): array {
         $positional = [];
         $named = [];
         foreach ($argSpecs as $spec) {
@@ -207,9 +269,9 @@ final class ReflectionSupport
         $pi = 0;
         foreach ($ctor->block->paramNames as $paramName) {
             if (isset($named[$paramName])) {
-                $vars[] = self::scalarToVariable($named[$paramName]);
+                $vars[] = self::attributeValueToVariable($named[$paramName], $ctx);
             } elseif (array_key_exists($pi, $positional)) {
-                $vars[] = self::scalarToVariable($positional[$pi++]);
+                $vars[] = self::attributeValueToVariable($positional[$pi++], $ctx);
             } else {
                 $null = new Variable();
                 $null->null();
@@ -227,8 +289,12 @@ final class ReflectionSupport
      *
      * @param list<array{name: ?string, value: mixed}> $argSpecs
      */
-    public static function applyConstructorPropertyArgs(ObjectEntry $object, \PHPCompiler\Func\PHP $ctor, array $argSpecs): void
-    {
+    public static function applyConstructorPropertyArgs(
+        ObjectEntry $object,
+        \PHPCompiler\Func\PHP $ctor,
+        array $argSpecs,
+        ?Context $ctx = null,
+    ): void {
         $positional = [];
         $named = [];
         foreach ($argSpecs as $spec) {
@@ -248,7 +314,7 @@ final class ReflectionSupport
                 continue;
             }
             if ($object->hasProperty($paramName)) {
-                $object->getProperty($paramName)->copyFrom(self::scalarToVariable($value));
+                $object->getProperty($paramName)->copyFrom(self::attributeValueToVariable($value, $ctx));
             }
         }
     }
@@ -279,7 +345,10 @@ final class ReflectionSupport
                 if ('name' === $key->toString()) {
                     $name = Variable::TYPE_NULL === $resolved->type ? null : $resolved->toString();
                 } elseif ('value' === $key->toString()) {
-                    $value = self::variableToScalar($resolved);
+                    $value = match ($resolved->type) {
+                        Variable::TYPE_OBJECT => $resolved,
+                        default => self::variableToScalar($resolved),
+                    };
                 }
             }
             $out[] = ['name' => $name, 'value' => $value];
