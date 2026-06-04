@@ -516,6 +516,7 @@ class Module extends ModuleAbstract
             new proc_nice(),
             new memory_get_peak_usage(),
             new memory_get_usage(),
+            new memory_reset_peak_usage(),
             new microtime(),
             new gettimeofday(),
             new hrtime(),

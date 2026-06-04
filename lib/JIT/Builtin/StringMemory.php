@@ -50,7 +50,11 @@ final class StringMemory
 
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach (['__compiler_memory_get_usage', '__compiler_memory_get_peak_usage'] as $symbol) {
+        foreach ([
+            '__compiler_memory_get_usage',
+            '__compiler_memory_get_peak_usage',
+            '__compiler_memory_reset_peak_usage',
+        ] as $symbol) {
             $fn = $context->module->getNamedFunction($symbol);
             if (null === $fn) {
                 throw new \LogicException($symbol.' missing after memory bitcode link');
