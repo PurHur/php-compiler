@@ -26,9 +26,6 @@
                 $defaultArm = $arm;
                 continue;
             }
-            if (null !== $defaultArm) {
-                throw new \CompileError('Default arm must be the last arm in the match expression');
-            }
             $matchBlock = $this->block->create();
             $afterArmBlock = $this->block->create();
             $testBlock = $chainBlock;
