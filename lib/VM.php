@@ -4904,6 +4904,10 @@ restart:
      */
     private function assertMethodCallableStatically(ClassEntry $declaringClass, string $methodLc): void
     {
+        $vis = $declaringClass->methodVisibility[$methodLc] ?? 0;
+        if (($vis & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+            return;
+        }
         $func = $declaringClass->methods[$methodLc];
         if ($this->methodIsStatic($func)) {
             return;
