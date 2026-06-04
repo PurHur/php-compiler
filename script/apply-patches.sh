@@ -778,12 +778,18 @@ apply_php_cfg_enum_class_method_parser_fix() {
 apply_php_cfg_enum_class_const_overlay() {
   local const_file="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php"
   local parser="${1:-$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php}"
+  local already_applied=0
   if patch_already_applied "$PATCH_DIR/php-cfg-enum-class-const.patch"; then
-    return 0
+    already_applied=1
   fi
   if ! grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null; then
     echo "Skip php-cfg-enum-class-const.patch (parseStmt_Enum missing)" >&2
     return 1
+  fi
+  if [[ "$already_applied" -eq 1 ]] \
+    && grep -q 'enumCaseHasExplicitValue' "$const_file" 2>/dev/null \
+    && grep -q 'enumCaseHasExplicitValue' "$parser" 2>/dev/null; then
+    return 0
   fi
   python3 - "$const_file" "$parser" <<'PY'
 import sys
@@ -796,6 +802,8 @@ if "isEnumCase" not in const_text:
     insert = (
         "    /** True for `case Name = value` in enums; false for `const` in enum/class bodies (#5054). */\n"
         "    public bool $isEnumCase = false;\n\n"
+        "    /** True when enum case declares `= value`; false for unit enum implicit case (#5397). */\n"
+        "    public bool $enumCaseHasExplicitValue = false;\n\n"
     )
     for old in (
         "    public int $flags = 0;\n\n    public function __construct",
@@ -843,12 +851,37 @@ case_new = """        $constOp = new Op\\Terminal\\Const_(
             $this->mapAttributes($node)
         );
         $constOp->isEnumCase = true;
+        $constOp->enumCaseHasExplicitValue = null !== $node->expr;
         $this->block->children[] = $constOp;"""
 if case_old in text:
     text = text.replace(case_old, case_new, 1)
+elif "enumCaseHasExplicitValue" not in text.split("function parseEnumCase", 1)[-1].split("function parseStmt_Echo", 1)[0]:
+    case_is_only = """        $constOp->isEnumCase = true;
+        $this->block->children[] = $constOp;"""
+    case_is_explicit = """        $constOp->isEnumCase = true;
+        $constOp->enumCaseHasExplicitValue = null !== $node->expr;
+        $this->block->children[] = $constOp;"""
+    if case_is_only in text:
+        text = text.replace(case_is_only, case_is_explicit, 1)
+
+if "enumCaseHasExplicitValue" not in const_text and "isEnumCase" in const_path.read_text():
+    const_text = const_path.read_text()
+    const_text = const_text.replace(
+        "    public bool $isEnumCase = false;\n\n",
+        "    public bool $isEnumCase = false;\n\n"
+        "    /** True when enum case declares `= value`; false for unit enum implicit case (#5397). */\n"
+        "    public bool $enumCaseHasExplicitValue = false;\n\n",
+        1,
+    )
+    const_path.write_text(const_text)
+
 parser_path.write_text(text)
 PY
-  echo "Applied php-cfg-enum-class-const.patch (overlay)"
+  if [[ "$already_applied" -eq 0 ]]; then
+    echo "Applied php-cfg-enum-class-const.patch (overlay)"
+  else
+    echo "Synced php-cfg-enum-class-const overlay (#5397 enumCaseHasExplicitValue)"
+  fi
 }
 
 apply_php_cfg_enum_class_const_parser_fix() {
