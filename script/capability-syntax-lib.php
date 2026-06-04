@@ -810,7 +810,7 @@ function syntaxRowDefinitions(): array
                 'VM: WeakReference::create/get via indirect target slot; unset clears get immediately',
                 'GC-backed weak refs via WeakRefRegistry — referent collected by gc_collect_cycles() clears get()',
                 'WeakMap uses object-id string keys; entries removed when key object is collected',
-                'JIT: phpc_weakref.c registry + LLVM handlers (#3667)',
+                'JIT: WeakRefRegistryRuntime LLVM registry (#3667, #5684)',
             ],
             'probe' => 'class Box {} $o = new Box(); $r = WeakReference::create($o); unset($o); echo $r->get() === null ? "1" : "0";',
         ],

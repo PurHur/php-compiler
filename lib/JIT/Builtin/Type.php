@@ -193,6 +193,7 @@ class Type extends Builtin {
         TimeSleepRuntime::ensureLinked($this->context);
         StringHrtime::ensureLinked($this->context);
         LastErrorRuntime::ensureLinked($this->context);
+        WeakRefRegistryRuntime::ensureLinked($this->context);
         MemoryRuntime::ensureLinked($this->context);
         ErrorHandlerOutput::registerExternals($this->context);
         StreamContextOutput::registerExternals($this->context);
