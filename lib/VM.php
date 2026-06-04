@@ -1157,13 +1157,18 @@ restart:
                     }
                     $arg2->copyFrom($arg3);
                     $arg1->copyFrom($arg3);
-                    if ($op->arg2 !== $op->arg3 && !isset($frame->block->constants[$op->arg3])) {
+                    if (
+                        $op->arg2 !== $op->arg3
+                        && !isset($frame->block->constants[$op->arg3])
+                        && !$frame->block->isNamedVariableSlot($op->arg3)
+                    ) {
                         $arg3->null();
                     }
                     if (
                         $op->arg1 !== $op->arg2
                         && $op->arg1 !== $op->arg3
                         && !isset($frame->block->constants[$op->arg1])
+                        && !$frame->block->isNamedVariableSlot($op->arg1)
                     ) {
                         $arg1->null();
                     }
