@@ -2183,6 +2183,12 @@ restart:
                         }
                     }
                     if (!isset($this->context->classes[$lcClass])) {
+                        // `ConstName::class` when ConstName is a user constant (Zend zend_compile.c; #5440).
+                        if ('class' === $constName && null !== $this->context->constantFetch($className)) {
+                            $frame->scope[$op->arg1]->string($className);
+                            break;
+                        }
+
                         return $this->raise("Unknown class for constant fetch: {$className}", $frame);
                     }
                     $classEntry = $this->context->classes[$lcClass];
