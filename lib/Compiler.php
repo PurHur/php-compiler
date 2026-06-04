@@ -23,6 +23,8 @@ use PHPCfg\Operand\Temporary;
 use PHPCfg\Operand\Variable as CfgVariable;
 use PHPCfg\Script;
 use PHPTypes\Type;
+use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\Variable;
@@ -91,6 +93,9 @@ class Compiler {
 
     /** @var array<string, array<string, Variable>> compile-time class constants by lc name */
     private array $compileTimeClassConsts = [];
+
+    /** @var array<string, ?string> lowercase enum name => backing type (`int`/`string`) while compiling enum body */
+    private array $compileTimeEnumBackedTypes = [];
 
     /** @var array<string, array<string, true>> lowercase class => declared static property names (#3814). */
     private array $compiledClassStaticProperties = [];
@@ -309,6 +314,7 @@ class Compiler {
         $this->resetCompileAbortDetail();
         $this->abstractClasses = [];
         $this->abstractEnums = [];
+        $this->compileTimeEnumBackedTypes = [];
         $this->haltCompilerRemaining = null;
         $this->haltCompilerOffset = null;
         $this->compiledClassStaticProperties = [];
@@ -2226,6 +2232,14 @@ class Compiler {
             }
         }
         $enumName = $this->staticNameFromOperand($enum->name);
+        if (null !== $enumName) {
+            $enumLc = strtolower(ltrim($enumName, '\\'));
+            $backedTypeName = null;
+            if (null !== $enum->backedType && $enum->backedType instanceof Op\Type\Literal) {
+                $backedTypeName = $enum->backedType->name;
+            }
+            $this->compileTimeEnumBackedTypes[$enumLc] = $backedTypeName;
+        }
         $return->block1 = $this->compileEnumBody($enum->stmts, $enumName);
 
         return $return;
@@ -2245,6 +2259,9 @@ class Compiler {
             $this->compilingClassDisplayName = ltrim($enumName, '\\');
             if (!isset($this->compileTimeClassConsts[$this->compilingClassLc])) {
                 $this->compileTimeClassConsts[$this->compilingClassLc] = [];
+            }
+            if (!isset($this->compileTimeEnumBackedTypes[$this->compilingClassLc])) {
+                $this->compileTimeEnumBackedTypes[$this->compilingClassLc] = null;
             }
         } else {
             $this->compilingClassDisplayName = null;
@@ -3016,11 +3033,50 @@ class Compiler {
         if (null !== $this->compilingClassLc && isset($result->constants[$valueSlot])) {
             $constName = $this->staticNameFromOperand($child->name);
             if (null !== $constName) {
-                $stored = new Variable();
-                $stored->copyFrom($result->constants[$valueSlot]);
+                $backing = new Variable();
+                $backing->copyFrom($result->constants[$valueSlot]);
+                if ($constOp->isEnumCaseDeclare) {
+                    $stored = $this->compileTimeEnumCaseVar(
+                        $this->compilingClassDisplayName ?? $this->compilingClassLc,
+                        $constName,
+                        $backing,
+                        $this->compileTimeEnumBackedTypes[$this->compilingClassLc] ?? null
+                    );
+                } else {
+                    $stored = new Variable();
+                    $stored->copyFrom($backing);
+                }
                 $this->compileTimeClassConsts[$this->compilingClassLc][strtolower($constName)] = $stored;
             }
         }
+    }
+
+    /**
+     * Compile-time enum case singleton for folds (default args, class const inits; #5514).
+     */
+    private function compileTimeEnumCaseVar(
+        string $enumName,
+        string $caseName,
+        Variable $backing,
+        ?string $backedType
+    ): Variable {
+        $entry = new ClassEntry(ltrim($enumName, '\\'));
+        $entry->isEnum = true;
+        $entry->backedType = $backedType;
+
+        return EnumCaseSupport::createCase($entry, $caseName, $backing);
+    }
+
+    private function compileTimeStoredValueIsEnumCaseBackingScalar(string $lcClass, Variable $stored): bool
+    {
+        if (!array_key_exists($lcClass, $this->compileTimeEnumBackedTypes)) {
+            return false;
+        }
+        if (Variable::TYPE_OBJECT === $stored->type && EnumCaseSupport::isEnumCase($stored->toObject())) {
+            return false;
+        }
+
+        return $stored->is(Variable::TYPE_INTEGER) || $stored->is(Variable::TYPE_STRING);
     }
 
     protected function tryFoldClassConstValueSlot(Op\Terminal\Const_ $terminal, Block $block): ?int
@@ -3613,8 +3669,17 @@ class Compiler {
         }
         $lcConst = strtolower($constName);
         if (isset($this->compileTimeClassConsts[$lcClass][$lcConst])) {
+            $stored = $this->compileTimeClassConsts[$lcClass][$lcConst];
+            if ($this->compileTimeStoredValueIsEnumCaseBackingScalar($lcClass, $stored)) {
+                return $this->compileTimeEnumCaseVar(
+                    $className,
+                    $constName,
+                    $stored,
+                    $this->compileTimeEnumBackedTypes[$lcClass] ?? null
+                );
+            }
             $value = new Variable();
-            $value->copyFrom($this->compileTimeClassConsts[$lcClass][$lcConst]);
+            $value->copyFrom($stored);
 
             return $value;
         }
