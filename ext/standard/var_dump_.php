@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -90,6 +91,12 @@ final class var_dump_ extends Internal
 
             return;
         }
+        if (Variable::TYPE_ENUM_CASE === $var->type) {
+            $case = $var->toEnumCase();
+            echo 'enum('.$case->enumClass->name.'::'.$case->caseName.")\n";
+
+            return;
+        }
 
         echo "unknown()\n";
     }
@@ -114,6 +121,11 @@ final class var_dump_ extends Internal
 
     private static function dumpObject(VM $vm, VM\ObjectEntry $object, int $level): void
     {
+        if (EnumCaseSupport::isEnumCase($object)) {
+            echo 'enum('.$object->class->name.'::'.($object->enumCaseName ?? '').")\n";
+
+            return;
+        }
         $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm);
         $count = \count($props);
         echo 'object(', $object->class->name, ')#', $object->id, ' (', $count, ") {\n";

@@ -7131,9 +7131,16 @@ restart:
                             $block->constants[$op->arg2]
                         );
                         $entry->enumCaseCanonicalNames[$name] = $canonical;
+                        $caseBacking = clone $block->constants[$op->arg2];
+                        if (null !== $entry->backedType) {
+                            $caseBacking = clone VM\BackedEnum::caseBackingScalar(
+                                $entry->backedType,
+                                $block->constants[$op->arg2]
+                            );
+                        }
                         $entry->enumCases[] = [
                             'name' => $canonical,
-                            'value' => clone $block->constants[$op->arg2],
+                            'value' => $caseBacking,
                         ];
                         if ([] !== $op->attributeEntries) {
                             $entry->enumCaseAttributeEntries[$name] = $op->attributeEntries;

@@ -18,7 +18,7 @@ final class BackedEnum
         }
         $normalized = self::normalizeBackingArgument($enum, $value->resolveIndirect());
         foreach ($enum->enumCases as $case) {
-            $backing = $case['value'];
+            $backing = self::caseBackingScalar($enum->backedType, $case['value']);
             if (!self::backingValuesMatch($enum->backedType, $backing, $normalized)) {
                 continue;
             }
@@ -27,6 +27,45 @@ final class BackedEnum
         }
 
         return null;
+    }
+
+    /**
+     * Canonical enum case variable for a matched case name (Zend singleton identity, #5533).
+     */
+    public static function canonicalCaseVariable(ClassEntry $enum, string $caseName): ?Variable
+    {
+        $lc = strtolower($caseName);
+        if (isset($enum->constants[$lc])) {
+            return $enum->constants[$lc];
+        }
+
+        return null;
+    }
+
+    /**
+     * Backing scalar for enumCases table entries (int/string), including legacy object storage.
+     */
+    public static function caseBackingScalar(string $backedType, Variable $caseValue): Variable
+    {
+        $caseValue = $caseValue->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $caseValue->type && EnumCaseSupport::isEnumCase($caseValue->toObject())) {
+            $object = $caseValue->toObject();
+            if (null === $object->enumCaseValue) {
+                throw new \LogicException('Backed enum case object missing backing value');
+            }
+            $scalar = new Variable();
+            $scalar->copyFrom($object->enumCaseValue);
+
+            return $scalar;
+        }
+        if (Variable::TYPE_ENUM_CASE === $caseValue->type) {
+            $scalar = new Variable();
+            $scalar->copyFrom($caseValue->toEnumCase()->backingValue);
+
+            return $scalar;
+        }
+
+        return $caseValue;
     }
 
     public static function valueErrorMessage(ClassEntry $enum, Variable $value): string
