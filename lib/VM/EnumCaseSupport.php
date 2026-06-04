@@ -161,4 +161,49 @@ final class EnumCaseSupport
 
         return [null, ''];
     }
+
+    /**
+     * Zend {@see zend_clone_obj} rejection for enum cases (#3554, #5535).
+     *
+     * When enum constants were materialized as backing scalars (#5514 regression),
+     * clone still must throw catchable Error, not LogicException.
+     */
+    public static function uncloneableEnumClassForClone(Variable $src, ?Context $context = null): ?string
+    {
+        $src = $src->resolveIndirect();
+        if (Variable::TYPE_ENUM_CASE === $src->type) {
+            return $src->toEnumCase()->enumClass->name;
+        }
+        if (Variable::TYPE_OBJECT === $src->type && self::isEnumCase($src->toObject())) {
+            return $src->toObject()->class->name;
+        }
+        if (null === $context) {
+            return null;
+        }
+        if (!$src->is(Variable::TYPE_INTEGER) && !$src->is(Variable::TYPE_STRING)) {
+            return null;
+        }
+        foreach ($context->classes as $entry) {
+            if (!$entry->isEnum || null === $entry->backedType) {
+                continue;
+            }
+            $match = BackedEnum::caseForValue($entry, $src);
+            if (null === $match) {
+                continue;
+            }
+            $caseLc = strtolower($match->caseName);
+            if (!isset($entry->constants[$caseLc])) {
+                continue;
+            }
+            $stored = $entry->constants[$caseLc]->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $stored->type && self::isEnumCase($stored->toObject())) {
+                continue;
+            }
+            if ($stored->is(Variable::TYPE_INTEGER) || $stored->is(Variable::TYPE_STRING)) {
+                return $entry->name;
+            }
+        }
+
+        return null;
+    }
 }
