@@ -38,7 +38,6 @@ final class Linker
         __DIR__.'/runtime/filter_validate.c',
         __DIR__.'/runtime/phpc_fs_dir.c',
         __DIR__.'/runtime/phpc_dir.c',
-        __DIR__.'/runtime/phpc_gethostname.c',
         __DIR__.'/runtime/phpc_network_services.c',
         __DIR__.'/runtime/phpc_getrusage.c',
         __DIR__.'/runtime/phpc_upload_temp.c',
@@ -69,7 +68,6 @@ final class Linker
     private const RUNTIME_HOST_LIBC_BASENAMES = [
         'phpc_fs_dir.c',
         'phpc_dir.c',
-        'phpc_gethostname.c',
         'phpc_network_services.c',
         'phpc_getrusage.c',
         'phpc_upload_temp.c',

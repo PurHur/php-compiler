@@ -820,6 +820,16 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('chdir', $ft);
             $context->registerFunction('chdir', $fn);
         }
+        try {
+            $context->lookupFunction('gethostname');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $sizeT = $context->getTypeFromString('size_t');
+            $ft = $context->context->functionType($i32, false, $i8p, $sizeT);
+            $fn = $context->module->addFunction('gethostname', $ft);
+            $context->registerFunction('gethostname', $fn);
+        }
         $double = $context->getTypeFromString('double');
         try {
             $context->lookupFunction('fabs');
