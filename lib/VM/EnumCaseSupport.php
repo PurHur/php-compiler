@@ -38,6 +38,7 @@ final class EnumCaseSupport
         if (!$object->isEnumCase) {
             throw new \LogicException('getProperty called on non-enum-case object');
         }
+        EnumSupport::ensureBackedEnumValuesUnique($object->class);
         $result = new Variable();
         $lc = strtolower($name);
         if ('name' === $lc) {

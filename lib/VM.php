@@ -2199,16 +2199,26 @@ restart:
                                 goto restart;
                             }
                         }
-                        if (!$this->copyClassConstOrStaticPropertyByName(
-                            $classEntry,
-                            $memberNameRaw,
-                            $frame->scope[$op->arg1],
-                            $frame
-                        )) {
-                            return $this->raise(
-                                "Undefined class constant {$classEntry->name}::{$memberNameRaw}",
+                        try {
+                            if (!$this->copyClassConstOrStaticPropertyByName(
+                                $classEntry,
+                                $memberNameRaw,
+                                $frame->scope[$op->arg1],
                                 $frame
-                            );
+                            )) {
+                                return $this->raise(
+                                    "Undefined class constant {$classEntry->name}::{$memberNameRaw}",
+                                    $frame
+                                );
+                            }
+                        } catch (\Error $e) {
+                            $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+
+                            return self::EXCEPTION;
                         }
                         break;
                     }
@@ -2260,13 +2270,23 @@ restart:
                             goto restart;
                         }
                     }
-                    if (!$this->copyClassConstOrStaticPropertyByName(
-                        $classEntry,
-                        $memberNameRaw,
-                        $frame->scope[$op->arg1],
-                        $frame
-                    )) {
-                        return $this->raise("Undefined class constant {$className}::{$memberNameRaw}", $frame);
+                    try {
+                        if (!$this->copyClassConstOrStaticPropertyByName(
+                            $classEntry,
+                            $memberNameRaw,
+                            $frame->scope[$op->arg1],
+                            $frame
+                        )) {
+                            return $this->raise("Undefined class constant {$className}::{$memberNameRaw}", $frame);
+                        }
+                    } catch (\Error $e) {
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+
+                        return self::EXCEPTION;
                     }
                     break;
                 case OpCode::TYPE_INSTANCEOF:
@@ -3127,6 +3147,14 @@ restart:
                             $prop = $var->toEnumCase()->fetchProperty($name);
                         } catch (\LogicException $e) {
                             return $this->raise($e->getMessage(), $frame);
+                        } catch (\Error $e) {
+                            $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+
+                            return self::EXCEPTION;
                         }
                         $result->copyFrom($prop);
                         break;
@@ -3162,7 +3190,17 @@ restart:
                     $propertyObject = $var->toObject();
                     VM\LazyObjectSupport::ensureInitialized($this, $propertyObject);
                     if (EnumCaseSupport::isEnumCase($propertyObject)) {
-                        $result->copyFrom(EnumCaseSupport::getProperty($propertyObject, $name));
+                        try {
+                            $result->copyFrom(EnumCaseSupport::getProperty($propertyObject, $name));
+                        } catch (\Error $e) {
+                            $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+
+                            return self::EXCEPTION;
+                        }
                         break;
                     }
                     $forWrite = $frame->pos < $frame->block->nOpCodes
@@ -7692,6 +7730,9 @@ restart:
                     ),
                     $frame
                 );
+            }
+            if ($classEntry->isEnum && null !== $classEntry->backedType) {
+                VM\EnumSupport::ensureBackedEnumValuesUnique($classEntry);
             }
             if ($classEntry->isEnum && isset($classEntry->enumCaseCanonicalNames[$memberLc])) {
                 $canonical = $classEntry->enumCaseCanonicalNames[$memberLc];
