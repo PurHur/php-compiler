@@ -819,6 +819,8 @@ class Block {
             }
         }
 
+        $this->ensureOpcodeReferencedSlots($scope);
+
         // Sparse slot indices must preserve keys; variadic spread reindexes (#137).
         $return = new Frame(null, $this, $frame);
         $return->scope = $scope;
@@ -833,6 +835,33 @@ class Block {
             }
         }
         return $return;
+    }
+
+    /**
+     * Opcodes may reference slot indices without a matching scope operand (#5911, enum ctor assign).
+     */
+    private function ensureOpcodeReferencedSlots(array &$scope): void
+    {
+        $max = -1;
+        foreach ($this->opCodes as $op) {
+            foreach (['arg1', 'arg2', 'arg3'] as $field) {
+                $idx = $op->$field;
+                if (null !== $idx && (int) $idx > $max) {
+                    $max = (int) $idx;
+                }
+            }
+        }
+        for ($i = 0; $i <= $max; ++$i) {
+            if (isset($scope[$i])) {
+                continue;
+            }
+            if (isset($this->constants[$i])) {
+                $scope[$i] = $this->constants[$i];
+
+                continue;
+            }
+            $scope[$i] = new Variable();
+        }
     }
 
     /** Top-level script variable (not superglobal) — always indirect through global table (#3787). */
