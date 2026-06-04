@@ -3970,6 +3970,9 @@ class Compiler {
 
             return [$opcode];
         } elseif ($expr instanceof Op\Expr\Cast) {
+            if ($expr instanceof Op\Expr\Cast\Unset_) {
+                $this->throwCompileError('The (unset) cast is no longer supported');
+            }
             $line = $expr->getLine();
             return [new OpCode(
                 $this->getOpCodeTypeFromCastOp($expr),
