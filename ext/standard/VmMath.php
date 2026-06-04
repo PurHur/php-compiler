@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
 /** Shared math coercion helpers for ext/standard (issue #3578) and base_convert (#3173). */
@@ -57,6 +58,7 @@ final class VmMath
         string $paramName
     ): int {
         $var = $var->resolveIndirect();
+        self::rejectEnumCaseIntBuiltinArg($var, $function, $argIndex, $paramName);
         if (Variable::TYPE_ARRAY === $var->type) {
             throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'array'));
         }
@@ -89,6 +91,7 @@ final class VmMath
         string $paramName
     ): int {
         $var = $var->resolveIndirect();
+        self::rejectEnumCaseIntBuiltinArg($var, $function, $argIndex, $paramName);
         if (Variable::TYPE_ARRAY === $var->type) {
             throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'array'));
         }
@@ -129,6 +132,32 @@ final class VmMath
         }
     }
 
+    /**
+     * Z_PARAM_LONG rejects enum cases (php-src ext/standard/string.c chr/ord; #5673, #5836).
+     *
+     * @throws \TypeError
+     */
+    private static function rejectEnumCaseIntBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): void {
+        if (!EnumCaseSupport::isEnumCaseVariable($var)) {
+            return;
+        }
+        $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
+
+        throw new \TypeError(
+            self::intBuiltinTypeError(
+                $function,
+                $argIndex,
+                $paramName,
+                null !== $enumClass ? $enumClass->name : 'object'
+            )
+        );
+    }
+
     private static function intBuiltinTypeError(
         string $function,
         int $argIndex,
@@ -154,7 +183,7 @@ final class VmMath
             Variable::TYPE_NULL => 'null',
             Variable::TYPE_ARRAY => 'array',
             Variable::TYPE_OBJECT => 'object',
-            Variable::TYPE_RESOURCE => 'resource',
+            Variable::TYPE_ENUM_CASE => 'object',
             default => 'mixed',
         };
     }
