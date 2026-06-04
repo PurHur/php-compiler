@@ -47,6 +47,9 @@ final class is_scalar extends Internal
         if (JITVariable::TYPE_STRING === $args[0]->type) {
             $this->jitString($context, $args[0], 'is_scalar() argument #1');
         }
+        if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY) {
+            return $context->constantFromBool(false);
+        }
         switch ($args[0]->type) {
             case JITVariable::TYPE_NATIVE_LONG:
             case JITVariable::TYPE_NATIVE_DOUBLE:
@@ -54,11 +57,13 @@ final class is_scalar extends Internal
             case JITVariable::TYPE_STRING:
                 return $context->constantFromBool(true);
             case JITVariable::TYPE_NULL:
+            case JITVariable::TYPE_HASHTABLE:
+            case JITVariable::TYPE_OBJECT:
                 return $context->constantFromBool(false);
             case JITVariable::TYPE_VALUE:
                 return $this->jitBoxedIsScalar($context, $args[0]);
             default:
-                throw new \LogicException('is_scalar() does not support this value type in this compiler build');
+                return $context->constantFromBool(false);
         }
     }
 
@@ -71,8 +76,14 @@ final class is_scalar extends Internal
             case Variable::TYPE_STRING:
                 return true;
             case Variable::TYPE_NULL:
+            case Variable::TYPE_OBJECT:
+            case Variable::TYPE_ENUM_CASE:
+            case Variable::TYPE_ARRAY:
                 return false;
             default:
+                if ($v->isStreamResource() || $v->isDirResource()) {
+                    return false;
+                }
                 throw new \LogicException('is_scalar() does not support this value type in this compiler build');
         }
     }
