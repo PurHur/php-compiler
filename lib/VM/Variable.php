@@ -1968,6 +1968,11 @@ restart:
             case self::TYPE_ARRAY:
                 throw new \TypeError('Cannot increment array');
             default:
+                if (self::isEnumCaseOperand($this)) {
+                    throw new \TypeError(
+                        'Cannot increment '.self::operandEnumClassName($this)
+                    );
+                }
                 $one = new self();
                 $one->int(1);
                 $this->numericOp(OpCode::TYPE_PLUS, $this, $one);
@@ -2005,6 +2010,11 @@ restart:
             case self::TYPE_ARRAY:
                 throw new \TypeError('Cannot decrement array');
             default:
+                if (self::isEnumCaseOperand($this)) {
+                    throw new \TypeError(
+                        'Cannot decrement '.self::operandEnumClassName($this)
+                    );
+                }
                 $one = new self();
                 $one->int(1);
                 $this->numericOp(OpCode::TYPE_MINUS, $this, $one);
