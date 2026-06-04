@@ -46,9 +46,13 @@ final class ReflectionAttributeNewInstance extends VmClassMethod
             throw new \LogicException('ReflectionAttribute::newInstance() requires active VM');
         }
         if (null !== $classEntry->constructor) {
-            $invokeArgs = ReflectionSupport::constructorInvokeVariables($classEntry->constructor, $argSpecs);
+            $invokeArgs = ReflectionSupport::constructorInvokeVariables(
+                $classEntry->constructor,
+                $argSpecs,
+                $ctx
+            );
             $vm->invokePhpFunction($classEntry->constructor, $thisVar, ...$invokeArgs);
-            ReflectionSupport::applyConstructorPropertyArgs($object, $classEntry->constructor, $argSpecs);
+            ReflectionSupport::applyConstructorPropertyArgs($object, $classEntry->constructor, $argSpecs, $ctx);
             $object->constructed = true;
         } else {
             $object->constructed = true;

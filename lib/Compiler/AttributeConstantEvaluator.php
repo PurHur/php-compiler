@@ -52,9 +52,30 @@ final class AttributeConstantEvaluator
         if ($expr instanceof Expr\UnaryMinus && $expr->expr instanceof Scalar\LNumber) {
             return -(int) $expr->expr->value;
         }
+        if ($expr instanceof Expr\UnaryPlus && $expr->expr instanceof Scalar\LNumber) {
+            return (int) $expr->expr->value;
+        }
+        if ($expr instanceof Expr\New_) {
+            return self::evalNew($expr);
+        }
 
         throw new \LogicException(
             'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
         );
+    }
+
+    private static function evalNew(Expr\New_ $expr): CompileTimeNew
+    {
+        if (!$expr->class instanceof Node\Name) {
+            throw new \LogicException(
+                'Dynamic class name in attribute constructor new expression is not supported'
+            );
+        }
+        $args = [];
+        foreach ($expr->args as $arg) {
+            $args[] = self::evalArg($arg);
+        }
+
+        return new CompileTimeNew($expr->class->toString(), $args);
     }
 }
