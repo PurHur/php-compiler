@@ -12,7 +12,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * ob_get_status() — output buffer metadata (VM; ext/standard/output.c, issue #3647).
+ * ob_get_status() — output buffer metadata (ext/standard/output.c, issue #3647; JIT {@see JitObGetStatus}).
  */
 final class ob_get_status extends Internal
 {
@@ -39,6 +39,6 @@ final class ob_get_status extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ob_get_status() is VM-only in this compiler build');
+        return JitObGetStatus::invoke($context, ...$args);
     }
 }
