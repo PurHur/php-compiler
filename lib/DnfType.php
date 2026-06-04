@@ -16,24 +16,42 @@ final class DnfType
     /**
      * @return list<DnfArm>
      */
-    public static function armsFromCfgType(?CfgType $type, callable $intersectionNames, ?callable $intersectionDisplay = null): array
-    {
+    public static function armsFromCfgType(
+        ?CfgType $type,
+        callable $intersectionNames,
+        ?callable $intersectionDisplay = null,
+        ?callable $referenceName = null
+    ): array {
         if (null === $type) {
             return [];
         }
         if ($type instanceof CfgType\Nullable) {
             return array_merge(
-                self::armsFromCfgType($type->subtype, $intersectionNames, $intersectionDisplay),
+                self::armsFromCfgType($type->subtype, $intersectionNames, $intersectionDisplay, $referenceName),
                 [['kind' => 'null']]
             );
         }
         if ($type instanceof CfgType\Union_) {
             $arms = [];
             foreach ($type->types as $member) {
-                $arms = array_merge($arms, self::armsFromCfgType($member, $intersectionNames, $intersectionDisplay));
+                $arms = array_merge(
+                    $arms,
+                    self::armsFromCfgType($member, $intersectionNames, $intersectionDisplay, $referenceName)
+                );
             }
 
             return $arms;
+        }
+        if ($type instanceof CfgType\Reference) {
+            if (null === $referenceName) {
+                return [];
+            }
+            $name = $referenceName($type);
+            if (null === $name || '' === $name) {
+                return [];
+            }
+
+            return [['kind' => 'literal', 'name' => strtolower(ltrim($name, '\\'))]];
         }
         if ($type instanceof CfgType\Intersection) {
             $ifaces = $intersectionNames($type);
@@ -56,10 +74,11 @@ final class DnfType
     public static function labelFromCfgType(
         ?CfgType $type,
         callable $intersectionNames,
-        ?callable $intersectionDisplay = null
+        ?callable $intersectionDisplay = null,
+        ?callable $referenceName = null
     ): string {
         return self::formatUnionType(
-            self::armsFromCfgType($type, $intersectionNames, $intersectionDisplay)
+            self::armsFromCfgType($type, $intersectionNames, $intersectionDisplay, $referenceName)
         );
     }
 
