@@ -338,12 +338,12 @@ final class HashTable {
     /**
      * php-src: null array keys coerce to empty string; bool keys to int (zend_hash.c; #5269, #5275).
      */
-    public static function normalizeIndexKey(Variable $index): Variable
+    public static function normalizeIndexKey(Variable $index, string $illegalOffsetMessage = 'Illegal offset type'): Variable
     {
         if (Variable::TYPE_INDIRECT === $index->type) {
             $index = $index->resolveIndirect();
         }
-        EnumCaseSupport::rejectIllegalArrayOffset($index);
+        EnumCaseSupport::rejectIllegalArrayOffset($index, $illegalOffsetMessage);
         if (Variable::TYPE_NULL === $index->type) {
             $empty = new Variable();
             $empty->string('');
@@ -1502,7 +1502,7 @@ final class HashTable {
      */
     public function offsetIsSet(Variable $index): bool
     {
-        $index = self::normalizeIndexKey($index);
+        $index = self::normalizeIndexKey($index, 'Illegal offset type in isset or empty');
         $stored = null;
         switch ($index->type) {
             case Variable::TYPE_INTEGER:

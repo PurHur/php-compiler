@@ -18,6 +18,7 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -33,6 +34,7 @@ final class array_key_exists extends Internal
             throw new \LogicException('array_key_exists() requires exactly two arguments');
         }
         $key = $frame->calledArgs[0]->resolveIndirect();
+        EnumCaseSupport::rejectIllegalArrayOffset($key);
         $array = VmArray::requireArrayParam(
             $frame->calledArgs[1],
             'array_key_exists',
