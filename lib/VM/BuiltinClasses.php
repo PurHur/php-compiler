@@ -36,6 +36,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassGetMethods;
 use PHPCompiler\VM\Builtin\ReflectionClassGetProperty;
 use PHPCompiler\VM\Builtin\ReflectionClassGetProperties;
 use PHPCompiler\VM\Builtin\ReflectionClassGetReflectionConstant;
+use PHPCompiler\VM\Builtin\ReflectionClassIsInternal;
 use PHPCompiler\VM\Builtin\ReflectionClassNewLazyGhost;
 use PHPCompiler\VM\Builtin\ReflectionClassNewLazyProxy;
 use PHPCompiler\VM\Builtin\ReflectionConstantConstruct;
@@ -94,6 +95,7 @@ final class BuiltinClasses
     {
         $before = array_keys($ctx->classes);
         StringableSupport::register($ctx);
+        AttributeSupport::register($ctx);
         self::registerStdClass($ctx);
         self::registerCountable($ctx);
         self::registerTraversableInterfaces($ctx);
@@ -265,6 +267,8 @@ final class BuiltinClasses
         $rc->methodVisibility['newlazyproxy'] = $pub;
         $rc->methods['newlazyghost'] = new ReflectionClassNewLazyGhost();
         $rc->methodVisibility['newlazyghost'] = $pub;
+        $rc->methods['isinternal'] = new ReflectionClassIsInternal();
+        $rc->methodVisibility['isinternal'] = $pub;
 
         $rp = new ClassEntry('ReflectionProperty');
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
