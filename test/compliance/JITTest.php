@@ -302,10 +302,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'exit_array_status')) {
                 continue;
             }
-            // class const scalar expressions — VM defineClass eval (#3567); JIT deferred.
-            if (str_contains($name, 'class_const_scalar_expr')) {
-                continue;
-            }
             // define() case_insensitive + constant() MCJIT execute segfaults (#3711); VM + AOT PHPT green.
             if (str_contains($name, 'define_case_insensitive')) {
                 continue;

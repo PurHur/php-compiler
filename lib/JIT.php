@@ -8185,6 +8185,25 @@ class JIT {
                     // Default property values are initialized in __object__ allocation.
                     // Object class constants are materialized at TYPE_DECLARE_CLASS_CONST (#3196).
                     break;
+                case OpCode::TYPE_PLUS:
+                case OpCode::TYPE_MINUS:
+                case OpCode::TYPE_MUL:
+                case OpCode::TYPE_DIV:
+                case OpCode::TYPE_MODULO:
+                case OpCode::TYPE_POW:
+                case OpCode::TYPE_BITWISE_AND:
+                case OpCode::TYPE_BITWISE_OR:
+                case OpCode::TYPE_BITWISE_XOR:
+                case OpCode::TYPE_SHIFT_LEFT:
+                case OpCode::TYPE_SHIFT_RIGHT:
+                case OpCode::TYPE_UNARY_MINUS:
+                case OpCode::TYPE_UNARY_PLUS:
+                case OpCode::TYPE_BITWISE_NOT:
+                case OpCode::TYPE_BOOLEAN_NOT:
+                case OpCode::TYPE_CONCAT:
+                case OpCode::TYPE_ARRAY_DIM_FETCH:
+                    // Scalar class const expressions — evaluated in jitClassConstDefineValue (#5394).
+                    break;
                 case OpCode::TYPE_DECLARE_METHOD:
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
@@ -8271,7 +8290,7 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     $constNameLc = strtolower($name->value);
-                    $constValue = $this->jitClassConstDefineValue($block, $op, $constNameLc);
+                    $constValue = $this->jitClassConstDefineValue($block, $op, $constNameLc, $classId);
                     if (!isset($block->constants[$op->arg2])) {
                         if ($this->shouldSkipExternalClassBodyLowering($classId)) {
                             break;
@@ -11215,11 +11234,16 @@ class JIT {
     /**
      * Resolve a class constant initializer for JIT defineClassConst (#4900, zend_constants.c).
      */
-    private function jitClassConstDefineValue(Block $block, OpCode $op, string $constNameLc): VM\Variable
-    {
+    private function jitClassConstDefineValue(
+        Block $block,
+        OpCode $op,
+        string $constNameLc,
+        int $classId
+    ): VM\Variable {
         if (!isset($block->constants[$op->arg2])) {
             $vm = new VM($this->context->runtime->vmContext);
-            $value = VM\ClassConstMaterializer::materializeSlot($vm, $block, $op->arg2);
+            $className = $this->context->type->object->classNameForId($classId);
+            $value = VM\ClassConstMaterializer::materializeSlot($vm, $block, $op->arg2, $className);
         } else {
             $value = $block->constants[$op->arg2];
         }
