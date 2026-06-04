@@ -101,10 +101,14 @@ final class is_scalar extends Internal
         $isDouble = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false));
         $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false));
         $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false));
+        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(Variable::TYPE_ENUM_CASE, false));
+        $isObject = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_OBJECT, false));
         $scalar = $context->builder->or($isLong, $isDouble);
         $scalar = $context->builder->or($scalar, $isBool);
         $scalar = $context->builder->or($scalar, $isString);
+        $nonScalar = $context->builder->or($isNull, $isEnumCase);
+        $nonScalar = $context->builder->or($nonScalar, $isObject);
 
-        return $context->builder->select($isNull, $context->constantFromBool(false), $scalar);
+        return $context->builder->select($nonScalar, $context->constantFromBool(false), $scalar);
     }
 }
