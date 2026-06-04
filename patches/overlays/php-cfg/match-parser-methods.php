@@ -70,21 +70,57 @@
     }
 
     /**
-     * throw new UnhandledMatchError('Unhandled match case '.$subject) — zend_exceptions.c (#4221).
+     * throw new UnhandledMatchError — zend_exceptions.c (#4221, #5448).
+     *
+     * Objects (incl. enum cases): "Unhandled match case of type {class}".
+     * Scalars: "Unhandled match case {value}" via string cast.
      */
     private function lowerUnhandledMatchError(Operand $cond, array $attrs): void
     {
-        $prefix = $this->readVariable(new Literal('Unhandled match case '));
+        $entryBlock = $this->block;
+        $isObj = new Op\Expr\FuncCall(
+            $this->readVariable(new Literal('is_object')),
+            [$cond],
+            $attrs
+        );
+        $entryBlock->children[] = $isObj;
+        $objectBlock = $this->block->create();
+        $scalarBlock = $this->block->create();
+        $entryBlock->children[] = new JumpIf($isObj->result, $objectBlock, $scalarBlock, $attrs);
+        $objectBlock->addParent($entryBlock);
+        $scalarBlock->addParent($entryBlock);
+
+        $this->block = $objectBlock;
+        $getClass = new Op\Expr\FuncCall(
+            $this->readVariable(new Literal('get_class')),
+            [$cond],
+            $attrs
+        );
+        $this->block->children[] = $getClass;
+        $objMsg = new Op\Expr\BinaryOp\Concat(
+            $this->readVariable(new Literal('Unhandled match case of type ')),
+            $this->readVariable($getClass->result),
+            $attrs
+        );
+        $this->block->children[] = $objMsg;
+        $this->lowerThrowUnhandledMatchError($objMsg->result, $attrs);
+
+        $this->block = $scalarBlock;
         $strCond = new Op\Expr\Cast\String_($cond, $attrs);
         $this->block->children[] = $strCond;
-        $msg = new Op\Expr\BinaryOp\Concat(
-            $prefix,
+        $scalarMsg = new Op\Expr\BinaryOp\Concat(
+            $this->readVariable(new Literal('Unhandled match case ')),
             $this->readVariable($strCond->result),
             $attrs
         );
-        $this->block->children[] = $msg;
+        $this->block->children[] = $scalarMsg;
+        $this->lowerThrowUnhandledMatchError($scalarMsg->result, $attrs);
+    }
+
+    private function lowerThrowUnhandledMatchError(Operand $msg, array $attrs): void
+    {
         $class = $this->readVariable(new Literal('UnhandledMatchError'));
-        $new = new Op\Expr\New_($class, [$this->readVariable($msg->result)], $attrs);
+        $new = new Op\Expr\New_($class, [$this->readVariable($msg)], $attrs);
         $this->block->children[] = $new;
         $this->block->children[] = new Op\Terminal\Throw_(
             $this->readVariable($new->result),
