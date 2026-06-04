@@ -625,6 +625,8 @@ final class BuiltinClasses
     {
         $entry = new ClassEntry('Fiber');
         $pub = CfgFunc::FLAG_PUBLIC;
+        // Zend zend_fibers.c: suspend/getCurrent are statically invokable inside fiber callbacks (#5485).
+        $pubStatic = $pub | CfgFunc::FLAG_STATIC;
         $entry->constructor = new FiberConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
@@ -642,7 +644,9 @@ final class BuiltinClasses
             ] as $name => $method
         ) {
             $entry->methods[$name] = $method;
-            $entry->methodVisibility[$name] = $pub;
+            $entry->methodVisibility[$name] = ('suspend' === $name || 'getcurrent' === $name)
+                ? $pubStatic
+                : $pub;
         }
         $ctx->classes[FiberSupport::CLASS_FIBER] = $entry;
     }
