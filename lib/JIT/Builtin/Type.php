@@ -191,6 +191,7 @@ class Type extends Builtin {
         PowIntRuntime::ensureLinked($this->context);
         GethostbynamelRuntime::ensureLinked($this->context);
         TimeSleepRuntime::ensureLinked($this->context);
+        StringHrtime::ensureLinked($this->context);
         LastErrorRuntime::ensureLinked($this->context);
         MemoryRuntime::ensureLinked($this->context);
         ErrorHandlerOutput::registerExternals($this->context);
