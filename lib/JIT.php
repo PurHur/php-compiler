@@ -6828,7 +6828,8 @@ class JIT {
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
                     if (isset($block->constants[$op->arg2])) {
-                        $constValue = $block->constants[$op->arg2];
+                        $constValue = new VM\Variable();
+                        $constValue->copyFrom($block->constants[$op->arg2]);
                     } else {
                         if ($this->shouldUseSelfHostJitStubs()) {
                             break;
@@ -6846,8 +6847,13 @@ class JIT {
                         if (!isset($frame->scope[$op->arg2])) {
                             throw new \LogicException('Global constant value must be a compile-time constant');
                         }
-                        $constValue = VM\ClassConstMaterializer::detachConstantValue($frame->scope[$op->arg2]);
+                        $constValue = new VM\Variable();
+                        $constValue->copyFrom($frame->scope[$op->arg2]);
                     }
+                    $constValue = VM\EnumCaseSupport::materializeConstantValue(
+                        $this->context->runtime->vmContext,
+                        $constValue
+                    );
                     if (!$this->context->runtime->vmContext->defineConstant(
                         $nameOp->value,
                         $constValue

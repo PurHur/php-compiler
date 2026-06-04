@@ -37,7 +37,7 @@ final class ClassConstMaterializer
                 continue;
             }
             if (null !== $entry && OpCode::TYPE_DECLARE_CLASS_CONST === $op->type) {
-                self::registerPriorClassConst($bodyBlock, $frame, $entry, $op);
+                self::registerPriorClassConst($vm->context, $bodyBlock, $frame, $entry, $op);
             }
         }
         if (!isset($frame->scope[$valueSlot])) {
@@ -64,6 +64,7 @@ final class ClassConstMaterializer
     }
 
     private static function registerPriorClassConst(
+        Context $context,
         Block $bodyBlock,
         Frame $frame,
         ClassEntry $entry,
@@ -73,9 +74,12 @@ final class ClassConstMaterializer
         if (isset($bodyBlock->constants[$op->arg2])) {
             $value = new Variable();
             $value->copyFrom($bodyBlock->constants[$op->arg2]);
-            $entry->constants[$name] = self::detachConstantValue($value);
+            $entry->constants[$name] = EnumCaseSupport::materializeConstantValue($context, $value);
         } elseif (isset($frame->scope[$op->arg2])) {
-            $entry->constants[$name] = self::detachConstantValue($frame->scope[$op->arg2]);
+            $entry->constants[$name] = EnumCaseSupport::materializeConstantValue(
+                $context,
+                $frame->scope[$op->arg2]
+            );
         }
     }
 

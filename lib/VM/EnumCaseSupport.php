@@ -394,6 +394,44 @@ final class EnumCaseSupport
     }
 
     /**
+     * Store const/define/class-const values as immortal enum case objects (#5738, zend_constants.c).
+     *
+     * Converts legacy backing scalars from enum case constant tables to canonical singletons.
+     */
+    public static function materializeConstantValue(Context $context, Variable $src): Variable
+    {
+        $src = $src->resolveIndirect();
+        if (self::isEnumCaseVariable($src)) {
+            return ClassConstMaterializer::detachConstantValue($src);
+        }
+        if (!$src->is(Variable::TYPE_INTEGER) && !$src->is(Variable::TYPE_STRING)) {
+            return ClassConstMaterializer::detachConstantValue($src);
+        }
+        foreach ($context->classes as $entry) {
+            if (!$entry->isEnum || null === $entry->backedType) {
+                continue;
+            }
+            if (!self::scalarIsLegacyEnumCaseForClass($src, $entry)) {
+                continue;
+            }
+            $match = BackedEnum::caseForValue($entry, $src);
+            if (null === $match) {
+                continue;
+            }
+            $canonical = BackedEnum::canonicalCaseVariable($entry, $match->caseName);
+            if (null !== $canonical && self::isEnumCaseVariable($canonical)) {
+                return ClassConstMaterializer::detachConstantValue($canonical);
+            }
+
+            return ClassConstMaterializer::detachConstantValue(
+                self::createCase($entry, $match->caseName, $match->backingValue)
+            );
+        }
+
+        return ClassConstMaterializer::detachConstantValue($src);
+    }
+
+    /**
      * Zend {@see zend_clone_obj} rejection for enum cases (#3554, #5535).
      *
      * When enum constants were materialized as backing scalars (#5514 regression),
