@@ -754,6 +754,16 @@ final class ArrayBuiltinHelper
         );
     }
 
+    public static function resolveMapCallbackForFind(Variable $callback): Internal
+    {
+        return self::resolveMapCallback($callback);
+    }
+
+    public static function resolveReduceCallbackForFind(Context $context, Variable $callback): Call
+    {
+        return self::resolveReduceCallback($context, $callback);
+    }
+
     private static function resolveReduceCallback(Context $context, Variable $callback): Call
     {
         $name = $callback->compileTimeString ?? null;

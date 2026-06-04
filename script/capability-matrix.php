@@ -92,6 +92,9 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
         $notes[] = 'callbacks: string builtins; VM closure callbacks (#3086)';
     }
     if (in_array($fn->getName(), ['array_find', 'array_find_key', 'array_any', 'array_all'], true)
+        && str_contains($source, 'ArrayFindHelper')) {
+        $notes[] = 'callbacks: string builtins/user functions/closure JIT/AOT (#3073); VM closure callbacks (#3086)';
+    } elseif (in_array($fn->getName(), ['array_find', 'array_find_key', 'array_any', 'array_all'], true)
         && str_contains($source, 'VmArrayValueCallback')) {
         $notes[] = 'callbacks: string builtins/user functions; VM closure callbacks (#3073)';
     }
