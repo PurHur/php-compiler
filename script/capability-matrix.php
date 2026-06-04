@@ -25,6 +25,7 @@ function collectCapabilities(string $root): array
 {
     $modules = [
         'types' => new PHPCompiler\ext\types\Module(),
+        'bcmath' => new PHPCompiler\ext\bcmath\Module(),
         'standard' => new PHPCompiler\ext\standard\Module(),
     ];
 

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 1406 |
-| Phase A inventory files (M2 ratio SSOT) | 1406 |
+| PHP files on vm.php path | 1414 |
+| Phase A inventory files (M2 ratio SSOT) | 1414 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 3918 |
+| Source constructs flagged (warnings) | 3927 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -26,6 +26,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | File | Blockers | Warnings |
 |------|----------|----------|
 | `bin/vm.php` | 0 | 1 |
+| `ext/bcmath/BcmathStub.php` | 0 | 1 |
+| `ext/bcmath/Module.php` | 0 | 7 |
 | `ext/filter/FilterConstants.php` | 0 | 1 |
 | `ext/filter/Module.php` | 0 | 4 |
 | `ext/filter/filter_id.php` | 0 | 1 |
@@ -1223,7 +1225,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Printer.php` | 0 | 1 |
 | `lib/PropertyVisibility.php` | 0 | 1 |
 | `lib/PseudoClassScope.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 32 |
+| `lib/Runtime.php` | 0 | 33 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 1 |
 | `lib/SwitchCommaCaseRewriter.php` | 0 | 1 |
@@ -1416,6 +1418,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Runtime (line 17)
+
+### `ext/bcmath/BcmathStub.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/bcmath/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new bcadd (line 19)
+- new bcsub (line 20)
+- new bcmul (line 21)
+- new bcdiv (line 22)
+- new bcscale (line 23)
+- new bccomp (line 24)
+- 1 class method(s)
 
 ### `ext/filter/FilterConstants.php`
 
@@ -9288,13 +9306,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\intl\Module (line 180)
 - new ext\mbstring\Module (line 181)
 - new ext\filter\Module (line 182)
-- new ext\standard\Module (line 183)
-- new JIT (line 259)
-- new JITContext (line 273)
-- new SealedClassPreprocessor (line 298)
-- new SourcePreprocessor\PropertyHooks (line 301)
-- new State (line 335)
-- new LintCompiler (line 701)
+- new ext\bcmath\Module (line 183)
+- new ext\standard\Module (line 184)
+- new JIT (line 260)
+- new JITContext (line 274)
+- new SealedClassPreprocessor (line 299)
+- new SourcePreprocessor\PropertyHooks (line 302)
+- new State (line 336)
+- new LintCompiler (line 702)
 - 45 class method(s)
 
 ### `lib/SourceBareThrowRewriter.php`
