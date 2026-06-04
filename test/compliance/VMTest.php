@@ -19,7 +19,7 @@ class VMTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'spl_autoload_register_jit')) {
                 continue;
             }
-            if (str_contains(strtolower($case[0]), 'dynamic_property_deprecation')) {
+            if (str_contains($name, 'dynamic_property_deprecation')) {
                 continue;
             }
             // Native preg stub error codes (JIT/AOT); VM uses host PCRE (issue #1181, #3110).

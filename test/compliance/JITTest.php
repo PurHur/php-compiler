@@ -250,6 +250,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'allow_dynamic_properties')) {
                 continue;
             }
+            // E_DEPRECATED on stderr: DynamicPropertyDeprecatedJITTest (#5470, #4570).
+            if (str_contains($name, 'dynamic_property_deprecation')) {
+                continue;
+            }
             // count() COUNT_RECURSIVE is VM-only until recursive LLVM count (#3511).
             if (str_contains($name, 'count_recursive')) {
                 continue;
