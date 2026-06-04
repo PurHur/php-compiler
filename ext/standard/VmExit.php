@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
+use PHPCompiler\VM;
 use PHPCompiler\VM\ScriptExit;
 use PHPCompiler\VM\ShutdownQueue;
 use PHPCompiler\VM\TypeCheck;
@@ -13,9 +15,9 @@ use PHPCompiler\Web\Superglobals;
 /** VM lowering for exit/die (issue #269). */
 final class VmExit
 {
-    public static function terminate(?Variable $arg): never
+    public static function terminate(?Variable $arg, ?Frame $frame = null): never
     {
-        $status = self::resolveStatus($arg);
+        $status = self::resolveStatus($arg, $frame);
         $ctx = Superglobals::getActiveContext();
         if (null !== $ctx) {
             ShutdownQueue::run($ctx);
@@ -23,7 +25,7 @@ final class VmExit
         throw new ScriptExit($status);
     }
 
-    public static function resolveStatus(?Variable $arg): int
+    public static function resolveStatus(?Variable $arg, ?Frame $frame = null): int
     {
         if (null === $arg) {
             return 0;
@@ -42,6 +44,12 @@ final class VmExit
         }
         if (Variable::TYPE_FLOAT === $v->type || Variable::TYPE_BOOLEAN === $v->type) {
             echo $v->toString();
+
+            return 0;
+        }
+        if (Variable::TYPE_ARRAY === $v->type) {
+            $vm = VM::running();
+            echo null !== $vm ? $vm->coerceVariableToString($v, $frame) : 'Array';
 
             return 0;
         }
