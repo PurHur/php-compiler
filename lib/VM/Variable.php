@@ -1415,6 +1415,21 @@ restart:
 
             return;
         }
+        $left = $left->resolveIndirect();
+        $right = $right->resolveIndirect();
+        // Zend compare_function: relational < > <= >= with enum cases are always false (#5812).
+        if (self::isEnumCaseOperand($left) || self::isEnumCaseOperand($right)) {
+            switch ($opCode) {
+                case OpCode::TYPE_GREATER:
+                case OpCode::TYPE_SMALLER:
+                case OpCode::TYPE_GREATER_OR_EQUAL:
+                case OpCode::TYPE_SMALLER_OR_EQUAL:
+                    $this->reset();
+                    $this->bool(false);
+
+                    return;
+            }
+        }
         $this->reset();
 restart:
         switch (type_pair($left->type, $right->type)) {
