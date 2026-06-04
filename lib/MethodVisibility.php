@@ -37,6 +37,57 @@ final class MethodVisibility
         ?callable $isSameOrSubclassOf = null,
         ?string $callerClassDisplay = null
     ): void {
+        self::assertCallableInternal(
+            $visibilityFlags,
+            $callerClassLc,
+            $declaringClassLc,
+            $declaringClassDisplay,
+            $methodName,
+            $parentScopeAllows,
+            $isSameOrSubclassOf,
+            $callerClassDisplay,
+            false
+        );
+    }
+
+    /**
+     * Object construction: Zend uses "Call to private Class::__construct()" wording (#5382).
+     *
+     * @throws \LogicException when the call is not allowed
+     */
+    public static function assertConstructorCallable(
+        int $visibilityFlags,
+        ?string $callerClassLc,
+        string $declaringClassLc,
+        string $declaringClassDisplay,
+        bool $parentScopeAllows = false,
+        ?callable $isSameOrSubclassOf = null,
+        ?string $callerClassDisplay = null
+    ): void {
+        self::assertCallableInternal(
+            $visibilityFlags,
+            $callerClassLc,
+            $declaringClassLc,
+            $declaringClassDisplay,
+            '__construct',
+            $parentScopeAllows,
+            $isSameOrSubclassOf,
+            $callerClassDisplay,
+            true
+        );
+    }
+
+    private static function assertCallableInternal(
+        int $visibilityFlags,
+        ?string $callerClassLc,
+        string $declaringClassLc,
+        string $declaringClassDisplay,
+        string $methodName,
+        bool $parentScopeAllows,
+        ?callable $isSameOrSubclassOf,
+        ?string $callerClassDisplay,
+        bool $constructorMessage
+    ): void {
         if (self::isPublic($visibilityFlags)) {
             return;
         }
@@ -44,7 +95,7 @@ final class MethodVisibility
             return;
         }
         if ($callerClassLc === null) {
-            self::deny($visibilityFlags, $declaringClassDisplay, $methodName, null);
+            self::deny($visibilityFlags, $declaringClassDisplay, $methodName, null, $constructorMessage);
         }
         if (($visibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0) {
             if ($callerClassLc !== $declaringClassLc) {
@@ -52,7 +103,8 @@ final class MethodVisibility
                     $visibilityFlags,
                     $declaringClassDisplay,
                     $methodName,
-                    $callerClassDisplay ?? $callerClassLc
+                    $callerClassDisplay ?? $callerClassLc,
+                    $constructorMessage
                 );
             }
 
@@ -69,7 +121,8 @@ final class MethodVisibility
                 $visibilityFlags,
                 $declaringClassDisplay,
                 $methodName,
-                $callerClassDisplay ?? $callerClassLc
+                $callerClassDisplay ?? $callerClassLc,
+                $constructorMessage
             );
         }
     }
@@ -119,9 +172,20 @@ final class MethodVisibility
         return true;
     }
 
-    private static function deny(int $visibilityFlags, string $className, string $methodName, ?string $fromScope): void
-    {
+    private static function deny(
+        int $visibilityFlags,
+        string $className,
+        string $methodName,
+        ?string $fromScope,
+        bool $constructorMessage = false
+    ): void {
         $kind = ($visibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0 ? 'private' : 'protected';
+        if ($constructorMessage) {
+            if (null === $fromScope) {
+                throw new \LogicException("Call to {$kind} {$className}::{$methodName}() from global scope");
+            }
+            throw new \LogicException("Call to {$kind} {$className}::{$methodName}() from scope {$fromScope}");
+        }
         if (null === $fromScope) {
             throw new \LogicException("Call to {$kind} method {$className}::{$methodName}() from global scope");
         }
