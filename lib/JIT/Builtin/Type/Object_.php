@@ -148,11 +148,17 @@ class Object_ extends Type {
             $this->context->getTypeFromString('__ref__'),
             $this->context->getTypeFromString('int64'),
             $this->context->getTypeFromString('int8'),
+            $this->context->getTypeFromString('int8'),
+            $this->context->getTypeFromString('int8'),
+            $this->context->getTypeFromString('int32'),
         );
         $this->context->structFieldMap['__object__'] = [
             'ref' => 0,
             'class_id' => 1,
             'constructed' => 2,
+            'lazy_pending' => 3,
+            'lazy_ghost' => 4,
+            'lazy_init_index' => 5,
         ];
         $this->pointer = $this->context->getTypeFromString('__object__*');
         \PHPCompiler\JIT\Builtin\ReadonlyRaise::registerDeclarations($this->context);
@@ -492,6 +498,19 @@ class Object_ extends Type {
         $this->context->builder->store(
             $this->context->getTypeFromString('int8')->constInt($constructedInit, false),
             $this->context->builder->structGep($obj, $map['constructed'])
+        );
+        $i8 = $this->context->getTypeFromString('int8');
+        $this->context->builder->store(
+            $i8->constInt(0, false),
+            $this->context->builder->structGep($obj, $map['lazy_pending'])
+        );
+        $this->context->builder->store(
+            $i8->constInt(0, false),
+            $this->context->builder->structGep($obj, $map['lazy_ghost'])
+        );
+        $this->context->builder->store(
+            $this->context->getTypeFromString('int32')->constInt(-1, true),
+            $this->context->builder->structGep($obj, $map['lazy_init_index'])
         );
 
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
@@ -2049,13 +2068,15 @@ class Object_ extends Type {
     private function copyConstructedFlag(PHPLLVM\Value $dest, PHPLLVM\Value $src): void
     {
         $map = $this->context->structFieldMap['__object__'];
-        $constructed = $this->context->builder->load(
-            $this->context->builder->structGep($src, $map['constructed'])
-        );
-        $this->context->builder->store(
-            $constructed,
-            $this->context->builder->structGep($dest, $map['constructed'])
-        );
+        foreach (['constructed', 'lazy_pending', 'lazy_ghost', 'lazy_init_index'] as $field) {
+            $value = $this->context->builder->load(
+                $this->context->builder->structGep($src, $map[$field])
+            );
+            $this->context->builder->store(
+                $value,
+                $this->context->builder->structGep($dest, $map[$field])
+            );
+        }
     }
 
     public function classNameForId(int $id): string
