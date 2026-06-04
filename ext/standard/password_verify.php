@@ -7,9 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** password_verify() — VM via host PHP; JIT/AOT via libcrypt (issue #172). */
@@ -25,16 +24,13 @@ final class password_verify extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('password_verify() requires exactly two arguments');
         }
+        $password = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'password_verify', 0, 'password');
+        $hash = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'password_verify', 1, 'hash');
         if (null === $frame->returnVar) {
             return;
         }
-        $password = $frame->calledArgs[0]->resolveIndirect();
-        $hash = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $password->type || Variable::TYPE_STRING !== $hash->type) {
-            throw new \LogicException('password_verify() requires string password and hash in this compiler build');
-        }
         $frame->returnVar->bool(
-            VmPassword::verify($password->toString(), $hash->toString())
+            VmPassword::verify($password, $hash)
         );
     }
 
@@ -46,8 +42,8 @@ final class password_verify extends Internal
 
         return JitPassword::verify(
             $context,
-            JitStringArg::lower($context, $args[0], 'password_verify() password'),
-            JitStringArg::lower($context, $args[1], 'password_verify() hash')
+            JitStringBuiltinArg::lower($context, $args[0], 'password_verify', 0, 'password'),
+            JitStringBuiltinArg::lower($context, $args[1], 'password_verify', 1, 'hash')
         );
     }
 }
