@@ -2167,6 +2167,25 @@ restart:
                     $memberNameRaw = $frame->scope[$op->arg3]->toString();
                     $classOperand = $frame->scope[$op->arg2]->resolveIndirect();
                     if ($op->classConstFetchOnObject) {
+                        if ('class' === strtolower($memberNameRaw)) {
+                            $fqcn = $this->resolveClassPseudoConstFromOperand($classOperand);
+                            if (null !== $fqcn) {
+                                $frame->scope[$op->arg1]->string($fqcn);
+                                break;
+                            }
+                            $catchFrame = $this->dispatchVmTypeError(
+                                new \TypeError(
+                                    'Cannot use "::class" on value of type '
+                                    .$this->valueDebugTypeLabel($classOperand)
+                                ),
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
                         if (Variable::TYPE_OBJECT !== $classOperand->type) {
                             $catchFrame = $this->dispatchVmTypeError(
                                 new \TypeError(
@@ -4186,7 +4205,7 @@ restart:
     /** Zend get_debug_type() labels for TypeError messages (#4241). */
     private function valueDebugTypeLabel(Variable $value): string
     {
-        if (Variable::TYPE_OBJECT === $value->type) {
+        if (Variable::TYPE_OBJECT === $value->type || Variable::TYPE_ENUM_CASE === $value->type) {
             return 'object';
         }
 
@@ -4199,6 +4218,22 @@ restart:
             Variable::TYPE_ARRAY => 'array',
             default => 'mixed',
         };
+    }
+
+    /**
+     * Resolve `$operand::class` (Zend zend_compile.c FETCH_CLASS on enum case / object).
+     */
+    private function resolveClassPseudoConstFromOperand(Variable $operand): ?string
+    {
+        $operand = $operand->resolveIndirect();
+        if (Variable::TYPE_ENUM_CASE === $operand->type) {
+            return $operand->toEnumCase()->enumClass->name;
+        }
+        if (Variable::TYPE_OBJECT === $operand->type) {
+            return $operand->toObject()->class->name;
+        }
+
+        return null;
     }
 
     /** True when the next opcode assigns through this VAR_FETCH destination slot (#3801). */

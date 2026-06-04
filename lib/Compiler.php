@@ -3715,6 +3715,15 @@ class Compiler {
     protected function tryFoldClassConstFetchDefault(Op\Expr\ClassConstFetch $expr, Block $block): ?Variable
     {
         $constName = $this->staticNameFromOperand($expr->name);
+        if (null !== $constName && 'class' === strtolower($constName)) {
+            $enumFqcn = $this->tryFoldEnumCaseClassPseudoConstFqcn($expr->class, $block);
+            if (null !== $enumFqcn) {
+                $value = new Variable(Variable::TYPE_STRING);
+                $value->string($enumFqcn);
+
+                return $value;
+            }
+        }
         $className = $this->staticNameFromOperand($expr->class);
         if (null === $constName || null === $className) {
             return null;
@@ -3744,6 +3753,58 @@ class Compiler {
         }
 
         return $this->tryFoldExternalClassConstFetch($className, $constName);
+    }
+
+    /**
+     * Fold {@code EnumCase::class} to the enum type FQCN (Zend zend_compile.c; #5662).
+     */
+    protected function tryFoldEnumCaseClassPseudoConstFqcn(Operand $classOperand, Block $block): ?string
+    {
+        if ($classOperand instanceof Op\Expr\ClassConstFetch) {
+            $inner = $this->tryFoldClassConstFetchDefault($classOperand, $block);
+
+            return null !== $inner ? $this->enumFqcnFromEnumCaseVariable($inner) : null;
+        }
+        if (!$classOperand instanceof Operand\Variable && !$classOperand instanceof Temporary) {
+            return null;
+        }
+        if (null === $block->orig) {
+            return null;
+        }
+        foreach ($block->orig->children as $child) {
+            if (!$child instanceof Op\Expr\ClassConstFetch || $child->result !== $classOperand) {
+                continue;
+            }
+            $className = $this->staticNameFromOperand($child->class);
+            $caseName = $this->staticNameFromOperand($child->name);
+            if (null === $className || null === $caseName) {
+                continue;
+            }
+            $lcClass = $this->resolveDefaultClassConstScope($className, $block);
+            if (null === $lcClass || !isset($this->compileTimeClassConsts[$lcClass][strtolower($caseName)])) {
+                continue;
+            }
+            $stored = $this->compileTimeClassConsts[$lcClass][strtolower($caseName)];
+            $fqcn = $this->enumFqcnFromEnumCaseVariable($stored);
+            if (null !== $fqcn) {
+                return $fqcn;
+            }
+        }
+
+        return null;
+    }
+
+    protected function enumFqcnFromEnumCaseVariable(Variable $var): ?string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_ENUM_CASE === $var->type) {
+            return $var->toEnumCase()->enumClass->name;
+        }
+        if (Variable::TYPE_OBJECT === $var->type && EnumCaseSupport::isEnumCase($var->toObject())) {
+            return $var->toObject()->class->name;
+        }
+
+        return null;
     }
 
     protected function tryFoldExternalClassConstFetch(string $className, string $constName): ?Variable
@@ -7092,6 +7153,12 @@ class Compiler {
      */
     protected function compileClassConstFetch(Op\Expr\ClassConstFetch $expr, Block $block): array
     {
+        $folded = $this->tryFoldClassConstFetchDefault($expr, $block);
+        if (null !== $folded) {
+            $block->registerConstant($expr->result, $folded);
+
+            return [];
+        }
         $constName = $this->staticNameFromOperand($expr->name);
         $className = $this->staticNameFromOperand($expr->class);
         if (null !== $constName
