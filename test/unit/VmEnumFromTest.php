@@ -94,6 +94,22 @@ PHP;
         $this->assertSame('HighLow', $output);
     }
 
+    public function testIntBackedEnumFromReturnsObjectType(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; }
+echo gettype(E::from(1));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_from_object_type.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame('object', $output);
+    }
+
     public function testIntBackedEnumFromRejectsNonNumericString(): void
     {
         $code = <<<'PHP'

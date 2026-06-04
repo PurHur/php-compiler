@@ -26,6 +26,7 @@ final class EnumVMTest extends BaseTest
                 'enum_cases_backed_spread.phpt',
                 'enum_from.phpt',
                 'enum_from_int.phpt',
+                'enum_from_valid.phpt',
                 'enum_from_invalid.phpt',
                 'enum_try_from.phpt',
                 'enum_instanceof.phpt',

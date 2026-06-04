@@ -42,7 +42,12 @@ final class EnumFromHandler extends Internal
             return;
         }
         if (null !== $frame->returnVar) {
-            $frame->returnVar->enumCase($match);
+            $canonical = BackedEnum::canonicalCaseVariable($this->enum, $match->caseName);
+            if (null !== $canonical) {
+                $frame->returnVar->copyFrom($canonical);
+            } else {
+                $frame->returnVar->enumCase($match);
+            }
         }
     }
 
