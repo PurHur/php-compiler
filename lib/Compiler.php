@@ -4852,7 +4852,7 @@ class Compiler {
             $block->addOpCode(new OpCode(
                 OpCode::TYPE_ISSET,
                 $checkSlot,
-                $leftSlot,
+                $resultSlot,
                 null
             ));
         }

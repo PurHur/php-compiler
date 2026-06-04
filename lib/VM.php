@@ -1903,7 +1903,13 @@ restart:
                     $dest->copyFrom($evalResult);
                     break;
                 case OpCode::TYPE_COALESCE:
-                    $takeLeft = $frame->scope[$op->arg2]->toBool();
+                    $check = $frame->scope[$op->arg2]->resolveIndirect();
+                    if (Variable::TYPE_BOOLEAN === $check->type) {
+                        $takeLeft = $check->toBool($this);
+                    } else {
+                        $takeLeft = !$check->isUndefined()
+                            && Variable::TYPE_NULL !== $check->type;
+                    }
                     $frame = ($takeLeft ? $op->block1 : $op->block2)->getFrame(
                         $this->context,
                         $frame
