@@ -527,6 +527,18 @@ class Block {
         return null;
     }
 
+    /** True when $slot holds a named local ($a), not a compiler temporary (#5340). */
+    public function isNamedVariableSlot(int $slot): bool
+    {
+        foreach ($this->scope as $operand) {
+            if ($this->scope[$operand] === $slot && null !== self::resolveVariableName($operand)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** Yields [variable name, scope slot] pairs. */
     public function eachNamedScopeSlot(): \Generator
     {
