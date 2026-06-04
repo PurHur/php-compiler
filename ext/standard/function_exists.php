@@ -27,7 +27,7 @@ final class function_exists extends Internal
             return;
         }
         $ctx = VmReflection::requireContext($frame);
-        $name = VmReflection::stringArg($frame->calledArgs[0], 'function_exists() argument #1');
+        $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'function_exists', 0, 'function');
         $frame->returnVar->bool(VmReflection::functionExists($ctx, $name));
     }
 
@@ -36,10 +36,6 @@ final class function_exists extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('function_exists() requires exactly one argument');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type && JITVariable::TYPE_VALUE !== $args[0]->type) {
-            throw new \LogicException('function_exists() argument #1 must be a string in this compiler build');
-        }
-
         return JitFunctionExists::invoke($context, $args[0]);
     }
 }

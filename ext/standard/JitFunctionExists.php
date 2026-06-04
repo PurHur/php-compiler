@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\Builtin\StringFunctionExists;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -22,7 +23,7 @@ final class JitFunctionExists
             return $i1->constInt($context->functionIsRegistered($literal) ? 1 : 0, false);
         }
 
-        $nameStr = JitStringArg::lower($context, $nameArg, 'function_exists() argument #1');
+        $nameStr = JitStringBuiltinArg::lower($context, $nameArg, 'function_exists', 0, 'function');
         StringFunctionExists::ensureLinked($context);
         $builtinHit = $context->builder->call(
             $context->lookupFunction('__compiler_builtin_function_exists'),
