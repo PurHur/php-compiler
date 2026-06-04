@@ -1,5 +1,5 @@
 --TEST--
-Language: switch() enum case label must not match scalar subject (zend_operators.c, #5819)
+Language: switch() enum case label must not match scalar subject (zend_operators.c, #5819, #5835)
 --FILE--
 <?php
 enum E: int { case A = 1; }
@@ -19,7 +19,16 @@ switch ('x') {
     default:
         echo "str-no\n";
 }
+
+switch (E::A) {
+    case E::A:
+        echo "identity\n";
+        break;
+    default:
+        echo "identity-no\n";
+}
 ?>
 --EXPECT--
 no
 str-no
+identity
