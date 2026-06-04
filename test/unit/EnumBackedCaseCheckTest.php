@@ -99,4 +99,36 @@ PHP,
         );
         $this->assertNotNull($block);
     }
+
+    public function testIntBackedDuplicateBackingValueFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Duplicate value in enum E for cases A and B');
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+enum E: int {
+    case A = 1;
+    case B = 1;
+}
+PHP,
+            'enum_dup_int.php'
+        );
+    }
+
+    public function testStringBackedDuplicateBackingValueFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Duplicate value in enum E for cases A and B');
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+enum E: string {
+    case A = 'x';
+    case B = 'x';
+}
+PHP,
+            'enum_dup_string.php'
+        );
+    }
 }

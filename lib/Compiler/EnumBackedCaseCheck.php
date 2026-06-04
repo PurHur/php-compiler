@@ -10,9 +10,10 @@ use PHPCfg\Operand\Literal as OperandLiteral;
 use PHPCfg\Script;
 
 /**
- * Compile-time check: backed enum cases must declare an explicit scalar value (#5397).
+ * Compile-time check: backed enum cases must declare an explicit scalar value (#5397)
+ * and backing scalars must be unique (#5710).
  *
- * php-src: Zend/zend_compile.c — zend_compile_enum_case
+ * php-src: Zend/zend_enum.c — zend_register_enum_case
  */
 final class EnumBackedCaseCheck
 {
@@ -28,10 +29,16 @@ final class EnumBackedCaseCheck
 
     private function validateEnum(Op\Stmt\Enum_ $enum): void
     {
-        if (null === $enum->backedType) {
+        if (null === $enum->backedType || !$enum->backedType instanceof Op\Type\Literal) {
+            return;
+        }
+        $backedType = $enum->backedType->name;
+        if ('int' !== $backedType && 'string' !== $backedType) {
             return;
         }
         $enumDisplay = $this->operandDisplayName($enum->name, 'enum');
+        /** @var array<int|string, string> */
+        $seenBacking = [];
         foreach ($enum->stmts->children as $member) {
             if (!$member instanceof Op\Terminal\Const_) {
                 continue;
@@ -39,16 +46,59 @@ final class EnumBackedCaseCheck
             if (property_exists($member, 'isEnumCase') && !$member->isEnumCase) {
                 continue;
             }
-            if ($this->enumCaseHasExplicitValue($member, $enum)) {
+            $caseName = $this->operandDisplayName($member->name, 'case');
+            if (!$this->enumCaseHasExplicitValue($member, $enum)) {
+                throw new CompileFatal(
+                    $member->getFile(),
+                    $member->getLine(),
+                    "Enum case {$enumDisplay}::{$caseName} must have a value"
+                );
+            }
+            $backingKey = $this->compileTimeEnumCaseBackingKey($member, $backedType);
+            if (null === $backingKey) {
                 continue;
             }
-            $caseName = $this->operandDisplayName($member->name, 'case');
-            throw new CompileFatal(
-                $member->getFile(),
-                $member->getLine(),
-                "Enum case {$enumDisplay}::{$caseName} must have a value"
-            );
+            if (isset($seenBacking[$backingKey])) {
+                throw new CompileFatal(
+                    $member->getFile(),
+                    $member->getLine(),
+                    sprintf(
+                        'Duplicate value in enum %s for cases %s and %s',
+                        $enumDisplay,
+                        $seenBacking[$backingKey],
+                        $caseName
+                    )
+                );
+            }
+            $seenBacking[$backingKey] = $caseName;
         }
+    }
+
+    /**
+     * @return int|string|null backing scalar when known at compile time
+     */
+    private function compileTimeEnumCaseBackingKey(Op\Terminal\Const_ $member, string $backedType): int|string|null
+    {
+        $value = $member->value;
+        if (!$value instanceof OperandLiteral) {
+            return null;
+        }
+        $literal = $value->value;
+        if ('int' === $backedType) {
+            if (is_int($literal)) {
+                return $literal;
+            }
+            if (is_float($literal) && (float) (int) $literal === $literal) {
+                return (int) $literal;
+            }
+
+            return null;
+        }
+        if (is_string($literal)) {
+            return $literal;
+        }
+
+        return null;
     }
 
     private function enumCaseHasExplicitValue(Op\Terminal\Const_ $member, Op\Stmt\Enum_ $enum): bool

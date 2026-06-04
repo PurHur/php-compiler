@@ -41,7 +41,6 @@ final class EnumSupport
         if (!$entry->isEnum || null === $entry->backedType || $entry->backedEnumTableBuilt) {
             return;
         }
-        $entry->backedEnumTableBuilt = true;
         $backedType = $entry->backedType;
         /** @var array<int, string>|array<string, string> */
         $seen = [];
@@ -68,5 +67,6 @@ final class EnumSupport
             }
             $seen[$key] = $case['name'];
         }
+        $entry->backedEnumTableBuilt = true;
     }
 }
