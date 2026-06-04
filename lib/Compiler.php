@@ -2489,6 +2489,32 @@ class Compiler {
     }
 
     /**
+     * True when the static fetch class operand is an instance (new expr or variable), not a class name (#5477).
+     */
+    protected function staticPropertyClassIsObjectExpression(Operand $class): bool
+    {
+        if ($class instanceof Operand\Literal && is_string($class->value)) {
+            return false;
+        }
+        $current = $class;
+        while (null !== $current) {
+            if ($current instanceof Op\Expr\New_) {
+                return true;
+            }
+            if ($current instanceof Operand\Temporary || $current instanceof Operand\Variable) {
+                $next = $current->original;
+                $current = $next instanceof Operand ? $next : null;
+
+                continue;
+            }
+
+            break;
+        }
+
+        return $class instanceof Operand\Temporary || $class instanceof Operand\Variable;
+    }
+
+    /**
      * @return list<string>
      */
     protected function intersectionNamesFromCfgType(Op\Type\Intersection $type): array
@@ -6442,7 +6468,9 @@ class Compiler {
         $literalName = $this->staticNameFromOperand($name);
         if (null !== $literalName) {
             $lcProp = strtolower($literalName);
-            $className = $this->literalScopeClassName($class);
+            $className = $this->staticPropertyClassIsObjectExpression($class)
+                ? null
+                : $this->literalScopeClassName($class);
             if (null !== $className) {
                 $lcClass = strtolower(ltrim($className, '\\'));
                 // self::/static::/parent:: with a literal member — property name, not a local (#4668).
@@ -6452,6 +6480,9 @@ class Compiler {
                 if (isset($this->compiledClassStaticProperties[$lcClass][$lcProp])) {
                     return $this->compileOperand($name, $block, true);
                 }
+            } elseif ($this->staticPropertyClassIsObjectExpression($class)) {
+                // (new Class()) / $obj — literal member is a declared property name, not $local (#5477).
+                return $this->compileOperand($name, $block, true);
             }
             if (
                 null !== $this->compilingClassLc
