@@ -352,6 +352,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/VmFilter.php',
         'ext/standard/VmHash.php',
         'ext/standard/VmHashNative.php',
+        'ext/standard/VmPregNative.php',
         'ext/standard/VmSession.php',
         'ext/standard/SetcookieLine.php',
         'ext/standard/sqrt.php',

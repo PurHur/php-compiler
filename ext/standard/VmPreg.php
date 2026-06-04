@@ -8,7 +8,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * VM preg_match() — host PCRE via PHP for reference-compatible captures (issue #93).
+ * VM preg_match() — native PCRE via VmPregNative (issue #4874).
  *
  * JIT/AOT use native {@see lib/AOT/runtime/preg_match.c} instead.
  */
@@ -43,9 +43,9 @@ final class VmPreg
         };
     }
 
-    private static function syncLastErrorFromHost(): void
+    private static function syncLastErrorFromNative(): void
     {
-        self::$lastError = \preg_last_error();
+        self::$lastError = VmPregNative::lastError();
     }
 
     public static function validatePregMatchFlags(int $flags): void
@@ -85,8 +85,8 @@ final class VmPreg
         }
         self::validatePregMatchFlags($flags);
 
-        $result = \preg_match($pattern, $subject, $matches, $flags, $offset);
-        self::syncLastErrorFromHost();
+        $result = VmPregNative::pregMatch($pattern, $subject, $matches, $flags, $offset);
+        self::syncLastErrorFromNative();
 
         return $result;
     }
@@ -106,8 +106,8 @@ final class VmPreg
         }
         self::validatePregMatchAllFlags($flags);
 
-        $result = \preg_match_all($pattern, $subject, $matches, $flags, $offset);
-        self::syncLastErrorFromHost();
+        $result = VmPregNative::pregMatchAll($pattern, $subject, $matches, $flags, $offset);
+        self::syncLastErrorFromNative();
 
         return $result;
     }
@@ -128,8 +128,8 @@ final class VmPreg
             return false;
         }
 
-        $result = \preg_filter($pattern, $replacement, $subject, $limit, $flags);
-        self::syncLastErrorFromHost();
+        $result = VmPregNative::pregFilter($pattern, $replacement, $subject, $limit, $flags);
+        self::syncLastErrorFromNative();
         if (false === $result) {
             return false;
         }
@@ -152,8 +152,8 @@ final class VmPreg
             return false;
         }
 
-        $result = \preg_replace($pattern, $replacement, $subject, $limit);
-        self::syncLastErrorFromHost();
+        $result = VmPregNative::pregReplace($pattern, $replacement, $subject, $limit);
+        self::syncLastErrorFromNative();
         if (null === $result) {
             return false;
         }
@@ -200,8 +200,8 @@ final class VmPreg
             );
         }
 
-        $result = \preg_split($pattern, $subject, $limit, $flags);
-        self::syncLastErrorFromHost();
+        $result = VmPregNative::pregSplit($pattern, $subject, $limit, $flags);
+        self::syncLastErrorFromNative();
         if (false === $result) {
             return false;
         }

@@ -111,7 +111,7 @@ final class StringPregMatch
 
         $includes = self::includeFlags();
         $cmd = escapeshellarg($compiler)
-            .' -emit-llvm -c -fPIC -O2'.$includes.' '
+            .' -emit-llvm -c -fPIC -O2 -DPCRE2_CODE_UNIT_WIDTH=8'.$includes.' '
             .escapeshellarg($source).' -o '.escapeshellarg($cache).' 2>&1';
         $output = shell_exec($cmd);
         if (!is_file($cache)) {

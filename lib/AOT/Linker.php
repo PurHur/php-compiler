@@ -275,6 +275,9 @@ final class Linker
         if ('function_exists.c' === $basename) {
             $flags .= ' -I'.escapeshellarg(__DIR__.'/runtime');
         }
+        if ('preg_match.c' === $basename) {
+            $flags .= ' -DPCRE2_CODE_UNIT_WIDTH=8';
+        }
 
         return $flags;
     }
