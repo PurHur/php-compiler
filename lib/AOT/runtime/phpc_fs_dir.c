@@ -260,6 +260,17 @@ long long __compiler_umask_get(void)
     return (long long) old;
 }
 
+/** proc_nice() — returns 1 on success, 0 on failure (#5181; php-src ext/standard/basic_functions.c). */
+long long __compiler_proc_nice(long long priority)
+{
+    errno = 0;
+    if (nice((int) priority) == -1 && errno != 0) {
+        return 0;
+    }
+
+    return 1;
+}
+
 
 void __phpc_strvec_free(char **items, int count);
 

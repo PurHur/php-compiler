@@ -423,6 +423,9 @@ class Type extends Builtin {
         $fntypeUmask = $this->context->context->functionType($i64, false, $i64);
         $fnUmask = $this->context->module->addFunction('__compiler_umask', $fntypeUmask);
         $this->context->registerFunction('__compiler_umask', $fnUmask);
+        $fntypeProcNice = $this->context->context->functionType($i64, false, $i64);
+        $fnProcNice = $this->context->module->addFunction('__compiler_proc_nice', $fntypeProcNice);
+        $this->context->registerFunction('__compiler_proc_nice', $fnProcNice);
         $fntypeCopy = $this->context->context->functionType(
             $i32,
             false,

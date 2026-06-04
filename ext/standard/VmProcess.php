@@ -36,4 +36,14 @@ final class VmProcess
 
         return $ht;
     }
+
+    /** proc_nice() — host libc via Zend when available (php-src basic_functions.c; #5181). */
+    public static function proc_nice(int $priority): bool
+    {
+        if (!\function_exists('proc_nice')) {
+            return false;
+        }
+
+        return \proc_nice($priority);
+    }
 }
