@@ -404,6 +404,11 @@ class VM {
     /** (string) cast on objects — invoke __toString (Zend zend_operators.c, issue #3421). */
     public function castObjectToString(ObjectEntry $object): string
     {
+        if (EnumCaseSupport::isEnumCase($object)) {
+            throw new \Error(
+                'Object of class '.$object->class->name.' could not be converted to string'
+            );
+        }
         $typeString = VM\ReflectionTypeSupport::tryObjectTypeString($object);
         if (null !== $typeString) {
             return $typeString;

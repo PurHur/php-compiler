@@ -54,27 +54,14 @@ final class EnumCaseSupport
         throw new \LogicException("Undefined property: {$name}");
     }
 
+    /** Zend rejects implicit string conversion of enum case objects (#4819, #5508). */
     public static function toString(ObjectEntry $object): string
     {
         if (!$object->isEnumCase) {
             throw new \LogicException('toString called on non-enum-case object');
         }
-        if (null === $object->enumCaseValue) {
-            $className = $object->class->name;
-            throw new \Error("Object of class {$className} could not be converted to string");
-        }
-        $value = $object->enumCaseValue;
-        switch ($value->type) {
-            case Variable::TYPE_STRING:
-                return $value->toString();
-            case Variable::TYPE_INTEGER:
-                return (string) $value->toInt();
-            case Variable::TYPE_FLOAT:
-                return (string) $value->toFloat();
-            default:
-                $className = $object->class->name;
-                throw new \Error("Object of class {$className} could not be converted to string");
-        }
+
+        throw new \Error("Object of class {$object->class->name} could not be converted to string");
     }
 
     /**
