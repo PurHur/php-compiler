@@ -25,8 +25,8 @@ final class strcmp extends Internal
         if (2 !== count($frame->calledArgs)) {
             throw new \LogicException('strcmp() requires exactly two arguments');
         }
-        $a = $frame->calledArgs[0]->resolveIndirect()->toString();
-        $b = $frame->calledArgs[1]->resolveIndirect()->toString();
+        $a = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strcmp', 0, 'string1');
+        $b = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strcmp', 1, 'string2');
         if (null === $frame->returnVar) {
             return;
         }
@@ -41,8 +41,8 @@ final class strcmp extends Internal
         if (2 !== count($args)) {
             throw new \LogicException('strcmp() requires exactly two arguments');
         }
-        $p0 = $this->stringDataPtr($context, $this->jitString($context, $args[0], 'strcmp() argument #1'));
-        $p1 = $this->stringDataPtr($context, $this->jitString($context, $args[1], 'strcmp() argument #2'));
+        $p0 = $this->stringDataPtr($context, JitStrcmp::lowerStringOperand($context, $args[0], 1, 'string1'));
+        $p1 = $this->stringDataPtr($context, JitStrcmp::lowerStringOperand($context, $args[1], 2, 'string2'));
         $fn = $context->lookupFunction('strcmp');
         $raw = $context->builder->call($fn, $p0, $p1);
         $i64 = $context->getTypeFromString('int64');
