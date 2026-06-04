@@ -11597,23 +11597,7 @@ class JIT {
 
     private function ensureJitGlobal(string $name): Variable
     {
-        if (!isset($this->context->jitGlobalVariables[$name])) {
-            if ('argv' === $name && null !== JIT\CliArgvGlobalInit::$global) {
-                $this->context->jitGlobalVariables[$name] = JIT\CliArgvGlobalInit::load($this->context);
-            } elseif ('argc' === $name && null !== JIT\CliArgvGlobalInit::$argcGlobal) {
-                $this->context->jitGlobalVariables[$name] = JIT\CliArgvGlobalInit::loadArgc($this->context);
-            } else {
-                $slot = JIT\JitValueBox::alloc($this->context);
-                $this->context->jitGlobalVariables[$name] = new Variable(
-                    $this->context,
-                    Variable::TYPE_VALUE,
-                    Variable::KIND_VARIABLE,
-                    $slot
-                );
-            }
-        }
-
-        return $this->context->jitGlobalVariables[$name];
+        return $this->context->ensureScriptGlobal($name);
     }
 
     /**

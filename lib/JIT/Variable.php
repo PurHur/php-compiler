@@ -12,6 +12,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\Block;
 use PHPCompiler\OpCode;
+use PHPCompiler\Web\Superglobals;
 use PHPCfg\Operand;
 use PHPTypes\Type;
 use PHPCompiler\VM\Variable as VMVariable;
@@ -370,6 +371,15 @@ final class Variable {
                 self::KIND_VARIABLE,
                 BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__hashtable__*'))
             );
+        }
+        $name = OperandName::resolve($op);
+        if (
+            null !== $name
+            && '' !== $name
+            && !Superglobals::isSuperglobalName($name)
+            && $block->isMainScript()
+        ) {
+            return $context->ensureScriptGlobal($name);
         }
         $type = self::getTypeFromType($op->type);
         if ($type === self::TYPE_NULL) {

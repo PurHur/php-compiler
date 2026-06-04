@@ -263,6 +263,58 @@ class Context {
         $this->jitUndeclaredInstancePropertyWrites = [];
     }
 
+    /**
+     * LLVM module-global __value__ slot for a script-level variable (#3601, #5393).
+     *
+     * Shared by {main} locals and `global $name` imports in nested functions.
+     */
+    public function ensureScriptGlobal(string $name): Variable
+    {
+        if (!isset($this->jitGlobalVariables[$name])) {
+            if ('argv' === $name && null !== CliArgvGlobalInit::$global) {
+                $this->jitGlobalVariables[$name] = CliArgvGlobalInit::load($this);
+            } elseif ('argc' === $name && null !== CliArgvGlobalInit::$argcGlobal) {
+                $this->jitGlobalVariables[$name] = CliArgvGlobalInit::loadArgc($this);
+            } else {
+                $globalName = 'phpc_script_global_'.substr(hash('sha256', 'script:'.$name), 0, 16);
+                $ptrTy = $this->getTypeFromString('__value__*');
+                $global = $this->module->addGlobal($ptrTy, $globalName);
+                $global->setInitializer($ptrTy->constNull());
+                $scriptVar = new Variable(
+                    $this,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VALUE,
+                    $global
+                );
+                $scriptVar->functionStaticGlobal = true;
+                $this->jitGlobalVariables[$name] = $scriptVar;
+                $this->initScriptGlobalHeapBox($global);
+            }
+        }
+
+        return $this->jitGlobalVariables[$name];
+    }
+
+    private function initScriptGlobalHeapBox(PHPLLVM\Value $global): void
+    {
+        $restore = $this->builder->getInsertBlock();
+        $this->builder->positionAtEnd($this->initBlock);
+        $valueType = $this->getTypeFromString('__value__');
+        $heapVal = $this->memory->malloc($valueType);
+        $heapPtr = $this->builder->pointerCast(
+            $heapVal,
+            $this->getTypeFromString('__value__*')
+        );
+        $this->builder->call(
+            $this->lookupFunction('__value__writeNull'),
+            $heapPtr
+        );
+        $this->builder->store($heapPtr, $global);
+        if (null !== $restore) {
+            $this->builder->positionAtEnd($restore);
+        }
+    }
+
     public function bindVariableByName(string $name, Variable $var): void
     {
         $resolved = $this->resolveRefAliasName($name);
