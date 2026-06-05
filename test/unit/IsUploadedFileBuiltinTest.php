@@ -6,6 +6,8 @@ namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\is_uploaded_file;
 use PHPCompiler\ext\standard\VmFs;
+use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPUnit\Framework\TestCase;
 
@@ -28,6 +30,25 @@ final class IsUploadedFileBuiltinTest extends TestCase
         $fn->execute($frame);
         $this->assertTrue($frame->returnVar->resolveIndirect()->toBool());
         @unlink($tmp);
+    }
+
+    public function testEnumCaseFilenameTypeError(): void
+    {
+        $runtime = new Runtime();
+        $fn = new is_uploaded_file();
+        $enum = new ClassEntry('E');
+        $enum->isEnum = true;
+        $enum->backedType = 'string';
+        $backing = new VMVariable();
+        $backing->string('/tmp/x');
+        $case = EnumCaseSupport::createCase($enum, 'A', $backing);
+
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->calledArgs = [$case];
+        $frame->returnVar = new VMVariable();
+        $this->expectException(\TypeError::class);
+        $this->expectExceptionMessage('is_uploaded_file(): Argument #1 ($filename) must be of type string, E given');
+        $fn->execute($frame);
     }
 
     public function testRejectsPlainTemp(): void
