@@ -61,6 +61,8 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringDateTime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringDeployPath.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFileGetContents.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFilePutContents.php';
+require_once __DIR__.'/../../../ext/standard/BuiltinRegistry.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/FunctionExistsRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFunctionExists.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGetenv.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHtmlspecialchars.php';
