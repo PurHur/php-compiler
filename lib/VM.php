@@ -428,7 +428,6 @@ class VM {
         return null;
     }
 
-    /**
     public function unsetObjectProperty(ObjectEntry $object, string $propName): void
     {
         $props = $object->getRawProperties();

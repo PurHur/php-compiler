@@ -46,6 +46,10 @@ final class TypedPropertyCheck
             if ($property->prototype->isUndefined()) {
                 return true;
             }
+            // Post-unset typed property with default (#4863, zend_object_handlers.c).
+            if (Variable::TYPE_UNDEFINED === $target->type && $property->prototype->hasDeclaredTypeConstraint()) {
+                return true;
+            }
             // Readonly without default stays uninitialized until constructor assigns (#4248).
             if ($property->readonly && null === $property->default && !$property->hasRuntimeDefaultInit()) {
                 return Variable::TYPE_UNDEFINED === $target->type;
