@@ -104,6 +104,51 @@ PHP;
         );
     }
 
+    public function testPhpTypesThrowExprOverlayApplied(): void
+    {
+        $recon = self::$root.'/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php';
+        if (!is_readable($recon)) {
+            self::markTestSkipped('vendor/ircmaxell/php-types not installed');
+        }
+
+        $body = (string) file_get_contents($recon);
+        self::assertStringContainsString(
+            "case 'Expr_Throw':",
+            $body,
+            'php-types-throw-expr overlay must type-reconstruct throw expressions (#3802, #5151)'
+        );
+    }
+
+    public function testPhpTypesThrowExprOverlayReappliesAfterPartialVendor(): void
+    {
+        $recon = self::$root.'/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php';
+        if (!is_readable($recon)) {
+            self::markTestSkipped('vendor/ircmaxell/php-types not installed');
+        }
+
+        $original = (string) file_get_contents($recon);
+        $stripped = str_replace("            case 'Expr_Throw':\n", '', $original);
+        self::assertNotSame($original, $stripped, 'fixture must include Expr_Throw case arm');
+        file_put_contents($recon, $stripped);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertSame(0, $exitCode, "apply-patches failed after stripping Expr_Throw:\n".$joined);
+
+            $restored = (string) file_get_contents($recon);
+            self::assertStringContainsString(
+                "case 'Expr_Throw':",
+                $restored,
+                'overlay must re-insert Expr_Throw on harness tar-copy vendor (#5151)'
+            );
+        } finally {
+            file_put_contents($recon, $original);
+        }
+    }
+
     public function testPhpCfgThrowExprParserOverlayReappliesAfterPartialVendor(): void
     {
         $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';

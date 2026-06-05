@@ -246,6 +246,7 @@ class TypeReconstructor
 
                 return false;
             case 'Expr_Exit':
+            case 'Expr_Throw':
             case 'Iterator_Reset':
                 return [Type::null()];
             case 'Iterator_Valid':

@@ -2047,31 +2047,80 @@ PY
   echo "Applied php-types-yield-from.patch (overlay)"
 }
 
-apply_php_types_throw_expr_overlay() {
-  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
-  if grep -q "case 'Expr_Throw':" "$target" 2>/dev/null; then
-    echo "Skip php-types-throw-expr.patch (already applied)"
+apply_php_types_throw_expr_overlay_to_target() {
+  local target="$1"
+  if [[ ! -f "$target" ]]; then
+    echo "Skip php-types-throw-expr.patch (target missing): ${target}"
     return 0
   fi
-  python3 - "$target" <<'PY'
+  if grep -q "case 'Expr_Throw':" "$target" 2>/dev/null; then
+    echo "Skip php-types-throw-expr.patch (already applied): ${target}"
+    return 0
+  fi
+  if ! python3 - "$target" <<'PY'
+import re
 import sys
 from pathlib import Path
 
 path = Path(sys.argv[1])
 text = path.read_text()
-old = """            case 'Expr_Exit':
+anchors = [
+    (
+        """            case 'Expr_Exit':
             case 'Iterator_Reset':
-                return [Type::null()];"""
-new = """            case 'Expr_Exit':
+                return [Type::null()];""",
+        """            case 'Expr_Exit':
             case 'Expr_Throw':
             case 'Iterator_Reset':
-                return [Type::null()];"""
-if old not in text:
-    sys.stderr.write("php-types-throw-expr: TypeReconstructor Expr_Exit anchor not found\n")
-    raise SystemExit(1)
-path.write_text(text.replace(old, new, 1))
+                return [Type::null()];""",
+    ),
+    (
+        """            case 'Expr_Exit':
+                return [Type::null()];
+            case 'Iterator_Reset':""",
+        """            case 'Expr_Exit':
+            case 'Expr_Throw':
+                return [Type::null()];
+            case 'Iterator_Reset':""",
+    ),
+]
+for old, new in anchors:
+    if old in text:
+        path.write_text(text.replace(old, new, 1))
+        raise SystemExit(0)
+
+match = re.search(
+    r"(?m)^(\s+case 'Expr_Exit':\n)(\s+case 'Iterator_Reset':)",
+    text,
+)
+if match:
+    indent = match.group(1).split("case")[0]
+    insert = f"{match.group(1)}{indent}case 'Expr_Throw':\n{match.group(2)}"
+    path.write_text(text[: match.start()] + insert + text[match.end() :])
+    raise SystemExit(0)
+
+sys.stderr.write("php-types-throw-expr: TypeReconstructor Expr_Exit anchor not found\n")
+raise SystemExit(1)
 PY
-  echo "Applied php-types-throw-expr.patch (overlay)"
+  then
+    echo "ERROR: php-types-throw-expr overlay failed for ${target} (#5151)" >&2
+    return 1
+  fi
+  echo "Applied php-types-throw-expr.patch (overlay): ${target}"
+}
+
+apply_php_types_throw_expr_overlay() {
+  local rc=0
+  if ! apply_php_types_throw_expr_overlay_to_target "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"; then
+    rc=1
+  fi
+  if ! apply_php_types_throw_expr_overlay_to_target "$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"; then
+    rc=1
+  fi
+  if [[ "$rc" -ne 0 ]]; then
+    record_patch_failure "php-types-throw-expr.patch" "Expr_Throw TypeReconstructor arm missing — fix overlay anchors (#5151)"
+  fi
+  return "$rc"
 }
 
 apply_php_types_hex2bin_strict_overlay() {
@@ -3678,9 +3727,15 @@ verify_critical_language_patches() {
   if ! grep -q "case 'Expr_PostInc':" "$recon" 2>/dev/null; then
     missing+=("php-types-incdec-type")
   fi
+  if ! grep -q "case 'Expr_Throw':" "$recon" 2>/dev/null; then
+    missing+=("php-types-throw-expr")
+  fi
   local prelinked_recon="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
   if [[ -f "$prelinked_recon" ]] && ! grep -q "case 'Expr_PostInc':" "$prelinked_recon" 2>/dev/null; then
     missing+=("php-types-incdec-type-prelinked")
+  fi
+  if [[ -f "$prelinked_recon" ]] && ! grep -q "case 'Expr_Throw':" "$prelinked_recon" 2>/dev/null; then
+    missing+=("php-types-throw-expr-prelinked")
   fi
   if ((${#missing[@]} > 0)); then
     echo "apply-patches: critical language patch markers missing: ${missing[*]}" >&2
