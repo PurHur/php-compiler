@@ -1514,6 +1514,10 @@ PY
 
 apply_php_types_first_class_callable_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  if grep -q 'return \[Type::array()\];' "$target" 2>/dev/null; then
+    sed -i 's/return \[Type::array()\];/return [new Type(Type::TYPE_ARRAY)];/' "$target"
+    echo "Repaired php-types-first-class-callable Type::array() typo (#4957)"
+  fi
   if grep -q 'FirstClassCallable::KIND_METHOD' "$target" 2>/dev/null; then
     echo "Skip php-types-first-class-callable.patch (already applied)"
     return 0
