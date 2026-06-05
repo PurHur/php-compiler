@@ -106,6 +106,32 @@ PHP;
         $this->assertSame("true\ncompiled\nuninit\nlazy\n", ob_get_clean());
     }
 
+    /** @covers issue #6125 */
+    public function testResetAsLazyObject(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Svc {
+    public string $id = '';
+    public function __construct(string $tag = '') {
+        $this->id = $tag;
+    }
+}
+$ref = new ReflectionClass(Svc::class);
+$lazy = $ref->newLazyGhost(function (Svc $o) {
+    $o->__construct('init');
+});
+$ref->markLazyObjectAsInitialized($lazy);
+$ref->resetAsLazyObject($lazy);
+echo $ref->isUninitializedLazyObject($lazy) ? 'uninit' : 'init', "\n";
+echo $lazy->id, "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'lazy_object_reset.php'));
+        $this->assertSame("uninit\ninit\n", ob_get_clean());
+    }
+
     /** @covers issue #5968 */
     public function testLazyObjectIntrospectionMethods(): void
     {
