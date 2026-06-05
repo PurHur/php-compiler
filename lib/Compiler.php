@@ -2993,6 +2993,7 @@ class Compiler {
                             || $this->isReadonlyPropertyFlags($child->visibility);
                         $declare->propertyVisibility = MethodVisibility::mask($child->visibility);
                         $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($child);
+                        $declare->propertyGetVisibility = $this->asymmetricGetVisibilityFromCfgOp($child);
                     }
                     $declare->attributeNames = AttributeNames::fromOp($child);
                     $this->assignAttributeMetadata($declare, $child);
@@ -3367,6 +3368,7 @@ class Compiler {
         $declare->propertyReadonly = $this->isPromotedParamReadonly($param);
         $declare->propertyVisibility = MethodVisibility::mask($param->promotionFlags);
         $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($param);
+        $declare->propertyGetVisibility = $this->asymmetricGetVisibilityFromCfgOp($param);
         $result->addOpCode($declare);
     }
 
@@ -3390,6 +3392,18 @@ class Compiler {
         }
 
         return AsymmetricVisibilityRewriter::extractSetVisibilityFromAttributes($op->getAttributes());
+    }
+
+    protected function asymmetricGetVisibilityFromCfgOp(Op $op): int
+    {
+        if (property_exists($op, 'getVisibility') && 0 !== (int) $op->getVisibility) {
+            return (int) $op->getVisibility;
+        }
+        if (property_exists($op, 'promotionGetVisibility') && 0 !== (int) $op->promotionGetVisibility) {
+            return (int) $op->promotionGetVisibility;
+        }
+
+        return AsymmetricVisibilityRewriter::extractGetVisibilityFromAttributes($op->getAttributes());
     }
 
     /**

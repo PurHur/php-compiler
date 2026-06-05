@@ -677,7 +677,8 @@ class VM {
                 $declaringDisplay,
                 $name,
                 strtolower($object->class->name),
-                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc)
+                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
+                $meta->getVisibility
             );
 
             return false;
@@ -3328,7 +3329,7 @@ restart:
                         && (int) $frame->block->opCodes[$frame->pos]->arg2 === (int) $op->arg1;
                     $magicGetForRead = !$forWrite
                         && $this->propertyReadUsesMagicGet($propertyObject, $name, $frame);
-                    if (!$magicGetForRead) {
+                    if (!$magicGetForRead && !$forWrite) {
                         $catchFrame = $this->enforcePropertyVisibilityRead($propertyObject, $name, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
@@ -5536,18 +5537,22 @@ restart:
             return null;
         }
 
-        return $this->enforcePropertyVisibility($owner, $target->objectPropertyName ?? 'property', $frame);
+        return $this->enforcePropertyWriteVisibility($owner, $target->objectPropertyName ?? 'property', $frame);
     }
 
     private function enforcePropertyVisibilityRead(ObjectEntry $object, string $propName, Frame $frame): ?Frame
     {
-        return $this->enforcePropertyVisibility($object, $propName, $frame);
+        return $this->enforcePropertyReadVisibility($object, $propName, $frame);
     }
 
-    private function enforcePropertyVisibility(ObjectEntry $object, string $propName, Frame $frame): ?Frame
+    private function enforcePropertyReadVisibility(ObjectEntry $object, string $propName, Frame $frame): ?Frame
     {
         $meta = $this->classPropertyMeta($object, $propName);
-        if (null === $meta || MethodVisibility::isPublic($meta->visibility)) {
+        if (null === $meta) {
+            return null;
+        }
+        $readVis = PropertyVisibility::effectiveGetVisibility($meta->visibility, $meta->getVisibility);
+        if (MethodVisibility::isPublic($readVis)) {
             return null;
         }
         $declaringDisplay = $this->context->classes[$meta->declaringClassLc]->name
@@ -5560,7 +5565,42 @@ restart:
                 $declaringDisplay,
                 $propName,
                 strtolower($object->class->name),
-                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc)
+                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
+                $meta->getVisibility
+            );
+        } catch (\LogicException $e) {
+            return $this->dispatchVmError($e->getMessage(), $frame);
+        }
+
+        return null;
+    }
+
+    private function enforcePropertyWriteVisibility(ObjectEntry $object, string $propName, Frame $frame): ?Frame
+    {
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null === $meta) {
+            return null;
+        }
+        $writeVis = PropertyVisibility::effectiveSetVisibility($meta->visibility, $meta->setVisibility);
+        $readVis = PropertyVisibility::effectiveGetVisibility($meta->visibility, $meta->getVisibility);
+        if ($writeVis !== $readVis) {
+            return null;
+        }
+        if (MethodVisibility::isPublic($writeVis)) {
+            return null;
+        }
+        $declaringDisplay = $this->context->classes[$meta->declaringClassLc]->name
+            ?? $meta->declaringClassLc;
+        try {
+            PropertyVisibility::assertAccessible(
+                $meta->visibility,
+                $this->callerClassLc($frame),
+                $meta->declaringClassLc,
+                $declaringDisplay,
+                $propName,
+                strtolower($object->class->name),
+                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
+                0
             );
         } catch (\LogicException $e) {
             return $this->dispatchVmError($e->getMessage(), $frame);
@@ -6958,7 +6998,8 @@ restart:
             $property->readonly,
             $property->visibility,
             strtolower($entry->name),
-            $property->setVisibility
+            $property->setVisibility,
+            $property->getVisibility
         );
         $cloned->getHookMethodLc = $property->getHookMethodLc;
         $cloned->setHookMethodLc = $property->setHookMethodLc;
@@ -7015,6 +7056,9 @@ restart:
                 $matched = true;
                 if (0 !== $ifaceProp->setVisibility) {
                     $classProp->setVisibility = $ifaceProp->setVisibility;
+                }
+                if (0 !== $ifaceProp->getVisibility) {
+                    $classProp->getVisibility = $ifaceProp->getVisibility;
                 }
                 break;
             }
@@ -7306,7 +7350,8 @@ restart:
                         $op->propertyReadonly,
                         MethodVisibility::mask($op->propertyVisibility),
                         strtolower($entry->name),
-                        (int) ($op->propertySetVisibility ?? 0)
+                        (int) ($op->propertySetVisibility ?? 0),
+                        (int) ($op->propertyGetVisibility ?? 0)
                     );
                     if ([] !== $op->attributeNames) {
                         $entry->propertyAttributeNames[$propLc] = $op->attributeNames;

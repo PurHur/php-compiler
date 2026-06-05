@@ -30,6 +30,8 @@ class ClassProperty {
     public int $visibility;
     /** Asymmetric set visibility; 0 means same as read (#3165). */
     public int $setVisibility = 0;
+    /** Asymmetric get visibility; 0 means same as write (#5059). */
+    public int $getVisibility = 0;
     /** Lowercase class that declared this property (issue #145). */
     public string $declaringClassLc;
 
@@ -40,7 +42,8 @@ class ClassProperty {
         bool $readonly = false,
         int $visibility = \PHPCfg\Func::FLAG_PUBLIC,
         string $declaringClassLc = '',
-        int $setVisibility = 0
+        int $setVisibility = 0,
+        int $getVisibility = 0
     ) {
         $this->name = $name;
         $this->default = $default;
@@ -49,6 +52,7 @@ class ClassProperty {
         $this->visibility = $visibility;
         $this->declaringClassLc = $declaringClassLc;
         $this->setVisibility = $setVisibility;
+        $this->getVisibility = $getVisibility;
     }
 
     public function hasRuntimeDefaultInit(): bool

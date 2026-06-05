@@ -8,6 +8,9 @@ diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php vendor/ircma
 +    /** PHP 8.4 asymmetric set visibility (0 = same as read; issue #3165). */
 +    public int $setVisibility = 0;
 +
++    /** PHP 8.4 asymmetric get visibility (0 = same as write; issue #5059). */
++    public int $getVisibility = 0;
++
      public function __construct(Operand $name, int $visibility, bool $static, Op\Type $declaredType, Operand $defaultVar = null, Block $defaultBlock = null, array $attributes = [])
      {
          parent::__construct($attributes);
@@ -20,6 +23,9 @@ diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php vendor/ircmaxel
  
 +    /** Constructor promotion: asymmetric set visibility (#3165). */
 +    public int $promotionSetVisibility = 0;
++
++    /** Constructor promotion: asymmetric get visibility (#5059). */
++    public int $promotionGetVisibility = 0;
 +
      // A helper
      public $function;

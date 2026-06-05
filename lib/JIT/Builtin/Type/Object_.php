@@ -85,6 +85,7 @@ class Object_ extends Type {
 
     /** @var array<int, array<string, int>> class id => property lc => asymmetric set visibility (#3165) */
     private array $propertySetVisibility = [];
+    private array $propertyGetVisibility = [];
 
     /** @var array<int, array<string, list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>>> */
     private array $propertyDnfArms = [];
@@ -2741,6 +2742,13 @@ class Object_ extends Type {
         }
     }
 
+    public function definePropertyGetVisibility(int $classId, string $name, int $getVisibilityFlags): void
+    {
+        if (0 !== $getVisibilityFlags) {
+            $this->propertyGetVisibility[$classId][strtolower($name)] = $getVisibilityFlags;
+        }
+    }
+
     public function propertyVisibility(int $classId, string $name): int
     {
         return $this->propertyVisibility[$classId][strtolower($name)] ?? \PHPCfg\Func::FLAG_PUBLIC;
@@ -2749,6 +2757,11 @@ class Object_ extends Type {
     public function propertySetVisibility(int $classId, string $name): int
     {
         return $this->propertySetVisibility[$classId][strtolower($name)] ?? 0;
+    }
+
+    public function propertyGetVisibility(int $classId, string $name): int
+    {
+        return $this->propertyGetVisibility[$classId][strtolower($name)] ?? 0;
     }
 
     public function methodVisibility(int $classId, string $methodLc): int

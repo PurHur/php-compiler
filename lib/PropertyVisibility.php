@@ -16,6 +16,11 @@ final class PropertyVisibility
         return 0 !== $setVisibility ? $setVisibility : $readVisibility;
     }
 
+    public static function effectiveGetVisibility(int $writeVisibility, int $getVisibility): int
+    {
+        return 0 !== $getVisibility ? $getVisibility : $writeVisibility;
+    }
+
     /**
      * @throws \LogicException when access is not allowed
      */
@@ -26,30 +31,34 @@ final class PropertyVisibility
         string $declaringClassDisplay,
         string $propertyName,
         string $objectClassLc,
-        callable $isSameOrSubclassOf
+        callable $isSameOrSubclassOf,
+        int $storedGetVisibility = 0
     ): void {
-        if (MethodVisibility::isPublic($visibilityFlags)) {
+        $readVis = self::effectiveGetVisibility($visibilityFlags, $storedGetVisibility);
+        if (MethodVisibility::isPublic($readVis)) {
             return;
         }
-        if (($visibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0) {
+        $asymmetricGet = 0 !== $storedGetVisibility && $storedGetVisibility !== MethodVisibility::mask($visibilityFlags);
+        $scopeLabel = null === $callerClassLc ? 'global scope' : $callerClassLc;
+        if (($readVis & CfgFunc::FLAG_PRIVATE) !== 0) {
             if ($callerClassLc !== $declaringClassLc) {
-                self::denyAccess($visibilityFlags, $declaringClassDisplay, $propertyName);
+                self::denyRead($readVis, $asymmetricGet, $declaringClassDisplay, $propertyName, $scopeLabel);
             }
 
             return;
         }
-        if (($visibilityFlags & CfgFunc::FLAG_PROTECTED) !== 0) {
+        if (($readVis & CfgFunc::FLAG_PROTECTED) !== 0) {
             if (null === $callerClassLc) {
-                self::denyAccess($visibilityFlags, $declaringClassDisplay, $propertyName);
+                self::denyRead($readVis, $asymmetricGet, $declaringClassDisplay, $propertyName, $scopeLabel);
             }
             if (!$isSameOrSubclassOf($callerClassLc, $declaringClassLc)) {
-                self::denyAccess($visibilityFlags, $declaringClassDisplay, $propertyName);
+                self::denyRead($readVis, $asymmetricGet, $declaringClassDisplay, $propertyName, $scopeLabel);
             }
             if (
                 $objectClassLc !== $callerClassLc
                 && !$isSameOrSubclassOf($objectClassLc, $callerClassLc)
             ) {
-                self::denyAccess($visibilityFlags, $declaringClassDisplay, $propertyName);
+                self::denyRead($readVis, $asymmetricGet, $declaringClassDisplay, $propertyName, $scopeLabel);
             }
         }
     }
@@ -86,9 +95,27 @@ final class PropertyVisibility
         }
     }
 
-    private static function denyAccess(int $visibilityFlags, string $className, string $propertyName): void
-    {
-        $kind = ($visibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0 ? 'private' : 'protected';
+    private static function denyRead(
+        int $getVisibilityFlags,
+        bool $asymmetricGet,
+        string $className,
+        string $propertyName,
+        string $scopeLabel
+    ): void {
+        $kind = $asymmetricGet
+            ? Ast\AsymmetricVisibilityRewriter::getModifierLabel($getVisibilityFlags)
+            : (($getVisibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0 ? 'private' : 'protected');
+        if ($asymmetricGet) {
+            throw new \LogicException(
+                sprintf(
+                    'Cannot access %s property %s::$%s from %s',
+                    $kind,
+                    $className,
+                    $propertyName,
+                    $scopeLabel
+                )
+            );
+        }
         throw new \LogicException("Cannot access {$kind} property {$className}::\${$propertyName}");
     }
 

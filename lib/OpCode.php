@@ -262,6 +262,8 @@ class OpCode {
     public array $traitAdaptations = [];
     /** Asymmetric set visibility on TYPE_DECLARE_PROPERTY (#3165); 0 = symmetric with read. */
     public int $propertySetVisibility = 0;
+    /** Asymmetric get visibility on TYPE_DECLARE_PROPERTY (#5059); 0 = symmetric with write. */
+    public int $propertyGetVisibility = 0;
     /** TYPE_CLASS_CONST_FETCH: `::class` on a runtime expression operand (must be object, #4241). */
     public bool $classConstFetchOnObject = false;
     /** TYPE_DECLARE_CLASS_CONST: PHPCfg visibility flags (#4651). */
