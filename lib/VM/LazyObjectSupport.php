@@ -86,6 +86,66 @@ final class LazyObjectSupport
         $object->lazyPending = false;
     }
 
+    public static function getInitializer(ObjectEntry $object): ?ClosureState
+    {
+        if ($object->lazyPending && null !== $object->lazyInitializer) {
+            return $object->lazyInitializer;
+        }
+
+        return null;
+    }
+
+    /**
+     * Zend zend_lazy_object_mark_as_initialized — skip initializer, apply defaults (#5968).
+     */
+    public static function markAsInitialized(ObjectEntry $object): ObjectEntry
+    {
+        if (!$object->lazyPending) {
+            return $object;
+        }
+        self::applyPropertyDefaults($object);
+        $object->lazyInitializer = null;
+        $object->lazyPending = false;
+        $object->lazyGhost = false;
+        $object->constructed = true;
+
+        return $object;
+    }
+
+    /** ReflectionClass::SKIP_DESTRUCTOR (PHP 8.4). */
+    public const SKIP_DESTRUCTOR = 1;
+
+    /**
+     * Zend zend_object_make_lazy ghost reset path (#5968).
+     */
+    public static function resetAsLazyGhost(
+        \PHPCompiler\VM $vm,
+        ObjectEntry $object,
+        ClosureState $initializer,
+        int $options = 0
+    ): void {
+        if ($object->lazyPending) {
+            $object->lazyInitializer = $initializer;
+
+            return;
+        }
+
+        if (0 === ($options & self::SKIP_DESTRUCTOR) && !$object->destructorInvoked) {
+            $vm->invokeUserDestructor($object);
+        }
+
+        foreach ($object->getRawProperties() as $var) {
+            $var->reset();
+            $var->type = Variable::TYPE_UNDEFINED;
+        }
+
+        $object->constructed = false;
+        $object->destructorInvoked = false;
+        $object->lazyInitializer = $initializer;
+        $object->lazyPending = true;
+        $object->lazyGhost = true;
+    }
+
     private static function applyPropertyDefaults(ObjectEntry $object): void
     {
         foreach ($object->class->properties as $property) {
