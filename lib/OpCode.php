@@ -124,6 +124,8 @@ class OpCode {
     public const INCLUDE_KIND_REQUIRE_ONCE = 4;
 
     const TYPE_ASSIGN_REF = 97;
+    /** {@see TYPE_ASSIGN_REF} arg3: foreach `as &$obj->hookedProp` iteration assign (#6435). */
+    const ASSIGN_REF_FOREACH_PROPERTY_HOOK = 2;
     const TYPE_DECLARE_GLOBAL = 98;
     const TYPE_DECLARE_STATIC_PROPERTY = 99;
     /** Dynamic variable fetch: `$$name` where arg2 holds the name variable (#1226). */
