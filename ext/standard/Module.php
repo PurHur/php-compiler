@@ -30,7 +30,7 @@ class Module extends ModuleAbstract
             'DEBUG_BACKTRACE_PROVIDE_OBJECT' => VmDebugBacktrace::PROVIDE_OBJECT,
             'DEBUG_BACKTRACE_IGNORE_ARGS' => VmDebugBacktrace::IGNORE_ARGS,
             'DEBUG_BACKTRACE_IGNORE_STATIC_ARGS' => VmDebugBacktrace::IGNORE_STATIC_ARGS,
-        ] + VmStreamSupports::constants() as $name => $value) {
+        ] + VmStreamSupports::constants() + VmImage::constants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
@@ -211,6 +211,7 @@ class Module extends ModuleAbstract
             new explode(),
             new implode(),
             new implode('join'),
+            new image_type_to_extension(),
             new str_replace(),
             new str_ireplace(),
             new strtr(),
