@@ -83,6 +83,7 @@ final class StringPasswordCrypto
                 '__compiler_crypt',
                 '__compiler_password_get_info',
                 '__compiler_password_needs_rehash',
+                '__compiler_password_algos',
             ] as $name
         ) {
             $fn = $context->module->getNamedFunction($name);
