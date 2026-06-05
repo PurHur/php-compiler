@@ -24,6 +24,10 @@ final class Variable {
     const TYPE_NATIVE_LONG = 1;
     const TYPE_NATIVE_BOOL = 2;
     const TYPE_NATIVE_DOUBLE = 3;
+
+    const IS_NATIVE_ARRAY = 1 << 6;
+    const IS_REFCOUNTED   = 1 << 7;
+
     const TYPE_STRING = 4 | self::IS_REFCOUNTED;
     const TYPE_OBJECT = 5 | self::IS_REFCOUNTED;
     const TYPE_VALUE = 6 | self::IS_REFCOUNTED;
@@ -47,9 +51,6 @@ final class Variable {
         self::TYPE_VALUE => '__value__',
         self::TYPE_HASHTABLE => '__hashtable__*',
     ];
-
-    const IS_NATIVE_ARRAY = 1 << 6;
-    const IS_REFCOUNTED   = 1 << 7;
 
     public int $type;
 
