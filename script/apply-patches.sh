@@ -2169,8 +2169,7 @@ apply_php_cfg_in_operator_overlay() {
 apply_php_cfg_list_spread_overlay() {
   local assign="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assign.php"
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
-  if grep -q 'listSpreadRhs' "$assign" 2>/dev/null \
-    && grep -q '\$item->unpack' "$parser" 2>/dev/null; then
+  if grep -q 'listSpreadExcludedKeys = \$excludedKeys' "$parser" 2>/dev/null; then
     echo "Skip php-cfg-list-spread.patch (already applied)"
     return 0
   fi
@@ -2199,8 +2198,6 @@ if 'listSpreadRhs' not in assign:
     assign_path.write_text(assign.replace(needle, insert, 1))
 
 parser = parser_path.read_text()
-if '$item->unpack' in parser:
-    raise SystemExit(0)
 
 old = """        $attributes = $this->mapAttributes($expr);
         foreach ($expr->items as $i => $item) {
