@@ -3200,7 +3200,9 @@ class Object_ extends Type {
                 $classId,
                 $name,
                 $entry['type'],
-                $entry['default'] ?? null
+                $entry['default'] ?? null,
+                null,
+                !empty($entry['typedWithoutDefault'])
             );
         }
     }
@@ -3271,7 +3273,9 @@ class Object_ extends Type {
                     $childId,
                     $name,
                     $entry['type'],
-                    $entry['default'] ?? null
+                    $entry['default'] ?? null,
+                    null,
+                    !empty($entry['typedWithoutDefault'])
                 );
             }
         }
@@ -3369,12 +3373,25 @@ class Object_ extends Type {
         return $out;
     }
 
-    public function defineStaticProperty(int $classId, string $name, int $jitType, ?VMVariable $default = null): void
-    {
+    public function defineStaticProperty(
+        int $classId,
+        string $name,
+        int $jitType,
+        ?VMVariable $default = null,
+        ?VMVariable $prototype = null,
+        bool $forceTypedWithoutDefault = false
+    ): void {
         $key = strtolower($name);
         if (isset($this->staticPropertyGlobals[$classId][$key])) {
             return;
         }
+        $typedWithoutDefault = $forceTypedWithoutDefault
+            || (
+                null === $default
+                && null !== $prototype
+                && $prototype->hasDeclaredTypeConstraint()
+                && $prototype->isUndefined()
+            );
         if (
             Variable::TYPE_NATIVE_LONG !== $jitType
             && Variable::TYPE_STRING !== $jitType
@@ -3405,11 +3422,21 @@ class Object_ extends Type {
             $global = $this->context->module->addGlobal($llvmType, $globalName);
             $global->setInitializer($this->staticPropertyScalarInitializer($jitType, $default));
         }
-        $this->staticPropertyGlobals[$classId][$key] = [
+        $entry = [
             'type' => $jitType,
             'global' => $global,
             'default' => $default,
+            'typedWithoutDefault' => $typedWithoutDefault,
+            'initGlobal' => null,
         ];
+        if ($typedWithoutDefault) {
+            $initGlobalName = 'sp_init_'.$classId.'_'.$key;
+            $initType = $this->context->getTypeFromString('int1');
+            $initGlobal = $this->context->module->addGlobal($initType, $initGlobalName);
+            $initGlobal->setInitializer($initType->constInt(0, false));
+            $entry['initGlobal'] = $initGlobal;
+        }
+        $this->staticPropertyGlobals[$classId][$key] = $entry;
         if (Variable::TYPE_STRING === $jitType && null !== $default) {
             $this->initStaticStringPropertyDefault($global, $default);
         }
@@ -3519,6 +3546,12 @@ class Object_ extends Type {
         }
         $entry = $this->staticPropertyGlobals[$classId][$key];
         $global = $entry['global'];
+        if (null !== ($entry['initGlobal'] ?? null)) {
+            $this->context->builder->store(
+                $this->context->getTypeFromString('int1')->constInt(0, false),
+                $entry['initGlobal']
+            );
+        }
         if (Variable::TYPE_VALUE === $entry['type']) {
             $valueType = $this->context->getTypeFromString('__value__');
             $heapVal = $this->context->memory->malloc($valueType);
@@ -3571,6 +3604,14 @@ class Object_ extends Type {
             throw new \LogicException("Undefined static property: {$name}");
         }
         $entry = $this->staticPropertyGlobals[$classId][$key];
+        if (!empty($entry['typedWithoutDefault']) && null !== ($entry['initGlobal'] ?? null)) {
+            TypedPropertyUninitGuard::emitBeforeStaticRead(
+                $this->context,
+                $entry['initGlobal'],
+                $this->classNameForId($classId),
+                $name
+            );
+        }
         $loaded = $this->context->builder->load($entry['global']);
         if (Variable::TYPE_VALUE === $entry['type']) {
             $var = new Variable(
@@ -3581,6 +3622,7 @@ class Object_ extends Type {
             );
             $var->staticPropertyGlobal = $entry['global'];
             $var->staticPropertyType = $entry['type'];
+            $var->staticPropertyInitGlobal = $entry['initGlobal'] ?? null;
 
             return $var;
         }
@@ -3592,6 +3634,7 @@ class Object_ extends Type {
         );
         $var->staticPropertyGlobal = $entry['global'];
         $var->staticPropertyType = $entry['type'];
+        $var->staticPropertyInitGlobal = $entry['initGlobal'] ?? null;
 
         return $var;
     }
@@ -3801,10 +3844,15 @@ class Object_ extends Type {
         $this->context->builder->positionAtEnd($done);
     }
 
-    public function staticPropertyStore(\PHPLLVM\Value $global, Variable $value, int $propertyType): void
-    {
+    public function staticPropertyStore(
+        \PHPLLVM\Value $global,
+        Variable $value,
+        int $propertyType,
+        ?\PHPLLVM\Value $initGlobal = null
+    ): void {
         if (Variable::TYPE_VALUE === $propertyType) {
             $this->staticPropertyStoreValueBox($global, $value);
+            $this->markStaticPropertyInitialized($initGlobal);
 
             return;
         }
@@ -3814,6 +3862,7 @@ class Object_ extends Type {
             if (Variable::TYPE_STRING === $value->type) {
                 $value->addref();
             }
+            $this->markStaticPropertyInitialized($initGlobal);
 
             return;
         }
@@ -3833,10 +3882,23 @@ class Object_ extends Type {
                 );
             }
             $this->context->builder->store($loaded, $global);
+            $this->markStaticPropertyInitialized($initGlobal);
 
             return;
         }
         $this->context->builder->store($this->context->helper->loadValue($value), $global);
+        $this->markStaticPropertyInitialized($initGlobal);
+    }
+
+    private function markStaticPropertyInitialized(?\PHPLLVM\Value $initGlobal): void
+    {
+        if (null === $initGlobal) {
+            return;
+        }
+        $this->context->builder->store(
+            $this->context->getTypeFromString('int1')->constInt(1, false),
+            $initGlobal
+        );
     }
 
     private function staticPropertyStoreValueBox(\PHPLLVM\Value $global, Variable $value): void

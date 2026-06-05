@@ -30,15 +30,44 @@ final class TypedPropertyUninitJitCompileTest extends TestCase
 
     public function testUninitTypedPropertyReadModuleVerify(): void
     {
-        $path = $this->repoRoot . '/test/compliance/cases/language/typed_property_uninitialized.phpt';
+        $this->assertJitModuleVerifies(
+            $this->repoRoot . '/test/compliance/cases/language/typed_property_uninitialized.phpt',
+            'typed_property_uninitialized.phpt'
+        );
+    }
+
+    public function testUninitStaticTypedPropertyReadModuleVerify(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public static int $x;
+}
+function f(): void {
+    echo C::$x, "\n";
+}
+f();
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'static_typed_uninit_jit_pure.php');
+        $runtime->jitCompileBlock($block);
+        $context = $runtime->loadJitContext();
+        $verify = new \ReflectionMethod($context, 'compileCommon');
+        $verify->setAccessible(true);
+        $verify->invoke($context);
+        $this->addToAssertionCount(1);
+    }
+
+    private function assertJitModuleVerifies(string $path, string $label): void
+    {
         $contents = file_get_contents($path);
         $this->assertNotFalse($contents);
         if (!preg_match('/--FILE--\s*\n(.*?)\n--EXPECT/s', $contents, $matches)) {
-            $this->fail('typed_property_uninitialized.phpt FILE section missing');
+            $this->fail($label . ' FILE section missing');
         }
 
         $runtime = new Runtime();
-        $block = $runtime->parseAndCompile($matches[1], 'typed_property_uninitialized.phpt');
+        $block = $runtime->parseAndCompile($matches[1], $label);
         $runtime->jitCompileBlock($block);
         $context = $runtime->loadJitContext();
         $verify = new \ReflectionMethod($context, 'compileCommon');
