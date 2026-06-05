@@ -29,11 +29,9 @@ final class fwrite extends Internal
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $dataVar = $frame->calledArgs[1]->resolveIndirect();
+        $handle = VmStreamArg::requireStreamHandle($handleVar, $fn);
         if (null === $frame->returnVar) {
             return;
-        }
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException($fn.'() handle must be an integer in this compiler build');
         }
         if (Variable::TYPE_STRING !== $dataVar->type) {
             throw new \LogicException($fn.'() data must be a string in this compiler build');
@@ -46,7 +44,7 @@ final class fwrite extends Internal
             }
             $length = $lenVar->toInt();
         }
-        $written = VmFs::fwrite($handleVar->toInt(), $dataVar->toString(), $length);
+        $written = VmFs::fwrite($handle, $dataVar->toString(), $length);
         if (false === $written) {
             $frame->returnVar->bool(false);
 

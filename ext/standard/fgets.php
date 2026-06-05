@@ -27,11 +27,9 @@ final class fgets extends Internal
             throw new \LogicException('fgets() requires one or two arguments in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'fgets');
         if (null === $frame->returnVar) {
             return;
-        }
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('fgets() handle must be an integer in this compiler build');
         }
         $length = null;
         if (2 === $argc) {
@@ -41,7 +39,7 @@ final class fgets extends Internal
             }
             $length = $lenVar->toInt();
         }
-        $line = VmFs::fgets($handleVar->toInt(), $length);
+        $line = VmFs::fgets($handle, $length);
         if (false === $line) {
             $frame->returnVar->bool(false);
 

@@ -40,6 +40,10 @@ final class VmStreamArg
 
     public static function debugTypeName(Variable $v): string
     {
+        if (Variable::TYPE_OBJECT === $v->type || Variable::TYPE_ENUM_CASE === $v->type) {
+            return 'object';
+        }
+
         switch ($v->type) {
             case Variable::TYPE_NULL:
                 return 'null';

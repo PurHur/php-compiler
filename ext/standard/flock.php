@@ -22,13 +22,14 @@ final class flock extends Internal
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $operationVar = $frame->calledArgs[1]->resolveIndirect();
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'flock');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER !== $handleVar->type || Variable::TYPE_INTEGER !== $operationVar->type) {
-            throw new \LogicException('flock() handle and operation must be integers in this compiler build');
+        if (Variable::TYPE_INTEGER !== $operationVar->type) {
+            throw new \LogicException('flock() operation must be an integer in this compiler build');
         }
-        $frame->returnVar->bool(VmFs::flock($handleVar->toInt(), $operationVar->toInt()));
+        $frame->returnVar->bool(VmFs::flock($handle, $operationVar->toInt()));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

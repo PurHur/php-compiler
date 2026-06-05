@@ -28,11 +28,9 @@ final class fseek extends Internal
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $offsetVar = $frame->calledArgs[1]->resolveIndirect();
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'fseek');
         if (null === $frame->returnVar) {
             return;
-        }
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('fseek() handle must be an integer in this compiler build');
         }
         if (Variable::TYPE_INTEGER !== $offsetVar->type) {
             throw new \LogicException('fseek() offset must be an integer in this compiler build');
@@ -45,7 +43,7 @@ final class fseek extends Internal
             }
             $whence = $whenceVar->toInt();
         }
-        $frame->returnVar->int(VmFs::fseek($handleVar->toInt(), $offsetVar->toInt(), $whence));
+        $frame->returnVar->int(VmFs::fseek($handle, $offsetVar->toInt(), $whence));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

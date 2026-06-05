@@ -26,13 +26,11 @@ final class ftell_ extends Internal
             throw new \LogicException('ftell() requires exactly one argument in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'ftell');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('ftell() handle must be an integer in this compiler build');
-        }
-        $pos = VmFs::ftell($handleVar->toInt());
+        $pos = VmFs::ftell($handle);
         if (false === $pos) {
             $frame->returnVar->bool(false);
 

@@ -33,9 +33,7 @@ final class fputcsv extends Internal
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $fieldsVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('fputcsv() handle must be an integer in this compiler build');
-        }
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'fputcsv');
         if (Variable::TYPE_ARRAY !== $fieldsVar->type) {
             throw new \LogicException('fputcsv() fields must be an array in this compiler build');
         }
@@ -75,7 +73,7 @@ final class fputcsv extends Internal
             }
         }
         $written = VmFs::fputcsv(
-            $handleVar->toInt(),
+            $handle,
             $fields,
             $separator,
             $enclosure,

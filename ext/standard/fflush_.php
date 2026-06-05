@@ -26,13 +26,11 @@ final class fflush_ extends Internal
             throw new \LogicException('fflush() requires exactly one argument in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'fflush');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('fflush() handle must be an integer in this compiler build');
-        }
-        $frame->returnVar->bool(VmFs::fflush($handleVar->toInt()));
+        $frame->returnVar->bool(VmFs::fflush($handle));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

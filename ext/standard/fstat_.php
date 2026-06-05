@@ -26,13 +26,11 @@ final class fstat_ extends Internal
             throw new \LogicException('fstat() requires exactly one argument in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'fstat');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('fstat() handle must be an integer in this compiler build');
-        }
-        $info = VmFs::fstat($handleVar->toInt());
+        $info = VmFs::fstat($handle);
         if (false === $info) {
             $frame->returnVar->bool(false);
         } else {

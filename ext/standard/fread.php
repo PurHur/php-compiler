@@ -22,16 +22,14 @@ final class fread extends Internal
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $lenVar = $frame->calledArgs[1]->resolveIndirect();
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'fread');
         if (null === $frame->returnVar) {
             return;
-        }
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('fread() handle must be an integer in this compiler build');
         }
         if (Variable::TYPE_INTEGER !== $lenVar->type) {
             throw new \LogicException('fread() length must be an integer in this compiler build');
         }
-        $data = VmFs::fread($handleVar->toInt(), $lenVar->toInt());
+        $data = VmFs::fread($handle, $lenVar->toInt());
         if (false === $data) {
             $frame->returnVar->bool(false);
 

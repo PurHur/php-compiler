@@ -26,10 +26,10 @@ final class stream_supports_lock extends Internal
             throw new \LogicException('stream_supports_lock() requires exactly one argument in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'stream_supports_lock');
         if (null === $frame->returnVar) {
             return;
         }
-        $handle = VmStreamArg::requireStreamHandle($handleVar, 'stream_supports_lock');
         $frame->returnVar->bool(
             VmFs::streamSupports($handle, VmStreamSupports::STREAM_LOCK)
         );

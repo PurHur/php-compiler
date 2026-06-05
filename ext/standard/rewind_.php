@@ -26,13 +26,11 @@ final class rewind_ extends Internal
             throw new \LogicException('rewind() requires exactly one argument in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'rewind');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('rewind() handle must be an integer in this compiler build');
-        }
-        $frame->returnVar->bool(VmFs::rewind($handleVar->toInt()));
+        $frame->returnVar->bool(VmFs::rewind($handle));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

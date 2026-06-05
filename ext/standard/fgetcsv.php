@@ -28,11 +28,9 @@ final class fgetcsv extends Internal
             throw new \LogicException('fgetcsv() requires one to five arguments in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'fgetcsv');
         if (null === $frame->returnVar) {
             return;
-        }
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('fgetcsv() handle must be an integer in this compiler build');
         }
         $length = null;
         if ($argc >= 2) {
@@ -54,7 +52,7 @@ final class fgetcsv extends Internal
         if ($argc >= 5) {
             $escape = VmReflection::stringArg($frame->calledArgs[4], 'fgetcsv() escape');
         }
-        $row = VmFs::fgetcsv($handleVar->toInt(), $length, $separator, $enclosure, $escape);
+        $row = VmFs::fgetcsv($handle, $length, $separator, $enclosure, $escape);
         if (false === $row) {
             $frame->returnVar->bool(false);
 

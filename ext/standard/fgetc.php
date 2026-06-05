@@ -26,13 +26,11 @@ final class fgetc extends Internal
             throw new \LogicException('fgetc() requires exactly one argument in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'fgetc');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('fgetc() handle must be an integer in this compiler build');
-        }
-        $data = VmFs::fgetc($handleVar->toInt());
+        $data = VmFs::fgetc($handle);
         if (false === $data) {
             $frame->returnVar->bool(false);
         } else {

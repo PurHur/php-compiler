@@ -21,10 +21,8 @@ final class fclose extends Internal
             throw new \LogicException('fclose() requires exactly one argument in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('fclose() handle must be an integer in this compiler build');
-        }
-        $closed = VmFs::fclose($handleVar->toInt());
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'fclose');
+        $closed = VmFs::fclose($handle);
         if (null === $frame->returnVar) {
             return;
         }
