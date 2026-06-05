@@ -6695,7 +6695,7 @@ class JIT {
                     $sendValue = $this->context->getVariableFromOp($block->getOperand($op->arg1));
                     if (null !== $op->arg3) {
                         $this->context->scope->args[] = ['unpack' => $sendValue];
-                        $this->context->scope->argOperands[] = null;
+                        $this->context->scope->argOperands[] = $block->getOperand($op->arg1);
                     } elseif (null !== $op->arg2 && isset($block->constants[$op->arg2])) {
                         $this->context->scope->args[] = [
                             'named' => $block->constants[$op->arg2]->toString(),
@@ -11011,13 +11011,24 @@ class JIT {
             }
         }
 
-        foreach ($argEntries as $entry) {
-            if (\is_array($entry) && isset($entry['unpack'])) {
-                return [
-                    $this->finalizeJitCallArgs($argEntries),
-                    $argOperands,
-                ];
+        if ($this->jitCallArgsHaveUnpack($argEntries)) {
+            [$paramNames, $variadicIndex] = $this->jitCalleeParamMetadata($toCall);
+            $namedUnpack = JIT\CallUnpackHelper::tryResolveCompileTimeNamedUnpack(
+                $this->context->jitEnclosingBlock,
+                $argEntries,
+                $argOperands,
+                $paramNames,
+                $variadicIndex,
+                $this
+            );
+            if (null !== $namedUnpack) {
+                return $namedUnpack;
             }
+
+            return [
+                $this->finalizeJitCallArgs($argEntries),
+                $argOperands,
+            ];
         }
 
         if ($this->jitCallArgsHaveNamed($argEntries)) {
@@ -11045,6 +11056,26 @@ class JIT {
         }
 
         return false;
+    }
+
+    /**
+     * @param list<Variable|array{unpack: Variable}|array{named: string, value: Variable}> $argEntries
+     */
+    private function jitCallArgsHaveUnpack(array $argEntries): bool
+    {
+        foreach ($argEntries as $entry) {
+            if (\is_array($entry) && isset($entry['unpack'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @internal CallUnpackHelper compile-time named unpack (#5031). */
+    public function jitVariableFromVmConstantForCallUnpack(VM\Variable $vm): Variable
+    {
+        return $this->jitVariableFromVmConstant($vm);
     }
 
     /**
