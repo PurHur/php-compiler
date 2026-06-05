@@ -2107,7 +2107,7 @@ class Block {
             || self::containsReadonlyClassOpcodes($root)
             || self::containsUserClassDeclaredInstancePropertyOpcodes($root)
             || self::containsDynamicPropertyDeprecationOpcodes($root)
-            || self::containsFiberSuspendOpcodes($root)
+            || self::containsFiberSuspendOpcodesInScriptScope($root)
             || self::containsTraitConstructorOpcodes($root)
             || self::containsReflectionAttributeNewInstanceOpcodes($root)
             || self::containsInterfaceAbstractStaticMcjitDeferral($root)
