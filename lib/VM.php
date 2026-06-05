@@ -2089,6 +2089,7 @@ restart:
                         $frame->suppressNextEcho = false;
                         break;
                     }
+                    $this->releaseVmStatementDeadTemps($frame, (int) $op->arg1);
                     try {
                         if (!VM\SapiOutput::headersSent()) {
                             VM\HeaderCallbackQueue::runBeforeOutput($this->context);
@@ -2641,9 +2642,23 @@ restart:
                     break;
                 case OpCode::TYPE_UNSET:
                     if (null === $op->arg3) {
+                        $this->releaseVmStatementDeadTemps($frame, (int) $op->arg2);
                         if (null !== $op->arg2 && isset($frame->scope[$op->arg2])) {
                             $slot = $frame->scope[$op->arg2];
                             $unsetTarget = $slot->resolveIndirect();
+                            $globalBinding = $slot->directIndirectTarget();
+                            $ownedNamedUnset = null !== $frame->block
+                                && $frame->block->isNamedVariableSlot((int) $op->arg2)
+                                && (
+                                    !$slot->isIndirect()
+                                    || (
+                                        null !== $globalBinding
+                                        && $this->context->isGlobalStorage($globalBinding)
+                                    )
+                                );
+                            if ($ownedNamedUnset) {
+                                ObjectLifetime::invokeUnsetDestructor($this, $unsetTarget);
+                            }
                             if (null !== $frame->block && $frame->block->isMainScript()) {
                                 foreach ($frame->block->eachNamedScopeSlot() as [$globalName, $namedSlot]) {
                                     if ($namedSlot === (int) $op->arg2) {
@@ -2659,7 +2674,6 @@ restart:
                             }
                             // Break the local/reference binding only — never destroy the shared
                             // target (Zend unset on ref; foreach &$v cleanup #4997, #3517).
-                            $globalBinding = $slot->directIndirectTarget();
                             if (
                                 null !== $globalBinding
                                 && $this->context->isGlobalStorage($globalBinding)
@@ -3404,6 +3418,7 @@ restart:
                     $frame->callArgEntries = [];
                     if (null === $frame->call) {
                         $object->constructed = true;
+                        $this->releaseVmDeadScopeSlot($frame, (int) $op->arg1);
                     }
                     break;
                 case OpCode::TYPE_PROPERTY_FETCH:
@@ -8695,6 +8710,39 @@ restart:
         foreach ($frame->iterators as $iter) {
             ObjectLifetime::releaseDirectObject($iter);
         }
+    }
+
+    /**
+     * Release php-cfg dead compiler temps at statement boundary (Zend end-of-statement, #6456).
+     *
+     * @param int ...$keepSlots scope slots still needed by the current opcode
+     */
+    private function releaseVmStatementDeadTemps(Frame $frame, int ...$keepSlots): void
+    {
+        $keep = array_fill_keys($keepSlots, true);
+        $cfg = $frame->block->orig;
+        if (null === $cfg) {
+            return;
+        }
+        foreach ($cfg->deadOperands as $op) {
+            $slot = $frame->block->slotForOperand($op);
+            if (null === $slot || isset($keep[$slot]) || !isset($frame->scope[$slot])) {
+                continue;
+            }
+            if ($frame->block->isNamedVariableSlot($slot)) {
+                continue;
+            }
+            $this->releaseVmDeadScopeSlot($frame, $slot);
+        }
+    }
+
+    private function releaseVmDeadScopeSlot(Frame $frame, int $slot): void
+    {
+        if (!isset($frame->scope[$slot]) || $frame->block->isNamedVariableSlot($slot)) {
+            return;
+        }
+        ObjectLifetime::releaseDirectObject($frame->scope[$slot]);
+        $frame->scope[$slot]->null();
     }
 
 }
