@@ -2566,6 +2566,11 @@ restart:
                             $frame
                         );
                     }
+                    $catchFrame = $this->enforceVirtualStaticPropertyHookUnset($lcClass, $propName, $propNameRaw, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $storage->reset();
                     $storage->type = Variable::TYPE_UNDEFINED;
                     break;
@@ -2619,6 +2624,11 @@ restart:
                             goto restart;
                         }
                         $catchFrame = $this->enforceReadonlyPropertyUnset($object, $propName, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        $catchFrame = $this->enforceVirtualPropertyHookUnset($object, $propName, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
@@ -5647,6 +5657,52 @@ restart:
         $thrown = VM\BuiltinExceptionSupport::materializeError(
             $this->context,
             sprintf('Cannot unset readonly property %s::$%s', $declaringClass, $propName)
+        );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /** Reject unset() on get-only virtual hooked instance properties (#6425, zend_property_hooks.c). */
+    private function enforceVirtualPropertyHookUnset(ObjectEntry $object, string $propName, Frame $frame): ?Frame
+    {
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null === $meta || !$meta->propertyHookVirtual || null !== $meta->setHookMethodLc) {
+            return null;
+        }
+        $className = $object->class->name;
+        if ('' !== $meta->declaringClassLc && isset($this->context->classes[$meta->declaringClassLc])) {
+            $className = $this->context->classes[$meta->declaringClassLc]->name;
+        }
+
+        return $this->raiseVirtualPropertyHookUnsetError($className, $propName, $frame);
+    }
+
+    /** Reject unset() on get-only virtual hooked static properties (#6425). */
+    private function enforceVirtualStaticPropertyHookUnset(
+        string $classLc,
+        string $propLc,
+        string $propNameRaw,
+        Frame $frame
+    ): ?Frame {
+        $hooks = $this->resolveStaticPropertyHooks($classLc, $propLc);
+        if (null === $hooks || empty($hooks['virtual']) || !empty($hooks['set'])) {
+            return null;
+        }
+        $className = $this->context->classes[$classLc]->name ?? $classLc;
+
+        return $this->raiseVirtualPropertyHookUnsetError($className, $propNameRaw, $frame);
+    }
+
+    private function raiseVirtualPropertyHookUnsetError(string $className, string $propName, Frame $frame): ?Frame
+    {
+        $thrown = VM\BuiltinExceptionSupport::materializeError(
+            $this->context,
+            sprintf('Cannot unset read-only property %s::$%s', $className, $propName)
         );
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
