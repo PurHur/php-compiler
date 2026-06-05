@@ -4614,7 +4614,13 @@ restart:
      */
     private function dispatchVmTypeError(\TypeError $error, Frame $frame): ?Frame
     {
-        $thrown = VM\BuiltinExceptionSupport::materializeTypeError($this->context, $error->getMessage());
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeTypeError(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
             return $catchFrame;
