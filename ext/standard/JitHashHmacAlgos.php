@@ -9,7 +9,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Value;
 
-/** LLVM lowering for hash_hmac_algos() (#6229). */
+/** LLVM lowering for hash_hmac_algos() (#6229, #6365). */
 final class JitHashHmacAlgos
 {
     public static function invoke(Context $context): Value
