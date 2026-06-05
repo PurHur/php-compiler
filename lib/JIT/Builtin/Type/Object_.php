@@ -2285,6 +2285,18 @@ class Object_ extends Type {
         return isset($this->propertyAllowsNullSlots[$classId][$slotIndex]);
     }
 
+    /** True when the slot stores a typed __value__ property (#4912). */
+    public function propertySlotIsTypedValue(int $classId, int $slotIndex): bool
+    {
+        foreach ($this->properties[$classId] ?? [] as $propset) {
+            if ($propset[3] === $slotIndex) {
+                return Variable::TYPE_VALUE === $propset[2];
+            }
+        }
+
+        return false;
+    }
+
     public function lookupOperand(Operand $name): int
     {
         if (!$name instanceof Literal) {

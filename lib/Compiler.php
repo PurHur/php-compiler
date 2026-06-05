@@ -1184,7 +1184,7 @@ class Compiler {
                         && $i + 1 < $opCount
                         && $this->isPropertyFetchOnlyEmptyVar($child, $ops[$i + 1], $block)
                     ) {
-                        // Lowered by compileExpr Empty_ via TYPE_ISSET + TYPE_BOOLEAN_NOT (#3298, #4586).
+                        // Lowered by compileExpr Empty_ via TYPE_EMPTY_OBJECT_PROPERTY (#4912).
                         break;
                     } elseif (
                         (
@@ -4584,16 +4584,22 @@ class Compiler {
                 if (null === $propFetch) {
                     $propFetch = $this->unwrapPropertyFetch($expr->expr);
                 }
-                $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($expr->expr, $block);
-                if (null !== $propFetch || null !== $dimFetch) {
+                if (null !== $propFetch) {
+                    return [new OpCode(
+                        OpCode::TYPE_EMPTY_OBJECT_PROPERTY,
+                        $this->compileOperand($expr->result, $block, false),
+                        $this->compileOperand($propFetch->var, $block, true),
+                        $this->compileOperand($propFetch->name, $block, true),
+                    )];
+                }
+                $dimFetch = $this->findCoalesceArrayDimFetch($expr->expr, $block);
+                if (null !== $dimFetch) {
                     $resultSlot = $this->compileOperand($expr->result, $block, false);
                     $checkSlot = $this->compileBoolTemporary($block);
-                    [$containerSlot, $dimSlot] = null !== $propFetch
-                        ? $this->resolveIssetTargetFromPropertyFetch($propFetch, $block)
-                        : $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block);
+                    [$containerSlot, $dimSlot] = $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block);
                     if (null !== $containerSlot) {
                         return [
-                            $this->makeIssetOpCode($checkSlot, $containerSlot, $dimSlot, null !== $propFetch),
+                            $this->makeIssetOpCode($checkSlot, $containerSlot, $dimSlot, false),
                             new OpCode(
                                 OpCode::TYPE_BOOLEAN_NOT,
                                 $resultSlot,

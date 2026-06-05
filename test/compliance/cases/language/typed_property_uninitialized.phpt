@@ -8,7 +8,11 @@ class C {
 $c = new C;
 $c2 = new C;
 var_dump(isset($c->x));
-var_dump(empty($c2->x));
+try {
+    var_dump(empty($c2->x));
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
 try {
     echo $c->x;
 } catch (Error $e) {
@@ -19,7 +23,7 @@ var_dump(isset($c->x));
 echo $c->x, "\n";
 --EXPECT--
 bool(false)
-bool(true)
+Typed property C::$x must not be accessed before initialization
 Typed property C::$x must not be accessed before initialization
 bool(true)
 1

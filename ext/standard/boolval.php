@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -128,6 +129,7 @@ final class boolval extends Internal
     public static function isTruthy(Variable $v): bool
     {
         $v = $v->resolveIndirect();
+        TypedPropertyCheck::assertReadable($v);
         if ($v->isUndefined()) {
             return false;
         }
