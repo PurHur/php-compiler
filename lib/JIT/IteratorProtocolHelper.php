@@ -258,7 +258,7 @@ final class IteratorProtocolHelper
         return new RuntimeIndirectInstanceMethodCall($receiver, $methodLc, $candidates);
     }
 
-    private static function classImplementsIteratorProtocol(Context $context, string $classLc): bool
+    public static function classImplementsIteratorProtocol(Context $context, string $classLc): bool
     {
         foreach ($context->type->object->allInterfacesForClassLc($classLc) as $ifaceLc) {
             if (in_array($ifaceLc, self::ITERATOR_IFACES_LC, true)) {
