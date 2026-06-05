@@ -68,6 +68,22 @@ trait VmArrayAssocSetOps
 
     /**
      * @param list<\PHPCompiler\VM\Variable> $calledArgs
+     */
+    private static function guardSetOpOperands(array $calledArgs, string $fn): void
+    {
+        $first = $calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $first->type) {
+            throw new \LogicException($fn.'() first argument must be an array in this compiler build');
+        }
+        $tables = [$first->toArray()];
+        if (\count($calledArgs) > 1) {
+            $tables = array_merge($tables, self::collectOtherHashTables($calledArgs, $fn));
+        }
+        VmArray::rejectEnumCaseSetOpOperands(...$tables);
+    }
+
+    /**
+     * @param list<\PHPCompiler\VM\Variable> $calledArgs
      *
      * @return list<HashTable>
      */
