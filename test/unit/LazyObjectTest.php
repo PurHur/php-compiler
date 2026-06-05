@@ -55,4 +55,41 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'lazy_object_ghost.php'));
         $this->assertSame("before\ninit\nx\nx\n", ob_get_clean());
     }
+
+    /** @covers issue #5968 */
+    public function testLazyObjectIntrospectionMethods(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Svc {
+    public string $id = '';
+    public function __construct(public string $tag = '') {
+        $this->id = $tag;
+    }
+}
+$ref = new ReflectionClass(Svc::class);
+$lazy = $ref->newLazyGhost(function (Svc $o) {
+    $o->__construct('init');
+});
+$init = $ref->getLazyInitializer($lazy);
+echo 'pending_init=', (null === $init ? 'null' : 'callable'), "\n";
+$ref->markLazyObjectAsInitialized($lazy);
+echo 'marked_id=', $lazy->id, "\n";
+echo 'after_mark_init=', (null === $ref->getLazyInitializer($lazy) ? 'null' : 'callable'), "\n";
+
+$plain = new Svc('plain');
+$ref->resetAsLazyGhost($plain, function (Svc $o) {
+    $o->__construct('reset');
+});
+echo 'reset_before=', $plain->id, "\n";
+echo 'reset_after=', $plain->id, "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'lazy_object_introspection.php'));
+        $this->assertSame(
+            "pending_init=callable\nmarked_id=\nafter_mark_init=null\nreset_before=reset\nreset_after=reset\n",
+            ob_get_clean()
+        );
+    }
 }
