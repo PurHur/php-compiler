@@ -92,8 +92,17 @@ final class EmbedObOutput
         }
         $entry = $fn->appendBasicBlock('entry');
         $context->builder->positionAtEnd($entry);
-        $i32 = $context->getTypeFromString('int32');
-        $context->builder->returnValue($i32->constInt(0, false));
+        $fnType = $fn->typeOf();
+        if ($fnType instanceof \PHPLLVM\Type\Pointer) {
+            $fnType = $fnType->getElementType();
+        }
+        $retTyName = $fnType instanceof \PHPLLVM\Type\Function_
+            ? $context->getStringFromType($fnType->getReturnType())
+            : 'int32';
+        $zero = 'int64' === $retTyName
+            ? $context->getTypeFromString('int64')->constInt(0, false)
+            : $context->getTypeFromString('int32')->constInt(0, false);
+        $context->builder->returnValue($zero);
         $context->builder->clearInsertionPosition();
     }
 
