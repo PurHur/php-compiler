@@ -25,13 +25,7 @@ final class gzdeflate extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('gzdeflate() expects one to three arguments in this compiler build');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $data = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $data->type) {
-            throw new \LogicException('gzdeflate() data must be a string in this compiler build');
-        }
+        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'gzdeflate', 0, 'data');
         $level = -1;
         $encoding = \ZLIB_ENCODING_RAW;
         if ($argc >= 2) {
@@ -48,7 +42,10 @@ final class gzdeflate extends Internal
             }
             $encoding = $encVar->toInt();
         }
-        $result = VmZlib::gzdeflate($data->toString(), $level, $encoding);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmZlib::gzdeflate($data, $level, $encoding);
         if (false === $result) {
             VmZlib::triggerWarning($frame, 'gzdeflate(): data error');
 

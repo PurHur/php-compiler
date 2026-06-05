@@ -25,13 +25,7 @@ final class gzencode extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('gzencode() expects one to three arguments in this compiler build');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $data = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $data->type) {
-            throw new \LogicException('gzencode() data must be a string in this compiler build');
-        }
+        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'gzencode', 0, 'data');
         $level = -1;
         $encoding = \ZLIB_ENCODING_GZIP;
         if ($argc >= 2) {
@@ -48,7 +42,10 @@ final class gzencode extends Internal
             }
             $encoding = $encVar->toInt();
         }
-        $result = VmZlib::gzencode($data->toString(), $level, $encoding);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmZlib::gzencode($data, $level, $encoding);
         if (false === $result) {
             VmZlib::triggerWarning($frame, 'gzencode(): data error');
 
