@@ -2484,9 +2484,7 @@ restart:
                             $frame
                         );
                     }
-                    $forWrite = $frame->pos < $frame->block->nOpCodes
-                        && OpCode::TYPE_ASSIGN === $frame->block->opCodes[$frame->pos]->type
-                        && (int) $frame->block->opCodes[$frame->pos]->arg2 === (int) $op->arg1;
+                    $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
                     $hooks = $this->resolveStaticPropertyHooks($lcClass, $propName);
                     if (
                         !$forWrite
@@ -3339,9 +3337,7 @@ restart:
                         $resolved = $var->resolveIndirect();
                         $typeName = TypeCheck::typeNameForConstraint($resolved->type);
                         $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
-                        $forWrite = $frame->pos < $frame->block->nOpCodes
-                            && OpCode::TYPE_ASSIGN === $frame->block->opCodes[$frame->pos]->type
-                            && (int) $frame->block->opCodes[$frame->pos]->arg2 === (int) $op->arg1;
+                        $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
                         if ($forWrite) {
                             $catchFrame = $this->dispatchVmError(
                                 sprintf('Attempt to assign property "%s" on %s', $name, $typeName),
@@ -3384,9 +3380,7 @@ restart:
                         }
                         break;
                     }
-                    $forWrite = $frame->pos < $frame->block->nOpCodes
-                        && OpCode::TYPE_ASSIGN === $frame->block->opCodes[$frame->pos]->type
-                        && (int) $frame->block->opCodes[$frame->pos]->arg2 === (int) $op->arg1;
+                    $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
                     $magicGetForRead = !$forWrite
                         && $this->propertyReadUsesMagicGet($propertyObject, $name, $frame);
                     if (!$magicGetForRead && !$forWrite) {
@@ -4440,16 +4434,27 @@ restart:
         return null;
     }
 
-    /** True when the next opcode assigns through this VAR_FETCH destination slot (#3801). */
+    /** True when the next opcode assigns through this VAR_FETCH destination slot (#3801, #5370). */
     private function varFetchDestUsedAsAssignLvalue(Frame $frame, OpCode $op): bool
     {
         $nextIndex = $frame->pos;
         if ($nextIndex >= $frame->block->nOpCodes) {
             return false;
         }
-        $next = $frame->block->opCodes[$nextIndex];
 
-        return OpCode::TYPE_ASSIGN === $next->type && $next->arg2 === $op->arg1;
+        return OpCode::destSlotUsedAsAssignLvalue($frame->block->opCodes[$nextIndex], (int) $op->arg1);
+    }
+
+    /** True when a following opcode assigns through this PROPERTY_FETCH destination slot (#5370). */
+    private function propertyFetchDestUsedAsAssignLvalue(Frame $frame, OpCode $op): bool
+    {
+        for ($j = $frame->pos, $n = $frame->block->nOpCodes; $j < $n; $j++) {
+            if (OpCode::destSlotUsedAsAssignLvalue($frame->block->opCodes[$j], (int) $op->arg1)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
