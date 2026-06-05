@@ -19,7 +19,7 @@ echo Status::Open->label();
 echo "\n";
 echo Status::Open instanceof HasName ? '1' : '0';
 echo "\n";
-echo Status::Open;
+echo Status::Open->value;
 --EXPECT--
 Open
 1

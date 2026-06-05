@@ -27,7 +27,7 @@ enum Status: string implements HasName {
 
 echo Status::Open->label();
 echo Status::Open instanceof HasName ? '1' : '0';
-echo Status::Open;
+echo Status::Open->value;
 PHP;
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile($code, 'enum_iface.php');
@@ -36,5 +36,33 @@ PHP;
         $output = ob_get_clean();
 
         $this->assertSame('Open1open', $output);
+    }
+
+    public function testUnitEnumCaseInstanceMethodAndInstanceof(): void
+    {
+        $code = <<<'PHP'
+<?php
+interface Labeled {
+    public function tag(): string;
+}
+
+enum Status implements Labeled {
+    case Open;
+
+    public function tag(): string {
+        return 'open';
+    }
+}
+
+echo Status::Open->tag();
+echo Status::Open instanceof Labeled ? '1' : '0';
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_iface_unit.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame('open1', $output);
     }
 }

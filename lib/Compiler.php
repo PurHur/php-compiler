@@ -1265,11 +1265,17 @@ class Compiler {
         return $assign->expr === $fetch->result;
     }
 
+    private function assignIsListSpread(Op\Expr\Assign $assign): bool
+    {
+        return property_exists($assign, 'listSpreadRhs')
+            && null !== $assign->listSpreadRhs
+            && property_exists($assign, 'listSpreadFromIndex')
+            && null !== $assign->listSpreadFromIndex;
+    }
+
     private function isListSpreadAssignOp(Op $op): bool
     {
-        return $op instanceof Op\Expr\Assign
-            && null !== $op->listSpreadRhs
-            && null !== $op->listSpreadFromIndex;
+        return $op instanceof Op\Expr\Assign && $this->assignIsListSpread($op);
     }
 
     /**
@@ -4471,11 +4477,11 @@ class Compiler {
                     $this->compileOperand($expr->expr, $block, true) 
                 )];
             case Op\Expr\Assign::class:
-                if (null === $expr->listSpreadRhs) {
+                if (!$this->assignIsListSpread($expr)) {
                     $this->rejectThisReassignment($expr->var);
                     $this->rejectNullsafeInWriteContext($expr->var, $block);
                 }
-                if (null !== $expr->listSpreadRhs && null !== $expr->listSpreadFromIndex) {
+                if ($this->assignIsListSpread($expr)) {
                     $fromIndex = new Operand\Literal($expr->listSpreadFromIndex);
                     $spreadOp = new OpCode(
                         OpCode::TYPE_LIST_SPREAD_ASSIGN,
