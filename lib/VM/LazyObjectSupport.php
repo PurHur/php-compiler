@@ -95,6 +95,12 @@ final class LazyObjectSupport
         return null;
     }
 
+    /** Zend zend_object_is_lazy && !zend_lazy_object_initialized (#6054, #6068). */
+    public static function isUninitializedLazyObject(ObjectEntry $object): bool
+    {
+        return $object->lazyPending;
+    }
+
     /**
      * Zend zend_lazy_object_mark_as_initialized — skip initializer, apply defaults (#5968).
      */
