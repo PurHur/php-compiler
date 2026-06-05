@@ -99,10 +99,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'array_literal_duplicate_key')) {
                 continue;
             }
-            // base_convert() MCJIT execute unstable until MathBaseConvert verify (#3173).
-            if (str_contains($name, 'base_convert') || str_contains(strtolower($case[0]), 'base_convert')) {
-                continue;
-            }
             // hexdec()/bindec() overflow boxed return: VM + AOT (#3688); MCJIT until MathBaseConvert stable.
             if (str_contains($name, 'hexdec_bindec_overflow')) {
                 continue;
