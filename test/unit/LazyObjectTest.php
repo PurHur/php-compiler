@@ -78,6 +78,34 @@ PHP;
         $this->assertSame("true\nfalse\nfalse\n", ob_get_clean());
     }
 
+    /** @covers issue #6096 */
+    public function testLazyGhostTraitBuiltinMarker(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+var_export(trait_exists('LazyGhostTrait'));
+echo "\n";
+class Svc {
+    use LazyGhostTrait;
+    public string $id = '';
+    public function __construct(string $id = '') {
+        $this->id = $id;
+    }
+}
+echo "compiled\n";
+$ref = new ReflectionClass(Svc::class);
+$lazy = $ref->newLazyGhost(function (Svc $o) {
+    $o->__construct('lazy');
+});
+echo $ref->isUninitializedLazyObject($lazy) ? 'uninit' : 'init', "\n";
+echo $lazy->id, "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'lazy_ghost_trait.php'));
+        $this->assertSame("true\ncompiled\nuninit\nlazy\n", ob_get_clean());
+    }
+
     /** @covers issue #5968 */
     public function testLazyObjectIntrospectionMethods(): void
     {

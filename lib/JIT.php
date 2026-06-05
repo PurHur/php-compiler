@@ -8509,6 +8509,9 @@ class JIT {
                 throw new \LogicException("{$traitName} is not a trait");
             }
             $traitId = $object->lookup($traitName);
+            if (VM\LazyGhostTraitSupport::isLazyGhostTrait($traitLc)) {
+                $object->markLazyGhostTraitClass($classId);
+            }
             $object->inheritTraitConstants($classId, $traitId, $traitName);
             $object->inheritTraitStaticProperties($classId, $traitId, $traitName);
             $object->inheritTraitInstanceProperties($classId, $traitId, $traitName);

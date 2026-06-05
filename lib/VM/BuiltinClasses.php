@@ -100,6 +100,7 @@ final class BuiltinClasses
     {
         $before = array_keys($ctx->classes);
         StringableSupport::register($ctx);
+        LazyGhostTraitSupport::register($ctx);
         AttributeSupport::register($ctx);
         self::registerStdClass($ctx);
         self::registerCountable($ctx);

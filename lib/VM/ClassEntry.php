@@ -29,6 +29,8 @@ class ClassEntry {
     public bool $isInterface = false;
     /** True for `trait` declarations (#2312). */
     public bool $isTrait = false;
+    /** True when class `use LazyGhostTrait` (PHP 8.4 marker, #6096). */
+    public bool $usesLazyGhostTrait = false;
     /** True for `abstract class` declarations (#3385). */
     public bool $isAbstract = false;
     /** @var array<string, true> lowercase method names declared abstract on this class */
