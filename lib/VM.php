@@ -2238,7 +2238,13 @@ restart:
                         $classOperand = $frame->scope[$op->arg1]->resolveIndirect();
                         $staticCallMethodName = $frame->scope[$op->arg2]->toString();
                         $parentKeywordScope = false;
-                        if (Variable::TYPE_OBJECT === $classOperand->type) {
+                        $enumScopeClass = VM\EnumCaseSupport::enumClassForCaseVariable($classOperand);
+                        if (null !== $enumScopeClass) {
+                            // (E::A)::staticMethod() — enum case scope resolves to enum type (#6408, zend_enum.c).
+                            $instanceScopeCall = true;
+                            $scopeClassName = $enumScopeClass->name;
+                            $callableName = $scopeClassName.'::'.$staticCallMethodName;
+                        } elseif (Variable::TYPE_OBJECT === $classOperand->type) {
                             $instanceScopeCall = true;
                             $scopeClassName = $classOperand->toObject()->class->name;
                             $callableName = $scopeClassName.'::'.$staticCallMethodName;
