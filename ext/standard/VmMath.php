@@ -133,6 +133,28 @@ final class VmMath
     }
 
     /**
+     * Z_PARAM_DOUBLE coercion for float builtins (php-src math.c fdiv; #6185).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function parseDoubleBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): float {
+        $var = $var->resolveIndirect();
+        self::rejectEnumCaseDoubleBuiltinArg($var, $function, $argIndex, $paramName);
+        if (Variable::TYPE_INTEGER === $var->type) {
+            return (float) $var->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $var->type) {
+            return $var->toFloat();
+        }
+        throw new \LogicException($function.'() only supports integers and floats in this compiler build');
+    }
+
+    /**
      * Z_PARAM_LONG rejects enum cases (php-src ext/standard/string.c chr/ord; #5673, #5836).
      *
      * @throws \TypeError
@@ -143,19 +165,43 @@ final class VmMath
         int $argIndex,
         string $paramName
     ): void {
+        self::rejectEnumCaseBuiltinArg($var, $function, $argIndex, $paramName, 'int');
+    }
+
+    /**
+     * Z_PARAM_DOUBLE rejects enum cases (php-src ext/standard/math.c fdiv; #6185).
+     *
+     * @throws \TypeError
+     */
+    private static function rejectEnumCaseDoubleBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): void {
+        self::rejectEnumCaseBuiltinArg($var, $function, $argIndex, $paramName, 'float');
+    }
+
+    /**
+     * @throws \TypeError
+     */
+    private static function rejectEnumCaseBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType
+    ): void {
         if (!EnumCaseSupport::isEnumCaseVariable($var)) {
             return;
         }
         $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
+        $given = null !== $enumClass ? $enumClass->name : 'object';
+        $message = 'int' === $expectedType
+            ? self::intBuiltinTypeError($function, $argIndex, $paramName, $given)
+            : self::doubleBuiltinTypeError($function, $argIndex, $paramName, $given);
 
-        throw new \TypeError(
-            self::intBuiltinTypeError(
-                $function,
-                $argIndex,
-                $paramName,
-                null !== $enumClass ? $enumClass->name : 'object'
-            )
-        );
+        throw new \TypeError($message);
     }
 
     private static function intBuiltinTypeError(
@@ -166,6 +212,21 @@ final class VmMath
     ): string {
         return sprintf(
             '%s(): Argument #%d ($%s) must be of type int, %s given',
+            $function,
+            $argIndex,
+            $paramName,
+            $given
+        );
+    }
+
+    private static function doubleBuiltinTypeError(
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $given
+    ): string {
+        return sprintf(
+            '%s(): Argument #%d ($%s) must be of type float, %s given',
             $function,
             $argIndex,
             $paramName,
