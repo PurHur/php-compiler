@@ -53,6 +53,26 @@ PHP;
         $runtime->parseAndCompile($code, 'trait_typed_const_inherit_bad.php');
     }
 
+    public function testTypedTraitConstantValueTypeMismatchFailsCompile(): void
+    {
+        if (!CompilerVersion::supportsTypedTraitConstants()) {
+            $this->markTestSkipped('typed trait constants require CompilerVersion 8.3+');
+        }
+        $code = <<<'PHP'
+<?php
+trait TBad {
+    public const int X = '1';
+}
+final class C {
+    use TBad;
+}
+PHP;
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot assign string to class constant X of type int');
+        $runtime->parseAndCompile($code, 'trait_typed_const_mismatch.php');
+    }
+
     public function testUntypedTraitConstantStillCompiles(): void
     {
         $code = <<<'PHP'
