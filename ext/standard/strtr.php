@@ -67,7 +67,9 @@ final class strtr extends Internal
             return JitStrtr::translateArray(
                 $context,
                 $this->jitString($context, $args[0], 'strtr() argument #1'),
-                $this->loadReplacePairs($context, $args[1])
+                $this->loadReplacePairs($context, $args[1]),
+                $args[0],
+                $args[1]
             );
         }
         if (3 === \count($args)) {
@@ -75,7 +77,10 @@ final class strtr extends Internal
                 $context,
                 $this->jitString($context, $args[0], 'strtr() argument #1'),
                 $this->jitString($context, $args[1], 'strtr() argument #2'),
-                $this->jitString($context, $args[2], 'strtr() argument #3')
+                $this->jitString($context, $args[2], 'strtr() argument #3'),
+                $args[0],
+                $args[1],
+                $args[2]
             );
         }
 
