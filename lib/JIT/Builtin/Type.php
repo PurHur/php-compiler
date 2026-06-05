@@ -185,6 +185,7 @@ class Type extends Builtin {
         StringHrtime::ensureLinked($this->context);
         StringMicrotime::ensureLinked($this->context);
         StringGettimeofday::ensureLinked($this->context);
+        StringGetrusage::ensureLinked($this->context);
         LastErrorRuntime::ensureLinked($this->context);
         FunctionExistsRuntime::ensureLinked($this->context);
         WeakRefRegistryRuntime::ensureLinked($this->context);
