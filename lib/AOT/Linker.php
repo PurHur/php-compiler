@@ -17,8 +17,6 @@ final class Linker
         __DIR__.'/runtime/phpc_env_local.c',
         __DIR__.'/runtime/phpc_pending_headers.c',
         __DIR__.'/runtime/hash_crypto.c',
-        __DIR__.'/runtime/phpc_microtime.c',
-        __DIR__.'/runtime/phpc_gettimeofday.c',
         __DIR__.'/runtime/phpc_info.c',
         __DIR__.'/runtime/phpc_spaceship.c',
         __DIR__.'/runtime/phpc_similar_text.c',

@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * gettimeofday() — wall-clock array or float (ext/standard/microtimers.c parity, #3208).
+ * gettimeofday() — wall-clock array or float (VM VmDate; JIT/AOT StringGettimeofday LLVM, #6110/#3208).
  */
 final class gettimeofday extends Internal
 {
