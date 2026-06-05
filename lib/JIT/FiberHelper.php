@@ -33,6 +33,7 @@ final class FiberHelper
         $context->functionProxies['fiber::resume'] = new Call\FiberResume();
         $context->functionProxies['fiber::throw'] = new Call\FiberThrow();
         $context->functionProxies['fiber::suspend'] = new Call\FiberSuspendStatic();
+        $context->functionProxies['fiber::getreturn'] = new Call\FiberGetReturn();
     }
 
     public static function blockContainsFiberSuspend(?Block $block): bool
@@ -376,7 +377,12 @@ final class FiberHelper
         if (null !== $fiberVar->fiberStatePtr) {
             return $fiberVar->fiberStatePtr;
         }
-        throw new \LogicException('Fiber missing __fiber_state in JIT');
+        self::ensureTypes($context);
+        $objVal = $context->helper->loadValue($fiberVar);
+        $bitsVar = $context->type->object->propertyFetch($objVal, 'Fiber', self::STATE_PROPERTY);
+        $bits = $context->helper->loadValue($bitsVar);
+
+        return $context->builder->inttoptr($bits, $context->getTypeFromString('__fiber_state__*'));
     }
 
     public static function storeResumeNameOnFiber(Context $context, Value $fiberObj, string $resumeName): void
