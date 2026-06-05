@@ -97,4 +97,35 @@ PHP;
         $this->expectExceptionMessage('Type of C::FOO must be compatible with T::FOO of type string');
         $runtime->parseAndCompile($code, 'typed_trait_const_inherit_bad.php');
     }
+
+    /** @covers issue #5982 */
+    public function testIncompatibleInterfaceTypedConstantOverrideFailsCompile(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I { public const array X = [1]; }
+class C implements I { public const string X = 'not-array'; }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Type of C::X must be compatible with I::X of type array');
+        $runtime->parseAndCompile($code, 'interface_typed_const_inherit_bad.php');
+    }
+
+    /** @covers issue #5982 */
+    public function testCompatibleInterfaceTypedConstantOverrideCompilesAndRuns(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I { public const array X = [1]; }
+class C implements I { public const array X = [2, 3]; }
+echo C::X[0], "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'interface_typed_const_inherit_ok.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("2\n", ob_get_clean());
+    }
 }
