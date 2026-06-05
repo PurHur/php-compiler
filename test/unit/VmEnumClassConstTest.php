@@ -38,6 +38,28 @@ PHP;
         $this->assertArrayNotHasKey('foo', $entry->enumCaseCanonicalNames);
     }
 
+    public function testBackedEnumTypedClassConst(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int {
+    case A = 1;
+    public const int FOO = 2;
+}
+echo E::FOO, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_typed_class_const.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame("2\n", $output);
+        $entry = $runtime->vmContext->classes['e'];
+        $this->assertArrayHasKey('foo', $entry->constants);
+        $this->assertSame(2, $entry->constants['foo']->toInt());
+    }
+
     public function testUnitEnumClassConst(): void
     {
         $code = <<<'PHP'
