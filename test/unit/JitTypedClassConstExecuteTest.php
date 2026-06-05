@@ -59,6 +59,7 @@ final class JitTypedClassConstExecuteTest extends TestCase
                 'typed_class_const.phpt',
                 'typed_class_const_float_int.phpt',
                 'typed_class_constant.phpt',
+                'interface_typed_const.phpt',
             ] as $fixture
         ) {
             yield $fixture => [$fixture];
