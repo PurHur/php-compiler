@@ -243,7 +243,7 @@ final class InheritanceVariance
                 }
             }
         }
-        if ($parent->isAbstract && count($child->params) > count($parent->params)) {
+        if (count($child->params) > count($parent->params)) {
             for ($i = count($parent->params); $i < count($child->params); ++$i) {
                 if (!($child->paramHasDefault[$i] ?? false)) {
                     return self::formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
