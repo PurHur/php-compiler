@@ -641,22 +641,59 @@ if anchor not in text:
 insert = method_path.read_text().rstrip("\n") + "\n\n"
 text = text.replace(anchor, insert + anchor, 1)
 
-param_needle = "            $p->promotionReadonly = 0 !== ($param->flags & Stmt\\Class_::MODIFIER_READONLY);\n"
-param_insert = param_needle + "            $p->promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($p->getAttributes());\n"
-if param_needle in text and 'promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text:
-    text = text.replace(param_needle, param_insert, 1)
+param_needles = [
+    "            $p->promotionReadonly = (bool) ($param->flags & Stmt\\Class_::MODIFIER_READONLY);\n",
+    "            $p->promotionReadonly = 0 !== ($param->flags & Stmt\\Class_::MODIFIER_READONLY);\n",
+]
+param_insert_suffix = "            $p->promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($p->getAttributes());\n"
+for param_needle in param_needles:
+    if param_needle in text and 'promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text:
+        text = text.replace(param_needle, param_needle + param_insert_suffix, 1)
+        break
 
-prop_needle = "            $property->readonly = 0 !== ($node->flags & Node\\Stmt\\Class_::MODIFIER_READONLY);\n"
-prop_insert = prop_needle + "            $property->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($property->getAttributes());\n"
-if prop_needle in text and 'property->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text:
-    text = text.replace(prop_needle, prop_insert, 1)
+prop_needles = [
+    "            $prop->propertyFlags = $node->flags;\n",
+    "            $cfgProp->readonly = 0 !== ($node->flags & Node\\Stmt\\Class_::MODIFIER_READONLY);\n",
+    "            $prop->readonly = 0 !== ($node->flags & Node\\Stmt\\Class_::MODIFIER_READONLY);\n",
+    "            $property->readonly = 0 !== ($node->flags & Node\\Stmt\\Class_::MODIFIER_READONLY);\n",
+]
+prop_insert_suffix = "            $prop->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($prop->getAttributes());\n"
+for prop_needle in prop_needles:
+    if prop_needle in text and 'setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text:
+        if '$prop->propertyFlags' in prop_needle:
+            text = text.replace(prop_needle, prop_needle + prop_insert_suffix, 1)
+        elif '$cfgProp->readonly' in prop_needle:
+            text = text.replace(
+                prop_needle,
+                prop_needle + "            $cfgProp->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($cfgProp->getAttributes());\n",
+                1,
+            )
+        elif '$prop->readonly' in prop_needle:
+            text = text.replace(
+                prop_needle,
+                prop_needle + "            $prop->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($prop->getAttributes());\n",
+                1,
+            )
+        else:
+            text = text.replace(
+                prop_needle,
+                prop_needle + "            $property->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($property->getAttributes());\n",
+                1,
+            )
+        break
 
-if 'promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text and 'property->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text:
+if 'extractAsymmetricSetVisibilityFromAttributes($p->getAttributes())' not in text \
+    and 'extractAsymmetricSetVisibilityFromAttributes($prop->getAttributes())' not in text \
+    and 'extractAsymmetricSetVisibilityFromAttributes($cfgProp->getAttributes())' not in text \
+    and 'extractAsymmetricSetVisibilityFromAttributes($property->getAttributes())' not in text:
     sys.stderr.write("php-cfg-asymmetric-set-visibility: Parser promotion/readonly anchors missing (apply after ctor-promotion)\n")
     raise SystemExit(1)
 
 parser_path.write_text(text)
 PY
+  if [[ $? -ne 0 ]]; then
+    return 1
+  fi
   echo "Applied php-cfg asymmetric set-visibility Parser overlay (#4690)"
 }
 
@@ -688,22 +725,43 @@ if anchor not in text:
 insert = method_path.read_text().rstrip("\n") + "\n\n"
 text = text.replace(anchor, insert + anchor, 1)
 
-param_needle = "            $p->promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($p->getAttributes());\n"
-param_insert = param_needle + "            $p->promotionGetVisibility = $this->extractAsymmetricGetVisibilityFromAttributes($p->getAttributes());\n"
-if param_needle in text and 'promotionGetVisibility = $this->extractAsymmetricGetVisibilityFromAttributes' not in text:
-    text = text.replace(param_needle, param_insert, 1)
+param_needles = [
+    "            $p->promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($p->getAttributes());\n",
+]
+param_insert_suffix = "            $p->promotionGetVisibility = $this->extractAsymmetricGetVisibilityFromAttributes($p->getAttributes());\n"
+for param_needle in param_needles:
+    if param_needle in text and 'promotionGetVisibility = $this->extractAsymmetricGetVisibilityFromAttributes' not in text:
+        text = text.replace(param_needle, param_needle + param_insert_suffix, 1)
+        break
 
-prop_needle = "            $property->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($property->getAttributes());\n"
-prop_insert = prop_needle + "            $property->getVisibility = $this->extractAsymmetricGetVisibilityFromAttributes($property->getAttributes());\n"
-if prop_needle in text and 'property->getVisibility = $this->extractAsymmetricGetVisibilityFromAttributes' not in text:
-    text = text.replace(prop_needle, prop_insert, 1)
+prop_needles = [
+    "            $prop->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($prop->getAttributes());\n",
+    "            $cfgProp->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($cfgProp->getAttributes());\n",
+    "            $property->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($property->getAttributes());\n",
+]
+for prop_needle in prop_needles:
+    if prop_needle in text and 'getVisibility = $this->extractAsymmetricGetVisibilityFromAttributes' not in text:
+        var = 'prop'
+        if '$cfgProp->' in prop_needle:
+            var = 'cfgProp'
+        elif '$property->' in prop_needle:
+            var = 'property'
+        get_line = f"            ${var}->getVisibility = $this->extractAsymmetricGetVisibilityFromAttributes(${var}->getAttributes());\n"
+        text = text.replace(prop_needle, prop_needle + get_line, 1)
+        break
 
-if 'promotionGetVisibility = $this->extractAsymmetricGetVisibilityFromAttributes' not in text and 'property->getVisibility = $this->extractAsymmetricGetVisibilityFromAttributes' not in text:
+if 'extractAsymmetricGetVisibilityFromAttributes($p->getAttributes())' not in text \
+    and 'extractAsymmetricGetVisibilityFromAttributes($prop->getAttributes())' not in text \
+    and 'extractAsymmetricGetVisibilityFromAttributes($cfgProp->getAttributes())' not in text \
+    and 'extractAsymmetricGetVisibilityFromAttributes($property->getAttributes())' not in text:
     sys.stderr.write("php-cfg-asymmetric-get-visibility: Parser setVisibility anchors missing (apply after set overlay)\n")
     raise SystemExit(1)
 
 parser_path.write_text(text)
 PY
+  if [[ $? -ne 0 ]]; then
+    return 1
+  fi
   echo "Applied php-cfg asymmetric get-visibility Parser overlay (#5059)"
 }
 
@@ -3599,8 +3657,8 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-ctor-promotion.patch"
   apply_patch "$PATCH_DIR/php-cfg-ctor-promotion-readonly.patch"
   apply_patch "$PATCH_DIR/php-cfg-property-readonly.patch"
-  apply_php_cfg_asymmetric_set_visibility_parser_overlay || true
-  apply_php_cfg_asymmetric_get_visibility_parser_overlay || true
+  apply_php_cfg_asymmetric_set_visibility_parser_overlay
+  apply_php_cfg_asymmetric_get_visibility_parser_overlay
   apply_patch "$PATCH_DIR/php-cfg-attribute-groups.patch"
   apply_patch "$PATCH_DIR/php-cfg-trait-use.patch"
   apply_patch "$PATCH_DIR/php-cfg-throw-expr.patch"
@@ -3708,6 +3766,12 @@ verify_critical_language_patches() {
   fi
   if ! grep -qE 'propertyFlags = \$node->flags|\$cfgProp->readonly =|\$prop->readonly =|\$property->readonly =|->readonly = 0 !== \\(\\$node->flags & .*MODIFIER_READONLY\\)' "$parser" 2>/dev/null; then
     missing+=("php-cfg-property-readonly-Parser")
+  fi
+  if ! grep -q 'function extractAsymmetricSetVisibilityFromAttributes' "$parser" 2>/dev/null; then
+    missing+=("php-cfg-asymmetric-set-visibility-Parser")
+  fi
+  if ! grep -q 'function extractAsymmetricGetVisibilityFromAttributes' "$parser" 2>/dev/null; then
+    missing+=("php-cfg-asymmetric-get-visibility-Parser")
   fi
   if [[ ! -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/In_.php" ]]; then
     missing+=("php-cfg-in-operator-In_")
