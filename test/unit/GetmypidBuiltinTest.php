@@ -20,4 +20,16 @@ final class GetmypidBuiltinTest extends TestCase
         $fn->execute($frame);
         $this->assertSame(\getmypid(), $frame->returnVar->resolveIndirect()->toInt());
     }
+
+    public function testTooManyArgsThrowsArgumentCountError(): void
+    {
+        $runtime = new Runtime();
+        $fn = new getmypid();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->calledArgs[] = new VMVariable();
+        $frame->calledArgs[0]->string('extra');
+        $this->expectException(\ArgumentCountError::class);
+        $this->expectExceptionMessage('getmypid() expects exactly 0 arguments, 1 given');
+        $fn->execute($frame);
+    }
 }
