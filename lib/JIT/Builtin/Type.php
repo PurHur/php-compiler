@@ -183,6 +183,8 @@ class Type extends Builtin {
         GethostbynamelRuntime::ensureLinked($this->context);
         TimeSleepRuntime::ensureLinked($this->context);
         StringHrtime::ensureLinked($this->context);
+        StringMicrotime::ensureLinked($this->context);
+        StringGettimeofday::ensureLinked($this->context);
         LastErrorRuntime::ensureLinked($this->context);
         FunctionExistsRuntime::ensureLinked($this->context);
         WeakRefRegistryRuntime::ensureLinked($this->context);
