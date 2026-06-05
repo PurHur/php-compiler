@@ -47,6 +47,11 @@ final class ApplyPatchesTest extends TestCase
             $body,
             'php-types-union-type must lower Op\\Type\\Union_ in resolveOpType (M2 spine compile)'
         );
+        self::assertStringContainsString(
+            'instanceof Op\\Type\\Intersection',
+            $body,
+            'php-types-intersection-type must lower Op\\Type\\Intersection in resolveOpType (#4956)'
+        );
     }
 
     public function testPhpTypesUnionTypeReconstructorOverlayReappliesAfterPartialVendor(): void

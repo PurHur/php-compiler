@@ -822,6 +822,13 @@ class TypeReconstructor
             }
 
             return (new Type(Type::TYPE_UNION, $subs))->simplify();
+        } elseif ($type instanceof Op\Type\Intersection) {
+            $subs = [];
+            foreach ($type->types as $sub) {
+                $subs[] = $this->resolveOpType($sub);
+            }
+
+            return new Type(Type::TYPE_INTERSECTION, $subs);
         }
 
         throw new \LogicException('Unknown Op\\Type provided: '.get_class($type));

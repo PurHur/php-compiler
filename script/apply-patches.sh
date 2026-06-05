@@ -1442,9 +1442,50 @@ PY
   echo "Applied php-cfg-attribute-groups.patch (overlay)"
 }
 
+apply_php_types_intersection_type_reconstructor_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  [[ -f "$target" ]] || return 0
+  if grep -q 'instanceof Op\\Type\\Intersection' "$target" 2>/dev/null && php -l "$target" >/dev/null 2>&1; then
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+intersection_branch = """        } elseif ($type instanceof Op\\Type\\Intersection) {
+            $subs = [];
+            foreach ($type->types as $sub) {
+                $subs[] = $this->resolveOpType($sub);
+            }
+
+            return new Type(Type::TYPE_INTERSECTION, $subs);
+"""
+throw_anchor = """        throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
+union_close = (
+    "            return (new Type(Type::TYPE_UNION, $subs))->simplify();\n"
+    "        }\n\n"
+    + throw_anchor
+)
+if "instanceof Op\\Type\\Intersection" in text:
+    raise SystemExit(0)
+if union_close in text:
+    text = text.replace(union_close, union_close.replace("\n\n" + throw_anchor, "\n" + intersection_branch + "\n" + throw_anchor, 1), 1)
+elif throw_anchor in text:
+    text = text.replace(throw_anchor, intersection_branch + "\n" + throw_anchor, 1)
+else:
+    sys.stderr.write("php-types-intersection-type: TypeReconstructor anchor not found\n")
+    raise SystemExit(1)
+path.write_text(text)
+PY
+  echo "Applied php-types-intersection-type.patch (TypeReconstructor overlay)"
+}
+
 apply_php_types_intersection_type_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
   if grep -q 'instanceof CfgType\\Intersection' "$target" 2>/dev/null; then
+    apply_php_types_intersection_type_reconstructor_overlay
     echo "Skip php-types-intersection-type.patch (already applied)"
     return 0
   fi
@@ -1480,6 +1521,7 @@ insert = """        if ($decl instanceof CfgType\\Union_) {
 """
 path.write_text(text.replace(anchor, insert + anchor, 1))
 PY
+  apply_php_types_intersection_type_reconstructor_overlay
   echo "Applied php-types-intersection-type.patch (overlay)"
 }
 
@@ -1517,7 +1559,9 @@ PY
 apply_php_types_union_type_reconstructor_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
   repair_php_types_union_type_reconstructor_if_needed
-  if grep -q 'instanceof Op\\Type\\Union_' "$target" 2>/dev/null && php -l "$target" >/dev/null 2>&1; then
+  if grep -q 'instanceof Op\\Type\\Union_' "$target" 2>/dev/null \
+    && grep -q 'instanceof Op\\Type\\Intersection' "$target" 2>/dev/null \
+    && php -l "$target" >/dev/null 2>&1; then
     return 0
   fi
   python3 - "$target" <<'PY'
@@ -1553,13 +1597,22 @@ literal_throw_anchor = """        } elseif ($type instanceof Op\\Type\\Literal) 
         }
 
         throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
+intersection_branch = """        } elseif ($type instanceof Op\\Type\\Intersection) {
+            $subs = [];
+            foreach ($type->types as $sub) {
+                $subs[] = $this->resolveOpType($sub);
+            }
+
+            return new Type(Type::TYPE_INTERSECTION, $subs);
+"""
 never_union_tail = (
     """        } elseif ($type instanceof Op\\Type\\Never_) {
             return Type::never();
         } elseif ($type instanceof Op\\Type\\Union_) {
 """
     + union_body
-    + """        }
+    + intersection_branch
+    + """
 
         throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
 )
@@ -1571,7 +1624,8 @@ literal_union_tail = (
         } elseif ($type instanceof Op\\Type\\Union_) {
 """
     + union_body
-    + """        }
+    + intersection_branch
+    + """
 
         throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"""
 )
@@ -1621,6 +1675,7 @@ apply_php_types_union_type_overlay() {
   if [[ "$need_recon" -eq 1 ]]; then
     apply_php_types_union_type_reconstructor_overlay
   fi
+  apply_php_types_intersection_type_reconstructor_overlay
 }
 
 apply_php_types_closure_unbound_this_overlay() {
@@ -3760,6 +3815,9 @@ verify_critical_language_patches() {
     missing+=("php-types-union-type")
   elif ! php -l "$recon" >/dev/null 2>&1; then
     missing+=("php-types-union-type-syntax")
+  fi
+  if ! grep -q 'instanceof Op\\Type\\Intersection' "$recon" 2>/dev/null; then
+    missing+=("php-types-intersection-type")
   fi
   if ! grep -qE 'public \$readonly|propertyFlags' "$prop" 2>/dev/null; then
     missing+=("php-cfg-property-readonly-Property")
