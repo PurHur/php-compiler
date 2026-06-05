@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringInfo;
+use PHPCompiler\JIT\Builtin\StringVersionCompare;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -13,7 +14,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for phpversion/php_uname/php_sapi_name/version introspection via phpc_info.c (#3174, #3204). */
+/** LLVM lowering for phpversion/php_uname/php_sapi_name/version introspection (#3174, #3204, #6124). */
 final class JitInfo
 {
     public static function phpversion(Context $context, ?JITVariable $extension): Value
@@ -95,7 +96,7 @@ final class JitInfo
         JITVariable $ver2,
         ?JITVariable $operator = null
     ): Value {
-        StringInfo::ensureLinked($context);
+        StringVersionCompare::ensureLinked($context);
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_version_compare'),
             JitStringArg::lower($context, $ver1, 'version_compare() ver1'),
