@@ -375,6 +375,7 @@ class Module extends ModuleAbstract
             new is_executable(),
             new is_link(),
             new readlink(),
+            new linkinfo(),
             new link_(),
             new symlink_(),
             new unlink(),
