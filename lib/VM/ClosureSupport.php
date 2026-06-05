@@ -196,6 +196,7 @@ final class ClosureSupport
         $boundThis = new Variable();
         $boundThis->copyFrom($newThis);
         $invokeState->boundThis = $boundThis;
+        $invokeState->boundScopeClass = $newThis->toObject()->class->name;
 
         $copies = [];
         foreach ($invokeArgs as $arg) {
