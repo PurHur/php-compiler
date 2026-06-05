@@ -39,9 +39,13 @@ final class BuiltinExceptionSupport
         return self::materializeThrowable($ctx, self::CLASS_VALUE_ERROR, $message);
     }
 
-    public static function materializeError(Context $ctx, string $message): Variable
-    {
-        return self::materializeThrowable($ctx, self::CLASS_ERROR, $message);
+    public static function materializeError(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        return self::materializeThrowable($ctx, self::CLASS_ERROR, $message, $file, $line);
     }
 
     public static function materializeFiberError(Context $ctx, string $message): Variable
