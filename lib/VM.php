@@ -1953,6 +1953,17 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
+                    if ($op->arg1 === $op->arg2) {
+                        $hookedRead = $this->fetchHookedPropertyValueForIncDec($arg2, $frame);
+                        if (null !== $hookedRead) {
+                            $catchFrame = $this->executeHookedPropertyInPlaceCompound($frame, $op, $hookedRead);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
+                    }
                     try {
                         if (
                             $op->isIncDec
@@ -1991,6 +2002,17 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
+                    if ($op->arg1 === $op->arg2) {
+                        $hookedRead = $this->fetchHookedPropertyValueForIncDec($arg2, $frame);
+                        if (null !== $hookedRead) {
+                            $catchFrame = $this->executeHookedPropertyInPlaceCompound($frame, $op, $hookedRead);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
+                    }
                     try {
                         $arg1->bitwiseOp($op->type, $arg2, $arg3, $this, $frame);
                     } catch (\TypeError $e) {
@@ -2025,6 +2047,17 @@ restart:
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
                         goto restart;
+                    }
+                    if ($op->arg1 === $op->arg2) {
+                        $hookedRead = $this->fetchHookedPropertyValueForIncDec($arg1, $frame);
+                        if (null !== $hookedRead) {
+                            $catchFrame = $this->executeHookedPropertyInPlaceCompound($frame, $op, $hookedRead);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
                     }
                     try {
                         $arg2 = $this->coerceVariableToString($frame->scope[$op->arg2], $frame);
@@ -2536,6 +2569,7 @@ restart:
                         );
                     }
                     $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
+                    $readBeforeAssign = $forWrite && $this->propertyFetchDestUsedAsReadBeforeAssign($frame, $op);
                     $hooks = $this->resolveStaticPropertyHooks($lcClass, $propName);
                     if (
                         !$forWrite
@@ -2553,6 +2587,14 @@ restart:
                         && isset($hooks['set'])
                         && !$this->isPropertyHookRawWrite($frame, $propNameRaw)
                     ) {
+                        if ($readBeforeAssign && isset($hooks['get'])) {
+                            $hookValue = $this->fetchStaticPropertyWithHooks($lcClass, $propNameRaw, $hooks['get'], $frame);
+                            $dest = $frame->scope[$op->arg1];
+                            $dest->copyFrom($hookValue);
+                            $dest->staticPropertyClassLc = $lcClass;
+                            $dest->objectPropertyName = $propNameRaw;
+                            break;
+                        }
                         $frame->scope[$op->arg1]->indirect($storage);
                         $storage->staticPropertyClassLc = $lcClass;
                         $storage->objectPropertyName = $propNameRaw;
@@ -4428,8 +4470,8 @@ restart:
             return null;
         }
         $target = $write->resolveIndirect();
-        $classLc = $target->staticPropertyClassLc;
-        $staticPropName = $target->objectPropertyName;
+        $classLc = $write->staticPropertyClassLc ?? $target->staticPropertyClassLc;
+        $staticPropName = $write->objectPropertyName ?? $target->objectPropertyName;
         if (is_string($classLc) && is_string($staticPropName) && '' !== $staticPropName) {
             $hooks = $this->resolveStaticPropertyHooks($classLc, strtolower($staticPropName));
             $getLc = $hooks['get'] ?? null;
@@ -4446,6 +4488,57 @@ restart:
         }
 
         return $this->fetchPropertyWithHooks($owner, $propName, $frame);
+    }
+
+    /**
+     * In-place compound assign on hooked properties ($prop .= 'x', $prop += 1) (#6438, zend_property_hooks.c).
+     */
+    private function executeHookedPropertyInPlaceCompound(Frame $frame, OpCode $op, Variable $hookedRead): ?Frame
+    {
+        $write = $frame->scope[$op->arg1];
+        $working = new Variable();
+        $working->copyFrom($hookedRead->resolveIndirect());
+        try {
+            switch ($op->type) {
+                case OpCode::TYPE_CONCAT:
+                    $lhs = $this->coerceVariableToString($working, $frame);
+                    $rhs = $this->coerceVariableToString($frame->scope[$op->arg3], $frame);
+                    $working->string($lhs . $rhs);
+                    break;
+                case OpCode::TYPE_PLUS:
+                case OpCode::TYPE_MINUS:
+                case OpCode::TYPE_MUL:
+                case OpCode::TYPE_DIV:
+                case OpCode::TYPE_MODULO:
+                case OpCode::TYPE_POW:
+                    $working->numericOp($op->type, $working, $frame->scope[$op->arg3], $this, $frame);
+                    break;
+                case OpCode::TYPE_BITWISE_AND:
+                case OpCode::TYPE_BITWISE_OR:
+                case OpCode::TYPE_BITWISE_XOR:
+                case OpCode::TYPE_SHIFT_LEFT:
+                case OpCode::TYPE_SHIFT_RIGHT:
+                    $working->bitwiseOp($op->type, $working, $frame->scope[$op->arg3], $this, $frame);
+                    break;
+                default:
+                    return null;
+            }
+        } catch (\TypeError $e) {
+            return $this->dispatchVmTypeError($e, $frame);
+        } catch (\DivisionByZeroError $e) {
+            return $this->dispatchVmDivisionByZeroError($e, $frame);
+        } catch (\Error $e) {
+            return $this->dispatchVmError($e->getMessage(), $frame);
+        }
+        if (!$this->dispatchPropertySetHookAssign($write, $working, $frame)) {
+            $catchFrame = $this->enforceVirtualPropertyHookWrite($write, $frame);
+            if (null !== $catchFrame) {
+                return $catchFrame;
+            }
+            $write->copyFrom($working);
+        }
+
+        return null;
     }
 
     private function executeHookedPropertyIncDec(
@@ -4595,20 +4688,41 @@ restart:
         if ($nextIndex >= $frame->block->nOpCodes) {
             return false;
         }
+        $next = $frame->block->opCodes[$nextIndex] ?? null;
+        if (null === $next) {
+            return false;
+        }
 
-        return OpCode::destSlotUsedAsAssignLvalue($frame->block->opCodes[$nextIndex], (int) $op->arg1);
+        return OpCode::destSlotUsedAsAssignLvalue($next, (int) $op->arg1);
     }
 
     /** True when a following opcode assigns through this PROPERTY_FETCH destination slot (#5370). */
     private function propertyFetchDestUsedAsAssignLvalue(Frame $frame, OpCode $op): bool
     {
+        $destSlot = (int) $op->arg1;
         for ($j = $frame->pos, $n = $frame->block->nOpCodes; $j < $n; $j++) {
-            if (OpCode::destSlotUsedAsAssignLvalue($frame->block->opCodes[$j], (int) $op->arg1)) {
+            $candidate = $frame->block->opCodes[$j] ?? null;
+            if (null === $candidate) {
+                continue;
+            }
+            if (OpCode::destSlotUsedAsAssignLvalue($candidate, $destSlot)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /** True when fetch dest is read by a compound op before a later assign (#6438, zend_property_hooks.c). */
+    private function propertyFetchDestUsedAsReadBeforeAssign(Frame $frame, OpCode $op): bool
+    {
+        $destSlot = (int) $op->arg1;
+        $next = $frame->block->opCodes[$frame->pos] ?? null;
+        if (null === $next) {
+            return false;
+        }
+
+        return OpCode::destSlotUsedAsCompoundAssignRead($next, $destSlot);
     }
 
     /**
@@ -5654,8 +5768,8 @@ restart:
     private function dispatchPropertySetHookAssign(Variable $lvalue, Variable $value, Frame $frame): bool
     {
         $target = $lvalue->resolveIndirect();
-        $classLc = $target->staticPropertyClassLc;
-        $staticPropName = $target->objectPropertyName;
+        $classLc = $lvalue->staticPropertyClassLc ?? $target->staticPropertyClassLc;
+        $staticPropName = $lvalue->objectPropertyName ?? $target->objectPropertyName;
         if (
             is_string($classLc)
             && is_string($staticPropName)

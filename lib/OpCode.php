@@ -292,7 +292,56 @@ class OpCode {
             || (self::TYPE_POST_INC === $op->type && $op->arg3 === $destSlot)
             || (self::TYPE_PRE_INC === $op->type && $op->arg3 === $destSlot)
             || (self::TYPE_POST_DEC === $op->type && $op->arg3 === $destSlot)
-            || (self::TYPE_PRE_DEC === $op->type && $op->arg3 === $destSlot);
+            || (self::TYPE_PRE_DEC === $op->type && $op->arg3 === $destSlot)
+            || self::destSlotUsedAsInPlaceCompoundAssign($op, $destSlot);
+    }
+
+    /** True when this opcode reads {@see $destSlot} as lhs in fetch-op-assign compound lowering (#6438). */
+    public static function destSlotUsedAsCompoundAssignRead(self $op, int $destSlot): bool
+    {
+        if ($op->arg2 !== $destSlot || $op->arg1 === $destSlot) {
+            return false;
+        }
+
+        return match ($op->type) {
+            self::TYPE_CONCAT,
+            self::TYPE_PLUS,
+            self::TYPE_MINUS,
+            self::TYPE_MUL,
+            self::TYPE_DIV,
+            self::TYPE_MODULO,
+            self::TYPE_POW,
+            self::TYPE_BITWISE_AND,
+            self::TYPE_BITWISE_OR,
+            self::TYPE_BITWISE_XOR,
+            self::TYPE_SHIFT_LEFT,
+            self::TYPE_SHIFT_RIGHT => true,
+            default => false,
+        };
+    }
+
+    /** True when this opcode mutates {@see $destSlot} in-place (arg1 === arg2) (#6438). */
+    public static function destSlotUsedAsInPlaceCompoundAssign(self $op, int $destSlot): bool
+    {
+        if ($op->arg1 !== $destSlot || $op->arg2 !== $destSlot) {
+            return false;
+        }
+
+        return match ($op->type) {
+            self::TYPE_CONCAT,
+            self::TYPE_PLUS,
+            self::TYPE_MINUS,
+            self::TYPE_MUL,
+            self::TYPE_DIV,
+            self::TYPE_MODULO,
+            self::TYPE_POW,
+            self::TYPE_BITWISE_AND,
+            self::TYPE_BITWISE_OR,
+            self::TYPE_BITWISE_XOR,
+            self::TYPE_SHIFT_LEFT,
+            self::TYPE_SHIFT_RIGHT => true,
+            default => false,
+        };
     }
 
 }
