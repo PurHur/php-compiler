@@ -19,13 +19,19 @@ final class JitFdiv
 {
     private const FUNCTION = 'fdiv';
 
-    public static function lowerOperands(Context $context, JITVariable $num1, JITVariable $num2): array
-    {
+    public static function lowerOperands(
+        Context $context,
+        JITVariable $num1,
+        JITVariable $num2,
+        string $function = self::FUNCTION,
+        string $param1 = 'num1',
+        string $param2 = 'num2'
+    ): array {
         $double = $context->getTypeFromString('double');
 
         return [
-            self::lowerOperand($context, $num1, 1, 'num1', $double),
-            self::lowerOperand($context, $num2, 2, 'num2', $double),
+            self::lowerOperand($context, $num1, 1, $param1, $double, $function),
+            self::lowerOperand($context, $num2, 2, $param2, $double, $function),
         ];
     }
 
@@ -34,36 +40,38 @@ final class JitFdiv
         JITVariable $arg,
         int $argIndex,
         string $paramName,
-        $double
+        $double,
+        string $function = self::FUNCTION
     ): Value {
         if (JITVariable::TYPE_OBJECT === $arg->type) {
             self::emitDoubleTypeErrorAndAbort(
                 $context,
                 $argIndex,
                 $paramName,
-                self::compileTimeObjectGivenLabel($context, $arg)
+                self::compileTimeObjectGivenLabel($context, $arg),
+                $function
             );
 
             return $double->constReal(0.0);
         }
         switch ($arg->type) {
             case JITVariable::TYPE_NATIVE_LONG:
-                $v = JitLongArg::lower($context, $arg, self::FUNCTION.'() argument');
+                $v = JitLongArg::lower($context, $arg, $function.'() argument');
 
                 return $context->builder->siToFp($v, $double);
             case JITVariable::TYPE_NATIVE_DOUBLE:
                 return $context->helper->loadValue($arg);
             case JITVariable::TYPE_VALUE:
                 if (JitValueBox::isValueOperand($arg)) {
-                    return self::unboxValueToDouble($context, $arg, $double, $argIndex, $paramName);
+                    return self::unboxValueToDouble($context, $arg, $double, $argIndex, $paramName, $function);
                 }
                 break;
             default:
                 if (JitValueBox::isValueOperand($arg)) {
-                    return self::unboxValueToDouble($context, $arg, $double, $argIndex, $paramName);
+                    return self::unboxValueToDouble($context, $arg, $double, $argIndex, $paramName, $function);
                 }
         }
-        throw new \LogicException(self::FUNCTION.'() only supports integers and floats in this compiler build');
+        throw new \LogicException($function.'() only supports integers and floats in this compiler build');
     }
 
     private static function unboxValueToDouble(
@@ -71,7 +79,8 @@ final class JitFdiv
         JITVariable $arg,
         $double,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        string $function = self::FUNCTION
     ): Value {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
@@ -92,7 +101,8 @@ final class JitFdiv
             $context,
             $argIndex,
             $paramName,
-            self::compileTimeEnumCaseGivenLabel($context, $arg)
+            self::compileTimeEnumCaseGivenLabel($context, $arg),
+            $function
         );
 
         $context->builder->positionAtEnd($afterEnum);
@@ -148,11 +158,15 @@ final class JitFdiv
         return self::compileTimeObjectGivenLabel($context, $arg);
     }
 
-    private static function doubleTypeError(int $argIndex, string $paramName, string $given): string
-    {
+    private static function doubleTypeError(
+        int $argIndex,
+        string $paramName,
+        string $given,
+        string $function = self::FUNCTION
+    ): string {
         return sprintf(
             '%s(): Argument #%d ($%s) must be of type float, %s given',
-            self::FUNCTION,
+            $function,
             $argIndex,
             $paramName,
             $given
@@ -163,11 +177,12 @@ final class JitFdiv
         Context $context,
         int $argIndex,
         string $paramName,
-        string $given
+        string $given,
+        string $function = self::FUNCTION
     ): void {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, self::doubleTypeError($argIndex, $paramName, $given));
+        TypeErrorRaise::emitRaise($context, self::doubleTypeError($argIndex, $paramName, $given, $function));
         $context->builder->call($context->lookupFunction('abort'));
     }
 }
