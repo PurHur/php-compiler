@@ -103,4 +103,20 @@ final class VmFilterTest extends TestCase
         $this->assertTrue(VmFilter::isIntegerString('123'));
         $this->assertTrue(VmFilter::isIntegerString('-42'));
     }
+
+    public function testIsValidEmailSubsetAcceptsPracticalAddresses(): void
+    {
+        $this->assertTrue(VmFilter::isValidEmailSubset('user@example.com'));
+        $this->assertTrue(VmFilter::isValidEmailSubset('a@b.co'));
+    }
+
+    public function testIsValidEmailSubsetRejectsInvalidAddresses(): void
+    {
+        $this->assertFalse(VmFilter::isValidEmailSubset(''));
+        $this->assertFalse(VmFilter::isValidEmailSubset('not-an-email'));
+        $this->assertFalse(VmFilter::isValidEmailSubset('bad@'));
+        $this->assertFalse(VmFilter::isValidEmailSubset('@example.com'));
+        $this->assertFalse(VmFilter::isValidEmailSubset('a@b'));
+        $this->assertFalse(VmFilter::isValidEmailSubset('a@@b.co'));
+    }
 }
