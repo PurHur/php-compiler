@@ -27,19 +27,14 @@ final class stream_set_read_buffer_ extends Internal
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $bufferVar = $frame->calledArgs[1]->resolveIndirect();
-        if (!$handleVar->isStreamResource()) {
-            throw new \TypeError(
-                'stream_set_read_buffer(): Argument #1 ($stream) must be of type resource, '
-                . VmStreamArg::debugTypeName($handleVar) . ' given'
-            );
-        }
         if (Variable::TYPE_INTEGER !== $bufferVar->type) {
             throw new \TypeError('stream_set_read_buffer(): Argument #2 ($buffer) must be of type int');
         }
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'stream_set_read_buffer');
         if (null === $frame->returnVar) {
             return;
         }
-        $previous = VmFs::streamSetReadBuffer($handleVar->toInt(), $bufferVar->toInt());
+        $previous = VmFs::streamSetReadBuffer($handle, $bufferVar->toInt());
         if (false === $previous) {
             $frame->returnVar->bool(false);
 
