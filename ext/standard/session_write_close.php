@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /** session_write_close() — persist $_SESSION and close (issue #1185). */
-final class session_write_close extends Internal
+class session_write_close extends Internal
 {
     public function __construct()
     {
