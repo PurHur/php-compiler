@@ -14,7 +14,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -29,20 +31,28 @@ final class str_contains extends Internal
         if (2 !== count($frame->calledArgs)) {
             throw new \LogicException('str_contains() requires exactly two arguments');
         }
-        $haystack = $frame->calledArgs[0]->resolveIndirect();
-        $needle = $frame->calledArgs[1]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $haystackStr = VmString::coerceOperand($haystack);
-        $needleStr = VmString::coerceOperand($needle);
-        if ('' === $needleStr) {
-            $frame->returnVar->bool(true);
+        $haystackStr = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'str_contains',
+            0,
+            'haystack'
+        );
+        $needleStr = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[1],
+            'str_contains',
+            1,
+            'needle'
+        );
+        BuiltinExecute::writeReturn(
+            $frame,
+            static function (Variable $ret) use ($haystackStr, $needleStr): void {
+                if ('' === $needleStr) {
+                    $ret->bool(true);
 
-            return;
-        }
-        $frame->returnVar->bool(
-            false !== VmString::strpos($haystackStr, $needleStr)
+                    return;
+                }
+                $ret->bool(false !== VmString::strpos($haystackStr, $needleStr));
+            }
         );
     }
 
@@ -54,8 +64,8 @@ final class str_contains extends Internal
         if (2 !== count($args)) {
             throw new \LogicException('str_contains() requires exactly two arguments');
         }
-        $hayPtr = $this->stringDataPtr($context, $this->jitString($context, $args[0], 'str_contains() argument #1'));
-        $needlePtr = $this->stringDataPtr($context, $this->jitString($context, $args[1], 'str_contains() argument #2'));
+        $hayPtr = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[0], 'str_contains', 0, 'haystack'));
+        $needlePtr = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[1], 'str_contains', 1, 'needle'));
         $found = $context->builder->call($context->lookupFunction('strstr'), $hayPtr, $needlePtr);
         $null = $context->getTypeFromString('int8*')->constNull();
         $isNull = $context->builder->icmp(Builder::INT_EQ, $found, $null);
