@@ -7,10 +7,7 @@ namespace PHPCompiler;
 require_once __DIR__.'/../BaseTest.php';
 
 /**
- * JIT compile (lint) for dynamic class operand `::class` (#4179).
- *
- * MCJIT execute via bin/jit.php segfaults in the LLVM 9 harness (pre-existing);
- * VM coverage: compliance class_name_dynamic_jit.phpt; AOT: fixtures/aot/cases/class_name_dynamic.phpt.
+ * JIT compile (lint) for dynamic class operand `::class` (#4179, MCJIT execute #4954).
  *
  * @group llvm
  * @group jit
