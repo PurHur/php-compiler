@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -30,15 +31,22 @@ final class str_ends_with extends Internal
         if (2 !== count($frame->calledArgs)) {
             throw new \LogicException('str_ends_with() requires exactly two arguments');
         }
-        $haystack = $frame->calledArgs[0]->resolveIndirect();
-        $needle = $frame->calledArgs[1]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $frame->returnVar->bool(VmString::endsWith(
-            VmString::coerceStringBuiltinArg($haystack, 'str_ends_with', 0, 'haystack'),
-            VmString::coerceStringBuiltinArg($needle, 'str_ends_with', 1, 'needle')
-        ));
+        $haystackStr = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'str_ends_with',
+            0,
+            'haystack'
+        );
+        $needleStr = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[1],
+            'str_ends_with',
+            1,
+            'needle'
+        );
+        BuiltinExecute::writeReturn(
+            $frame,
+            static fn (Variable $ret) => $ret->bool(VmString::endsWith($haystackStr, $needleStr))
+        );
     }
 
     public Context $context;
