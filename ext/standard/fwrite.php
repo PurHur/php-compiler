@@ -12,14 +12,20 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** fwrite() — VM via VmFs; JIT/AOT via __compiler_fwrite (issue #1070). */
+/** fwrite() / fputs() — VM via VmFs; JIT/AOT via __compiler_fwrite (issue #1070, #6162). */
 final class fwrite extends Internal
 {
+    public function __construct(string $name = 'fwrite')
+    {
+        parent::__construct($name);
+    }
+
     public function execute(Frame $frame): void
     {
+        $fn = $this->getName();
         $argc = \count($frame->calledArgs);
         if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('fwrite() requires two or three arguments in this compiler build');
+            throw new \LogicException($fn.'() requires two or three arguments in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $dataVar = $frame->calledArgs[1]->resolveIndirect();
@@ -27,16 +33,16 @@ final class fwrite extends Internal
             return;
         }
         if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('fwrite() handle must be an integer in this compiler build');
+            throw new \LogicException($fn.'() handle must be an integer in this compiler build');
         }
         if (Variable::TYPE_STRING !== $dataVar->type) {
-            throw new \LogicException('fwrite() data must be a string in this compiler build');
+            throw new \LogicException($fn.'() data must be a string in this compiler build');
         }
         $length = null;
         if (3 === $argc) {
             $lenVar = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $lenVar->type) {
-                throw new \LogicException('fwrite() length must be an integer in this compiler build');
+                throw new \LogicException($fn.'() length must be an integer in this compiler build');
             }
             $length = $lenVar->toInt();
         }
@@ -51,19 +57,20 @@ final class fwrite extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $fn = $this->getName();
         $argc = \count($args);
         if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('fwrite() requires two or three arguments in this compiler build');
+            throw new \LogicException($fn.'() requires two or three arguments in this compiler build');
         }
         $i64 = $context->getTypeFromString('int64');
         $handle = $context->builder->truncOrBitCast(
-            JitLongArg::lower($context, $args[0], 'fwrite() handle'),
+            JitLongArg::lower($context, $args[0], $fn.'() handle'),
             $i64
         );
-        $dataStr = $this->jitString($context, $args[1], 'fwrite() data');
+        $dataStr = $this->jitString($context, $args[1], $fn.'() data');
         if (3 === $argc) {
             $length = $context->builder->truncOrBitCast(
-                JitLongArg::lower($context, $args[2], 'fwrite() length'),
+                JitLongArg::lower($context, $args[2], $fn.'() length'),
                 $i64
             );
         } else {

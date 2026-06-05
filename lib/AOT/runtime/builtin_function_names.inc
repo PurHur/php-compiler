@@ -155,6 +155,7 @@ static const char *phpc_builtin_functions[] = {
     "forward_static_call_array",
     "fpassthru",
     "fputcsv",
+    "fputs",
     "fread",
     "frexp",
     "fseek",
@@ -508,4 +509,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 507;
+static const size_t phpc_builtin_functions_count = 508;

@@ -417,6 +417,7 @@ class Module extends ModuleAbstract
             new ftruncate_(),
             new fpassthru(),
             new fwrite(),
+            new fwrite('fputs'),
             new fclose(),
             new flock(),
             new forward_static_call(),
