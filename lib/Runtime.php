@@ -105,6 +105,7 @@ class Runtime {
         $astTraverser->addVisitor($this->abstractEnumMarker);
         $this->sealedClassAnnotator = new SealedClassAnnotator();
         $astTraverser->addVisitor($this->sealedClassAnnotator);
+        $astTraverser->addVisitor(new Ast\EnumPropertyCompileCheck());
         $this->parser = new Parser(
             (new ParserFactory)->create(ParserFactory::ONLY_PHP7),
             $astTraverser
