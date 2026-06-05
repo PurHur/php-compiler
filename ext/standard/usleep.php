@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** usleep() — microsecond delay (VM host; JIT/AOT via libc usleep(3)). */
@@ -19,11 +18,13 @@ final class usleep extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('usleep() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $v->type) {
-            throw new \LogicException('usleep() requires an integer in this compiler build');
-        }
-        VmSleep::usleep($v->toInt());
+        $microseconds = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[0]->resolveIndirect(),
+            'usleep',
+            1,
+            'microseconds'
+        );
+        VmSleep::usleep($microseconds);
         if (null !== $frame->returnVar) {
             $frame->returnVar->null();
         }
