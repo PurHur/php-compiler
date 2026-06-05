@@ -201,9 +201,8 @@ final class ClassConstExpr
         }
         $container = self::resolveValue($frame, $block, $op->arg2);
         if (Variable::TYPE_ARRAY !== $container->type) {
-            $msg = TypeCheck::cannotUseBracketOn($container);
-            if (null !== $msg) {
-                throw new \TypeError($msg);
+            if (TypeCheck::isScalarUsedAsArray($container)) {
+                throw new \Error(TypeCheck::SCALAR_USED_AS_ARRAY_MESSAGE);
             }
             throw new \LogicException('[] is only supported for arrays in class constant expressions');
         }

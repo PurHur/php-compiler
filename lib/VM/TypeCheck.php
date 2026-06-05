@@ -305,21 +305,32 @@ final class TypeCheck
         ], true);
     }
 
+    /** Zend zend_execute.c FETCH_DIM_W on scalars (#6325, #4713). */
+    public const SCALAR_USED_AS_ARRAY_MESSAGE = 'Cannot use a scalar value as an array';
+
     /**
-     * Zend write/append [] on scalars — TypeError "Cannot use [] on …" (zend_operators.c, #4713).
+     * True when []= / dim-write targets a scalar container (null/bool/int/float).
+     */
+    public static function isScalarUsedAsArray(Variable $value): bool
+    {
+        $resolved = $value->resolveIndirect();
+
+        return \in_array($resolved->type, [
+            Variable::TYPE_NULL,
+            Variable::TYPE_BOOLEAN,
+            Variable::TYPE_INTEGER,
+            Variable::TYPE_FLOAT,
+        ], true);
+    }
+
+    /**
+     * Zend write/append [] on scalars — Error "Cannot use a scalar value as an array" (zend_execute.c, #6325).
+     *
+     * @deprecated Use isScalarUsedAsArray() + SCALAR_USED_AS_ARRAY_MESSAGE; kept for const-expr paths.
      */
     public static function cannotUseBracketOn(Variable $value): ?string
     {
-        $resolved = $value->resolveIndirect();
-        switch ($resolved->type) {
-            case Variable::TYPE_NULL:
-            case Variable::TYPE_BOOLEAN:
-            case Variable::TYPE_INTEGER:
-            case Variable::TYPE_FLOAT:
-                return 'Cannot use [] on ' . self::typeNameForConstraint($resolved->type);
-            default:
-                return null;
-        }
+        return self::isScalarUsedAsArray($value) ? self::SCALAR_USED_AS_ARRAY_MESSAGE : null;
     }
 
     private static function isExactType(Variable $value, int $constraint): bool
