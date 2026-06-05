@@ -271,10 +271,11 @@ final class BuiltinClasses
         $rc->methodVisibility['getmethods'] = $pub;
         $rc->methods['getreflectionconstant'] = new ReflectionClassGetReflectionConstant();
         $rc->methodVisibility['getreflectionconstant'] = $pub;
+        $pubStatic = $pub | CfgFunc::FLAG_STATIC;
         $rc->methods['newlazyproxy'] = new ReflectionClassNewLazyProxy();
-        $rc->methodVisibility['newlazyproxy'] = $pub;
+        $rc->methodVisibility['newlazyproxy'] = $pubStatic;
         $rc->methods['newlazyghost'] = new ReflectionClassNewLazyGhost();
-        $rc->methodVisibility['newlazyghost'] = $pub;
+        $rc->methodVisibility['newlazyghost'] = $pubStatic;
         $rc->methods['getlazyinitializer'] = new ReflectionClassGetLazyInitializer();
         $rc->methodVisibility['getlazyinitializer'] = $pub;
         $rc->methods['isuninitializedlazyobject'] = new ReflectionClassIsUninitializedLazyObject();

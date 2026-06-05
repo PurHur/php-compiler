@@ -10,7 +10,7 @@ use PHPCompiler\VM\LazyObjectSupport;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
 
-/** ReflectionClass::newLazyGhost(callable $initializer) — VM (#4026). */
+/** ReflectionClass::newLazyGhost(callable|string, callable) — VM (#4026, #6399). */
 final class ReflectionClassNewLazyGhost extends VmClassMethod
 {
     public function __construct()
@@ -23,9 +23,8 @@ final class ReflectionClassNewLazyGhost extends VmClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('ReflectionClass::newLazyGhost() expects an initializer callable');
         }
-        $receiver = ReflectionSupport::requireReflectionClass($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
-        $className = ReflectionSupport::classNameFromReflection($receiver);
+        $className = ReflectionSupport::classNameFromLazyFactoryArg($frame->calledArgs[0]);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
             throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');

@@ -518,6 +518,48 @@ final class ReflectionSupport
         return $nameVar->toString();
     }
 
+    /**
+     * ReflectionClass::newLazyGhost/Proxy — class name string or ReflectionClass receiver (#6399).
+     */
+    public static function classNameFromLazyFactoryArg(Variable $arg, string $method = 'newLazyGhost'): string
+    {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_STRING === $arg->type) {
+            return $arg->toString();
+        }
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            $obj = $arg->toObject();
+            if (strtolower($obj->class->name) !== self::REFLECTION_CLASS) {
+                throw new \TypeError(
+                    'ReflectionClass::'.$method.'(): Argument #1 ($class) must be of type string, '
+                    .$obj->class->name.' given'
+                );
+            }
+
+            return self::classNameFromReflection($obj);
+        }
+
+        throw new \TypeError(
+            'ReflectionClass::'.$method.'(): Argument #1 ($class) must be of type string, '
+            .self::valueTypeLabel($arg).' given'
+        );
+    }
+
+    private static function valueTypeLabel(Variable $var): string
+    {
+        return match ($var->type) {
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_BOOL => 'bool',
+            Variable::TYPE_LONG => 'int',
+            Variable::TYPE_DOUBLE => 'float',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            Variable::TYPE_RESOURCE => 'resource',
+            default => 'unknown',
+        };
+    }
+
     public static function enumCaseNameFromReflection(ObjectEntry $reflection): string
     {
         $nameVar = $reflection->getProperty(self::PROP_ENUM_CASE_NAME)->resolveIndirect();

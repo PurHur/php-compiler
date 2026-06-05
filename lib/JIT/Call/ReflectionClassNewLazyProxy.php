@@ -48,7 +48,18 @@ final class ReflectionClassNewLazyProxy implements Call
 
     public static function loadClassIdFromReflection(Context $context, Variable $receiver): Value
     {
-        $obj = ReflectionSetup::loadObjectFromArg($context, $receiver);
+        return self::loadClassIdFromLazyFactoryArg($context, $receiver);
+    }
+
+    public static function loadClassIdFromLazyFactoryArg(Context $context, Variable $arg): Value
+    {
+        if (Variable::TYPE_STRING === ($arg->type & ~Variable::IS_REFCOUNTED)) {
+            [$cstr, $len] = ReflectionSetup::stringVarAsCstr($context, $arg);
+
+            return $context->type->object->classIdFromRuntimeName($cstr, $len);
+        }
+
+        $obj = ReflectionSetup::loadObjectFromArg($context, $arg);
         [$cstr, $len] = ReflectionSetup::reflectionClassNameAsCstr($context, $obj);
 
         return $context->type->object->classIdFromRuntimeName($cstr, $len);
