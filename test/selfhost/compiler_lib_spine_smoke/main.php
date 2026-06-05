@@ -69,6 +69,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringHtmlspecialchars.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHttpBuildQuery.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringJsonEncode.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNl2br.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringParseStrJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringParseStr.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPregMatch.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPregQuote.php';
