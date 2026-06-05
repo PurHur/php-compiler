@@ -9754,6 +9754,36 @@ class JIT {
 
             return;
         }
+        if (JIT\Variable::TYPE_OBJECT === $src->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeObject'),
+                $destPtr,
+                $this->context->helper->loadValue($src)
+            );
+
+            return;
+        }
+        if (JIT\Variable::TYPE_HASHTABLE === $src->type) {
+            $ht = $this->context->helper->loadValue($src);
+            $this->context->refcount->addref($ht);
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeHashtable'),
+                $destPtr,
+                $ht
+            );
+
+            return;
+        }
+        if (0 !== ($src->type & JIT\Variable::IS_NATIVE_ARRAY)) {
+            $htPtr = JIT\HashTableHelper::materializeNativeArrayForCall($this->context, $src);
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeHashtable'),
+                $destPtr,
+                $htPtr
+            );
+
+            return;
+        }
         if (null !== $srcOp) {
             $lit = $srcOp instanceof Operand\Literal ? $srcOp : null;
             if (null !== $lit && null !== $lit->type) {
