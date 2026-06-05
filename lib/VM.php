@@ -3578,7 +3578,23 @@ restart:
                         );
                     }
                     if (null === $file) {
-                        $file = $frame->scope[$op->arg1]->toString();
+                        try {
+                            $file = $frame->scope[$op->arg1]->toString();
+                        } catch (\Error $e) {
+                            $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        } catch (\TypeError $e) {
+                            $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
                     }
 
                     $kind = $op->includeKind ?? OpCode::INCLUDE_KIND_INCLUDE_ONCE;
