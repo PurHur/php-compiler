@@ -8155,6 +8155,11 @@ class JIT {
                         $name->value,
                         (int) ($op->propertySetVisibility ?? 0)
                     );
+                    $this->context->type->object->definePropertyGetVisibility(
+                        $classId,
+                        $name->value,
+                        (int) ($op->propertyGetVisibility ?? 0)
+                    );
                     if ($op->propertyReadonly || $this->context->scope->classIsReadonly) {
                         $this->context->type->object->markPropertyReadonly($classId, $name->value);
                     }

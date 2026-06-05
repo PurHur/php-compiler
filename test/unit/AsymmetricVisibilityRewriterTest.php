@@ -32,6 +32,35 @@ PHP;
         self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $x', preg_replace('/\s+/', ' ', $rewritten));
     }
 
+    public function testRewritePublicPrivateGet(): void
+    {
+        $source = <<<'PHP'
+<?php
+class Box {
+    public private(get) string $secret = 'hidden';
+}
+PHP;
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-get:private*/ public string $secret',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
+        self::assertSame(
+            \PHPCfg\Func::FLAG_PRIVATE,
+            AsymmetricVisibilityRewriter::getVisibilityFromMarker('/*phpc-asymmetric-get:private*/')
+        );
+    }
+
+    public function testImplicitPublicWriteForPrivateGet(): void
+    {
+        $source = 'private(get) string $x = "a";';
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-get:private*/ public string $x',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
+    }
+
     public function testRewriteConstructorPromotedPrivateSet(): void
     {
         $source = <<<'PHP'
