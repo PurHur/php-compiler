@@ -61,13 +61,12 @@ final class StringUnserialize
             throw new \LogicException('Cannot create JIT runtime cache: '.$cacheDir);
         }
 
-        $namesInc = dirname($source).'/builtin_function_names.inc';
         $cache = $cacheDir.'/unserialize-'.substr(
-            sha1($source.filemtime($source).filemtime($namesInc).$compiler),
+            sha1($source.filemtime($source).$compiler),
             0,
             16
         ).'.bc';
-        if (is_file($cache) && filemtime($cache) >= filemtime($source) && filemtime($cache) >= filemtime($namesInc)) {
+        if (is_file($cache) && filemtime($cache) >= filemtime($source)) {
             return $cache;
         }
 
