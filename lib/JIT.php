@@ -10180,7 +10180,7 @@ class JIT {
         }
     }
 
-    /** ++/-- on object properties: guard readonly and store via property slot (#3149). */
+    /** ++/-- on object properties: get/set hook dispatch or guard readonly (#6309, #3149). */
     private function compileObjectPropertyIncDecOp(
         Variable $read,
         \PHPCfg\Operand $resultOp,
@@ -10190,8 +10190,34 @@ class JIT {
         if (null === $read->objectPropertySlot || null === $read->objectPropertyType) {
             throw new \LogicException('objectPropertySlot requires objectPropertyType');
         }
+        $current = null;
+        if (
+            null !== $read->objectPropertyReceiver
+            && null !== $read->objectPropertyClassName
+            && null !== $read->objectPropertyName
+            && '' !== $read->objectPropertyName
+        ) {
+            $hookVal = JIT\PropertyHookDispatch::tryEmitPropertyGet(
+                $this->context,
+                $read->objectPropertyReceiver,
+                $read->objectPropertyClassName,
+                $read->objectPropertyName,
+                $this->context->jitEnclosingBlock
+            );
+            if (null !== $hookVal) {
+                $current = new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VALUE,
+                    $hookVal
+                );
+            }
+        }
+        if (null === $current) {
+            $current = $read;
+        }
         if (!$prefix) {
-            $this->assignOperand($resultOp, $read, true);
+            $this->assignOperand($resultOp, $current, true);
         }
         $arithOp = new OpCode($increment ? OpCode::TYPE_PLUS : OpCode::TYPE_MINUS);
         $oneVar = new Variable(
@@ -10200,7 +10226,20 @@ class JIT {
             Variable::KIND_VALUE,
             $this->context->constantFromInteger(1)
         );
-        $newVal = $this->context->helper->binaryOp($arithOp, $read, $oneVar);
+        $newVal = $this->context->helper->binaryOp($arithOp, $current, $oneVar);
+        if (JIT\PropertyHookDispatch::emitSetHookIfNeeded(
+            $this->context,
+            $read,
+            $newVal,
+            $this->context->jitEnclosingBlock,
+            $this
+        )) {
+            if ($prefix) {
+                $this->assignOperand($resultOp, $newVal, true);
+            }
+
+            return;
+        }
         JIT\ReadonlyClassGuard::emitBeforePropertyStore(
             $this->context,
             $read,

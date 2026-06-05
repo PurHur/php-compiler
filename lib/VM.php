@@ -4399,6 +4399,10 @@ restart:
                     $working->applyDecrement();
                 }
                 if (!$this->dispatchPropertySetHookAssign($write, $working, $frame)) {
+                    $catchFrame = $this->enforceVirtualPropertyHookWrite($write, $frame);
+                    if (null !== $catchFrame) {
+                        return $catchFrame;
+                    }
                     $write->copyFrom($working);
                 }
                 $result->copyFrom($working);
@@ -4413,6 +4417,10 @@ restart:
                 $working->applyDecrement();
             }
             if (!$this->dispatchPropertySetHookAssign($write, $working, $frame)) {
+                $catchFrame = $this->enforceVirtualPropertyHookWrite($write, $frame);
+                if (null !== $catchFrame) {
+                    return $catchFrame;
+                }
                 $write->copyFrom($working);
             }
             $result->copyFrom($old);
