@@ -17,6 +17,10 @@ final class GethostnameVMTest extends BaseTest
             __DIR__.'/cases/stdlib/gethostname.phpt',
             'gethostname.phpt'
         );
+        yield 'gethostname_argc.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/gethostname_argc.phpt',
+            'gethostname_argc.phpt'
+        );
     }
 
     public function setUp(): void
