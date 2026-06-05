@@ -4921,7 +4921,7 @@ restart:
         if (null !== $pending && $this->frameIsInFinallyBody($frame)) {
             VM\ExceptionSupport::chainPendingExceptionOnFinallyThrow($thrown, $pending);
         }
-        $this->context->pendingException = $thrown;
+        $this->stashPendingException($thrown);
         $handlers = $this->context->activeTryHandlerFrames;
         for ($i = \count($handlers) - 1; $i >= 0; --$i) {
             $handler = $handlers[$i];
@@ -5245,6 +5245,15 @@ restart:
         $this->context->pendingReturnIsVoid = true;
         $this->context->pendingReturnValue = null;
         $this->context->pendingReturnResumeFrame = null;
+    }
+
+    /** Snapshot throw operand so scope reuse cannot clobber pending try exceptions (#5867, #6457). */
+    private function stashPendingException(Variable $thrown): void
+    {
+        if (null === $this->context->pendingException) {
+            $this->context->pendingException = new Variable();
+        }
+        $this->context->pendingException->copyFrom($thrown);
     }
 
     private function hasPendingFinally(Frame $handler): bool
@@ -6615,7 +6624,7 @@ restart:
     /** Catch handlers inside the generator function only (not caller try/catch). */
     private function findCatchFrameForGeneratorThrow(GeneratorState $gen, Variable $thrown): ?Frame
     {
-        $this->context->pendingException = $thrown;
+        $this->stashPendingException($thrown);
         for ($handler = $gen->frame; null !== $handler; $handler = $handler->parent) {
             if ($handler->generatorState !== $gen && $this->findGeneratorState($handler) !== $gen) {
                 break;

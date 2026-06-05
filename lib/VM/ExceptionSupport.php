@@ -310,6 +310,9 @@ final class ExceptionSupport
         if (Variable::TYPE_OBJECT !== $previous->type) {
             throw new \LogicException('Exception previous must be an object');
         }
+        if ($receiver === $previous->toObject()) {
+            return;
+        }
         if (!self::objectImplementsThrowable($previous->toObject())) {
             throw new \LogicException('Exception previous must implement Throwable');
         }
@@ -323,8 +326,15 @@ final class ExceptionSupport
     /** Chain pending try exception onto a throw from finally (zend_exceptions.c, #5486). */
     public static function chainPendingExceptionOnFinallyThrow(Variable $thrown, Variable $pending): void
     {
+        if ($thrown === $pending) {
+            return;
+        }
         $thrown = $thrown->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $thrown->type) {
+        $pending = $pending->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $thrown->type || Variable::TYPE_OBJECT !== $pending->type) {
+            return;
+        }
+        if ($thrown->toObject() === $pending->toObject()) {
             return;
         }
         self::setExceptionPrevious($thrown->toObject(), $pending);
@@ -375,6 +385,9 @@ final class ExceptionSupport
             return $native;
         }
         $prevEntry = $prevVar->toObject();
+        if ($prevEntry === $entry) {
+            return $native;
+        }
         $prevMessage = self::readThrowableMessage($prevEntry);
         $prevNative = self::nativeUncaughtThrowable($prevEntry, $prevMessage);
         if ($native instanceof \Exception && $prevNative instanceof \Throwable) {
