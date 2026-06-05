@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringFilterEmail;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -175,6 +176,7 @@ final class JitFilter
 
     public static function validateEmail(Context $context, JITVariable $value): Value
     {
+        StringFilterEmail::ensureLinked($context);
         if (JITVariable::TYPE_VALUE === $value->type) {
             return self::boxValueValidateEmail($context, $value);
         }
