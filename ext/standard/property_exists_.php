@@ -67,7 +67,9 @@ final class property_exists_ extends Internal
 
     private static function requireValidObjectOrClass(Variable $objectOrClass): void
     {
-        if (Variable::TYPE_STRING === $objectOrClass->type || Variable::TYPE_OBJECT === $objectOrClass->type) {
+        if (Variable::TYPE_STRING === $objectOrClass->type
+            || Variable::TYPE_OBJECT === $objectOrClass->type
+            || Variable::TYPE_ENUM_CASE === $objectOrClass->type) {
             return;
         }
         throw new \TypeError(\sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, self::vmTypeName($objectOrClass->type)));
@@ -113,6 +115,8 @@ final class property_exists_ extends Internal
             case Variable::TYPE_ARRAY:
                 return 'array';
             case Variable::TYPE_OBJECT:
+                return 'object';
+            case Variable::TYPE_ENUM_CASE:
                 return 'object';
             default:
                 return 'mixed';
