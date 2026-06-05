@@ -508,6 +508,13 @@ class Type extends Builtin {
         $fntypeHashEquals = $this->context->context->functionType($i32, false, $strPtr, $strPtr);
         $fnHashEquals = $this->context->module->addFunction('__compiler_hash_equals', $fntypeHashEquals);
         $this->context->registerFunction('__compiler_hash_equals', $fnHashEquals);
+        $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $fntypeHashHmacAlgos = $this->context->context->functionType($htPtr, false);
+        $fnHashHmacAlgos = $this->context->module->addFunction(
+            '__compiler_hash_hmac_algos',
+            $fntypeHashHmacAlgos
+        );
+        $this->context->registerFunction('__compiler_hash_hmac_algos', $fnHashHmacAlgos);
         $double = $this->context->getTypeFromString('double');
         $fntypeMicrotimeStr = $this->context->context->functionType($strPtr, false);
         $fnMicrotimeStr = $this->context->module->addFunction('__compiler_microtime_string', $fntypeMicrotimeStr);

@@ -57,6 +57,7 @@ final class StringHashCrypto
                 '__compiler_hash_hmac',
                 '__compiler_hash_pbkdf2',
                 '__compiler_hash_equals',
+                '__compiler_hash_hmac_algos',
             ] as $name
         ) {
             $fn = $context->module->getNamedFunction($name);

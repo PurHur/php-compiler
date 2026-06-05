@@ -273,6 +273,7 @@ class Module extends ModuleAbstract
             new quoted_printable_decode(),
             new hash_(),
             new hash_hmac(),
+            new hash_hmac_algos(),
             new hash_pbkdf2(),
             new hash_equals(),
             new md5(),
