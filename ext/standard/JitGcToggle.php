@@ -6,7 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\GcCollectCyclesNative;
 use PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -18,8 +20,16 @@ final class JitGcToggle
     /** @return Value */
     public static function enable(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 0) {
-            throw new \LogicException('gc_enable() takes no arguments');
+        $argc = \count($args);
+        if ($argc > 0) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'gc_enable() expects exactly 0 arguments, '.$argc.' given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
         self::prepare($context);
         $context->builder->call($context->lookupFunction('phpc_gc_enable'));
