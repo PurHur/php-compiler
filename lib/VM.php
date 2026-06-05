@@ -46,6 +46,9 @@ class VM {
 
     private static ?self $running = null;
 
+    /** Frame executing the current opcode (property hook ref read/write, #6426). */
+    private ?Frame $executingFrame = null;
+
     /** @internal Active VM during runFrames (#3429 typed property errors). */
     public static function running(): ?self
     {
@@ -1224,6 +1227,7 @@ restart:
         }
 
         while ($frame->pos < $frame->block->nOpCodes) {
+            $this->executingFrame = $frame;
             $op = $frame->block->opCodes[$frame->pos++];
             try {
                 switch ($op->type) {
@@ -1287,7 +1291,10 @@ restart:
                         }
                     }
                     $writeTarget = $arg2->resolveIndirect();
-                    if ($this->context->isGlobalStorage($writeTarget)) {
+                    if (
+                        $this->context->isGlobalStorage($writeTarget)
+                        && !VM\EnumCaseSupport::arrayContainsRuntimeRefs($arg3)
+                    ) {
                         $stored = VM\EnumCaseSupport::materializeConstantValue($this->context, $arg3);
                         $arg2->copyFrom($stored);
                         $arg1->copyFrom($stored);
@@ -1380,6 +1387,22 @@ restart:
                     // Zend: Class::$prop = &Class::$prop stores NULL, not a circular ref (#5405).
                     if ($writeTarget === $rhs && $this->isStaticPropertyStorageCell($writeTarget)) {
                         $writeTarget->null();
+                        break;
+                    }
+                    $hookRefLvalue = $this->resolvePropertyHookRefWriteLvalue($rhsSlot, $frame);
+                    if (null !== $hookRefLvalue) {
+                        if (!$this->propertyWriteHasSetHook($hookRefLvalue)) {
+                            $catchFrame = $this->enforceVirtualPropertyHookWrite($hookRefLvalue, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
+                        $stableLvalue = $this->stablePropertyHookRefWriteLvalue($hookRefLvalue);
+                        $hookRefVar = new Variable();
+                        $hookRefVar->propertyHookRef(new VM\PropertyHookRef($this, $stableLvalue));
+                        $writeTarget->indirect($hookRefVar);
                         break;
                     }
                     // Object property / static / nested ref slots are live storage (Zend FE_FETCH_R,
@@ -4157,6 +4180,9 @@ restart:
                 }
 
                 return self::FAILURE;
+            } catch (VM\PropertyHookRefWriteSignal $signal) {
+                $frame = $signal->catchFrame;
+                goto restart;
             }
             if ($frame->generatorYield) {
                 $frame->generatorYield = false;
@@ -5501,6 +5527,125 @@ restart:
         }
 
         return null;
+    }
+
+    /**
+     * Read a hooked property through a reference binding (#6426).
+     */
+    public function readPropertyHookRef(Variable $writeLvalue): Variable
+    {
+        $frame = $this->requireExecutingFrame();
+        $owner = $this->resolvePropertyWriteOwner($writeLvalue);
+        $propName = $this->resolvePropertyWriteName($writeLvalue);
+        if (null !== $owner && null !== $propName) {
+            $hookValue = $this->fetchPropertyWithHooks($owner, $propName, $frame);
+            if (null !== $hookValue) {
+                return $hookValue;
+            }
+        }
+        $target = $writeLvalue->resolveIndirect();
+        $classLc = $target->staticPropertyClassLc;
+        $staticPropName = $target->objectPropertyName;
+        if (is_string($classLc) && is_string($staticPropName) && '' !== $staticPropName) {
+            $hooks = $this->resolveStaticPropertyHooks($classLc, strtolower($staticPropName));
+            $getLc = $hooks['get'] ?? null;
+            if (null !== $getLc) {
+                return $this->fetchStaticPropertyWithHooks($classLc, $staticPropName, $getLc, $frame);
+            }
+        }
+        $out = new Variable();
+        $out->copyFrom($target);
+
+        return $out;
+    }
+
+    /**
+     * Write a hooked property through a reference binding (#6426).
+     */
+    public function writePropertyHookRef(Variable $writeLvalue, Variable $value): void
+    {
+        $frame = $this->requireExecutingFrame();
+        if ($this->dispatchPropertySetHookAssign($writeLvalue, $value, $frame)) {
+            return;
+        }
+        if ($this->context->propertyHookSetAborted) {
+            $this->context->propertyHookSetAborted = false;
+
+            return;
+        }
+        $catchFrame = $this->enforceVirtualPropertyHookWrite($writeLvalue, $frame);
+        if (null !== $catchFrame) {
+            throw new VM\PropertyHookRefWriteSignal($catchFrame);
+        }
+        $writeLvalue->resolveIndirect()->copyFrom($value);
+    }
+
+    private function requireExecutingFrame(): Frame
+    {
+        if (null === $this->executingFrame) {
+            throw new \LogicException('No active frame for property hook reference');
+        }
+
+        return $this->executingFrame;
+    }
+
+    /**
+     * Property lvalue for assign-by-ref when rhs is a hooked property (#6426).
+     */
+    private function resolvePropertyHookRefWriteLvalue(Variable $operand, Frame $frame): ?Variable
+    {
+        if (null === $this->resolvePropertyWriteOwner($operand)) {
+            return null;
+        }
+        $propName = $this->resolvePropertyWriteName($operand);
+        if (null === $propName || $this->isPropertyHookRawWrite($frame, $propName)) {
+            return null;
+        }
+
+        return $operand;
+    }
+
+    /** Live property storage cell for hooked ref bindings (#6426). */
+    private function stablePropertyHookRefWriteLvalue(Variable $operand): Variable
+    {
+        $owner = $this->resolvePropertyWriteOwner($operand);
+        $propName = $this->resolvePropertyWriteName($operand);
+        if (null !== $owner && null !== $propName && $owner->hasProperty($propName)) {
+            return $owner->getProperty($propName);
+        }
+        $target = $operand->resolveIndirect();
+        $classLc = $target->staticPropertyClassLc;
+        $staticPropName = $target->objectPropertyName;
+        if (is_string($classLc) && is_string($staticPropName) && isset($this->context->classes[$classLc])) {
+            return $this->context->classes[$classLc]->staticProperties[strtolower($staticPropName)];
+        }
+
+        return $operand;
+    }
+
+    private function propertyWriteHasSetHook(Variable $lvalue): bool
+    {
+        $propName = $this->resolvePropertyWriteName($lvalue);
+        if (null === $propName) {
+            return false;
+        }
+        $target = $lvalue->resolveIndirect();
+        $classLc = $target->staticPropertyClassLc;
+        $staticPropName = $target->objectPropertyName;
+        if (is_string($classLc) && is_string($staticPropName) && '' !== $staticPropName) {
+            $hooks = $this->resolveStaticPropertyHooks($classLc, strtolower($staticPropName));
+
+            return null !== $hooks && !empty($hooks['set']);
+        }
+        $owner = $this->resolvePropertyWriteOwner($lvalue);
+        if (null === $owner) {
+            return false;
+        }
+        $meta = $this->classPropertyMeta($owner, $propName);
+        $setLc = $meta?->setHookMethodLc
+            ?? strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($propName));
+
+        return isset($owner->class->methods[$setLc]);
     }
 
     /**

@@ -284,11 +284,11 @@ class OpCode {
         $this->arg3 = $arg3;
     }
 
-    /** True when this opcode assigns through {@see $destSlot} as lvalue (#5370). */
+    /** True when this opcode assigns through {@see $destSlot} as lvalue (#5370, #6426). */
     public static function destSlotUsedAsAssignLvalue(self $op, int $destSlot): bool
     {
         return (self::TYPE_ASSIGN === $op->type && $op->arg2 === $destSlot)
-            || (self::TYPE_ASSIGN_REF === $op->type && $op->arg1 === $destSlot)
+            || (self::TYPE_ASSIGN_REF === $op->type && ($op->arg1 === $destSlot || $op->arg2 === $destSlot))
             || (self::TYPE_POST_INC === $op->type && $op->arg3 === $destSlot)
             || (self::TYPE_PRE_INC === $op->type && $op->arg3 === $destSlot)
             || (self::TYPE_POST_DEC === $op->type && $op->arg3 === $destSlot)

@@ -30,6 +30,8 @@ final class Variable {
     const TYPE_ENUM_CASE = 9;
     /** Writable ArrayAccess dimension ($obj[$key] assignment, #3331). */
     const TYPE_ARRAYACCESS_OFFSET = 10;
+    /** Writable hooked property reference cell (#6426). */
+    const TYPE_PROPERTY_HOOK_REF = 11;
 
 
     const NUMERIC = self::TYPE_INTEGER | self::TYPE_FLOAT;
@@ -54,6 +56,7 @@ final class Variable {
     private ?\PHPCompiler\Frame $stringOffsetFrame = null;
     private ?string $stringOffsetFile = null;
     private ArrayAccessDimension $arrayAccessDimension;
+    private PropertyHookRef $propertyHookRef;
 
 
     public int $next = -1;
@@ -333,6 +336,8 @@ final class Variable {
                 break;
             case self::TYPE_ARRAYACCESS_OFFSET:
                 return $this->arrayAccessDimension->read()->toInt($vm);
+            case self::TYPE_PROPERTY_HOOK_REF:
+                return $this->propertyHookRef->read()->toInt($vm);
         }
         throw new \LogicException("Cannot convert type {$this->type} to int");
     }
@@ -376,6 +381,8 @@ final class Variable {
                     return $enumFloat;
                 }
                 break;
+            case self::TYPE_PROPERTY_HOOK_REF:
+                return $this->propertyHookRef->read()->toFloat($vm);
         }
         throw new \LogicException("Cannot convert type {$this->type} to float");
     }
@@ -542,6 +549,8 @@ final class Variable {
                 return $this->objectToScalarString($vm, 'bool')->toBool($vm);
             case self::TYPE_ENUM_CASE:
                 return true;
+            case self::TYPE_PROPERTY_HOOK_REF:
+                return $this->propertyHookRef->read()->toBool($vm);
         }
         throw new \LogicException("Cannot convert type {$this->type} to bool");
     }
@@ -594,6 +603,8 @@ final class Variable {
                 return $var->readStringOffset();
             case self::TYPE_ARRAYACCESS_OFFSET:
                 return $var->arrayAccessDimension->read()->toString();
+            case self::TYPE_PROPERTY_HOOK_REF:
+                return $var->propertyHookRef->read()->toString($vm, $frame);
             case self::TYPE_NULL:
             case self::TYPE_UNDEFINED:
                 return '';
@@ -724,6 +735,7 @@ final class Variable {
         unset($this->stringOffsetFrame);
         unset($this->stringOffsetFile);
         unset($this->arrayAccessDimension);
+        unset($this->propertyHookRef);
     }
 
     public function arrayAccessDimension(ArrayAccessDimension $dimension): void
@@ -755,6 +767,36 @@ final class Variable {
         }
 
         return $this->arrayAccessDimension->declaringClassName();
+    }
+
+    public function propertyHookRef(PropertyHookRef $ref): void
+    {
+        $this->reset();
+        $this->type = self::TYPE_PROPERTY_HOOK_REF;
+        $this->propertyHookRef = $ref;
+    }
+
+    public function isPropertyHookRef(): bool
+    {
+        return self::TYPE_PROPERTY_HOOK_REF === $this->type;
+    }
+
+    public function readPropertyHookRefValue(): Variable
+    {
+        if (self::TYPE_PROPERTY_HOOK_REF !== $this->type) {
+            throw new \LogicException('Not a property hook reference');
+        }
+
+        return $this->propertyHookRef->read()->resolveIndirect();
+    }
+
+    public function propertyHookRefWriteLvalue(): Variable
+    {
+        if (self::TYPE_PROPERTY_HOOK_REF !== $this->type) {
+            throw new \LogicException('Not a property hook reference');
+        }
+
+        return $this->propertyHookRef->writeLvalue();
     }
 
     /**
@@ -928,6 +970,11 @@ final class Variable {
 
             return;
         }
+        if ($this->type === self::TYPE_PROPERTY_HOOK_REF) {
+            $this->propertyHookRef->write($var);
+
+            return;
+        }
         switch ($var->type) {
             case self::TYPE_NULL:
                 $this->null();
@@ -937,6 +984,9 @@ final class Variable {
                 break;
             case self::TYPE_STRING_OFFSET:
                 $this->string($var->toString());
+                break;
+            case self::TYPE_PROPERTY_HOOK_REF:
+                $this->copyFrom($var->propertyHookRef->read());
                 break;
             case self::TYPE_INTEGER:
                 $this->int($var->integer);

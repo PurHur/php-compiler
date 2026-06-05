@@ -113,6 +113,7 @@ final class ReferencableCheck
         if (
             Variable::TYPE_STRING_OFFSET === $resolved->type
             || Variable::TYPE_ARRAYACCESS_OFFSET === $resolved->type
+            || Variable::TYPE_PROPERTY_HOOK_REF === $resolved->type
         ) {
             return true;
         }
