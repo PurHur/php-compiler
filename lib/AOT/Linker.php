@@ -22,7 +22,6 @@ final class Linker
         __DIR__.'/runtime/phpc_similar_text.c',
         __DIR__.'/runtime/phpc_base_convert.c',
         __DIR__.'/runtime/phpc_str_getcsv.c',
-        __DIR__.'/runtime/phpc_strtok.c',
         __DIR__.'/runtime/password_crypto.c',
         __DIR__.'/runtime/phpc_array_merge_recursive.c',
         __DIR__.'/runtime/phpc_utf8_latin1.c',

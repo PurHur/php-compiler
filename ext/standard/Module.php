@@ -595,15 +595,6 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('substr_compare', $ft);
             $context->registerFunction('substr_compare', $fn);
         }
-        try {
-            $context->lookupFunction('phpc_strtok');
-        } catch (\Throwable $e) {
-            $strPtr = $context->getTypeFromString('__string__*');
-            $i8 = $context->getTypeFromString('int8');
-            $ft = $context->context->functionType($strPtr, false, $strPtr, $strPtr, $i8);
-            $fn = $context->module->addFunction('phpc_strtok', $ft);
-            $context->registerFunction('phpc_strtok', $fn);
-        }
         foreach (['strspn', 'strcspn'] as $name) {
             try {
                 $context->lookupFunction($name);
