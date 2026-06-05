@@ -3474,15 +3474,13 @@ restart:
                 case OpCode::TYPE_ARRAY_SPREAD:
                     $result = $frame->scope[$op->arg1];
                     $source = $frame->scope[$op->arg2];
-                    try {
-                        VM\ArraySpread::spreadInto($this, $frame, $result->toArray(), $source);
-                    } catch (\TypeError $e) {
-                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
-                        if (null !== $catchFrame) {
-                            $frame = $catchFrame;
-                            goto restart;
-                        }
-                    }
+                    VM\ArraySpread::spreadInto(
+                        $this,
+                        $frame,
+                        $result->toArray(),
+                        $source,
+                        (int) ($op->arg3 ?? 0)
+                    );
                     break;
                 case OpCode::TYPE_CLONE:
                     $result = $frame->scope[$op->arg1];
@@ -7999,7 +7997,13 @@ restart:
             case OpCode::TYPE_ARRAY_SPREAD:
                 $result = $frame->scope[$op->arg1];
                 $source = $frame->scope[$op->arg2];
-                VM\ArraySpread::spreadInto($this, $frame, $result->toArray(), $source);
+                VM\ArraySpread::spreadInto(
+                    $this,
+                    $frame,
+                    $result->toArray(),
+                    $source,
+                    (int) ($op->arg3 ?? 0)
+                );
                 break;
             default:
                 throw new \LogicException(

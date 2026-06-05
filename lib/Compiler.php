@@ -7709,7 +7709,8 @@ class Compiler {
                 $return[] = new OpCode(
                     OpCode::TYPE_ARRAY_SPREAD,
                     $result,
-                    $this->compileOperand($expr->values[$i], $block, true)
+                    $this->compileOperand($expr->values[$i], $block, true),
+                    max(0, $expr->getLine())
                 );
                 continue;
             }

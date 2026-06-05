@@ -14,18 +14,19 @@ final class ArraySpread
 {
     public const NON_TRAVERSABLE_MESSAGE = 'Only arrays and Traversables can be unpacked';
 
-    public static function spreadInto(VM $vm, Frame $frame, HashTable $dest, Variable $source): void
-    {
+    public static function spreadInto(
+        VM $vm,
+        Frame $frame,
+        HashTable $dest,
+        Variable $source,
+        int $sourceLine = 0
+    ): void {
         $source = $source->resolveIndirect();
 
         if (Variable::TYPE_ARRAY === $source->type) {
             $dest->spreadFrom($source->toArray());
 
             return;
-        }
-
-        if (Variable::TYPE_NULL === $source->type) {
-            throw new \TypeError('Cannot spread null');
         }
 
         if (Variable::TYPE_OBJECT === $source->type && null !== $source->toObject()->generatorState) {
@@ -38,7 +39,7 @@ final class ArraySpread
             try {
                 $iterable = ForeachIterator::resolveTraversableObject($vm, $frame, $source);
             } catch (\TypeError) {
-                throw new \TypeError(self::NON_TRAVERSABLE_MESSAGE);
+                self::throwNonTraversableFatal($frame, $sourceLine);
             }
             if (null !== $iterable->toObject()->generatorState) {
                 self::spreadFromGenerator($vm, $iterable, $dest);
@@ -50,7 +51,24 @@ final class ArraySpread
             return;
         }
 
-        throw new \TypeError(self::NON_TRAVERSABLE_MESSAGE);
+        self::throwNonTraversableFatal($frame, $sourceLine);
+    }
+
+    /**
+     * Zend zend_execute.c array-literal unpack: E_ERROR fatal, not catchable TypeError (#4812).
+     *
+     * @return never
+     */
+    private static function throwNonTraversableFatal(Frame $frame, int $sourceLine): void
+    {
+        $file = '' !== $frame->scriptPath ? $frame->scriptPath : 'Standard input code';
+        $line = $sourceLine > 0 ? $sourceLine : 0;
+        throw new \LogicException(sprintf(
+            'Fatal error: %s in %s on line %d',
+            self::NON_TRAVERSABLE_MESSAGE,
+            $file,
+            $line
+        ));
     }
 
     private static function spreadFromGenerator(VM $vm, Variable $genVar, HashTable $dest): void
