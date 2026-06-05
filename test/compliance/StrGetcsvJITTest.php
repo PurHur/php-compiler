@@ -25,4 +25,14 @@ final class StrGetcsvJITTest extends BaseTest
             'str_getcsv_enum_type_error_jit.phpt'
         );
     }
+
+    public function setUp(): void
+    {
+        $this->BIN = realpath(__DIR__.'/../../bin/jit.php');
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh or use the 22.04-dev Docker image.'
+            );
+        }
+    }
 }
