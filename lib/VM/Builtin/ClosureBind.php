@@ -6,6 +6,7 @@ namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClosureSupport;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
 /** Closure::bind() — static VM (#3673, Zend zend_closures.c). */
@@ -62,15 +63,6 @@ final class ClosureBind extends VmClassMethod
 
     private static function valueTypeName(Variable $value): string
     {
-        return match ($value->type) {
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            default => 'mixed',
-        };
+        return EnumCaseSupport::typeNameForVariable($value);
     }
 }

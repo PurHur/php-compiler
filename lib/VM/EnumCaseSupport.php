@@ -408,6 +408,31 @@ final class EnumCaseSupport
         return null;
     }
 
+    /**
+     * Zend {@see zend_type_to_string()} label for TypeError "… given" messages (#6236).
+     *
+     * Enum case operands surface the enum class name (E), not mixed/object.
+     */
+    public static function typeNameForVariable(Variable $value): string
+    {
+        $value = $value->resolveIndirect();
+        $enumClass = self::enumClassForCaseVariable($value);
+        if (null !== $enumClass) {
+            return $enumClass->name;
+        }
+
+        return match ($value->type) {
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            default => 'mixed',
+        };
+    }
+
     public static function enumCaseNameForVariable(Variable $value): string
     {
         $value = $value->resolveIndirect();

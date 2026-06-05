@@ -165,23 +165,6 @@ final class InterfaceCheck
 
     private static function valueTypeName(Variable $value): string
     {
-        switch ($value->type) {
-            case Variable::TYPE_INTEGER:
-                return 'int';
-            case Variable::TYPE_FLOAT:
-                return 'float';
-            case Variable::TYPE_BOOLEAN:
-                return 'bool';
-            case Variable::TYPE_STRING:
-                return 'string';
-            case Variable::TYPE_NULL:
-                return 'null';
-            case Variable::TYPE_ARRAY:
-                return 'array';
-            case Variable::TYPE_OBJECT:
-                return 'object';
-            default:
-                return 'mixed';
-        }
+        return EnumCaseSupport::typeNameForVariable($value);
     }
 }

@@ -35,7 +35,7 @@ final class InternalStrictArg
         }
         self::raiseTypeErrorAndAbort(
             $context,
-            self::message($function, $argNumber, $paramName, 'int', $arg)
+            self::message($context, $function, $argNumber, $paramName, 'int', $arg)
         );
     }
 
@@ -52,7 +52,7 @@ final class InternalStrictArg
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             self::raiseTypeErrorAndAbort(
                 $context,
-                self::message($function, $argNumber, $paramName, 'string', $arg)
+                self::message($context, $function, $argNumber, $paramName, 'string', $arg)
             );
 
             return;
@@ -82,7 +82,7 @@ final class InternalStrictArg
         $context->builder->positionAtEnd($failBlock);
         self::raiseTypeErrorAndAbort(
             $context,
-            self::message($function, $argNumber, $paramName, 'string', $arg)
+            self::message($context, $function, $argNumber, $paramName, 'string', $arg)
         );
         $context->builder->positionAtEnd($okBlock);
     }
@@ -107,7 +107,7 @@ final class InternalStrictArg
         }
         self::raiseTypeErrorAndAbort(
             $context,
-            self::message($function, $argNumber, $paramName, 'string', $arg)
+            self::message($context, $function, $argNumber, $paramName, 'string', $arg)
         );
     }
 
@@ -160,6 +160,7 @@ final class InternalStrictArg
     }
 
     private static function message(
+        Context $context,
         string $function,
         int $argNumber,
         string $paramName,
@@ -172,21 +173,7 @@ final class InternalStrictArg
             $argNumber,
             $paramName,
             $expected,
-            self::givenLabel($arg)
+            JitOperandTypeLabel::givenLabel($context, $arg)
         );
-    }
-
-    private static function givenLabel(Variable $arg): string
-    {
-        return match ($arg->type) {
-            Variable::TYPE_NATIVE_LONG => 'int',
-            Variable::TYPE_NATIVE_DOUBLE => 'float',
-            Variable::TYPE_NATIVE_BOOL => 'bool',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_HASHTABLE => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            default => 'mixed',
-        };
     }
 }

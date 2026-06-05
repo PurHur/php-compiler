@@ -32,7 +32,7 @@ final class JitStringBuiltinArg
                 $function,
                 $argIndex,
                 $paramName,
-                self::compileTimeObjectGivenLabel($context, $arg)
+                self::compileTimeGivenLabel($context, $arg)
             );
 
             return self::unreachableStringPtr($context);
@@ -87,7 +87,7 @@ final class JitStringBuiltinArg
             $function,
             $argIndex,
             $paramName,
-            self::compileTimeObjectGivenLabel($context, $arg)
+            self::compileTimeGivenLabel($context, $arg)
         );
 
         $context->builder->positionAtEnd($coerceBlock);
@@ -111,9 +111,13 @@ final class JitStringBuiltinArg
         );
     }
 
-    private static function compileTimeObjectGivenLabel(Context $context, Variable $arg): string
+    private static function compileTimeGivenLabel(Context $context, Variable $arg): string
     {
-        if (Variable::KIND_VALUE !== $arg->kind) {
+        $enumLabel = JitOperandTypeLabel::compileTimeEnumClassName($context, $arg);
+        if (null !== $enumLabel) {
+            return $enumLabel;
+        }
+        if (Variable::KIND_VALUE !== $arg->kind || Variable::TYPE_OBJECT !== $arg->type) {
             return 'object';
         }
         $objMap = $context->structFieldMap['__object__'] ?? null;
