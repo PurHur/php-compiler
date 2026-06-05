@@ -245,7 +245,7 @@ final class SelfHostBuiltinPolicy
     ];
 
     /** @var array<string, string> */
-    private const CATEGORY_HASH = ['hash' => 'hash', 'hash_hmac' => 'hash', 'md5' => 'hash', 'sha1' => 'hash', 'crc32' => 'hash', 'crc32c' => 'hash'];
+    private const CATEGORY_HASH = ['hash' => 'hash', 'hash_hmac' => 'hash', 'hash_hmac_algos' => 'hash', 'md5' => 'hash', 'sha1' => 'hash', 'crc32' => 'hash', 'crc32c' => 'hash'];
 
     /** @var array<string, string> */
     private const CATEGORY_PREG = [

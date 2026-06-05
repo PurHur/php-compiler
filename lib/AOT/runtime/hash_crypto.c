@@ -9,8 +9,11 @@
 #include <string.h>
 
 typedef struct __string__ __string__;
+typedef struct __hashtable__ __hashtable__;
 
 extern __string__ *__string__init(long long size, const char *value);
+extern __hashtable__ *__hashtable__alloc(void);
+extern void __hashtable__setStringAt(__hashtable__ *ht, size_t index, __string__ *val);
 
 static size_t hc_strlen(__string__ *s)
 {
@@ -775,4 +778,23 @@ int __compiler_hash_equals(__string__ *known, __string__ *user)
     }
 
     return result == 0 ? 1 : 0;
+}
+
+/** hash_hmac_algos() — HMAC-capable digest names (ext/hash/hash.c, issue #6229). */
+__hashtable__ *__compiler_hash_hmac_algos(void)
+{
+    static const char *algos[] = {"md5", "sha1", "sha256", NULL};
+    __hashtable__ *ht;
+    size_t i;
+
+    ht = __hashtable__alloc();
+    if (NULL == ht) {
+        return NULL;
+    }
+    for (i = 0; algos[i] != NULL; ++i) {
+        size_t len = strlen(algos[i]);
+        __hashtable__setStringAt(ht, i, __string__init((long long) len, algos[i]));
+    }
+
+    return ht;
 }
