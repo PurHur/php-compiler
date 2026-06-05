@@ -36,7 +36,7 @@ final class getservbyname extends Internal
         if (Variable::TYPE_STRING !== $serviceVar->type || Variable::TYPE_STRING !== $protocolVar->type) {
             throw new \LogicException('getservbyname() requires string service and protocol in this compiler build');
         }
-        $port = VmNetwork::getservbyname($serviceVar->toString(), $protocolVar->toString());
+        $port = VmNetworkServices::getservbyname($serviceVar->toString(), $protocolVar->toString());
         if (false === $port) {
             $frame->returnVar->bool(false);
 
