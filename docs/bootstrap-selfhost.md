@@ -77,6 +77,13 @@
 
 Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-aot-lint`). Phase C: `make bootstrap-aot-link` (or `php script/bootstrap-aot-lint.php --link`). Phase D: `make bootstrap-aot-link-lib`. Bundled compiler lint: `./script/bootstrap-selfhost-lint.sh`. Live lowering target: `make bootstrap-selfhost-probe` (or `./script/bootstrap-selfhost-compile-probe.sh`; optional `--update-inventory`).
 
+**Vendor patches before probes:** run `./script/apply-patches.sh` after every `composer install` (CI does this in `script/ci-common.sh`). The script **must exit non-zero** when `php-types-incdec-type` / `php-cfg-incdec-expr` overlays cannot insert `Expr_PostInc` arms — silent drift breaks `$x++` compile ([#6326](https://github.com/PurHur/php-compiler/issues/6326), anchor fix [#6321](https://github.com/PurHur/php-compiler/issues/6321)). Quick check:
+
+```bash
+./script/apply-patches.sh
+grep -q "case 'Expr_PostInc':" vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php && echo OK
+```
+
 ### Minimal harness hosts (no host `make` / `php`) ([#2905](https://github.com/PurHur/php-compiler/issues/2905))
 
 When `make bootstrap-selfhost-link` or `php script/bootstrap-inventory.php` fail with `command not found` on the host, use the gate wrapper (no host `make`/`php` required when Docker works):

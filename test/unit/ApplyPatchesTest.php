@@ -277,6 +277,69 @@ PHP;
         );
     }
 
+    public function testApplyPatchesDoesNotSwallowIncdecOverlayFailures(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
+        self::assertStringNotContainsString(
+            'apply_php_types_incdec_type_overlay || true',
+            $script,
+            'incdec TypeReconstructor overlay must fail CI when PostInc arms are missing (#6326)'
+        );
+        self::assertStringNotContainsString(
+            'apply_php_cfg_incdec_expr_overlay || true',
+            $script,
+            'incdec Parser overlay must fail CI when PostInc lowering is missing (#6326)'
+        );
+    }
+
+    public function testIncdecTypeOverlayFailureExitsNonZero(): void
+    {
+        $recon = self::$root.'/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php';
+        if (!is_readable($recon)) {
+            self::markTestSkipped('vendor/ircmaxell/php-types not installed');
+        }
+
+        $original = (string) file_get_contents($recon);
+        $broken = preg_replace(
+            "/\\s*case 'Expr_PostInc':.*?return false;\\n/s",
+            '',
+            $original
+        );
+        self::assertIsString($broken);
+        self::assertNotSame($original, $broken, 'fixture must include inc/dec switch arms');
+        $broken = str_replace(
+            "throw new \\LogicException('Unknown variable op found: '.\$op->getType());",
+            "throw new \\LogicException('incdec overlay test sentinel');",
+            $broken
+        );
+        self::assertNotSame($original, $broken, 'fixture must include resolveVariableOp throw anchor');
+        file_put_contents($recon, $broken);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertNotSame(0, $exitCode, "apply-patches must fail when incdec overlay cannot insert arms:\n".$joined);
+            self::assertMatchesRegularExpression(
+                '/php-types-incdec-type.*(overlay failed|marker not found|arms missing)/i',
+                $joined,
+                'failure must name php-types-incdec-type overlay (#6326)'
+            );
+            self::assertStringNotContainsString(
+                'Applied php-types-incdec-type.patch (overlay): '.self::$root.'/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php',
+                $joined,
+                'must not claim Applied when overlay did not insert PostInc arms (#6326)'
+            );
+        } finally {
+            file_put_contents($recon, $original);
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            self::assertSame(0, $exitCode, 'apply-patches must restore vendor after incdec overlay test');
+        }
+    }
+
     public function testPhpCfgInOperatorOverlayApplied(): void
     {
         $op = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/In_.php';

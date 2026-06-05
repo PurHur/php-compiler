@@ -723,7 +723,7 @@ apply_php_cfg_incdec_expr_overlay() {
     mkdir -p "$(dirname "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/${class}.php")"
     cp "$overlay/Op/Expr/${class}.php" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/${class}.php"
   done
-  python3 - "$parser" "$overlay/incdec-parser-methods.php" <<'PY'
+  if ! python3 - "$parser" "$overlay/incdec-parser-methods.php" <<'PY'
 import sys
 from pathlib import Path
 
@@ -786,6 +786,11 @@ if old not in text:
 
 parser_path.write_text(text.replace(old, new_methods.rstrip('\n'), 1))
 PY
+  then
+    echo "ERROR: php-cfg-incdec-expr overlay failed (#6326, #6321)" >&2
+    record_patch_failure "php-cfg-incdec-expr.patch" "PostInc Parser.php anchor missing"
+    return 1
+  fi
   echo "Applied php-cfg-incdec-expr.patch (overlay)"
 }
 
@@ -1791,14 +1796,17 @@ PY
   echo "Applied php-cfg-class-const-flags.patch (overlay)"
 }
 
-apply_php_types_incdec_type_overlay() {
-  apply_php_types_incdec_type_overlay_to_target() {
-    local target="$1"
-    if grep -q "case 'Expr_PostInc':" "$target" 2>/dev/null; then
-      echo "Skip php-types-incdec-type.patch (already applied): ${target}"
-      return 0
-    fi
-    python3 - "$target" <<'PY'
+apply_php_types_incdec_type_overlay_to_target() {
+  local target="$1"
+  if [[ ! -f "$target" ]]; then
+    echo "Skip php-types-incdec-type.patch (target missing): ${target}"
+    return 0
+  fi
+  if grep -q "case 'Expr_PostInc':" "$target" 2>/dev/null; then
+    echo "Skip php-types-incdec-type.patch (already applied): ${target}"
+    return 0
+  fi
+  if ! python3 - "$target" <<'PY'
 import sys
 from pathlib import Path
 
@@ -1885,11 +1893,25 @@ for old, new in anchors:
 sys.stderr.write("php-types-incdec-type: TypeReconstructor switch marker not found\\n")
 raise SystemExit(1)
 PY
-    echo "Applied php-types-incdec-type.patch (overlay): ${target}"
-  }
+  then
+    echo "ERROR: php-types-incdec-type overlay failed for ${target} (#6326, #6321)" >&2
+    return 1
+  fi
+  echo "Applied php-types-incdec-type.patch (overlay): ${target}"
+}
 
-  apply_php_types_incdec_type_overlay_to_target "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
-  apply_php_types_incdec_type_overlay_to_target "$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+apply_php_types_incdec_type_overlay() {
+  local rc=0
+  if ! apply_php_types_incdec_type_overlay_to_target "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"; then
+    rc=1
+  fi
+  if ! apply_php_types_incdec_type_overlay_to_target "$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"; then
+    rc=1
+  fi
+  if [[ "$rc" -ne 0 ]]; then
+    record_patch_failure "php-types-incdec-type.patch" "PostInc TypeReconstructor arms missing — fix overlay anchors (#6321)"
+  fi
+  return "$rc"
 }
 
 apply_php_types_yield_from_overlay() {
@@ -3363,9 +3385,9 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_php_cfg_in_operator_overlay || true
   # PHP 8.3 typed class/trait constants must survive optional patch failures (#6012).
   apply_php_cfg_typed_class_const_overlay || true
-  # ++/-- must survive optional patch failures (#4926, self-host loops #1492).
-  apply_php_cfg_incdec_expr_overlay || true
-  apply_php_types_incdec_type_overlay || true
+  # ++/-- overlays are hard-required — missing PostInc arms break compile (#6326, #6321).
+  apply_php_cfg_incdec_expr_overlay
+  apply_php_types_incdec_type_overlay
   apply_patch "$PATCH_DIR/php-cfg-dollars-brace.patch"
   apply_patch "$PATCH_DIR/php-cfg-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-cfg-nullsafe.patch"
@@ -3429,7 +3451,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
 fi
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
-  apply_php_types_incdec_type_overlay || true
+  apply_php_types_incdec_type_overlay
   apply_patch "$PATCH_DIR/php-types-binaryop-pow.patch"
   apply_patch "$PATCH_DIR/php-types-binaryop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-types-cast-object.patch"
@@ -3548,8 +3570,13 @@ verify_critical_language_patches() {
   if ! grep -q "case 'Expr_PostInc':" "$recon" 2>/dev/null; then
     missing+=("php-types-incdec-type")
   fi
+  local prelinked_recon="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  if [[ -f "$prelinked_recon" ]] && ! grep -q "case 'Expr_PostInc':" "$prelinked_recon" 2>/dev/null; then
+    missing+=("php-types-incdec-type-prelinked")
+  fi
   if ((${#missing[@]} > 0)); then
     echo "apply-patches: critical language patch markers missing: ${missing[*]}" >&2
+    echo "apply-patches: hint: php-types-incdec-type overlay anchor drift — see #6321" >&2
     exit 1
   fi
 }
