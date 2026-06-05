@@ -98,7 +98,13 @@ final class ClassConstMaterializer
                 $stored->string($src->toString());
                 break;
             case Variable::TYPE_INTEGER:
-                $stored->int($src->toInt());
+                if ($src->isStreamResource()) {
+                    $stored->streamHandle($src->toInt());
+                } elseif ($src->isDirResource()) {
+                    $stored->dirHandle($src->toInt());
+                } else {
+                    $stored->int($src->toInt());
+                }
                 break;
             case Variable::TYPE_FLOAT:
                 $stored->float($src->toFloat());
