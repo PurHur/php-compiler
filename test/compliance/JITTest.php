@@ -434,6 +434,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'class_parents_get_class_vars')) {
                 continue;
             }
+            // get_class_methods() MCJIT execute segfaults; PHP lowering: GetClassMethodsRuntimeShrinkTest (#6339).
+            if (str_contains($name, 'get_class_methods')) {
+                continue;
+            }
             // class_parents() $autoload flag: VM + AOT (#5026); MCJIT execute segfaults (#3159).
             if (str_contains($name, 'class_parents_autoload')) {
                 continue;

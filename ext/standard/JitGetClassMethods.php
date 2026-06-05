@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin;
-use PHPCompiler\JIT\Builtin\MethodRegistry;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringArg;
@@ -124,29 +122,7 @@ final class JitGetClassMethods
 
     private static function invokeForClassName(Context $context, string $className, int $filter): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return self::invokeNativeForClassName($context, $className, $filter);
-        }
-
         return self::invokeCompileTimeForClassName($context, $className, $filter);
-    }
-
-    private static function invokeNativeForClassName(Context $context, string $className, int $filter): Value
-    {
-        MethodRegistry::registerDeclarations($context);
-        $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
-        $classLc = strtolower(ltrim($className, '\\'));
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $context->builder->call(
-            $context->lookupFunction('phpc_get_class_methods'),
-            $context->builder->pointerCast($context->constantFromString($classLc), $i8p),
-            $i32->constInt($filter, false),
-            $ptr
-        );
-
-        return $ptr;
     }
 
     private static function invokeCompileTimeForClassName(Context $context, string $className, int $filter): Value
@@ -157,14 +133,16 @@ final class JitGetClassMethods
             || $object->isInterfaceClassLc($lc)
             || $object->hasUserDeclaredEnum($className)) {
             $names = $object->allMethodNamesForClassId($object->lookup($className), $filter);
-            if ([] !== $names) {
-                return self::buildIndexedStringArray($context, $names);
-            }
+
+            return self::buildIndexedStringArray($context, $names);
         }
 
         $vm = $context->runtime->vmContext;
         if (null !== $vm && isset($vm->classes[$lc])) {
-            return self::buildIndexedStringArray($context, VmReflection::classMethodsList($vm->classes[$lc], $filter));
+            return self::buildIndexedStringArray(
+                $context,
+                VmReflection::classMethodsList($vm->classes[$lc], $filter)
+            );
         }
 
         return self::returnFalse($context);
