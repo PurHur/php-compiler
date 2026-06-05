@@ -61,6 +61,8 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/JIT/Builtin/SessionName.php',
         'lib/JIT/Builtin/SessionStart.php',
         'lib/JIT/Builtin/SessionWriteClose.php',
+        'ext/standard/BuiltinRegistry.php',
+        'lib/JIT/Builtin/FunctionExistsRuntime.php',
         'lib/JIT/Builtin/StringFunctionExists.php',
         'lib/JIT/Builtin/StringHttpBuildQuery.php',
         'lib/JIT/Builtin/StringSerialize.php',

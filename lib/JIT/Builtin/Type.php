@@ -184,6 +184,7 @@ class Type extends Builtin {
         TimeSleepRuntime::ensureLinked($this->context);
         StringHrtime::ensureLinked($this->context);
         LastErrorRuntime::ensureLinked($this->context);
+        FunctionExistsRuntime::ensureLinked($this->context);
         WeakRefRegistryRuntime::ensureLinked($this->context);
         MemoryRuntime::ensureLinked($this->context);
         IniRuntime::ensureLinked($this->context);
@@ -690,12 +691,6 @@ class Type extends Builtin {
             $fntypeSuperglobalName
         );
         $this->context->registerFunction('__compiler_is_superglobal_name', $fnSuperglobalName);
-        $fntypeBuiltinFunctionExists = $this->context->context->functionType($i64, false, $strPtr);
-        $fnBuiltinFunctionExists = $this->context->module->addFunction(
-            '__compiler_builtin_function_exists',
-            $fntypeBuiltinFunctionExists
-        );
-        $this->context->registerFunction('__compiler_builtin_function_exists', $fnBuiltinFunctionExists);
         $fntypeGetrandom = $this->context->context->functionType($i64, false, $i8p, $sizeT, $i32);
         $fnGetrandom = $this->context->module->addFunction('getrandom', $fntypeGetrandom);
         $this->context->registerFunction('getrandom', $fnGetrandom);

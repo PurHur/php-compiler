@@ -16,7 +16,6 @@ final class Linker
         __DIR__.'/runtime/superglobals_refresh.c',
         __DIR__.'/runtime/phpc_env_local.c',
         __DIR__.'/runtime/phpc_pending_headers.c',
-        __DIR__.'/runtime/function_exists.c',
         __DIR__.'/runtime/hash_crypto.c',
         __DIR__.'/runtime/phpc_microtime.c',
         __DIR__.'/runtime/phpc_gettimeofday.c',
@@ -265,9 +264,6 @@ final class Linker
             }
         } else {
             $flags = self::runtimeCIncludeFlags();
-        }
-        if ('function_exists.c' === $basename) {
-            $flags .= ' -I'.escapeshellarg(__DIR__.'/runtime');
         }
         if ('preg_match.c' === $basename) {
             $flags .= ' -DPCRE2_CODE_UNIT_WIDTH=8';
