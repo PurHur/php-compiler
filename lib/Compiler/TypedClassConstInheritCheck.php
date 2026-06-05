@@ -11,7 +11,7 @@ use PhpParser\Node\Stmt\Class_ as ClassNode;
 
 /**
  * Compile-time check: typed class constant redeclarations must be covariant-compatible
- * with parent/interface definitions (PHP 8.3, zend_inheritance.c do_inherit_constant_check, #5953).
+ * with parent/interface/trait definitions (PHP 8.3, zend_inheritance.c do_inherit_constant_check, #5953, #5993).
  */
 final class TypedClassConstInheritCheck
 {
@@ -21,7 +21,8 @@ final class TypedClassConstInheritCheck
      *     constants: array<string, array{display: string, type: ?TypeSig, private: bool}>,
      *     extends: ?string,
      *     implements: list<string>,
-     *     ifaceExtends: list<string>
+     *     ifaceExtends: list<string>,
+     *     traitUses: list<string>
      * }>
      */
     private array $types = [];
@@ -40,6 +41,8 @@ final class TypedClassConstInheritCheck
                 $this->collectClass($child);
             } elseif ($child instanceof Op\Stmt\Interface_) {
                 $this->collectInterface($child);
+            } elseif ($child instanceof Op\Stmt\Trait_) {
+                $this->collectTrait($child);
             }
         }
     }
@@ -67,6 +70,7 @@ final class TypedClassConstInheritCheck
             'extends' => $parentLc,
             'implements' => $implements,
             'ifaceExtends' => [],
+            'traitUses' => $this->collectTraitUses($class->stmts->children),
         ];
     }
 
@@ -89,7 +93,47 @@ final class TypedClassConstInheritCheck
             'extends' => null,
             'implements' => [],
             'ifaceExtends' => $extends,
+            'traitUses' => [],
         ];
+    }
+
+    private function collectTrait(Op\Stmt\Trait_ $trait): void
+    {
+        $lc = $this->operandLcName($trait->name);
+        if (null === $lc) {
+            return;
+        }
+        $this->types[$lc] = [
+            'display' => $this->operandDisplayName($trait->name, $lc),
+            'constants' => $this->collectConstants($trait->stmts->children),
+            'extends' => null,
+            'implements' => [],
+            'ifaceExtends' => [],
+            'traitUses' => $this->collectTraitUses($trait->stmts->children),
+        ];
+    }
+
+    /**
+     * @param list<Op> $members
+     *
+     * @return list<string>
+     */
+    private function collectTraitUses(array $members): array
+    {
+        $traits = [];
+        foreach ($members as $member) {
+            if (!$member instanceof Op\Stmt\TraitUse) {
+                continue;
+            }
+            foreach ($member->traits as $traitOperand) {
+                $traitLc = $this->operandLcName($traitOperand);
+                if (null !== $traitLc) {
+                    $traits[] = $traitLc;
+                }
+            }
+        }
+
+        return $traits;
     }
 
     /**
@@ -167,7 +211,7 @@ final class TypedClassConstInheritCheck
     /**
      * Parent class + implemented / extended interfaces that may define inherited typed constants.
      *
-     * @param array{display: string, constants: array<string, array{display: string, type: ?TypeSig, private: bool}>, extends: ?string, implements: list<string>, ifaceExtends: list<string>} $type
+     * @param array{display: string, constants: array<string, array{display: string, type: ?TypeSig, private: bool}>, extends: ?string, implements: list<string>, ifaceExtends: list<string>, traitUses: list<string>} $type
      *
      * @return list<array{lc: string, display: string, constants: array<string, array{display: string, type: ?TypeSig, private: bool}>}>
      */
@@ -193,6 +237,41 @@ final class TypedClassConstInheritCheck
         }
         foreach ($type['ifaceExtends'] as $ifaceLc) {
             $sources = array_merge($sources, $this->interfaceConstantSources($ifaceLc, $seen));
+        }
+        foreach ($type['traitUses'] as $traitLc) {
+            $sources = array_merge($sources, $this->traitConstantSources($traitLc, $seen));
+        }
+
+        return $sources;
+    }
+
+    /**
+     * @param array<string, true> $seen
+     *
+     * @return list<array{lc: string, display: string, constants: array<string, array{display: string, type: ?TypeSig, private: bool}>}>
+     */
+    private function traitConstantSources(string $traitLc, array &$seen): array
+    {
+        $sources = [];
+        $queue = [$traitLc];
+        while ([] !== $queue) {
+            $current = array_shift($queue);
+            if ('' === $current || isset($seen[$current])) {
+                continue;
+            }
+            $seen[$current] = true;
+            if (!isset($this->types[$current])) {
+                continue;
+            }
+            $trait = $this->types[$current];
+            $sources[] = [
+                'lc' => $current,
+                'display' => $trait['display'],
+                'constants' => $trait['constants'],
+            ];
+            foreach ($trait['traitUses'] as $nestedTraitLc) {
+                $queue[] = $nestedTraitLc;
+            }
         }
 
         return $sources;

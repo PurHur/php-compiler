@@ -81,4 +81,20 @@ PHP;
         $this->expectExceptionMessage('Type of Bad::FOO must be compatible with Base::FOO of type string');
         $runtime->parseAndCompile($code, 'typed_const_inherit_grand.php');
     }
+
+    public function testIncompatibleTypedTraitConstantOverrideFailsCompile(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T { public const string FOO = 'a'; }
+class C {
+    use T;
+    public const int FOO = 1;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Type of C::FOO must be compatible with T::FOO of type string');
+        $runtime->parseAndCompile($code, 'typed_trait_const_inherit_bad.php');
+    }
 }

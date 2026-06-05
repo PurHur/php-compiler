@@ -293,7 +293,7 @@ function syntaxRowDefinitions(): array
             'issue' => 3592,
             'notes' => [
                 'Compile-time literal fold for array/scalar const values; typed mismatch is compile-time TypeError; JIT lowers immutable array constants (#3592)',
-                'Typed trait constants rejected on 8.2 target (Zend parse error parity, #5212); enable via CompilerVersion 8.3+',
+                'Typed trait constants enabled on 8.3+ target (#5993); rejected on 8.2 (Zend parse error parity, #5212)',
             ],
             'probe' => 'class C { public const array X = [1, 2]; } echo C::X[0];',
         ],

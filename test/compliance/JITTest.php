@@ -22,6 +22,11 @@ class JITTest extends BaseTest {
                 && (str_contains($name, 'str_increment') || str_contains($name, 'str_decrement'))) {
                 continue;
             }
+            // 8.2-target reject gate; skipped when CompilerVersion 8.3+ enables typed trait constants (#5993).
+            if (CompilerVersion::supportsTypedTraitConstants()
+                && str_contains($name, 'trait_typed_const_reject')) {
+                continue;
+            }
             // ?-> LLVM lowering verified in NullsafeJitCompileTest (#3219); MCJIT execute needs jit-runtime-probe (#98).
             if (str_contains(strtolower($case[0]), 'nullsafe')) {
                 continue;
@@ -494,6 +499,10 @@ class JITTest extends BaseTest {
             }
             // PHP 8.3 typed class constants: VM + AOT; MCJIT execute unstable (#4511, #3592).
             if (str_contains($name, 'typed_class_const')) {
+                continue;
+            }
+            // PHP 8.3 typed trait constants: VM + AOT; MCJIT LLVM verify unstable (#5993).
+            if (str_contains($name, 'trait_typed_const')) {
                 continue;
             }
             // list() from null/false/int: VM + LLVM verify (#4325); MCJIT execute segfault until list unpack branch stable.
