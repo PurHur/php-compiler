@@ -46,6 +46,12 @@ class MagicStringResolver extends NodeVisitorAbstract
 
     public function beginCompilationUnit(string $fileName): void
     {
+        if ('' !== $fileName && is_file($fileName)) {
+            $real = realpath($fileName);
+            if (false !== $real) {
+                $fileName = $real;
+            }
+        }
         $this->compilationUnitFile = $fileName;
         $this->anonymousClassCounter = 0;
     }
@@ -61,7 +67,7 @@ class MagicStringResolver extends NodeVisitorAbstract
             $this->namespaceStack[] = $name;
         }
         if ($node instanceof Node\Stmt\ClassLike) {
-            if (null === $node->namespacedName) {
+            if (null === $node->name) {
                 $node->namespacedName = new Node\Name\FullyQualified(
                     $this->anonymousClassName($node),
                     $node->getAttributes()

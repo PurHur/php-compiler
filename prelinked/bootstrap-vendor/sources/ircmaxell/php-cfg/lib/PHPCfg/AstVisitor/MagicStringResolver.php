@@ -17,6 +17,10 @@ use PhpParser\NodeVisitorAbstract;
 
 class MagicStringResolver extends NodeVisitorAbstract
 {
+    private const PROPERTY_GET_HOOK_PREFIX = '__phpc_property_get_';
+
+    private const PROPERTY_SET_HOOK_PREFIX = '__phpc_property_set_';
+
     protected $classStack = [];
 
     protected $parentStack = [];
@@ -26,10 +30,31 @@ class MagicStringResolver extends NodeVisitorAbstract
     protected $methodStack = [];
 
     /** @var list<string> */
+    protected $propertyStack = [];
+
+    /** @var list<string> */
     protected $namespaceStack = [];
 
     /** @var list<string> */
     protected $traitStack = [];
+
+    /** @var string */
+    protected $compilationUnitFile = '';
+
+    /** @var int */
+    protected $anonymousClassCounter = 0;
+
+    public function beginCompilationUnit(string $fileName): void
+    {
+        if ('' !== $fileName && is_file($fileName)) {
+            $real = realpath($fileName);
+            if (false !== $real) {
+                $fileName = $real;
+            }
+        }
+        $this->compilationUnitFile = $fileName;
+        $this->anonymousClassCounter = 0;
+    }
 
     public function enterNode(Node $node)
     {
@@ -42,7 +67,7 @@ class MagicStringResolver extends NodeVisitorAbstract
             $this->namespaceStack[] = $name;
         }
         if ($node instanceof Node\Stmt\ClassLike) {
-            if (null === $node->namespacedName) {
+            if (null === $node->name) {
                 $node->namespacedName = new Node\Name\FullyQualified(
                     $this->anonymousClassName($node),
                     $node->getAttributes()
@@ -64,6 +89,16 @@ class MagicStringResolver extends NodeVisitorAbstract
             $this->functionStack[] = $node->namespacedName->toString();
         } elseif ($node instanceof Node\Stmt\ClassMethod) {
             $this->methodStack[] = end($this->classStack).'::'.$node->name;
+            $prop = $this->propertyNameFromHookMethod($node->name->name);
+            if (null !== $prop) {
+                $this->propertyStack[] = $prop;
+            }
+        } elseif ($node instanceof Node\Expr\ConstFetch) {
+            if ('__property__' === strtolower($node->name->toString())) {
+                $name = $this->propertyStack !== [] ? end($this->propertyStack) : '';
+
+                return new Node\Scalar\String_($name, $node->getAttributes());
+            }
         } elseif ($node instanceof Node\Name) {
             switch (strtolower($node->toString())) {
                 case 'self':
@@ -130,7 +165,22 @@ class MagicStringResolver extends NodeVisitorAbstract
         } elseif ($node instanceof Node\Stmt\ClassMethod) {
             assert(end($this->methodStack) === end($this->classStack).'::'.$node->name);
             array_pop($this->methodStack);
+            if (null !== $this->propertyNameFromHookMethod($node->name->name)) {
+                array_pop($this->propertyStack);
+            }
         }
+    }
+
+    private function propertyNameFromHookMethod(string $method): ?string
+    {
+        $lc = strtolower($method);
+        foreach ([self::PROPERTY_GET_HOOK_PREFIX, self::PROPERTY_SET_HOOK_PREFIX] as $prefix) {
+            if (str_starts_with($lc, $prefix)) {
+                return substr($method, strlen($prefix));
+            }
+        }
+
+        return null;
     }
 
     private function stripClass($class)
@@ -155,12 +205,33 @@ class MagicStringResolver extends NodeVisitorAbstract
 
     private function anonymousClassName(Node\Stmt\ClassLike $node): string
     {
-        $start = $node->getStartLine();
-        if (null === $start) {
-            $start = 0;
+        $line = $node->getStartLine();
+        if (null === $line) {
+            $line = 0;
         }
 
-        return 'AnonymousClass@' . $start;
+        $prefix = 'class';
+        if (!empty($node->extends) && !is_array($node->extends)) {
+            $prefix = $node->extends->getLast();
+        }
+
+        $file = $this->compilationUnitFile;
+        if ('' === $file) {
+            $attrs = $node->getAttributes();
+            if (isset($attrs['fileName']) && is_string($attrs['fileName'])) {
+                $file = $attrs['fileName'];
+            }
+        }
+        if ('' !== $file && is_file($file)) {
+            $real = realpath($file);
+            if (false !== $real) {
+                $file = $real;
+            }
+        }
+
+        $id = $this->anonymousClassCounter++;
+
+        return $prefix.'@anonymous'."\0".$file.':'.$line.'$'.$id;
     }
 
     private function repairCommentsCallback($match)

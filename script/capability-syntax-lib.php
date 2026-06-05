@@ -37,7 +37,7 @@ function syntaxRowDefinitions(): array
             'issue' => 1233,
             'aot' => true,
             'notes' => [
-                'php-cfg inline Stmt\\Class_ in parseExpr_New; Zend @anonymous\\0path:line$id name (#4510)',
+                'php-cfg inline Stmt\\Class_ in parseExpr_New; Zend @anonymous\\0path:line$id name (#4510, #6281 get_class/static::class)',
                 'AOT: user AnonymousClass@* methods lowered when PHP_COMPILER_SELFHOST_AOT=1 (#3098)',
             ],
             'probe' => '$o = new class { public function f(): int { return 42; } }; echo $o->f();',
