@@ -131,6 +131,24 @@ PHP;
         self::assertTrue($registry['h']['x']['virtual'] ?? false);
     }
 
+    public function testLowersSetArrowTransformToSeparateBackingField(): void
+    {
+        $src = <<<'PHP'
+<?php
+class Box {
+    private int $stored = 0;
+    public int $value {
+        get => $this->stored;
+        set => $this->stored = $value * 10;
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('$this->stored = $value * 10;', $out);
+        self::assertStringNotContainsString('$this->value =', $out);
+        self::assertTrue($registry['box']['value']['virtual'] ?? false);
+    }
+
     public function testLowersStaticPropertyHooksAsStaticMethods(): void
     {
         $src = <<<'PHP'
