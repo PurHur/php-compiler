@@ -95,7 +95,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringDeployPath.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringReadfile.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHtmlspecialchars.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringDateTime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringWordwrap.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUrlencode.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFilePutContents.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Type/Value.php';
