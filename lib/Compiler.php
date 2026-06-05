@@ -1258,15 +1258,44 @@ class Compiler {
     }
 
     /**
+     * php-cfg may emit PropertyFetch before Assign for hooked list slots (#6434).
+     */
+    private function isListDestructPropertyFetchStmt(Op $op): bool
+    {
+        return $op instanceof Op\Expr\PropertyFetch || $op instanceof Op\Expr\StaticPropertyFetch;
+    }
+
+    /**
+     * Assign/AssignRef index for one list slot after optional property-fetch prelude (#6434).
+     *
+     * @param Op[] $ops
+     */
+    private function listDestructSlotAssignIndex(array $ops, int $index): ?int
+    {
+        if (!$ops[$index] instanceof Op\Expr\ArrayDimFetch) {
+            return null;
+        }
+        $cursor = $index + 1;
+        if ($cursor < count($ops) && $this->isListDestructPropertyFetchStmt($ops[$cursor])) {
+            ++$cursor;
+        }
+        if ($cursor >= count($ops)) {
+            return null;
+        }
+        if (!$ops[$cursor] instanceof Op\Expr\Assign && !$ops[$cursor] instanceof Op\Expr\AssignRef) {
+            return null;
+        }
+
+        return $cursor;
+    }
+
+    /**
      * php-cfg lowers `["key" => $v] = $array` to array literal + dim fetch + assign pairs (#1234).
      *
      * @param Op[] $ops
      */
     private function isKeyedListDestructDimFetch(array $ops, int $index): bool
     {
-        if ($index + 1 >= count($ops) || !$ops[$index + 1] instanceof Op\Expr\Assign) {
-            return false;
-        }
         if (!$ops[$index] instanceof Op\Expr\ArrayDimFetch) {
             return false;
         }
@@ -1278,8 +1307,12 @@ class Compiler {
         if (!$fetch->dim instanceof Literal || !is_string($fetch->dim->value)) {
             return false;
         }
-        /** @var Op\Expr\Assign $assign */
-        $assign = $ops[$index + 1];
+        $assignIndex = $this->listDestructSlotAssignIndex($ops, $index);
+        if (null === $assignIndex) {
+            return false;
+        }
+        /** @var Op\Expr\Assign|Op\Expr\AssignRef $assign */
+        $assign = $ops[$assignIndex];
 
         return $assign->expr === $fetch->result;
     }
@@ -1390,13 +1423,14 @@ class Compiler {
             return false;
         }
         $fetch = $ops[$index];
-        $next = $ops[$index + 1];
-        if (
-            ($next instanceof Op\Expr\Assign || $next instanceof Op\Expr\AssignRef)
-            && $next->expr === $fetch->result
-        ) {
-            return true;
+        $assignIndex = $this->listDestructSlotAssignIndex($ops, $index);
+        if (null !== $assignIndex) {
+            /** @var Op\Expr\Assign|Op\Expr\AssignRef $assign */
+            $assign = $ops[$assignIndex];
+
+            return $assign->expr === $fetch->result;
         }
+        $next = $ops[$index + 1];
 
         return $next instanceof Op\Expr\ArrayDimFetch
             && $next->var === $fetch->result
@@ -1451,18 +1485,19 @@ class Compiler {
     {
         /** @var Op\Expr\ArrayDimFetch $fetch */
         $fetch = $ops[$index];
-        if ($index + 1 >= count($ops)) {
-            return $index + 1;
+        $assignIndex = $this->listDestructSlotAssignIndex($ops, $index);
+        if (null !== $assignIndex) {
+            /** @var Op\Expr\Assign|Op\Expr\AssignRef $assign */
+            $assign = $ops[$assignIndex];
+            if ($assign->expr === $fetch->result) {
+                return $assignIndex + 1;
+            }
         }
-        $next = $ops[$index + 1];
-        if (
-            ($next instanceof Op\Expr\Assign || $next instanceof Op\Expr\AssignRef)
-            && $next->expr === $fetch->result
-        ) {
-            return $index + 2;
-        }
-        if ($next instanceof Op\Expr\ArrayDimFetch && $next->var === $fetch->result) {
-            return $this->listDestructOpEndIndex($ops, $index + 1);
+        if ($index + 1 < count($ops)) {
+            $next = $ops[$index + 1];
+            if ($next instanceof Op\Expr\ArrayDimFetch && $next->var === $fetch->result) {
+                return $this->listDestructOpEndIndex($ops, $index + 1);
+            }
         }
 
         return $index + 1;
