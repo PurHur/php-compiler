@@ -20,9 +20,13 @@ final class BuiltinExceptionSupport
     public const CLASS_THROWABLE = 'throwable';
     public const PROP_MESSAGE = 'message';
 
-    public static function materializeTypeError(Context $ctx, string $message): Variable
-    {
-        return self::materializeThrowable($ctx, self::CLASS_TYPE_ERROR, $message);
+    public static function materializeTypeError(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        return self::materializeThrowable($ctx, self::CLASS_TYPE_ERROR, $message, $file, $line);
     }
 
     public static function materializeArgumentCountError(Context $ctx, string $message): Variable
@@ -45,14 +49,20 @@ final class BuiltinExceptionSupport
         return self::materializeThrowable($ctx, self::CLASS_FIBER_ERROR, $message);
     }
 
-    private static function materializeThrowable(Context $ctx, string $classLc, string $message): Variable
-    {
+    private static function materializeThrowable(
+        Context $ctx,
+        string $classLc,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
         if (!isset($ctx->classes[$classLc])) {
             throw new \LogicException("{$classLc} builtin class is not registered");
         }
         $entry = $ctx->classes[$classLc];
         $obj = new ObjectEntry($entry);
         $obj->getProperty(self::PROP_MESSAGE)->string($message);
+        ExceptionSupport::stampThrowableSite($obj, $file, $line);
         $obj->constructed = true;
         $var = new Variable();
         $var->object($obj);

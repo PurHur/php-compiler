@@ -198,6 +198,82 @@ final class ExceptionSupport
         return 0;
     }
 
+    /**
+     * User call-site for uncaught builtin fatals (#6334).
+     *
+     * @return array{0: string, 1: int}
+     */
+    public static function userFatalSite(Frame $frame): array
+    {
+        $file = self::throwSiteFile($frame);
+        $line = $frame->callSiteLine;
+        if ($line <= 0) {
+            for ($f = $frame->parent; null !== $f; $f = $f->parent) {
+                if ($f->callSiteLine > 0) {
+                    $line = $f->callSiteLine;
+                    break;
+                }
+            }
+        }
+
+        return [$file, $line];
+    }
+
+    public static function stampThrowableSite(ObjectEntry $receiver, string $file, int $line): void
+    {
+        if ('' !== $file) {
+            $receiver->getProperty(self::PROP_FILE)->string($file);
+        }
+        if ($line > 0) {
+            $receiver->getProperty(self::PROP_LINE)->int($line);
+        }
+    }
+
+    public static function applyNativeLocation(\Throwable $native, string $file, int $line): void
+    {
+        if ('' === $file && $line <= 0) {
+            return;
+        }
+        try {
+            $ref = new \ReflectionObject($native);
+            if ('' !== $file && $ref->hasProperty('file')) {
+                $ref->getProperty('file')->setValue($native, $file);
+            }
+            if ($line > 0 && $ref->hasProperty('line')) {
+                $ref->getProperty('line')->setValue($native, $line);
+            }
+        } catch (\ReflectionException) {
+        }
+    }
+
+    private static function readOptionalStringProperty(ObjectEntry $entry, string $prop): ?string
+    {
+        try {
+            $var = $entry->getProperty($prop)->resolveIndirect();
+            if (Variable::TYPE_STRING !== $var->type) {
+                return null;
+            }
+
+            return $var->toString();
+        } catch (\LogicException) {
+            return null;
+        }
+    }
+
+    private static function readOptionalIntProperty(ObjectEntry $entry, string $prop): ?int
+    {
+        try {
+            $var = $entry->getProperty($prop)->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $var->type) {
+                return null;
+            }
+
+            return $var->toInt();
+        } catch (\LogicException) {
+            return null;
+        }
+    }
+
     /** Stamp throw-statement line on a Throwable before dispatch (#195). */
     public static function stampThrowLine(Variable $thrown, int $line): void
     {
@@ -288,6 +364,11 @@ final class ExceptionSupport
             self::CLASS_EXCEPTION => new \Exception($message),
             default => new \Exception($message),
         };
+        $file = self::readOptionalStringProperty($entry, self::PROP_FILE);
+        $line = self::readOptionalIntProperty($entry, self::PROP_LINE);
+        if (null !== $file || (null !== $line && $line > 0)) {
+            self::applyNativeLocation($native, $file ?? '', $line ?? 0);
+        }
         $prevVar = $entry->getProperty(self::PROP_PREVIOUS)->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $prevVar->type) {
             return $native;
@@ -300,10 +381,20 @@ final class ExceptionSupport
         }
         $prevNative = self::nativeUncaughtThrowable($prevEntry, $prevMessage);
         if ($native instanceof \Exception && $prevNative instanceof \Throwable) {
-            return new \Exception($message, $native->getCode(), $prevNative);
+            $chained = new \Exception($message, $native->getCode(), $prevNative);
+            if (null !== $file || (null !== $line && $line > 0)) {
+                self::applyNativeLocation($chained, $file ?? '', $line ?? 0);
+            }
+
+            return $chained;
         }
         if ($native instanceof \Error && $prevNative instanceof \Throwable) {
-            return new \Error($message, $native->getCode(), $prevNative);
+            $chained = new \Error($message, $native->getCode(), $prevNative);
+            if (null !== $file || (null !== $line && $line > 0)) {
+                self::applyNativeLocation($chained, $file ?? '', $line ?? 0);
+            }
+
+            return $chained;
         }
 
         return $native;
