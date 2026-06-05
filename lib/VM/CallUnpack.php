@@ -24,6 +24,24 @@ final class CallUnpack
      *
      * @throws \TypeError|\Error
      */
+    /**
+     * @param list<string> $paramNames
+     *
+     * @return list<array{0: string, 1?: mixed, 2?: Variable}>
+     */
+    public static function expandArrayEntries(
+        Variable $spread,
+        array $paramNames,
+        ?int $variadicParamIndex
+    ): array {
+        $spread = $spread->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $spread->type) {
+            throw new \LogicException('Expected array for call-time unpack');
+        }
+
+        return self::fromArray($spread, $paramNames, $variadicParamIndex);
+    }
+
     public static function expandToEntries(
         VM $vm,
         Frame $frame,

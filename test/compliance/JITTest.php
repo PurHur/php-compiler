@@ -410,10 +410,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'generator_')) {
                 continue;
             }
-            // Named call-time unpack (...$assoc) is VM-only until JIT resolveOutgoingCall expansion (#4669).
-            if (str_contains($name, 'call_unpack_named_keys')) {
-                continue;
-            }
             // Negative string offsets: VM (#3751); MCJIT StringOffsetHelper still segfaults (#198).
             if (str_contains($name, 'string_negative_offset')) {
                 continue;
