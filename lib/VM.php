@@ -160,7 +160,7 @@ class VM {
             $this->context->swapRunStack($savedStack);
             if (null !== $savedStack) {
                 $thrown = $native instanceof \Error
-                    ? VM\BuiltinExceptionSupport::materializeError($this->context, $native->getMessage())
+                    ? VM\BuiltinExceptionSupport::materializeNativeError($this->context, $native)
                     : $this->makeEngineError($native->getMessage(), 'Exception');
                 $catchFrame = $this->findCatchFrameForThrow($savedStack->frame, $thrown);
                 if (null !== $catchFrame) {
@@ -6343,9 +6343,7 @@ restart:
             try {
                 $result = $this->runFrames();
             } catch (\TypeError|\Error $e) {
-                $thrown = $e instanceof \TypeError
-                    ? VM\BuiltinExceptionSupport::materializeTypeError($this->context, $e->getMessage())
-                    : VM\BuiltinExceptionSupport::materializeError($this->context, $e->getMessage());
+                $thrown = VM\BuiltinExceptionSupport::materializeNativeError($this->context, $e);
                 $catchFrame = $this->findCatchFrameForGeneratorThrow($gen, $thrown);
                 if (null !== $catchFrame) {
                     $catchFrame->generatorState = $gen;

@@ -587,6 +587,7 @@ final class BuiltinClasses
             ExceptionSupport::CLASS_TYPE_ERROR
         );
         self::registerThrowableClass($ctx, 'ParseError', ExceptionSupport::CLASS_PARSE_ERROR, ExceptionSupport::CLASS_ERROR);
+        self::registerThrowableClass($ctx, 'CompileError', ExceptionSupport::CLASS_COMPILE_ERROR, ExceptionSupport::CLASS_ERROR);
         self::registerThrowableClass(
             $ctx,
             'UnhandledMatchError',
