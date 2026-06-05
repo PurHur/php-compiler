@@ -246,11 +246,19 @@ final class ExceptionSupport
         }
     }
 
+    /** Safe read for Throwable slots that may stay at typed prototype without a value (#6357). */
+    public static function readThrowableMessage(ObjectEntry $entry): string
+    {
+        $message = self::readOptionalStringProperty($entry, self::PROP_MESSAGE);
+
+        return null !== $message && '' !== $message ? $message : 'Exception';
+    }
+
     private static function readOptionalStringProperty(ObjectEntry $entry, string $prop): ?string
     {
         try {
             return $entry->getProperty($prop)->optionalScalarString();
-        } catch (\LogicException) {
+        } catch (\Throwable) {
             return null;
         }
     }
@@ -259,7 +267,7 @@ final class ExceptionSupport
     {
         try {
             return $entry->getProperty($prop)->optionalScalarInt();
-        } catch (\LogicException) {
+        } catch (\Throwable) {
             return null;
         }
     }
@@ -364,11 +372,7 @@ final class ExceptionSupport
             return $native;
         }
         $prevEntry = $prevVar->toObject();
-        try {
-            $prevMessage = $prevEntry->getProperty(self::PROP_MESSAGE)->toString();
-        } catch (\LogicException) {
-            $prevMessage = 'Exception';
-        }
+        $prevMessage = self::readThrowableMessage($prevEntry);
         $prevNative = self::nativeUncaughtThrowable($prevEntry, $prevMessage);
         if ($native instanceof \Exception && $prevNative instanceof \Throwable) {
             $chained = new \Exception($message, $native->getCode(), $prevNative);

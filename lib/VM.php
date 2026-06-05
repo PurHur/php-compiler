@@ -5183,8 +5183,10 @@ restart:
         }
         if (Variable::TYPE_OBJECT === $thrown->type) {
             $entry = $thrown->toObject();
-            $message = $entry->getProperty('message')->optionalScalarString() ?? 'Exception';
-            throw VM\ExceptionSupport::nativeUncaughtThrowable($entry, $message);
+            throw VM\ExceptionSupport::nativeUncaughtThrowable(
+                $entry,
+                VM\ExceptionSupport::readThrowableMessage($entry)
+            );
         }
         throw new \Exception($thrown->toString());
     }

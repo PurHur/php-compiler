@@ -1,8 +1,7 @@
 --TEST--
-Runtime: uncaught Error prints once without Variable::$string secondary fatal (#6357)
+Uncaught dispatchVmError fatal must not secondary-fatal in ExceptionSupport (#6357)
 --FILE--
 <?php
-enum E: string { case A = 'x'; }
-exit(E::A);
+$w = WeakReference::create(new stdClass);
 --EXPECT_EXIT--
 255
