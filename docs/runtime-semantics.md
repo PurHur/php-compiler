@@ -28,3 +28,20 @@ Recommended app pattern: `$name = $_GET['name'] ?? 'Guest';` (no undefined-key w
 # Docker:
 ./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && ./script/ci-local.sh --filter UndefinedArrayKey'
 ```
+
+## Stdlib argument type errors ([#6267](https://github.com/PurHur/php-compiler/issues/6267))
+
+User-visible Z_PARAM-style mistakes in `ext/standard` builtins must raise catchable **`TypeError`** (or **`ValueError`** where php-src does), not **`LogicException`**. The latter is reserved for compiler-internal faults and often aborts the VM instead of unwinding through user `try/catch`.
+
+| Layer | Path |
+|-------|------|
+| VM | `VmString::coerceStringBuiltinArg()`, `VmStreamArg::requireStreamHandle()`, path helpers on builtins |
+| JIT/AOT | `JitStringBuiltinArg::lower()` mirroring the same guards |
+
+Enum-case operands must name the enum class in the message (php-src-strict; see [#5780](https://github.com/PurHur/php-compiler/issues/5780)).
+
+Verification:
+
+```bash
+./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && ./script/ci-local.sh --filter logic_exception_enum'
+```
