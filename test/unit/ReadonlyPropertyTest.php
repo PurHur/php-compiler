@@ -105,6 +105,23 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'readonly_promoted.php'));
     }
 
+    /** @covers issue #6146 */
+    public function testReadonlyClassPromotedStringCtorInitRejectsExteriorWrite(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+readonly class RC {
+    public function __construct(public string $x = 'init') {}
+}
+$r = new RC();
+$r->x = 'nope';
+PHP;
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Cannot modify readonly property RC::$x');
+        $runtime->run($runtime->parseAndCompile($code, 'readonly_class_string_ctor_init.php'));
+    }
+
     public function testInheritedReadonlyPropertyUsesDeclaringClassInMessage(): void
     {
         $runtime = new Runtime();
