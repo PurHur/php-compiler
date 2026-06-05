@@ -7,14 +7,14 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Value;
 
-use PHPCompiler\JIT\Builtin\ConvertUuRuntime;
+use PHPCompiler\JIT\Builtin\StringConvertUu;
 
-/** LLVM JIT/AOT helper for convert_uuencode() — ConvertUuRuntime bitcode, no AOT phpc_uuencode.c (#5277). */
+/** LLVM JIT/AOT helper for convert_uuencode() — StringConvertUuJit, no uuencode_jit_runtime.c (#6307). */
 final class JitConvertUuencode
 {
     public static function encode(Context $context, Value $src): Value
     {
-        ConvertUuRuntime::ensureLinked($context);
+        StringConvertUu::ensureLinked($context);
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_convert_uuencode'),
