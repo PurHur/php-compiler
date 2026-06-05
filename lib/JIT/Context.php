@@ -637,7 +637,6 @@ class Context {
 
         Builtin\ReflectionNative::registerDeclarations($this);
         Builtin\AttributeRegistry::registerDeclarations($this);
-        Builtin\MethodRegistry::registerDeclarations($this);
         if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
             Builtin\TypeErrorRaise::ensureStandaloneBodies($this);
             Builtin\ErrorRaise::ensureStandaloneBodies($this);

@@ -7011,13 +7011,6 @@ class JIT {
                         $parentOp = $block->getOperand($op->arg2);
                         assert($parentOp instanceof Operand\Literal);
                         $this->context->type->object->setClassParentName($nameOp->value, $parentOp->value);
-                        if (JIT\Builtin::LOAD_TYPE_STANDALONE === $this->context->loadType) {
-                            JIT\Builtin\MethodRegistry::emitSetParent(
-                                $this->context,
-                                strtolower(ltrim($nameOp->value, '\\')),
-                                strtolower(ltrim($parentOp->value, '\\'))
-                            );
-                        }
                     }
                     if ([] !== $op->attributeNames || [] !== $op->attributeEntries) {
                         $attrNames = [];
@@ -8306,16 +8299,6 @@ class JIT {
                         $visFlags,
                         $name->value
                     );
-                    if ('' !== ($this->context->scope->className ?? '')
-                        && JIT\Builtin::LOAD_TYPE_STANDALONE === $this->context->loadType) {
-                        JIT\Builtin\MethodRegistry::emitRegisterMethod(
-                            $this->context,
-                            strtolower(ltrim($this->context->scope->className, '\\')),
-                            $methodLc,
-                            $name->value,
-                            $visFlags
-                        );
-                    }
                     if (($this->isBundledSuperglobalsClass($classId) || $this->shouldSkipExternalClassBodyLowering($classId))
                         && 'issuperglobalname' !== $methodLc
                     ) {
