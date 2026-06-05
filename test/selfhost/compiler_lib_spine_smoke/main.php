@@ -702,6 +702,7 @@ require_once __DIR__.'/../../../lib/Compiler/ParameterMetadata.php';
 require_once __DIR__.'/../../../lib/JIT/BootstrapCompileSmokeM3Emit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/JitThrow.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReadonlyRaise.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/UploadTempJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFsDir.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHashCrypto.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringMicrotime.php';

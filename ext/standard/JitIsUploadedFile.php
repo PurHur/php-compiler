@@ -9,7 +9,7 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for is_uploaded_file() via __compiler_is_uploaded_file (issue #2204). */
+/** LLVM lowering for is_uploaded_file() via UploadTempJit (issue #5346). */
 final class JitIsUploadedFile
 {
     /** @return Value */
