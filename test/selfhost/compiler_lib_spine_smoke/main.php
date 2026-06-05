@@ -1089,6 +1089,7 @@ require_once __DIR__.'/../../../ext/standard/vsprintf.php';
 require_once __DIR__.'/../../../lib/AOT/AutoloadDiscovery.php';
 require_once __DIR__.'/../../../lib/AbstractEnumSourceRewriter.php';
 require_once __DIR__.'/../../../lib/Ast/AbstractEnumMarker.php';
+require_once __DIR__.'/../../../lib/Ast/EnumPropertyCompileCheck.php';
 require_once __DIR__.'/../../../lib/Ast/AsymmetricVisibilityRewriter.php';
 require_once __DIR__.'/../../../lib/Ast/PipeOperatorDesugar.php';
 require_once __DIR__.'/../../../lib/Ast/SealedClassAnnotator.php';
