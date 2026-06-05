@@ -8,14 +8,14 @@ var_export(class_exists('Attribute', false));
 echo "\n";
 var_export((new ReflectionClass('Override'))->isInternal());
 echo "\n";
-class Base { public function f(): void {} }
+class Base { public function f(): string { return 'b'; } }
 class Child extends Base {
     #[\Override]
-    public function f(): void {}
+    public function f(): string { return 'c'; }
 }
-echo "ok\n";
+echo (new Child())->f() . "\n";
 --EXPECT--
 true
 true
 true
-ok
+c
