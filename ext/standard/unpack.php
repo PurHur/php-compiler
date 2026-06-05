@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -22,17 +23,8 @@ final class unpack extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('unpack() requires two or three arguments in this compiler build');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $fmtVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $fmtVar->type) {
-            throw new \LogicException('unpack() format must be a string in this compiler build');
-        }
-        $dataVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $dataVar->type) {
-            throw new \LogicException('unpack() data must be a string in this compiler build');
-        }
+        $fmt = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'unpack', 0, 'format');
+        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'unpack', 1, 'string');
         $offset = 0;
         if (3 === $argc) {
             $offsetVar = $frame->calledArgs[2]->resolveIndirect();
@@ -41,27 +33,29 @@ final class unpack extends Internal
             }
             $offset = $offsetVar->toInt();
         }
-        $result = VmPack::unpack($fmtVar->toString(), $dataVar->toString(), $offset);
-        if (false === $result) {
-            if (null !== $frame->vmContext) {
-                $last = error_get_last();
-                $message = 'unpack() failed';
-                if (\is_array($last) && isset($last['message'])) {
-                    $message = $last['message'];
+        $result = VmPack::unpack($fmt, $data, $offset);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($frame, $result): void {
+            if (false === $result) {
+                if (null !== $frame->vmContext) {
+                    $last = error_get_last();
+                    $message = 'unpack() failed';
+                    if (\is_array($last) && isset($last['message'])) {
+                        $message = $last['message'];
+                    }
+                    $frame->vmContext->errors->triggerError(
+                        $message,
+                        ErrorReporter::E_WARNING,
+                        '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                        $frame->vmContext,
+                        $frame
+                    );
                 }
-                $frame->vmContext->errors->triggerError(
-                    $message,
-                    ErrorReporter::E_WARNING,
-                    '' !== $frame->scriptPath ? $frame->scriptPath : null,
-                    $frame->vmContext,
-                    $frame
-                );
-            }
-            $frame->returnVar->bool(false);
+                $ret->bool(false);
 
-            return;
-        }
-        $frame->returnVar->array(self::importResult($result));
+                return;
+            }
+            $ret->array(self::importResult($result));
+        });
     }
 
     public function call(Context $context, JITVariable ...$args): Value
