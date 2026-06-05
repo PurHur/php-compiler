@@ -332,6 +332,30 @@ final class InheritanceVariance
      * @param callable(string, string): bool $isClassSubtypeOf
      * @param callable(string, string): bool $classImplementsInterface
      */
+    /**
+     * PHP 8.3 typed class constants are covariant (zend_inheritance.c class_constant_types_compatible, #5953).
+     *
+     * @param callable(string, string): bool $isClassSubtypeOf
+     * @param callable(string, string): bool $classImplementsInterface
+     */
+    public static function isCovariantTypeCompatible(
+        ?TypeSig $parent,
+        ?TypeSig $child,
+        string $parentOwnerLc,
+        string $childOwnerLc,
+        callable $isClassSubtypeOf,
+        callable $classImplementsInterface
+    ): bool {
+        return self::isReturnCompatibleStatic(
+            $parent,
+            $child,
+            $parentOwnerLc,
+            $childOwnerLc,
+            $isClassSubtypeOf,
+            $classImplementsInterface
+        );
+    }
+
     private static function isReturnCompatibleStatic(
         ?TypeSig $parent,
         ?TypeSig $child,
