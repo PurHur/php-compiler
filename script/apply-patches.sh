@@ -710,7 +710,8 @@ PY
 apply_php_cfg_incdec_expr_overlay() {
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local overlay="$PATCH_DIR/overlays/php-cfg"
-  if grep -q 'new Op\\Expr\\PostInc' "$parser" 2>/dev/null; then
+  if grep -q 'new Op\\Expr\\PostInc' "$parser" 2>/dev/null \
+    && [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/PostInc.php" ]]; then
     echo "Skip php-cfg-incdec-expr.patch (already applied)"
     return 0
   fi
@@ -3243,6 +3244,8 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_php_cfg_in_operator_overlay || true
   # PHP 8.3 typed class/trait constants must survive optional patch failures (#6012).
   apply_php_cfg_typed_class_const_overlay || true
+  # ++/-- must survive optional patch failures (#4926, self-host loops #1492).
+  apply_php_cfg_incdec_expr_overlay || true
   apply_patch "$PATCH_DIR/php-cfg-dollars-brace.patch"
   apply_patch "$PATCH_DIR/php-cfg-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-cfg-nullsafe.patch"
@@ -3306,6 +3309,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
 fi
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
+  apply_php_types_incdec_type_overlay || true
   apply_patch "$PATCH_DIR/php-types-binaryop-pow.patch"
   apply_patch "$PATCH_DIR/php-types-binaryop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-types-cast-object.patch"
@@ -3416,6 +3420,13 @@ verify_critical_language_patches() {
   if grep -q 'function parseStmt_ClassConst' "$parser" 2>/dev/null \
     && ! grep -q 'declaredType = null !== \$node->type' "$parser" 2>/dev/null; then
     missing+=("php-cfg-typed-class-const-Parser")
+  fi
+  if ! grep -q 'new Op\\Expr\\PostInc' "$parser" 2>/dev/null \
+    || [[ ! -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/PostInc.php" ]]; then
+    missing+=("php-cfg-incdec-expr")
+  fi
+  if ! grep -q "case 'Expr_PostInc':" "$recon" 2>/dev/null; then
+    missing+=("php-types-incdec-type")
   fi
   if ((${#missing[@]} > 0)); then
     echo "apply-patches: critical language patch markers missing: ${missing[*]}" >&2
