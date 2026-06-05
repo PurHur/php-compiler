@@ -193,6 +193,7 @@ class Type extends Builtin {
         WeakRefRegistryRuntime::ensureLinked($this->context);
         MemoryRuntime::ensureLinked($this->context);
         IniRuntime::ensureLinked($this->context);
+        StringEnvLocal::ensureLinked($this->context);
         ErrorHandlerOutput::registerExternals($this->context);
         CallArgv::implement($this->context);
         $i8p = $this->context->getTypeFromString('int8*');
