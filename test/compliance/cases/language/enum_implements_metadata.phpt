@@ -11,7 +11,7 @@ enum Status: string implements Labeled
     case Active = 'active';
 }
 
-echo Status::Active;
+echo Status::Active->value;
 echo "\n";
 echo enum_exists('Status') ? '1' : '0';
 --EXPECT--
