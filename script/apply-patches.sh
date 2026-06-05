@@ -1097,6 +1097,7 @@ php_cfg_sync_enum_flags_parser() {
     return 0
   fi
   php_cfg_apply_enum_flags_parser_fix "$parser"
+  apply_php_cfg_enum_trait_use_parser_fix "$parser" || true
   echo "Repair php-cfg-enum-abstract.patch (Enum_ flags ctor vs Parser.php)"
 }
 
