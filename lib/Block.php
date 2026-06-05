@@ -1913,8 +1913,7 @@ class Block {
     private static function propertyFetchDestUsedAsAssignLvalue(self $block, int $opIndex, int $destSlot): bool
     {
         for ($j = $opIndex + 1, $n = count($block->opCodes); $j < $n; $j++) {
-            $next = $block->opCodes[$j];
-            if (OpCode::TYPE_ASSIGN === $next->type && $next->arg2 === $destSlot) {
+            if (OpCode::destSlotUsedAsAssignLvalue($block->opCodes[$j], $destSlot)) {
                 return true;
             }
         }
