@@ -12,6 +12,7 @@ use PHPCompiler\Block as CompilerBlock;
 use PHPCompiler\ext\standard\VmScope;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\Web\Superglobals;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -271,49 +272,356 @@ final class ScopeBuiltinHelper
             return;
         }
 
-        $scopeNames = array_keys($named);
-        $bindingCount = \count($scopeNames);
-        $charPtr = $context->getTypeFromString('char*');
-        $valuePtrTy = $context->getTypeFromString('__value__*');
-        $i64 = $context->getTypeFromString('int64');
-        foreach ($named as $scopeVar) {
-            if (null === $scopeVar->valueBoxAliasPtr) {
-                JitValueBox::promoteNativeLvalueToValueBox($context, $scopeVar);
-            }
-        }
-
-        $namesArrayTy = $charPtr->arrayType($bindingCount);
-        $slotsArrayTy = $valuePtrTy->arrayType($bindingCount);
-        $namesAlloc = BasicBlockHelper::entryAlloca($context, $namesArrayTy);
-        $slotsAlloc = BasicBlockHelper::entryAlloca($context, $slotsArrayTy);
-        $zero = $i64->constInt(0, false);
-
-        foreach ($scopeNames as $i => $scopeName) {
-            $idx = $i64->constInt($i, false);
-            $nameSlot = $context->builder->gep($namesAlloc, $zero, $idx);
-            $valueSlot = $context->builder->gep($slotsAlloc, $zero, $idx);
-            $nameGlobal = $context->builder->load($context->constantStringFromString($scopeName));
-            $context->builder->store(
-                self::stringDataPtr($context, $nameGlobal),
-                $nameSlot
-            );
-            $context->builder->store(
-                JitValueBox::valuePtrFromVariable($context, $named[$scopeName]),
-                $valueSlot
-            );
-        }
-
         $argPtr = self::compactArgValuePtr($context, $arg);
-        $namesPtr = $context->builder->pointerCast($namesAlloc, $charPtr->pointerType(0));
-        $slotsPtr = $context->builder->pointerCast($slotsAlloc, $valuePtrTy->pointerType(0));
+        self::collectCompactValue($context, $result, $argPtr, $named, $argNum);
+    }
+
+    /**
+     * @param array<string, Variable> $named
+     */
+    private static function collectCompactValue(
+        Context $context,
+        Value $result,
+        Value $valuePtr,
+        array $named,
+        int $argNum
+    ): void {
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $tag = 'cc'.(string) ++self::$blockSeq;
+        $stringBlock = BasicBlockHelper::append($context, 'compact_collect_string_'.$tag);
+        $htBlock = BasicBlockHelper::append($context, 'compact_collect_ht_'.$tag);
+        $invalidBlock = BasicBlockHelper::append($context, 'compact_collect_invalid_'.$tag);
+        $done = BasicBlockHelper::append($context, 'compact_collect_done_'.$tag);
+        $afterString = BasicBlockHelper::append($context, 'compact_collect_after_string_'.$tag);
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        self::compactApplyNameFromCstr($context, $result, self::stringDataPtr($context, $str), $named);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isHt, $htBlock, $invalidBlock);
+
+        $context->builder->positionAtEnd($htBlock);
+        $ht = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valuePtr
+        );
+        $htResume = self::captureInsertBlock($context);
+        self::collectCompactFromHashtable($context, $result, $ht, $named, $argNum);
+        self::restoreInsertBlock($context, $htResume);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($invalidBlock);
+        self::emitCompactInvalidArgumentWarning($context, $argNum, $typeByte);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    /**
+     * @param array<string, Variable> $named
+     */
+    private static function collectCompactFromHashtable(
+        Context $context,
+        Value $result,
+        Value $ht,
+        array $named,
+        int $argNum
+    ): void {
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'compact_packed_idx');
+        $context->builder->store($zero, $idxSlot);
+
+        $packedHead = BasicBlockHelper::append($context, 'compact_packed_head');
+        $packedBody = BasicBlockHelper::append($context, 'compact_packed_body');
+        $packedCollect = BasicBlockHelper::append($context, 'compact_packed_collect');
+        $packedNext = BasicBlockHelper::append($context, 'compact_packed_next');
+        $packedDone = BasicBlockHelper::append($context, 'compact_packed_done');
+        $context->builder->branch($packedHead);
+
+        $context->builder->positionAtEnd($packedHead);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
+        $context->builder->branchIf($atEnd, $packedDone, $packedBody);
+
+        $context->builder->positionAtEnd($packedBody);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $idx
+        );
+        $context->builder->branchIf($isSet, $packedCollect, $packedNext);
+
+        $context->builder->positionAtEnd($packedCollect);
+        $entryPtr = self::compactValueEntryAt($context, $ht, $idx);
+        $packedResume = self::captureInsertBlock($context);
+        self::collectCompactValue($context, $result, $entryPtr, $named, $argNum);
+        self::restoreInsertBlock($context, $packedResume);
+        $context->builder->branch($packedNext);
+
+        $context->builder->positionAtEnd($packedNext);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($packedHead);
+
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'compact_str_walk');
+        $context->builder->positionAtEnd($packedDone);
+        $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+
+        $strHead = BasicBlockHelper::append($context, 'compact_str_head');
+        $strBody = BasicBlockHelper::append($context, 'compact_str_body');
+        $strNext = BasicBlockHelper::append($context, 'compact_str_next');
+        $strDone = BasicBlockHelper::append($context, 'compact_str_done');
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $strDone, $strBody);
+
+        $context->builder->positionAtEnd($strBody);
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $strResume = self::captureInsertBlock($context);
+        self::collectCompactValue($context, $result, $valEntry, $named, $argNum);
+        self::restoreInsertBlock($context, $strResume);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strNext);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strDone);
+    }
+
+    private static function compactValueEntryAt(Context $context, Value $ht, Value $index): Value
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $values = $context->builder->load($context->builder->structGep($ht, $map['values']));
+
+        return $context->builder->inBoundsGep($values, $index);
+    }
+
+    /**
+     * @param array<string, Variable> $named
+     */
+    private static function compactApplyNameFromCstr(
+        Context $context,
+        Value $result,
+        Value $namePtr,
+        array $named
+    ): void {
+        if ([] === $named) {
+            return;
+        }
+
+        $i8 = $context->getTypeFromString('int8');
+        $tag = 'cn'.(string) ++self::$blockSeq;
+        $emptyDone = BasicBlockHelper::append($context, 'compact_name_empty_done_'.$tag);
+        $nonEmpty = BasicBlockHelper::append($context, 'compact_name_nonempty_'.$tag);
+        $firstChar = $context->builder->load($namePtr);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $firstChar, $i8->constInt(0, false));
+        $context->builder->branchIf($isEmpty, $emptyDone, $nonEmpty);
+
+        $names = array_keys($named);
+        $n = \count($names);
+        $missDone = BasicBlockHelper::append($context, 'compact_name_miss_'.$tag);
+        $checkBlocks = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $checkBlocks[$i] = 0 === $i
+                ? $nonEmpty
+                : BasicBlockHelper::append($context, 'compact_name_check_'.$tag.'_'.$i);
+        }
+
+        foreach ($names as $i => $name) {
+            $context->builder->positionAtEnd($checkBlocks[$i]);
+            $nameGlobal = $context->builder->load($context->constantStringFromString($name));
+            $cmp = $context->builder->call(
+                $context->lookupFunction('strcmp'),
+                $namePtr,
+                self::stringDataPtr($context, $nameGlobal)
+            );
+            $i32 = $context->getTypeFromString('int32');
+            $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+            $onMatch = BasicBlockHelper::append($context, 'compact_name_match_'.$tag.'_'.$i);
+            $onMiss = ($i < $n - 1) ? $checkBlocks[$i + 1] : $missDone;
+            $context->builder->branchIf($isMatch, $onMatch, $onMiss);
+
+            $context->builder->positionAtEnd($onMatch);
+            $keyStr = $context->builder->load($context->constantStringFromString($name));
+            self::storeVariableAtStringKey($context, $result, $keyStr, $named[$name]);
+            $context->builder->branch($emptyDone);
+        }
+
+        $context->builder->positionAtEnd($missDone);
+        self::emitCompactUndefinedVariableWarningFromCstr($context, $namePtr);
+        $context->builder->branch($emptyDone);
+
+        $context->builder->positionAtEnd($emptyDone);
+    }
+
+    private static function emitCompactUndefinedVariableWarningFromCstr(Context $context, Value $namePtr): void
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $buf = $context->builder->alloca($i8, 128, 'compact_undef_msg');
+        $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        $fmtPtr = $context->builder->pointerCast(
+            $context->constantFromString('compact(): Undefined variable $%s'),
+            $i8p
+        );
         $context->builder->call(
-            $context->lookupFunction('__compiler_compact_apply_arg'),
-            $result,
-            $argPtr,
-            $namesPtr,
-            $slotsPtr,
-            $i64->constInt($bindingCount, false),
-            $i64->constInt($argNum, false)
+            $context->lookupFunction('snprintf'),
+            $bufPtr,
+            $sizeT->constInt(128, false),
+            $fmtPtr,
+            $namePtr
+        );
+        $msgLen = $context->builder->call($context->lookupFunction('strlen'), $bufPtr);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $bufPtr,
+            $msgLen,
+            $i32->constInt(ErrorReporter::E_WARNING, false),
+            $context->builder->pointerCast($context->constantFromString(''), $i8p),
+            $i32->constInt(0, false)
+        );
+    }
+
+    private static function emitCompactInvalidArgumentWarning(
+        Context $context,
+        int $argNum,
+        Value $typeByte
+    ): void {
+        $i8 = $context->getTypeFromString('int8');
+        $tag = 'cia'.(string) ++self::$blockSeq;
+        $done = BasicBlockHelper::append($context, 'compact_invalid_done_'.$tag);
+        $afterInt = BasicBlockHelper::append($context, 'compact_invalid_after_int_'.$tag);
+        $afterFloat = BasicBlockHelper::append($context, 'compact_invalid_after_float_'.$tag);
+        $afterBool = BasicBlockHelper::append($context, 'compact_invalid_after_bool_'.$tag);
+        $afterString = BasicBlockHelper::append($context, 'compact_invalid_after_string_'.$tag);
+        $afterArray = BasicBlockHelper::append($context, 'compact_invalid_after_array_'.$tag);
+        $intBlock = BasicBlockHelper::append($context, 'compact_invalid_int_'.$tag);
+        $floatBlock = BasicBlockHelper::append($context, 'compact_invalid_float_'.$tag);
+        $boolBlock = BasicBlockHelper::append($context, 'compact_invalid_bool_'.$tag);
+        $stringBlock = BasicBlockHelper::append($context, 'compact_invalid_string_'.$tag);
+        $arrayBlock = BasicBlockHelper::append($context, 'compact_invalid_array_'.$tag);
+        $unknownBlock = BasicBlockHelper::append($context, 'compact_invalid_unknown_'.$tag);
+
+        $isInt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $context->builder->branchIf($isInt, $intBlock, $afterInt);
+
+        $context->builder->positionAtEnd($intBlock);
+        self::emitCompactInvalidArgumentWarningMessage($context, $argNum, 'int');
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterInt);
+        $isFloat = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $context->builder->branchIf($isFloat, $floatBlock, $afterFloat);
+
+        $context->builder->positionAtEnd($floatBlock);
+        self::emitCompactInvalidArgumentWarningMessage($context, $argNum, 'float');
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterFloat);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
+
+        $context->builder->positionAtEnd($boolBlock);
+        self::emitCompactInvalidArgumentWarningMessage($context, $argNum, 'bool');
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterBool);
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        self::emitCompactInvalidArgumentWarningMessage($context, $argNum, 'string');
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $isArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isArray, $arrayBlock, $afterArray);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        self::emitCompactInvalidArgumentWarningMessage($context, $argNum, 'array');
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterArray);
+        $context->builder->branch($unknownBlock);
+
+        $context->builder->positionAtEnd($unknownBlock);
+        self::emitCompactInvalidArgumentWarningMessage($context, $argNum, 'unknown type');
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    private static function emitCompactInvalidArgumentWarningMessage(
+        Context $context,
+        int $argNum,
+        string $typeName
+    ): void {
+        $message = "compact(): Argument #{$argNum} must be string or array of strings, {$typeName} given";
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $sizeT->constInt(\strlen($message), false),
+            $i32->constInt(ErrorReporter::E_WARNING, false),
+            $context->builder->pointerCast($context->constantFromString(''), $i8p),
+            $i32->constInt(0, false)
         );
     }
 
@@ -774,6 +1082,24 @@ final class ScopeBuiltinHelper
         $map = $context->structFieldMap['__string__'];
 
         return $context->builder->structGep($str, $map['value']);
+    }
+
+    private static function captureInsertBlock(Context $context): ?BasicBlock
+    {
+        try {
+            return $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
+    {
+        if (null !== $block) {
+            $context->builder->positionAtEnd($block);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function emitCompactUndefinedVariableWarning(Context $context, string $name): void
