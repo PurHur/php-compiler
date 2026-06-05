@@ -513,8 +513,8 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'list_destructure_string')) {
                 continue;
             }
-            // Pipe operator (|>): VM + AOT via desugar (#3243, #4456); MCJIT in PipeOperatorJit*Test (#98).
-            if (str_contains($name, 'pipe_operator') || str_contains($name, 'pipe_first_class')) {
+            // Pipe operator (|>): LLVM verify green in PipeOperatorJitCompileTest (#4783); MCJIT execute in PipeOperatorJitExecuteTest (#98).
+            if (str_contains($name, 'pipe_first_class')) {
                 continue;
             }
             yield $name => $case;
