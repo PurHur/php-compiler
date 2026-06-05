@@ -961,6 +961,9 @@ final class Variable {
                 }
                 $this->releaseArrayRef();
                 $this->resetScalars();
+                $this->objectPropertyOwner = null;
+                $this->objectPropertyName = null;
+                $this->staticPropertyClassLc = null;
                 $var->array->addRef();
                 $this->type = self::TYPE_ARRAY;
                 $this->streamResource = false;
