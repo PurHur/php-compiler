@@ -48,6 +48,7 @@ use PHPCompiler\Compiler\ParameterMetadata;
 use PHPCompiler\Compiler\GeneratorStaticMethodCompileCheck;
 use PHPCompiler\Compiler\ReadonlyClassCompileCheck;
 use PHPCompiler\Compiler\TraitCollisionCheck;
+use PHPCompiler\Compiler\TypedClassConstInheritCheck;
 use PHPCompiler\Compiler\ClassCompileRegistry;
 use PHPCompiler\Compiler\OverrideValidator;
 use PHPCompiler\Web\ConstStringFolder;
@@ -361,6 +362,7 @@ class Compiler {
         TraitCollisionCheck::validate($script);
         FinalClassExtensionCheck::validate($script);
         FinalClassConstCheck::validate($script);
+        TypedClassConstInheritCheck::validate($script);
         AbstractMethodVisibilityCheck::validate($script);
         MagicMethodReturnTypeCheck::validate($script);
         EnumMagicMethodCheck::validate($script);
