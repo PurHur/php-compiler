@@ -49,6 +49,9 @@ class ObjectEntry {
     /** True for ghost lazy objects (in-place init); false for proxy strategy (#4026). */
     public bool $lazyGhost = false;
 
+    /** Archived initializer for ReflectionClass::resetAsLazyObject() (#6125). */
+    public ?ClosureState $lazyResetInitializer = null;
+
     /** True for backed/unit enum case singleton objects (#3518). */
     public bool $isEnumCase = false;
 
@@ -102,6 +105,7 @@ class ObjectEntry {
         $this->lazyInitializer = null;
         $this->lazyPending = false;
         $this->lazyGhost = false;
+        $this->lazyResetInitializer = null;
         $this->fiberState = null;
     }
 
@@ -266,6 +270,7 @@ class ObjectEntry {
         $clone->lazyInitializer = $this->lazyInitializer;
         $clone->lazyPending = $this->lazyPending;
         $clone->lazyGhost = $this->lazyGhost;
+        $clone->lazyResetInitializer = $this->lazyResetInitializer;
 
         return $clone;
     }

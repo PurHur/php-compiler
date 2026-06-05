@@ -25,6 +25,7 @@ final class LazyObjectSupport
         $object->lazyInitializer = $initializer;
         $object->lazyPending = true;
         $object->lazyGhost = false;
+        $object->lazyResetInitializer = $initializer;
 
         return $object;
     }
@@ -40,6 +41,7 @@ final class LazyObjectSupport
         $object->lazyInitializer = $initializer;
         $object->lazyPending = true;
         $object->lazyGhost = true;
+        $object->lazyResetInitializer = $initializer;
 
         return $object;
     }
@@ -51,6 +53,7 @@ final class LazyObjectSupport
         }
 
         $initializer = $object->lazyInitializer;
+        self::archiveResetInitializer($object, $initializer);
         $object->lazyInitializer = null;
 
         if ($object->lazyGhost) {
@@ -115,9 +118,9 @@ final class LazyObjectSupport
             return $object;
         }
         self::applyPropertyDefaults($object);
+        self::archiveResetInitializer($object, $object->lazyInitializer);
         $object->lazyInitializer = null;
         $object->lazyPending = false;
-        $object->lazyGhost = false;
         $object->constructed = true;
 
         return $object;
@@ -137,6 +140,7 @@ final class LazyObjectSupport
     ): void {
         if ($object->lazyPending) {
             $object->lazyInitializer = $initializer;
+            $object->lazyResetInitializer = $initializer;
 
             return;
         }
@@ -155,6 +159,43 @@ final class LazyObjectSupport
         $object->lazyInitializer = $initializer;
         $object->lazyPending = true;
         $object->lazyGhost = true;
+        $object->lazyResetInitializer = $initializer;
+    }
+
+    /**
+     * Zend reflection_class_reset_as_lazy_object — restore uninitialized lazy state (#6125).
+     */
+    public static function resetAsLazyObject(\PHPCompiler\VM $vm, ObjectEntry $object): void
+    {
+        if ($object->lazyPending) {
+            throw new \ReflectionException('Object is lazy and non-initialized');
+        }
+
+        $initializer = $object->lazyResetInitializer;
+        if (null === $initializer) {
+            throw new \TypeError('ReflectionClass::resetAsLazyObject(): Argument #1 ($object) must be a lazy object');
+        }
+
+        if (!$object->destructorInvoked) {
+            $vm->invokeUserDestructor($object);
+        }
+
+        foreach ($object->getRawProperties() as $var) {
+            $var->reset();
+            $var->type = Variable::TYPE_UNDEFINED;
+        }
+
+        $object->constructed = false;
+        $object->destructorInvoked = false;
+        $object->lazyInitializer = $initializer;
+        $object->lazyPending = true;
+    }
+
+    private static function archiveResetInitializer(ObjectEntry $object, ?ClosureState $initializer): void
+    {
+        if (null !== $initializer) {
+            $object->lazyResetInitializer = $initializer;
+        }
     }
 
     private static function applyPropertyDefaults(ObjectEntry $object): void
