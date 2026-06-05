@@ -1079,7 +1079,8 @@ restart:
     }
 
     /**
-     * Unary {@see OpCode::TYPE_UNARY_PLUS}/{@see OpCode::TYPE_UNARY_MINUS}: non-numeric strings warn and coerce to 0 (zend_operators.c, #4723, #5083).
+     * Unary {@see OpCode::TYPE_UNARY_PLUS}/{@see OpCode::TYPE_UNARY_MINUS}: string operands use
+     * zend_is_numeric_string / numeric-prefix coercion (zend_operators.c, #4723, #5083, #5427).
      */
     private static function coerceUnaryPlusOperand(
         Variable $expr,
@@ -1098,13 +1099,19 @@ restart:
             case self::TYPE_BOOLEAN:
                 return $expr->bool ? 1 : 0;
             case self::TYPE_STRING:
-                if (!is_numeric($expr->string)) {
+                try {
+                    [$value, $warn] = self::parseStringForArithmetic($expr->string);
+                } catch (\LogicException) {
+                    throw new \TypeError(sprintf(
+                        'Unsupported operand types: %s * int',
+                        self::operandZendTypeName($expr)
+                    ));
+                }
+                if ($warn) {
                     self::warnNonNumericValue($vm, $frame);
-
-                    return 0;
                 }
 
-                return self::looseNumericFromString($expr->string);
+                return $value;
             case self::TYPE_OBJECT:
                 return self::coerceUnaryPlusOperand(
                     $expr->objectToScalarString($vm, 'int'),
