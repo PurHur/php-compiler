@@ -5819,9 +5819,11 @@ class JIT {
                         $this->assignOperand($block->getOperand($op->arg1), $result);
                         break;
                     }
-                    $classOp = $block->getOperand($op->arg3);
-                    assert($classOp instanceof Operand\Literal);
-                    $result = $this->context->type->object->emitInstanceOf($expr, $classOp->value);
+                    $result = JIT\InstanceOfHelper::emit(
+                        $this->context,
+                        $expr,
+                        $block->getOperand($op->arg3)
+                    );
                     $this->assignOperand($block->getOperand($op->arg1), $result);
                     break;
                 case OpCode::TYPE_IN:

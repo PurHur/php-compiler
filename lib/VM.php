@@ -2411,24 +2411,34 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_INSTANCEOF:
-                    $value = $frame->scope[$op->arg2];
-                    $matches = false;
-                    $unionEncoded = $op->instanceofUnionTypes;
-                    if (null !== $unionEncoded && '' !== $unionEncoded) {
-                        foreach (explode('|', $unionEncoded) as $typeName) {
-                            if ('' === $typeName) {
-                                continue;
+                    try {
+                        $value = $frame->scope[$op->arg2];
+                        $matches = false;
+                        $unionEncoded = $op->instanceofUnionTypes;
+                        if (null !== $unionEncoded && '' !== $unionEncoded) {
+                            foreach (explode('|', $unionEncoded) as $typeName) {
+                                if ('' === $typeName) {
+                                    continue;
+                                }
+                                if ($this->valueInstanceOfClassName($value, $typeName)) {
+                                    $matches = true;
+                                    break;
+                                }
                             }
-                            if ($this->valueInstanceOfClassName($value, $typeName)) {
-                                $matches = true;
-                                break;
-                            }
+                        } else {
+                            $className = VM\InstanceOfClassName::resolveClassName($frame->scope[$op->arg3]);
+                            $matches = $this->valueInstanceOfClassName($value, $className);
                         }
-                    } else {
-                        $className = strtolower($frame->scope[$op->arg3]->toString());
-                        $matches = $this->valueInstanceOfClassName($value, $className);
+                        $frame->scope[$op->arg1]->bool($matches);
+                    } catch (\Error $e) {
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+
+                        return self::EXCEPTION;
                     }
-                    $frame->scope[$op->arg1]->bool($matches);
                     break;
                 case OpCode::TYPE_IN:
                     try {
