@@ -6135,6 +6135,12 @@ class Compiler {
     ): ?Variable
     {
         $unpackFlags = property_exists($expr, 'unpack') ? $expr->unpack : [];
+        $byRefFlags = property_exists($expr, 'byRef') ? $expr->byRef : [];
+        foreach ($byRefFlags as $refFlag) {
+            if (!empty($refFlag)) {
+                return null;
+            }
+        }
         $ht = new HashTable();
         $n = \count($expr->values);
         for ($i = 0; $i < $n; ++$i) {
@@ -6786,6 +6792,17 @@ class Compiler {
     {
         foreach ($block->orig->children as $child) {
             if ($child instanceof Op\Expr\Array_ && $child->result === $result) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
+    protected function findPropertyFetchForResult(Operand $result, Block $block): ?Op\Expr\PropertyFetch
+    {
+        foreach ($block->orig->children as $child) {
+            if ($child instanceof Op\Expr\PropertyFetch && $child->result === $result) {
                 return $child;
             }
         }
@@ -7725,6 +7742,7 @@ class Compiler {
         $return = [];
         $started = false;
         $unpackFlags = property_exists($expr, 'unpack') ? $expr->unpack : [];
+        $byRefFlags = property_exists($expr, 'byRef') ? $expr->byRef : [];
         for ($i = 0, $n = count($expr->values); $i < $n; ++$i) {
             if (!empty($unpackFlags[$i])) {
                 if (!$started) {
@@ -7742,6 +7760,35 @@ class Compiler {
 
             $valueSlot = $this->compileOperand($expr->values[$i], $block, true);
             $keySlot = $this->compileOperand($expr->keys[$i], $block, true);
+            if (!empty($byRefFlags[$i])) {
+                if (!$started) {
+                    $return[] = new OpCode(OpCode::TYPE_INIT_ARRAY, $result);
+                    $started = true;
+                }
+                $elemTemp = new Operand\Temporary();
+                $elemSlot = $block->getVarSlot($elemTemp, false);
+                $return[] = new OpCode(
+                    OpCode::TYPE_ARRAY_DIM_FETCH,
+                    $elemSlot,
+                    $result,
+                    $keySlot instanceof Operand\NullOperand ? null : $keySlot
+                );
+                $propFetch = $this->findPropertyFetchForResult($expr->values[$i], $block);
+                if (null !== $propFetch) {
+                    $return[] = new OpCode(
+                        OpCode::TYPE_PROPERTY_FETCH,
+                        $valueSlot,
+                        $this->compileOperand($propFetch->var, $block, true),
+                        $this->compileOperand($propFetch->name, $block, true)
+                    );
+                }
+                $return[] = new OpCode(
+                    OpCode::TYPE_ASSIGN_REF,
+                    $elemSlot,
+                    $valueSlot
+                );
+                continue;
+            }
             if (!$started) {
                 $return[] = new OpCode(OpCode::TYPE_INIT_ARRAY, $result, $valueSlot, $keySlot);
                 $started = true;

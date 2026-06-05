@@ -524,8 +524,21 @@ final class EnumCaseSupport
      */
     public static function materializeConstantValue(Context $context, Variable $src): Variable
     {
+        if ($src->is(Variable::TYPE_INDIRECT) || $src->is(Variable::TYPE_PROPERTY_HOOK_REF)) {
+            $out = new Variable();
+            $out->copyFrom($src);
+
+            return $out;
+        }
         $src = $src->resolveIndirect();
         if ($src->is(Variable::TYPE_ARRAY)) {
+            if (self::arrayContainsRuntimeRefs($src)) {
+                $out = new Variable();
+                $out->copyFrom($src);
+
+                return $out;
+            }
+
             return ClassConstMaterializer::detachConstantValue(
                 self::materializeConstantArrayDeep($context, $src)
             );
@@ -568,6 +581,27 @@ final class EnumCaseSupport
         }
 
         return ClassConstMaterializer::detachConstantValue($src);
+    }
+
+    /** True when array storage carries live reference cells (must not immortalize for globals, #6426). */
+    public static function arrayContainsRuntimeRefs(Variable $arrayVar): bool
+    {
+        $arrayVar = $arrayVar->resolveIndirect();
+        if (!$arrayVar->is(Variable::TYPE_ARRAY)) {
+            return false;
+        }
+
+        foreach ($arrayVar->toArray()->iterate(true) as $element) {
+            $resolved = $element->resolveIndirect();
+            if (
+                $element->is(Variable::TYPE_INDIRECT)
+                || $resolved->is(Variable::TYPE_PROPERTY_HOOK_REF)
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

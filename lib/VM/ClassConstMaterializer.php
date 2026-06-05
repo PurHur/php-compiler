@@ -123,6 +123,9 @@ final class ClassConstMaterializer
             case Variable::TYPE_ARRAY:
                 $stored->array($src->toArray());
                 break;
+            case Variable::TYPE_PROPERTY_HOOK_REF:
+                $stored->copyFrom($src);
+                break;
             default:
                 throw new \LogicException(
                     'Unsupported class constant value type: '.$src->type
