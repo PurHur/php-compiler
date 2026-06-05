@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -25,11 +26,8 @@ final class version_compare extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('version_compare() expects 2 or 3 arguments');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $ver1 = $frame->calledArgs[0]->resolveIndirect()->toString();
-        $ver2 = $frame->calledArgs[1]->resolveIndirect()->toString();
+        $ver1 = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'version_compare', 0, 'version1');
+        $ver2 = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'version_compare', 1, 'version2');
         $operator = null;
         if (3 === $argc) {
             $opVar = $frame->calledArgs[2]->resolveIndirect();
@@ -43,11 +41,13 @@ final class version_compare extends Internal
             }
         }
         $result = VmInfo::version_compare($ver1, $ver2, $operator);
-        if (\is_bool($result)) {
-            $frame->returnVar->bool($result);
-        } else {
-            $frame->returnVar->int($result);
-        }
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
+            if (\is_bool($result)) {
+                $ret->bool($result);
+            } else {
+                $ret->int($result);
+            }
+        });
     }
 
     public function call(Context $context, JITVariable ...$args): Value
