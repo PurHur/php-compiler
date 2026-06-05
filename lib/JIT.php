@@ -1165,6 +1165,7 @@ class JIT {
                     $this->paramTypeConstraintsForNativeCall($block),
                     $this->paramIntersectionConstraintsForNativeCall($block),
                     $this->paramDnfConstraintsForNativeCall($block),
+                    $this->paramClassConstraintsForNativeCall($block),
                     $this->paramByRefForNativeCall($block),
                     $block->paramNames,
                     $block->variadicParamIndex,
@@ -11099,6 +11100,28 @@ class JIT {
                 continue;
             }
             $constraints[$paramIdx + $offset] = $block->paramIntersectionConstraints[$slot];
+        }
+
+        return $constraints;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function paramClassConstraintsForNativeCall(Block $block): array
+    {
+        $constraints = [];
+        $offset = $this->instanceMethodUsesThis($block) ? 1 : 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARG_RECV !== $op->type) {
+                continue;
+            }
+            $slot = (int) $op->arg1;
+            $paramIdx = (int) $op->arg2;
+            if (!isset($block->paramClassConstraints[$slot])) {
+                continue;
+            }
+            $constraints[$paramIdx + $offset] = $block->paramClassConstraints[$slot];
         }
 
         return $constraints;

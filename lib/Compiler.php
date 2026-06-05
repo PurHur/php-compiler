@@ -2794,6 +2794,21 @@ class Compiler {
         if (null !== $declared) {
             $block->paramDeclaredTypes[$slot] = $declared;
         }
+        if ($declared instanceof Op\Type\Reference) {
+            $className = $this->staticNameFromCfgType($declared);
+            if (null !== $className && '' !== $className) {
+                $label = ltrim($className, '\\');
+                if ($variadicElement) {
+                    $block->paramVariadicElementTypeConstraints[$slot] = Variable::TYPE_OBJECT;
+                } else {
+                    $block->paramTypeConstraints[$slot] = Variable::TYPE_OBJECT;
+                    $block->paramClassConstraints[$slot] = $className;
+                    $block->paramDeclaredTypeLabels[$slot] = $label;
+                }
+            }
+
+            return;
+        }
         if ($declared instanceof Op\Type\Intersection) {
             if ($variadicElement) {
                 $block->paramVariadicElementTypeConstraints[$slot] = Variable::TYPE_OBJECT;

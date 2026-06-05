@@ -68,6 +68,12 @@ class Block {
     /** @var array<int, int> scope slot index => Variable::TYPE_* for typed parameters */
     public array $paramTypeConstraints = [];
 
+    /** @var array<int, string> scope slot => class/interface name for object type-hinted parameters (#6145) */
+    public array $paramClassConstraints = [];
+
+    /** @var array<int, string> scope slot => declared type label for error messages (#6145) */
+    public array $paramDeclaredTypeLabels = [];
+
     /** Parameter scope slots declared `iterable` (array|Traversable union, #4829). */
     public array $paramIterableSlots = [];
 
@@ -474,6 +480,8 @@ class Block {
             $this->returnDeclaredType = $parent->returnDeclaredType;
             $this->paramDeclaredTypes = $parent->paramDeclaredTypes;
             $this->paramTypeConstraints = $parent->paramTypeConstraints;
+            $this->paramClassConstraints = $parent->paramClassConstraints;
+            $this->paramDeclaredTypeLabels = $parent->paramDeclaredTypeLabels;
             $this->paramIterableSlots = $parent->paramIterableSlots;
             $this->paramLiteralBoolTypes = $parent->paramLiteralBoolTypes;
             $this->returnLiteralBoolType = $parent->returnLiteralBoolType;
@@ -894,6 +902,12 @@ class Block {
             if (isset($block->paramTypeConstraints[$slot])) {
                 $local->resolveIndirect()->typeConstraint = $block->paramTypeConstraints[$slot];
             }
+            if (isset($block->paramClassConstraints[$slot])) {
+                $local->resolveIndirect()->classConstraint = $block->paramClassConstraints[$slot];
+            }
+            if (isset($block->paramDeclaredTypeLabels[$slot])) {
+                $local->resolveIndirect()->declaredTypeLabel = $block->paramDeclaredTypeLabels[$slot];
+            }
             if (isset($block->paramLiteralBoolTypes[$slot])) {
                 $local->resolveIndirect()->literalBoolType = $block->paramLiteralBoolTypes[$slot];
             }
@@ -926,6 +940,12 @@ class Block {
         $var = new Variable(Variable::TYPE_NULL);
         if (isset($block->paramTypeConstraints[$slot])) {
             $var->typeConstraint = $block->paramTypeConstraints[$slot];
+        }
+        if (isset($block->paramClassConstraints[$slot])) {
+            $var->classConstraint = $block->paramClassConstraints[$slot];
+        }
+        if (isset($block->paramDeclaredTypeLabels[$slot])) {
+            $var->declaredTypeLabel = $block->paramDeclaredTypeLabels[$slot];
         }
         if (isset($block->paramLiteralBoolTypes[$slot])) {
             $var->literalBoolType = $block->paramLiteralBoolTypes[$slot];

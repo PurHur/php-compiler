@@ -264,12 +264,6 @@ final class EnumCaseSupport
             return InterfaceCheck::entryIsInstanceOf($entry, $className, $context)
                 || InterfaceCheck::entryImplements($entry, $className, $context);
         }
-        $classLc = strtolower(ltrim($className, '\\'));
-        $target = $context->classes[$classLc] ?? null;
-        if (null !== $target && self::scalarIsLegacyEnumCaseForClass($value, $target)) {
-            return true;
-        }
-
         return null;
     }
 
