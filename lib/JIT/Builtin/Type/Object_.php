@@ -2503,6 +2503,11 @@ class Object_ extends Type {
         if ('weakreference' === $lcname) {
             $this->weakReferenceClassId = $id;
             $this->defineProperty($id, '__weak_target', Variable::TYPE_VALUE);
+            $this->defineMethodVisibility(
+                $id,
+                'create',
+                \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC
+            );
         }
         if ('weakmap' === $lcname) {
             $this->weakMapClassId = $id;

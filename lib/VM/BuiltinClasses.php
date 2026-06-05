@@ -165,8 +165,9 @@ final class BuiltinClasses
             $nullProto
         );
         $pub = CfgFunc::FLAG_PUBLIC;
+        $pubStatic = $pub | CfgFunc::FLAG_STATIC;
         $entry->methods['create'] = new WeakReferenceCreate();
-        $entry->methodVisibility['create'] = $pub;
+        $entry->methodVisibility['create'] = $pubStatic;
         $entry->methods['get'] = new WeakReferenceGet();
         $entry->methodVisibility['get'] = $pub;
         $entry->constructor = new WeakReferenceConstruct();
