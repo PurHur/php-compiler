@@ -7,9 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -31,14 +30,11 @@ final class gethostbynamel extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('gethostbynamel() requires exactly one argument in this compiler build');
         }
+        $hostname = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'gethostbynamel', 0, 'hostname');
         if (null === $frame->returnVar) {
             return;
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('gethostbynamel() requires a string hostname in this compiler build');
-        }
-        $result = VmDns::gethostbynamel($v->toString());
+        $result = VmDns::gethostbynamel($hostname);
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {
@@ -54,7 +50,7 @@ final class gethostbynamel extends Internal
 
         return JitGethostbynamel::invoke(
             $context,
-            JitStringArg::lower($context, $args[0], 'gethostbynamel() hostname')
+            JitStringBuiltinArg::lower($context, $args[0], 'gethostbynamel', 0, 'hostname')
         );
     }
 }

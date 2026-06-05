@@ -7,8 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** link() — VM via VmFs; JIT/AOT via libc linkat(2) (issue #3589). */
@@ -24,16 +24,11 @@ final class link_ extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('link() requires exactly two arguments in this compiler build');
         }
-        $targetVar = $frame->calledArgs[0]->resolveIndirect();
-        $linkVar = $frame->calledArgs[1]->resolveIndirect();
+        $target = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'link', 0, 'target');
+        $linkPath = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'link', 1, 'link');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $targetVar->type || Variable::TYPE_STRING !== $linkVar->type) {
-            throw new \LogicException('link() requires string paths in this compiler build');
-        }
-        $target = $targetVar->toString();
-        $linkPath = $linkVar->toString();
         $frame->returnVar->bool(VmFs::hardLink($target, $linkPath));
     }
 
@@ -42,8 +37,8 @@ final class link_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('link() requires exactly two arguments in this compiler build');
         }
-        $target = $this->jitString($context, $args[0], 'link() argument #1');
-        $linkPath = $this->jitString($context, $args[1], 'link() argument #2');
+        $target = JitStringBuiltinArg::lower($context, $args[0], 'link', 0, 'target');
+        $linkPath = JitStringBuiltinArg::lower($context, $args[1], 'link', 1, 'link');
 
         return JitLink::invoke($context, $target, $linkPath);
     }

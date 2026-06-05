@@ -8,7 +8,9 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringSubstrCompare;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -29,13 +31,12 @@ final class substr_compare extends Internal
         if ($argc < 3 || $argc > 5) {
             throw new \LogicException('substr_compare() accepts three to five arguments in this compiler build');
         }
-        $haystack = $frame->calledArgs[0]->resolveIndirect();
-        $needle = $frame->calledArgs[1]->resolveIndirect();
+        $haystack = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'substr_compare', 0, 'haystack');
+        $needle = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'substr_compare', 1, 'needle');
         $offset = $frame->calledArgs[2]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $haystack->type
-            || Variable::TYPE_STRING !== $needle->type
-            || Variable::TYPE_INTEGER !== $offset->type) {
-            throw new \LogicException('substr_compare() requires two strings and an integer offset in this compiler build');
+        if (Variable::TYPE_INTEGER !== $offset->type) {
+            throw new \TypeError('substr_compare(): Argument #3 ($offset) must be of type int, '
+                .EnumCaseSupport::typeNameForVariable($offset).' given');
         }
         $length = null;
         if ($argc >= 4) {
@@ -57,8 +58,8 @@ final class substr_compare extends Internal
             return;
         }
         $frame->returnVar->int(VmString::substr_compare(
-            $haystack->toString(),
-            $needle->toString(),
+            $haystack,
+            $needle,
             $offset->toInt(),
             $length,
             $caseInsensitive
@@ -103,8 +104,8 @@ final class substr_compare extends Internal
                 $i32
             );
         }
-        $p0 = $this->stringDataPtr($context, $this->jitString($context, $args[0], 'substr_compare() argument #1'));
-        $p1 = $this->stringDataPtr($context, $this->jitString($context, $args[1], 'substr_compare() argument #2'));
+        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[0], 'substr_compare', 0, 'haystack'));
+        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[1], 'substr_compare', 1, 'needle'));
         $offset = $this->jitLong($context, $args[2], 'substr_compare() offset');
         $fn = $context->lookupFunction('substr_compare');
         $raw = $context->builder->call($fn, $p0, $p1, $offset, $lengthVal, $ci);

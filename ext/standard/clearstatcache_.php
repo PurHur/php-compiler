@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -38,7 +39,7 @@ final class clearstatcache_ extends Internal
             if (Variable::TYPE_BOOLEAN !== $clearRealpath->type) {
                 throw new \LogicException('clearstatcache() argument #1 must be a boolean in this compiler build');
             }
-            $filename = VmReflection::stringArg($frame->calledArgs[1], 'clearstatcache() filename');
+            $filename = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'clearstatcache', 1, 'filename');
             \clearstatcache($clearRealpath->toBool(), $filename);
         }
         if (null !== $frame->returnVar) {
@@ -56,7 +57,7 @@ final class clearstatcache_ extends Internal
             $this->jitBool($context, $args[0], 'clearstatcache() argument #1');
         }
         if (2 === $argc) {
-            $this->jitString($context, $args[1], 'clearstatcache() argument #2');
+            JitStringBuiltinArg::lower($context, $args[1], 'clearstatcache', 1, 'filename');
         }
 
         return JitClearstatcache::invoke($context);
