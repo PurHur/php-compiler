@@ -6136,6 +6136,25 @@ class JIT {
                 case OpCode::TYPE_MUL:
                 case OpCode::TYPE_PLUS:
                 case OpCode::TYPE_MINUS:
+                    if ($op->isIncDec && (OpCode::TYPE_PLUS === $op->type || OpCode::TYPE_MINUS === $op->type)) {
+                        $this->maybeRefreshIncludeBindingsBeforeUse();
+                        $left = $this->context->getVariableFromOp($this->operandAt($block, $op->arg2, 'inc/dec left'));
+                        $right = $this->context->getVariableFromOp($this->operandAt($block, $op->arg3, 'inc/dec right'));
+                        $resultOp = $this->operandAt($block, $op->arg1, 'inc/dec result');
+                        $literal = JIT\JitStringArg::compileTimeLiteral($left) ?? JIT\JitStringArg::compileTimeLiteral($right);
+                        if (null !== $literal) {
+                            $vm = new VM\Variable();
+                            $vm->string($literal);
+                            if (OpCode::TYPE_PLUS === $op->type) {
+                                $vm->applyIncrement();
+                            } else {
+                                $vm->applyDecrement();
+                            }
+                            $this->assignOperand($resultOp, $this->jitVariableFromVmConstant($vm), true);
+                            break;
+                        }
+                    }
+                    // fall through
                 case OpCode::TYPE_DIV:
                 case OpCode::TYPE_MODULO:
                 case OpCode::TYPE_BITWISE_AND:
@@ -9895,6 +9914,26 @@ class JIT {
         $writeOp = $this->operandAt($block, $op->arg3, 'inc/dec write');
         $resultOp = $this->operandAt($block, $op->arg1, 'inc/dec result');
         $read = $this->context->getVariableFromOpInScopes($readOp);
+        $literal = JIT\JitStringArg::compileTimeLiteral($read);
+        if (null !== $literal) {
+            $vm = new VM\Variable();
+            $vm->string($literal);
+            if ($increment) {
+                $vm->applyIncrement();
+            } else {
+                $vm->applyDecrement();
+            }
+            $newVar = $this->jitVariableFromVmConstant($vm);
+            if (!$prefix) {
+                $this->assignOperand($resultOp, $read, true);
+            }
+            $this->assignOperand($writeOp, $newVar, true);
+            if ($prefix) {
+                $this->assignOperand($resultOp, $newVar, true);
+            }
+
+            return;
+        }
         if (null !== $read->objectPropertySlot) {
             $this->compileObjectPropertyIncDecOp($read, $resultOp, $increment, $prefix);
 
