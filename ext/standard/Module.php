@@ -447,6 +447,7 @@ class Module extends ModuleAbstract
             new chdir_(),
             new putenv_(),
             new ini_set_(),
+            new ini_set_('ini_alter'),
             new ini_get_(),
             new error_reporting(),
             new define_(),
