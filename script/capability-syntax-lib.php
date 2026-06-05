@@ -298,6 +298,16 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { public const array X = [1, 2]; } echo C::X[0];',
         ],
         [
+            'id' => 'typed_interface_const',
+            'construct' => 'PHP 8.3 typed interface constants (`interface I { public const string X = \'a\'; }`)',
+            'opcodes' => ['TYPE_DECLARE_INTERFACE', 'TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH'],
+            'issue' => 5980,
+            'notes' => [
+                'Implements/inheritance typed constant compatibility enforced at compile time (#5953, #5980).',
+            ],
+            'probe' => 'interface I { public const string X = "a"; } class C implements I {} echo C::X;',
+        ],
+        [
             'id' => 'class_const_object',
             'construct' => 'Class constants with `new` object expressions (PHP 8.3)',
             'opcodes' => ['TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH', 'TYPE_NEW'],
@@ -998,6 +1008,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'heredoc_flexible_indent' => '/<<<\s*\w+\s*\r?\n\s+\S/',
         'array_access_interface' => '/implements\s+ArrayAccess|function\s+offsetGet\s*\(/',
         'heredoc_nowdoc' => '/<<<[\'"]?\w+/',
+        'typed_interface_const' => '/interface\s+\w+\s*\{[^}]*\bconst\s+\w+\s+\w+\s*=|interface\s+\w+\s*\{[^}]*\b(?:public|protected|private)\s+const\s+\w+\s+\w+\s*=/s',
     ];
 
     $scan = [];
