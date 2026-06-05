@@ -4,9 +4,10 @@ unset() on property hooks resets backing; isset false without fatal (issue #5191
 <?php
 class C {
     public string $p {
-        get { return $this->p; }
-        set (string $value) { $this->p = $value; }
+        get => $this->backing;
+        set (string $value) { $this->backing = $value; }
     }
+    private string $backing = '';
 }
 $c = new C();
 $c->p = 'a';
