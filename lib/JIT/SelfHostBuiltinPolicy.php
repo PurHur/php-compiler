@@ -241,7 +241,7 @@ final class SelfHostBuiltinPolicy
         'trigger_error' => 'array',
         'error_get_last' => 'array',
         'error_clear_last' => 'array',
-        'ini_set' => 'array', 'ini_get' => 'array',
+        'ini_set' => 'array', 'ini_alter' => 'array', 'ini_get' => 'array',
     ];
 
     /** @var array<string, string> */
