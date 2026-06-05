@@ -87,7 +87,6 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/JIT/Builtin/StringStripslashes.php',
             'lib/JIT/Builtin/StringUcwords.php',
             'lib/JIT/Builtin/StringUrlencode.php',
-            'lib/JIT/Builtin/StringWordwrap.php',
             'lib/JIT/Builtin/Type/MaskedArray.php',
             'lib/JIT/Builtin/Type/NativeArray.php',
             'lib/JIT/Builtin/Type/Value.php',

@@ -84,7 +84,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringUcwords.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUnserialize.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUrldecode.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUrlencode.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringWordwrap.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Type.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Type/HashTable.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Type/MaskedArray.php';

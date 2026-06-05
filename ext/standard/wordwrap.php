@@ -90,6 +90,6 @@ final class wordwrap extends Internal
             $cutI8 = $context->builder->zExt($context->helper->loadValue($args[3]), $i8);
         }
 
-        return JitWordwrap::wrap($context, $input, $width, $break, $cutI8);
+        return JitWordwrap::wrap($context, $input, $width, $break, $cutI8, $args[0], $argc >= 2 ? $args[1] : null, $argc >= 3 ? $args[2] : null, 4 === $argc ? $args[3] : null);
     }
 }
