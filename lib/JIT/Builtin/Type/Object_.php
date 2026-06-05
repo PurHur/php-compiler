@@ -135,6 +135,11 @@ class Object_ extends Type {
 
     private bool $traversableInterfacesSeeded = false;
 
+    private bool $lazyGhostTraitSeeded = false;
+
+    /** @var array<int, true> class ids that use LazyGhostTrait (#6096) */
+    private array $lazyGhostTraitClassIds = [];
+
     /** @var array<int, true> class ids declared readonly (issue #1360) */
     private array $readonlyClassIds = [];
 
@@ -1457,6 +1462,27 @@ class Object_ extends Type {
         $this->lookup('IteratorAggregate');
         $this->markInterfaceClass('IteratorAggregate');
         $this->setInterfaceExtends('IteratorAggregate', ['Traversable']);
+    }
+
+    /** PHP 8.4 built-in LazyGhostTrait marker for trait_exists / use Trait (#6096). */
+    private function ensureLazyGhostBuiltinTrait(): void
+    {
+        if ($this->lazyGhostTraitSeeded) {
+            return;
+        }
+        $this->lazyGhostTraitSeeded = true;
+        $this->lookup('LazyGhostTrait');
+        $this->markTraitClass('lazyghosttrait');
+    }
+
+    public function markLazyGhostTraitClass(int $classId): void
+    {
+        $this->lazyGhostTraitClassIds[$classId] = true;
+    }
+
+    public function classUsesLazyGhostTrait(int $classId): bool
+    {
+        return isset($this->lazyGhostTraitClassIds[$classId]);
     }
 
     public function classLcForId(int $classId): ?string
@@ -3092,6 +3118,8 @@ class Object_ extends Type {
 
     public function isTraitClass(string $classLc): bool
     {
+        $this->ensureLazyGhostBuiltinTrait();
+
         return isset($this->traitClassLcs[strtolower(ltrim($classLc, '\\'))]);
     }
 

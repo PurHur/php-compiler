@@ -675,6 +675,17 @@ function syntaxRowDefinitions(): array
             'probe' => 'trait T { public function f(): int { return 1; } } class C { use T { f as r; } } echo (new C())->r();',
         ],
         [
+            'id' => 'lazy_ghost_trait',
+            'construct' => 'Built-in `LazyGhostTrait` marker (PHP 8.4 lazy objects)',
+            'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_USE_TRAIT'],
+            'issue' => 6096,
+            'notes' => [
+                'Zend/zend_lazy_objects.c — internal empty trait; trait_exists true; use in class bodies',
+                'ReflectionClass::newLazyGhost on trait-marked classes (#5968)',
+            ],
+            'probe' => 'class S { use LazyGhostTrait; public string $id = ""; } echo trait_exists("LazyGhostTrait") ? 1 : 0;',
+        ],
+        [
             'id' => 'array_argument_unpack',
             'construct' => 'Array/argument unpack `...$x`',
             'opcodes' => ['TYPE_ARRAY_SPREAD', 'TYPE_ARG_SEND', 'TYPE_INIT_ARRAY', 'TYPE_ADD_ARRAY_ELEMENT'],

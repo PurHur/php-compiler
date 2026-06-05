@@ -6814,6 +6814,9 @@ restart:
         foreach ($traitNames as $traitName) {
             $trait = $this->resolveTraitEntry($traitName);
             $traitLc = strtolower(ltrim($trait->name, '\\'));
+            if (VM\LazyGhostTraitSupport::isLazyGhostTrait($traitLc)) {
+                $entry->usesLazyGhostTrait = true;
+            }
             $entry->usedTraits[$trait->name] = $trait->name;
             $usedTraitNameByLc[$traitLc] = $trait->name;
             if (!isset($perTraitMethods[$traitLc])) {

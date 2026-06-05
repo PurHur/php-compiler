@@ -13,6 +13,11 @@ namespace PHPCompiler\VM;
  */
 final class LazyObjectSupport
 {
+    public static function classUsesLazyGhostTrait(ClassEntry $class): bool
+    {
+        return $class->usesLazyGhostTrait;
+    }
+
     public static function createProxy(ClassEntry $class, ClosureState $initializer): ObjectEntry
     {
         $object = new ObjectEntry($class);
