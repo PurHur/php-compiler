@@ -60,10 +60,7 @@ final class ClassCompileRegistry
         return isset($this->traits[self::lc($lcName)]);
     }
 
-    /**
-     * @param list<string> $traitLcs traits composed into the class (#5550)
-     */
-    public function hasOverridableMethod(?string $parentLc, array $interfaceLcs, array $traitLcs, string $methodLc): bool
+    public function hasOverridableMethod(?string $parentLc, array $interfaceLcs, string $methodLc): bool
     {
         if (null !== $parentLc && '' !== $parentLc && $this->hasMethodInClassChain($parentLc, $methodLc)) {
             return true;
@@ -75,22 +72,13 @@ final class ClassCompileRegistry
             }
         }
 
-        foreach ($traitLcs as $traitLc) {
-            if (isset($this->methods[$traitLc][$methodLc])) {
-                return true;
-            }
-        }
-
         return false;
     }
 
     /**
      * @return array{sig: MethodSig, ownerLc: string, ownerDisplay: string}|null
      */
-    /**
-     * @param list<string> $traitLcs traits composed into the class (#5550)
-     */
-    public function findOverriddenMethod(?string $parentLc, array $interfaceLcs, array $traitLcs, string $methodLc): ?array
+    public function findOverriddenMethod(?string $parentLc, array $interfaceLcs, string $methodLc): ?array
     {
         if (null !== $parentLc && '' !== $parentLc) {
             $found = $this->findMethodInClassChain($parentLc, $methodLc);
@@ -103,16 +91,6 @@ final class ClassCompileRegistry
             $found = $this->findMethodInInterfaceChain($ifaceLc, $methodLc);
             if (null !== $found) {
                 return $found;
-            }
-        }
-
-        foreach ($traitLcs as $traitLc) {
-            if (isset($this->methods[$traitLc][$methodLc])) {
-                return [
-                    'sig' => $this->methods[$traitLc][$methodLc],
-                    'ownerLc' => $traitLc,
-                    'ownerDisplay' => $this->displayNames[$traitLc] ?? $traitLc,
-                ];
             }
         }
 
