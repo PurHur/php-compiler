@@ -21,6 +21,10 @@ final class RandomIntVMTest extends BaseTest
             __DIR__.'/cases/stdlib/random_int_invalid_range.phpt',
             'random_int_invalid_range.phpt'
         );
+        yield 'random_int_enum_typeerror.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/random_int_enum_typeerror.phpt',
+            'random_int_enum_typeerror.phpt'
+        );
     }
 
     public function setUp(): void

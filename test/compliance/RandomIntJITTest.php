@@ -25,6 +25,10 @@ final class RandomIntJITTest extends BaseTest
             __DIR__.'/cases/stdlib/random_int_invalid_range_jit.phpt',
             'random_int_invalid_range_jit.phpt'
         );
+        yield 'random_int_enum_typeerror_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/random_int_enum_typeerror_jit.phpt',
+            'random_int_enum_typeerror_jit.phpt'
+        );
     }
 
     public function setUp(): void
