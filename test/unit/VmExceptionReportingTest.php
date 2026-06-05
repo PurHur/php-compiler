@@ -6,9 +6,25 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** Issue #6357: uncaught VM errors must not secondary-fatal in ExceptionSupport. */
+/** Issues #6357 / #6358: uncaught VM errors must not secondary-fatal in ExceptionSupport. */
 final class VmExceptionReportingTest extends TestCase
 {
+    public function testUncaughtExitEnumCasePrintsSingleErrorMessage(): void
+    {
+        $stderr = $this->runVmCliFile(<<<'PHP'
+<?php
+enum E: string { case A = 'x'; }
+exit(E::A);
+PHP
+        );
+        $this->assertStringContainsString(
+            'Uncaught Error: Object of class E could not be converted to string',
+            $stderr
+        );
+        $this->assertStringNotContainsString('Variable::$string must not be accessed before initialization', $stderr);
+        $this->assertStringNotContainsString('ExceptionSupport.php', $stderr);
+    }
+
     public function testUncaughtBuiltinTypeErrorPrintsOnceWithoutExceptionSupportStack(): void
     {
         $stderr = $this->runVmCliFile('<?php

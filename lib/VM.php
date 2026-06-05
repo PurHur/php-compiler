@@ -2120,21 +2120,28 @@ restart:
                     if (null !== $op->arg2) {
                         $exitArg = $frame->scope[$op->arg2];
                     }
+                    $savedCallSiteLine = $frame->callSiteLine;
+                    if (null !== $op->arg3 && $op->arg3 > 0) {
+                        $frame->callSiteLine = $op->arg3;
+                    }
                     try {
                         ext\standard\VmExit::terminate($exitArg, $frame);
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        $frame->callSiteLine = $savedCallSiteLine;
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
                         }
                     } catch (\Error $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        $frame->callSiteLine = $savedCallSiteLine;
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
                         }
                     }
+                    $frame->callSiteLine = $savedCallSiteLine;
                     break;
                 case OpCode::TYPE_JUMP:
                     $this->markFinallyCompletedWhenLeavingFinallyBody($frame);

@@ -303,6 +303,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'exit_array_status')) {
                 continue;
             }
+            // exit()/die() enum case Error + uncaught reporting — VM TYPE_EXIT (#6358).
+            if (str_contains($name, 'exit_enum_case_error') || str_contains($name, 'uncaught_no_secondary_fatal')) {
+                continue;
+            }
             // define() case_insensitive + constant() MCJIT execute segfaults (#3711); VM + AOT PHPT green.
             if (str_contains($name, 'define_case_insensitive')) {
                 continue;

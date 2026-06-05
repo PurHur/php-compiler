@@ -257,15 +257,7 @@ final class ExceptionSupport
     private static function readOptionalStringProperty(ObjectEntry $entry, string $prop): ?string
     {
         try {
-            $var = $entry->getProperty($prop)->resolveIndirect();
-            if (Variable::TYPE_STRING !== $var->type) {
-                return null;
-            }
-            if (TypedPropertyCheck::isUninitialized($var)) {
-                return null;
-            }
-
-            return $var->toString();
+            return $entry->getProperty($prop)->optionalScalarString();
         } catch (\Throwable) {
             return null;
         }
@@ -274,15 +266,7 @@ final class ExceptionSupport
     private static function readOptionalIntProperty(ObjectEntry $entry, string $prop): ?int
     {
         try {
-            $var = $entry->getProperty($prop)->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $var->type) {
-                return null;
-            }
-            if (TypedPropertyCheck::isUninitialized($var)) {
-                return null;
-            }
-
-            return $var->toInt();
+            return $entry->getProperty($prop)->optionalScalarInt();
         } catch (\Throwable) {
             return null;
         }

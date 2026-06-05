@@ -4647,7 +4647,8 @@ class Compiler {
                 return [new OpCode(
                     OpCode::TYPE_EXIT,
                     $resultSlot,
-                    $exitExpr
+                    $exitExpr,
+                    max(0, $expr->getLine())
                 )];
             case Op\Expr\PostInc::class:
                 return $this->compileIncDecExpr($expr, $block, OpCode::TYPE_POST_INC);

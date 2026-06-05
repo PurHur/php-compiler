@@ -542,6 +542,28 @@ final class Variable {
         $this->string = $value;
     }
 
+    /** Read string scalar when assigned; null for typed prototypes / unset slots (#6357). */
+    public function optionalScalarString(): ?string
+    {
+        $var = $this->resolveIndirect();
+        if (self::TYPE_STRING !== $var->type || !isset($var->string)) {
+            return null;
+        }
+
+        return $var->string;
+    }
+
+    /** Read int scalar when assigned; null for typed prototypes / unset slots (#6357). */
+    public function optionalScalarInt(): ?int
+    {
+        $var = $this->resolveIndirect();
+        if (self::TYPE_INTEGER !== $var->type || !isset($var->integer)) {
+            return null;
+        }
+
+        return $var->integer;
+    }
+
     public function toString(?\PHPCompiler\VM $vm = null, ?\PHPCompiler\Frame $frame = null): string {
         $var = $this->resolveIndirect();
         TypedPropertyCheck::assertReadable($var);
