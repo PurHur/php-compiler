@@ -7188,6 +7188,7 @@ class Compiler {
             case 'Terminal_Unset':
                 $ops = [];
                 foreach ($terminal->exprs as $unsetExpr) {
+                    $this->rejectThisUnset($unsetExpr);
                     $staticPropertyFetch = $unsetExpr instanceof Op\Expr\StaticPropertyFetch
                         ? $unsetExpr
                         : ($unsetExpr instanceof Operand ? $this->findStaticPropertyFetchForUnset($unsetExpr, $block) : null);
@@ -7967,6 +7968,35 @@ class Compiler {
         if ('this' === $this->baseVariableName($var)) {
             $this->throwCompileError('Cannot re-assign $this');
         }
+    }
+
+    /**
+     * Zend zend_compile.c: unset($this) is a compile-time fatal (#5436).
+     *
+     * @return never
+     */
+    protected function rejectThisUnset($expr): void
+    {
+        if (!$expr instanceof Operand) {
+            return;
+        }
+        if ('this' === $this->unsetTargetVariableName($expr)) {
+            $this->throwCompileError('Cannot unset $this');
+        }
+    }
+
+    private function unsetTargetVariableName(Operand $expr): ?string
+    {
+        $name = $this->baseVariableName($expr);
+        if (null !== $name) {
+            return $name;
+        }
+        $var = $this->unwrapVariableOperand($expr);
+        if (null !== $var && $var->name instanceof Literal && is_string($var->name->value)) {
+            return $var->name->value;
+        }
+
+        return null;
     }
 
     /**
