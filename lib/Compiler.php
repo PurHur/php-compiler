@@ -3948,27 +3948,71 @@ class Compiler {
 
     protected function tryFoldExternalClassConstFetch(string $className, string $constName): ?Variable
     {
-        if ('phpcfg\\func' !== strtolower(ltrim($className, '\\'))) {
-            return null;
-        }
-        $flags = [
-            'FLAG_PUBLIC' => \PHPCfg\Func::FLAG_PUBLIC,
-            'FLAG_PROTECTED' => \PHPCfg\Func::FLAG_PROTECTED,
-            'FLAG_PRIVATE' => \PHPCfg\Func::FLAG_PRIVATE,
-            'FLAG_STATIC' => \PHPCfg\Func::FLAG_STATIC,
-            'FLAG_ABSTRACT' => \PHPCfg\Func::FLAG_ABSTRACT,
-            'FLAG_FINAL' => \PHPCfg\Func::FLAG_FINAL,
-            'FLAG_RETURNS_REF' => \PHPCfg\Func::FLAG_RETURNS_REF,
-            'FLAG_CLOSURE' => \PHPCfg\Func::FLAG_CLOSURE,
-        ];
-        $lcConst = strtoupper($constName);
-        if (!isset($flags[$lcConst])) {
-            return null;
-        }
-        $value = new Variable(Variable::TYPE_INTEGER);
-        $value->int($flags[$lcConst]);
+        $lcClass = strtolower(ltrim($className, '\\'));
+        if ('phpcfg\\func' === $lcClass) {
+            $flags = [
+                'FLAG_PUBLIC' => \PHPCfg\Func::FLAG_PUBLIC,
+                'FLAG_PROTECTED' => \PHPCfg\Func::FLAG_PROTECTED,
+                'FLAG_PRIVATE' => \PHPCfg\Func::FLAG_PRIVATE,
+                'FLAG_STATIC' => \PHPCfg\Func::FLAG_STATIC,
+                'FLAG_ABSTRACT' => \PHPCfg\Func::FLAG_ABSTRACT,
+                'FLAG_FINAL' => \PHPCfg\Func::FLAG_FINAL,
+                'FLAG_RETURNS_REF' => \PHPCfg\Func::FLAG_RETURNS_REF,
+                'FLAG_CLOSURE' => \PHPCfg\Func::FLAG_CLOSURE,
+            ];
+            $lcConst = strtoupper($constName);
+            if (!isset($flags[$lcConst])) {
+                return null;
+            }
+            $value = new Variable(Variable::TYPE_INTEGER);
+            $value->int($flags[$lcConst]);
 
-        return $value;
+            return $value;
+        }
+
+        return $this->tryFoldNativePhpClassConstFetch(ltrim($className, '\\'), $constName);
+    }
+
+    /**
+     * Fold class constants from already-loaded native PHP classes (bootstrap spine; #6221).
+     */
+    protected function tryFoldNativePhpClassConstFetch(string $className, string $constName): ?Variable
+    {
+        if (!class_exists($className, false)) {
+            return null;
+        }
+        try {
+            $ref = new \ReflectionClassConstant($className, $constName);
+        } catch (\ReflectionException) {
+            return null;
+        }
+        $raw = $ref->getValue();
+        if (\is_int($raw)) {
+            $value = new Variable(Variable::TYPE_INTEGER);
+            $value->int($raw);
+
+            return $value;
+        }
+        if (\is_bool($raw)) {
+            $value = new Variable(Variable::TYPE_BOOLEAN);
+            $value->bool($raw);
+
+            return $value;
+        }
+        if (\is_float($raw)) {
+            $value = new Variable(Variable::TYPE_FLOAT);
+            $value->float($raw);
+
+            return $value;
+        }
+        if (\is_string($raw)) {
+            $value = new Variable(Variable::TYPE_STRING);
+            $value->string($raw);
+
+            return $value;
+        }
+
+        return null;
     }
 
     protected function pseudoClassInCompileScope(string $className, Block $block): bool
