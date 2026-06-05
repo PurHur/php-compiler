@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringVarExportJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ValueEchoHelper;
@@ -63,6 +64,7 @@ final class var_export extends Internal
 
             return $outPtr;
         }
+        StringVarExportJit::ensureLinked($context);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $args[0]);
         $str = $context->builder->call(
             $context->lookupFunction('__compiler_var_export'),
@@ -130,7 +132,14 @@ final class var_export extends Internal
             return (string) $v->toInt();
         }
         if (Variable::TYPE_FLOAT === $v->type) {
-            $s = (string) $v->toFloat();
+            $f = $v->toFloat();
+            if (is_nan($f)) {
+                return $f < 0 ? '-NAN' : 'NAN';
+            }
+            if (is_infinite($f)) {
+                return $f < 0 ? '-INF' : 'INF';
+            }
+            $s = (string) $f;
             if (false === strpos($s, '.')) {
                 return $s.'.0';
             }
