@@ -346,9 +346,9 @@ final class GeneratorHelper
         int $startIndex,
         int $yieldIdx,
         \PHPLLVM\BasicBlock $entryBlock
-    ): void {
+    ): \PHPLLVM\BasicBlock {
         if ($startIndex >= $yieldIdx) {
-            return;
+            return $entryBlock;
         }
         $context = $jit->context;
         $savedStorage = $context->scope->blockStorage;
@@ -356,6 +356,8 @@ final class GeneratorHelper
         $exit = $jit->compileGeneratorResumePrefix($func, $block, $startIndex, $yieldIdx, $entryBlock);
         $context->builder->positionAtEnd($exit);
         $context->scope->blockStorage = $savedStorage;
+
+        return $exit;
     }
 
     /**
@@ -499,7 +501,7 @@ final class GeneratorHelper
             if ('yield' === $point['kind']) {
                 $yieldBb = $catchDispatchBb ?? $prefixEntry;
                 if (null === $catchDispatchBb && $prefixStart < $yieldIdx) {
-                    self::compileYieldPrefix(
+                    $yieldBb = self::compileYieldPrefix(
                         $jit,
                         $func,
                         $pointBlock,
@@ -510,7 +512,7 @@ final class GeneratorHelper
                 } elseif (null !== $catchDispatchBb) {
                     $context->builder->positionAtEnd($catchDispatchBb);
                     if ($prefixStart < $yieldIdx) {
-                        self::compileYieldPrefix(
+                        $yieldBb = self::compileYieldPrefix(
                             $jit,
                             $func,
                             $pointBlock,
@@ -518,6 +520,8 @@ final class GeneratorHelper
                             $yieldIdx,
                             $catchDispatchBb
                         );
+                    } else {
+                        $yieldBb = $catchDispatchBb;
                     }
                 }
                 $context->builder->positionAtEnd($yieldBb);

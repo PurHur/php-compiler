@@ -259,6 +259,38 @@ PHP
     }
 
     /**
+     * Yield object/array expressions must lower without LogicException (#4981).
+     *
+     * @runInSeparateProcess
+     */
+    public function testYieldObjectArrayForeachScriptVerifies(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+function gen() {
+    yield ['k' => 1];
+    yield new stdClass;
+}
+foreach (gen() as $v) {
+    echo is_array($v) ? 'arr' : get_class($v), "\n";
+}
+PHP
+            ,
+            'generator_jit_yield_object.php'
+        );
+        $this->assertNotNull($block);
+        $this->assertFalse(Block::requiresVmLowering($block));
+        $runtime->jitCompileBlock($block);
+        $context = $runtime->loadJitContext();
+        $verify = new \ReflectionMethod($context, 'compileCommon');
+        $verify->setAccessible(true);
+        $verify->invoke($context);
+        $this->assertArrayHasKey('gen', $context->generatorCreators);
+        $this->addToAssertionCount(1);
+    }
+
+    /**
      * Generator::send/current/getReturn on MCJIT-created generators must compile (#4558).
      *
      * @runInSeparateProcess
