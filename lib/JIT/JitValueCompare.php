@@ -875,6 +875,14 @@ final class JitValueCompare
     }
 
     /**
+     * True when strtol(base 10) consumes no bytes — string has no leading integer prefix (#3644, #5427).
+     */
+    public static function stringHasNoLeadingIntegerPrefix(Context $context, Value $strPtr): Value
+    {
+        return self::stringStrtolConsumedNothing($context, $strPtr);
+    }
+
+    /**
      * True when strtol(base 10) consumes no bytes — string has no leading integer prefix (#3644).
      */
     private static function stringStrtolConsumedNothing(Context $context, Value $strPtr): Value

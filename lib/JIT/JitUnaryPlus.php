@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Builder;
@@ -109,21 +110,32 @@ final class JitUnaryPlus
     private static function lowerStringPtr(Context $context, Value $strPtr): Variable
     {
         $isNumeric = JitValueCompare::stringIsNumeric($context, $strPtr);
+        $noLeadingPrefix = JitValueCompare::stringHasNoLeadingIntegerPrefix($context, $strPtr);
+        $needsTypeError = $context->builder->and($noLeadingPrefix, $context->builder->not($isNumeric));
+
+        $typeErrorBlock = BasicBlockHelper::append($context, 'unary_plus_str_type_error');
         $continueBlock = BasicBlockHelper::append($context, 'unary_plus_str_cont');
-        $warnBlock = BasicBlockHelper::append($context, 'unary_plus_str_warn');
         $entry = $context->builder->getInsertBlock();
-        $context->builder->branchIf($isNumeric, $continueBlock, $warnBlock);
+        $context->builder->branchIf($needsTypeError, $typeErrorBlock, $continueBlock);
+
+        $context->builder->positionAtEnd($typeErrorBlock);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, 'Unsupported operand types: string * int');
+        $context->builder->call($context->lookupFunction('abort'));
+
+        $context->builder->positionAtEnd($continueBlock);
+        $warnBlock = BasicBlockHelper::append($context, 'unary_plus_str_warn');
+        $afterWarnBlock = BasicBlockHelper::append($context, 'unary_plus_str_after_warn');
+        $context->builder->branchIf($isNumeric, $afterWarnBlock, $warnBlock);
         $context->builder->positionAtEnd($warnBlock);
         self::emitNonNumericWarning($context);
-        $context->builder->branch($continueBlock);
-        $context->builder->positionAtEnd($continueBlock);
+        $context->builder->branch($afterWarnBlock);
+        $context->builder->positionAtEnd($afterWarnBlock);
 
-        $i64 = $context->getTypeFromString('int64');
-        $zero = $i64->constInt(0, false);
         $numericLong = self::numericStringToLong($context, $strPtr);
-        $merged = $context->builder->select($isNumeric, $numericLong, $zero);
 
-        return new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $merged);
+        return new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $numericLong);
     }
 
     private static function numericStringToLong(Context $context, Value $strPtr): Value

@@ -32,4 +32,15 @@ final class UnaryPlusNonNumericTest extends TestCase
         self::assertSame(Variable::TYPE_INTEGER, $result->type);
         self::assertSame(42, $result->toInt());
     }
+
+    public function testNumericPrefixStringCoercesToPrefix(): void
+    {
+        $src = new Variable(Variable::TYPE_STRING);
+        $src->string('5x');
+        $result = new Variable();
+        $result->unaryOp(OpCode::TYPE_UNARY_PLUS, $src);
+
+        self::assertSame(Variable::TYPE_INTEGER, $result->type);
+        self::assertSame(5, $result->toInt());
+    }
 }
