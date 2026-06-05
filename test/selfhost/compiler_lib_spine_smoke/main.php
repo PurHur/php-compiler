@@ -1141,6 +1141,8 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringInfo.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MemoryRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNetworkServices.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNetworkServicesJit.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringConvertUu.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringConvertUuJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringQuotPrint.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrspn.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrspnJit.php';
