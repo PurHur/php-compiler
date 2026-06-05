@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\VmReflection;
+use PHPCompiler\Frame;
+use PHPCompiler\VM\Builtin\EnumCases;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
@@ -143,5 +145,56 @@ PHP;
         $output = ob_get_clean();
 
         $this->assertSame('111', $output);
+    }
+
+    /** Enum::cases() must return canonical singletons (Zend zend_enum_list_cases, #5715). */
+    public function testEnumCasesIdentity(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum U { case A; case B; }
+enum E: int { case A = 1; case B = 2; }
+$cases = U::cases();
+echo ($cases[0] instanceof U) ? '1' : '0';
+echo ($cases[0] === U::A) ? '1' : '0';
+$backed = E::cases();
+echo ($backed[0] === E::A) ? '1' : '0';
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_cases_identity.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame('111', $output);
+
+        $ctx = $runtime->vmContext;
+        $this->assertInstanceOf(Context::class, $ctx);
+        $unitEntry = $ctx->classes['u'];
+        $backedEntry = $ctx->classes['e'];
+        $unitA = $unitEntry->constants['a']->resolveIndirect();
+        $backedA = $backedEntry->constants['a']->resolveIndirect();
+        $this->assertSame(Variable::TYPE_OBJECT, $unitA->type);
+        $this->assertSame(Variable::TYPE_OBJECT, $backedA->type);
+
+        $returnVar = new Variable();
+        $frame = new Frame(null, $block, null);
+        $frame->returnVar = $returnVar;
+        (new EnumCases($unitEntry))->execute($frame);
+        $uCase0 = $returnVar->toArray()->findIndex(0);
+        $this->assertNotNull($uCase0);
+        $uCase0 = $uCase0->resolveIndirect();
+        $this->assertSame(Variable::TYPE_OBJECT, $uCase0->type);
+        $this->assertSame($unitA->toObject(), $uCase0->toObject());
+
+        $returnVar = new Variable();
+        $frame = new Frame(null, $block, null);
+        $frame->returnVar = $returnVar;
+        (new EnumCases($backedEntry))->execute($frame);
+        $eCase0 = $returnVar->toArray()->findIndex(0);
+        $this->assertNotNull($eCase0);
+        $eCase0 = $eCase0->resolveIndirect();
+        $this->assertSame(Variable::TYPE_OBJECT, $eCase0->type);
+        $this->assertSame($backedA->toObject(), $eCase0->toObject());
     }
 }

@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\BackedEnum;
 use PHPCompiler\VM\ClassEntry;
-use PHPCompiler\VM\EnumCaseEntry;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
 use PHPCompiler\VM\Variable;
 
@@ -28,10 +29,16 @@ final class EnumCases extends VmClassMethod
         $result->newArray();
         $ht = $result->toArray();
         foreach ($this->enumClass->enumCases as $index => $case) {
+            $canonical = BackedEnum::canonicalCaseVariable($this->enumClass, $case['name']);
+            if (null !== $canonical) {
+                $caseVar = new Variable();
+                $caseVar->copyFrom($canonical->resolveIndirect());
+                $ht->addIndex($index, $caseVar);
+                continue;
+            }
             $backing = new Variable();
             $backing->copyFrom($case['value']);
-            $caseVar = new Variable(Variable::TYPE_ENUM_CASE);
-            $caseVar->enumCase(new EnumCaseEntry($this->enumClass, $case['name'], $backing));
+            $caseVar = EnumCaseSupport::createCase($this->enumClass, $case['name'], $backing);
             $ht->addIndex($index, $caseVar);
         }
         if (null !== $frame->returnVar) {
