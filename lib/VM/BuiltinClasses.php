@@ -18,6 +18,7 @@ use PHPCompiler\VM\Builtin\ExceptionGetMessage;
 use PHPCompiler\VM\Builtin\ExceptionGetPrevious;
 use PHPCompiler\VM\Builtin\FiberConstruct;
 use PHPCompiler\VM\Builtin\FiberGetCurrent;
+use PHPCompiler\VM\Builtin\FiberGetReturn;
 use PHPCompiler\VM\Builtin\FiberIsRunning;
 use PHPCompiler\VM\Builtin\FiberIsStarted;
 use PHPCompiler\VM\Builtin\FiberIsSuspended;
@@ -680,6 +681,7 @@ final class BuiltinClasses
                 'issuspended' => new FiberIsSuspended(),
                 'isrunning' => new FiberIsRunning(),
                 'isterminated' => new FiberIsTerminated(),
+                'getreturn' => new FiberGetReturn(),
             ] as $name => $method
         ) {
             $entry->methods[$name] = $method;

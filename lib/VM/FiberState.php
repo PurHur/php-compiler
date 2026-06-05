@@ -37,6 +37,14 @@ final class FiberState
 
     public Variable $pendingThrow;
 
+    /** Callback return value after normal termination ({@see Fiber::getReturn()}, #5019). */
+    public Variable $returnValue;
+
+    public bool $hasReturnValue = false;
+
+    /** Fiber callback ended with uncaught Throwable (#5019, Zend/zend_fibers.c). */
+    public bool $threw = false;
+
     /**
      * Return target for the in-fiber `Fiber::suspend()` call.
      *
@@ -53,5 +61,7 @@ final class FiberState
         $this->resumeArgument->null();
         $this->pendingThrow = new Variable();
         $this->pendingThrow->null();
+        $this->returnValue = new Variable();
+        $this->returnValue->null();
     }
 }

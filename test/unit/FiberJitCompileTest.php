@@ -79,5 +79,10 @@ PHP
             \PHPCompiler\JIT\Call\FiberThrow::class,
             $context->functionProxies['fiber::throw']
         );
+        $this->assertArrayHasKey('fiber::getreturn', $context->functionProxies);
+        $this->assertInstanceOf(
+            \PHPCompiler\JIT\Call\FiberGetReturn::class,
+            $context->functionProxies['fiber::getreturn']
+        );
     }
 }

@@ -973,6 +973,8 @@ class VM {
                 $fiber->status = FiberState::STATUS_TERMINATED;
                 $fiber->frame = null;
                 $fiber->pendingSuspendReturnVar = null;
+                $fiber->hasReturnValue = false;
+                $fiber->threw = true;
                 throw $e;
             }
         } finally {
@@ -989,8 +991,12 @@ class VM {
         if (self::SUCCESS === $result) {
             $fiber->status = FiberState::STATUS_TERMINATED;
             $fiber->frame = null;
+            $resolved = $returnSlot->resolveIndirect();
+            $fiber->returnValue->copyFrom($resolved);
+            $fiber->hasReturnValue = true;
+            $fiber->threw = false;
             $out = new Variable();
-            $out->copyFrom($returnSlot->resolveIndirect());
+            $out->copyFrom($resolved);
 
             return $out;
         }
@@ -1022,6 +1028,8 @@ class VM {
         $frame = $fiber->frame;
         if (null === $frame) {
             $fiber->status = FiberState::STATUS_TERMINATED;
+            $fiber->hasReturnValue = false;
+            $fiber->threw = true;
             $this->raiseUncaughtException($thrown);
         }
         $this->context->pendingException = $thrown;
@@ -1040,6 +1048,8 @@ class VM {
         $this->clearTryCatchUnwindState();
         $fiber->status = FiberState::STATUS_TERMINATED;
         $fiber->frame = null;
+        $fiber->hasReturnValue = false;
+        $fiber->threw = true;
         $this->raiseUncaughtException($thrown);
     }
 
