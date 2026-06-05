@@ -6,29 +6,29 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** CompilerVersion gates for PHP 8.3+ surface on 8.2 target (issue #5697, #5212). */
+/** CompilerVersion gates for PHP 8.3+ surface (#5697, #5212, #5993). */
 final class CompilerVersionGateTest extends TestCase
 {
-    public function testVersionReports82Dev(): void
+    public function testVersionReports83Dev(): void
     {
-        $this->assertSame('8.2.0-dev', CompilerVersion::VERSION);
+        $this->assertSame('8.3.0-dev', CompilerVersion::VERSION);
     }
 
-    public function testSupportsStrIncrementFalseOn82Target(): void
+    public function testSupportsStrIncrementTrueOn83Target(): void
     {
-        $this->assertFalse(CompilerVersion::supportsStrIncrement());
+        $this->assertTrue(CompilerVersion::supportsStrIncrement());
     }
 
-    public function testSupportsTypedTraitConstantsFalseOn82Target(): void
+    public function testSupportsTypedTraitConstantsTrueOn83Target(): void
     {
-        $this->assertFalse(CompilerVersion::supportsTypedTraitConstants());
+        $this->assertTrue(CompilerVersion::supportsTypedTraitConstants());
     }
 
-    public function testVmDoesNotRegisterStrDecrementOn82Target(): void
+    public function testVmRegistersStrIncrementOn83Target(): void
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
-        $this->assertFalse(isset($ctx->functions['str_decrement']));
-        $this->assertFalse(isset($ctx->functions['str_increment']));
+        $this->assertTrue(isset($ctx->functions['str_decrement']));
+        $this->assertTrue(isset($ctx->functions['str_increment']));
     }
 }

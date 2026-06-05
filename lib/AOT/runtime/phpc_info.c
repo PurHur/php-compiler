@@ -18,7 +18,7 @@ extern __string__ *__string__init(long long size, const char *value);
 extern __hashtable__ *__hashtable__alloc(void);
 extern void __hashtable__setStringAt(__hashtable__ *ht, size_t index, __string__ *val);
 
-#define PHPC_VERSION "8.2.0-dev"
+#define PHPC_VERSION "8.3.0-dev"
 #define PHPC_SAPI "cli"
 
 static size_t phpc_strlen(__string__ *s)
