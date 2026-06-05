@@ -530,6 +530,15 @@ final class VmReflection
         return $parents;
     }
 
+    /** Empty VM array for class_parents() enum-case / no-parent operands (#6336). */
+    public static function emptyArray(): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+
+        return $result;
+    }
+
     /**
      * class_parents() result as a numerically indexed VM array (#3159).
      */

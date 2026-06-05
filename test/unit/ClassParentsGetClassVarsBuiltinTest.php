@@ -28,6 +28,23 @@ PHP;
         $this->assertSame("1\nBase3159\n2\n1\n9\nno-b", ob_get_clean());
     }
 
+    public function testVmClassParentsEnumCase(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum Enum6336 { case A; case B; }
+var_export(class_parents(Enum6336::A));
+echo "\n";
+var_export(class_parents(Enum6336::B));
+echo "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'class_parents_enum_case.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("array (\n)\narray (\n)\n", ob_get_clean());
+    }
+
     public function testVmClassParentsAutoloadFlag(): void
     {
         $code = <<<'PHP'
