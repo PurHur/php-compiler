@@ -18,7 +18,6 @@ final class Linker
         __DIR__.'/runtime/phpc_pending_headers.c',
         __DIR__.'/runtime/hash_crypto.c',
         __DIR__.'/runtime/phpc_spaceship.c',
-        __DIR__.'/runtime/phpc_str_getcsv.c',
         __DIR__.'/runtime/password_crypto.c',
         __DIR__.'/runtime/phpc_fs_dir.c',
         __DIR__.'/runtime/phpc_dir.c',

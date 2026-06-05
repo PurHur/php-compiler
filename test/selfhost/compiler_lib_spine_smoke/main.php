@@ -770,6 +770,7 @@ require_once __DIR__.'/../../../ext/standard/JitLevenshtein.php';
 require_once __DIR__.'/../../../ext/standard/JitMetaphone.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSimilarText.php';
 require_once __DIR__.'/../../../ext/standard/JitSoundex.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrGetcsvJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStreamCsv.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNaturalCompareJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrnatcasecmp.php';
