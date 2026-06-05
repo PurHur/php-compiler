@@ -90,4 +90,22 @@ PHP;
         $rt->run($block);
         $this->assertSame('5', ob_get_clean());
     }
+
+    /** Issue #4957: TypeReconstructor must not call missing Type::array(). */
+    public function testVmInstanceMethodFirstClassCallableOnNewExpression(): void
+    {
+        $code = <<<'PHP'
+<?php
+class Box {
+    public function add(int $a, int $b): int { return $a + $b; }
+}
+$f = (new Box())->add(...);
+echo $f(1, 2);
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('3', ob_get_clean());
+    }
 }
