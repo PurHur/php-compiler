@@ -1,14 +1,14 @@
 --TEST--
-Language: valid #[\Override] on parent method (issue #3211)
+Language: valid #[\Override] on parent method (issue #3211, #6355)
 --FILE--
 <?php
 class Base {
-    public function foo(): void {}
+    public function foo(): string { return 'base'; }
 }
 class Child extends Base {
     #[\Override]
-    public function foo(): void {}
+    public function foo(): string { return 'child'; }
 }
-echo "ok\n";
+echo (new Child())->foo() . "\n";
 --EXPECT--
-ok
+child
