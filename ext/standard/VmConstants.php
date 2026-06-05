@@ -32,6 +32,66 @@ final class VmConstants
     }
 
     /**
+     * defined() lookup — existence without materializing value (#4972, basic_functions.c).
+     */
+    public static function constantDefined(Context $ctx, string $name): bool
+    {
+        if (str_contains($name, '::')) {
+            return self::isClassConstantDefined($ctx, $name);
+        }
+
+        return null !== $ctx->constantFetch($name);
+    }
+
+    /**
+     * @see Zend zif_constant — zend_fetch_class + class constant table
+     */
+    private static function isClassConstantDefined(Context $ctx, string $qualifiedName): bool
+    {
+        $pos = strrpos($qualifiedName, '::');
+        if (false === $pos) {
+            return false;
+        }
+        $className = substr($qualifiedName, 0, $pos);
+        $constName = substr($qualifiedName, $pos + 2);
+        if ('' === $className || '' === $constName) {
+            return false;
+        }
+        $classLc = strtolower(ltrim($className, '\\'));
+        if (!isset($ctx->classes[$classLc])) {
+            $ctx->autoloadClass($className);
+        }
+        if (!isset($ctx->classes[$classLc])) {
+            return false;
+        }
+        $classEntry = $ctx->classes[$classLc];
+        if ($classEntry->isTrait) {
+            return false;
+        }
+        $constKey = VmReflection::findClassConstantKey($classEntry, $constName, $ctx);
+        if (null === $constKey) {
+            return false;
+        }
+        $constLc = strtolower($constName);
+        $vis = $classEntry->constVisibility[$constLc] ?? CfgFunc::FLAG_PUBLIC;
+        try {
+            ClassConstVisibility::assertAccessible(
+                $vis,
+                null,
+                $classLc,
+                $classEntry->name,
+                $constName,
+                static fn (string $callerLc, string $ancestorLc): bool => isset($ctx->classes[$callerLc])
+                    && self::isClassSameOrSubclassOf($ctx, $callerLc, $ancestorLc)
+            );
+        } catch (\LogicException $e) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * @see Zend zif_constant — zend_fetch_class + class constant table
      */
     private static function lookupClassConstant(Context $ctx, string $qualifiedName): ?Variable

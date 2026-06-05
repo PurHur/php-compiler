@@ -31,7 +31,7 @@ final class defined_ extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('defined() requires VM context');
         }
-        $defined = null !== $frame->vmContext->constantFetch($nameVar->toString());
+        $defined = VmConstants::constantDefined($frame->vmContext, $nameVar->toString());
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($defined);
         }
@@ -48,7 +48,10 @@ final class defined_ extends Internal
         if (JITVariable::TYPE_STRING !== $args[0]->type || null === $args[0]->compileTimeString) {
             throw new \LogicException('defined() constant name must be a string literal in this compiler build');
         }
-        $defined = null !== $context->runtime->vmContext->constantFetch($args[0]->compileTimeString);
+        $defined = VmConstants::constantDefined(
+            $context->runtime->vmContext,
+            $args[0]->compileTimeString
+        );
         $i1 = $context->getTypeFromString('int1');
 
         return $i1->constInt($defined ? 1 : 0, false);
