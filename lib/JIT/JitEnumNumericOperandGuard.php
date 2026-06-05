@@ -11,10 +11,22 @@ use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 
 /**
- * Reject enum case operands on ** and % (issue #5794, Zend/zend_operators.c).
+ * Reject enum case operands on binary arithmetic (issues #5790, #5794, Zend/zend_operators.c).
  */
 final class JitEnumNumericOperandGuard
 {
+    public static function guardArithmetic(
+        Context $context,
+        int $opCode,
+        Variable $left,
+        Variable $right
+    ): void {
+        if (!self::isGuardedArithmeticOp($opCode)) {
+            return;
+        }
+        self::guardOperands($context, $opCode, $left, $right);
+    }
+
     public static function guardPow(Context $context, Variable $base, Variable $exp): void
     {
         self::guardOperands($context, OpCode::TYPE_POW, $base, $exp);
@@ -23,6 +35,16 @@ final class JitEnumNumericOperandGuard
     public static function guardModulo(Context $context, Variable $left, Variable $right): void
     {
         self::guardOperands($context, OpCode::TYPE_MODULO, $left, $right);
+    }
+
+    private static function isGuardedArithmeticOp(int $opCode): bool
+    {
+        return OpCode::TYPE_PLUS === $opCode
+            || OpCode::TYPE_MINUS === $opCode
+            || OpCode::TYPE_MUL === $opCode
+            || OpCode::TYPE_DIV === $opCode
+            || OpCode::TYPE_MODULO === $opCode
+            || OpCode::TYPE_POW === $opCode;
     }
 
     private static function guardOperands(
@@ -198,7 +220,15 @@ final class JitEnumNumericOperandGuard
 
     private static function operatorSymbol(int $opCode): string
     {
-        return OpCode::TYPE_MODULO === $opCode ? '%' : '**';
+        return match ($opCode) {
+            OpCode::TYPE_PLUS => '+',
+            OpCode::TYPE_MINUS => '-',
+            OpCode::TYPE_MUL => '*',
+            OpCode::TYPE_DIV => '/',
+            OpCode::TYPE_MODULO => '%',
+            OpCode::TYPE_POW => '**',
+            default => '?',
+        };
     }
 
     private static function operandFallbackLabel(Variable $var): string

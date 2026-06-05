@@ -189,9 +189,7 @@ return_string:
     }
 
     public function binaryOp(OpCode $opcode, Variable $left, Variable $right): Variable {
-        if (OpCode::TYPE_MODULO === $opcode->type) {
-            JitEnumNumericOperandGuard::guardModulo($this->context, $left, $right);
-        }
+        JitEnumNumericOperandGuard::guardArithmetic($this->context, $opcode->type, $left, $right);
         if (OpCode::TYPE_BITWISE_AND === $opcode->type
             || OpCode::TYPE_BITWISE_OR === $opcode->type
             || OpCode::TYPE_BITWISE_XOR === $opcode->type
