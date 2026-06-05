@@ -226,6 +226,11 @@ final class Variable {
 
     public function streamHandle(int $value): void
     {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $this->indirect->streamHandle($value);
+
+            return;
+        }
         $this->int($value);
         $this->streamResource = true;
         $this->dirResource = false;
@@ -233,6 +238,11 @@ final class Variable {
 
     public function dirHandle(int $value): void
     {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $this->indirect->dirHandle($value);
+
+            return;
+        }
         $this->int($value);
         $this->dirResource = true;
         $this->streamResource = false;
@@ -2108,6 +2118,9 @@ restart:
 
                 return;
             case self::TYPE_INTEGER:
+                if ($this->isVmResource()) {
+                    throw new \TypeError('Cannot increment resource');
+                }
                 ++$this->integer;
 
                 return;
@@ -2159,6 +2172,9 @@ restart:
             case self::TYPE_NULL:
                 return;
             case self::TYPE_INTEGER:
+                if ($this->isVmResource()) {
+                    throw new \TypeError('Cannot decrement resource');
+                }
                 --$this->integer;
 
                 return;

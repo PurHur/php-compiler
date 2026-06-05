@@ -9977,6 +9977,7 @@ class JIT {
             Variable::TYPE_VALUE === $read->type
             && (Variable::KIND_VARIABLE === $read->kind || $read->functionStaticGlobal)
         ) {
+            $this->guardIncDecResourceOperand($read, $increment);
             $readPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $read);
             $cur = $this->context->builder->call(
                 $this->context->lookupFunction('__value__readLong'),
@@ -10007,6 +10008,7 @@ class JIT {
         }
 
         if (Variable::TYPE_NATIVE_LONG === $read->type && Variable::KIND_VARIABLE === $read->kind) {
+            $this->guardIncDecResourceOperand($read, $increment);
             $cur = $this->context->helper->loadValue($read);
             $one = $cur->typeOf()->constInt(1, false);
             $newLong = $increment
@@ -10038,6 +10040,41 @@ class JIT {
         if ($prefix) {
             $this->assignOperand($resultOp, $newVal, true);
         }
+    }
+
+    /** Reject ++/-- on stream/dir handles (issue #6396, zend_operators.c). */
+    private function guardIncDecResourceOperand(JIT\Variable $read, bool $increment): void
+    {
+        $longVal = null;
+        if (JIT\Variable::TYPE_NATIVE_LONG === $read->type) {
+            $longVal = $this->context->helper->loadValue($read);
+        } elseif (
+            JIT\Variable::TYPE_VALUE === $read->type
+            && (JIT\Variable::KIND_VARIABLE === $read->kind || $read->functionStaticGlobal)
+        ) {
+            $readPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $read);
+            $longVal = $this->context->builder->call(
+                $this->context->lookupFunction('__value__readLong'),
+                $readPtr
+            );
+        }
+        if (null === $longVal) {
+            return;
+        }
+        JIT\Builtin\StringDir::ensureLinked($this->context);
+        $isRes = JIT\JitValueCompare::nativeLongIsResource($this->context, $longVal);
+        $okBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_res_ok');
+        $errBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_res_err');
+        $this->context->builder->branchIf($isRes, $errBlock, $okBlock);
+        $this->context->builder->positionAtEnd($errBlock);
+        JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
+        JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
+        JIT\Builtin\TypeErrorRaise::emitRaise(
+            $this->context,
+            $increment ? 'Cannot increment resource' : 'Cannot decrement resource'
+        );
+        $this->context->builder->call($this->context->lookupFunction('abort'));
+        $this->context->builder->positionAtEnd($okBlock);
     }
 
     /** .= on object properties: concat into new string, guard readonly, store via slot (#3149). */
