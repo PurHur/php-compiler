@@ -4271,15 +4271,20 @@ class Compiler {
             $merge = $this->splitMergeBeforeNestedTry($merge);
             // Merge block is entered via TYPE_CATCH before catch locals exist (#195, #2084).
             $merge->inheritUndefinedLocals = true;
+            // Lower catch bodies before try so sibling ?: merge prebind cannot clobber try locals (#6411).
+            $compiledCatches = [];
+            foreach ($stmt->catches as $i => $catchBlock) {
+                $compiledCatch = $this->compileCfgBranch($catchBlock, $block);
+                $compiledCatch->inheritUndefinedLocals = true;
+                $compiledCatches[] = $compiledCatch;
+            }
             $try = $this->compileCfgBranch($stmt->try, $block);
             $try->inheritUndefinedLocals = true;
             $tryOp = new OpCode(OpCode::TYPE_TRY);
             $tryOp->block1 = $try;
             $tryOp->block2 = $merge;
             $block->addOpCode($tryOp);
-            foreach ($stmt->catches as $i => $catchBlock) {
-                $compiledCatch = $this->compileCfgBranch($catchBlock, $block);
-                $compiledCatch->inheritUndefinedLocals = true;
+            foreach ($compiledCatches as $i => $compiledCatch) {
                 $catchOp = new OpCode(OpCode::TYPE_CATCH);
                 $catchOp->block1 = $compiledCatch;
                 $catchOp->block2 = $merge;

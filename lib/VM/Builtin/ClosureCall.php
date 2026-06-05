@@ -18,32 +18,71 @@ final class ClosureCall extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
+        if (\count($frame->calledArgs) < 1) {
             throw new \ArgumentCountError(
-                'Closure::call() expects at least 2 arguments, '.\count($frame->calledArgs).' given'
+                'Closure::call() expects at least 1 argument, '.\count($frame->calledArgs).' given'
             );
         }
         if (null === $frame->vmContext) {
             throw new \LogicException('Closure::call() requires VM context');
         }
-        $receiver = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $receiver->type) {
-            throw new \LogicException('Closure::call() called without $this');
-        }
-        $state = ClosureSupport::requireClosureState(
-            $receiver->toObject(),
-            'Closure::call()'
-        );
-        $invokeArgs = \array_slice($frame->calledArgs, 2);
+        [$state, $newThis, $invokeArgs] = self::resolveCallOperands($frame);
         $result = ClosureSupport::call(
             $frame->vmContext,
             $state,
-            $frame->calledArgs[1],
+            $newThis,
             $invokeArgs
         );
         if (null === $frame->returnVar) {
             return;
         }
         $frame->returnVar->copyFrom($result);
+    }
+
+    /**
+     * Static Closure::call($closure, $obj, ...) vs $closure->call($obj, ...) (#4927, #6411).
+     *
+     * @return array{0: ClosureState, 1: Variable, 2: list<Variable>}
+     */
+    private static function resolveCallOperands(Frame $frame): array
+    {
+        $args = $frame->calledArgs;
+        $closureArg = $args[0]->resolveIndirect();
+        if (
+            Variable::TYPE_OBJECT === $closureArg->type
+            && null !== $closureArg->toObject()->closureState
+        ) {
+            if (\count($args) < 2) {
+                throw new \ArgumentCountError(
+                    'Closure::call() expects at least 2 arguments, '.\count($args).' given'
+                );
+            }
+
+            return [
+                ClosureSupport::requireClosureState($closureArg->toObject(), 'Closure::call()'),
+                $args[1],
+                \array_slice($args, 2),
+            ];
+        }
+        if (!empty($frame->callArgs)) {
+            $receiver = $frame->callArgs[0]->resolveIndirect();
+            if (
+                Variable::TYPE_OBJECT === $receiver->type
+                && null !== $receiver->toObject()->closureState
+            ) {
+                if (\count($args) < 1) {
+                    throw new \ArgumentCountError(
+                        'Closure::call() expects at least 1 argument, '.\count($args).' given'
+                    );
+                }
+
+                return [
+                    ClosureSupport::requireClosureState($receiver->toObject(), 'Closure::call()'),
+                    $args[0],
+                    \array_slice($args, 1),
+                ];
+            }
+        }
+        throw new \LogicException('Closure::call() called without closure receiver');
     }
 }
