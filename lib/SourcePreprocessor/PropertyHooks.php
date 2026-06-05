@@ -194,9 +194,14 @@ final class PropertyHooks
                 $rest = preg_replace('/^set\s*=>\s*/', '', $rest, 1) ?? $rest;
                 [$expr, $rest] = $this->takeUntilSemicolon($rest);
                 $expr = rtrim($expr);
-                $backing = $isStatic ? 'self::$'.$prop : '$this->'.$prop;
-                $usesBacking = true;
-                $body = '{ '.$backing.' = ('.$expr.'); }';
+                if ($this->setArrowExprUsesStatementForm($expr, $isStatic)) {
+                    $usesBacking = $usesBacking || $this->hookTouchesBacking($expr, $prop, $isStatic);
+                    $body = '{ '.$expr.'; }';
+                } else {
+                    $backing = $isStatic ? 'self::$'.$prop : '$this->'.$prop;
+                    $usesBacking = true;
+                    $body = '{ '.$backing.' = ('.$expr.'); }';
+                }
                 $method = self::SET_METHOD_PREFIX.$prop;
                 $methods[] = $this->hookMethodDecl($isStatic, $method, '$value', $body);
                 $this->registerHook($lcClass, $prop, 'set', $method, $isStatic);
@@ -229,6 +234,20 @@ final class PropertyHooks
             : '/\$this->'.preg_quote($prop, '/').'\b/';
 
         return (bool) preg_match($pattern, $source);
+    }
+
+    /** Zend short set => expr: assignment statements run as-is; other exprs assign to backing (#6424). */
+    private function setArrowExprUsesStatementForm(string $expr, bool $isStatic): bool
+    {
+        $expr = ltrim($expr);
+        if (preg_match('/^\$this->\w+\s*=/', $expr)) {
+            return true;
+        }
+        if ($isStatic && preg_match('/^self::\$\w+\s*=/', $expr)) {
+            return true;
+        }
+
+        return false;
     }
 
     private function hookMethodDecl(bool $isStatic, string $method, string $params, string $body): string

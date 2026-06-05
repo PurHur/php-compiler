@@ -113,6 +113,24 @@ PHP;
         self::assertSame('__phpc_property_get_x', $registry['t']['x']['get'] ?? null);
     }
 
+    public function testLowersSetArrowAssignmentToSeparateBackingField(): void
+    {
+        $src = <<<'PHP'
+<?php
+class H {
+    public int $x {
+        get => $this->v;
+        set => $this->v = $value;
+    }
+    private int $v = 1;
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('$this->v = $value;', $out);
+        self::assertStringNotContainsString('$this->x =', $out);
+        self::assertTrue($registry['h']['x']['virtual'] ?? false);
+    }
+
     public function testLowersStaticPropertyHooksAsStaticMethods(): void
     {
         $src = <<<'PHP'
