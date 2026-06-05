@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -35,8 +36,8 @@ final class str_ends_with extends Internal
             return;
         }
         $frame->returnVar->bool(VmString::endsWith(
-            VmString::coerceOperand($haystack),
-            VmString::coerceOperand($needle)
+            VmString::coerceStringBuiltinArg($haystack, 'str_ends_with', 0, 'haystack'),
+            VmString::coerceStringBuiltinArg($needle, 'str_ends_with', 1, 'needle')
         ));
     }
 
@@ -48,8 +49,8 @@ final class str_ends_with extends Internal
         if (2 !== count($args)) {
             throw new \LogicException('str_ends_with() requires exactly two arguments');
         }
-        $hay = $this->jitString($context, $args[0], 'str_ends_with() argument #1');
-        $needle = $this->jitString($context, $args[1], 'str_ends_with() argument #2');
+        $hay = JitStringBuiltinArg::lower($context, $args[0], 'str_ends_with', 0, 'haystack');
+        $needle = JitStringBuiltinArg::lower($context, $args[1], 'str_ends_with', 1, 'needle');
         $hayMap = $context->structFieldMap[$hay->typeOf()->getElementType()->getName()];
         $needleMap = $context->structFieldMap[$needle->typeOf()->getElementType()->getName()];
         $hayLen = $context->builder->load($context->builder->structGep($hay, $hayMap['length']));
