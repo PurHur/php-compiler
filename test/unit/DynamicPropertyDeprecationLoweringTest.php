@@ -45,5 +45,6 @@ PHP,
         );
         $this->assertNotNull($block);
         $this->assertFalse(Block::containsDynamicPropertyDeprecationOpcodes($block));
+        $this->assertFalse(Block::requiresVmLowering($block));
     }
 }

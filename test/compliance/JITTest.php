@@ -251,10 +251,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'named_args_variadic')) {
                 continue;
             }
-            // #[\AllowDynamicProperties] is VM-only until JIT class flag (#3467).
-            if (str_contains($name, 'allow_dynamic_properties')) {
-                continue;
-            }
             // E_DEPRECATED on stderr: DynamicPropertyDeprecatedJITTest (#5470, #4570).
             if (str_contains($name, 'dynamic_property_deprecation')) {
                 continue;
