@@ -17,6 +17,10 @@ use PhpParser\NodeVisitorAbstract;
 
 class MagicStringResolver extends NodeVisitorAbstract
 {
+    private const PROPERTY_GET_HOOK_PREFIX = '__phpc_property_get_';
+
+    private const PROPERTY_SET_HOOK_PREFIX = '__phpc_property_set_';
+
     protected $classStack = [];
 
     protected $parentStack = [];
@@ -24,6 +28,9 @@ class MagicStringResolver extends NodeVisitorAbstract
     protected $functionStack = [];
 
     protected $methodStack = [];
+
+    /** @var list<string> */
+    protected $propertyStack = [];
 
     /** @var list<string> */
     protected $namespaceStack = [];
@@ -76,6 +83,16 @@ class MagicStringResolver extends NodeVisitorAbstract
             $this->functionStack[] = $node->namespacedName->toString();
         } elseif ($node instanceof Node\Stmt\ClassMethod) {
             $this->methodStack[] = end($this->classStack).'::'.$node->name;
+            $prop = $this->propertyNameFromHookMethod($node->name->name);
+            if (null !== $prop) {
+                $this->propertyStack[] = $prop;
+            }
+        } elseif ($node instanceof Node\Expr\ConstFetch) {
+            if ('__property__' === strtolower($node->name->toString())) {
+                $name = '' !== $this->propertyStack ? end($this->propertyStack) : '';
+
+                return new Node\Scalar\String_($name, $node->getAttributes());
+            }
         } elseif ($node instanceof Node\Name) {
             switch (strtolower($node->toString())) {
                 case 'self':
@@ -142,7 +159,22 @@ class MagicStringResolver extends NodeVisitorAbstract
         } elseif ($node instanceof Node\Stmt\ClassMethod) {
             assert(end($this->methodStack) === end($this->classStack).'::'.$node->name);
             array_pop($this->methodStack);
+            if (null !== $this->propertyNameFromHookMethod($node->name->name)) {
+                array_pop($this->propertyStack);
+            }
         }
+    }
+
+    private function propertyNameFromHookMethod(string $method): ?string
+    {
+        $lc = strtolower($method);
+        foreach ([self::PROPERTY_GET_HOOK_PREFIX, self::PROPERTY_SET_HOOK_PREFIX] as $prefix) {
+            if (str_starts_with($lc, $prefix)) {
+                return substr($method, strlen($prefix));
+            }
+        }
+
+        return null;
     }
 
     private function stripClass($class)

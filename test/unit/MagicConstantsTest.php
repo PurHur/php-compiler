@@ -25,6 +25,20 @@ PHP;
         $this->assertSame('C::id', $this->runVm($code));
     }
 
+    public function testPropertyMagicConstInHook(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public string $p {
+        get => __PROPERTY__;
+    }
+}
+echo (new C)->p;
+PHP;
+        $this->assertSame('p', $this->runVm($code));
+    }
+
     public function testNamespaceAndClass(): void
     {
         $code = <<<'PHP'
