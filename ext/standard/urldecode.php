@@ -7,7 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -19,14 +21,16 @@ final class urldecode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('urldecode() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('urldecode() only supports strings in this compiler build');
-        }
-        $frame->returnVar->string(VmString::urldecode($v->toString()));
+        $subject = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'urldecode',
+            0,
+            'string'
+        );
+        BuiltinExecute::writeReturn(
+            $frame,
+            static fn (Variable $ret) => $ret->string(VmString::urldecode($subject))
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -35,7 +39,9 @@ final class urldecode extends Internal
             throw new \LogicException('urldecode() requires exactly one argument');
         }
 
-        return JitUrlencode::urldecode($context, $this->jitString($context, $args[0], 'urldecode() argument #1'));
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'urldecode', 0, 'string');
+
+        return JitUrlencode::urldecode($context, $str);
     }
 
 }
