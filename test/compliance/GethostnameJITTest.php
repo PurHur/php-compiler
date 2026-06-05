@@ -22,6 +22,10 @@ final class GethostnameJITTest extends BaseTest
             __DIR__.'/cases/stdlib/gethostname_jit.phpt',
             'gethostname_jit.phpt'
         );
+        yield 'gethostname_argc_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/gethostname_argc_jit.phpt',
+            'gethostname_argc_jit.phpt'
+        );
     }
 
     public function setUp(): void
