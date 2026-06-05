@@ -15,8 +15,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\MathBaseConvert;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -31,11 +31,8 @@ final class hexdec extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('hexdec() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('hexdec() only supports strings in this compiler build');
-        }
-        VmMath::assignRadixToReturn($frame->returnVar, $v->toString(), 16);
+        $hexString = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hexdec', 0, 'hex_string');
+        VmMath::assignRadixToReturn($frame->returnVar, $hexString, 16);
     }
 
     public Context $context;
@@ -49,7 +46,10 @@ final class hexdec extends Internal
 
         return MathBaseConvert::baseToZvalCall(
             $context,
-            $this->stringDataPtr($context, $this->jitString($context, $args[0], 'hexdec() argument #1')),
+            $this->stringDataPtr(
+                $context,
+                JitStringBuiltinArg::lower($context, $args[0], 'hexdec', 0, 'hex_string')
+            ),
             16
         );
     }
