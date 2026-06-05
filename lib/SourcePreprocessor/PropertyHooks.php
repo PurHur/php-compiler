@@ -175,6 +175,7 @@ final class PropertyHooks
                 $rest = preg_replace('/^get\s*=>\s*/', '', $rest, 1) ?? $rest;
                 [$expr, $rest] = $this->takeUntilSemicolon($rest);
                 $usesBacking = $usesBacking || $this->hookTouchesBacking($expr, $prop, $isStatic);
+                $this->registerHookBacking($lcClass, $prop, 'get', $expr, $isStatic);
                 $body = '{ return '.$expr.'; }';
                 $method = self::GET_METHOD_PREFIX.$prop;
                 $methods[] = $this->hookMethodDecl($isStatic, $method, '', $body);
@@ -196,6 +197,7 @@ final class PropertyHooks
                 $expr = rtrim($expr);
                 if ($this->setArrowExprUsesStatementForm($expr, $isStatic)) {
                     $usesBacking = $usesBacking || $this->hookTouchesBacking($expr, $prop, $isStatic);
+                    $this->registerHookBacking($lcClass, $prop, 'set', $expr, $isStatic);
                     $body = '{ '.$expr.'; }';
                 } else {
                     $backing = $isStatic ? 'self::$'.$prop : '$this->'.$prop;
@@ -271,6 +273,32 @@ final class PropertyHooks
         $this->registry[$lcClass][$prop][$kind] = $method;
         if ($isStatic) {
             $this->registry[$lcClass][$prop]['static'] = true;
+        }
+    }
+
+    /**
+     * Record `$this->field` / `self::$field` read/write targets for foreach-by-ref (#6435).
+     *
+     * @param 'get'|'set' $kind
+     */
+    private function registerHookBacking(string $lcClass, string $prop, string $kind, string $expr, bool $isStatic): void
+    {
+        $expr = trim($expr);
+        if ($isStatic) {
+            if (preg_match('/^self::\$(\w+)\s*(?:=\s*|$)/', $expr, $m)) {
+                $key = 'get' === $kind ? 'getBacking' : 'setBacking';
+                $this->registry[$lcClass][$prop][$key] = $m[1];
+            }
+
+            return;
+        }
+        if ('get' === $kind && preg_match('/^\$this->(\w+)$/', $expr, $m)) {
+            $this->registry[$lcClass][$prop]['getBacking'] = $m[1];
+
+            return;
+        }
+        if ('set' === $kind && preg_match('/^\$this->(\w+)\s*=/', $expr, $m)) {
+            $this->registry[$lcClass][$prop]['setBacking'] = $m[1];
         }
     }
 

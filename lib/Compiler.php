@@ -78,6 +78,8 @@ class Compiler {
     private array $bareRethrowLines = [];
     /** Trailing source bytes after __halt_compiler(); (issue #3479). */
     private ?string $haltCompilerRemaining = null;
+    /** {@see OpCode::ASSIGN_REF_FOREACH_PROPERTY_HOOK} for the next AssignRef compile (#6435). */
+    private int $assignRefBindRefFlags = 0;
 
     /** Byte offset where halt trailing data starts; null when no __halt_compiler() (#5455). */
     private ?int $haltCompilerOffset = null;
@@ -1222,7 +1224,15 @@ class Compiler {
                             $block = $echoBlock;
                             break;
                         }
+                        $savedAssignRefFlags = $this->assignRefBindRefFlags;
+                        if (
+                            $child instanceof Op\Expr\AssignRef
+                            && $this->isForeachPropertyHookAssignRefPair($ops, $i)
+                        ) {
+                            $this->assignRefBindRefFlags = OpCode::ASSIGN_REF_FOREACH_PROPERTY_HOOK;
+                        }
                         $this->compileOp($child, $block);
+                        $this->assignRefBindRefFlags = $savedAssignRefFlags;
                     }
             }
         }
@@ -1255,6 +1265,46 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * foreach ($iterable as &$obj->hookedProp) — Iterator\\Value [, PropertyFetch] AssignRef (#6435).
+     *
+     * @param Op[] $ops
+     */
+    private function isForeachPropertyHookAssignRefPair(array $ops, int $assignIndex): bool
+    {
+        if (!isset($ops[$assignIndex]) || !$ops[$assignIndex] instanceof Op\Expr\AssignRef) {
+            return false;
+        }
+        /** @var Op\Expr\AssignRef $assign */
+        $assign = $ops[$assignIndex];
+        $cursor = $assignIndex - 1;
+        if ($cursor >= 0 && $this->isListDestructPropertyFetchStmt($ops[$cursor])) {
+            --$cursor;
+        }
+        if ($cursor < 0 || !$ops[$cursor] instanceof Op\Iterator\Value) {
+            return false;
+        }
+        /** @var Op\Iterator\Value $iter */
+        $iter = $ops[$cursor];
+
+        return $iter->byRef
+            && $iter->result === $assign->expr
+            && (
+                $this->operandIsPropertyWriteTarget($assign->var)
+                || ($assignIndex > 0 && $this->isListDestructPropertyFetchStmt($ops[$assignIndex - 1]))
+            );
+    }
+
+    private function operandIsPropertyWriteTarget(Operand $operand): bool
+    {
+        while ($operand instanceof Operand\Temporary && null !== $operand->original) {
+            $operand = $operand->original;
+        }
+
+        return $operand instanceof Op\Expr\PropertyFetch
+            || $operand instanceof Op\Expr\StaticPropertyFetch;
     }
 
     /**
@@ -4964,6 +5014,8 @@ class Compiler {
                 if (null !== $arrayLiteral) {
                     // Zend zend_compile_list_assign: ref target from inline array literal (#3799).
                     $bindRefFlags = 1;
+                } elseif (0 !== $this->assignRefBindRefFlags) {
+                    $bindRefFlags = $this->assignRefBindRefFlags;
                 }
                 $ops = [new OpCode(
                     OpCode::TYPE_ASSIGN_REF,

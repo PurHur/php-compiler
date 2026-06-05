@@ -1345,7 +1345,7 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
-                    if (null !== $op->arg3 && 0 !== (int) $op->arg3) {
+                    if (null !== $op->arg3 && 1 === (int) $op->arg3) {
                         $catchFrame = $this->dispatchVmError(
                             'Cannot assign reference to non referenceable value',
                             $frame
@@ -1384,6 +1384,40 @@ restart:
                     // ArrayDimFetch / property fetch temps are indirect to live storage; write the
                     // reference into that cell instead of redirecting the temp (#5349).
                     $writeTarget = $lhs->isIndirect() ? $lhs->directIndirectTarget() : $lhs;
+                    if (
+                        null !== $op->arg3
+                        && OpCode::ASSIGN_REF_FOREACH_PROPERTY_HOOK === (int) $op->arg3
+                    ) {
+                        $lhsHookRefLvalue = $this->resolvePropertyHookRefWriteLvalue($lhs, $frame);
+                        if (null === $lhsHookRefLvalue) {
+                            $hookTarget = $writeTarget->resolveIndirect();
+                            $owner = $hookTarget->objectPropertyOwner;
+                            $propName = $hookTarget->objectPropertyName;
+                            if (null !== $owner && null !== $propName) {
+                                $proxy = new Variable();
+                                $proxy->objectPropertyOwner = $owner;
+                                $proxy->objectPropertyName = $propName;
+                                $lhsHookRefLvalue = $proxy;
+                            }
+                        }
+                        if (null !== $lhsHookRefLvalue) {
+                            if (!$this->propertyWriteHasSetHook($lhsHookRefLvalue)) {
+                                $catchFrame = $this->enforceVirtualPropertyHookWrite($lhsHookRefLvalue, $frame);
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                break;
+                            }
+                            // Zend FE_FETCH_R: iteration value to hook backing; in-loop writes use hooks (#6435).
+                            $this->writeHookedPropertyForeachIterationValue(
+                                $lhsHookRefLvalue,
+                                $rhs,
+                                $frame
+                            );
+                        }
+                        break;
+                    }
                     // Zend: Class::$prop = &Class::$prop stores NULL, not a circular ref (#5405).
                     if ($writeTarget === $rhs && $this->isStaticPropertyStorageCell($writeTarget)) {
                         $writeTarget->null();
@@ -5759,6 +5793,41 @@ restart:
         }
 
         return $operand;
+    }
+
+    /**
+     * foreach ($iterable as &$obj->hooked) — write iteration scalar to hook backing without set hook (#6435).
+     */
+    private function writeHookedPropertyForeachIterationValue(
+        Variable $writeLvalue,
+        Variable $value,
+        Frame $frame,
+    ): void {
+        $owner = $this->resolvePropertyWriteOwner($writeLvalue);
+        $propName = $this->resolvePropertyWriteName($writeLvalue);
+        if (null === $owner || null === $propName) {
+            $this->stablePropertyHookRefWriteLvalue($writeLvalue)->copyFrom($value->resolveIndirect());
+
+            return;
+        }
+        $lcClass = strtolower($owner->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+        $backingName = is_array($propMeta)
+            ? ($propMeta['getBacking'] ?? $propMeta['setBacking'] ?? null)
+            : null;
+        if (null !== $backingName && $owner->hasProperty($backingName)) {
+            $owner->getProperty($backingName)->copyFrom($value->resolveIndirect());
+
+            return;
+        }
+        if ($owner->hasProperty($propName)) {
+            $owner->getProperty($propName)->copyFrom($value->resolveIndirect());
+
+            return;
+        }
+        $this->stablePropertyHookRefWriteLvalue($writeLvalue)->copyFrom($value->resolveIndirect());
     }
 
     private function propertyWriteHasSetHook(Variable $lvalue): bool

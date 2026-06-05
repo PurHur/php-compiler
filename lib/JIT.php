@@ -5037,8 +5037,14 @@ class JIT {
                     }
                     break;  
                 case OpCode::TYPE_ASSIGN_REF:
-                    if (null !== $op->arg3 && 0 !== (int) $op->arg3) {
+                    if (null !== $op->arg3 && 1 === (int) $op->arg3) {
                         throw new \LogicException('Cannot assign reference to non referenceable value');
+                    }
+                    if (
+                        null !== $op->arg3
+                        && OpCode::ASSIGN_REF_FOREACH_PROPERTY_HOOK === (int) $op->arg3
+                    ) {
+                        break;
                     }
                     $destOp = $block->getOperand($op->arg1);
                     $srcOp = $block->getOperand($op->arg2);
