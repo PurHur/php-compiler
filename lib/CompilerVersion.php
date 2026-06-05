@@ -24,4 +24,10 @@ final class CompilerVersion
     {
         return version_compare(self::VERSION, '8.3', '>=');
     }
+
+    /** PHP 8.3+ #[\Override] builtin attribute class (Zend/zend_attributes.c, issue #6303). */
+    public static function supportsOverrideAttribute(): bool
+    {
+        return version_compare(self::VERSION, '8.3', '>=');
+    }
 }

@@ -6,17 +6,24 @@ namespace PHPCompiler\VM;
 
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\Compiler\AttributeEntry;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\Builtin\AttributeConstruct;
 use PHPCompiler\VM\Builtin\OverrideConstruct;
 
 /**
- * Builtin Attribute / Override classes (Zend zend_attributes.c, issues #5142, #5937).
+ * Builtin Attribute / Override classes (Zend zend_attributes.c, issues #5142, #5937, #6303).
  */
 final class AttributeSupport
 {
     public const CLASS_ATTRIBUTE = 'attribute';
 
     public const CLASS_OVERRIDE = 'override';
+
+    public const CLASS_RETURN_TYPE_WILL_CHANGE = 'returntypewillchange';
+
+    public const CLASS_ALLOW_DYNAMIC_PROPERTIES = 'allowdynamicproperties';
+
+    public const CLASS_SENSITIVE_PARAMETER = 'sensitiveparameter';
 
     /** Zend ZEND_ATTRIBUTE_TARGET_* flags (zend_attributes.h). */
     public const TARGET_CLASS = 1;
@@ -40,9 +47,19 @@ final class AttributeSupport
     public static function register(Context $ctx): void
     {
         self::registerAttribute($ctx);
-        self::registerOverride($ctx);
+        self::registerReturnTypeWillChange($ctx);
+        self::registerAllowDynamicProperties($ctx);
+        self::registerSensitiveParameter($ctx);
+        if (CompilerVersion::supportsOverrideAttribute()) {
+            self::registerOverride($ctx);
+        }
         $ctx->classes[self::CLASS_ATTRIBUTE]->isInternal = true;
-        $ctx->classes[self::CLASS_OVERRIDE]->isInternal = true;
+        $ctx->classes[self::CLASS_RETURN_TYPE_WILL_CHANGE]->isInternal = true;
+        $ctx->classes[self::CLASS_ALLOW_DYNAMIC_PROPERTIES]->isInternal = true;
+        $ctx->classes[self::CLASS_SENSITIVE_PARAMETER]->isInternal = true;
+        if (CompilerVersion::supportsOverrideAttribute()) {
+            $ctx->classes[self::CLASS_OVERRIDE]->isInternal = true;
+        }
     }
 
     private static function registerAttribute(Context $ctx): void
@@ -83,22 +100,65 @@ final class AttributeSupport
         $ctx->classes[self::CLASS_ATTRIBUTE] = $entry;
     }
 
+    private static function registerReturnTypeWillChange(Context $ctx): void
+    {
+        self::registerBuiltinAttributeClass(
+            $ctx,
+            'ReturnTypeWillChange',
+            self::CLASS_RETURN_TYPE_WILL_CHANGE,
+            self::TARGET_METHOD
+        );
+    }
+
+    private static function registerAllowDynamicProperties(Context $ctx): void
+    {
+        self::registerBuiltinAttributeClass(
+            $ctx,
+            'AllowDynamicProperties',
+            self::CLASS_ALLOW_DYNAMIC_PROPERTIES,
+            self::TARGET_CLASS
+        );
+    }
+
+    private static function registerSensitiveParameter(Context $ctx): void
+    {
+        self::registerBuiltinAttributeClass(
+            $ctx,
+            'SensitiveParameter',
+            self::CLASS_SENSITIVE_PARAMETER,
+            self::TARGET_PARAMETER
+        );
+    }
+
     private static function registerOverride(Context $ctx): void
     {
+        self::registerBuiltinAttributeClass(
+            $ctx,
+            'Override',
+            self::CLASS_OVERRIDE,
+            self::TARGET_METHOD | self::TARGET_PROPERTY
+        );
+    }
+
+    private static function registerBuiltinAttributeClass(
+        Context $ctx,
+        string $name,
+        string $lcKey,
+        int $targets
+    ): void {
         $pub = CfgFunc::FLAG_PUBLIC;
 
-        $entry = new ClassEntry('Override');
+        $entry = new ClassEntry($name);
         $entry->parentLc = self::CLASS_ATTRIBUTE;
         $entry->constructor = new OverrideConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
 
-        $targets = self::TARGET_METHOD | self::TARGET_PROPERTY;
         $entry->attributeNames = ['Attribute'];
         $entry->attributeEntries = [
             new AttributeEntry('Attribute', [['name' => null, 'value' => $targets]]),
         ];
 
-        $ctx->classes[self::CLASS_OVERRIDE] = $entry;
+        $ctx->classes[$lcKey] = $entry;
     }
 }
