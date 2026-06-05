@@ -25,4 +25,18 @@ PHP;
         $rt->run($block);
         $this->assertSame("B\nB\n0", ob_get_clean());
     }
+
+    public function testVmGetParentClassEnumCaseReturnsFalse(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: string { case A = 'x'; }
+var_export(get_parent_class(E::A));
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'get_parent_class_enum.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('false', ob_get_clean());
+    }
 }

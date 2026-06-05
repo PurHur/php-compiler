@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -33,8 +34,18 @@ final class get_parent_class_ extends Internal
         }
         $ctx = VmReflection::requireContext($frame);
         $arg = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_ENUM_CASE === $arg->type) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
         $entry = null;
         if (Variable::TYPE_OBJECT === $arg->type) {
+            if (EnumCaseSupport::isEnumCase($arg->toObject())) {
+                $frame->returnVar->bool(false);
+
+                return;
+            }
             $entry = $arg->toObject()->class;
         } elseif (Variable::TYPE_STRING === $arg->type) {
             VmReflection::stringArg($arg, 'get_parent_class() class name');
