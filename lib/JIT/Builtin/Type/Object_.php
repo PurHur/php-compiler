@@ -1776,8 +1776,7 @@ class Object_ extends Type {
         $names = [];
         foreach (array_keys($this->classes) as $classLc) {
             if (isset($this->interfaceClassLcs[$classLc])
-                || isset($this->traitClassLcs[$classLc])
-                || isset($this->enums[$classLc])) {
+                || isset($this->traitClassLcs[$classLc])) {
                 continue;
             }
             $resolved = null;

@@ -117,7 +117,7 @@ final class VmReflection
     {
         $result = new \PHPCompiler\VM\HashTable();
         foreach ($ctx->classes as $lc => $entry) {
-            if ($entry->isInterface || $entry->isTrait || $entry->isEnum || isset($ctx->classAliases[$lc])) {
+            if ($entry->isInterface || $entry->isTrait || isset($ctx->classAliases[$lc])) {
                 continue;
             }
             $value = new Variable();
