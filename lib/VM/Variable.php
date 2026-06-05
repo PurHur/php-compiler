@@ -2127,6 +2127,11 @@ restart:
                         'Cannot increment '.self::operandEnumClassName($this)
                     );
                 }
+                if (self::TYPE_OBJECT === $this->type) {
+                    throw new \TypeError(
+                        'Cannot increment '.$this->object->class->name
+                    );
+                }
                 $one = new self();
                 $one->int(1);
                 $this->numericOp(OpCode::TYPE_PLUS, $this, $one);
@@ -2171,6 +2176,11 @@ restart:
                 if (self::isEnumCaseOperand($this)) {
                     throw new \TypeError(
                         'Cannot decrement '.self::operandEnumClassName($this)
+                    );
+                }
+                if (self::TYPE_OBJECT === $this->type) {
+                    throw new \TypeError(
+                        'Cannot decrement '.$this->object->class->name
                     );
                 }
                 $one = new self();
