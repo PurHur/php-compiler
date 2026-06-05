@@ -20,6 +20,10 @@ final class LevenshteinJITTest extends BaseTest
             __DIR__.'/cases/stdlib/levenshtein_jit.phpt',
             'levenshtein_jit.phpt'
         );
+        yield 'levenshtein_enum_case_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/levenshtein_enum_case_jit.phpt',
+            'levenshtein_enum_case_jit.phpt'
+        );
     }
 
     public function setUp(): void
