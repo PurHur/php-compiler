@@ -326,6 +326,28 @@ int __compiler_fflush(int64_t handle)
     return fflush(fp) == 0 ? 1 : 0;
 }
 
+int __compiler_fsync(int64_t handle)
+{
+    FILE *fp = phpc_resolve_stream(handle);
+    int fd;
+
+    if (NULL == fp) {
+        return 0;
+    }
+    if (0 != fflush(fp)) {
+        return 0;
+    }
+    fd = fileno(fp);
+    if (fd < 0) {
+        return 0;
+    }
+#if defined(_WIN32)
+    return _commit(fd) == 0 ? 1 : 0;
+#else
+    return fsync(fd) == 0 ? 1 : 0;
+#endif
+}
+
 int64_t __compiler_stream_set_chunk_size(int64_t handle, int64_t chunk_size)
 {
     int previous;

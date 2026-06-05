@@ -572,6 +572,17 @@ final class VmFs
         return @\fflush($fp);
     }
 
+    /** fsync() — flush buffers and sync to disk (php-src ext/standard/streamsfuncs.c, #6062). */
+    public static function fsync(int $handle): bool
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+
+        return @\fsync($fp);
+    }
+
     /**
      * stream_set_chunk_size() — php-src ext/standard/streams.c (issue #3754).
      *

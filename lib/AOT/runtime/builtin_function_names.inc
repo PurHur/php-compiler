@@ -126,6 +126,7 @@ static const char *phpc_builtin_functions[] = {
     "fdiv",
     "feof",
     "fflush",
+    "fsync",
     "fgetc",
     "fgetcsv",
     "fgets",
