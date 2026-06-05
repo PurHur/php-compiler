@@ -608,17 +608,6 @@ class Type extends Builtin {
         $fntypeStrtrArray = $this->context->context->functionType($strPtr, false, $strPtr, $htPtr);
         $fnStrtrArray = $this->context->module->addFunction('__compiler_strtr_array', $fntypeStrtrArray);
         $this->context->registerFunction('__compiler_strtr_array', $fnStrtrArray);
-        $fntypeMergeRecursiveOverlay = $this->context->context->functionType(
-            $this->context->getTypeFromString('void'),
-            false,
-            $htPtr,
-            $htPtr
-        );
-        $fnMergeRecursiveOverlay = $this->context->module->addFunction(
-            '__compiler_array_merge_recursive_overlay',
-            $fntypeMergeRecursiveOverlay
-        );
-        $this->context->registerFunction('__compiler_array_merge_recursive_overlay', $fnMergeRecursiveOverlay);
         $fntypeUuencode = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnUuencode = $this->context->module->addFunction('__compiler_convert_uuencode', $fntypeUuencode);
         $this->context->registerFunction('__compiler_convert_uuencode', $fnUuencode);

@@ -5310,10 +5310,433 @@ final class ArrayBuiltinHelper
         $result = HashTableHelper::alloc($context);
         self::overlayHashTable($context, $result, $hts[0]);
         for ($i = 1, $n = \count($hts); $i < $n; ++$i) {
-            \PHPCompiler\ext\standard\JitArrayMergeRecursive::overlay($context, $result, $hts[$i]);
+            self::mergeRecursiveOverlay($context, $result, $hts[$i]);
         }
 
         return $result;
+    }
+
+    /**
+     * array_merge_recursive() overlay — deep merge with scalar→array promotion (#3297, #6177).
+     *
+     * php-src: ext/standard/array.c — php_array_merge_recursive()
+     */
+    public static function mergeRecursiveOverlay(Context $context, Value $dest, Value $src): void
+    {
+        self::mergeRecursiveOverlayPackedIndices($context, $dest, $src);
+        self::mergeRecursiveOverlayStringKeys($context, $dest, $src);
+    }
+
+    /**
+     * Append packed-index entries from {@param $src} onto {@param $dest}.
+     */
+    private static function mergeRecursiveOverlayPackedIndices(
+        Context $context,
+        Value $dest,
+        Value $src
+    ): void {
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+
+        $nextFree = $context->builder->load($context->builder->structGep($src, $map['nextFreeElement']));
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_merge_rec_packed_idx');
+        $context->builder->store($zero, $idxSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_merge_rec_packed_head');
+        $body = BasicBlockHelper::append($context, 'array_merge_rec_packed_body');
+        $append = BasicBlockHelper::append($context, 'array_merge_rec_packed_append');
+        $next = BasicBlockHelper::append($context, 'array_merge_rec_packed_next');
+        $done = BasicBlockHelper::append($context, 'array_merge_rec_packed_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $idx
+        );
+        $context->builder->branchIf($isSet, $append, $next);
+
+        $context->builder->positionAtEnd($append);
+        self::appendValueEntryToPacked(
+            $context,
+            $dest,
+            self::listEntryAt($context, $src, $idx)
+        );
+        $context->builder->branch($next);
+
+        $context->builder->positionAtEnd($next);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    /**
+     * Merge string-key entries from {@param $src} into {@param $dest} recursively.
+     */
+    private static function mergeRecursiveOverlayStringKeys(
+        Context $context,
+        Value $dest,
+        Value $src
+    ): void {
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+
+        $strInit = BasicBlockHelper::append($context, 'array_merge_rec_str_init');
+        $strHead = BasicBlockHelper::append($context, 'array_merge_rec_str_head');
+        $context->builder->branch($strInit);
+
+        $context->builder->positionAtEnd($strInit);
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_merge_rec_str_walk');
+        $head = $context->builder->load($context->builder->structGep($src, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+        $strBody = BasicBlockHelper::append($context, 'array_merge_rec_str_body');
+        $strSet = BasicBlockHelper::append($context, 'array_merge_rec_str_set');
+        $strNext = BasicBlockHelper::append($context, 'array_merge_rec_str_next');
+        $strDone = BasicBlockHelper::append($context, 'array_merge_rec_str_done');
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $strDone, $strBody);
+
+        $context->builder->positionAtEnd($strBody);
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $context->builder->branch($strSet);
+
+        $context->builder->positionAtEnd($strSet);
+        self::mergeRecursiveMergeStringKey($context, $dest, $keyStr, $valEntry);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strNext);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strDone);
+    }
+
+    private static function mergeRecursiveMergeStringKey(
+        Context $context,
+        Value $dest,
+        Value $keyStr,
+        Value $overlayValEntry
+    ): void {
+        $valuePtrType = $context->getTypeFromString('__value__*');
+        $valueMap = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $htType = Variable::TYPE_HASHTABLE;
+
+        $existingPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__peekStringKeyValue'),
+            $dest,
+            $keyStr
+        );
+        $existingNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $existingPtr,
+            $valuePtrType->constNull()
+        );
+
+        $addNew = BasicBlockHelper::append($context, 'array_merge_rec_skey_add');
+        $merge = BasicBlockHelper::append($context, 'array_merge_rec_skey_merge');
+        $done = BasicBlockHelper::append($context, 'array_merge_rec_skey_done');
+        $context->builder->branchIf($existingNull, $addNew, $merge);
+
+        $context->builder->positionAtEnd($addNew);
+        self::storeValueEntryAtStringKey($context, $dest, $keyStr, $overlayValEntry);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($merge);
+        $overlayIsHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($context->builder->structGep($overlayValEntry, $valueMap['type'])),
+            $i8->constInt($htType, false)
+        );
+        $existingIsHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($context->builder->structGep($existingPtr, $valueMap['type'])),
+            $i8->constInt($htType, false)
+        );
+        $bothHt = $context->builder->and($overlayIsHt, $existingIsHt);
+        $deepMerge = BasicBlockHelper::append($context, 'array_merge_rec_skey_deep');
+        $combine = BasicBlockHelper::append($context, 'array_merge_rec_skey_combine');
+        $context->builder->branchIf($bothHt, $deepMerge, $combine);
+
+        $context->builder->positionAtEnd($deepMerge);
+        $merged = HashTableHelper::alloc($context);
+        $existingHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $existingPtr
+        );
+        $overlayHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $overlayValEntry
+        );
+        self::mergeRecursiveOverlay($context, $merged, $existingHt);
+        self::mergeRecursiveOverlay($context, $merged, $overlayHt);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyHashtable'),
+            $dest,
+            $keyStr,
+            $merged
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($combine);
+        $combined = self::mergeRecursiveCombineValueEntries($context, $existingPtr, $overlayValEntry);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyHashtable'),
+            $dest,
+            $keyStr,
+            $combined
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    /**
+     * Promote colliding scalars to a packed list; returns a __hashtable__* (#3297).
+     */
+    private static function mergeRecursiveCombineValueEntries(
+        Context $context,
+        Value $existingEntry,
+        Value $overlayEntry
+    ): Value {
+        $valueMap = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $htPtrType = $context->getTypeFromString('__hashtable__*');
+        $htType = Variable::TYPE_HASHTABLE;
+
+        $existingIsHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($context->builder->structGep($existingEntry, $valueMap['type'])),
+            $i8->constInt($htType, false)
+        );
+        $overlayIsHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($context->builder->structGep($overlayEntry, $valueMap['type'])),
+            $i8->constInt($htType, false)
+        );
+        $bothHt = $context->builder->and($existingIsHt, $overlayIsHt);
+
+        $bothBlock = BasicBlockHelper::append($context, 'array_merge_rec_combine_both');
+        $afterBoth = BasicBlockHelper::append($context, 'array_merge_rec_combine_after_both');
+        $existingOnly = BasicBlockHelper::append($context, 'array_merge_rec_combine_existing_ht');
+        $afterBothOverlay = BasicBlockHelper::append($context, 'array_merge_rec_combine_after_existing');
+        $overlayOnly = BasicBlockHelper::append($context, 'array_merge_rec_combine_overlay_ht');
+        $scalar = BasicBlockHelper::append($context, 'array_merge_rec_combine_scalar');
+        $done = BasicBlockHelper::append($context, 'array_merge_rec_combine_done');
+        $context->builder->branchIf($bothHt, $bothBlock, $afterBoth);
+
+        $context->builder->positionAtEnd($bothBlock);
+        $combinedBoth = HashTableHelper::alloc($context);
+        $existingHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $existingEntry
+        );
+        $overlayHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $overlayEntry
+        );
+        self::mergeRecursiveOverlay($context, $combinedBoth, $existingHt);
+        self::mergeRecursiveOverlay($context, $combinedBoth, $overlayHt);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterBoth);
+        $context->builder->branchIf($existingIsHt, $existingOnly, $afterBothOverlay);
+
+        $context->builder->positionAtEnd($existingOnly);
+        $existingHtOnly = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $existingEntry
+        );
+        self::appendValueEntryToPacked($context, $existingHtOnly, $overlayEntry);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterBothOverlay);
+        $context->builder->branchIf($overlayIsHt, $overlayOnly, $scalar);
+
+        $context->builder->positionAtEnd($overlayOnly);
+        $combinedOverlay = HashTableHelper::alloc($context);
+        self::appendValueEntryToPacked($context, $combinedOverlay, $existingEntry);
+        $overlayHtOnly = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $overlayEntry
+        );
+        self::mergeRecursiveOverlay($context, $combinedOverlay, $overlayHtOnly);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($scalar);
+        $combinedScalar = HashTableHelper::alloc($context);
+        self::appendValueEntryToPacked($context, $combinedScalar, $existingEntry);
+        self::appendValueEntryToPacked($context, $combinedScalar, $overlayEntry);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $phi = $context->builder->phi($htPtrType);
+        $phi->addIncoming($combinedBoth, $bothBlock);
+        $phi->addIncoming($existingHtOnly, $existingOnly);
+        $phi->addIncoming($combinedOverlay, $overlayOnly);
+        $phi->addIncoming($combinedScalar, $scalar);
+
+        return $phi;
+    }
+
+    /**
+     * Append a __value__ list entry at dest->nextFreeElement (php_array_merge_recursive parity).
+     */
+    private static function appendValueEntryToPacked(
+        Context $context,
+        Value $dest,
+        Value $valEntry
+    ): void {
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $nextPtr = $context->builder->structGep($dest, $map['nextFreeElement']);
+        $index = $context->builder->load($nextPtr);
+        self::storeValueEntryAtIndexWithHashtable($context, $dest, $index, $valEntry);
+        $one = $sizeT->constInt(1, false);
+        $context->builder->store($context->builder->addNoSignedWrap($index, $one), $nextPtr);
+    }
+
+    private static function storeValueEntryAtIndexWithHashtable(
+        Context $context,
+        Value $dest,
+        Value $index,
+        Value $valEntry
+    ): void {
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+
+        $longBlock = BasicBlockHelper::append($context, 'array_merge_rec_val_long');
+        $stringBlock = BasicBlockHelper::append($context, 'array_merge_rec_val_string');
+        $doubleBlock = BasicBlockHelper::append($context, 'array_merge_rec_val_double');
+        $boolBlock = BasicBlockHelper::append($context, 'array_merge_rec_val_bool');
+        $htBlock = BasicBlockHelper::append($context, 'array_merge_rec_val_ht');
+        $nullBlock = BasicBlockHelper::append($context, 'array_merge_rec_val_null');
+        $done = BasicBlockHelper::append($context, 'array_merge_rec_val_done');
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
+        );
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+
+        $afterString = BasicBlockHelper::append($context, 'array_merge_rec_val_after_string');
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valEntry
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $dest,
+            $index,
+            $context->builder->call($context->lookupFunction('__string__separate'), $str)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $afterLong = BasicBlockHelper::append($context, 'array_merge_rec_val_after_long');
+        $context->builder->branchIf($isLong, $longBlock, $afterLong);
+
+        $context->builder->positionAtEnd($longBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setLongAt'),
+            $dest,
+            $index,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterLong);
+        $afterBool = BasicBlockHelper::append($context, 'array_merge_rec_val_after_bool');
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setBoolAt'),
+            $dest,
+            $index,
+            $context->builder->truncOrBitCast(
+                $context->builder->call($context->lookupFunction('__value__readLong'), $valEntry),
+                $context->getTypeFromString('int1')
+            )
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterBool);
+        $afterDouble = BasicBlockHelper::append($context, 'array_merge_rec_val_after_double');
+        $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setDoubleAt'),
+            $dest,
+            $index,
+            $context->builder->call($context->lookupFunction('__value__readDouble'), $valEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $context->builder->branchIf($isHt, $htBlock, $nullBlock);
+
+        $context->builder->positionAtEnd($htBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setHashtableAt'),
+            $dest,
+            $index,
+            $context->builder->call($context->lookupFunction('__value__readHashtable'), $valEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setNullAt'),
+            $dest,
+            $index
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
     }
 
     /**
