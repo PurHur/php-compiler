@@ -602,6 +602,12 @@ class Type extends Builtin {
             $fntypePasswordNeedsRehash
         );
         $this->context->registerFunction('__compiler_password_needs_rehash', $fnPasswordNeedsRehash);
+        $fntypePasswordAlgos = $this->context->context->functionType($htPtr, false);
+        $fnPasswordAlgos = $this->context->module->addFunction(
+            '__compiler_password_algos',
+            $fntypePasswordAlgos
+        );
+        $this->context->registerFunction('__compiler_password_algos', $fnPasswordAlgos);
         $fntypeStrtr = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr);
         $fnStrtr = $this->context->module->addFunction('__compiler_strtr', $fntypeStrtr);
         $this->context->registerFunction('__compiler_strtr', $fnStrtr);

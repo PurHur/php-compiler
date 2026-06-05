@@ -1,6 +1,6 @@
 /*
- * password_hash() / password_verify() / password_get_info() / password_needs_rehash() for AOT/JIT.
- * PASSWORD_DEFAULT / PASSWORD_BCRYPT via libcrypt(3); no OpenSSL.
+ * password_hash() / password_verify() / password_get_info() / password_needs_rehash() /
+ * password_algos() for AOT/JIT. PASSWORD_DEFAULT / PASSWORD_BCRYPT via libcrypt(3); no OpenSSL.
  */
 
 #include <errno.h>
@@ -27,6 +27,7 @@ extern __hashtable__ *__value__readHashtable(__value__ *v);
 extern long long __value__readLong(__value__ *v);
 
 extern __string__ *__string__init(long long size, const char *value);
+extern void __hashtable__setStringAt(__hashtable__ *ht, size_t index, __string__ *val);
 
 static int pc_is_valid_salt_char(char c)
 {
@@ -334,6 +335,23 @@ static long long pc_bcrypt_cost_from_hash(const char *h, size_t len)
     }
 
     return cost;
+}
+
+__hashtable__ *__compiler_password_algos(void)
+{
+    static const char *algos[] = {"2y", NULL};
+    __hashtable__ *ht;
+    size_t i;
+
+    ht = __hashtable__alloc();
+    if (NULL == ht) {
+        return NULL;
+    }
+    for (i = 0; algos[i] != NULL; ++i) {
+        __hashtable__setStringAt(ht, i, pc_string_from_cstr(algos[i]));
+    }
+
+    return ht;
 }
 
 int __compiler_password_needs_rehash(__string__ *hash, int64_t algo, int64_t new_cost)

@@ -283,6 +283,7 @@ class Module extends ModuleAbstract
             new password_verify(),
             new password_get_info(),
             new password_needs_rehash(),
+            new password_algos(),
             new crypt(),
             new random_bytes(),
             new random_int(),

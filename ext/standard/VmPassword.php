@@ -58,6 +58,22 @@ final class VmPassword
         return \password_needs_rehash($hash, $algo, $options);
     }
 
+    /** password_algos() — host PHP for Zend parity (ext/standard/password.c, issue #6195). */
+    public static function algos(): HashTable
+    {
+        $ht = new HashTable();
+        foreach (\password_algos() as $algo) {
+            if (!\is_string($algo)) {
+                throw new \LogicException('password_algos() returned unexpected value type');
+            }
+            $var = new Variable();
+            $var->string($algo);
+            $ht->append($var);
+        }
+
+        return $ht;
+    }
+
     /** @param array<string, mixed> $info */
     public static function infoToHashTable(array $info): HashTable
     {
