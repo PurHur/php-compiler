@@ -2120,21 +2120,28 @@ restart:
                     if (null !== $op->arg2) {
                         $exitArg = $frame->scope[$op->arg2];
                     }
+                    $savedCallSiteLine = $frame->callSiteLine;
+                    if (null !== $op->arg3 && $op->arg3 > 0) {
+                        $frame->callSiteLine = $op->arg3;
+                    }
                     try {
                         ext\standard\VmExit::terminate($exitArg, $frame);
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        $frame->callSiteLine = $savedCallSiteLine;
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
                         }
                     } catch (\Error $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        $frame->callSiteLine = $savedCallSiteLine;
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
                         }
                     }
+                    $frame->callSiteLine = $savedCallSiteLine;
                     break;
                 case OpCode::TYPE_JUMP:
                     $this->markFinallyCompletedWhenLeavingFinallyBody($frame);
@@ -4714,7 +4721,8 @@ restart:
 
     private function dispatchVmError(string $message, Frame $frame): ?Frame
     {
-        $thrown = VM\BuiltinExceptionSupport::materializeError($this->context, $message);
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeError($this->context, $message, $file, $line);
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
             return $catchFrame;
@@ -5175,11 +5183,7 @@ restart:
         }
         if (Variable::TYPE_OBJECT === $thrown->type) {
             $entry = $thrown->toObject();
-            try {
-                $message = $entry->getProperty('message')->toString();
-            } catch (\LogicException) {
-                $message = 'Exception';
-            }
+            $message = $entry->getProperty('message')->optionalScalarString() ?? 'Exception';
             throw VM\ExceptionSupport::nativeUncaughtThrowable($entry, $message);
         }
         throw new \Exception($thrown->toString());
