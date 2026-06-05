@@ -155,15 +155,13 @@ class ObjectEntry {
             if ($property->name !== $name) {
                 continue;
             }
-            if ($property->prototype->isUndefined()) {
-                $slot->reset();
-                $slot->type = Variable::TYPE_UNDEFINED;
-                $slot->objectPropertyOwner = $this;
-                $slot->objectPropertyName = $name;
+            // Declared property unset → uninitialized slot (typed with/without default, #4863).
+            $slot->reset();
+            $slot->type = Variable::TYPE_UNDEFINED;
+            $slot->objectPropertyOwner = $this;
+            $slot->objectPropertyName = $name;
 
-                return;
-            }
-            break;
+            return;
         }
         $slot->null();
     }
