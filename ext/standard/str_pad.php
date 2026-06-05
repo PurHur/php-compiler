@@ -15,7 +15,9 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -30,21 +32,24 @@ final class str_pad extends Internal
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('str_pad() requires two to four arguments');
         }
-        $input = $frame->calledArgs[0]->resolveIndirect();
+        $input = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'str_pad',
+            0,
+            'string'
+        );
         $padLength = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $input->type) {
-            throw new \LogicException('str_pad() input must be a string in this compiler build');
-        }
         if (Variable::TYPE_INTEGER !== $padLength->type) {
             throw new \LogicException('str_pad() pad length must be an integer in this compiler build');
         }
         $padString = ' ';
         if ($argc >= 3) {
-            $padArg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $padArg->type) {
-                throw new \LogicException('str_pad() pad string must be a string in this compiler build');
-            }
-            $padString = $padArg->toString();
+            $padString = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[2],
+                'str_pad',
+                2,
+                'pad_string'
+            );
         }
         // Compiler convention: 0 = STR_PAD_LEFT, 1 = STR_PAD_RIGHT (default).
         $padType = 1;
@@ -55,11 +60,11 @@ final class str_pad extends Internal
             }
             $padType = $typeArg->toInt();
         }
-        $result = VmString::strPad($input->toString(), $padLength->toInt(), $padString, $padType);
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $frame->returnVar->string($result);
+        $result = VmString::strPad($input, $padLength->toInt(), $padString, $padType);
+        BuiltinExecute::writeReturn(
+            $frame,
+            static fn (Variable $ret) => $ret->string($result)
+        );
     }
 
     public Context $context;
@@ -74,10 +79,10 @@ final class str_pad extends Internal
         if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
             throw new \LogicException('str_pad() pad length must be an integer in this compiler build');
         }
-        $input = $this->jitString($context, $args[0], 'str_pad() argument #1');
+        $input = JitStringBuiltinArg::lower($context, $args[0], 'str_pad', 0, 'string');
         $padLength = $context->helper->loadValue($args[1]);
         if ($argc >= 3) {
-            $padString = $this->jitString($context, $args[2], 'str_pad() argument #3');
+            $padString = JitStringBuiltinArg::lower($context, $args[2], 'str_pad', 2, 'pad_string');
         } else {
             $padString = $context->builder->load($context->constantStringFromString(' '));
         }
