@@ -4714,7 +4714,8 @@ restart:
 
     private function dispatchVmError(string $message, Frame $frame): ?Frame
     {
-        $thrown = VM\BuiltinExceptionSupport::materializeError($this->context, $message);
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeError($this->context, $message, $file, $line);
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
             return $catchFrame;
@@ -5175,12 +5176,10 @@ restart:
         }
         if (Variable::TYPE_OBJECT === $thrown->type) {
             $entry = $thrown->toObject();
-            try {
-                $message = $entry->getProperty('message')->toString();
-            } catch (\LogicException) {
-                $message = 'Exception';
-            }
-            throw VM\ExceptionSupport::nativeUncaughtThrowable($entry, $message);
+            throw VM\ExceptionSupport::nativeUncaughtThrowable(
+                $entry,
+                VM\ExceptionSupport::readThrowableMessage($entry)
+            );
         }
         throw new \Exception($thrown->toString());
     }
