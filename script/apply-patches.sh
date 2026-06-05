@@ -1812,7 +1812,8 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 text = path.read_text()
-incdec_case = """            case 'Expr_PostInc':
+incdec_case = """
+            case 'Expr_PostInc':
             case 'Expr_PostDec':
             case 'Expr_PreInc':
             case 'Expr_PreDec':
@@ -1822,8 +1823,74 @@ incdec_case = """            case 'Expr_PostInc':
 
                 return false;
 """
+throw_tail = "        throw new \\LogicException('Unknown variable op found: '.$op->getType());"
 anchors = [
     (
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [Type::array()];
+                }
+
+                return [Type::string()];
+            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+
+        }
+
+""" + throw_tail,
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [Type::array()];
+                }
+
+                return [Type::string()];
+            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+""" + incdec_case + """        }
+
+""" + throw_tail,
+    ),
+    (
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [new Type(Type::TYPE_ARRAY)];
+                }
+
+                return [Type::string()];
+            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+        }
+
+""" + throw_tail,
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [new Type(Type::TYPE_ARRAY)];
+                }
+
+                return [Type::string()];
+            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+""" + incdec_case + """        }
+
+""" + throw_tail,
+    ),
+    (
         """            case 'Expr_MagicScriptConst':
                 if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind
                     || \\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_HALT_OFFSET === $op->kind) {
@@ -1833,7 +1900,7 @@ anchors = [
                 return [Type::string()];
         }
 
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+""" + throw_tail,
         """            case 'Expr_MagicScriptConst':
                 if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind
                     || \\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_HALT_OFFSET === $op->kind) {
@@ -1843,7 +1910,7 @@ anchors = [
                 return [Type::string()];
 """ + incdec_case + """        }
 
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+""" + throw_tail,
     ),
     (
         """            case 'Expr_MagicScriptConst':
@@ -1854,7 +1921,7 @@ anchors = [
                 return [Type::string()];
         }
 
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+""" + throw_tail,
         """            case 'Expr_MagicScriptConst':
                 if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
                     return [Type::int()];
@@ -1863,7 +1930,48 @@ anchors = [
                 return [Type::string()];
 """ + incdec_case + """        }
 
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+""" + throw_tail,
+    ),
+    (
+        """            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+
+        }
+
+""" + throw_tail,
+        """            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+""" + incdec_case + """        }
+
+""" + throw_tail,
+    ),
+    (
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [Type::array()];
+                }
+
+                return [Type::string()];
+        }
+
+""" + throw_tail,
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [Type::array()];
+                }
+
+                return [Type::string()];
+""" + incdec_case + """        }
+
+""" + throw_tail,
     ),
     (
         """            case 'Expr_FirstClassCallable':
@@ -1874,7 +1982,7 @@ anchors = [
                 return [Type::string()];
         }
 
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+""" + throw_tail,
         """            case 'Expr_FirstClassCallable':
                 if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
                     return [new Type(Type::TYPE_ARRAY)];
@@ -1883,7 +1991,7 @@ anchors = [
                 return [Type::string()];
 """ + incdec_case + """        }
 
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+""" + throw_tail,
     ),
 ]
 for old, new in anchors:
