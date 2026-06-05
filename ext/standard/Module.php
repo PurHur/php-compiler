@@ -76,6 +76,7 @@ class Module extends ModuleAbstract
             new ldexp(),
             new frexp(),
             new fdiv(),
+            new fpow(),
             new intval(),
             new floatval(),
             new doubleval(),

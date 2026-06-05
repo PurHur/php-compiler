@@ -854,6 +854,7 @@ require_once __DIR__.'/../../../ext/standard/escapeshellcmd.php';
 require_once __DIR__.'/../../../ext/standard/eval_.php';
 require_once __DIR__.'/../../../ext/standard/expm1.php';
 require_once __DIR__.'/../../../ext/standard/fdiv.php';
+require_once __DIR__.'/../../../ext/standard/fpow.php';
 require_once __DIR__.'/../../../ext/standard/flock.php';
 require_once __DIR__.'/../../../ext/standard/flush_.php';
 require_once __DIR__.'/../../../ext/standard/fnmatch.php';
