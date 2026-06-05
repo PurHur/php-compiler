@@ -2117,6 +2117,10 @@ restart:
                 $this->float += 1;
 
                 return;
+            case self::TYPE_STRING:
+                $this->applyStringIncDec(OpCode::TYPE_PLUS, $this->string);
+
+                return;
             case self::TYPE_ARRAY:
                 throw new \TypeError('Cannot increment array');
             default:
@@ -2157,6 +2161,10 @@ restart:
                 return;
             case self::TYPE_FLOAT:
                 $this->float -= 1;
+
+                return;
+            case self::TYPE_STRING:
+                $this->applyStringIncDec(OpCode::TYPE_MINUS, $this->string);
 
                 return;
             case self::TYPE_ARRAY:

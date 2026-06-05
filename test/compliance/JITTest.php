@@ -406,10 +406,6 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'enum_case_name_value')) {
                 continue;
             }
-            // ++/-- string increment_string is VM-only until JIT reads OpCode::isIncDec (#3469).
-            if (str_contains($name, 'string_increment')) {
-                continue;
-            }
             // Generator foreach MCJIT resume (#3074); VM in GeneratorVMTest, compile in GeneratorJITTest/GeneratorJitCompileTest.
             if (str_contains($name, 'generator_')) {
                 continue;
