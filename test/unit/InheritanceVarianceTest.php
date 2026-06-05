@@ -146,4 +146,34 @@ PHP;
         $this->expectExceptionMessage('Declaration of Child::__construct($x) must be compatible with Base::__construct()');
         $runtime->parseAndCompile($code, 'abstract_ctor.php');
     }
+
+    /** Concrete parent: child must not add required parameters (#6412). */
+    public function testConcreteParentExtraRequiredParamFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class ParentClass { public function foo(): void {} }
+class Child extends ParentClass { public function foo(int $x): void {} }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Declaration of Child::foo(int $x): void must be compatible with ParentClass::foo(): void');
+        $runtime->parseAndCompile($code, 'child_extra_param.php');
+    }
+
+    public function testConcreteParentExtraOptionalParamAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class ParentClass { public function foo(): void {} }
+class Child extends ParentClass { public function foo(int $x = 0): void {} }
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'child_extra_optional_param.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
 }
