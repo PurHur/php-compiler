@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** is_uploaded_file() — VM via VmFs; JIT/AOT via __compiler_is_uploaded_file (issue #2204). */
+/** is_uploaded_file() — VM via VmFs; JIT/AOT via UploadTempJit (issue #5346). */
 final class is_uploaded_file extends Internal
 {
     public function __construct()

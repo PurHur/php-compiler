@@ -9,7 +9,7 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for move_uploaded_file() via __compiler_move_uploaded_file (issue #2005). */
+/** LLVM lowering for move_uploaded_file() via UploadTempJit (issue #5346). */
 final class JitMoveUploadedFile
 {
     /** @return Value */
