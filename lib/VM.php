@@ -447,6 +447,43 @@ class VM {
     }
 
     /**
+     * unset($obj->hooked) — reset hook backing + declared slot (Zend zend_property_hooks.c, #6471).
+     */
+    private function unsetHookedInstanceProperty(ObjectEntry $object, string $propName): void
+    {
+        $this->resetHookedPropertyBackingField($object, $propName);
+        $this->unsetObjectProperty($object, $propName);
+    }
+
+    /** Clear registry-recorded get/set backing field after hooked-property unset (#6471, #5191). */
+    private function resetHookedPropertyBackingField(ObjectEntry $object, string $propName): void
+    {
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null === $meta || null === $meta->setHookMethodLc) {
+            return;
+        }
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+        if (!is_array($propMeta)) {
+            return;
+        }
+        $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null;
+        if (null === $backingName || !$object->hasProperty($backingName)) {
+            return;
+        }
+        $slot = $object->getProperty($backingName);
+        if (VM\TypedPropertyCheck::propertyAllowsNull($slot)) {
+            $slot->null();
+
+            return;
+        }
+        $slot->reset();
+        $slot->type = Variable::TYPE_UNDEFINED;
+    }
+
+    /**
      * True when $slot is an indirect binding shared with another local (Zend ref chain).
      * Used by (unset) cast: only break references, not ordinary locals (#3517).
      *
@@ -2746,7 +2783,7 @@ restart:
                             $frame = $catchFrame;
                             goto restart;
                         }
-                        $this->unsetObjectProperty($object, $propName);
+                        $this->unsetHookedInstanceProperty($object, $propName);
                         break;
                     }
                     if (Variable::TYPE_ARRAY === $container->type) {

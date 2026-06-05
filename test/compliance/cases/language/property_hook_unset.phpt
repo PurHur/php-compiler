@@ -16,6 +16,15 @@ var_export(isset($c->p));
 echo "\n";
 $c->p = 'b';
 echo $c->p, "\n";
+
+class RW {
+    private ?string $v = 'a';
+    public string $x { get => $this->v ?? 'u'; set => $this->v = $value; }
+}
+$h = new RW();
+unset($h->x);
+echo 'rw=', $h->x, "\n";
 --EXPECT--
 false
 b
+rw=u
