@@ -468,6 +468,27 @@ final class TypeCheck
         $classLc = strtolower(ltrim($classConstraint, '\\'));
         $vm = \PHPCompiler\VM::running();
         $context = $vm?->context;
+        if (null !== $context) {
+            $targetClass = $context->classes[$classLc] ?? null;
+            if (null !== $targetClass && $targetClass->isEnum) {
+                if (Variable::TYPE_ENUM_CASE === $resolved->type) {
+                    return InterfaceCheck::entryIsInstanceOf(
+                        $resolved->toEnumCase()->enumClass,
+                        $classLc,
+                        $context
+                    );
+                }
+                if (Variable::TYPE_OBJECT === $resolved->type && EnumCaseSupport::isEnumCase($resolved->toObject())) {
+                    return InterfaceCheck::entryIsInstanceOf(
+                        $resolved->toObject()->class,
+                        $classLc,
+                        $context
+                    );
+                }
+
+                return false;
+            }
+        }
         if (Variable::TYPE_ENUM_CASE === $resolved->type) {
             $entry = $resolved->toEnumCase()->enumClass;
             if (null === $context) {
@@ -551,6 +572,9 @@ final class TypeCheck
     private static function valueTypeLabel(Variable $value): string
     {
         $resolved = $value->resolveIndirect();
+        if (Variable::TYPE_ENUM_CASE === $resolved->type) {
+            return $resolved->toEnumCase()->enumClass->name;
+        }
         if (Variable::TYPE_OBJECT === $resolved->type) {
             return $resolved->toObject()->class->name;
         }

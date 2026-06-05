@@ -44,6 +44,9 @@ class Native implements Call {
     /** @var array<int, list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>> LLVM arg index => DNF arms (#4008) */
     public array $paramDnfConstraintsByArg = [];
 
+    /** @var array<int, string> LLVM arg index => class/interface name (#6145) */
+    public array $paramClassConstraintsByArg = [];
+
     /** LLVM arg index => by-reference formal (issue #3161, #140). @var array<int, true> */
     public array $paramByRefByArg = [];
 
@@ -65,6 +68,7 @@ class Native implements Call {
         array $paramTypeConstraintsByArg = [],
         array $paramIntersectionConstraintsByArg = [],
         array $paramDnfConstraintsByArg = [],
+        array $paramClassConstraintsByArg = [],
         array $paramByRefByArg = [],
         array $paramNames = [],
         ?int $namedArgsVariadicIndex = null,
@@ -78,6 +82,7 @@ class Native implements Call {
         $this->paramTypeConstraintsByArg = $paramTypeConstraintsByArg;
         $this->paramIntersectionConstraintsByArg = $paramIntersectionConstraintsByArg;
         $this->paramDnfConstraintsByArg = $paramDnfConstraintsByArg;
+        $this->paramClassConstraintsByArg = $paramClassConstraintsByArg;
         $this->paramByRefByArg = $paramByRefByArg;
         $this->paramNames = $paramNames;
         $this->namedArgsVariadicIndex = $namedArgsVariadicIndex;
@@ -129,6 +134,13 @@ class Native implements Call {
                     $context,
                     $arg,
                     $this->paramDnfConstraintsByArg[$index]
+                );
+            }
+            if (!$skipVariadicPackedTypeCheck && isset($this->paramClassConstraintsByArg[$index])) {
+                \PHPCompiler\JIT\ClassParamCheck::enforce(
+                    $context,
+                    $arg,
+                    $this->paramClassConstraintsByArg[$index]
                 );
             }
             $argValues[] = $this->compileArg($context, $arg, $index);
@@ -467,6 +479,13 @@ class Native implements Call {
                     $this->paramDnfConstraintsByArg[$idx]
                 );
             }
+            if (isset($this->paramClassConstraintsByArg[$idx])) {
+                \PHPCompiler\JIT\ClassParamCheck::enforce(
+                    $context,
+                    $arg,
+                    $this->paramClassConstraintsByArg[$idx]
+                );
+            }
         }
     }
 
@@ -474,7 +493,8 @@ class Native implements Call {
     {
         return isset($this->paramTypeConstraintsByArg[$llvmArgIndex])
             || isset($this->paramIntersectionConstraintsByArg[$llvmArgIndex])
-            || isset($this->paramDnfConstraintsByArg[$llvmArgIndex]);
+            || isset($this->paramDnfConstraintsByArg[$llvmArgIndex])
+            || isset($this->paramClassConstraintsByArg[$llvmArgIndex]);
     }
 
     private function skipImplicitNullableTypeCheck(int $index, Variable $arg): bool

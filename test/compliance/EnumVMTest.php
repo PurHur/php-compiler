@@ -66,6 +66,7 @@ final class EnumVMTest extends BaseTest
                 'abstract_enum.phpt',
                 'duplicate_enum_backing_value.phpt',
                 'enum_typed_param_dnf.phpt',
+                'enum_typed_param_reject_backing_scalar.phpt',
             ] as $file
         ) {
             yield $file => self::parsePHPT(
