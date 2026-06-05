@@ -15,7 +15,9 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -30,18 +32,20 @@ final class nl2br extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('nl2br() requires one or two arguments');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('nl2br() only supports strings in this compiler build');
-        }
+        $subject = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'nl2br',
+            0,
+            'string'
+        );
         $useXhtml = true;
         if (2 === $argc) {
             $useXhtml = self::resolveUseXhtmlBool($frame, 1);
         }
-        $frame->returnVar->string(VmString::nl2br($v->toString(), $useXhtml));
+        BuiltinExecute::writeReturn(
+            $frame,
+            static fn (Variable $ret) => $ret->string(VmString::nl2br($subject, $useXhtml))
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -64,7 +68,7 @@ final class nl2br extends Internal
             );
         }
 
-        $str = JitStringArg::lower($context, $args[0], 'nl2br() argument #1');
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'nl2br', 0, 'string');
         $i8 = $context->getTypeFromString('int8');
         $useXhtmlI8 = $i8->constInt(1, false);
         if (2 === $argc) {
