@@ -73,8 +73,12 @@ final class ObjectLifetime
     public static function releaseDirectObject(Variable $var): void
     {
         $var = $var->resolveIndirect();
-        if (Variable::TYPE_OBJECT === $var->type && isset($var->object)) {
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            return;
+        }
+        try {
             self::releaseRef($var->toObject());
+        } catch (\LogicException) {
         }
     }
 
@@ -86,10 +90,14 @@ final class ObjectLifetime
     public static function invokeUnsetDestructor(VM $vm, Variable $var): void
     {
         $var = $var->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $var->type || !isset($var->object)) {
+        if (Variable::TYPE_OBJECT !== $var->type) {
             return;
         }
-        $object = $var->toObject();
+        try {
+            $object = $var->toObject();
+        } catch (\LogicException) {
+            return;
+        }
         if (!$object->destructorInvoked) {
             $vm->invokeUserDestructor($object);
         }

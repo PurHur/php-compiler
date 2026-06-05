@@ -3452,7 +3452,10 @@ restart:
                     $frame->callArgEntries = [];
                     if (null === $frame->call) {
                         $object->constructed = true;
-                        $this->releaseVmDeadScopeSlot($frame, (int) $op->arg1);
+                        $newResultSlot = (int) $op->arg1;
+                        if (!$this->isVmScopeSlotUsedByFollowingOps($frame, $newResultSlot)) {
+                            $this->releaseVmDeadScopeSlot($frame, $newResultSlot);
+                        }
                     }
                     break;
                 case OpCode::TYPE_PROPERTY_FETCH:
@@ -8779,6 +8782,27 @@ restart:
         foreach ($frame->iterators as $iter) {
             ObjectLifetime::releaseDirectObject($iter);
         }
+    }
+
+    /**
+     * True when a compiler temp slot is still read/written by opcodes after the current PC (#6467).
+     */
+    private function isVmScopeSlotUsedByFollowingOps(Frame $frame, int $slot): bool
+    {
+        $block = $frame->block;
+        if (null === $block) {
+            return false;
+        }
+        for ($i = $frame->pos + 1; $i < $block->nOpCodes; ++$i) {
+            $next = $block->opCodes[$i];
+            foreach ([$next->arg1, $next->arg2, $next->arg3] as $arg) {
+                if (is_int($arg) && $arg === $slot) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
