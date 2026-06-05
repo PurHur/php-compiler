@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\VM\Variable as VmVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 final class JitStringArg
@@ -111,5 +113,114 @@ final class JitStringArg
     public static function compileTimeLiteral(Variable $arg): ?string
     {
         return $arg->compileTimeString ?? null;
+    }
+
+    /**
+     * Lower dynamic property / variable name with zend_operators.c Error on enum/object (#6206).
+     *
+     * @return Value
+     */
+    public static function lowerPropertyName(Context $context, Variable $arg): Value
+    {
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            $classHint = ltrim((string) ($arg->type?->userType ?? ''), '\\');
+            if (
+                '' !== $classHint
+                && 'object' !== strtolower($classHint)
+                && $context->type->object->isEnumClassLc(strtolower($classHint))
+            ) {
+                Builtin\ErrorRaise::ensureLinked($context);
+                Builtin\ErrorRaise::emitRaise(
+                    $context,
+                    'Object of class '.$classHint.' could not be converted to string'
+                );
+
+                return $context->builder->load($context->constantStringFromString(''));
+            }
+            $magic = MagicMethodDispatch::coerceObjectToString($context, $arg);
+            if (null !== $magic) {
+                return self::materializeStringSlot($context, $context->helper->loadValue($magic));
+            }
+            Builtin\ErrorRaise::ensureLinked($context);
+            Builtin\ErrorRaise::emitRaise(
+                $context,
+                'Object of class '.('' !== $classHint ? $classHint : 'stdClass').' could not be converted to string'
+            );
+
+            return $context->builder->load($context->constantStringFromString(''));
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            return self::lowerBoxedPropertyName($context, $arg);
+        }
+
+        return self::lowerDominating($context, $arg, 'dynamic property name');
+    }
+
+    /** @return Value */
+    private static function lowerBoxedPropertyName(Context $context, Variable $arg): Value
+    {
+        Builtin\ErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $objectTy = $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false);
+        $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
+
+        $rejectBlock = BasicBlockHelper::append($context, 'prop_name_reject');
+        $coerceBlock = BasicBlockHelper::append($context, 'prop_name_coerce');
+        $doneBlock = BasicBlockHelper::append($context, 'prop_name_done');
+        $strSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__string__*'));
+
+        $isObject = $context->builder->icmp(Builder::INT_EQ, $typeKind, $objectTy);
+        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeKind, $enumCaseTy);
+        $isObjOrEnum = $context->builder->or($isObject, $isEnumCase);
+        $context->builder->branchIf($isObjOrEnum, $rejectBlock, $coerceBlock);
+
+        $context->builder->positionAtEnd($rejectBlock);
+        Builtin\ErrorRaise::emitRaise(
+            $context,
+            'Object of class '.self::compileTimeObjectGivenLabel($context, $arg).' could not be converted to string'
+        );
+        $context->builder->store(
+            $context->builder->load($context->constantStringFromString('')),
+            $strSlot
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($coerceBlock);
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        $context->builder->store($str, $strSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $context->builder->load($strSlot);
+    }
+
+    private static function compileTimeObjectGivenLabel(Context $context, Variable $arg): string
+    {
+        if (Variable::KIND_VALUE !== $arg->kind) {
+            return 'object';
+        }
+        $objMap = $context->structFieldMap['__object__'] ?? null;
+        if (null === $objMap || !isset($objMap['class_id'])) {
+            return 'object';
+        }
+        $classIdVal = $context->builder->load(
+            $context->builder->structGep($arg->value, $objMap['class_id'])
+        );
+        if (!method_exists($classIdVal, 'isConstant') || !$classIdVal->isConstant()) {
+            return 'object';
+        }
+        $classId = (int) $classIdVal->getConstantValue();
+
+        return $context->type->object->classNameForId($classId);
     }
 }

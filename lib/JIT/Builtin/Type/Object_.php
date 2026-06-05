@@ -4555,7 +4555,7 @@ class Object_ extends Type {
             throw new \LogicException('Dynamic property fetch requires at least one declared property on '.$class);
         }
 
-        $runtimeName = JitStringArg::lowerDominating($this->context, $nameVar, 'dynamic property name');
+        $runtimeName = JitStringArg::lowerPropertyName($this->context, $nameVar);
 
         $fn = BasicBlockHelper::parentFunction($this->context);
         $entry = $this->context->builder->getInsertBlock();

@@ -1407,7 +1407,11 @@ restart:
                             '' !== $frame->scriptPath ? $frame->scriptPath : null
                         );
                     }
-                    $name = $nameHolder->toString();
+                    [$name, $catchFrame] = $this->coerceRuntimeOperandToString($nameHolder, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     if ('this' === strtolower($name)) {
                         if (null !== $frame->block->func && null !== $frame->block->func->class) {
                             $isStatic = (($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0;
@@ -2583,7 +2587,11 @@ restart:
                             $this->invokeArrayAccessOffsetUnset($object, $key);
                             break;
                         }
-                        $propName = $key->toString();
+                        [$propName, $catchFrame] = $this->coerceRuntimeOperandToString($key, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                         $catchFrame = $this->enforceReadonlyPropertyUnset($object, $propName, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
@@ -3305,7 +3313,11 @@ restart:
                         goto restart;
                     }
                     $var = $frame->scope[$op->arg2]->resolveIndirect();
-                    $name = $frame->scope[$op->arg3]->toString();
+                    [$name, $catchFrame] = $this->coerceRuntimeOperandToString($frame->scope[$op->arg3], $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     if (Variable::TYPE_ENUM_CASE === $var->type) {
                         try {
                             $prop = $var->toEnumCase()->fetchProperty($name, $this->context, $frame);
@@ -3527,7 +3539,11 @@ restart:
                         $dst->bool(true);
                         break;
                     }
-                    $propName = $frame->scope[$op->arg3]->toString();
+                    [$propName, $catchFrame] = $this->coerceRuntimeOperandToString($frame->scope[$op->arg3], $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     VM\LazyObjectSupport::ensureInitialized($this, $container->toObject());
                     $catchFrame = $this->emptyObjectProperty(
                         $container->toObject(),
@@ -3573,7 +3589,11 @@ restart:
                                 ));
                                 break;
                             }
-                            $propName = $frame->scope[$op->arg3]->toString();
+                            [$propName, $catchFrame] = $this->coerceRuntimeOperandToString($frame->scope[$op->arg3], $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
                             VM\LazyObjectSupport::ensureInitialized($this, $object);
                             $dst->bool($this->objectPropertyIsSet($object, $propName, $frame));
                             break;
@@ -4563,6 +4583,20 @@ restart:
         $this->raiseUncaughtException($thrown);
 
         return null;
+    }
+
+    /**
+     * Coerce a runtime operand to string for property/var names (Zend zend_operators.c, #6206).
+     *
+     * @return array{0: string|null, 1: Frame|null}
+     */
+    private function coerceRuntimeOperandToString(Variable $operand, Frame $frame): array
+    {
+        try {
+            return [$operand->resolveIndirect()->toString($this, $frame), null];
+        } catch (\Error $e) {
+            return [null, $this->dispatchVmError($e->getMessage(), $frame)];
+        }
     }
 
     /**
