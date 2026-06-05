@@ -13,8 +13,11 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -29,16 +32,16 @@ final class lcfirst extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('lcfirst() requires exactly one argument');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         $subject = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'lcfirst',
             0,
             'string'
         );
-        $frame->returnVar->string(VmString::asciiLcfirst($subject));
+        BuiltinExecute::writeReturn(
+            $frame,
+            static fn (Variable $ret) => $ret->string(VmString::asciiLcfirst($subject))
+        );
     }
 
     public Context $context;
@@ -49,7 +52,7 @@ final class lcfirst extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('lcfirst() requires exactly one argument');
         }
-        $str = $this->jitString($context, $args[0], 'lcfirst() argument #1');
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'lcfirst', 0, 'string');
         $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
         self::transformFirstAscii($context, $copy, ord('A'), ord('Z'), 32);
 
