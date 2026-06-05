@@ -34,6 +34,7 @@ final class ExceptionSupport
     public const CLASS_VALUE_ERROR = 'valueerror';
     public const CLASS_ARGUMENT_COUNT_ERROR = 'argumentcounterror';
     public const CLASS_PARSE_ERROR = 'parseerror';
+    public const CLASS_COMPILE_ERROR = 'compileerror';
     public const CLASS_UNHANDLED_MATCH_ERROR = 'unhandledmatcherror';
     public const CLASS_ARITHMETIC_ERROR = 'arithmeticerror';
     public const CLASS_DIVISION_BY_ZERO_ERROR = 'divisionbyzeroerror';
@@ -122,6 +123,7 @@ final class ExceptionSupport
             self::CLASS_VALUE_ERROR,
             self::CLASS_ARGUMENT_COUNT_ERROR,
             self::CLASS_PARSE_ERROR,
+            self::CLASS_COMPILE_ERROR,
             self::CLASS_UNHANDLED_MATCH_ERROR,
             self::CLASS_ARITHMETIC_ERROR,
             self::CLASS_DIVISION_BY_ZERO_ERROR,
@@ -340,6 +342,7 @@ final class ExceptionSupport
             self::CLASS_DIVISION_BY_ZERO_ERROR => new \DivisionByZeroError($message),
             self::CLASS_ARGUMENT_COUNT_ERROR => new \ArgumentCountError($message),
             self::CLASS_PARSE_ERROR => new \ParseError($message),
+            self::CLASS_COMPILE_ERROR => new \CompileError($message),
             self::CLASS_UNHANDLED_MATCH_ERROR => new \UnhandledMatchError($message),
             self::CLASS_ASSERTION_ERROR => new \AssertionError($message),
             // FiberError is reserved for internal use in Zend; cannot be instantiated from userland PHP.
