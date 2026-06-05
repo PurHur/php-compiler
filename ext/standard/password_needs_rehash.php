@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -25,14 +26,8 @@ final class password_needs_rehash extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('password_needs_rehash() requires two or three arguments');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $hash = $frame->calledArgs[0]->resolveIndirect();
+        $hash = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'password_needs_rehash', 0, 'hash');
         $algo = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $hash->type) {
-            throw new \LogicException('password_needs_rehash() requires a string hash in this compiler build');
-        }
         if (Variable::TYPE_INTEGER !== $algo->type) {
             throw new \LogicException('password_needs_rehash() requires an integer algorithm in this compiler build');
         }
@@ -48,8 +43,11 @@ final class password_needs_rehash extends Internal
             }
             $options = $exported;
         }
+        if (null === $frame->returnVar) {
+            return;
+        }
         $frame->returnVar->bool(
-            VmPassword::needsRehash($hash->toString(), $algo->toInt(), $options)
+            VmPassword::needsRehash($hash, $algo->toInt(), $options)
         );
     }
 
@@ -66,7 +64,7 @@ final class password_needs_rehash extends Internal
 
         return JitPasswordNeedsRehash::invoke(
             $context,
-            $this->jitString($context, $args[0], 'password_needs_rehash() hash'),
+            JitStringBuiltinArg::lower($context, $args[0], 'password_needs_rehash', 0, 'hash'),
             $args[1],
             $options
         );
