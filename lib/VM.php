@@ -1569,13 +1569,16 @@ restart:
                         $container = $containerSlot->resolveIndirect();
                     }
                     if (is_null($op->arg3)) {
-                        $bracketMsg = TypeCheck::cannotUseBracketOn($container);
-                        if (null !== $bracketMsg) {
-                            $catchFrame = $this->dispatchVmTypeError(new \TypeError($bracketMsg), $frame);
+                        if (TypeCheck::isScalarUsedAsArray($container)) {
+                            $catchFrame = $this->dispatchVmError(
+                                TypeCheck::SCALAR_USED_AS_ARRAY_MESSAGE,
+                                $frame
+                            );
                             if (null !== $catchFrame) {
                                 $frame = $catchFrame;
                                 goto restart;
                             }
+                            break;
                         }
                         if ($container->type !== Variable::TYPE_ARRAY) {
                             throw new \LogicException('[] is only supported for arrays');
@@ -1699,13 +1702,16 @@ restart:
                             }
                             break;
                         }
-                        $bracketMsg = TypeCheck::cannotUseBracketOn($container);
-                        if (null !== $bracketMsg) {
-                            $catchFrame = $this->dispatchVmTypeError(new \TypeError($bracketMsg), $frame);
+                        if (TypeCheck::isScalarUsedAsArray($container)) {
+                            $catchFrame = $this->dispatchVmError(
+                                TypeCheck::SCALAR_USED_AS_ARRAY_MESSAGE,
+                                $frame
+                            );
                             if (null !== $catchFrame) {
                                 $frame = $catchFrame;
                                 goto restart;
                             }
+                            break;
                         }
                         throw new \LogicException('Illegal offset');
                     }

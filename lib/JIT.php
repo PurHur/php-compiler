@@ -5199,11 +5199,11 @@ class JIT {
                     if (null === $op->arg3) {
                         $bracketLabel = Variable::cannotUseBracketLabel($value->type);
                         if (null !== $bracketLabel) {
-                            JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
-                            JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
-                            JIT\Builtin\TypeErrorRaise::emitRaise(
+                            JIT\Builtin\ErrorRaise::registerDeclarations($this->context);
+                            JIT\Builtin\ErrorRaise::ensureLinked($this->context);
+                            JIT\Builtin\ErrorRaise::emitRaise(
                                 $this->context,
-                                'Cannot use [] on ' . $bracketLabel
+                                \PHPCompiler\VM\TypeCheck::SCALAR_USED_AS_ARRAY_MESSAGE
                             );
                             break;
                         }
@@ -5294,11 +5294,11 @@ class JIT {
                             );
                             break;
                         }
-                        JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
-                        JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
-                        JIT\Builtin\TypeErrorRaise::emitRaise(
+                        JIT\Builtin\ErrorRaise::registerDeclarations($this->context);
+                        JIT\Builtin\ErrorRaise::ensureLinked($this->context);
+                        JIT\Builtin\ErrorRaise::emitRaise(
                             $this->context,
-                            'Cannot use [] on ' . $bracketLabel
+                            \PHPCompiler\VM\TypeCheck::SCALAR_USED_AS_ARRAY_MESSAGE
                         );
                         break;
                     }
