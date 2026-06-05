@@ -41,7 +41,7 @@ final class vsprintf extends Internal
         foreach ($argsVar->toArray()->iterate(true) as $element) {
             $values[] = $element->resolveIndirect();
         }
-        $frame->returnVar->string(VmSprintf::format($fmtVar->toString(), $values));
+        $frame->returnVar->string(VmSprintf::format($fmtVar->toString(), $values, $frame));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

@@ -38,7 +38,7 @@ final class printf_ extends Internal
         for ($i = 1; $i < $argc; ++$i) {
             $values[] = $frame->calledArgs[$i]->resolveIndirect();
         }
-        $out = VmSprintf::format($fmtVar->toString(), $values);
+        $out = VmSprintf::format($fmtVar->toString(), $values, $frame);
         OutputBuffer::append($out);
         if (null !== $frame->returnVar) {
             $frame->returnVar->int(VmString::byteLength($out));

@@ -46,7 +46,7 @@ final class sprintf_ extends Internal
         for ($i = 1; $i < $argc; ++$i) {
             $values[] = $frame->calledArgs[$i]->resolveIndirect();
         }
-        $frame->returnVar->string(VmSprintf::format($fmtVar->toString(), $values));
+        $frame->returnVar->string(VmSprintf::format($fmtVar->toString(), $values, $frame));
     }
 
     public Context $context;
