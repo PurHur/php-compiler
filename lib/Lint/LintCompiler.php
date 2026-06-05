@@ -97,20 +97,19 @@ final class LintCompiler extends Compiler
             switch (get_class($child)) {
                 case Op\Stmt\Property::class:
                     try {
-                        if ($type !== OpCode::TYPE_DECLARE_CLASS) {
-                            if (OpCode::TYPE_DECLARE_TRAIT === $type) {
-                                if (!$child->static) {
-                                    throw new \LogicException('Traits cannot declare non-static properties');
-                                }
-                            } elseif (OpCode::TYPE_DECLARE_INTERFACE === $type) {
-                                if ($child->static) {
-                                    throw new \LogicException('Interfaces cannot declare static properties');
-                                }
-                                if (!is_null($child->defaultBlock) || null !== $child->defaultVar) {
-                                    throw new \LogicException('Interface properties cannot have default values');
-                                }
-                            } else {
-                                throw new \LogicException('Properties are only supported on classes for now');
+                        if (
+                            OpCode::TYPE_DECLARE_CLASS !== $type
+                            && OpCode::TYPE_DECLARE_INTERFACE !== $type
+                            && OpCode::TYPE_DECLARE_TRAIT !== $type
+                        ) {
+                            throw new \LogicException('Properties are only supported on classes, interfaces, and traits for now');
+                        }
+                        if (OpCode::TYPE_DECLARE_INTERFACE === $type) {
+                            if ($child->static) {
+                                throw new \LogicException('Interfaces cannot declare static properties');
+                            }
+                            if (!is_null($child->defaultBlock) || null !== $child->defaultVar) {
+                                throw new \LogicException('Interface properties cannot have default values');
                             }
                         }
                         if (!is_null($child->defaultBlock)) {

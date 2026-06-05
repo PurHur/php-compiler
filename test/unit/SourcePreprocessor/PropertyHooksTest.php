@@ -79,6 +79,40 @@ PHP;
         self::assertSame('__phpc_property_get_p', $registry['c']['p']['get'] ?? null);
     }
 
+    public function testStripsAbstractGetHookOnInterface(): void
+    {
+        $src = <<<'PHP'
+<?php
+interface HasTitle {
+    public string $title {
+        get;
+    }
+}
+PHP;
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$title {', $out);
+        self::assertStringContainsString('public string $title;', $out);
+        self::assertStringNotContainsString('__phpc_property_get_title', $out);
+    }
+
+    public function testLowersTraitPropertyHooks(): void
+    {
+        $src = <<<'PHP'
+<?php
+trait T {
+    public string $x {
+        get => $this->__x;
+        set(string $v) { $this->__x = $v; }
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('public string $x;', $out);
+        self::assertStringContainsString('function __phpc_property_get_x', $out);
+        self::assertStringContainsString('function __phpc_property_set_x', $out);
+        self::assertSame('__phpc_property_get_x', $registry['t']['x']['get'] ?? null);
+    }
+
     public function testLowersStaticPropertyHooksAsStaticMethods(): void
     {
         $src = <<<'PHP'
