@@ -89,7 +89,7 @@ class MagicStringResolver extends NodeVisitorAbstract
             }
         } elseif ($node instanceof Node\Expr\ConstFetch) {
             if ('__property__' === strtolower($node->name->toString())) {
-                $name = '' !== $this->propertyStack ? end($this->propertyStack) : '';
+                $name = $this->propertyStack !== [] ? end($this->propertyStack) : '';
 
                 return new Node\Scalar\String_($name, $node->getAttributes());
             }

@@ -39,6 +39,21 @@ PHP;
         $this->assertSame('p', $this->runVm($code));
     }
 
+    public function testPropertyMagicConstOutsideHookScope(): void
+    {
+        $code = <<<'PHP'
+<?php
+class P {
+    public string $foo = '';
+    public function m(): string {
+        return __PROPERTY__;
+    }
+}
+echo (new P)->m();
+PHP;
+        $this->assertSame('', $this->runVm($code));
+    }
+
     public function testNamespaceAndClass(): void
     {
         $code = <<<'PHP'
