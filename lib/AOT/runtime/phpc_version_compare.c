@@ -1,25 +1,17 @@
 /*
- * phpversion() / php_sapi_name() / php_uname() / version_compare() /
- * extension_loaded() / get_loaded_extensions() for VM/JIT/AOT (#3174, #3204).
- * php-src reference: ext/standard/info.c, ext/standard/versioning.c
+ * version_compare() for JIT/AOT (issue #6124).
+ * php-src reference: ext/standard/versioning.c
+ *
+ * Remaining C after phpversion/php_uname/extension introspection moved to
+ * lib/JIT/Builtin/StringInfo.php (LLVM). Full PHP lowering tracked separately.
  */
 
 #include <ctype.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/utsname.h>
 
 typedef struct __string__ __string__;
-typedef struct __hashtable__ __hashtable__;
-
-extern __string__ *__string__init(long long size, const char *value);
-extern __hashtable__ *__hashtable__alloc(void);
-extern void __hashtable__setStringAt(__hashtable__ *ht, size_t index, __string__ *val);
-
-#define PHPC_VERSION "8.3.0-dev"
-#define PHPC_SAPI "cli"
 
 static size_t phpc_strlen(__string__ *s)
 {
@@ -37,125 +29,6 @@ static const char *phpc_strdata(__string__ *s)
     }
 
     return (const char *) s + sizeof(void *) + sizeof(long long);
-}
-
-static __string__ *phpc_string_from_cstr(const char *value)
-{
-    size_t len;
-
-    if (NULL == value) {
-        value = "";
-    }
-    len = strlen(value);
-
-    return __string__init((long long) len, value);
-}
-
-static int phpc_extension_loaded_cstr(const char *name)
-{
-    static const char *extensions[] = {"standard", "types", NULL};
-    size_t i;
-    size_t len;
-    char lower[64];
-
-    if (NULL == name) {
-        return 0;
-    }
-    len = strlen(name);
-    if (0 == len || len >= sizeof(lower)) {
-        return 0;
-    }
-    for (i = 0; i < len; ++i) {
-        lower[i] = (char) tolower((unsigned char) name[i]);
-    }
-    lower[len] = '\0';
-    for (i = 0; extensions[i] != NULL; ++i) {
-        if (0 == strcmp(lower, extensions[i])) {
-            return 1;
-        }
-    }
-
-    return 0;
-}
-
-static int phpc_extension_loaded_str(__string__ *name)
-{
-    if (NULL == name || 0 == phpc_strlen(name)) {
-        return 0;
-    }
-
-    return phpc_extension_loaded_cstr(phpc_strdata(name));
-}
-
-__string__ *__compiler_phpversion(__string__ *extension)
-{
-    if (NULL == extension || 0 == phpc_strlen(extension)) {
-        return phpc_string_from_cstr(PHPC_VERSION);
-    }
-    if (phpc_extension_loaded_str(extension)) {
-        return phpc_string_from_cstr(PHPC_VERSION);
-    }
-
-    return NULL;
-}
-
-__string__ *__compiler_php_sapi_name(void)
-{
-    return phpc_string_from_cstr(PHPC_SAPI);
-}
-
-static int phpc_uname_mode_char(__string__ *mode, char *out)
-{
-    char c = 'a';
-
-    if (NULL != mode && phpc_strlen(mode) >= 1) {
-        c = phpc_strdata(mode)[0];
-    }
-    if (NULL != out) {
-        *out = c;
-    }
-
-    return (c == 'a' || c == 's' || c == 'n' || c == 'r' || c == 'v' || c == 'm') ? 1 : 0;
-}
-
-__string__ *__compiler_php_uname(__string__ *mode)
-{
-    struct utsname buf;
-    char result[512];
-    char mode_c = 'a';
-
-    if (!phpc_uname_mode_char(mode, &mode_c)) {
-        return phpc_string_from_cstr("");
-    }
-    if (0 != uname(&buf)) {
-        return phpc_string_from_cstr("");
-    }
-
-    switch (mode_c) {
-    case 's':
-        return phpc_string_from_cstr(buf.sysname);
-    case 'n':
-        return phpc_string_from_cstr(buf.nodename);
-    case 'r':
-        return phpc_string_from_cstr(buf.release);
-    case 'v':
-        return phpc_string_from_cstr(buf.version);
-    case 'm':
-        return phpc_string_from_cstr(buf.machine);
-    case 'a':
-    default:
-        snprintf(
-            result,
-            sizeof(result),
-            "%s %s %s %s %s",
-            buf.sysname,
-            buf.nodename,
-            buf.release,
-            buf.version,
-            buf.machine
-        );
-        return phpc_string_from_cstr(result);
-    }
 }
 
 static char *phpc_canonicalize_version(const char *version)
@@ -372,29 +245,4 @@ long long __compiler_version_compare(__string__ *ver1, __string__ *ver2)
     const char *s2 = (NULL == ver2) ? "" : phpc_strdata(ver2);
 
     return (long long) phpc_version_compare(s1, s2);
-}
-
-int __compiler_extension_loaded(__string__ *extension)
-{
-    return phpc_extension_loaded_str(extension);
-}
-
-__hashtable__ *__compiler_get_loaded_extensions(int zend_extensions)
-{
-    static const char *extensions[] = {"standard", "types", NULL};
-    __hashtable__ *ht;
-    size_t i;
-
-    ht = __hashtable__alloc();
-    if (NULL == ht) {
-        return NULL;
-    }
-    if (0 != zend_extensions) {
-        return ht;
-    }
-    for (i = 0; extensions[i] != NULL; ++i) {
-        __hashtable__setStringAt(ht, i, phpc_string_from_cstr(extensions[i]));
-    }
-
-    return ht;
 }
