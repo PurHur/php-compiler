@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * VM helpers for opendir/readdir/closedir/rewinddir (ext/standard/dir.c; issue #3235).
+ * VM helpers for opendir/readdir/closedir/rewinddir (ext/standard/dir.c; issue #3235, #5494).
  *
  * php-src: ext/standard/dir.c — php_opendir, php_readdir, php_closedir, php_rewinddir
  */
