@@ -1407,9 +1407,12 @@ final class Doctor
         $missing = [];
         $parserBody = (string) file_get_contents($parser);
         if (!preg_match('/parseExpr_Throw|Op\\\\Expr\\\\Throw_/', $parserBody)) {
-            $missing[] = 'throw-expr';
+            $missing[] = 'throw-expr-cfg';
         }
         $reconBody = (string) file_get_contents($recon);
+        if (!str_contains($reconBody, "case 'Expr_Throw':")) {
+            $missing[] = 'throw-expr-types';
+        }
         if (!str_contains($reconBody, 'instanceof Op\\Type\\Union_')) {
             $missing[] = 'union-type';
         }
