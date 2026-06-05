@@ -50,8 +50,9 @@ final class DnfType
             if (null === $name || '' === $name) {
                 return [];
             }
+            $display = ltrim($name, '\\');
 
-            return [['kind' => 'literal', 'name' => strtolower(ltrim($name, '\\'))]];
+            return [['kind' => 'literal', 'name' => strtolower($display), 'display' => $display]];
         }
         if ($type instanceof CfgType\Intersection) {
             $ifaces = $intersectionNames($type);
@@ -100,7 +101,7 @@ final class DnfType
             $part = match ($arm['kind']) {
                 'null' => 'null',
                 'intersection' => $arm['display'] ?? implode('&', $arm['interfaces']),
-                'literal' => $arm['name'],
+                'literal' => $arm['display'] ?? $arm['name'],
             };
             if (\count($arms) > 1 && 'intersection' === $arm['kind']) {
                 $part = '(' . $part . ')';
