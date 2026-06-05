@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\VM\ObStackLimits;
 
 /**
  * LLVM globals for JIT/AOT ob_*() buffer stack (issue #5582).
  *
- * VM uses {@see \PHPCompiler\VM\OutputBuffer}; standalone AOT links storage from
- * {@see lib/AOT/runtime/phpc_ob.c} instead of this TU.
+ * VM uses {@see \PHPCompiler\VM\OutputBuffer}; JIT/AOT use these globals via
+ * {@see ObOutputRuntime} (issue #5314).
  */
 final class ObStorageGlobals
 {
@@ -24,10 +23,6 @@ final class ObStorageGlobals
 
     public static function ensureGlobals(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $depth = ObStackLimits::MAX_DEPTH;
         $bufSize = ObStackLimits::BUF_SIZE;
         $i32 = $context->getTypeFromString('int32');
