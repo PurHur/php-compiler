@@ -1141,6 +1141,7 @@ class JIT {
 
         $lcname = strtolower($logicalName ?? $internalName);
         $this->context->functions[$lcname] = $func;
+        $this->context->activeFunction = $lcname;
         if (!is_null($funcName)) {
             $lcname = strtolower($funcName);
             $this->context->activeFunction = $lcname;
@@ -8125,11 +8126,15 @@ class JIT {
                     $default = (null !== $op->arg2 && isset($block->constants[$op->arg2]))
                         ? $block->constants[$op->arg2]
                         : null;
+                    $prototype = (null !== $op->arg3 && isset($block->constants[$op->arg3]))
+                        ? $block->constants[$op->arg3]
+                        : null;
                     $this->context->type->object->defineStaticProperty(
                         $classId,
                         $name->value,
                         $declaredJitType,
-                        $default
+                        $default,
+                        $prototype
                     );
                     break;
                 case OpCode::TYPE_DECLARE_PROPERTY:
@@ -8912,7 +8917,8 @@ class JIT {
             $this->context->type->object->staticPropertyStore(
                 $result->staticPropertyGlobal,
                 $value,
-                $result->staticPropertyType
+                $result->staticPropertyType,
+                $result->staticPropertyInitGlobal
             );
 
             return;

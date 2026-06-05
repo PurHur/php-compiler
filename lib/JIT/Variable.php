@@ -117,6 +117,9 @@ final class Variable {
     /** Declared JIT type when {@see $staticPropertyGlobal} is set. */
     public ?int $staticPropertyType = null;
 
+    /** i1 init flag for typed static properties without compile-time default (#5047). */
+    public ?\PHPLLVM\Value $staticPropertyInitGlobal = null;
+
     /** Declaring class lc for static property set-hook dispatch (#4807). */
     public ?string $staticPropertyHookClassLc = null;
 

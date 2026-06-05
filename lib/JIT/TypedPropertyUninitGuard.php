@@ -82,6 +82,113 @@ final class TypedPropertyUninitGuard
         $context->builder->positionAtEnd($exitBlock);
     }
 
+    /**
+     * Uninitialized static typed property read guard (#4908, #5047, zend_object_handlers.c).
+     */
+    public static function emitBeforeStaticRead(
+        Context $context,
+        \PHPLLVM\Value $initGlobal,
+        string $declaringClass,
+        string $propertyName
+    ): void {
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        $entry = $context->builder->getInsertBlock();
+        if (null === $entry || null !== $entry->getTerminator()) {
+            return;
+        }
+
+        $checkBlock = $fn->appendBasicBlock('static_typed_prop_uninit_check');
+        $okBlock = $fn->appendBasicBlock('static_typed_prop_uninit_ok');
+        $exitBlock = $fn->appendBasicBlock('static_typed_prop_uninit_exit');
+        $raiseBlock = $fn->appendBasicBlock('static_typed_prop_uninit_raise');
+
+        $context->builder->positionAtEnd($entry);
+        $context->builder->branch($checkBlock);
+
+        $context->builder->positionAtEnd($checkBlock);
+        $initFlag = $context->builder->load($initGlobal);
+        $isInit = $context->builder->icmp(
+            Builder::INT_EQ,
+            $initFlag,
+            $context->getTypeFromString('int1')->constInt(1, false)
+        );
+        $context->builder->branchIf($isInit, $okBlock, $raiseBlock);
+
+        $context->builder->positionAtEnd($raiseBlock);
+        ErrorRaise::emitRaise(
+            $context,
+            sprintf(
+                'Typed static property %s::$%s must not be accessed before initialization',
+                $declaringClass,
+                $propertyName
+            )
+        );
+        self::emitRaiseAndTerminate($context);
+
+        $context->builder->positionAtEnd($okBlock);
+        $context->builder->branch($exitBlock);
+        $context->builder->positionAtEnd($exitBlock);
+    }
+
+    /** Pending Error is thrown when the JIT function returns ({@see Func\JIT::execute}). */
+    private static function emitRaiseAndTerminate(Context $context): void
+    {
+        self::emitUnreachableFunctionReturn($context);
+    }
+
+    private static function emitUnreachableFunctionReturn(Context $context): void
+    {
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        $expected = self::expectedReturnCallbackType($context, $fn);
+        if ('void' === $expected) {
+            $context->builder->returnVoid();
+
+            return;
+        }
+        $fnType = $fn->typeOf();
+        $retTy = $fnType instanceof \PHPLLVM\Type\Function_
+            ? $fnType->getReturnType()
+            : $context->getTypeFromString($expected ?? '__value__');
+        $context->builder->returnValue(
+            self::defaultReturnForType($context, $expected ?? '__value__', $retTy)
+        );
+    }
+
+    private static function expectedReturnCallbackType(Context $context, \PHPLLVM\Value $fn): ?string
+    {
+        if (null !== $context->activeFunction) {
+            $active = $context->functionReturnType[strtolower($context->activeFunction)] ?? null;
+            if (null !== $active) {
+                return $active;
+            }
+        }
+        $fnId = spl_object_id($fn);
+        foreach ($context->functions as $name => $registered) {
+            if (spl_object_id($registered) !== $fnId) {
+                continue;
+            }
+
+            return $context->functionReturnType[strtolower((string) $name)] ?? null;
+        }
+
+        return null;
+    }
+
+    private static function defaultReturnForType(Context $context, string $typeName, \PHPLLVM\Type $retTy): \PHPLLVM\Value
+    {
+        return match ($typeName) {
+            'int1', 'bool' => $context->getTypeFromString('int1')->constInt(0, false),
+            'double' => $context->getTypeFromString('double')->constReal(0.0),
+            'int64', 'long long' => $context->getTypeFromString('int64')->constInt(0, false),
+            '__value__' => $retTy->constNull(),
+            default => $retTy->getKind() === \PHPLLVM\Type::KIND_POINTER
+                ? $retTy->constNull()
+                : $retTy->constNull(),
+        };
+    }
+
     private static function valuePtrFromVariable(Context $context, Variable $var): ?\PHPLLVM\Value
     {
         if (null !== $var->valueBoxAliasPtr) {
