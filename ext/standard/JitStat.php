@@ -22,6 +22,9 @@ final class JitStat
     /** sizeof(struct stat) on Linux x86_64 glibc */
     private const STAT_BUF_SIZE = 144;
 
+    /** offsetof(struct stat, st_dev) on Linux x86_64 glibc */
+    private const STAT_DEV_OFFSET = 0;
+
     /** offsetof(struct stat, st_ino) on Linux x86_64 glibc */
     private const STAT_INO_OFFSET = 8;
 
@@ -257,6 +260,12 @@ final class JitStat
     }
 
     /** @return Value */
+    public static function pathLinkinfoBoxed(Context $context, Value $str): Value
+    {
+        return self::pathStatFieldBoxed($context, $str, self::STAT_DEV_OFFSET, 'linkinfo', true, 'lstat');
+    }
+
+    /** @return Value */
     public static function pathFileOwnerBoxed(Context $context, Value $str): Value
     {
         return self::pathStatFieldBoxed($context, $str, self::STAT_UID_OFFSET, 'fileowner', false);
@@ -269,8 +278,14 @@ final class JitStat
     }
 
     /** @return Value */
-    private static function pathStatFieldBoxed(Context $context, Value $str, int $offset, string $tag, bool $fieldIsI64): Value
-    {
+    private static function pathStatFieldBoxed(
+        Context $context,
+        Value $str,
+        int $offset,
+        string $tag,
+        bool $fieldIsI64,
+        string $statFn = 'stat'
+    ): Value {
         $map = $context->structFieldMap['__string__'];
         $pathPtr = $context->builder->structGep($str, $map['value']);
         $i8 = $context->getTypeFromString('int8');
@@ -279,7 +294,7 @@ final class JitStat
         $i8p = $context->getTypeFromString('int8*');
         $bufPtr = $context->builder->pointerCast($buf, $i8p);
         $ret = $context->builder->call(
-            $context->lookupFunction('stat'),
+            $context->lookupFunction($statFn),
             $pathPtr,
             $bufPtr
         );

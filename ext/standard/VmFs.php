@@ -75,6 +75,16 @@ final class VmFs
         return (int) $stat['ino'];
     }
 
+    /** linkinfo() — st_dev from lstat(2) on the link itself (php-src ext/standard/link.c, #6083). */
+    public static function linkinfo(string $path) {
+        $stat = @lstat($path);
+        if (false === $stat) {
+            return false;
+        }
+
+        return (int) $stat['dev'];
+    }
+
     public static function fileOwner(string $path) {
         $stat = @stat($path);
         if (false === $stat) {
