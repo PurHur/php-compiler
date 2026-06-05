@@ -1241,6 +1241,16 @@ restart:
                     $arg3 = isset($frame->block->constants[$op->arg3])
                         ? $frame->block->constants[$op->arg3]
                         : $frame->scope[$op->arg3];
+                    $catchFrame = $this->enforcePropertyVisibilityWrite($arg2, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
+                    $catchFrame = $this->enforceReadonlyPropertyWrite($arg2, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     if ($this->dispatchPropertySetHookAssign($arg2, $arg3, $frame)) {
                         $arg1->copyFrom($arg3);
                         break;
@@ -1259,16 +1269,6 @@ restart:
                         $this->invokeMagicSet($writeTarget->magicSetTarget, $writeTarget->magicSetName, $arg3);
                         $arg1->copyFrom($arg3);
                         break;
-                    }
-                    $catchFrame = $this->enforcePropertyVisibilityWrite($arg2, $frame);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
-                    }
-                    $catchFrame = $this->enforceReadonlyPropertyWrite($arg2, $frame);
-                    if (null !== $catchFrame) {
-                        $frame = $catchFrame;
-                        goto restart;
                     }
                     if (null !== ($msg = $this->asymmetricPropertyWriteMessage($arg2, $frame))) {
                         $catchFrame = $this->dispatchVmError($msg, $frame);
@@ -5356,8 +5356,8 @@ restart:
 
             return true;
         }
-        $owner = $target->objectPropertyOwner;
-        $propName = $target->objectPropertyName;
+        $owner = $this->resolvePropertyWriteOwner($lvalue);
+        $propName = $this->resolvePropertyWriteName($lvalue);
         if (null === $owner || null === $propName || $this->isPropertyHookRawWrite($frame, $propName)) {
             return false;
         }
@@ -5519,7 +5519,7 @@ restart:
             $hasSetHook = !empty($hooks['set']);
             $className = $entry->name;
         } else {
-            $owner = $target->objectPropertyOwner;
+            $owner = $this->resolvePropertyWriteOwner($lvalue);
             if (null === $owner) {
                 return null;
             }
@@ -5580,11 +5580,11 @@ restart:
     private function enforceReadonlyPropertyWrite(Variable $lvalue, Frame $frame): ?Frame
     {
         $target = $lvalue->resolveIndirect();
-        $owner = $target->objectPropertyOwner;
+        $owner = $this->resolvePropertyWriteOwner($lvalue);
         if (null === $owner || !$owner->constructed) {
             return null;
         }
-        $prop = $target->objectPropertyName ?? 'property';
+        $prop = $this->resolvePropertyWriteName($lvalue) ?? 'property';
         $declaringClass = $this->readonlyPropertyDeclaringClass($owner, $prop);
         if (null === $declaringClass) {
             return null;
@@ -5751,6 +5751,68 @@ restart:
         }
 
         return strtolower(ltrim($traitName, '\\'));
+    }
+
+    /**
+     * Resolve instance owner for a property-write lvalue, including indirect wrappers (#6146).
+     */
+    private function resolvePropertyWriteOwner(Variable $lvalue): ?ObjectEntry
+    {
+        $var = $lvalue;
+        $seen = [];
+        while (true) {
+            $id = \spl_object_id($var);
+            if (isset($seen[$id])) {
+                break;
+            }
+            $seen[$id] = true;
+            if (null !== $var->objectPropertyOwner) {
+                return $var->objectPropertyOwner;
+            }
+            if (null !== $var->magicSetTarget) {
+                return $var->magicSetTarget;
+            }
+            if (!$var->isIndirect()) {
+                break;
+            }
+            $next = $var->directIndirectTarget();
+            if (null === $next) {
+                break;
+            }
+            $var = $next;
+        }
+
+        return null;
+    }
+
+    /** Property name for a property-write lvalue when metadata lives on an indirect wrapper (#6146). */
+    private function resolvePropertyWriteName(Variable $lvalue): ?string
+    {
+        $var = $lvalue;
+        $seen = [];
+        while (true) {
+            $id = \spl_object_id($var);
+            if (isset($seen[$id])) {
+                break;
+            }
+            $seen[$id] = true;
+            if (null !== $var->objectPropertyName) {
+                return $var->objectPropertyName;
+            }
+            if (null !== $var->magicSetName) {
+                return $var->magicSetName;
+            }
+            if (!$var->isIndirect()) {
+                break;
+            }
+            $next = $var->directIndirectTarget();
+            if (null === $next) {
+                break;
+            }
+            $var = $next;
+        }
+
+        return null;
     }
 
     private function readonlyPropertyDeclaringClass(ObjectEntry $object, string $propName): ?string
