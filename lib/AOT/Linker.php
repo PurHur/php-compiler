@@ -34,7 +34,6 @@ final class Linker
         __DIR__.'/runtime/preg_match.c',
         __DIR__.'/runtime/phpc_pack.c',
         __DIR__.'/runtime/phpc_var_export.c',
-        __DIR__.'/runtime/phpc_error_handler.c',
         __DIR__.'/runtime/phpc_cli_argv.c',
         __DIR__.'/runtime/phpc_gc.c',
     ];
