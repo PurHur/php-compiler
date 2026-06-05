@@ -1739,6 +1739,58 @@ PY
   echo "Applied php-types-magic-script-const.patch (overlay)"
 }
 
+apply_php_cfg_class_const_flags_overlay() {
+  local const_file="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php"
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if patch_already_applied "$PATCH_DIR/php-cfg-class-const-flags.patch"; then
+    echo "Skip php-cfg-class-const-flags.patch (already applied)"
+    return 0
+  fi
+  python3 - "$const_file" "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+const_path = Path(sys.argv[1])
+parser_path = Path(sys.argv[2])
+const_text = const_path.read_text()
+if 'public int $flags = 0' not in const_text:
+    for old in (
+        "    public ?Type $declaredType = null;\n\n    public function __construct",
+        "    public $valueBlock;\n\n    public function __construct",
+    ):
+        if old in const_text:
+            const_text = const_text.replace(
+                old,
+                old.replace(
+                    "\n\n    public function __construct",
+                    "\n\n    /** PhpParser Stmt\\ClassConst flags (MODIFIER_FINAL, visibility, etc.). */\n"
+                    "    public int $flags = 0;\n\n    public function __construct",
+                    1,
+                ),
+                1,
+            )
+            const_path.write_text(const_text)
+            break
+    else:
+        sys.stderr.write("php-cfg-class-const-flags: Const_.php anchor not found\n")
+        raise SystemExit(1)
+
+text = parser_path.read_text()
+if '$constOp->flags = $node->flags' not in text:
+    old = "$constOp->declaredType = null !== $node->type ? $this->parseTypeNode($node->type) : null;\n            $this->block->children[] = $constOp;"
+    new = old.replace(
+        "\n            $this->block->children[] = $constOp;",
+        "\n            $constOp->flags = $node->flags;\n            $this->block->children[] = $constOp;",
+        1,
+    )
+    if old not in text:
+        sys.stderr.write("php-cfg-class-const-flags: Parser parseStmt_ClassConst anchor not found\n")
+        raise SystemExit(1)
+    parser_path.write_text(text.replace(old, new, 1))
+PY
+  echo "Applied php-cfg-class-const-flags.patch (overlay)"
+}
+
 apply_php_types_incdec_type_overlay() {
   apply_php_types_incdec_type_overlay_to_target() {
     local target="$1"
@@ -1762,14 +1814,76 @@ incdec_case = """            case 'Expr_PostInc':
 
                 return false;
 """
-marker = """
+anchors = [
+    (
+        """            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind
+                    || \\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_HALT_OFFSET === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
         }
 
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());"""
-if marker not in text:
-    sys.stderr.write("php-types-incdec-type: TypeReconstructor switch marker not found\\n")
-    raise SystemExit(1)
-path.write_text(text.replace(marker, incdec_case + marker, 1))
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+        """            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind
+                    || \\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_HALT_OFFSET === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+""" + incdec_case + """        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+    ),
+    (
+        """            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+        """            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+""" + incdec_case + """        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+    ),
+    (
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [new Type(Type::TYPE_ARRAY)];
+                }
+
+                return [Type::string()];
+        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [new Type(Type::TYPE_ARRAY)];
+                }
+
+                return [Type::string()];
+""" + incdec_case + """        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+    ),
+]
+for old, new in anchors:
+    if old in text:
+        path.write_text(text.replace(old, new, 1))
+        raise SystemExit(0)
+sys.stderr.write("php-types-incdec-type: TypeReconstructor switch marker not found\\n")
+raise SystemExit(1)
 PY
     echo "Applied php-types-incdec-type.patch (overlay): ${target}"
   }
@@ -2290,6 +2404,7 @@ new = """            $constOp = new Op\\Terminal\\Const_(
                 $this->mapAttributes($node)
             );
             $constOp->declaredType = null !== $node->type ? $this->parseTypeNode($node->type) : null;
+            $constOp->flags = $node->flags;
             $this->block->children[] = $constOp;"""
 if old not in text:
     raise SystemExit('php-cfg typed class const: parseStmt_ClassConst anchor missing')
@@ -3120,6 +3235,10 @@ apply_patch() {
     apply_php_cfg_typed_class_const_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-class-const-flags.patch" ]]; then
+    apply_php_cfg_class_const_flags_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-match.patch" ]]; then
     apply_php_cfg_match_overlay
     return $?
@@ -3246,6 +3365,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_php_cfg_typed_class_const_overlay || true
   # ++/-- must survive optional patch failures (#4926, self-host loops #1492).
   apply_php_cfg_incdec_expr_overlay || true
+  apply_php_types_incdec_type_overlay || true
   apply_patch "$PATCH_DIR/php-cfg-dollars-brace.patch"
   apply_patch "$PATCH_DIR/php-cfg-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-cfg-nullsafe.patch"

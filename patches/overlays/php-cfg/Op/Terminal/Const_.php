@@ -27,6 +27,9 @@ class Const_ extends Terminal
     /** PHP 8.3+ typed class constant declaration; null when untyped. */
     public ?Type $declaredType = null;
 
+    /** PhpParser Stmt\ClassConst flags (MODIFIER_FINAL, visibility, etc.). */
+    public int $flags = 0;
+
     public function __construct(Operand $name, Operand $value, Block $valueBlock, array $attributes = [])
     {
         parent::__construct($attributes);
