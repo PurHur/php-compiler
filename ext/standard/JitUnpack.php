@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\UnpackJitRuntime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -21,8 +21,8 @@ final class JitUnpack
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('unpack() requires two or three arguments in this compiler build');
         }
-        $fmt = JitStringArg::lower($context, $args[0], 'unpack() format');
-        $data = JitStringArg::lower($context, $args[1], 'unpack() data');
+        $fmt = JitStringBuiltinArg::lower($context, $args[0], 'unpack', 0, 'format');
+        $data = JitStringBuiltinArg::lower($context, $args[1], 'unpack', 1, 'string');
         $offset = $context->getTypeFromString('int64')->constInt(0, false);
         if (3 === $argc) {
             $offset = self::jitOffsetArg($context, $args[2]);
