@@ -4608,6 +4608,12 @@ class Object_ extends Type {
         );
     }
 
+    public function boxFetchedPropertyIntoValueBox(PHPLLVM\Value $destSlot, Variable $fetched): void
+    {
+        $propertyType = $fetched->objectPropertyType ?? $fetched->type;
+        $this->boxFetchedPropertyIntoValue($destSlot, $fetched, $propertyType);
+    }
+
     private function boxFetchedPropertyIntoValue(
         PHPLLVM\Value $destSlot,
         Variable $fetched,

@@ -186,6 +186,11 @@ final class IteratorHelper
     public static function compileReset(Context $context, Variable $array, ?string $containerUserType = null): void
     {
         $slotKey = $array;
+        if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
+            ObjectPropertyForeachHelper::compileReset($context, $array, $slotKey);
+
+            return;
+        }
         if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
             IteratorProtocolHelper::compileForeachReset($context, $array, $slotKey, $containerUserType);
 
@@ -214,6 +219,9 @@ final class IteratorHelper
         ?string $containerUserType = null
     ): \PHPLLVM\Value {
         $slotKey = $array;
+        if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
+            return ObjectPropertyForeachHelper::compileValid($context, $slotKey, $containerUserType);
+        }
         if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
             return IteratorProtocolHelper::compileForeachValid($context, $slotKey, $containerUserType);
         }
@@ -365,6 +373,9 @@ final class IteratorHelper
         ?string $containerUserType = null
     ): Variable {
         $slotKey = $array;
+        if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
+            return ObjectPropertyForeachHelper::compileKey($context, $slotKey, $containerUserType);
+        }
         if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
             return IteratorProtocolHelper::compileForeachKey($context, $slotKey, $containerUserType);
         }
@@ -435,6 +446,9 @@ final class IteratorHelper
         ?string $containerUserType = null
     ): Variable {
         $slotKey = $array;
+        if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
+            return ObjectPropertyForeachHelper::compileValue($context, $slotKey, $containerUserType);
+        }
         if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
             return IteratorProtocolHelper::compileForeachValue($context, $slotKey, $containerUserType);
         }
@@ -452,13 +466,16 @@ final class IteratorHelper
         ?string $containerUserType = null,
         ?\PHPCompiler\JIT $jit = null
     ): Variable {
+        $slotKey = $array;
+        if (ObjectPropertyForeachHelper::canLower($context, $array, $containerUserType)) {
+            return ObjectPropertyForeachHelper::compileValueByRef($context, $slotKey, $containerUserType);
+        }
         if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
             self::emitForeachIteratorByRefError($context, $jit);
             $slot = JitValueBox::alloc($context);
 
             return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
         }
-        $slotKey = $array;
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
             return self::compileValueByRefObject($context, $slotKey);

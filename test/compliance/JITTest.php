@@ -363,10 +363,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'object_identical')) {
                 continue;
             }
-            // foreach over user objects / stdClass is VM-only until IteratorHelper object walk (#3661).
-            if (str_contains($name, 'foreach_object_by_ref')) {
-                continue;
-            }
             // array <=> array is VM-only until __hashtable__compareSpaceship JIT lowering (#3672).
             if (str_contains($name, 'spaceship_array')) {
                 continue;
