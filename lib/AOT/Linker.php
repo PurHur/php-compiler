@@ -20,7 +20,6 @@ final class Linker
         __DIR__.'/runtime/phpc_spaceship.c',
         __DIR__.'/runtime/password_crypto.c',
         __DIR__.'/runtime/phpc_fs_dir.c',
-        __DIR__.'/runtime/phpc_dir.c',
         __DIR__.'/runtime/phpc_upload_temp.c',
         __DIR__.'/runtime/phpc_session_lifecycle.c',
         __DIR__.'/runtime/phpc_session_storage.c',
@@ -42,7 +41,6 @@ final class Linker
     /** Runtime units that need host libc headers (glob/scandir; llvm sysroot lacks linux/limits.h). */
     private const RUNTIME_HOST_LIBC_BASENAMES = [
         'phpc_fs_dir.c',
-        'phpc_dir.c',
         'phpc_upload_temp.c',
         'preg_match.c',
         'password_crypto.c',
