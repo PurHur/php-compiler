@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Compiler;
 
 use PHPCfg\Block as CfgBlock;
-use PHPCfg\Operand;
 use PHPCfg\Op\Stmt\ClassMethod;
-use PHPCfg\Op\Stmt\TraitUse;
 
 /**
  * PHP 8.3 #[\Override] compile-time validation (Zend zend_compile_override_attribute).
@@ -36,7 +34,6 @@ final class OverrideValidator
         array $interfaceLcs,
         ClassCompileRegistry $registry
     ): void {
-        $traitLcs = self::collectTraitUseLcs($stmts);
         foreach ($stmts->children as $child) {
             if (!$child instanceof ClassMethod) {
                 continue;
@@ -46,7 +43,7 @@ final class OverrideValidator
                 continue;
             }
             $methodLc = strtolower($child->func->name);
-            if (!$registry->hasOverridableMethod($parentLc, $interfaceLcs, $traitLcs, $methodLc)) {
+            if (!$registry->hasOverridableMethod($parentLc, $interfaceLcs, $methodLc)) {
                 throw new \CompileError(sprintf(
                     '%s::%s() has #[\Override] attribute, but no matching parent method exists',
                     ltrim($className, '\\'),
@@ -55,7 +52,7 @@ final class OverrideValidator
             }
             $childLc = strtolower(ltrim($className, '\\'));
             $childSig = MethodSig::fromFunc($child->func, $childLc);
-            $parent = $registry->findOverriddenMethod($parentLc, $interfaceLcs, $traitLcs, $methodLc);
+            $parent = $registry->findOverriddenMethod($parentLc, $interfaceLcs, $methodLc);
             if (null !== $parent) {
                 $msg = InheritanceVariance::methodCompatibilityError(
                     ltrim($className, '\\'),
@@ -71,38 +68,5 @@ final class OverrideValidator
                 }
             }
         }
-    }
-
-    /**
-     * @return list<string>
-     */
-    private static function collectTraitUseLcs(CfgBlock $stmts): array
-    {
-        $traits = [];
-        foreach ($stmts->children as $child) {
-            if (!$child instanceof TraitUse) {
-                continue;
-            }
-            foreach ($child->traits as $traitOperand) {
-                $traitLc = self::operandLcName($traitOperand);
-                if (null !== $traitLc) {
-                    $traits[] = $traitLc;
-                }
-            }
-        }
-
-        return $traits;
-    }
-
-    private static function operandLcName(Operand $op): ?string
-    {
-        if ($op instanceof Operand\Literal && is_string($op->value)) {
-            return strtolower(ltrim($op->value, '\\'));
-        }
-        if ($op instanceof Operand\Variable) {
-            return self::operandLcName($op->name);
-        }
-
-        return null;
     }
 }
