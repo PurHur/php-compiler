@@ -48,7 +48,8 @@ final class str_increment extends Internal
 
         return JitStrIncdec::increment(
             $context,
-            $this->jitString($context, $args[0], 'str_increment() argument #1')
+            $this->jitString($context, $args[0], 'str_increment() argument #1'),
+            $args[0]
         );
     }
 }

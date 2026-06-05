@@ -20,7 +20,6 @@ final class Linker
         __DIR__.'/runtime/phpc_info.c',
         __DIR__.'/runtime/phpc_spaceship.c',
         __DIR__.'/runtime/phpc_similar_text.c',
-        __DIR__.'/runtime/phpc_str_incdec.c',
         __DIR__.'/runtime/phpc_base_convert.c',
         __DIR__.'/runtime/phpc_str_getcsv.c',
         __DIR__.'/runtime/phpc_strtok.c',

@@ -48,7 +48,8 @@ final class str_decrement extends Internal
 
         return JitStrIncdec::decrement(
             $context,
-            $this->jitString($context, $args[0], 'str_decrement() argument #1')
+            $this->jitString($context, $args[0], 'str_decrement() argument #1'),
+            $args[0]
         );
     }
 }
