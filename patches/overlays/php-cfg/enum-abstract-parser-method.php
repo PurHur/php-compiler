@@ -24,6 +24,10 @@
                 $this->parseEnumCase($stmt);
             } elseif ($stmt instanceof Stmt\ClassMethod) {
                 $this->parseStmt_ClassMethod($stmt);
+            } elseif ($stmt instanceof Stmt\TraitUse) {
+                $this->parseStmt_TraitUse($stmt);
+            } elseif ($stmt instanceof Stmt\ClassConst) {
+                $this->parseStmt_ClassConst($stmt);
             }
         }
         $this->block = $savedBlock;
