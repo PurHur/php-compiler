@@ -552,6 +552,24 @@ class Compiler {
         }
     }
 
+    /**
+     * php-src: Zend/zend_compile.c — readonly on parameters is only valid in __construct (#6291).
+     *
+     * @param list<Op\Expr\Param> $params
+     */
+    protected function assertReadonlyParamOnlyInConstructor(array $params, ?CfgFunc $func): void
+    {
+        if (null !== $func && '__construct' === $func->name && null !== $func->class) {
+            return;
+        }
+        foreach ($params as $param) {
+            if (!$this->isPromotedParamReadonly($param)) {
+                continue;
+            }
+            $this->throwCompileError('Cannot declare promoted property outside a constructor');
+        }
+    }
+
     protected function compileCfgBlock(CfgBlock $block, array $params = [], ?CfgFunc $func = null): Block {
         if (null === $this->seen) {
             $this->seen = new SplObjectStorage;
@@ -566,6 +584,7 @@ class Compiler {
             if ([] !== $params) {
                 $this->assertNoDuplicateParameterNames($params);
                 $this->assertNoDuplicateParameterAttributes($params);
+                $this->assertReadonlyParamOnlyInConstructor($params, $func);
             }
             $paramIdx = 0;
             foreach ($params as $param) {
