@@ -103,6 +103,12 @@ class Object_ extends Type {
     /** @var array<int, array<string, array{type: int, value: int|float|bool|string|null}>> */
     private array $classConstants = [];
 
+    /** @var array<int, array<string, string>> class id => const key lc => canonical display name */
+    private array $classConstDisplayNames = [];
+
+    /** @var array<int, array<string, string>> class id => const key lc => trait FQCN when imported via use Trait */
+    private array $traitConstSources = [];
+
     /** @var array<string, PHPLLVM\Value> singleton __object__* globals for object class constants (#3196) */
     private array $classConstObjectGlobals = [];
 
@@ -2892,6 +2898,8 @@ class Object_ extends Type {
     public function defineClassConst(int $classId, string $name, VMVariable $value): void
     {
         $key = strtolower($name);
+        $this->classConstDisplayNames[$classId][$key] = $name;
+        unset($this->traitConstSources[$classId][$key]);
         if (VMVariable::TYPE_ARRAY === $value->type) {
             $table = $value->toArray();
             if (!$table instanceof \PHPCompiler\VM\HashTable) {
@@ -2955,6 +2963,8 @@ class Object_ extends Type {
         string $caseKey
     ): void {
         $constKey = strtolower($constName);
+        $this->classConstDisplayNames[$holdingClassId][$constKey] = $constName;
+        unset($this->traitConstSources[$holdingClassId][$constKey]);
         $caseKey = strtolower($caseKey);
         if (!$this->isEnumClassId($enumClassId)) {
             throw new \LogicException('Class constant enum case reference requires an enum class id');
@@ -3095,13 +3105,30 @@ class Object_ extends Type {
         if (!isset($this->classConstants[$traitId])) {
             return;
         }
+        $className = $this->classNameForId($classId);
         foreach ($this->classConstants[$traitId] as $name => $entry) {
             if (isset($this->classConstants[$classId][$name])) {
-                throw new \LogicException(
-                    "Trait constant {$traitName}::{$name} conflicts with an existing class constant"
-                );
+                if ($this->classConstEntriesIdentical($this->classConstants[$classId][$name], $entry)) {
+                    continue;
+                }
+                $prevTrait = $this->traitConstSources[$classId][$name] ?? $className;
+                $constDisplay = $this->classConstDisplayNames[$classId][$name]
+                    ?? $this->classConstDisplayNames[$traitId][$name]
+                    ?? $name;
+                throw new \LogicException(sprintf(
+                    '%s and %s define the same constant (%s) in the composition of %s. '
+                    .'However, the definition differs and is considered incompatible. Class was composed',
+                    $prevTrait,
+                    $traitName,
+                    $constDisplay,
+                    $className
+                ));
             }
             $this->classConstants[$classId][$name] = $entry;
+            $this->traitConstSources[$classId][$name] = $traitName;
+            if (isset($this->classConstDisplayNames[$traitId][$name])) {
+                $this->classConstDisplayNames[$classId][$name] = $this->classConstDisplayNames[$traitId][$name];
+            }
         }
     }
 
@@ -4027,6 +4054,22 @@ class Object_ extends Type {
             Variable::KIND_VALUE,
             $obj
         );
+    }
+
+    /**
+     * @param array{type: int, value?: int|float|bool|string|null, global?: string} $left
+     * @param array{type: int, value?: int|float|bool|string|null, global?: string} $right
+     */
+    private function classConstEntriesIdentical(array $left, array $right): bool
+    {
+        if (($left['type'] ?? null) !== ($right['type'] ?? null)) {
+            return false;
+        }
+        if (isset($left['global']) || isset($right['global'])) {
+            return ($left['global'] ?? null) === ($right['global'] ?? null);
+        }
+
+        return ($left['value'] ?? null) === ($right['value'] ?? null);
     }
 
     /**
