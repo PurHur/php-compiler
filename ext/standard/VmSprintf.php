@@ -8,6 +8,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
 final class VmSprintf
@@ -17,7 +19,7 @@ final class VmSprintf
     /**
      * @param list<Variable> $args
      */
-    public static function format(string $format, array $args): string
+    public static function format(string $format, array $args, ?Frame $frame = null): string
     {
         $out = '';
         $argIdx = 0;
@@ -42,13 +44,13 @@ final class VmSprintf
             $var = $args[$argIdx++];
             switch ($spec) {
                 case 's':
-                    $out .= self::argToString($var);
+                    $out .= self::argToString($var, $frame);
                     break;
                 case 'd':
-                    $out .= self::intToDecimal(self::argToInt($var));
+                    $out .= self::intToDecimal(self::argToInt($var, $frame));
                     break;
                 case 'f':
-                    $out .= VmNumberFormat::format(self::argToFloat($var), 6, '.', '');
+                    $out .= VmNumberFormat::format(self::argToFloat($var, $frame), 6, '.', '');
                     break;
                 default:
                     throw new \LogicException(
@@ -63,8 +65,12 @@ final class VmSprintf
         return $out;
     }
 
-    private static function argToString(Variable $var): string
+    private static function argToString(Variable $var, ?Frame $frame = null): string
     {
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
+            throw new \Error("Object of class {$enumClass->name} could not be converted to string");
+        }
         switch ($var->type) {
             case Variable::TYPE_STRING:
                 return $var->toString();
@@ -81,8 +87,14 @@ final class VmSprintf
         }
     }
 
-    private static function argToInt(Variable $var): int
+    private static function argToInt(Variable $var, ?Frame $frame = null): int
     {
+        $enumInt = null !== $frame
+            ? VmScalarType::tryEnumCaseToInt($frame, $var)
+            : EnumCaseSupport::tryCastToInt($var);
+        if (null !== $enumInt) {
+            return $enumInt;
+        }
         switch ($var->type) {
             case Variable::TYPE_INTEGER:
                 return $var->toInt();
@@ -99,8 +111,14 @@ final class VmSprintf
         }
     }
 
-    private static function argToFloat(Variable $var): float
+    private static function argToFloat(Variable $var, ?Frame $frame = null): float
     {
+        $enumFloat = null !== $frame
+            ? VmScalarType::tryEnumCaseToFloat($frame, $var)
+            : EnumCaseSupport::tryCastToFloat($var);
+        if (null !== $enumFloat) {
+            return $enumFloat;
+        }
         switch ($var->type) {
             case Variable::TYPE_FLOAT:
                 return $var->toFloat();

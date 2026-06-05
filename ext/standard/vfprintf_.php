@@ -42,7 +42,8 @@ final class vfprintf_ extends Internal
         $written = VmVprintf::vfprintf(
             $handleVar->toInt(),
             $fmtVar->toString(),
-            $argsVar
+            $argsVar,
+            $frame
         );
         if (null !== $frame->returnVar) {
             $frame->returnVar->int($written);
