@@ -7,7 +7,10 @@ namespace PHPCompiler\VM;
 use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\CompileTimeNew;
 use PHPCompiler\Frame;
+use PHPCompiler\Func;
 use PHPCompiler\VM as VmEngine;
+use PHPCompiler\VM\Builtin\AttributeConstruct;
+use PHPCompiler\VM\Builtin\DeprecatedConstruct;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -239,11 +242,56 @@ final class ReflectionSupport
         $thisVar = new Variable();
         $thisVar->object($object);
         $invokeArgs = self::constructorInvokeVariables($classEntry->constructor, $spec->args, $ctx);
-        $vm->invokePhpFunction($classEntry->constructor, $thisVar, ...$invokeArgs);
+        self::invokeAttributeConstructor($vm, $ctx, $classEntry->constructor, $thisVar, $invokeArgs);
         self::applyConstructorPropertyArgs($object, $classEntry->constructor, $spec->args, $ctx);
         $object->constructed = true;
 
         return $result;
+    }
+
+    /**
+     * @param list<Variable> $invokeArgs
+     */
+    public static function invokeAttributeConstructor(
+        VmEngine $vm,
+        Context $ctx,
+        Func $ctor,
+        Variable $thisVar,
+        array $invokeArgs,
+    ): void {
+        if ($ctor instanceof Func\PHP) {
+            $vm->invokePhpFunction($ctor, $thisVar, ...$invokeArgs);
+
+            return;
+        }
+        if ($ctor instanceof Func\Internal) {
+            $frame = $ctor->getFrame($ctx);
+            $frame->vmContext = $ctx;
+            $frame->calledArgs = array_merge([$thisVar], $invokeArgs);
+            $ctor->execute($frame);
+
+            return;
+        }
+        throw new \LogicException('Unsupported attribute constructor in this compiler build');
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function constructorParamNames(Func $ctor): array
+    {
+        if ($ctor instanceof Func\PHP) {
+            return $ctor->block->paramNames;
+        }
+        if ($ctor instanceof Func\Internal) {
+            return match ($ctor::class) {
+                DeprecatedConstruct::class => ['message', 'since'],
+                AttributeConstruct::class => ['flags'],
+                default => [],
+            };
+        }
+
+        return [];
     }
 
     /**
@@ -254,7 +302,7 @@ final class ReflectionSupport
      * @return list<Variable>
      */
     public static function constructorInvokeVariables(
-        \PHPCompiler\Func\PHP $ctor,
+        Func $ctor,
         array $argSpecs,
         ?Context $ctx = null,
     ): array {
@@ -269,7 +317,7 @@ final class ReflectionSupport
         }
         $vars = [];
         $pi = 0;
-        foreach ($ctor->block->paramNames as $paramName) {
+        foreach (self::constructorParamNames($ctor) as $paramName) {
             if (isset($named[$paramName])) {
                 $vars[] = self::attributeValueToVariable($named[$paramName], $ctx);
             } elseif (array_key_exists($pi, $positional)) {
@@ -293,10 +341,13 @@ final class ReflectionSupport
      */
     public static function applyConstructorPropertyArgs(
         ObjectEntry $object,
-        \PHPCompiler\Func\PHP $ctor,
+        Func $ctor,
         array $argSpecs,
         ?Context $ctx = null,
     ): void {
+        if ($ctor instanceof Func\Internal) {
+            return;
+        }
         $positional = [];
         $named = [];
         foreach ($argSpecs as $spec) {
@@ -307,7 +358,7 @@ final class ReflectionSupport
             }
         }
         $pi = 0;
-        foreach ($ctor->block->paramNames as $paramName) {
+        foreach (self::constructorParamNames($ctor) as $paramName) {
             if (isset($named[$paramName])) {
                 $value = $named[$paramName];
             } elseif (array_key_exists($pi, $positional)) {
