@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\ScriptMagic;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\OpCode;
@@ -31,10 +32,7 @@ final class trigger_error_ extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('trigger_error() requires VM context');
         }
-        $messageVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $messageVar->type) {
-            throw new \LogicException('trigger_error() message must be a string');
-        }
+        $message = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'trigger_error', 0, 'message');
         $level = ErrorReporter::E_USER_NOTICE;
         if (2 === $argc) {
             $levelVar = $frame->calledArgs[1]->resolveIndirect();
@@ -58,7 +56,7 @@ final class trigger_error_ extends Internal
             $file = $frame->scriptPath;
         }
         $frame->vmContext->errors->triggerError(
-            $messageVar->toString(),
+            $message,
             $level,
             $file,
             $frame->vmContext,
@@ -76,13 +74,7 @@ final class trigger_error_ extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('trigger_error() requires one or two arguments');
         }
-        if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
-            $this->jitString($context, $args[0], 'trigger_error() message');
-        }
-        $literal = $args[0]->compileTimeString ?? null;
-        if (JITVariable::TYPE_STRING !== $args[0]->type || null === $literal) {
-            throw new \LogicException('trigger_error() message must be a string literal in this compiler build');
-        }
+        $msgStr = JitStringBuiltinArg::lower($context, $args[0], 'trigger_error', 0, 'message');
         $level = ErrorReporter::E_USER_NOTICE;
         if (2 === $argc) {
             $level = self::jitResolveErrorLevel($context, $args[1]);
@@ -90,8 +82,15 @@ final class trigger_error_ extends Internal
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $i32 = $context->getTypeFromString('int32');
-        $msgPtr = $context->builder->pointerCast($context->constantFromString($literal), $i8p);
-        $msgLen = $sizeT->constInt(\strlen($literal), false);
+        $map = $context->structFieldMap['__string__'];
+        $msgLen = $context->builder->load(
+            $context->builder->structGep($msgStr, $map['length'])
+        );
+        $msgLen = $context->builder->zExt(
+            $context->builder->trunc($msgLen, $i32),
+            $sizeT
+        );
+        $msgPtr = $context->builder->structGep($msgStr, $map['value']);
         $filePath = '';
         if (null !== $context->jitEnclosingBlock) {
             $filePath = ScriptMagic::stringForBlock($context->jitEnclosingBlock, OpCode::SCRIPT_MAGIC_FILE);
