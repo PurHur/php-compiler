@@ -398,6 +398,7 @@ class Module extends ModuleAbstract
             new stream_set_write_buffer_(),
             new stream_set_read_buffer_(),
             new stream_supports(),
+            new stream_supports_lock(),
             new fopen(),
             new fread(),
             new stream_get_contents(),
