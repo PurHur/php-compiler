@@ -11,7 +11,7 @@ use PhpParser\Node\Stmt\Class_ as ClassNode;
 
 /**
  * Compile-time check: typed class constant redeclarations must be covariant-compatible
- * with parent/interface/trait definitions (PHP 8.3, zend_inheritance.c do_inherit_constant_check, #5953, #5993).
+ * with parent/interface/trait definitions (PHP 8.3, zend_inheritance.c do_inherit_constant_check, #5953, #5982, #5993).
  */
 final class TypedClassConstInheritCheck
 {
