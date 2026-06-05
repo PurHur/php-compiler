@@ -25,13 +25,7 @@ final class gzdecode extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('gzdecode() expects one or two arguments in this compiler build');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $data = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $data->type) {
-            throw new \LogicException('gzdecode() data must be a string in this compiler build');
-        }
+        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'gzdecode', 0, 'data');
         $maxLength = 0;
         if (2 === $argc) {
             $maxVar = $frame->calledArgs[1]->resolveIndirect();
@@ -40,7 +34,10 @@ final class gzdecode extends Internal
             }
             $maxLength = $maxVar->toInt();
         }
-        $result = VmZlib::gzdecode($data->toString(), $maxLength);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmZlib::gzdecode($data, $maxLength);
         if (false === $result) {
             VmZlib::triggerWarning($frame, 'gzdecode(): data error');
 

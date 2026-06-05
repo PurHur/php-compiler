@@ -25,13 +25,7 @@ final class gzcompress extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('gzcompress() expects one to three arguments in this compiler build');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $data = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $data->type) {
-            throw new \LogicException('gzcompress() data must be a string in this compiler build');
-        }
+        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'gzcompress', 0, 'data');
         $level = -1;
         $encoding = \ZLIB_ENCODING_DEFLATE;
         if ($argc >= 2) {
@@ -48,7 +42,10 @@ final class gzcompress extends Internal
             }
             $encoding = $encVar->toInt();
         }
-        $result = VmZlib::gzcompress($data->toString(), $level, $encoding);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmZlib::gzcompress($data, $level, $encoding);
         if (false === $result) {
             VmZlib::triggerWarning($frame, 'gzcompress(): data error');
 
