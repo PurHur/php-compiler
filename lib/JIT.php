@@ -9940,6 +9940,13 @@ class JIT {
 
             return;
         }
+        if (null !== $read->staticPropertyGlobal) {
+            $write = $this->context->getVariableFromOpInScopes($writeOp);
+            $this->compileStaticPropertyIncDecOp($read, $write, $resultOp, $increment, $prefix);
+
+            return;
+        }
+
         if (null !== $read->objectPropertySlot) {
             $this->compileObjectPropertyIncDecOp($read, $resultOp, $increment, $prefix);
 
@@ -10125,6 +10132,69 @@ class JIT {
             Variable::KIND_VALUE,
             $result
         );
+    }
+
+    /** ++/-- on static hooked properties: get hook read, set hook write (#6319). */
+    private function compileStaticPropertyIncDecOp(
+        Variable $read,
+        Variable $write,
+        \PHPCfg\Operand $resultOp,
+        bool $increment,
+        bool $prefix
+    ): void {
+        if (null === $read->staticPropertyType) {
+            throw new \LogicException('staticPropertyGlobal requires staticPropertyType');
+        }
+        $className = $read->staticPropertyHookClassLc ?? '';
+        $propName = $read->objectPropertyName ?? '';
+        $current = null;
+        if ('' !== $className && '' !== $propName) {
+            $hookVal = JIT\PropertyHookDispatch::tryEmitStaticPropertyGet(
+                $this->context,
+                $className,
+                $propName,
+                $this->context->jitEnclosingBlock
+            );
+            if (null !== $hookVal) {
+                $current = new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VALUE,
+                    $hookVal
+                );
+            }
+        }
+        if (null === $current) {
+            $current = $read;
+        }
+        if (!$prefix) {
+            $this->assignOperand($resultOp, $current, true);
+        }
+        $arithOp = new OpCode($increment ? OpCode::TYPE_PLUS : OpCode::TYPE_MINUS);
+        $oneVar = new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $this->context->constantFromInteger(1)
+        );
+        $newVal = $this->context->helper->binaryOp($arithOp, $current, $oneVar);
+        if (!JIT\PropertyHookDispatch::emitStaticSetHookIfNeeded(
+            $this->context,
+            $write,
+            $newVal,
+            $this->context->jitEnclosingBlock,
+            $this
+        )) {
+            $this->context->type->object->staticPropertyStore(
+                $read->staticPropertyGlobal,
+                $newVal,
+                $read->staticPropertyType,
+                $read->staticPropertyInitGlobal
+            );
+        }
+        if ($prefix) {
+            $this->assignOperand($resultOp, $newVal, true);
+        }
     }
 
     /** ++/-- on object properties: guard readonly and store via property slot (#3149). */

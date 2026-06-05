@@ -4311,6 +4311,17 @@ restart:
         if (null !== $catchFrame) {
             return $catchFrame;
         }
+        $hookedRead = $this->fetchHookedPropertyValueForIncDec($write, $frame);
+        if (null !== $hookedRead) {
+            return $this->executeHookedPropertyIncDec(
+                $frame,
+                $hookedRead,
+                $write,
+                $result,
+                $increment,
+                $prefix
+            );
+        }
         $working = new Variable();
         $working->copyFrom($read->resolveIndirect());
         try {
@@ -4333,6 +4344,77 @@ restart:
                 $working->applyDecrement();
             }
             $write->copyFrom($working);
+            $result->copyFrom($old);
+        } catch (\TypeError $e) {
+            return $this->dispatchVmTypeError($e, $frame);
+        }
+
+        return null;
+    }
+
+    /**
+     * Read via get hook for ++/-- on hooked static or instance properties (#6319, zend_property_hooks.c).
+     */
+    private function fetchHookedPropertyValueForIncDec(Variable $write, Frame $frame): ?Variable
+    {
+        if ($this->isPropertyHookRawWrite($frame, $this->resolvePropertyWriteName($write) ?? '')) {
+            return null;
+        }
+        $target = $write->resolveIndirect();
+        $classLc = $target->staticPropertyClassLc;
+        $staticPropName = $target->objectPropertyName;
+        if (is_string($classLc) && is_string($staticPropName) && '' !== $staticPropName) {
+            $hooks = $this->resolveStaticPropertyHooks($classLc, strtolower($staticPropName));
+            $getLc = $hooks['get'] ?? null;
+            if (null === $getLc) {
+                return null;
+            }
+
+            return $this->fetchStaticPropertyWithHooks($classLc, $staticPropName, $getLc, $frame);
+        }
+        $owner = $this->resolvePropertyWriteOwner($write);
+        $propName = $this->resolvePropertyWriteName($write);
+        if (null === $owner || null === $propName) {
+            return null;
+        }
+
+        return $this->fetchPropertyWithHooks($owner, $propName, $frame);
+    }
+
+    private function executeHookedPropertyIncDec(
+        Frame $frame,
+        Variable $hookedRead,
+        Variable $write,
+        Variable $result,
+        bool $increment,
+        bool $prefix
+    ): ?Frame {
+        $working = new Variable();
+        $working->copyFrom($hookedRead->resolveIndirect());
+        try {
+            if ($prefix) {
+                if ($increment) {
+                    $working->applyIncrement();
+                } else {
+                    $working->applyDecrement();
+                }
+                if (!$this->dispatchPropertySetHookAssign($write, $working, $frame)) {
+                    $write->copyFrom($working);
+                }
+                $result->copyFrom($working);
+
+                return null;
+            }
+            $old = new Variable();
+            $old->copyFrom($working);
+            if ($increment) {
+                $working->applyIncrement();
+            } else {
+                $working->applyDecrement();
+            }
+            if (!$this->dispatchPropertySetHookAssign($write, $working, $frame)) {
+                $write->copyFrom($working);
+            }
             $result->copyFrom($old);
         } catch (\TypeError $e) {
             return $this->dispatchVmTypeError($e, $frame);
