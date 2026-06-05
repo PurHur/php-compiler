@@ -1114,8 +1114,6 @@ require_once __DIR__.'/../../../lib/JIT/AotDebugSymbols.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayAccessHelper.php';
 require_once __DIR__.'/../../../lib/JIT/AsymmetricVisibilityGuard.php';
 require_once __DIR__.'/../../../lib/JIT/BoundMethodCallableHelper.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/CompactApplyArg.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/CompactRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/EmbedObOutput.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ErrorRaise.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ErrorReporting.php';

@@ -158,7 +158,6 @@ class Type extends Builtin {
         $this->context->registerFunction('__compiler_begin_silence', $fnBeginSilence);
         $fnEndSilence = $this->context->module->addFunction('__compiler_end_silence', $fntypeSilence);
         $this->context->registerFunction('__compiler_end_silence', $fnEndSilence);
-        CompactApplyArg::implement($this->context);
         $fntypeStripTags = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
