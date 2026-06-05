@@ -2255,6 +2255,47 @@ apply_php_cfg_in_operator_overlay() {
   echo "Applied php-cfg-in-operator overlay (In_.php)"
 }
 
+apply_php_cfg_typed_class_const_overlay() {
+  local const_op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php"
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg/Op/Terminal/Const_.php"
+  if patch_already_applied "$PATCH_DIR/php-cfg-typed-class-const.patch"; then
+    echo "Skip php-cfg-typed-class-const.patch (already applied)"
+    return 0
+  fi
+  if [[ ! -f "$overlay" ]]; then
+    echo "Skip php-cfg-typed-class-const overlay (missing $overlay)" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$const_op")"
+  cp "$overlay" "$const_op"
+  python3 - "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+text = parser_path.read_text()
+if 'declaredType = null !== $node->type' in text:
+    sys.exit(0)
+old = """            $this->block->children[] = new Op\\Terminal\\Const_(
+                $this->parseExprNode($const->name),
+                $value, $valueBlock,
+                $this->mapAttributes($node)
+            );"""
+new = """            $constOp = new Op\\Terminal\\Const_(
+                $this->parseExprNode($const->name),
+                $value, $valueBlock,
+                $this->mapAttributes($node)
+            );
+            $constOp->declaredType = null !== $node->type ? $this->parseTypeNode($node->type) : null;
+            $this->block->children[] = $constOp;"""
+if old not in text:
+    raise SystemExit('php-cfg typed class const: parseStmt_ClassConst anchor missing')
+parser_path.write_text(text.replace(old, new, 1))
+PY
+  echo "Applied php-cfg-typed-class-const overlay (#6012)"
+}
+
 apply_php_cfg_list_spread_overlay() {
   local assign="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assign.php"
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
@@ -3073,6 +3114,10 @@ apply_patch() {
     apply_php_cfg_list_spread_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-typed-class-const.patch" ]]; then
+    apply_php_cfg_typed_class_const_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-match.patch" ]]; then
     apply_php_cfg_match_overlay
     return $?
@@ -3195,13 +3240,15 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_php_cfg_magic_constants_overlay || true
   # PHP 8.3 `in` operator CFG node must survive optional patch failures (#4682, #4850).
   apply_php_cfg_in_operator_overlay || true
+  # PHP 8.3 typed class/trait constants must survive optional patch failures (#6012).
+  apply_php_cfg_typed_class_const_overlay || true
   apply_patch "$PATCH_DIR/php-cfg-dollars-brace.patch"
   apply_patch "$PATCH_DIR/php-cfg-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-cfg-nullsafe.patch"
   apply_patch "$PATCH_DIR/php-cfg-nullsafe-parser.patch"
   apply_patch "$PATCH_DIR/php-cfg-error-suppress-read.patch"
   apply_patch "$PATCH_DIR/php-cfg-error-suppress-simplifier.patch"
-  apply_patch "$PATCH_DIR/php-cfg-simplifier-call-unpack.patch"
+  apply_patch "$PATCH_DIR/php-cfg-simplifier-call-unpack.patch" || true
   apply_patch "$PATCH_DIR/php-cfg-strict-types.patch"
   apply_patch "$PATCH_DIR/php-cfg-trycatch.patch"
   apply_patch "$PATCH_DIR/php-cfg-goto-scope.patch"
@@ -3360,6 +3407,14 @@ verify_critical_language_patches() {
   fi
   if [[ ! -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/In_.php" ]]; then
     missing+=("php-cfg-in-operator-In_")
+  fi
+  if [[ -f "$const_file" ]] \
+    && ! grep -q 'public ?Type \$declaredType' "$const_file" 2>/dev/null; then
+    missing+=("php-cfg-typed-class-const-Const_")
+  fi
+  if grep -q 'function parseStmt_ClassConst' "$parser" 2>/dev/null \
+    && ! grep -q 'declaredType = null !== \$node->type' "$parser" 2>/dev/null; then
+    missing+=("php-cfg-typed-class-const-Parser")
   fi
   if ((${#missing[@]} > 0)); then
     echo "apply-patches: critical language patch markers missing: ${missing[*]}" >&2
