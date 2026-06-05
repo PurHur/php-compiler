@@ -28,6 +28,24 @@ PHP,
         );
     }
 
+    public function testEnumDebugInfoMethodFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Enum E cannot include magic method __debugInfo');
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+enum E: int {
+    case A = 1;
+    public function __debugInfo(): array {
+        return ['x' => 1];
+    }
+}
+PHP,
+            'enum_debuginfo.php'
+        );
+    }
+
     public function testBackedEnumStringableWithoutCustomToStringCompiles(): void
     {
         $runtime = new Runtime();
