@@ -11,7 +11,9 @@ use PHPCompiler\VM\IterableCheck;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** @covers \PHPCompiler\VM\IterableCheck */
+/** @covers \PHPCompiler\VM\IterableCheck
+ * @covers \PHPCompiler\VM\EnumCaseSupport::typeNameForVariable
+ */
 final class IterableParamTypeTest extends TestCase
 {
     public function testRejectsNonIterableScalars(): void

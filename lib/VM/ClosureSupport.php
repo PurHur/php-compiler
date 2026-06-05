@@ -356,16 +356,7 @@ final class ClosureSupport
 
     private static function valueTypeName(Variable $value): string
     {
-        return match ($value->type) {
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            default => 'mixed',
-        };
+        return EnumCaseSupport::typeNameForVariable($value);
     }
 
     private static function resolveClassScopeName(string $className, Frame $frame, Context $ctx): string

@@ -26,7 +26,7 @@ final class ParamTypeError
             $paramIndex + 1,
             $paramName,
             TypeCheck::typeNameForConstraint($expectedConstraint, $literalBoolType),
-            TypeCheck::typeNameForConstraint($value->type)
+            EnumCaseSupport::typeNameForVariable($argument)
         );
         if ($callSiteLine > 0 && '' !== $scriptPath) {
             $message .= sprintf(', called in %s on line %d', $scriptPath, $callSiteLine);

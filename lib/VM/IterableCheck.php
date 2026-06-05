@@ -39,16 +39,7 @@ final class IterableCheck
 
     public static function valueTypeName(Variable $value): string
     {
-        return match ($value->resolveIndirect()->type) {
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            default => 'mixed',
-        };
+        return EnumCaseSupport::typeNameForVariable($value);
     }
 
     public static function assertParameter(Variable $value, Context $context, string $kind = 'Argument'): void

@@ -47,14 +47,12 @@ final class VmString
             throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'array'));
         }
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
-            $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
-
             throw new \TypeError(
                 self::stringBuiltinTypeError(
                     $function,
                     $argIndex,
                     $paramName,
-                    null !== $enumClass ? $enumClass->name : 'object'
+                    EnumCaseSupport::typeNameForVariable($var)
                 )
             );
         }

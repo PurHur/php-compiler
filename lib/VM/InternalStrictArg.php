@@ -18,7 +18,7 @@ final class InternalStrictArg
             return $arg;
         }
         if (Variable::TYPE_INTEGER !== $arg->type) {
-            throw new \TypeError(self::message($function, $argIndex, $paramName, 'int', $arg->type));
+            throw new \TypeError(self::message($function, $argIndex, $paramName, 'int', $arg));
         }
 
         return $arg;
@@ -31,7 +31,7 @@ final class InternalStrictArg
             return $arg;
         }
         if (Variable::TYPE_STRING !== $arg->type) {
-            throw new \TypeError(self::message($function, $argIndex, $paramName, 'string', $arg->type));
+            throw new \TypeError(self::message($function, $argIndex, $paramName, 'string', $arg));
         }
 
         return $arg;
@@ -44,7 +44,7 @@ final class InternalStrictArg
     {
         $v = $arg->resolveIndirect();
         if (Variable::TYPE_NULL === $v->type) {
-            throw new \TypeError(self::message($function, $argIndex, $paramName, 'string', Variable::TYPE_NULL));
+            throw new \TypeError(self::message($function, $argIndex, $paramName, 'string', $v));
         }
     }
 
@@ -58,7 +58,7 @@ final class InternalStrictArg
         int $argIndex,
         string $paramName,
         string $expected,
-        int $givenType
+        Variable $arg
     ): string {
         return sprintf(
             '%s(): Argument #%d ($%s) must be of type %s, %s given',
@@ -66,21 +66,7 @@ final class InternalStrictArg
             $argIndex + 1,
             $paramName,
             $expected,
-            self::typeName($givenType)
+            EnumCaseSupport::typeNameForVariable($arg)
         );
-    }
-
-    private static function typeName(int $type): string
-    {
-        return match ($type) {
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            default => 'mixed',
-        };
     }
 }

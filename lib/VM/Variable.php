@@ -401,45 +401,18 @@ final class Variable {
         ));
     }
 
-    /** Zend zend_operators.c type name for operand TypeError messages (#3695, #4811). */
+    /** Zend zend_operators.c type name for operand TypeError messages (#3695, #4811, #6236). */
     private static function operandZendTypeName(Variable $var): string
     {
-        $enumName = self::operandEnumClassName($var);
-        if (null !== $enumName) {
-            return $enumName;
-        }
-        switch ($var->type) {
-            case self::TYPE_INTEGER:
-                return 'int';
-            case self::TYPE_FLOAT:
-                return 'float';
-            case self::TYPE_BOOLEAN:
-                return 'bool';
-            case self::TYPE_STRING:
-                return 'string';
-            case self::TYPE_NULL:
-                return 'null';
-            case self::TYPE_ARRAY:
-                return 'array';
-            case self::TYPE_OBJECT:
-                return 'object';
-            default:
-                return 'mixed';
-        }
+        return EnumCaseSupport::typeNameForVariable($var);
     }
 
     /** Enum case operands use the enum type name in unsupported-op messages (zend_operators.c). */
     private static function operandEnumClassName(Variable $var): ?string
     {
-        $var = $var->resolveIndirect();
-        if (self::TYPE_ENUM_CASE === $var->type) {
-            return $var->enumCase->enumClass->name;
-        }
-        if (self::TYPE_OBJECT === $var->type && EnumCaseSupport::isEnumCase($var->object)) {
-            return $var->object->class->name;
-        }
+        $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
 
-        return null;
+        return null !== $enumClass ? $enumClass->name : null;
     }
 
     private static function numericOpOperatorSymbol(int $opCode): string
