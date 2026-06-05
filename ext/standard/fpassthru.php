@@ -26,13 +26,11 @@ final class fpassthru extends Internal
             throw new \LogicException('fpassthru() requires exactly one argument in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'fpassthru');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('fpassthru() handle must be an integer in this compiler build');
-        }
-        $result = VmFs::fpassthru($handleVar->toInt());
+        $result = VmFs::fpassthru($handle);
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {

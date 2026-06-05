@@ -26,13 +26,11 @@ final class feof_ extends Internal
             throw new \LogicException('feof() requires exactly one argument in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'feof');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('feof() handle must be an integer in this compiler build');
-        }
-        $frame->returnVar->bool(VmFs::feof($handleVar->toInt()));
+        $frame->returnVar->bool(VmFs::feof($handle));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

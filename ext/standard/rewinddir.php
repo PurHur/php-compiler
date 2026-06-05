@@ -22,10 +22,8 @@ final class rewinddir extends Internal
             throw new \LogicException('rewinddir() requires exactly one argument in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('rewinddir() handle must be an integer in this compiler build');
-        }
-        VmDir::rewinddir($handleVar->toInt());
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'rewinddir');
+        VmDir::rewinddir($handle);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

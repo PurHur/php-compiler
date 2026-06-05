@@ -27,16 +27,14 @@ final class ftruncate_ extends Internal
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $sizeVar = $frame->calledArgs[1]->resolveIndirect();
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'ftruncate');
         if (null === $frame->returnVar) {
             return;
-        }
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('ftruncate() handle must be an integer in this compiler build');
         }
         if (Variable::TYPE_INTEGER !== $sizeVar->type) {
             throw new \LogicException('ftruncate() size must be an integer in this compiler build');
         }
-        $frame->returnVar->bool(VmFs::ftruncate($handleVar->toInt(), $sizeVar->toInt()));
+        $frame->returnVar->bool(VmFs::ftruncate($handle, $sizeVar->toInt()));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

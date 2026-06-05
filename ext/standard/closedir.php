@@ -22,10 +22,8 @@ final class closedir extends Internal
             throw new \LogicException('closedir() requires exactly one argument in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('closedir() handle must be an integer in this compiler build');
-        }
-        VmDir::closedir($handleVar->toInt());
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'closedir');
+        VmDir::closedir($handle);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

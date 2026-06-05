@@ -21,13 +21,11 @@ final class readdir extends Internal
             throw new \LogicException('readdir() requires exactly one argument in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'readdir');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER !== $handleVar->type) {
-            throw new \LogicException('readdir() handle must be an integer in this compiler build');
-        }
-        $entry = VmDir::readdir($handleVar->toInt());
+        $entry = VmDir::readdir($handle);
         if (false === $entry) {
             $frame->returnVar->bool(false);
 
