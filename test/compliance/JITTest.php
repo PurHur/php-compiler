@@ -295,10 +295,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'generator_get_return')) {
                 continue;
             }
-            // ?: merge branch slot unification is VM-only until JIT CFG merge (#3790).
-            if (str_contains($name, 'ternary_func_call')) {
-                continue;
-            }
             // exit/die expression ScriptExit status — VM compliance (#3539).
             if (str_contains($name, 'exit_expression') || str_contains($name, 'die_expression')) {
                 continue;
