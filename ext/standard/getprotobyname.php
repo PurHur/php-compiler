@@ -35,7 +35,7 @@ final class getprotobyname extends Internal
         if (Variable::TYPE_STRING !== $nameVar->type) {
             throw new \LogicException('getprotobyname() requires a string name in this compiler build');
         }
-        $number = VmNetwork::getprotobyname($nameVar->toString());
+        $number = VmNetworkServices::getprotobyname($nameVar->toString());
         if (false === $number) {
             $frame->returnVar->bool(false);
 

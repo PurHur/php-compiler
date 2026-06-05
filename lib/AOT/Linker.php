@@ -24,7 +24,6 @@ final class Linker
         __DIR__.'/runtime/password_crypto.c',
         __DIR__.'/runtime/phpc_fs_dir.c',
         __DIR__.'/runtime/phpc_dir.c',
-        __DIR__.'/runtime/phpc_network_services.c',
         __DIR__.'/runtime/phpc_getrusage.c',
         __DIR__.'/runtime/phpc_upload_temp.c',
         __DIR__.'/runtime/phpc_value_box.c',
@@ -52,7 +51,6 @@ final class Linker
     private const RUNTIME_HOST_LIBC_BASENAMES = [
         'phpc_fs_dir.c',
         'phpc_dir.c',
-        'phpc_network_services.c',
         'phpc_getrusage.c',
         'phpc_upload_temp.c',
         'preg_match.c',
