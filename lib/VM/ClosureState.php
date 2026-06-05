@@ -150,15 +150,19 @@ final class ClosureState
     public static function register(Context $ctx): void
     {
         $entry = new ClassEntry('Closure');
-        $pub = \PHPCfg\Func::FLAG_PUBLIC;
+        $pubStatic = \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC;
         $entry->methods['fromcallable'] = new Builtin\ClosureFromCallable();
-        $entry->methodVisibility['fromcallable'] = $pub;
+        $entry->methodVisibility['fromcallable'] = $pubStatic;
+        $entry->methodNames['fromcallable'] = 'fromCallable';
         $entry->methods['bind'] = new Builtin\ClosureBind();
-        $entry->methodVisibility['bind'] = $pub;
+        $entry->methodVisibility['bind'] = $pubStatic;
+        $entry->methodNames['bind'] = 'bind';
         $entry->methods['bindto'] = new Builtin\ClosureBindTo();
-        $entry->methodVisibility['bindto'] = $pub;
+        $entry->methodVisibility['bindto'] = $pubStatic;
+        $entry->methodNames['bindto'] = 'bindTo';
         $entry->methods['call'] = new Builtin\ClosureCall();
-        $entry->methodVisibility['call'] = $pub;
+        $entry->methodVisibility['call'] = $pubStatic;
+        $entry->methodNames['call'] = 'call';
         $ctx->classes['closure'] = $entry;
     }
 
