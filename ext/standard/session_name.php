@@ -12,7 +12,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** session_name() — get or set the session cookie name (issue #1184). */
-final class session_name extends Internal
+class session_name extends Internal
 {
     public function __construct()
     {

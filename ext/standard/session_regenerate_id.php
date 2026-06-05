@@ -12,7 +12,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** session_regenerate_id() — rotate session id (issue #1186). */
-final class session_regenerate_id extends Internal
+class session_regenerate_id extends Internal
 {
     public function __construct()
     {

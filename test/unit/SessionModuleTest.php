@@ -1,0 +1,61 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler;
+
+use PHPCompiler\ext\standard\VmReflection;
+use PHPCompiler\ext\standard\VmSession;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * session module skeleton registration (issue #6004).
+ *
+ * @group session_module_skeleton
+ */
+final class SessionModuleTest extends TestCase
+{
+    protected function tearDown(): void
+    {
+        VmSession::reset();
+        parent::tearDown();
+    }
+
+    public function test_session_module_skeleton_functions(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+
+        foreach (
+            [
+                'session_start',
+                'session_id',
+                'session_name',
+                'session_destroy',
+                'session_write_close',
+                'session_regenerate_id',
+            ] as $fn
+        ) {
+            self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
+        }
+
+        $code = <<<'PHP'
+<?php
+echo (int) function_exists('session_start');
+echo (int) function_exists('session_id');
+echo (int) function_exists('session_name');
+echo (int) function_exists('session_destroy');
+echo (int) function_exists('session_write_close');
+echo (int) function_exists('session_regenerate_id');
+echo PHP_SESSION_NONE, "\n";
+echo PHP_SESSION_ACTIVE, "\n";
+session_start();
+echo session_name(), "\n";
+session_write_close();
+PHP;
+        $block = $runtime->parseAndCompile($code, 'session_module.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1111111\n2\nPHPSESSID\n", ob_get_clean());
+    }
+}

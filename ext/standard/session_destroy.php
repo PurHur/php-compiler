@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /** session_destroy() — destroy session data (issue #1182). */
-final class session_destroy extends Internal
+class session_destroy extends Internal
 {
     public function __construct()
     {

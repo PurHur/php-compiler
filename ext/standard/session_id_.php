@@ -12,7 +12,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** session_id() — get or set the active session id (issue #1183). */
-final class session_id_ extends Internal
+class session_id_ extends Internal
 {
     public function __construct()
     {

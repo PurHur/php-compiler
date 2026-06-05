@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /** session_start() — resume or create file-backed $_SESSION (issues #64, #1182–#1186). */
-final class session_start extends Internal
+class session_start extends Internal
 {
     public function __construct()
     {

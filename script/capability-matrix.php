@@ -26,6 +26,8 @@ function collectCapabilities(string $root): array
     $modules = [
         'types' => new PHPCompiler\ext\types\Module(),
         'bcmath' => new PHPCompiler\ext\bcmath\Module(),
+        'filter' => new PHPCompiler\ext\filter\Module(),
+        'session' => new PHPCompiler\ext\session\Module(),
         'standard' => new PHPCompiler\ext\standard\Module(),
     ];
 
@@ -125,8 +127,10 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     $jit = false;
     if ($ref->hasMethod('call')) {
         $call = $ref->getMethod('call');
-        if ($call->getDeclaringClass()->getName() === $ref->getName()) {
-            $body = extractMethodBody($file, $call);
+        $declaring = $call->getDeclaringClass();
+        $bodyFile = $declaring->getFileName();
+        if (false !== $bodyFile) {
+            $body = extractMethodBody($bodyFile, $call);
             $jit = !preg_match('/not implemented for JIT/i', $body);
             if (!$jit && preg_match('/not implemented for JIT[^\'"]*([^\']+)/i', $body, $m)) {
                 $notes[] = trim($m[0]);
