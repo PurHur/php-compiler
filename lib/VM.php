@@ -4334,7 +4334,10 @@ restart:
         if (null !== $catchFrame) {
             return $catchFrame;
         }
-        $hookedRead = $this->fetchHookedPropertyValueForIncDec($write, $frame);
+        $resolvedRead = $read->resolveIndirect();
+        $hookedRead = Variable::TYPE_ARRAY === $resolvedRead->type
+            ? null
+            : $this->fetchHookedPropertyValueForIncDec($write, $frame);
         if (null !== $hookedRead) {
             return $this->executeHookedPropertyIncDec(
                 $frame,
@@ -4356,18 +4359,17 @@ restart:
                 }
                 $write->copyFrom($working);
                 $result->copyFrom($working);
-
-                return null;
-            }
-            $old = new Variable();
-            $old->copyFrom($working);
-            if ($increment) {
-                $working->applyIncrement();
             } else {
-                $working->applyDecrement();
+                $old = new Variable();
+                $old->copyFrom($working);
+                if ($increment) {
+                    $working->applyIncrement();
+                } else {
+                    $working->applyDecrement();
+                }
+                $write->copyFrom($working);
+                $result->copyFrom($old);
             }
-            $write->copyFrom($working);
-            $result->copyFrom($old);
         } catch (\TypeError $e) {
             return $this->dispatchVmTypeError($e, $frame);
         }
