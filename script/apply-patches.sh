@@ -966,9 +966,9 @@ elif "enumCaseHasExplicitValue" not in text.split("function parseEnumCase", 1)[-
     if case_is_only in text:
         text = text.replace(case_is_only, case_is_explicit, 1)
 
-if "enumCaseHasExplicitValue" not in const_text and "isEnumCase" in const_path.read_text():
-    const_text = const_path.read_text()
-    const_text = const_text.replace(
+const_fresh = const_path.read_text()
+if "enumCaseHasExplicitValue" not in const_fresh and "isEnumCase" in const_fresh:
+    const_text = const_fresh.replace(
         "    public bool $isEnumCase = false;\n\n",
         "    public bool $isEnumCase = false;\n\n"
         "    /** True when enum case declares `= value`; false for unit enum implicit case (#5397). */\n"
