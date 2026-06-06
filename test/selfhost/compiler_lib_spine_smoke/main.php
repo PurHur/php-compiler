@@ -1137,6 +1137,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringEnvLocal.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGetdate.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GethostbynamelRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/TimeSleepRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ProcessRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGetrusage.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGettimeofday.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHrtime.php';

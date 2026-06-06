@@ -4,18 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\ProcessRuntime;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for escapeshellcmd() via __compiler_escapeshellcmd (#3417). */
+/** LLVM lowering for escapeshellcmd() via ProcessRuntime::__compiler_escapeshellcmd (#3417). */
 final class JitEscapeshellcmd
 {
     /** @return Value */
     public static function invoke(Context $context, Value $argStr): Value
     {
+        ProcessRuntime::ensureLinked($context);
         $escaped = $context->builder->call(
             $context->lookupFunction('__compiler_escapeshellcmd'),
             $argStr

@@ -4,18 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\ProcessRuntime;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for shell_exec() via __compiler_shell_exec (popen). */
+/** LLVM lowering for shell_exec() via ProcessRuntime::__compiler_shell_exec (popen). */
 final class JitShellExec
 {
     /** @return Value */
     public static function invoke(Context $context, Value $cmdStr): Value
     {
+        ProcessRuntime::ensureLinked($context);
         $output = $context->builder->call(
             $context->lookupFunction('__compiler_shell_exec'),
             $cmdStr

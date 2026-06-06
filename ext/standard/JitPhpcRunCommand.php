@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\ProcessRuntime;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -12,12 +13,13 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for phpc_run_command() via __compiler_phpc_run_command (#2779). */
+/** LLVM lowering for phpc_run_command() via ProcessRuntime::__compiler_phpc_run_command (#2779). */
 final class JitPhpcRunCommand
 {
     /** @return Value */
     public static function invoke(Context $context, Value $cmdStr, ?JITVariable $envArg): Value
     {
+        ProcessRuntime::ensureLinked($context);
         $htPtrTy = $context->getTypeFromString('__hashtable__*');
         $envHt = $htPtrTy->constNull();
         if (null !== $envArg) {
