@@ -45,7 +45,8 @@ final class TypeCheck
         ?array $dnfArms,
         Context $context,
         bool $iterableElement = false,
-        bool $neverElement = false
+        bool $neverElement = false,
+        ?string $intersectionDisplay = null
     ): void {
         foreach ($elements as $element) {
             $probe = new Variable();
@@ -61,16 +62,20 @@ final class TypeCheck
 
                 continue;
             }
+            if (null !== $dnfArms) {
+                DnfCheck::assertMatches($probe, $dnfArms, $context);
+
+                continue;
+            }
+            if (null !== $intersection) {
+                self::assertParamIntersection($probe, $intersection, $context, $intersectionDisplay);
+
+                continue;
+            }
             if (null !== $typeConstraint) {
                 $resolved->typeConstraint = $typeConstraint;
             }
             self::coerceParameter($probe, $strict, $arraySpec);
-            if (null !== $intersection) {
-                self::assertParamIntersection($probe, $intersection, $context);
-            }
-            if (null !== $dnfArms) {
-                DnfCheck::assertMatches($probe, $dnfArms, $context);
-            }
         }
     }
 
@@ -88,9 +93,10 @@ final class TypeCheck
     public static function assertParamIntersection(
         Variable $dest,
         array $interfaceLcs,
-        Context $context
+        Context $context,
+        ?string $expectedDisplay = null
     ): void {
-        InterfaceCheck::assertObjectImplementsAll($dest, $interfaceLcs, $context, 'Argument');
+        InterfaceCheck::assertObjectImplementsAll($dest, $interfaceLcs, $context, 'Argument', $expectedDisplay);
     }
 
     public static function coercePropertyWrite(Variable $dest, bool $strict): void

@@ -3005,12 +3005,15 @@ class Compiler {
             return;
         }
         if ($declared instanceof Op\Type\Intersection) {
+            $display = $this->intersectionDisplayFromCfgType($declared);
             if ($variadicElement) {
                 $block->paramVariadicElementTypeConstraints[$slot] = Variable::TYPE_OBJECT;
                 $block->paramVariadicElementIntersectionConstraints[$slot] = $this->intersectionNamesFromCfgType($declared);
+                $block->paramVariadicElementIntersectionDisplayLabels[$slot] = $display;
             } else {
                 $block->paramTypeConstraints[$slot] = Variable::TYPE_OBJECT;
                 $block->paramIntersectionConstraints[$slot] = $this->intersectionNamesFromCfgType($declared);
+                $block->paramIntersectionDisplayLabels[$slot] = $display;
             }
 
             return;

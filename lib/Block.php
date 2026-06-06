@@ -95,8 +95,14 @@ class Block {
     /** @var array<int, list<string>> */
     public array $paramIntersectionConstraints = [];
 
+    /** @var array<int, string> declared intersection type labels for TypeError messages */
+    public array $paramIntersectionDisplayLabels = [];
+
     /** @var array<int, list<string>> typed variadic element intersection constraints (#4185) */
     public array $paramVariadicElementIntersectionConstraints = [];
+
+    /** @var array<int, string> typed variadic element intersection type labels (#6819) */
+    public array $paramVariadicElementIntersectionDisplayLabels = [];
 
     /** @var array<int, Op\Type> declared parameter types for reflection (#3355). */
     public array $paramDeclaredTypes = [];
@@ -496,6 +502,9 @@ class Block {
             $this->paramLiteralBoolTypes = $parent->paramLiteralBoolTypes;
             $this->returnLiteralBoolType = $parent->returnLiteralBoolType;
             $this->paramIntersectionConstraints = $parent->paramIntersectionConstraints;
+            $this->paramIntersectionDisplayLabels = $parent->paramIntersectionDisplayLabels;
+            $this->paramVariadicElementIntersectionConstraints = $parent->paramVariadicElementIntersectionConstraints;
+            $this->paramVariadicElementIntersectionDisplayLabels = $parent->paramVariadicElementIntersectionDisplayLabels;
             $this->paramDnfConstraints = $parent->paramDnfConstraints;
             $this->paramNames = $parent->paramNames;
             $this->paramByRef = $parent->paramByRef;
