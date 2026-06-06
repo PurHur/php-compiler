@@ -57,4 +57,35 @@ PHP,
         $verify->invoke($context);
         $this->addToAssertionCount(1);
     }
+
+    public function testGetOnlyPropertyHookIncDecJitModuleVerify(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(
+            <<<'PHP'
+<?php
+class Box {
+    private int $n = 0;
+    public int $count {
+        get => $this->n;
+    }
+}
+$b = new Box();
+try {
+    $b->count++;
+} catch (Throwable $e) {
+    echo get_class($e), "\n";
+}
+PHP,
+            'property_hook_get_only_incdec_jit_compile.php'
+        );
+        $this->assertNotNull($block);
+        $runtime->jitCompileBlock($block);
+
+        $context = $runtime->loadJitContext();
+        $verify = new \ReflectionMethod($context, 'compileCommon');
+        $verify->setAccessible(true);
+        $verify->invoke($context);
+        $this->addToAssertionCount(1);
+    }
 }

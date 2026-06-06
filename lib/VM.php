@@ -4839,6 +4839,10 @@ restart:
         if (null !== $catchFrame) {
             return $catchFrame;
         }
+        $catchFrame = $this->enforceVirtualPropertyHookWrite($write, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
         $resolvedRead = $read->resolveIndirect();
         $hookedRead = Variable::TYPE_ARRAY === $resolvedRead->type
             ? null
@@ -6581,6 +6585,10 @@ restart:
     {
         if ($op->arg1 !== $op->arg2) {
             return null;
+        }
+        $catchFrame = $this->enforceVirtualPropertyHookWrite($lvalue, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
         }
 
         return $this->enforceReadonlyPropertyWrite($lvalue, $frame);
