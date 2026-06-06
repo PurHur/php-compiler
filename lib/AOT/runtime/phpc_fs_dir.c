@@ -6,7 +6,6 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <fnmatch.h>
 #include <glob.h>
 #include <grp.h>
 #include <pwd.h>
@@ -273,45 +272,6 @@ long long __compiler_proc_nice(long long priority)
 
 
 void __phpc_strvec_free(char **items, int count);
-
-/** fnmatch() — returns 1 on match, 0 otherwise (issue #3189; php-src ext/standard/fnmatch.c). */
-static int phpc_fnmatch_system_flags(int php_flags)
-{
-    int sys = 0;
-
-    if (php_flags & 2) {
-        sys |= FNM_NOESCAPE;
-    }
-    if (php_flags & 1) {
-        sys |= FNM_PATHNAME;
-    }
-    if (php_flags & 4) {
-        sys |= FNM_PERIOD;
-    }
-#ifdef FNM_CASEFOLD
-    if (php_flags & 16) {
-        sys |= FNM_CASEFOLD;
-    }
-#endif
-
-    return sys;
-}
-
-int __phpc_fnmatch(__string__ *pattern, __string__ *filename, int flags)
-{
-    int rc;
-
-    if (NULL == pattern || NULL == filename) {
-        return 0;
-    }
-
-    rc = fnmatch(phpc_strdata(pattern), phpc_strdata(filename), phpc_fnmatch_system_flags(flags));
-    if (0 == rc) {
-        return 1;
-    }
-
-    return 0;
-}
 
 /** Collect glob matches; returns count (>= 0) or -1 on error. Caller frees with __phpc_strvec_free. */
 int __phpc_glob_vec(__string__ *pattern, int flags, char ***out_items)
