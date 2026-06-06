@@ -1,9 +1,9 @@
 --TEST--
-Language: asymmetric visibility — explicit public before private(set) compile fatal (#6774, zend_compile.c)
+Language: asymmetric visibility — duplicate public public(set) compile fatal (#6774, #6861, zend_compile.c)
 --FILE--
 <?php
 class C {
-    public private(set) string $x = 'a';
+    public public(set) string $x = 'a';
 }
 echo "ok\n";
 --EXPECT_EXIT--
