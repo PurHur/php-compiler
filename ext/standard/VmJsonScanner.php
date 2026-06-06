@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * JSON syntax scanner for VM json_validate() — mirrors lib/AOT/runtime/phpc_json_decode.c.
+ * JSON syntax scanner for VM json_validate() — mirrors StringJsonDecodeJit / former phpc_json_decode.c.
  *
  * php-src ref: ext/json/json_scanner.c (lexer-only validation subset).
  */
