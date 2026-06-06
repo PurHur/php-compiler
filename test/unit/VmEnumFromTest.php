@@ -110,6 +110,24 @@ PHP;
         $this->assertSame('object', $output);
     }
 
+    public function testBackedEnumFromSpaceshipMatchesCaseSingleton(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; }
+echo E::A <=> E::from(1);
+echo E::from(1) <=> E::A;
+echo E::A <=> E::tryFrom(1);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_from_spaceship.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame('000', $output);
+    }
+
     public function testIntBackedEnumFromRejectsNonNumericString(): void
     {
         $code = <<<'PHP'
