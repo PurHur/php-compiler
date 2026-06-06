@@ -3184,6 +3184,34 @@ restart:
                     $key = isset($frame->block->constants[$op->arg3])
                         ? $frame->block->constants[$op->arg3]
                         : $frame->scope[$op->arg3];
+                    if (Variable::TYPE_ENUM_CASE === $container->type) {
+                        [$propName, $catchFrame] = $this->coerceRuntimeOperandToString($key, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        $catchFrame = $this->enforcePropertyName($propName, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        $enumEntry = $container->toEnumCase()->enumClass;
+                        $readonlyMsg = EnumCaseSupport::readonlyPseudoPropertyViolationMessage(
+                            $enumEntry,
+                            $propName,
+                            true
+                        );
+                        if (null !== $readonlyMsg) {
+                            $catchFrame = $this->dispatchVmError($readonlyMsg, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+
+                            return self::EXCEPTION;
+                        }
+                        break;
+                    }
                     if (Variable::TYPE_OBJECT === $container->type) {
                         $object = $container->toObject();
                         if ($this->objectImplementsArrayAccess($object)) {
@@ -3199,6 +3227,23 @@ restart:
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
                             goto restart;
+                        }
+                        if (EnumCaseSupport::isEnumCase($object)) {
+                            $readonlyMsg = EnumCaseSupport::readonlyPseudoPropertyViolationMessage(
+                                $object->class,
+                                $propName,
+                                true
+                            );
+                            if (null !== $readonlyMsg) {
+                                $catchFrame = $this->dispatchVmError($readonlyMsg, $frame);
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+
+                                return self::EXCEPTION;
+                            }
+                            break;
                         }
                         $catchFrame = $this->enforceReadonlyPropertyUnset($object, $propName, $frame);
                         if (null !== $catchFrame) {
@@ -4022,6 +4067,22 @@ restart:
                         goto restart;
                     }
                     if (Variable::TYPE_ENUM_CASE === $var->type) {
+                        $enumEntry = $var->toEnumCase()->enumClass;
+                        $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
+                        $readonlyMsg = EnumCaseSupport::readonlyPseudoPropertyViolationMessage(
+                            $enumEntry,
+                            $name,
+                            false
+                        );
+                        if ($forWrite && null !== $readonlyMsg) {
+                            $catchFrame = $this->dispatchVmError($readonlyMsg, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+
+                            return self::EXCEPTION;
+                        }
                         try {
                             $prop = $var->toEnumCase()->fetchProperty($name, $this->context, $frame);
                         } catch (\LogicException $e) {
@@ -4067,6 +4128,21 @@ restart:
                     $propertyObject = $var->toObject();
                     VM\LazyObjectSupport::ensureInitialized($this, $propertyObject);
                     if (EnumCaseSupport::isEnumCase($propertyObject)) {
+                        $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
+                        $readonlyMsg = EnumCaseSupport::readonlyPseudoPropertyViolationMessage(
+                            $propertyObject->class,
+                            $name,
+                            false
+                        );
+                        if ($forWrite && null !== $readonlyMsg) {
+                            $catchFrame = $this->dispatchVmError($readonlyMsg, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+
+                            return self::EXCEPTION;
+                        }
                         try {
                             $result->copyFrom(EnumCaseSupport::getProperty(
                                 $propertyObject,
