@@ -23,7 +23,6 @@ final class Linker
         __DIR__.'/runtime/phpc_json_decode.c',
         __DIR__.'/runtime/phpc_unserialize.c',
         __DIR__.'/runtime/phpc_stream.c',
-        __DIR__.'/runtime/preg_match.c',
         __DIR__.'/runtime/phpc_cli_argv.c',
         __DIR__.'/runtime/phpc_gc.c',
     ];
@@ -33,7 +32,6 @@ final class Linker
     /** Runtime units that need host libc headers (glob/scandir; llvm sysroot lacks linux/limits.h). */
     private const RUNTIME_HOST_LIBC_BASENAMES = [
         'phpc_fs_dir.c',
-        'preg_match.c',
         'password_crypto.c',
     ];
 
@@ -234,10 +232,6 @@ final class Linker
         } else {
             $flags = self::runtimeCIncludeFlags();
         }
-        if ('preg_match.c' === $basename) {
-            $flags .= ' -DPCRE2_CODE_UNIT_WIDTH=8';
-        }
-
         return $flags;
     }
 
