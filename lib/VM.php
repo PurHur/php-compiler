@@ -7515,6 +7515,13 @@ restart:
 
             return null;
         }
+        if ('propertyisinitialized' === $methodLc) {
+            $frame->call = new VM\PropertyIsInitializedHandler();
+            $frame->callArgs = [$receiver];
+            $frame->callArgEntries = [];
+
+            return null;
+        }
         $class = $object->class;
         try {
             [$declaringClass, $methodLc] = $this->resolveInstanceMethod($class, $methodLc);
