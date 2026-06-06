@@ -9,9 +9,13 @@ class A {
 }
 class B extends A {
     public function go(): void {
-        echo parent::secret();
+        try {
+            echo parent::secret();
+        } catch (Throwable $e) {
+            echo get_class($e), ': ', $e->getMessage();
+        }
     }
 }
 (new B())->go();
 --EXPECT--
-ok
+Error: Call to private method A::secret() from scope B
