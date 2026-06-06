@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringStrspn;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -28,8 +29,8 @@ trait SpnJitExtended
 
         StringStrspn::ensureLinked($context);
         $map = $context->structFieldMap['__string__'];
-        $strVal = JitQuotPrint::lowerStringSubject($context, $args[0], $name, 1, 'string');
-        $maskVal = JitQuotPrint::lowerStringSubject($context, $args[1], $name, 2, 'characters');
+        $strVal = JitStringBuiltinArg::lower($context, $args[0], $name, 0, 'string');
+        $maskVal = JitStringBuiltinArg::lower($context, $args[1], $name, 1, 'characters');
         $strLen = $context->builder->load($context->builder->structGep($strVal, $map['length']));
         $maskLen = $context->builder->load($context->builder->structGep($maskVal, $map['length']));
         $strData = $this->stringDataPtr($context, $strVal);
