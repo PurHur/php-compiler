@@ -44,8 +44,12 @@ final class forward_static_call extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'forward_static_call() is not supported in JIT in this compiler build; use bin/vm.php'
-        );
+        if (\count($args) < 1) {
+            throw new \LogicException('forward_static_call() requires at least one argument');
+        }
+        $callable = $args[0];
+        $extra = \array_slice($args, 1);
+
+        return JitForwardStaticCall::invoke($context, $callable, $extra, 'forward_static_call');
     }
 }
