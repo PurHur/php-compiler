@@ -235,6 +235,16 @@ class Block {
             && '{main}' === $this->func->name;
     }
 
+    /**
+     * User function/method/closure body — unbound locals must not inherit {main} globals (#5454).
+     */
+    public function blocksScriptGlobalInheritance(): bool
+    {
+        return null !== $this->func
+            && !$this->isMainScript()
+            && !$this->inheritUndefinedLocals;
+    }
+
     public function getOperand(int $offset): Operand {
         foreach ($this->scope as $operand) {
             if ($this->scope[$operand] === $offset) {
@@ -349,6 +359,9 @@ class Block {
             return false;
         }
         if ($this->isLocallyWritten($operand)) {
+            return false;
+        }
+        if ($this->blocksScriptGlobalInheritance()) {
             return false;
         }
 
@@ -708,7 +721,15 @@ class Block {
 
     public static function findVariableInParentFramesByName(string $name, Frame $frame): ?Variable
     {
+        $blockScriptGlobals = null !== $frame->block && $frame->block->blocksScriptGlobalInheritance();
         for ($f = $frame; null !== $f; $f = $f->parent) {
+            if (
+                $blockScriptGlobals
+                && null !== $f->block
+                && $f->block->isMainScript()
+            ) {
+                break;
+            }
             if ('this' === $name) {
                 $boundThis = self::resolveBoundClosureThis($f);
                 if (null !== $boundThis) {
@@ -793,16 +814,18 @@ class Block {
                 }
                 $found = false;
                 // Resolve reads from the jump parent block, not the merge block's scope (#3787).
-                $parent = $frame->block->findSlot($op, $frame);
-                if (!is_null($parent)) {
-                    $scope[$pos] = $parent;
-                    $found = true;
-                }
-                if (!$found) {
-                    $inherited = self::findVariableInParentFrames($op, $frame);
-                    if (null !== $inherited) {
-                        $scope[$pos] = $inherited;
-                        continue;
+                if (!$this->blocksScriptGlobalInheritance()) {
+                    $parent = $frame->block->findSlot($op, $frame);
+                    if (!is_null($parent)) {
+                        $scope[$pos] = $parent;
+                        $found = true;
+                    }
+                    if (!$found) {
+                        $inherited = self::findVariableInParentFrames($op, $frame);
+                        if (null !== $inherited) {
+                            $scope[$pos] = $inherited;
+                            continue;
+                        }
                     }
                 }
                 if (!$found) {
@@ -829,10 +852,14 @@ class Block {
                         $scope[$pos] = new Variable(Variable::TYPE_UNDEFINED);
                         continue;
                     }
+                    if ($this->blocksScriptGlobalInheritance()) {
+                        $scope[$pos] = new Variable(Variable::TYPE_UNDEFINED);
+                        continue;
+                    }
                     throw new \LogicException("Could not resolve argument");
                 }
             } else {
-                if (null !== $frame) {
+                if (null !== $frame && !$this->blocksScriptGlobalInheritance()) {
                     $inherited = self::findVariableInParentFrames($op, $frame);
                     if (null !== $inherited) {
                         $scope[$pos] = $inherited;
@@ -861,6 +888,8 @@ class Block {
                     } elseif (null === $frame || self::usesMainScriptGlobalSlot($op, $this)) {
                         // {main} locals live in the global table on every CFG block (#3601, #3787).
                         $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
+                    } elseif ($this->blocksScriptGlobalInheritance() && null !== $frame) {
+                        $scope[$pos] = new Variable(Variable::TYPE_UNDEFINED);
                     } else {
                         $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
                     }
