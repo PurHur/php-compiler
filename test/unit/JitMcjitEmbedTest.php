@@ -36,4 +36,16 @@ PHP;
         $out = JitMcjitEmbed::prepareClassless($in);
         $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out);
     }
+
+    public function testInjectsBootstrapForEnumOnlyScript(): void
+    {
+        $in = <<<'PHP'
+<?php
+enum U { case A; case B; }
+echo count(U::cases());
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString('__phpc_mcjit_embed_bootstrap', $out);
+        $this->assertStringContainsString('enum U', $out);
+    }
 }

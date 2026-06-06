@@ -9,9 +9,9 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * LLVM compile-only verify for Enum::cases() JIT lowering (#4068, #3308).
+ * LLVM compile-only verify for Enum::cases() JIT lowering (#4068, #3308, #6487).
  *
- * php-src: Zend/zend_enum.c — zend_enum_list_cases
+ * Uses bin/jit.php -l in a child process (issue #98).
  *
  * @group llvm
  */
@@ -22,30 +22,80 @@ final class EnumCasesJitCompileTest extends TestCase
     protected function setUp(): void
     {
         $this->repoRoot = dirname(__DIR__, 2);
-        if (!LlvmToolchain::isReady($this->repoRoot)) {
-            $reason = LlvmToolchain::readyFailureReason() ?? 'LLVM 9 toolchain not available';
-            $this->markTestSkipped($reason.' — Enum::cases() JIT compile test needs LLVM (#4068)');
+        if (!LlvmToolchain::hasLibrary($this->repoRoot)) {
+            $this->markTestSkipped('LLVM 9 not available — Enum::cases() JIT compile test needs MCJIT (#4068)');
         }
     }
 
     public function testEnumCasesModuleVerify(): void
     {
-        $code = <<<'PHP'
+        $this->assertJitCompileOnly(<<<'PHP'
 <?php
 enum Suit: string { case Hearts = 'H'; case Spades = 'S'; }
 $cases = Suit::cases();
 echo count($cases), ':', $cases[0]->name, "\n";
-PHP;
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile($code, 'enum_cases_jit_compile.php');
-        $runtime->jitCompileBlock($block);
+PHP
+        );
+    }
 
-        $context = $runtime->loadJitContext();
-        $bc = $context->module->printToString();
-        $this->assertStringContainsString('suit::cases', $bc);
-        $verify = new \ReflectionMethod($context, 'compileCommon');
-        $verify->setAccessible(true);
-        $verify->invoke($context);
-        $this->addToAssertionCount(1);
+    public function testUnitEnumCasesModuleVerify(): void
+    {
+        $this->assertJitCompileOnly(<<<'PHP'
+<?php
+enum U { case A; case B; }
+$cases = U::cases();
+echo count($cases), ':', $cases[0]->name, "\n";
+PHP
+        );
+    }
+
+    private function assertJitCompileOnly(string $code): void
+    {
+        $dir = $this->repoRoot.'/var';
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            $this->fail('Could not create var/ for JIT compile probe');
+        }
+        $source = $dir.'/enum-cases-compile-'.getmypid().'-'.md5($code).'.php';
+        file_put_contents($source, $code);
+
+        $llvmDir = LlvmToolchain::resolveDir($this->repoRoot);
+        $this->assertNotNull($llvmDir);
+
+        $bash = <<<'BASH'
+set -euo pipefail
+ROOT=%s
+SOURCE=%s
+source "$ROOT/script/php-env.sh"
+export PHP_COMPILER_LLVM_PATH=%s
+export LD_LIBRARY_PATH="%s${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+unset PHP_COMPILER_SKIP_LLVM_PRELOAD
+"$PHP_BIN" "${PHP_OPTS[@]}" "$ROOT/bin/jit.php" -l "$SOURCE"
+BASH;
+
+        $command = sprintf(
+            $bash,
+            escapeshellarg($this->repoRoot),
+            escapeshellarg($source),
+            escapeshellarg($llvmDir),
+            $llvmDir
+        );
+
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(['bash', '-lc', $command], $descriptorSpec, $pipes, $this->repoRoot);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+
+        @unlink($source);
+
+        $this->assertSame(0, $exit, trim((string) $stderr."\n".(string) $stdout));
     }
 }

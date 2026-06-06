@@ -895,11 +895,13 @@ class Object_ extends Type {
             $this->context->builder->pointerCast($nameStr, $voidPtr),
             $this->propertySlotPtr($obj, self::ENUM_CASE_SLOT_NAME)
         );
-        $this->propertyStore(
-            $this->propertySlotPtr($obj, self::ENUM_CASE_SLOT_VALUE),
-            $backingJit,
-            Variable::TYPE_VALUE
-        );
+        if ($this->enumHasBacking($enumClassId)) {
+            $this->propertyStore(
+                $this->propertySlotPtr($obj, self::ENUM_CASE_SLOT_VALUE),
+                $backingJit,
+                Variable::TYPE_VALUE
+            );
+        }
 
         return $obj;
     }
@@ -1568,28 +1570,7 @@ class Object_ extends Type {
             throw new \LogicException("Unknown enum case: {$caseKey}");
         }
 
-        $globalName = 'php_compiler_enum_case_jit_'.$classId.'_'.$caseKey;
-        if (!isset($this->classConstObjectGlobals[$globalName])) {
-            $objPtrType = $this->context->getTypeFromString('__object__*');
-            $global = $this->context->module->addGlobal($objPtrType, $globalName);
-            $global->setInitializer($objPtrType->constNull());
-            $this->classConstObjectGlobals[$globalName] = $global;
-            $canonicalName = $this->enumCaseCanonicalName($classId, $caseKey);
-            $backingEntry = $this->classConstants[$classId][$caseKey];
-            $this->context->emitInInit(function (Context $ctx) use (
-                $classId,
-                $canonicalName,
-                $backingEntry,
-                $global
-            ): void {
-                $alloc = $this->allocateClassConstantEnumCase(
-                    $classId,
-                    $canonicalName,
-                    $this->jitConstantFromEntry($backingEntry)
-                );
-                $ctx->builder->store($alloc, $global);
-            });
-        }
+        $globalName = $this->ensureEnumCaseSingletonGlobal($classId, $caseKey);
 
         return $this->jitClassConstObjectFromGlobal([
             'type' => Variable::TYPE_OBJECT,
@@ -1638,11 +1619,13 @@ class Object_ extends Type {
             $this->context->builder->pointerCast($nameStr, $voidPtr),
             $this->propertySlotPtr($obj, self::ENUM_CASE_SLOT_NAME)
         );
-        $this->propertyStore(
-            $this->propertySlotPtr($obj, self::ENUM_CASE_SLOT_VALUE),
-            $backingJit,
-            Variable::TYPE_VALUE
-        );
+        if ($this->enumHasBacking($classId)) {
+            $this->propertyStore(
+                $this->propertySlotPtr($obj, self::ENUM_CASE_SLOT_VALUE),
+                $backingJit,
+                Variable::TYPE_VALUE
+            );
+        }
         \PHPCompiler\JIT\Builtin\GcCollectCyclesNative::registerDeclarations($this->context);
         \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime::ensureLinked($this->context);
         $this->context->builder->call(
