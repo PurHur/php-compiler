@@ -59,6 +59,10 @@ final class ClassValidator
 
     private static function validateInterfaceImplementation(ClassEntry $entry, Context $context): void
     {
+        if ($entry->isAbstract) {
+            return;
+        }
+
         $missing = [];
         foreach ($entry->interfaces as $ifaceLc) {
             foreach (self::collectInterfaceMethods($ifaceLc, $context) as $method) {

@@ -169,6 +169,12 @@ final class ClassCompileRegistry
                     'ownerDisplay' => $this->displayNames[$classLc] ?? $classLc,
                 ];
             }
+            foreach ($this->interfaces[$classLc] ?? [] as $ifaceLc) {
+                $found = $this->findMethodInInterfaceChain($ifaceLc, $methodLc);
+                if (null !== $found) {
+                    return $found;
+                }
+            }
             $parent = $this->parents[$classLc] ?? null;
             if (null === $parent || '' === $parent) {
                 break;
