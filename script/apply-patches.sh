@@ -980,6 +980,8 @@ if "isEnumCase" not in const_text:
     )
     for old in (
         "    public int $flags = 0;\n\n    public function __construct",
+        "    public bool $enumCaseHasExplicitValue = false;\n\n    public function __construct",
+        "    public bool $isEnumCase = false;\n\n    public function __construct",
         "    public ?Type $declaredType = null;\n\n    public function __construct",
         "    public $valueBlock;\n\n    public function __construct",
     ):
@@ -3692,6 +3694,8 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_php_cfg_enum_early_chain
   apply_patch "$PATCH_DIR/php-cfg-typed-class-const.patch"
   apply_patch "$PATCH_DIR/php-cfg-class-const-flags.patch"
+  # typed-class-const overlay copies Const_.php without enum markers; restore (#6622).
+  apply_php_cfg_enum_class_const_overlay || true
   apply_patch "$PATCH_DIR/php-cfg-asymmetric-visibility.patch"
   apply_patch "$PATCH_DIR/php-cfg-assertion-expr-property.patch"
   apply_php_cfg_yield_from_overlay
@@ -3821,6 +3825,11 @@ verify_critical_language_patches() {
     && grep -q 'function parseEnumCase' "$parser" 2>/dev/null \
     && ! grep -q 'enumCaseHasExplicitValue' "$const_file" 2>/dev/null; then
     missing+=("php-cfg-enum-case-explicit-value-Const_")
+  fi
+  if [[ -f "$const_file" ]] \
+    && grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null \
+    && ! grep -q 'public bool \$isEnumCase = false' "$const_file" 2>/dev/null; then
+    missing+=("php-cfg-enum-class-const-Const_")
   fi
   if ! grep -q 'instanceof Op\\Type\\Union_' "$recon" 2>/dev/null; then
     missing+=("php-types-union-type")
