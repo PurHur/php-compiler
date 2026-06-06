@@ -122,6 +122,12 @@ final class DeprecatedMetadata
         if ($node instanceof Node\Scalar\String_) {
             return $node->value;
         }
+        if ($node instanceof Node\Scalar\LNumber) {
+            return (string) $node->value;
+        }
+        if ($node instanceof Node\Scalar\DNumber) {
+            return (string) $node->value;
+        }
 
         return null;
     }
