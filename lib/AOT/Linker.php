@@ -26,7 +26,6 @@ final class Linker
         __DIR__.'/runtime/phpc_stream.c',
         __DIR__.'/runtime/phpc_process.c',
         __DIR__.'/runtime/preg_match.c',
-        __DIR__.'/runtime/phpc_pack.c',
         __DIR__.'/runtime/phpc_cli_argv.c',
         __DIR__.'/runtime/phpc_gc.c',
     ];

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-/** VM pack()/unpack() via host PHP (parity with PHP 8.2). */
+/** VM pack()/unpack() — pack via PackEngine; unpack via UnpackEngine (issues #5231, #5442). */
 final class VmPack
 {
     /**
@@ -12,7 +12,7 @@ final class VmPack
      */
     public static function pack(string $format, array $args): string
     {
-        return \call_user_func_array('pack', array_merge([$format], $args));
+        return PackEngine::pack($format, $args);
     }
 
     /**

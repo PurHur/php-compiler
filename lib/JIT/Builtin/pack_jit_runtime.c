@@ -1,7 +1,8 @@
 /*
- * pack() runtime for AOT/JIT (issue #1375).
+ * pack() JIT/AOT bitcode runtime (issue #5231 — VM uses ext/standard/PackEngine.php).
  * Subset aligned with PHP 8.2 pack(): Z, A, a, h, H, c, C, s, S, i, I, l, L,
  * n, N, v, V, q, Q, J, P, f, g, G, d, e, E, x, X, @.
+ * php-src reference: ext/standard/pack.c — php_pack()
  */
 
 #include <stdint.h>
