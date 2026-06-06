@@ -7,9 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** fileinode() — VM via stat; JIT/AOT via libc stat st_ino (php-src ext/standard/filestat.c). */
@@ -20,14 +19,11 @@ final class fileinode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('fileinode() requires exactly one argument in this compiler build');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'fileinode', 0, 'filename');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('fileinode() requires a string path in this compiler build');
-        }
-        $inode = VmFs::fileInode($v->toString());
+        $inode = VmFs::fileInode($path);
         if (false === $inode) {
             $frame->returnVar->bool(false);
         } else {
@@ -40,7 +36,7 @@ final class fileinode extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('fileinode() requires exactly one argument in this compiler build');
         }
-        $path = JitStringArg::lower($context, $args[0], 'fileinode() path');
+        $path = JitStringBuiltinArg::lower($context, $args[0], 'fileinode', 0, 'filename');
 
         return JitFileinode::invoke($context, $path);
     }
