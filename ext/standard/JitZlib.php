@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM helpers for gz*() — AOT runtime in lib/AOT/runtime/zlib_compress.c (issue #3194). */
+/** LLVM helpers for gz*() — libz via StringZlibJit (issues #3194, #6791). */
 final class JitZlib
 {
     private static int $blockSerial = 0;

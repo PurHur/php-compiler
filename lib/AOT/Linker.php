@@ -15,7 +15,6 @@ final class Linker
     private const RUNTIME_C_SOURCES = [
         __DIR__.'/runtime/superglobals_refresh.c',
         __DIR__.'/runtime/hash_crypto.c',
-        __DIR__.'/runtime/zlib_compress.c',
         __DIR__.'/runtime/password_crypto.c',
         __DIR__.'/runtime/phpc_json_decode.c',
         __DIR__.'/runtime/phpc_stream.c',
