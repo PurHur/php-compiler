@@ -102,6 +102,12 @@ final class Variable {
 
     public ?string $magicGetOverloadedName = null;
 
+    /** Hooked property dim modify: flush set hook after assign through this container (#6775). */
+    public bool $propertyHookDimWriteBackPending = false;
+
+    /** Dim lvalue → hooked property container pending set-hook writeback (#6775). */
+    public ?Variable $hookedPropertyDimWriteBackContainer = null;
+
     public function __construct(int $type = self::TYPE_NULL) {
         $this->type = $type;
     }

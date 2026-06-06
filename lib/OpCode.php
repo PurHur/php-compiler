@@ -306,6 +306,12 @@ class OpCode {
             || self::destSlotUsedAsInPlaceCompoundAssign($op, $destSlot);
     }
 
+    /** True when this opcode uses {@see $destSlot} as the container for dim write ([]/key assign, #6775). */
+    public static function destSlotUsedAsDimWriteContainer(self $op, int $destSlot): bool
+    {
+        return self::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type && $op->arg2 === $destSlot;
+    }
+
     /** True when this opcode reads {@see $destSlot} as lhs in fetch-op-assign compound lowering (#6438). */
     public static function destSlotUsedAsCompoundAssignRead(self $op, int $destSlot): bool
     {

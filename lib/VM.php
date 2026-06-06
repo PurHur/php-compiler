@@ -1614,6 +1614,11 @@ restart:
                         $arg2->copyFrom($arg3);
                         $arg1->copyFrom($arg3);
                     }
+                    $catchFrame = $this->flushHookedPropertyDimWriteBackAfterAssign($arg2, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     if (
                         $op->arg2 !== $op->arg3
                         && $frame->block->assignTempSlotIsDead((int) $op->arg3)
@@ -1961,6 +1966,7 @@ restart:
                             throw new \LogicException('[] is only supported for arrays');
                         }
                         $arg1->indirect($container->toArray()->append(new Variable));
+                        $this->tagHookedPropertyDimWriteLvalue($arg1, $containerSlot);
                         break;
                     }
                     $arg3 = $frame->scope[$op->arg3];
@@ -2032,6 +2038,9 @@ restart:
                                 );
                             }
                             $arg1->indirect($table->findVariable($arg3, $forWrite));
+                            if ($forWrite) {
+                                $this->tagHookedPropertyDimWriteLvalue($arg1, $containerSlot);
+                            }
                         } catch (\TypeError $e) {
                             $catchFrame = $this->dispatchVmTypeError($e, $frame);
                             if (null !== $catchFrame) {
@@ -2936,7 +2945,25 @@ restart:
                         && !$this->isPropertyHookRawWrite($frame, $propNameRaw)
                     ) {
                         $hookValue = $this->fetchStaticPropertyWithHooks($lcClass, $propNameRaw, $hooks['get'], $frame);
-                        $frame->scope[$op->arg1]->copyFrom($hookValue);
+                        $dest = $frame->scope[$op->arg1];
+                        if (
+                            $this->propertyFetchDestUsedAsDimWriteContainer($frame, $op)
+                            && isset($hooks['set'])
+                        ) {
+                            $catchFrame = $this->deliverHookedStaticPropertyDimWriteContainer(
+                                $dest,
+                                $hookValue,
+                                $lcClass,
+                                $propNameRaw,
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                        } else {
+                            $dest->copyFrom($hookValue);
+                        }
                         break;
                     }
                     if (
@@ -3937,7 +3964,21 @@ restart:
                         }
                         $hookValue = $this->fetchPropertyWithHooks($propertyObject, $name, $frame);
                         if (null !== $hookValue) {
-                            $result->copyFrom($hookValue);
+                            if ($this->propertyFetchDestUsedAsDimWriteContainer($frame, $op)) {
+                                $catchFrame = $this->deliverHookedPropertyDimWriteContainer(
+                                    $result,
+                                    $hookValue,
+                                    $propertyObject,
+                                    $name,
+                                    $frame
+                                );
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                            } else {
+                                $result->copyFrom($hookValue);
+                            }
                         } else {
                             $propSlot = $propertyObject->getProperty($name);
                             if ($op->nullsafeFetchPropertyRead) {
@@ -5191,6 +5232,116 @@ restart:
         }
 
         return OpCode::destSlotUsedAsCompoundAssignRead($next, $destSlot);
+    }
+
+    /** True when fetch dest is the container for a following dim write ($prop[] = / $prop[k] =, #6775). */
+    private function propertyFetchDestUsedAsDimWriteContainer(Frame $frame, OpCode $op): bool
+    {
+        $destSlot = (int) $op->arg1;
+        $next = $frame->block->opCodes[$frame->pos] ?? null;
+        if (null === $next) {
+            return false;
+        }
+
+        return OpCode::destSlotUsedAsDimWriteContainer($next, $destSlot);
+    }
+
+    private function containerNeedsHookedDimWriteBack(Variable $containerSlot): bool
+    {
+        $container = $containerSlot->resolveIndirect();
+
+        return $container->propertyHookDimWriteBackPending;
+    }
+
+    private function tagHookedPropertyDimWriteLvalue(Variable $dimLvalue, Variable $containerSlot): void
+    {
+        if (!$this->containerNeedsHookedDimWriteBack($containerSlot)) {
+            return;
+        }
+        $dimLvalue->hookedPropertyDimWriteBackContainer = $containerSlot;
+    }
+
+    private function flushHookedPropertyDimWriteBackAfterAssign(Variable $writtenLvalue, Frame $frame): ?Frame
+    {
+        $containerSlot = $writtenLvalue->hookedPropertyDimWriteBackContainer;
+        if (null === $containerSlot) {
+            $target = $writtenLvalue->resolveIndirect();
+            if ($target !== $writtenLvalue) {
+                $containerSlot = $target->hookedPropertyDimWriteBackContainer;
+            }
+        }
+        if (null === $containerSlot) {
+            return null;
+        }
+        $container = $containerSlot->resolveIndirect();
+        if (!$container->propertyHookDimWriteBackPending) {
+            return null;
+        }
+        $container->propertyHookDimWriteBackPending = false;
+        $writtenLvalue->hookedPropertyDimWriteBackContainer = null;
+        if ($this->dispatchPropertySetHookAssign($containerSlot, $containerSlot, $frame)) {
+            return null;
+        }
+        if ($this->context->propertyHookSetAborted) {
+            $this->context->propertyHookSetAborted = false;
+
+            return null;
+        }
+        $catchFrame = $this->enforceVirtualPropertyHookWrite($containerSlot, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $containerSlot->copyFrom($container);
+
+        return null;
+    }
+
+    private function deliverHookedPropertyDimWriteContainer(
+        Variable $dest,
+        Variable $hookValue,
+        ObjectEntry $owner,
+        string $propName,
+        Frame $frame,
+    ): ?Frame {
+        $proxy = new Variable();
+        $proxy->objectPropertyOwner = $owner;
+        $proxy->objectPropertyName = $propName;
+        $catchFrame = $this->enforceVirtualPropertyHookWrite($proxy, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $working = new Variable();
+        $working->duplicateFrom($hookValue);
+        $dest->copyFrom($working);
+        $dest->objectPropertyOwner = $owner;
+        $dest->objectPropertyName = $propName;
+        $dest->propertyHookDimWriteBackPending = true;
+
+        return null;
+    }
+
+    private function deliverHookedStaticPropertyDimWriteContainer(
+        Variable $dest,
+        Variable $hookValue,
+        string $classLc,
+        string $propNameRaw,
+        Frame $frame,
+    ): ?Frame {
+        $proxy = new Variable();
+        $proxy->staticPropertyClassLc = $classLc;
+        $proxy->objectPropertyName = $propNameRaw;
+        $catchFrame = $this->enforceVirtualPropertyHookWrite($proxy, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $working = new Variable();
+        $working->duplicateFrom($hookValue);
+        $dest->copyFrom($working);
+        $dest->staticPropertyClassLc = $classLc;
+        $dest->objectPropertyName = $propNameRaw;
+        $dest->propertyHookDimWriteBackPending = true;
+
+        return null;
     }
 
     /**
