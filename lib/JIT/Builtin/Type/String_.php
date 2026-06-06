@@ -289,6 +289,7 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringRandomBytes::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringJsonEncode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringSerialize::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringUnserialize::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringHttpBuildQuery::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringParseStr::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringGetenv::implement($this->context);
