@@ -55,6 +55,22 @@ PHP
         );
     }
 
+    public function testContinueOutsideLoopCompileFatal(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage("'continue' not in the 'loop' or 'switch' context");
+        $runtime->parseAndCompile("<?php\ncontinue;\n", 'continue_outside_loop.php');
+    }
+
+    public function testBreakOutsideLoopCompileFatal(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage("'break' not in the 'loop' or 'switch' context");
+        $runtime->parseAndCompile("<?php\nbreak;\n", 'break_outside_loop.php');
+    }
+
     private function runCode(string $code): string
     {
         $runtime = new Runtime();
