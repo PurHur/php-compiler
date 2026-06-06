@@ -10,6 +10,28 @@ use PHPLLVM\Builder;
  */
 final class StringOffsetHelper
 {
+    public const INCDEC_ERROR = 'Cannot increment/decrement string offsets';
+
+    /**
+     * Writable string offset lvalues store a char pointer, not {@see __string__}*.
+     */
+    public static function isWritableCharOffsetLvalue(Variable $var, Context $context): bool
+    {
+        if (Variable::KIND_VALUE !== $var->kind || Variable::TYPE_STRING !== $var->type) {
+            return false;
+        }
+        $ty = $context->getStringFromType($var->value->typeOf());
+
+        return 'i8*' === $ty || 'char*' === $ty;
+    }
+
+    public static function emitIncDecError(Context $context): void
+    {
+        Builtin\ErrorRaise::registerDeclarations($context);
+        Builtin\ErrorRaise::ensureLinked($context);
+        Builtin\ErrorRaise::emitRaise($context, self::INCDEC_ERROR);
+    }
+
     public static function dimFetch(Context $context, PHPLLVM\Value $strSlot, Variable $dim): PHPLLVM\Value
     {
         $str = $context->builder->load($strSlot);

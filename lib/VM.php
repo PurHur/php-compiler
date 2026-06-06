@@ -2333,6 +2333,13 @@ restart:
                             goto restart;
                         }
                         break;
+                    } catch (\Error $e) {
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
                     } catch (\DivisionByZeroError $e) {
                         $catchFrame = $this->dispatchVmDivisionByZeroError($e, $frame);
                         if (null !== $catchFrame) {
@@ -4960,6 +4967,9 @@ restart:
                 $prefix
             );
         }
+        if (Variable::TYPE_STRING_OFFSET === $write->resolveIndirect()->type) {
+            return $this->dispatchVmError(Variable::STRING_OFFSET_INCDEC_ERROR, $frame);
+        }
         $working = new Variable();
         $working->copyFrom($read->resolveIndirect());
         try {
@@ -4984,6 +4994,8 @@ restart:
             }
         } catch (\TypeError $e) {
             return $this->dispatchVmTypeError($e, $frame);
+        } catch (\Error $e) {
+            return $this->dispatchVmError($e->getMessage(), $frame);
         }
 
         return null;
