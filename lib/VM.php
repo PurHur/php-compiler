@@ -2760,6 +2760,15 @@ restart:
                                 goto restart;
                             }
                         }
+                        $staticVisFrame = $this->enforceStaticPropertyReadVisibility(
+                            strtolower($classEntry->name),
+                            $memberNameRaw,
+                            $frame
+                        );
+                        if (null !== $staticVisFrame) {
+                            $frame = $staticVisFrame;
+                            goto restart;
+                        }
                         try {
                             if (!$this->copyClassConstOrStaticPropertyByName(
                                 $classEntry,
@@ -2836,6 +2845,11 @@ restart:
                             $frame = $visFrame;
                             goto restart;
                         }
+                    }
+                    $staticVisFrame = $this->enforceStaticPropertyReadVisibility($lcClass, $memberNameRaw, $frame);
+                    if (null !== $staticVisFrame) {
+                        $frame = $staticVisFrame;
+                        goto restart;
                     }
                     try {
                         if (!$this->copyClassConstOrStaticPropertyByName(
@@ -2926,6 +2940,11 @@ restart:
                     }
                     $propNameRaw = $frame->scope[$op->arg3]->toString();
                     $propName = strtolower($propNameRaw);
+                    $visFrame = $this->enforceStaticPropertyReadVisibility($lcClass, $propNameRaw, $frame);
+                    if (null !== $visFrame) {
+                        $frame = $visFrame;
+                        goto restart;
+                    }
                     $storage = $this->resolveStaticPropertyStorage($lcClass, $propName);
                     if (null === $storage) {
                         $classLabel = $this->context->classes[$lcClass]->name;
@@ -7076,6 +7095,66 @@ restart:
         return null;
     }
 
+    /**
+     * @return array{visibility: int, declaringClassLc: string, declaringClassDisplay: string}|null
+     */
+    protected function resolveStaticPropertyVisibilityMeta(string $classLc, string $propLc): ?array
+    {
+        $currentLc = $classLc;
+        while (isset($this->context->classes[$currentLc])) {
+            $entry = $this->context->classes[$currentLc];
+            if (isset($entry->staticProperties[$propLc])) {
+                $declLc = $entry->staticPropertyDeclaringClassLc[$propLc] ?? $currentLc;
+                $declEntry = $this->context->classes[$declLc] ?? $entry;
+
+                return [
+                    'visibility' => $entry->staticPropertyVisibility[$propLc] ?? \PHPCfg\Func::FLAG_PUBLIC,
+                    'declaringClassLc' => $declLc,
+                    'declaringClassDisplay' => $declEntry->name,
+                ];
+            }
+            if (null === $entry->parentLc) {
+                break;
+            }
+            $currentLc = $entry->parentLc;
+        }
+
+        return null;
+    }
+
+    private function enforceStaticPropertyReadVisibility(
+        string $classLc,
+        string $propNameRaw,
+        Frame $frame
+    ): ?Frame {
+        $propLc = strtolower($propNameRaw);
+        $meta = $this->resolveStaticPropertyVisibilityMeta($classLc, $propLc);
+        if (null === $meta) {
+            return null;
+        }
+        $readVis = PropertyVisibility::effectiveGetVisibility($meta['visibility'], 0);
+        if (MethodVisibility::isPublic($readVis)) {
+            return null;
+        }
+        $callerLc = $this->callerClassLc($frame);
+        try {
+            PropertyVisibility::assertAccessible(
+                $meta['visibility'],
+                $callerLc,
+                $meta['declaringClassLc'],
+                $meta['declaringClassDisplay'],
+                $propNameRaw,
+                $callerLc ?? $meta['declaringClassLc'],
+                fn (string $classLcArg, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLcArg, $ancestorLc),
+                0
+            );
+        } catch (\LogicException $e) {
+            return $this->dispatchVmError($e->getMessage(), $frame);
+        }
+
+        return null;
+    }
+
     private function callerClassLc(Frame $frame): ?string
     {
         $classLc = null;
@@ -8305,6 +8384,10 @@ restart:
                     $storage->objectPropertyName ?? $name
                 );
                 $entry->traitStaticPropertyNames[$name] = true;
+                $entry->staticPropertyVisibility[$name] = $trait->staticPropertyVisibility[$name]
+                    ?? \PHPCfg\Func::FLAG_PUBLIC;
+                $entry->staticPropertyDeclaringClassLc[$name] = $trait->staticPropertyDeclaringClassLc[$name]
+                    ?? $traitLc;
             }
             $this->inheritTraitStaticPropertyHooks($entry, $trait);
             $this->inheritTraitInstanceProperties($entry, $trait, $trait->name);
@@ -8823,6 +8906,12 @@ restart:
                     // Class-declared inherited statics share one slot (Zend; #4668).
                     $entry->staticProperties[$name] = $storage;
                 }
+                if (isset($parent->staticPropertyVisibility[$name])) {
+                    $entry->staticPropertyVisibility[$name] = $parent->staticPropertyVisibility[$name];
+                }
+                if (isset($parent->staticPropertyDeclaringClassLc[$name])) {
+                    $entry->staticPropertyDeclaringClassLc[$name] = $parent->staticPropertyDeclaringClassLc[$name];
+                }
             }
         }
         foreach ($parent->staticPropertyHooks as $name => $hooks) {
@@ -9045,6 +9134,8 @@ restart:
                         $frame->scope[$op->arg1]->toString()
                     );
                     $entry->staticProperties[$name] = $storage;
+                    $entry->staticPropertyVisibility[$name] = MethodVisibility::mask($op->propertyVisibility);
+                    $entry->staticPropertyDeclaringClassLc[$name] = strtolower($entry->name);
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
                     $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
@@ -9219,6 +9310,8 @@ restart:
                 $frame->scope[$declareOp->arg1]->toString()
             );
             $entry->staticProperties[$name] = $storage;
+            $entry->staticPropertyVisibility[$name] = MethodVisibility::mask($declareOp->propertyVisibility);
+            $entry->staticPropertyDeclaringClassLc[$name] = strtolower($entry->name);
 
             return;
         }

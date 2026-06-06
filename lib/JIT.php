@@ -5876,6 +5876,13 @@ class JIT {
                                 break;
                             }
                         }
+                        JIT\StaticPropertyVisibilityJitGuard::emitBeforeFetch(
+                            $this->context->type->object,
+                            $this,
+                            $block,
+                            $classId,
+                            $nameOp->value
+                        );
                         $fetched = $this->context->type->object->staticPropertyFetch($classId, $nameOp->value);
                         if (
                             $forWrite
@@ -8173,7 +8180,9 @@ class JIT {
                         $name->value,
                         $declaredJitType,
                         $default,
-                        $prototype
+                        $prototype,
+                        false,
+                        \PHPCompiler\MethodVisibility::mask($op->propertyVisibility)
                     );
                     break;
                 case OpCode::TYPE_DECLARE_PROPERTY:
