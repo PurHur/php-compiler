@@ -161,6 +161,21 @@ final class TypeCheck
     }
 
     /**
+     * PHP 8.3+ typed compile-unit constants (#7081).
+     */
+    public static function assertGlobalConstantTypedValue(
+        Variable $value,
+        Variable $typeMeta,
+        ?string $constName = null
+    ): void {
+        try {
+            self::assertClassConstantTypedValue($value, $typeMeta, $constName);
+        } catch (\TypeError $e) {
+            throw new \TypeError(str_replace('class constant', 'constant', $e->getMessage()), $e->getCode(), $e);
+        }
+    }
+
+    /**
      * PHP 8.3+ union typed class constants (zend_compile_const_decl, #6886).
      */
     public static function assertClassConstantTypedValue(

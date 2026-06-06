@@ -2826,6 +2826,55 @@ PY
   echo "Applied php-cfg-typed-class-const overlay (#6012)"
 }
 
+apply_php_cfg_global_typed_const_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg/global-typed-const-parser-methods.php"
+  if [[ ! -f "$parser" || ! -f "$overlay" ]]; then
+    return 0
+  fi
+  if grep -q 'function extractGlobalTypedConstDeclaredTypeFromAttributes' "$parser" 2>/dev/null; then
+    return 0
+  fi
+  python3 - "$parser" "$overlay" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+text = parser_path.read_text()
+if 'function extractGlobalTypedConstDeclaredTypeFromAttributes' in text:
+    raise SystemExit(0)
+
+anchor = """    protected function parseExpr_Yield(Expr\\Yield_ $expr)
+    {"""
+if anchor not in text:
+    sys.stderr.write("php-cfg-global-typed-const: parseExpr_Yield anchor not found in Parser.php\n")
+    raise SystemExit(1)
+
+insert = method_path.read_text().rstrip("\n") + "\n\n"
+text = text.replace(anchor, insert + anchor, 1)
+
+old = """            $this->block->children[] = new Op\\Terminal\\Const_(
+                $this->parseExprNode($const->namespacedName),
+                $value, $valueBlock,
+                $this->mapAttributes($node)
+            );"""
+new = """            $constOp = new Op\\Terminal\\Const_(
+                $this->parseExprNode($const->namespacedName),
+                $value, $valueBlock,
+                $this->mapAttributes($node)
+            );
+            $constOp->declaredType = $this->extractGlobalTypedConstDeclaredTypeFromAttributes($node->getAttributes());
+            $this->block->children[] = $constOp;"""
+if old not in text:
+    sys.stderr.write("php-cfg-global-typed-const: parseStmt_Const anchor missing\n")
+    raise SystemExit(1)
+text = text.replace(old, new, 1)
+parser_path.write_text(text)
+PY
+  echo "Applied php-cfg-global-typed-const overlay (#7081)"
+}
+
 apply_php_cfg_list_spread_overlay() {
   local assign="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assign.php"
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
@@ -3848,6 +3897,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-property-readonly.patch"
   apply_php_cfg_asymmetric_set_visibility_parser_overlay
   apply_php_cfg_asymmetric_get_visibility_parser_overlay
+  apply_php_cfg_global_typed_const_overlay
   apply_patch "$PATCH_DIR/php-cfg-attribute-groups.patch"
   apply_patch "$PATCH_DIR/php-cfg-trait-use.patch"
   apply_patch "$PATCH_DIR/php-cfg-throw-expr.patch"
