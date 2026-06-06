@@ -735,13 +735,16 @@ final class ArrayBuiltinHelper
         Variable $callback,
         ?Variable $initial
     ): Value {
+        if ($callback->isNullConstant) {
+            throw new \TypeError(ArrayReduceCallbackPolicy::invalidCallbackTypeError());
+        }
         if (!ArrayReduceCallbackPolicy::isJitLowerable($callback)) {
             throw new \LogicException(ArrayReduceCallbackPolicy::jitRejectionMessage());
         }
         $proxy = self::resolveReduceCallback($context, $callback);
         if ($proxy instanceof ExternalMethod) {
-            throw new \LogicException(
-                "array_reduce() callback '{$callback->compileTimeString}' is not a defined function in this compile unit"
+            throw new \TypeError(
+                ArrayReduceCallbackPolicy::invalidStringCallbackTypeError($callback->compileTimeString ?? '')
             );
         }
 
@@ -771,9 +774,7 @@ final class ArrayBuiltinHelper
             throw new \LogicException(ArrayReduceCallbackPolicy::jitRejectionMessage());
         }
         if (!$context->functionIsRegistered($name)) {
-            throw new \LogicException(
-                "array_reduce() callback '{$name}' is not a defined function in this compile unit"
-            );
+            throw new \TypeError(ArrayReduceCallbackPolicy::invalidStringCallbackTypeError($name));
         }
 
         return $context->resolveFunctionProxy($name);

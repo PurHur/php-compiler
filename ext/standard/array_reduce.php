@@ -13,15 +13,18 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\Func\PHP;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayReduceCallbackPolicy;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ClosureState;
+use PHPCompiler\VM\Context as VmContext;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_reduce() with string user-function callbacks (subset of PHP).
+ * array_reduce() with string user-function and closure callbacks (subset of PHP).
  *
  * JIT/AOT: compile-time string user-function names in this compile unit (#1213).
  */
@@ -33,23 +36,56 @@ final class array_reduce extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_reduce() requires two or three arguments in this compiler build');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         $array = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('array_reduce() first argument must be an array in this compiler build');
         }
-        $callback = $frame->calledArgs[1]->resolveIndirect();
-        if (!ArrayReduceCallbackPolicy::isVmSupportedType($callback->type)) {
-            throw new \LogicException(ArrayReduceCallbackPolicy::vmRejectionMessage());
-        }
         if (null === $frame->vmContext) {
             throw new \LogicException('array_reduce() requires VM context in this compiler build');
         }
+        $callback = $frame->calledArgs[1]->resolveIndirect();
         $hasInitial = 3 === $argc;
         $initial = $hasInitial ? $frame->calledArgs[2]->resolveIndirect() : null;
-        $fn = VmUserCall::resolveStringCallback($frame->vmContext, $callback->toString());
+        [$closure, $userFn] = self::resolveVmCallback($frame, $callback);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        self::reduceVm($frame, $array, $hasInitial, $initial, $closure, $userFn, $frame->vmContext);
+    }
+
+    /**
+     * @return array{0: ?ClosureState, 1: ?PHP}
+     */
+    private static function resolveVmCallback(Frame $frame, Variable $callback): array
+    {
+        if (VmClosureCall::isClosure($callback)) {
+            return [VmClosureCall::resolve($callback), null];
+        }
+        if (Variable::TYPE_STRING !== $callback->type) {
+            throw new \TypeError(ArrayReduceCallbackPolicy::invalidCallbackTypeError());
+        }
+        try {
+            return [null, VmUserCall::resolveStringCallback($frame->vmContext, $callback->toString())];
+        } catch (\LogicException) {
+            throw new \TypeError(
+                ArrayReduceCallbackPolicy::invalidStringCallbackTypeError($callback->toString())
+            );
+        }
+    }
+
+    /**
+     * @param ClosureState|PHP|null $closureOrNull closure callback when set
+     * @param PHP|null $userFn user-function callback when set
+     */
+    private static function reduceVm(
+        Frame $frame,
+        Variable $array,
+        bool $hasInitial,
+        ?Variable $initial,
+        ?ClosureState $closureOrNull,
+        ?PHP $userFn,
+        VmContext $context
+    ): void {
         $carry = null;
         if ($hasInitial) {
             $carry = new Variable();
@@ -64,7 +100,11 @@ final class array_reduce extends Internal
                 $carry = $item;
                 continue;
             }
-            $carry = VmUserCall::invoke($frame->vmContext, $fn, $carry, $item);
+            if (null !== $closureOrNull) {
+                $carry = VmClosureCall::invoke($context, $closureOrNull, $carry, $item);
+                continue;
+            }
+            $carry = VmUserCall::invoke($context, $userFn, $carry, $item);
         }
         if ($empty) {
             if ($hasInitial) {
@@ -85,6 +125,9 @@ final class array_reduce extends Internal
         $argc = \count($args);
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_reduce() requires two or three arguments in this compiler build');
+        }
+        if ($args[1]->isNullConstant) {
+            throw new \TypeError(ArrayReduceCallbackPolicy::invalidCallbackTypeError());
         }
         if (!ArrayReduceCallbackPolicy::isJitLowerable($args[1])) {
             throw new \LogicException(ArrayReduceCallbackPolicy::jitRejectionMessage());
