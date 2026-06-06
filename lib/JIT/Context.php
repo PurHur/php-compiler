@@ -644,6 +644,7 @@ class Context {
             Builtin\AssertFail::ensureStandaloneBodies($this);
             Builtin\JitThrow::ensureStandaloneBodies($this);
             Builtin\JitReturnPending::ensureStandaloneBodies($this);
+            Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
         }
 
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();
