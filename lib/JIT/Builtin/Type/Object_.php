@@ -3001,7 +3001,6 @@ class Object_ extends Type {
     {
         $key = strtolower($name);
         $this->classConstDisplayNames[$classId][$key] = $name;
-        unset($this->traitConstSources[$classId][$key]);
         if (VMVariable::TYPE_ARRAY === $value->type) {
             $table = $value->toArray();
             if (!$table instanceof \PHPCompiler\VM\HashTable) {
@@ -3018,10 +3017,13 @@ class Object_ extends Type {
                 $ctx->refcount->addref($htPtr);
                 $ctx->builder->store($htPtr, $global);
             });
-            $this->classConstants[$classId][$key] = [
+            $entry = [
                 'type' => Variable::TYPE_HASHTABLE,
                 'global' => $globalName,
             ];
+            $this->rejectIncompatibleTraitClassConstOverride($classId, $key, $name, $entry);
+            unset($this->traitConstSources[$classId][$key]);
+            $this->classConstants[$classId][$key] = $entry;
 
             return;
         }
@@ -3045,17 +3047,23 @@ class Object_ extends Type {
                 $alloc = $this->allocateClassConstantObject($jitClassId);
                 $ctx->builder->store($alloc, $global);
             });
-            $this->classConstants[$classId][$key] = [
+            $entry = [
                 'type' => Variable::TYPE_OBJECT,
                 'global' => $globalName,
             ];
+            $this->rejectIncompatibleTraitClassConstOverride($classId, $key, $name, $entry);
+            unset($this->traitConstSources[$classId][$key]);
+            $this->classConstants[$classId][$key] = $entry;
 
             return;
         }
-        $this->classConstants[$classId][$key] = [
+        $entry = [
             'type' => Variable::fromVMVariable($value->type),
             'value' => $this->compileTimeValueFromVm($value),
         ];
+        $this->rejectIncompatibleTraitClassConstOverride($classId, $key, $name, $entry);
+        unset($this->traitConstSources[$classId][$key]);
+        $this->classConstants[$classId][$key] = $entry;
     }
 
     public function defineClassConstEnumCaseRef(
@@ -3066,7 +3074,6 @@ class Object_ extends Type {
     ): void {
         $constKey = strtolower($constName);
         $this->classConstDisplayNames[$holdingClassId][$constKey] = $constName;
-        unset($this->traitConstSources[$holdingClassId][$constKey]);
         $caseKey = strtolower($caseKey);
         if (!$this->isEnumClassId($enumClassId)) {
             throw new \LogicException('Class constant enum case reference requires an enum class id');
@@ -3076,10 +3083,13 @@ class Object_ extends Type {
             throw new \LogicException("Unknown enum case for class constant: {$enumLc}::{$caseKey}");
         }
         $globalName = $this->ensureEnumCaseSingletonGlobal($enumClassId, $caseKey);
-        $this->classConstants[$holdingClassId][$constKey] = [
+        $entry = [
             'type' => Variable::TYPE_OBJECT,
             'global' => $globalName,
         ];
+        $this->rejectIncompatibleTraitClassConstOverride($holdingClassId, $constKey, $constName, $entry);
+        unset($this->traitConstSources[$holdingClassId][$constKey]);
+        $this->classConstants[$holdingClassId][$constKey] = $entry;
     }
 
     /**
@@ -4299,6 +4309,34 @@ class Object_ extends Type {
         }
 
         return ($left['value'] ?? null) === ($right['value'] ?? null);
+    }
+
+    /**
+     * Class body constant after trait use must not redefine an inherited trait constant
+     * with an incompatible value (Zend/zend_traits.c, #7012).
+     */
+    private function rejectIncompatibleTraitClassConstOverride(
+        int $classId,
+        string $key,
+        string $constDisplay,
+        array $newEntry
+    ): void {
+        if (!isset($this->traitConstSources[$classId][$key], $this->classConstants[$classId][$key])) {
+            return;
+        }
+        if ($this->classConstEntriesIdentical($this->classConstants[$classId][$key], $newEntry)) {
+            return;
+        }
+        $className = $this->classNameForId($classId);
+        $traitName = $this->traitConstSources[$classId][$key];
+        throw new \LogicException(sprintf(
+            '%s and %s define the same constant (%s) in the composition of %s. '
+            .'However, the definition differs and is considered incompatible. Class was composed',
+            $className,
+            $traitName,
+            $constDisplay,
+            $className
+        ));
     }
 
     /**

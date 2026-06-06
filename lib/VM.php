@@ -9587,6 +9587,7 @@ restart:
                         TypeCheck::assertClassConstantTypedValue($check, $block->constants[$op->arg3], $name);
                         $value->copyFrom($check);
                     }
+                    $this->rejectIncompatibleTraitClassConstOverride($entry, $name, $canonical, $value);
                     $entry->constants[$name] = $value;
                     $entry->constNames[$name] = $canonical;
                     $entry->constVisibility[$name] = ClassConstVisibility::mask($op->classConstVisibilityFlags);
@@ -10131,6 +10132,32 @@ restart:
         $b->copyFrom($right);
 
         return $a->identicalTo($b);
+    }
+
+    /**
+     * Class body constant after trait use must not redefine an inherited trait constant
+     * with an incompatible value (Zend/zend_traits.c zend_traits_compile_role_constants, #7012).
+     */
+    private function rejectIncompatibleTraitClassConstOverride(
+        ClassEntry $entry,
+        string $nameLc,
+        string $constDisplay,
+        Variable $value
+    ): void {
+        if (!isset($entry->traitConstSources[$nameLc], $entry->constants[$nameLc])) {
+            return;
+        }
+        if ($this->classConstValuesIdentical($entry->constants[$nameLc], $value)) {
+            return;
+        }
+        throw new \LogicException(sprintf(
+            '%s and %s define the same constant (%s) in the composition of %s. '
+            .'However, the definition differs and is considered incompatible. Class was composed',
+            $entry->name,
+            $entry->traitConstSources[$nameLc],
+            $constDisplay,
+            $entry->name
+        ));
     }
 
     private function copyClassConstOrStaticPropertyByName(
