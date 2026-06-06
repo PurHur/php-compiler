@@ -66,6 +66,30 @@ PHP;
         $this->assertSame("C\n", ob_get_clean());
     }
 
+    public function testTraitAbstractPrivateMethodWithPrivateImplCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T {
+    abstract private function f(): void;
+}
+
+class C {
+    use T;
+
+    private function f(): void {}
+}
+
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'trait_abstract_private.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
     public function testLintAbstractPrivateMethodReportsCompileFatal(): void
     {
         $runtime = new Runtime();
