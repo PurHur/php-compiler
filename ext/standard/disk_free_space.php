@@ -24,14 +24,14 @@ final class disk_free_space extends Internal
         if ($argc > 1) {
             throw new \LogicException('disk_free_space() accepts at most one argument in this compiler build');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         $path = null;
-        if (1 === $argc) {
+        if ($argc >= 1) {
             $path = VmString::coerceOptionalDirectoryArg($frame->calledArgs[0], 'disk_free_space');
         }
         $result = VmFs::diskFreeSpace($path);
+        if (null === $frame->returnVar) {
+            return;
+        }
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {
