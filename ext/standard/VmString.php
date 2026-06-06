@@ -83,6 +83,47 @@ final class VmString
         return self::coerceStringBuiltinArg($var, $function, 0, 'directory');
     }
 
+    /**
+     * Coerce a ?string builtin operand (php-src Z_PARAM_STR with null; #6536 session_name).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function coerceNullableStringBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'string'
+    ): ?string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            throw new \TypeError(self::nullableStringBuiltinTypeError($function, $argIndex, $paramName, 'array'));
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(
+                self::nullableStringBuiltinTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    EnumCaseSupport::typeNameForVariable($var)
+                )
+            );
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $vm = VM::running();
+            $object = $var->toObject();
+            if (null === $vm || !$vm->hasInstanceMethod($object->class, '__tostring')) {
+                throw new \TypeError(
+                    self::nullableStringBuiltinTypeError($function, $argIndex, $paramName, $object->class->name)
+                );
+            }
+        }
+
+        return self::coerceOperand($var);
+    }
+
     private static function stringBuiltinTypeError(
         string $function,
         int $argIndex,
@@ -91,6 +132,21 @@ final class VmString
     ): string {
         return sprintf(
             '%s(): Argument #%d ($%s) must be of type string, %s given',
+            $function,
+            $argIndex + 1,
+            $paramName,
+            $given
+        );
+    }
+
+    private static function nullableStringBuiltinTypeError(
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $given
+    ): string {
+        return sprintf(
+            '%s(): Argument #%d ($%s) must be of type ?string, %s given',
             $function,
             $argIndex + 1,
             $paramName,

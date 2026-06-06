@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** session_name() — get or set the session cookie name (issue #1184). */
@@ -25,9 +24,6 @@ class session_name extends Internal
         if ($argc > 1) {
             throw new \LogicException('session_name() accepts at most one argument in this compiler build');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (0 === $argc) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->string(VmSession::getName());
@@ -36,10 +32,15 @@ class session_name extends Internal
             return;
         }
         $nameVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $nameVar->type) {
-            throw new \LogicException('session_name() argument must be a string in this compiler build');
+        $name = VmString::coerceNullableStringBuiltinArg($nameVar, 'session_name', 0, 'name');
+        if (null === $name) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->string(VmSession::getName());
+            }
+
+            return;
         }
-        $result = VmSession::setName($nameVar->toString());
+        $result = VmSession::setName($name);
         if (null === $frame->returnVar) {
             return;
         }
