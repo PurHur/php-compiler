@@ -249,6 +249,26 @@ final class VmReflection
         return isset($class->methods[$methodLc]);
     }
 
+    /**
+     * class_meth_exists() — method on a class name string (#7068).
+     *
+     * php-src: Zend/zend_builtin_functions.c — class_meth_exists (string $class only)
+     */
+    public static function classMethExists(Context $ctx, string $className, string $method): bool
+    {
+        $entry = self::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            return false;
+        }
+        if (self::methodExistsOnClass($entry, $method)) {
+            return true;
+        }
+        $classLc = strtolower(ltrim($className, '\\'));
+        $methodLc = strtolower($method);
+
+        return 'closure' === $classLc && '__invoke' === $methodLc;
+    }
+
     public static function propertyExistsOnClass(ClassEntry $class, string $property): bool
     {
         $lc = strtolower($property);
