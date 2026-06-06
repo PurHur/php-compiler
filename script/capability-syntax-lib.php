@@ -567,6 +567,7 @@ function syntaxRowDefinitions(): array
             'issue' => 3243,
             'notes' => [
                 'Ast\\PipeOperatorDesugar before php-parser (#3243); lowers $lhs |> f(...) to f($lhs, ...)',
+                'Arrow-function RHS and chained pipes (#6705): $lhs |> fn($p) => expr → (fn($p) => expr)($lhs)',
                 'Zend/zend_compile.c pipe expression; requires first-class callable (#1363)',
             ],
             'probe' => 'echo "hi" |> strtoupper(...);',
