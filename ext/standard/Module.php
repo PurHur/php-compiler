@@ -477,6 +477,7 @@ class Module extends ModuleAbstract
             new func_num_args(),
             new method_exists_(),
             new property_exists_(),
+            new attribute_exists_(),
             new get_object_vars_(),
             new get_mangled_object_vars_(),
             new get_object_id(),
