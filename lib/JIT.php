@@ -10085,33 +10085,13 @@ class JIT {
         }
 
         if (Variable::TYPE_NATIVE_BOOL === $read->type) {
+            // PHP 8.2+ zend_operators.c: bool inc/dec is a no-op (issue #7058, re-#4727).
             if (!$prefix) {
                 $this->assignOperand($resultOp, $read, true);
             }
-            if ($increment) {
-                $newVar = new Variable(
-                    $this->context,
-                    Variable::TYPE_NATIVE_LONG,
-                    Variable::KIND_VALUE,
-                    $this->context->constantFromInteger(1)
-                );
-            } else {
-                $boolVal = $this->context->helper->loadValue($read);
-                $i64 = $this->context->getTypeFromString('int64');
-                $one = $i64->constInt(1, false);
-                $zero = $i64->constInt(0, false);
-                $asLong = $this->context->builder->select($boolVal, $one, $zero);
-                $newLong = $this->context->builder->sub($asLong, $one);
-                $newVar = new Variable(
-                    $this->context,
-                    Variable::TYPE_NATIVE_LONG,
-                    Variable::KIND_VALUE,
-                    $newLong
-                );
-            }
-            $this->assignOperand($writeOp, $newVar, true);
+            $this->assignOperand($writeOp, $read, true);
             if ($prefix) {
-                $this->assignOperand($resultOp, $newVar, true);
+                $this->assignOperand($resultOp, $read, true);
             }
 
             return;

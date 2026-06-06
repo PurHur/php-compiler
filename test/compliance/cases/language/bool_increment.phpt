@@ -1,21 +1,21 @@
 --TEST--
-language bool pre/post increment (issue #3552, #4727)
+language bool pre/post increment (issue #3552, #7058)
 --FILE--
 <?php
 $b = true;
 $b++;
-echo $b, "\n";
+echo get_debug_type($b), " ", var_export($b, true), "\n";
 $b = false;
 $b++;
-echo $b, "\n";
+echo get_debug_type($b), " ", var_export($b, true), "\n";
 $b = true;
 $b--;
-echo $b, "\n";
+echo get_debug_type($b), " ", var_export($b, true), "\n";
 $b = false;
 $b--;
-echo $b, "\n";
+echo get_debug_type($b), " ", var_export($b, true), "\n";
 --EXPECT--
-1
-1
-0
--1
+bool true
+bool false
+bool true
+bool false

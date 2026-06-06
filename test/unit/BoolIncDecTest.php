@@ -7,39 +7,42 @@ namespace PHPCompiler;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPUnit\Framework\TestCase;
 
-/** VM ++/-- on bool operands (issue #4727). */
+/** VM ++/-- on bool operands (issue #7058, re-#4727). */
 final class BoolIncDecTest extends TestCase
 {
-    public function testIncrementTrueBecomesOne(): void
+    public function testIncrementTrueIsNoOp(): void
     {
         $v = new VMVariable();
         $v->bool(true);
         $v->applyIncrement();
-        $this->assertSame(VMVariable::TYPE_INTEGER, $v->type);
-        $this->assertSame(1, $v->toInt());
+        $this->assertSame(VMVariable::TYPE_BOOLEAN, $v->type);
+        $this->assertTrue($v->toBool());
     }
 
-    public function testIncrementFalseBecomesOne(): void
+    public function testIncrementFalseIsNoOp(): void
     {
         $v = new VMVariable();
         $v->bool(false);
         $v->applyIncrement();
-        $this->assertSame(1, $v->toInt());
+        $this->assertSame(VMVariable::TYPE_BOOLEAN, $v->type);
+        $this->assertFalse($v->toBool());
     }
 
-    public function testDecrementTrueBecomesZero(): void
+    public function testDecrementTrueIsNoOp(): void
     {
         $v = new VMVariable();
         $v->bool(true);
         $v->applyDecrement();
-        $this->assertSame(0, $v->toInt());
+        $this->assertSame(VMVariable::TYPE_BOOLEAN, $v->type);
+        $this->assertTrue($v->toBool());
     }
 
-    public function testDecrementFalseBecomesMinusOne(): void
+    public function testDecrementFalseIsNoOp(): void
     {
         $v = new VMVariable();
         $v->bool(false);
         $v->applyDecrement();
-        $this->assertSame(-1, $v->toInt());
+        $this->assertSame(VMVariable::TYPE_BOOLEAN, $v->type);
+        $this->assertFalse($v->toBool());
     }
 }

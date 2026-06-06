@@ -2203,9 +2203,7 @@ restart:
         }
         switch ($this->type) {
             case self::TYPE_BOOLEAN:
-                // Zend future inc/dec: bool promoted to int (issue #4727, zend_operators.c).
-                $this->int(1);
-
+                // PHP 8.2+ zend_operators.c: bool inc/dec is a no-op (issue #7058, re-#4727).
                 return;
             case self::TYPE_NULL:
                 throw new \TypeError('Cannot increment null');
@@ -2260,8 +2258,7 @@ restart:
         }
         switch ($this->type) {
             case self::TYPE_BOOLEAN:
-                $this->int(($this->bool ? 1 : 0) - 1);
-
+                // PHP 8.2+ zend_operators.c: bool inc/dec is a no-op (issue #7058, re-#4727).
                 return;
             case self::TYPE_NULL:
                 throw new \TypeError('Cannot decrement null');
