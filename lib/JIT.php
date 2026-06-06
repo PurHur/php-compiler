@@ -10971,20 +10971,27 @@ class JIT {
             return;
         }
         $declaringClassId = $this->context->type->object->lookup($className);
-        $allowParentInstanceScope = $parentScope && $this->instanceMethodUsesThis($block);
-        if (!$allowParentInstanceScope) {
-            $this->assertJitStaticMethodCallable($declaringClassLc, $methodLc, $className, $nameOp->value);
-        }
-        $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
         $callerClassLc = null;
         if (null !== $block->func && null !== $block->func->class) {
             $callerClassLc = strtolower($block->func->class->value);
         } elseif ($this->context->scope->className !== '') {
             $callerClassLc = $this->context->scope->className;
         }
+        $callerInstanceMethod = $this->instanceMethodUsesThis($block);
+        $directParentLc = null !== $callerClassLc
+            ? $this->context->type->object->parentClassLc($callerClassLc)
+            : null;
+        // Compiler staticCallParentScope + php-cfg lowered parent class (#1858, #6735).
+        $parentScopeInstanceCall = ($parentScope && $callerInstanceMethod)
+            || ($callerInstanceMethod
+                && null !== $directParentLc
+                && $directParentLc === $declaringClassLc);
+        if (!$parentScopeInstanceCall) {
+            $this->assertJitStaticMethodCallable($declaringClassLc, $methodLc, $className, $nameOp->value);
+        }
+        $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
         $parentScopeAllows = false;
         if (null !== $callerClassLc) {
-            $directParentLc = $this->context->type->object->parentClassLc($callerClassLc);
             if (null !== $directParentLc && $directParentLc === $declaringClassLc) {
                 $parentScopeAllows = MethodVisibility::parentScopeAllows(
                     $visFlags,
