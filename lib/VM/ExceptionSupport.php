@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\standard\ThrowableManifest;
 use PHPCompiler\Frame;
 use PHPCompiler\ext\standard\VmReflection;
 
@@ -14,32 +15,33 @@ use PHPCompiler\ext\standard\VmReflection;
  */
 final class ExceptionSupport
 {
-    public const CLASS_THROWABLE = 'throwable';
-    public const CLASS_EXCEPTION = 'exception';
-    public const CLASS_LOGIC_EXCEPTION = 'logicexception';
-    public const CLASS_BAD_FUNCTION_CALL_EXCEPTION = 'badfunctioncallexception';
-    public const CLASS_BAD_METHOD_CALL_EXCEPTION = 'badmethodcallexception';
-    public const CLASS_DOMAIN_EXCEPTION = 'domainexception';
-    public const CLASS_INVALID_ARGUMENT_EXCEPTION = 'invalidargumentexception';
-    public const CLASS_LENGTH_EXCEPTION = 'lengthexception';
-    public const CLASS_OUT_OF_RANGE_EXCEPTION = 'outofrangeexception';
-    public const CLASS_RUNTIME_EXCEPTION = 'runtimeexception';
-    public const CLASS_OUT_OF_BOUNDS_EXCEPTION = 'outofboundsexception';
-    public const CLASS_OVERFLOW_EXCEPTION = 'overflowexception';
-    public const CLASS_RANGE_EXCEPTION = 'rangeexception';
-    public const CLASS_UNDERFLOW_EXCEPTION = 'underflowexception';
-    public const CLASS_UNEXPECTED_VALUE_EXCEPTION = 'unexpectedvalueexception';
-    public const CLASS_ERROR = 'error';
-    public const CLASS_TYPE_ERROR = 'typeerror';
-    public const CLASS_VALUE_ERROR = 'valueerror';
-    public const CLASS_ARGUMENT_COUNT_ERROR = 'argumentcounterror';
-    public const CLASS_PARSE_ERROR = 'parseerror';
-    public const CLASS_COMPILE_ERROR = 'compileerror';
-    public const CLASS_UNHANDLED_MATCH_ERROR = 'unhandledmatcherror';
-    public const CLASS_ARITHMETIC_ERROR = 'arithmeticerror';
-    public const CLASS_DIVISION_BY_ZERO_ERROR = 'divisionbyzeroerror';
-    public const CLASS_ASSERTION_ERROR = 'assertionerror';
-    public const CLASS_FIBER_ERROR = 'fibererror';
+    public const CLASS_THROWABLE = ThrowableManifest::LC_THROWABLE;
+    public const CLASS_EXCEPTION = ThrowableManifest::LC_EXCEPTION;
+    public const CLASS_LOGIC_EXCEPTION = ThrowableManifest::LC_LOGIC_EXCEPTION;
+    public const CLASS_BAD_FUNCTION_CALL_EXCEPTION = ThrowableManifest::LC_BAD_FUNCTION_CALL_EXCEPTION;
+    public const CLASS_BAD_METHOD_CALL_EXCEPTION = ThrowableManifest::LC_BAD_METHOD_CALL_EXCEPTION;
+    public const CLASS_DOMAIN_EXCEPTION = ThrowableManifest::LC_DOMAIN_EXCEPTION;
+    public const CLASS_INVALID_ARGUMENT_EXCEPTION = ThrowableManifest::LC_INVALID_ARGUMENT_EXCEPTION;
+    public const CLASS_LENGTH_EXCEPTION = ThrowableManifest::LC_LENGTH_EXCEPTION;
+    public const CLASS_OUT_OF_RANGE_EXCEPTION = ThrowableManifest::LC_OUT_OF_RANGE_EXCEPTION;
+    public const CLASS_RUNTIME_EXCEPTION = ThrowableManifest::LC_RUNTIME_EXCEPTION;
+    public const CLASS_OUT_OF_BOUNDS_EXCEPTION = ThrowableManifest::LC_OUT_OF_BOUNDS_EXCEPTION;
+    public const CLASS_OVERFLOW_EXCEPTION = ThrowableManifest::LC_OVERFLOW_EXCEPTION;
+    public const CLASS_RANGE_EXCEPTION = ThrowableManifest::LC_RANGE_EXCEPTION;
+    public const CLASS_UNDERFLOW_EXCEPTION = ThrowableManifest::LC_UNDERFLOW_EXCEPTION;
+    public const CLASS_UNEXPECTED_VALUE_EXCEPTION = ThrowableManifest::LC_UNEXPECTED_VALUE_EXCEPTION;
+    public const CLASS_ERROR_EXCEPTION = ThrowableManifest::LC_ERROR_EXCEPTION;
+    public const CLASS_ERROR = ThrowableManifest::LC_ERROR;
+    public const CLASS_TYPE_ERROR = ThrowableManifest::LC_TYPE_ERROR;
+    public const CLASS_VALUE_ERROR = ThrowableManifest::LC_VALUE_ERROR;
+    public const CLASS_ARGUMENT_COUNT_ERROR = ThrowableManifest::LC_ARGUMENT_COUNT_ERROR;
+    public const CLASS_PARSE_ERROR = ThrowableManifest::LC_PARSE_ERROR;
+    public const CLASS_COMPILE_ERROR = ThrowableManifest::LC_COMPILE_ERROR;
+    public const CLASS_UNHANDLED_MATCH_ERROR = ThrowableManifest::LC_UNHANDLED_MATCH_ERROR;
+    public const CLASS_ARITHMETIC_ERROR = ThrowableManifest::LC_ARITHMETIC_ERROR;
+    public const CLASS_DIVISION_BY_ZERO_ERROR = ThrowableManifest::LC_DIVISION_BY_ZERO_ERROR;
+    public const CLASS_ASSERTION_ERROR = ThrowableManifest::LC_ASSERTION_ERROR;
+    public const CLASS_FIBER_ERROR = ThrowableManifest::LC_FIBER_ERROR;
 
     public const PROP_MESSAGE = 'message';
     public const PROP_CODE = 'code';
@@ -98,38 +100,16 @@ final class ExceptionSupport
 
     public static function isBuiltinExceptionSubclass(string $lc): bool
     {
-        return in_array($lc, [
-            self::CLASS_EXCEPTION,
-            self::CLASS_LOGIC_EXCEPTION,
-            self::CLASS_BAD_FUNCTION_CALL_EXCEPTION,
-            self::CLASS_BAD_METHOD_CALL_EXCEPTION,
-            self::CLASS_DOMAIN_EXCEPTION,
-            self::CLASS_INVALID_ARGUMENT_EXCEPTION,
-            self::CLASS_LENGTH_EXCEPTION,
-            self::CLASS_OUT_OF_RANGE_EXCEPTION,
-            self::CLASS_RUNTIME_EXCEPTION,
-            self::CLASS_OUT_OF_BOUNDS_EXCEPTION,
-            self::CLASS_OVERFLOW_EXCEPTION,
-            self::CLASS_RANGE_EXCEPTION,
-            self::CLASS_UNDERFLOW_EXCEPTION,
-            self::CLASS_UNEXPECTED_VALUE_EXCEPTION,
-        ], true);
+        return ThrowableManifest::isDescendantOf($lc, self::CLASS_EXCEPTION);
     }
 
     public static function isBuiltinErrorSubclass(string $lc): bool
     {
-        return in_array($lc, [
-            self::CLASS_TYPE_ERROR,
-            self::CLASS_VALUE_ERROR,
-            self::CLASS_ARGUMENT_COUNT_ERROR,
-            self::CLASS_PARSE_ERROR,
-            self::CLASS_COMPILE_ERROR,
-            self::CLASS_UNHANDLED_MATCH_ERROR,
-            self::CLASS_ARITHMETIC_ERROR,
-            self::CLASS_DIVISION_BY_ZERO_ERROR,
-            self::CLASS_ASSERTION_ERROR,
-            self::CLASS_FIBER_ERROR,
-        ], true);
+        if (self::CLASS_ERROR === $lc) {
+            return false;
+        }
+
+        return ThrowableManifest::isDescendantOf($lc, self::CLASS_ERROR);
     }
 
     public static function initFromConstruct(ObjectEntry $receiver, Frame $frame, int $messageArgIndex = 1): void
@@ -346,35 +326,18 @@ final class ExceptionSupport
     public static function nativeUncaughtThrowable(ObjectEntry $entry, string $message): \Throwable
     {
         $lc = strtolower($entry->class->name);
-        $native = match ($lc) {
-            self::CLASS_VALUE_ERROR => new \ValueError($message),
-            self::CLASS_TYPE_ERROR => new \TypeError($message),
-            self::CLASS_DIVISION_BY_ZERO_ERROR => new \DivisionByZeroError($message),
-            self::CLASS_ARGUMENT_COUNT_ERROR => new \ArgumentCountError($message),
-            self::CLASS_PARSE_ERROR => new \ParseError($message),
-            self::CLASS_COMPILE_ERROR => new \CompileError($message),
-            self::CLASS_UNHANDLED_MATCH_ERROR => new \UnhandledMatchError($message),
-            self::CLASS_ASSERTION_ERROR => new \AssertionError($message),
+        $nativeClass = ThrowableManifest::nativeClassForLc($lc);
+        if (null !== $nativeClass) {
+            $native = new $nativeClass($message);
+        } elseif (self::CLASS_FIBER_ERROR === $lc) {
             // FiberError is reserved for internal use in Zend; cannot be instantiated from userland PHP.
             // Map uncaught VM FiberError to a native Error for the test runner / CLI.
-            self::CLASS_FIBER_ERROR => new \Error('FiberError: '.$message),
-            self::CLASS_ERROR => new \Error($message),
-            self::CLASS_LOGIC_EXCEPTION => new \LogicException($message),
-            self::CLASS_BAD_FUNCTION_CALL_EXCEPTION => new \BadFunctionCallException($message),
-            self::CLASS_BAD_METHOD_CALL_EXCEPTION => new \BadMethodCallException($message),
-            self::CLASS_DOMAIN_EXCEPTION => new \DomainException($message),
-            self::CLASS_INVALID_ARGUMENT_EXCEPTION => new \InvalidArgumentException($message),
-            self::CLASS_LENGTH_EXCEPTION => new \LengthException($message),
-            self::CLASS_OUT_OF_RANGE_EXCEPTION => new \OutOfRangeException($message),
-            self::CLASS_RUNTIME_EXCEPTION => new \RuntimeException($message),
-            self::CLASS_OUT_OF_BOUNDS_EXCEPTION => new \OutOfBoundsException($message),
-            self::CLASS_OVERFLOW_EXCEPTION => new \OverflowException($message),
-            self::CLASS_RANGE_EXCEPTION => new \RangeException($message),
-            self::CLASS_UNDERFLOW_EXCEPTION => new \UnderflowException($message),
-            self::CLASS_UNEXPECTED_VALUE_EXCEPTION => new \UnexpectedValueException($message),
-            self::CLASS_EXCEPTION => new \Exception($message),
-            default => new \Exception($message),
-        };
+            $native = new \Error('FiberError: '.$message);
+        } elseif (ThrowableManifest::isDescendantOf($lc, self::CLASS_ERROR)) {
+            $native = new \Error($message);
+        } else {
+            $native = new \Exception($message);
+        }
         $file = self::readOptionalStringProperty($entry, self::PROP_FILE);
         $line = self::readOptionalIntProperty($entry, self::PROP_LINE);
         if (null !== $file || (null !== $line && $line > 0)) {
