@@ -2673,6 +2673,18 @@ apply_php_cfg_in_operator_overlay() {
   echo "Applied php-cfg-in-operator overlay (In_.php)"
 }
 
+apply_php_cfg_exit_two_arg_overlay() {
+  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Exit_.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg/Op/Expr/Exit_.php"
+  if [[ ! -f "$overlay" ]]; then
+    echo "Skip php-cfg-exit-two-arg overlay (missing $overlay)" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$op")"
+  cp "$overlay" "$op"
+  echo "Applied php-cfg-exit-two-arg overlay (Exit_.php)"
+}
+
 apply_php_cfg_typed_class_const_overlay() {
   local const_op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Const_.php"
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
@@ -3663,6 +3675,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_php_cfg_magic_constants_overlay || true
   # PHP 8.3 `in` operator CFG node must survive optional patch failures (#4682, #4850).
   apply_php_cfg_in_operator_overlay || true
+  apply_php_cfg_exit_two_arg_overlay || true
   # PHP 8.3 typed class/trait constants must survive optional patch failures (#6012).
   apply_php_cfg_typed_class_const_overlay || true
   # listSpreadRhs on Assign must exist before optional patch failures abort the script (#6069, #4835).
@@ -3853,6 +3866,10 @@ verify_critical_language_patches() {
   fi
   if [[ ! -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/In_.php" ]]; then
     missing+=("php-cfg-in-operator-In_")
+  fi
+  if [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Exit_.php" ]] \
+    && ! grep -q 'public \$message' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Exit_.php" 2>/dev/null; then
+    missing+=("php-cfg-exit-two-arg-Exit_")
   fi
   local assign_expr="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assign.php"
   if [[ -f "$assign_expr" ]] && ! grep -q 'listSpreadRhs' "$assign_expr" 2>/dev/null; then

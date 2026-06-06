@@ -5047,12 +5047,17 @@ class Compiler {
                     $resultSlot = $this->compileOperand($expr->result, $block, false);
                 }
 
-                return [new OpCode(
+                $exitOp = new OpCode(
                     OpCode::TYPE_EXIT,
                     $resultSlot,
                     $exitExpr,
                     max(0, $expr->getLine())
-                )];
+                );
+                if (null !== $expr->message) {
+                    $exitOp->exitMessageSlot = $this->compileOperand($expr->message, $block, true);
+                }
+
+                return [$exitOp];
             case Op\Expr\PostInc::class:
                 return $this->compileIncDecExpr($expr, $block, OpCode::TYPE_POST_INC);
             case Op\Expr\PreInc::class:

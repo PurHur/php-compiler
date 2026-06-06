@@ -16,9 +16,12 @@ use PHPCompiler\Web\Superglobals;
 /** VM lowering for exit/die (issue #269). */
 final class VmExit
 {
-    public static function terminate(?Variable $arg, ?Frame $frame = null): never
+    public static function terminate(?Variable $arg, ?Frame $frame = null, ?Variable $messageArg = null): never
     {
-        $status = self::resolveStatus($arg, $frame);
+        if (null !== $messageArg) {
+            self::echoExitMessage($messageArg, $frame);
+        }
+        $status = self::resolveStatus($arg, $frame, null !== $messageArg);
         $ctx = Superglobals::getActiveContext();
         if (null !== $ctx) {
             ShutdownQueue::run($ctx);
@@ -26,13 +29,16 @@ final class VmExit
         throw new ScriptExit($status);
     }
 
-    public static function resolveStatus(?Variable $arg, ?Frame $frame = null): int
+    public static function resolveStatus(?Variable $arg, ?Frame $frame = null, bool $twoArgForm = false): int
     {
         if (null === $arg) {
             return 0;
         }
         $v = $arg->resolveIndirect();
         if (Variable::TYPE_STRING === $v->type) {
+            if ($twoArgForm) {
+                return is_numeric($v->toString()) ? (int) $v->toString() : 0;
+            }
             echo $v->toString();
 
             return 0;
@@ -44,11 +50,17 @@ final class VmExit
             return 0;
         }
         if (Variable::TYPE_FLOAT === $v->type || Variable::TYPE_BOOLEAN === $v->type) {
+            if ($twoArgForm) {
+                return $v->toInt();
+            }
             echo $v->toString();
 
             return 0;
         }
         if (Variable::TYPE_ARRAY === $v->type) {
+            if ($twoArgForm) {
+                throw self::typeErrorForStatus($v);
+            }
             $vm = VM::running();
             echo null !== $vm ? $vm->coerceVariableToString($v, $frame) : 'Array';
 
@@ -66,6 +78,45 @@ final class VmExit
         }
 
         throw self::typeErrorForStatus($v);
+    }
+
+    private static function echoExitMessage(Variable $messageArg, ?Frame $frame): void
+    {
+        $v = $messageArg->resolveIndirect();
+        if (Variable::TYPE_STRING === $v->type) {
+            echo $v->toString();
+
+            return;
+        }
+        if (Variable::TYPE_NULL === $v->type) {
+            return;
+        }
+        if (Variable::TYPE_FLOAT === $v->type || Variable::TYPE_BOOLEAN === $v->type || Variable::TYPE_INTEGER === $v->type) {
+            echo $v->toString();
+
+            return;
+        }
+        if (Variable::TYPE_ARRAY === $v->type) {
+            $vm = VM::running();
+            echo null !== $vm ? $vm->coerceVariableToString($v, $frame) : 'Array';
+
+            return;
+        }
+        if (Variable::TYPE_ENUM_CASE === $v->type) {
+            throw new \Error(
+                'Object of class '.$v->toEnumCase()->enumClass->name.' could not be converted to string'
+            );
+        }
+        if (Variable::TYPE_OBJECT === $v->type && EnumCaseSupport::isEnumCase($v->toObject())) {
+            throw new \Error(
+                'Object of class '.$v->toObject()->class->name.' could not be converted to string'
+            );
+        }
+
+        throw new \TypeError(sprintf(
+            'exit(): Argument #2 ($message) must be of type string, %s given',
+            TypeCheck::typeNameForConstraint($v->type)
+        ));
     }
 
     private static function typeErrorForStatus(Variable $value): \TypeError

@@ -2540,12 +2540,16 @@ restart:
                     if (null !== $op->arg2) {
                         $exitArg = $frame->scope[$op->arg2];
                     }
+                    $exitMessage = null;
+                    if (null !== $op->exitMessageSlot) {
+                        $exitMessage = $frame->scope[$op->exitMessageSlot];
+                    }
                     $savedCallSiteLine = $frame->callSiteLine;
                     if (null !== $op->arg3 && $op->arg3 > 0) {
                         $frame->callSiteLine = $op->arg3;
                     }
                     try {
-                        ext\standard\VmExit::terminate($exitArg, $frame);
+                        ext\standard\VmExit::terminate($exitArg, $frame, $exitMessage);
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         $frame->callSiteLine = $savedCallSiteLine;
