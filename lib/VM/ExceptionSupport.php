@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\ext\standard\ThrowableManifest;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
-use PHPCompiler\ext\standard\VmReflection;
 
 /**
  * Shared helpers for Throwable / Exception / Error VM builtins (#195, #3371).
@@ -118,7 +118,13 @@ final class ExceptionSupport
         if (array_key_exists($messageArgIndex, $frame->calledArgs)) {
             $msgVar = $frame->calledArgs[$messageArgIndex]->resolveIndirect();
             if (Variable::TYPE_NULL !== $msgVar->type) {
-                $message = VmReflection::stringArg($frame->calledArgs[$messageArgIndex], 'Exception::__construct() message');
+                $className = $receiver->class->name;
+                $message = VmString::coerceStringBuiltinArg(
+                    $frame->calledArgs[$messageArgIndex],
+                    "{$className}::__construct",
+                    0,
+                    'message'
+                );
             }
         }
         $code = 0;
