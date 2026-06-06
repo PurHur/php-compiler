@@ -103,6 +103,18 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { public int $x = 1; public function __clone() { $this->x = 2; } } $a = new C(); $b = clone $a; echo $b->x;',
         ],
         [
+            'id' => 'clone_with',
+            'construct' => 'PHP 8.3+ `clone $obj with { prop: $value }`',
+            'opcodes' => ['TYPE_CLONE', 'TYPE_METHODCALL_INIT'],
+            'issue' => 4513,
+            'jit' => true,
+            'notes' => [
+                'Ast\\CloneWithDesugar before php-parser (#4513); lowers to IIFE clone + property writes',
+                'Zend/zend_language_parser.y clone_expr with clause; zend_clones.c property overrides',
+            ],
+            'probe' => 'class C { public int $x = 1; public string $y = "a"; } $c = new C(); $d = clone $c with { x: 2, y: "b" }; echo $d->x, $d->y;',
+        ],
+        [
             'id' => 'magic_methods',
             'construct' => 'Magic methods `__get` / `__set` / `__call` / `__toString`',
             'opcodes' => [],
@@ -1002,6 +1014,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'instance_methods' => '/function\s+\w+\s*\(/',
         'construct_method' => '/function\s+__construct\s*\(/',
         'clone_magic' => '/function\s+__clone\s*\(/',
+        'clone_with' => '/\bclone\b[^;{]*\bwith\s*\{/',
         'magic_methods' => '/function\s+__get\s*\(|function\s+__call\s*\(|function\s+__toString\s*\(/',
         'private_methods' => '/\bprivate\s+function\b/',
         'method_return_types' => '/function\s+\w+\([^)]*\)\s*:\s*(?:string|void|int)/',
