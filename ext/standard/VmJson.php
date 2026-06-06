@@ -6,6 +6,8 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseEntry;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\Variable;
 
@@ -133,6 +135,8 @@ final class VmJson
                 }
 
                 return $out;
+            case Variable::TYPE_ENUM_CASE:
+                return self::exportEnumCase($v->toEnumCase());
             case Variable::TYPE_OBJECT:
                 if (null === $ctx || null === $vm) {
                     throw new \LogicException(
@@ -140,6 +144,20 @@ final class VmJson
                     );
                 }
                 $object = $v->toObject();
+                if (EnumCaseSupport::isEnumCase($object)) {
+                    $backing = new Variable();
+                    if (null !== $object->enumCaseValue) {
+                        $backing->copyFrom($object->enumCaseValue);
+                    } else {
+                        $backing->string('');
+                    }
+
+                    return self::exportEnumCase(new EnumCaseEntry(
+                        $object->class,
+                        $object->enumCaseName ?? '',
+                        $backing
+                    ));
+                }
                 if (!InterfaceCheck::entryImplements($object->class, 'jsonserializable', $ctx)) {
                     self::$lastError = self::ERROR_UNSUPPORTED_TYPE;
 
@@ -158,6 +176,25 @@ final class VmJson
                     'json_encode() value type not supported in this compiler build'
                 );
         }
+    }
+
+    /**
+     * Zend ext/json/php_json.c — backed enum cases encode as backing scalar; unit cases as "".
+     */
+    private static function exportEnumCase(EnumCaseEntry $case): mixed
+    {
+        if (null === $case->enumClass->backedType) {
+            return '';
+        }
+        $backing = $case->backingValue->resolveIndirect();
+
+        return match ($case->enumClass->backedType) {
+            'int' => $backing->toInt(),
+            'string' => $backing->toString(),
+            default => throw new \LogicException(
+                'json_encode() unsupported enum backing type in this compiler build'
+            ),
+        };
     }
 }
 
