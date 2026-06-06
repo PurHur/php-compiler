@@ -5241,10 +5241,18 @@ class Compiler {
             case Op\Expr\BitwiseNot::class:
             case Op\Expr\BooleanNot::class:
             case Op\Expr\Clone_::class:
+                return [new OpCode(
+                    $this->getOpCodeTypeFromUnaryOp($expr),
+                    $this->compileOperand($expr->result, $block, false),
+                    $this->compileUnaryExprReadOperand($expr, $block)
+                )];
             case Op\Expr\Empty_::class:
-                $propFetch = $this->findCoalescePropertyFetch($expr->expr, $block);
-                if (null === $propFetch) {
-                    $propFetch = $this->unwrapPropertyFetch($expr->expr);
+                $emptyOperand = $this->unaryExprOperandForRead($expr, $block);
+                $propFetch = null !== $emptyOperand
+                    ? $this->findCoalescePropertyFetch($emptyOperand, $block)
+                    : null;
+                if (null === $propFetch && null !== $emptyOperand) {
+                    $propFetch = $this->unwrapPropertyFetch($emptyOperand);
                 }
                 if (null !== $propFetch) {
                     return [new OpCode(
@@ -5254,7 +5262,9 @@ class Compiler {
                         $this->compileOperand($propFetch->name, $block, true),
                     )];
                 }
-                $dimFetch = $this->findCoalesceArrayDimFetch($expr->expr, $block);
+                $dimFetch = null !== $emptyOperand
+                    ? $this->findCoalesceArrayDimFetch($emptyOperand, $block)
+                    : null;
                 if (null !== $dimFetch) {
                     $resultSlot = $this->compileOperand($expr->result, $block, false);
                     $checkSlot = $this->compileBoolTemporary($block);
@@ -5272,9 +5282,9 @@ class Compiler {
                 }
 
                 return [new OpCode(
-                    $this->getOpCodeTypeFromUnaryOp($expr),
+                    OpCode::TYPE_EMPTY,
                     $this->compileOperand($expr->result, $block, false),
-                    $this->compileOperand($expr->expr, $block, true)
+                    $this->compileUnaryExprReadOperand($expr, $block)
                 )];
             case Op\Expr\Eval_::class:
                 return [new OpCode(
@@ -6999,8 +7009,68 @@ class Compiler {
     /**
      * @return ?Op\Expr\ArrayDimFetch
      */
-    protected function findCoalesceArrayDimFetch(Operand $operand, Block $block): ?Op\Expr\ArrayDimFetch
+    /**
+     * php-cfg may clear Empty_/BooleanNot->expr after SSA phi replaceWith; recover read operand (#6829).
+     */
+    private function unaryExprOperandForRead(Op\Expr $expr, Block $block): ?Operand
     {
+        if (null !== $expr->expr) {
+            return $expr->expr;
+        }
+        if ($expr instanceof Op\Expr\Empty_) {
+            return $expr->result;
+        }
+        if ($expr instanceof Op\Expr\BooleanNot) {
+            return $this->recoverBooleanNotExprOperand($expr, $block);
+        }
+
+        return null;
+    }
+
+    private function compileUnaryExprReadOperand(Op\Expr $expr, Block $block): ?int
+    {
+        $operand = $this->unaryExprOperandForRead($expr, $block);
+
+        return null !== $operand ? $this->compileOperand($operand, $block, true) : null;
+    }
+
+    /**
+     * BooleanNot.expr cleared while JumpIf still uses result — find negated operand (#6829).
+     */
+    private function recoverBooleanNotExprOperand(Op\Expr\BooleanNot $expr, Block $block): ?Operand
+    {
+        $func = $block->func;
+        if (null === $func?->cfg) {
+            return null;
+        }
+        $line = $expr->getLine();
+        $nearest = null;
+        $nearestLine = -1;
+        $walk = function ($node) use (&$walk, $line, &$nearest, &$nearestLine): void {
+            if ($node instanceof Op\Expr\Assign && $node->getLine() <= $line && $node->getLine() > $nearestLine) {
+                $nearestLine = $node->getLine();
+                $nearest = $node->var;
+            }
+            if ($node instanceof CfgBlock) {
+                foreach ($node->children as $child) {
+                    $walk($child);
+                }
+            }
+            if ($node instanceof Op\Stmt\JumpIf) {
+                $walk($node->if);
+                $walk($node->else);
+            }
+        };
+        $walk($func->cfg);
+
+        return $nearest;
+    }
+
+    protected function findCoalesceArrayDimFetch(?Operand $operand, Block $block): ?Op\Expr\ArrayDimFetch
+    {
+        if (null === $operand) {
+            return null;
+        }
         $direct = $this->unwrapArrayDimFetch($operand);
         if (null !== $direct) {
             return $direct;
@@ -7017,8 +7087,11 @@ class Compiler {
     /**
      * @return ?Op\Expr\PropertyFetch
      */
-    protected function findCoalescePropertyFetch(Operand $operand, Block $block): ?Op\Expr\PropertyFetch
+    protected function findCoalescePropertyFetch(?Operand $operand, Block $block): ?Op\Expr\PropertyFetch
     {
+        if (null === $operand) {
+            return null;
+        }
         $direct = $this->unwrapPropertyFetch($operand);
         if (null !== $direct) {
             return $direct;
@@ -8329,8 +8402,11 @@ class Compiler {
         return $this->unwrapOperandChain($a) === $this->unwrapOperandChain($b);
     }
 
-    protected function operandDerivesFromNew(Operand $operand, Block $block): bool
+    protected function operandDerivesFromNew(?Operand $operand, Block $block): bool
     {
+        if (null === $operand) {
+            return false;
+        }
         if (null === $block->orig) {
             return false;
         }
