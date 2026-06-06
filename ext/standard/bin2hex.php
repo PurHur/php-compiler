@@ -14,8 +14,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPLLVM\Value;
 
 /**
@@ -28,14 +29,10 @@ final class bin2hex extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('bin2hex() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('bin2hex() only supports strings in this compiler build');
-        }
-        $frame->returnVar->string(VmString::bin2hex($v->toString()));
+        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'bin2hex', 0, 'string');
+        BuiltinExecute::writeReturn($frame, static function ($ret) use ($data): void {
+            $ret->string(VmString::bin2hex($data));
+        });
     }
 
     public Context $context;
@@ -47,6 +44,9 @@ final class bin2hex extends Internal
             throw new \LogicException('bin2hex() requires exactly one argument');
         }
 
-        return JitBin2hex::convert($context, $this->jitString($context, $args[0], 'bin2hex() argument #1'));
+        return JitBin2hex::convert(
+            $context,
+            JitStringBuiltinArg::lower($context, $args[0], 'bin2hex', 0, 'string')
+        );
     }
 }
