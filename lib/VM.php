@@ -4994,6 +4994,11 @@ restart:
 
                 return self::SUCCESS;
             }
+            // Property hooks run via swapRunStack(null); parent is only for static-init
+            // continue detection — must not resume the caller frame here (#7097, #7108).
+            if (null !== $frame->propertyHookRawProperty) {
+                return self::SUCCESS;
+            }
             $child = $frame;
             $frame = $frame->parent;
             $this->releaseFrameObjectRefs($child);
