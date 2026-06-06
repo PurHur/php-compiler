@@ -24,7 +24,7 @@ final class trait_exists_ extends Internal
             throw new \LogicException('trait_exists() requires one or two arguments in this compiler build');
         }
         $ctx = VmReflection::requireContext($frame);
-        $name = VmReflection::stringArg($frame->calledArgs[0], 'trait_exists() trait name');
+        $name = VmReflection::stringArg($frame->calledArgs[0], 'trait_exists() trait name', 0);
         $exists = VmReflection::traitExists($ctx, $name);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($exists);

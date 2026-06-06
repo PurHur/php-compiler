@@ -30,7 +30,7 @@ final class ReflectionClassGetReflectionConstant extends VmClassMethod
         if (null === $entry) {
             throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
         }
-        $constant = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionClass::getReflectionConstant() name');
+        $constant = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionClass::getReflectionConstant() name', 1);
         if (null === VmReflection::findClassConstantKey($entry, $constant, $ctx)) {
             throw new \LogicException("Constant {$constant} does not exist on {$className}");
         }

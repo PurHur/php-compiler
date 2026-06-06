@@ -22,7 +22,7 @@ final class DateTimeFormat extends VmClassMethod
             throw new \LogicException('DateTime::format() expects exactly 1 argument');
         }
         $receiver = DateTimeSupport::requireDateTime($frame->calledArgs[0], 'DateTime::format()');
-        $format = VmReflection::stringArg($frame->calledArgs[1], 'DateTime::format() format');
+        $format = VmReflection::stringArg($frame->calledArgs[1], 'DateTime::format() format', 1);
         if (null === $frame->returnVar) {
             return;
         }

@@ -29,7 +29,7 @@ final class ReflectionPropertyGetAttributes extends VmClassMethod
         }
         $filter = null;
         if (isset($frame->calledArgs[1])) {
-            $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionProperty::getAttributes() name');
+            $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionProperty::getAttributes() name', 1);
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom(

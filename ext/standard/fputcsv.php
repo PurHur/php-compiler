@@ -41,13 +41,13 @@ final class fputcsv extends Internal
         $enclosure = '"';
         $escape = '\\';
         if ($argc >= 3) {
-            $separator = VmReflection::stringArg($frame->calledArgs[2], 'fputcsv() separator');
+            $separator = VmReflection::stringArg($frame->calledArgs[2], 'fputcsv() separator', 2);
         }
         if ($argc >= 4) {
-            $enclosure = VmReflection::stringArg($frame->calledArgs[3], 'fputcsv() enclosure');
+            $enclosure = VmReflection::stringArg($frame->calledArgs[3], 'fputcsv() enclosure', 3);
         }
         if ($argc >= 5) {
-            $escape = VmReflection::stringArg($frame->calledArgs[4], 'fputcsv() escape');
+            $escape = VmReflection::stringArg($frame->calledArgs[4], 'fputcsv() escape', 4);
         }
         $fields = [];
         foreach ($fieldsVar->toArray()->iterate(true) as $value) {

@@ -27,7 +27,7 @@ final class ReflectionEnumUnitCaseConstruct extends VmClassMethod
         if (!$enumEntry->isEnum) {
             throw new \LogicException('ReflectionEnumUnitCase expects an enum class');
         }
-        $caseName = VmReflection::stringArg($frame->calledArgs[2], 'ReflectionEnumUnitCase::__construct() case');
+        $caseName = VmReflection::stringArg($frame->calledArgs[2], 'ReflectionEnumUnitCase::__construct() case', 2);
         $caseLc = strtolower($caseName);
         if (!isset($enumEntry->enumCaseCanonicalNames[$caseLc])) {
             throw new \LogicException('Enum '.$enumEntry->name.' has no case named '.$caseName);

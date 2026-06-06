@@ -39,12 +39,12 @@ final class preg_replace_callback extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('preg_replace_callback() requires VM context in this compiler build');
         }
-        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_replace_callback() pattern');
+        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_replace_callback() pattern', 0);
         $callbackVar = $frame->calledArgs[1]->resolveIndirect();
         if (!PregReplaceCallbackPolicy::isVmSupportedType($callbackVar->type)) {
             throw new \LogicException(PregReplaceCallbackPolicy::vmRejectionMessage());
         }
-        $subject = VmReflection::stringArg($frame->calledArgs[2], 'preg_replace_callback() subject');
+        $subject = VmReflection::stringArg($frame->calledArgs[2], 'preg_replace_callback() subject', 2);
         $fn = VmUserCall::resolveStringCallback($frame->vmContext, $callbackVar->toString());
         $result = VmPregReplaceCallback::invoke($frame->vmContext, $pattern, $fn, $subject);
         if (false === $result) {

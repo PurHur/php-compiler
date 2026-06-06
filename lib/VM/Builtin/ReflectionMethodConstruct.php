@@ -25,8 +25,8 @@ final class ReflectionMethodConstruct extends VmClassMethod
         }
         $receiver = ReflectionSupport::requireReflectionMethod($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
-        $className = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionMethod::__construct() class');
-        $method = VmReflection::stringArg($frame->calledArgs[2], 'ReflectionMethod::__construct() method');
+        $className = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionMethod::__construct() class', 1);
+        $method = VmReflection::stringArg($frame->calledArgs[2], 'ReflectionMethod::__construct() method', 2);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
             throw new \LogicException('ReflectionMethod refers to unknown class in this compiler build');

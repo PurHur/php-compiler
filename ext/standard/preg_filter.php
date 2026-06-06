@@ -36,8 +36,8 @@ final class preg_filter extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_filter() pattern');
-        $replacement = VmReflection::stringArg($frame->calledArgs[1], 'preg_filter() replacement');
+        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_filter() pattern', 0);
+        $replacement = VmReflection::stringArg($frame->calledArgs[1], 'preg_filter() replacement', 1);
         $subjectVar = $frame->calledArgs[2]->resolveIndirect();
         $limit = -1;
         $flags = 0;

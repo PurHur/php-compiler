@@ -28,7 +28,7 @@ final class DateTimeConstruct extends VmClassMethod
         if ($argc >= 2) {
             $timeVar = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_NULL !== $timeVar->type) {
-                $time = VmReflection::stringArg($frame->calledArgs[1], 'DateTime::__construct() time');
+                $time = VmReflection::stringArg($frame->calledArgs[1], 'DateTime::__construct() time', 1);
             }
         }
         $timezone = null;

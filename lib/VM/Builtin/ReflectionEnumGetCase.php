@@ -28,7 +28,7 @@ final class ReflectionEnumGetCase extends VmClassMethod
         if (null === $entry || !$entry->isEnum) {
             throw new \LogicException('ReflectionEnum refers to unknown enum in this compiler build');
         }
-        $caseName = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionEnum::getCase() case');
+        $caseName = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionEnum::getCase() case', 1);
         $obj = VmReflection::newReflectionEnumUnitCase($ctx, $entry, $caseName);
         if (null !== $frame->returnVar) {
             $frame->returnVar->object($obj);

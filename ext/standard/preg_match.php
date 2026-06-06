@@ -21,8 +21,8 @@ final class preg_match extends Internal
         if ($argc < 2 || $argc > 5) {
             throw new \LogicException('preg_match() requires 2 to 5 arguments in this compiler build');
         }
-        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_match() pattern');
-        $subject = VmReflection::stringArg($frame->calledArgs[1], 'preg_match() subject');
+        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_match() pattern', 0);
+        $subject = VmReflection::stringArg($frame->calledArgs[1], 'preg_match() subject', 1);
 
         $flags = 0;
         $offset = 0;

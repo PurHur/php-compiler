@@ -44,13 +44,13 @@ final class fgetcsv extends Internal
         $enclosure = '"';
         $escape = '\\';
         if ($argc >= 3) {
-            $separator = VmReflection::stringArg($frame->calledArgs[2], 'fgetcsv() separator');
+            $separator = VmReflection::stringArg($frame->calledArgs[2], 'fgetcsv() separator', 2);
         }
         if ($argc >= 4) {
-            $enclosure = VmReflection::stringArg($frame->calledArgs[3], 'fgetcsv() enclosure');
+            $enclosure = VmReflection::stringArg($frame->calledArgs[3], 'fgetcsv() enclosure', 3);
         }
         if ($argc >= 5) {
-            $escape = VmReflection::stringArg($frame->calledArgs[4], 'fgetcsv() escape');
+            $escape = VmReflection::stringArg($frame->calledArgs[4], 'fgetcsv() escape', 4);
         }
         $row = VmFs::fgetcsv($handle, $length, $separator, $enclosure, $escape);
         if (false === $row) {
