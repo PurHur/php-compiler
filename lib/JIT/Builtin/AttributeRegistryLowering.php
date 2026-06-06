@@ -15,7 +15,7 @@ use PHPLLVM\Value;
 /**
  * Compile-time attribute tables for JIT/AOT reflection (#1936, #5621).
  *
- * Replaces lib/AOT/runtime/phpc_attr_registry.c with LLVM lowered from PHP.
+ * Compile-time attribute lookup for JIT/AOT — PHP-owned tables, no C runtime (#5621, #6922).
  */
 final class AttributeRegistryLowering
 {
@@ -70,7 +70,7 @@ final class AttributeRegistryLowering
 
     public static function implementLookupFunctions(Context $context): void
     {
-        $fn = $context->module->getNamedFunction('phpc_attr_class_count');
+        $fn = $context->module->getNamedFunction('__compiler_attr_class_count');
         if (null !== $fn && $fn->countBasicBlocks() > 0) {
             return;
         }
@@ -85,7 +85,6 @@ final class AttributeRegistryLowering
         self::implementMethodCount($context, $methodNames);
         self::implementMethodNameAt($context, $methodNames);
         self::implementClassArgsHashtable($context, $classEntries);
-        self::implementClassStringArg($context);
         $context->builder->clearInsertionPosition();
     }
 
@@ -99,7 +98,7 @@ final class AttributeRegistryLowering
     /** @param array<string, list<string>> $classNames */
     private static function implementClassCount(Context $context, array $classNames): void
     {
-        $fn = self::defineFunction($context, 'phpc_attr_class_count', 'size_t', ['int8*']);
+        $fn = self::defineFunction($context, '__compiler_attr_class_count', 'size_t', ['int8*']);
         if (null === $fn) {
             return;
         }
@@ -129,7 +128,7 @@ final class AttributeRegistryLowering
     /** @param array<string, list<string>> $classNames */
     private static function implementClassNameAt(Context $context, array $classNames): void
     {
-        $fn = self::defineFunction($context, 'phpc_attr_class_name_at', 'int8*', ['int8*', 'size_t']);
+        $fn = self::defineFunction($context, '__compiler_attr_class_name_at', 'int8*', ['int8*', 'size_t']);
         if (null === $fn) {
             return;
         }
@@ -169,7 +168,7 @@ final class AttributeRegistryLowering
     /** @param array<string, array<string, list<string>>> $methodNames */
     private static function implementMethodCount(Context $context, array $methodNames): void
     {
-        $fn = self::defineFunction($context, 'phpc_attr_method_count', 'size_t', ['int8*', 'int8*']);
+        $fn = self::defineFunction($context, '__compiler_attr_method_count', 'size_t', ['int8*', 'int8*']);
         if (null === $fn) {
             return;
         }
@@ -205,7 +204,7 @@ final class AttributeRegistryLowering
     /** @param array<string, array<string, list<string>>> $methodNames */
     private static function implementMethodNameAt(Context $context, array $methodNames): void
     {
-        $fn = self::defineFunction($context, 'phpc_attr_method_name_at', 'int8*', ['int8*', 'int8*', 'size_t']);
+        $fn = self::defineFunction($context, '__compiler_attr_method_name_at', 'int8*', ['int8*', 'int8*', 'size_t']);
         if (null === $fn) {
             return;
         }
@@ -250,7 +249,7 @@ final class AttributeRegistryLowering
     /** @param array<string, list<AttributeEntry>> $classEntries */
     private static function implementClassArgsHashtable(Context $context, array $classEntries): void
     {
-        $fn = self::defineFunction($context, 'phpc_attr_class_args_hashtable', '__hashtable__*', ['int8*', 'size_t']);
+        $fn = self::defineFunction($context, '__compiler_attr_class_args_hashtable', '__hashtable__*', ['int8*', 'size_t']);
         if (null === $fn) {
             return;
         }
@@ -288,20 +287,6 @@ final class AttributeRegistryLowering
             $context->builder->positionAtEnd($entry);
             $context->builder->branch($next);
         }
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function implementClassStringArg(Context $context): void
-    {
-        $fn = self::defineFunction($context, 'phpc_attr_class_string_arg', 'int8*', ['int8*', 'size_t', 'size_t']);
-        if (null === $fn) {
-            return;
-        }
-        $i8p = $context->getTypeFromString('int8*');
-        $context->builder->positionAtEnd($fn->getFirstBasicBlock());
-        $context->builder->returnValue(
-            $context->builder->pointerCast($context->constantFromString(''), $i8p)
-        );
         $context->builder->clearInsertionPosition();
     }
 

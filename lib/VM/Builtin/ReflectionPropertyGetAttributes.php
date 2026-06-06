@@ -6,6 +6,7 @@ namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
+use PHPCompiler\VM\AttributeRegistry;
 use PHPCompiler\VM\ReflectionSupport;
 
 /** ReflectionProperty::getAttributes() — VM read path (#4136). */
@@ -26,22 +27,14 @@ final class ReflectionPropertyGetAttributes extends VmClassMethod
         if (null === $entry) {
             throw new \LogicException('ReflectionProperty refers to unknown class in this compiler build');
         }
-        $propLc = strtolower($property);
-        $all = $entry->propertyAttributeNames[$propLc] ?? [];
-        $allEntries = $entry->propertyAttributeEntries[$propLc] ?? [];
         $filter = null;
         if (isset($frame->calledArgs[1])) {
             $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionProperty::getAttributes() name');
         }
-        $entries = ReflectionSupport::filterEntriesByName($allEntries, $filter);
-        if ([] !== $entries) {
-            $out = ReflectionSupport::attributesArrayFromEntries($frame, $entries);
-        } else {
-            $names = ReflectionSupport::filterByName($all, $filter);
-            $out = ReflectionSupport::attributesArray($frame, $names);
-        }
         if (null !== $frame->returnVar) {
-            $frame->returnVar->copyFrom($out);
+            $frame->returnVar->copyFrom(
+                AttributeRegistry::propertyAttributes($frame, $entry, strtolower($property), $filter)
+            );
         }
     }
 }
