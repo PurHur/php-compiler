@@ -865,6 +865,9 @@ class Compiler {
         if (null === $branch->orig) {
             return null;
         }
+        if ($this->isPropertyWriteAssign($assign, $branch)) {
+            return null;
+        }
         if (!$this->isMergeBranchAssign($branch, $assign)) {
             return null;
         }
@@ -1227,6 +1230,13 @@ class Compiler {
                         && $i + 1 < $opCount
                         && $this->isPropertyFetchOnlyUnsetVar($child, $ops[$i + 1])
                     ) {
+                        break;
+                    } elseif (
+                        $child instanceof Op\Expr\PropertyFetch
+                        && $i + 1 < $opCount
+                        && $this->isPropertyFetchOnlyAssignVar($child, $ops[$i + 1])
+                    ) {
+                        // Lowered by compileExpr Assign via TYPE_PROPERTY_FETCH + TYPE_ASSIGN (#6834).
                         break;
                     } elseif ($this->isLoweredByFollowingCoalesce($child, $ops, $i)) {
                         break;
@@ -2299,6 +2309,41 @@ class Compiler {
         }
 
         return $this->findCoalesceArrayDimFetch($target, $block) === $fetch;
+    }
+
+    private function isPropertyWriteAssign(Op\Expr\Assign $assign, Block $block): bool
+    {
+        if (null !== $this->unwrapPropertyFetch($assign->var)
+            || null !== $this->findCoalescePropertyFetch($assign->var, $block)) {
+            return true;
+        }
+
+        return null !== $this->unwrapStaticPropertyFetch($assign->var)
+            || null !== $this->findStaticPropertyFetchForUnset($assign->var, $block);
+    }
+
+    private function isPropertyFetchOnlyAssignVar(
+        Op\Expr\PropertyFetch $fetch,
+        Op $next
+    ): bool {
+        if (!$next instanceof Op\Expr\Assign) {
+            return false;
+        }
+        $var = $next->var;
+        if ($var === $fetch || $var === $fetch->result) {
+            return true;
+        }
+        while ($var instanceof Temporary) {
+            if ($var === $fetch->result || $var->original === $fetch) {
+                return true;
+            }
+            if (null === $var->original) {
+                break;
+            }
+            $var = $var->original;
+        }
+
+        return $var === $fetch->result;
     }
 
     private function isPropertyFetchOnlyUnsetVar(
@@ -5077,7 +5122,8 @@ class Compiler {
 
                     return [$spreadOp];
                 }
-                $staticPropertyFetch = $this->unwrapStaticPropertyFetch($expr->var);
+                $staticPropertyFetch = $this->unwrapStaticPropertyFetch($expr->var)
+                    ?? $this->findStaticPropertyFetchForUnset($expr->var, $block);
                 if (null !== $staticPropertyFetch) {
                     $fetchSlot = $this->compileOperand($staticPropertyFetch->result, $block, false);
                     $rhsSlot = $this->compileOperand($expr->expr, $block, true);
@@ -5106,7 +5152,8 @@ class Compiler {
 
                     return $ops;
                 }
-                $propertyFetch = $this->unwrapPropertyFetch($expr->var);
+                $propertyFetch = $this->unwrapPropertyFetch($expr->var)
+                    ?? $this->findCoalescePropertyFetch($expr->var, $block);
                 if (null !== $propertyFetch) {
                     $fetchSlot = $this->compileOperand($propertyFetch->result, $block, false);
                     $rhsSlot = $this->compileOperand($expr->expr, $block, true);
