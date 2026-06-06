@@ -5629,12 +5629,20 @@ class Compiler {
                     : null));
         if (null !== $issetTarget) {
             [$containerSlot, $dimSlot] = $issetTarget;
-            $block->addOpCode($this->makeIssetOpCode(
+            $issetOp = $this->makeIssetOpCode(
                 $checkSlot,
                 $containerSlot,
                 $dimSlot,
                 null !== $propFetch
-            ));
+            );
+            if (
+                null !== $propFetch
+                && null !== $resultOverride
+                && $this->operandsChainEqual($resultOverride, $propFetch->result)
+            ) {
+                $issetOp->issetForCoalesceAssign = true;
+            }
+            $block->addOpCode($issetOp);
         } elseif (null !== $expr->left) {
             $leftSlot = $this->compileOperand($expr->left, $block, true);
             $block->addOpCode(new OpCode(
@@ -5674,6 +5682,12 @@ class Compiler {
         ) {
             $this->compileArrayDimFetchWrite($dimFetch, $rightEmitBlock);
         }
+        if (
+            null !== $propFetch
+            && $this->operandsChainEqual($coalesceAssignTarget, $propFetch->result)
+        ) {
+            $this->compilePropertyFetchWrite($propFetch, $rightEmitBlock);
+        }
         if (null !== $rightSlot) {
             $rightEmitBlock->addOpCode(new OpCode(
                 OpCode::TYPE_ASSIGN,
@@ -5693,6 +5707,17 @@ class Compiler {
                 $leftSlot = $this->compileOperand($dimFetch->result, $leftBlock, true);
                 // ??= left branch: skip store when result is the assign lvalue (php-src: no write when set).
                 if (null !== $expr->left && !$this->operandsChainEqual($resultOperand, $expr->left)) {
+                    $leftBlock->addOpCode(new OpCode(
+                        OpCode::TYPE_ASSIGN,
+                        $resultSlot,
+                        $resultSlot,
+                        $leftSlot
+                    ));
+                }
+            } elseif (null !== $propFetch) {
+                $this->compilePropertyFetchRead($propFetch, $leftBlock);
+                $leftSlot = $this->compileOperand($propFetch->result, $leftBlock, true);
+                if (!$this->operandsChainEqual($resultOperand, $expr->left)) {
                     $leftBlock->addOpCode(new OpCode(
                         OpCode::TYPE_ASSIGN,
                         $resultSlot,
@@ -5735,6 +5760,32 @@ class Compiler {
         $block->addOpCode($coalesceOp);
 
         return $endBlock;
+    }
+
+    /**
+     * Emit a read fetch in $block (used by ?? left branch when the stmt fetch was skipped).
+     */
+    private function compilePropertyFetchRead(Op\Expr\PropertyFetch $fetch, Block $block): void
+    {
+        $block->addOpCode(new OpCode(
+            OpCode::TYPE_PROPERTY_FETCH,
+            $this->compileOperand($fetch->result, $block, false),
+            $this->compileOperand($fetch->var, $block, true),
+            $this->compileOperand($fetch->name, $block, true)
+        ));
+    }
+
+    /**
+     * Emit a write fetch in $block (used by ??= right branch when backing is null, #6472).
+     */
+    private function compilePropertyFetchWrite(Op\Expr\PropertyFetch $fetch, Block $block): void
+    {
+        $block->addOpCode(new OpCode(
+            OpCode::TYPE_PROPERTY_FETCH,
+            $this->compileOperand($fetch->result, $block, false),
+            $this->compileOperand($fetch->var, $block, true),
+            $this->compileOperand($fetch->name, $block, true)
+        ));
     }
 
     /**
