@@ -46,6 +46,7 @@ final class SelfHostBuiltinPolicy
         'idate' => 'numeric',
         'uniqid' => 'numeric',
         'getmypid' => 'numeric',
+        'zend_thread_id' => 'numeric',
         'getmygrgid' => 'numeric',
         'getmyinode' => 'numeric',
         'getlastmod' => 'numeric',
