@@ -328,6 +328,38 @@ PHP;
         self::assertStringContainsString('function __phpc_property_set_x($value)', $out);
     }
 
+    /** @covers issue #7148 — brace hook `private set;` modifier before set keyword */
+    public function testLowersBraceHookPrivateSetModifierOnConcreteClass(): void
+    {
+        $src = <<<'PHP'
+<?php
+class User {
+    public string $email { get; private set; }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$email {', $out);
+        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $email;', $out);
+        self::assertArrayNotHasKey('requiresGet', $registry['user']['email'] ?? []);
+        self::assertArrayNotHasKey('requiresSet', $registry['user']['email'] ?? []);
+    }
+
+    public function testLowersBraceHookPrivateSetArrowHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public string $x {
+        get => 'g';
+        private set => $this->x = $value;
+    }
+}
+PHP;
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $x;', $out);
+        self::assertStringContainsString('function __phpc_property_set_x', $out);
+    }
+
     public function testSkipsClassDeclarationsInsideStringLiterals(): void
     {
         $src = <<<'PHP'
