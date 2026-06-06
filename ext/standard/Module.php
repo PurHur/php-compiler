@@ -791,6 +791,31 @@ class Module extends ModuleAbstract
             $context->registerFunction('chmod', $fn);
         }
         try {
+            $context->lookupFunction('umask');
+        } catch (\Throwable $e) {
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i32);
+            $fn = $context->module->addFunction('umask', $ft);
+            $context->registerFunction('umask', $fn);
+        }
+        try {
+            $context->lookupFunction('nice');
+        } catch (\Throwable $e) {
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i32);
+            $fn = $context->module->addFunction('nice', $ft);
+            $context->registerFunction('nice', $fn);
+        }
+        try {
+            $context->lookupFunction('__errno_location');
+        } catch (\Throwable $e) {
+            $i32 = $context->getTypeFromString('int32');
+            $i32Ptr = $i32->pointerType(0);
+            $ft = $context->context->functionType($i32Ptr, false);
+            $fn = $context->module->addFunction('__errno_location', $ft);
+            $context->registerFunction('__errno_location', $fn);
+        }
+        try {
             $context->lookupFunction('fnmatch');
         } catch (\Throwable $e) {
             $i8p = $context->getTypeFromString('int8*');
