@@ -20,23 +20,30 @@ final class highlight_file extends Internal
 {
     public function execute(Frame $frame): void
     {
+        self::run($frame, $this->getName());
+    }
+
+    public static function run(Frame $frame, string $functionName): void
+    {
         $argc = \count($frame->calledArgs);
         if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('highlight_file() expects 1 or 2 arguments in this compiler build');
+            throw new \LogicException($functionName.'() expects 1 or 2 arguments in this compiler build');
         }
-        $pathVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $pathVar->type) {
-            throw new \LogicException('highlight_file() expects string for argument 1 in this compiler build');
-        }
+        $path = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            $functionName,
+            0,
+            'filename'
+        );
         $return = false;
         if ($argc >= 2) {
             $retVar = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_BOOLEAN !== $retVar->type) {
-                throw new \LogicException('highlight_file() expects bool for argument 2 in this compiler build');
+                throw new \LogicException($functionName.'() expects bool for argument 2 in this compiler build');
             }
             $return = $retVar->toBool();
         }
-        $result = VmHighlight::highlightFile($pathVar->toString(), $return);
+        $result = VmHighlight::highlightFile($path, $return);
         if (null === $frame->returnVar) {
             return;
         }
