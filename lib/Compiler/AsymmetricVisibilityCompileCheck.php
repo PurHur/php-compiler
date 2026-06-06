@@ -68,20 +68,15 @@ final class AsymmetricVisibilityCompileCheck
     }
 
     /**
-     * Promoted parameters cannot combine ctor-promotion visibility with asymmetric (get/set) modifiers (#6742).
+     * Promoted asymmetric visibility — same rules as declared properties (#6981, RFC asymmetric-visibility-v2).
      *
-     * php-src: Zend/zend_compile.c — zend_compile_property_info() on promoted params.
+     * php-src: Zend/zend_compile.c — zend_compile_property_info() on promoted params; `public private(set)`
+     * is valid (public read + private write), not a duplicate-modifier fatal.
      */
     private function verifyPromotedParam(string $classDisplay, string $propertyName, Param $param): void
     {
         $readVisibility = MethodVisibility::mask($param->promotionFlags);
         $setVisibility = $this->setVisibilityFromParam($param);
-        $getVisibility = $this->getVisibilityFromParam($param);
-
-        if ((0 !== $readVisibility && 0 !== $setVisibility)
-            || (0 !== $readVisibility && 0 !== $getVisibility)) {
-            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
-        }
 
         $this->verifyProperty(
             $classDisplay,
