@@ -283,7 +283,26 @@ final class PropertyHooks
                     $declPrefix = $marker.$declPrefix;
                 }
             }
-            $out .= $declPrefix.$propDecl;
+            $sameNameBacking = $usesBacking && $this->hookTouchesBacking($hookSource, $prop, $isStatic);
+            $nextOffset = $close + 1;
+            if ($sameNameBacking) {
+                $backingDecl = $this->consumeSameNameBackingFieldDecl($body, $nextOffset, $prop);
+                if (null !== $backingDecl) {
+                    [$nextOffset, $initializer] = $backingDecl;
+                    $mergedDecl = rtrim($propDeclHead);
+                    if ('' !== $initializer) {
+                        $mergedDecl .= ' '.$initializer;
+                    }
+                    if (!str_ends_with($mergedDecl, ';')) {
+                        $mergedDecl .= ';';
+                    }
+                    $out .= $declPrefix.$mergedDecl;
+                } else {
+                    $out .= $declPrefix.$propDecl;
+                }
+            } else {
+                $out .= $declPrefix.$propDecl;
+            }
             $trailing = trim($trailing);
             if ('' !== $trailing) {
                 $out .= "\n    ".$trailing;
@@ -300,7 +319,7 @@ final class PropertyHooks
                 }
             }
             $injections = array_merge($injections, $methods);
-            $offset = $close + 1;
+            $offset = $nextOffset;
         }
         $out .= substr($body, $offset);
         if ([] !== $injections) {
@@ -497,6 +516,29 @@ final class PropertyHooks
         $this->registerHook($lcClass, $prop, 'set', $method, $isStatic);
 
         return [$this->hookMethodDecl($isStatic, $method, $params, $body)];
+    }
+
+    /**
+     * When hooks read/write `$this->prop`, merge the following same-name field decl (#7031).
+     *
+     * @return array{0: int, 1: string}|null [offset after decl, initializer including `=`]
+     */
+    private function consumeSameNameBackingFieldDecl(string $body, int $offset, string $prop): ?array
+    {
+        $remainder = substr($body, $offset);
+        if (!preg_match(
+            '/^\s*(?:(?:public|protected|private|static|readonly)\s+)*'
+            .'(?:[\w\\\\|]+(?:\s*\[\s*\])?\s+)+'
+            .'\$'.preg_quote($prop, '/').'\s*(=\s*[^;]+)?;/',
+            $remainder,
+            $m
+        )) {
+            return null;
+        }
+
+        $initializer = isset($m[1]) ? trim($m[1]) : '';
+
+        return [$offset + strlen($m[0]), $initializer];
     }
 
     private function hookTouchesBacking(string $source, string $prop, bool $isStatic): bool
