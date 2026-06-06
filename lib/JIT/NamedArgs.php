@@ -123,9 +123,7 @@ final class NamedArgs
                 throw new \Error("Unknown named parameter \${$entry['name']}");
             }
             if (isset($filled[$idx])) {
-                throw new \LogicException(
-                    \sprintf('Argument #%d ($%s) must be passed only once', $idx + 1, $paramNames[$idx])
-                );
+                throw new \Error("Named parameter \${$entry['name']} overwrites previous argument");
             }
             $filled[$idx] = true;
             $result[$idx] = $value;

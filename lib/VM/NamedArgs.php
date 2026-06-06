@@ -111,9 +111,7 @@ final class NamedArgs
                 continue;
             }
             if (isset($filled[$idx])) {
-                throw new \LogicException(
-                    sprintf('Argument #%d ($%s) must be passed only once', $idx + 1, $paramNames[$idx])
-                );
+                throw new \Error("Named parameter \${$entry[1]} overwrites previous argument");
             }
             $filled[$idx] = true;
             $result[$idx] = $value;
