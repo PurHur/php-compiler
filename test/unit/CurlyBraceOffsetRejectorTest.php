@@ -51,4 +51,10 @@ final class CurlyBraceOffsetRejectorTest extends TestCase
         $code = '<?php function f() { return 1; }';
         self::assertSame($code, CurlyBraceOffsetRejector::reject($code, 'test.php'));
     }
+
+    public function testAnonymousClassCtorArgsBraceIsAllowed(): void
+    {
+        $code = '<?php $o = new class(1) { public function __construct(private int $x) {} };';
+        self::assertSame($code, CurlyBraceOffsetRejector::reject($code, 'test.php'));
+    }
 }
