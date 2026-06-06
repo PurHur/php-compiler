@@ -450,6 +450,7 @@ class Module extends ModuleAbstract
             new getcwd_(),
             new gethostname(),
             new gethostbynamel(),
+            new gethostbyaddr(),
             new getprotobyname(),
             new getprotobynumber(),
             new getservbyname(),
