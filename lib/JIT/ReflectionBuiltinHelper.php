@@ -86,6 +86,23 @@ final class ReflectionBuiltinHelper
         return $i1->constInt($exists ? 1 : 0, false);
     }
 
+    public static function unitEnumExistsLiteral(Context $context, string $enumName): Value
+    {
+        $object = self::objectBuiltin($context);
+        $lc = strtolower($enumName);
+        $exists = false;
+        if ($object->hasUserDeclaredEnum($enumName)) {
+            $classId = $object->lookup($enumName);
+            $exists = !$object->enumHasBacking($classId);
+        } elseif (null !== $context->runtime->vmContext) {
+            $entry = $context->runtime->vmContext->classes[$lc] ?? null;
+            $exists = null !== $entry && $entry->isEnum && null === $entry->backedType;
+        }
+        $i1 = $context->getTypeFromString('int1');
+
+        return $i1->constInt($exists ? 1 : 0, false);
+    }
+
     public static function functionExistsLiteral(Context $context, string $functionName): Value
     {
         $lc = strtolower($functionName);

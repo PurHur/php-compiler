@@ -1850,6 +1850,25 @@ class Object_ extends Type {
     }
 
     /**
+     * Lowercase registry keys for JIT unitenum_exists() — pure enums only (#6884).
+     *
+     * @return list<string>
+     */
+    public function allDeclaredUnitEnumLowerNames(): array
+    {
+        $names = [];
+        foreach (array_keys($this->enums) as $enumLc) {
+            $classId = $this->classes[$enumLc] ?? null;
+            if (null === $classId || $this->enumHasBacking($classId)) {
+                continue;
+            }
+            $names[] = $enumLc;
+        }
+
+        return $names;
+    }
+
+    /**
      * Shallow clone: allocate a new object with the same class and copy property slots.
      */
     public function cloneObject(PHPLLVM\Value $src): PHPLLVM\Value
