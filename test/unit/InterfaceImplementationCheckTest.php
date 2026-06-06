@@ -153,6 +153,36 @@ PHP;
         $runtime->parseAndCompile($code, 'plain_iface_property.php');
     }
 
+    public function testInterfaceAsymmetricVisibilityPropertyCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {
+    private(set) string $slug;
+}
+class C implements I {
+    public string $slug = 'b';
+}
+$c = new C();
+echo $c->slug, "\n";
+try {
+    $c->slug = 'x';
+    echo "set ok\n";
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'iface_asymmetric_ok.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame(
+            "b\nCannot modify private(set) property C::\$slug from global scope\n",
+            ob_get_clean()
+        );
+    }
+
     public function testMissingInterfacePropertyHookFailsAtCompileTime(): void
     {
         $runtime = new Runtime();
