@@ -11,6 +11,18 @@ use PHPUnit\Framework\TestCase;
 /** @covers issue #3569 */
 final class DeprecatedAttributeTest extends TestCase
 {
+    public function testFormatClassMessage(): void
+    {
+        $meta = new DeprecatedMetadata('Legacy API', '8.4');
+        $this->assertSame(
+            'Class Legacy is deprecated since 8.4, Legacy API',
+            $meta->formatClass('Legacy')
+        );
+
+        $meta = new DeprecatedMetadata(null, null);
+        $this->assertSame('Class Old is deprecated', $meta->formatClass('Old'));
+    }
+
     public function testFormatFunctionMessage(): void
     {
         $meta = new DeprecatedMetadata('old', null);

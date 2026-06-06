@@ -3793,6 +3793,7 @@ restart:
                         $op->attributeNames
                     );
                     $classEntry->attributeEntries = $op->attributeEntries;
+                    $classEntry->classDeprecated = $op->deprecatedMetadata;
                     self::defineClass($classEntry, $op->block1);
                     if (null !== $classEntry->parentLc) {
                         $this->inheritFromParent($classEntry);
@@ -3869,6 +3870,7 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
+                    $this->emitClassInstantiationDeprecation($class, $frame);
                     $object = new ObjectEntry($class);
                     $this->initInstancePropertyDefaults($object);
                     if (null !== $op->arg3 && VM\ExceptionSupport::classEntryImplementsThrowable($class, $this->context)) {
@@ -9563,6 +9565,7 @@ restart:
                     throw new \Error("Cannot instantiate enum {$class->name}");
                 }
                 $this->enforceNewConstructorVisibility($class, $frame);
+                $this->emitClassInstantiationDeprecation($class, $frame);
                 $object = new VM\ObjectEntry($class);
                 $result->object($object);
                 $frame->call = $object->constructor;
@@ -9802,6 +9805,14 @@ restart:
             $this->context,
             $frame
         );
+    }
+
+    private function emitClassInstantiationDeprecation(ClassEntry $class, Frame $frame): void
+    {
+        if (null === $class->classDeprecated) {
+            return;
+        }
+        $this->emitDeprecatedNotice($class->classDeprecated->formatClass($class->name), $frame);
     }
 
     /**
