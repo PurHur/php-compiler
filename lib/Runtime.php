@@ -107,6 +107,7 @@ class Runtime {
             new NodeVisitor\NameResolver
         );
         $astTraverser->addVisitor(new Ast\EnumCaseImportRewriter());
+        $astTraverser->addVisitor(new Ast\EnumCaseMatchSwitchRewriter());
         $astTraverser->addVisitor(new GroupUseStripper());
         $this->abstractEnumMarker = new Ast\AbstractEnumMarker();
         $astTraverser->addVisitor($this->abstractEnumMarker);
