@@ -1,5 +1,5 @@
 --TEST--
-stdlib strcmp()/strncmp()/strcasecmp()/strncasecmp()/levenshtein() — enum case TypeError (#7132, ext/standard/string.c, php-src-strict)
+stdlib strcmp()/strncmp()/strcasecmp()/strncasecmp()/levenshtein() JIT — enum case TypeError (#7132)
 --FILE--
 <?php
 enum E: string { case A = 'x'; }
