@@ -2435,12 +2435,11 @@ restart:
                         $frame->suppressNextEcho = false;
                         break;
                     }
-                    $this->releaseVmStatementDeadTemps($frame, (int) $op->arg1);
                     try {
                         if (!VM\SapiOutput::headersSent()) {
                             VM\HeaderCallbackQueue::runBeforeOutput($this->context);
                         }
-                        VM\OutputBuffer::append($this->valueToPrintString($frame->scope[$op->arg1], $frame));
+                        $printed = $this->valueToPrintString($frame->scope[$op->arg1], $frame);
                     } catch (\Error $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                         if (null !== $catchFrame) {
@@ -2458,6 +2457,8 @@ restart:
                     } catch (VM\MagicMethodInvocationAborted) {
                         break;
                     }
+                    $this->releaseVmStatementDeadTemps($frame, (int) $op->arg1);
+                    VM\OutputBuffer::append($printed);
                     break;
                 case OpCode::TYPE_PRINT:
                     try {
@@ -8331,6 +8332,7 @@ restart:
             }
             $iface = $this->context->classes[$ifaceLc];
             $this->inheritInterfacePropertyRules($entry, $iface);
+            $this->inheritInterfacePropertyHooks($entry, $iface);
             foreach ($iface->constants as $name => $value) {
                 if (!isset($entry->constants[$name])) {
                     $entry->constants[$name] = $value;
@@ -8366,6 +8368,42 @@ restart:
             if (!$matched && $entry->isInterface) {
                 $entry->properties[] = $this->cloneClassPropertyForEntry($ifaceProp, $entry);
             }
+        }
+    }
+
+    /**
+     * Merge interface abstract property-hook metadata into implementing classes (#6620, zend_property_hooks.c).
+     */
+    protected function inheritInterfacePropertyHooks(ClassEntry $entry, ClassEntry $iface): void
+    {
+        $ifaceLc = strtolower($iface->name);
+        if (!isset($this->context->propertyHookRegistry[$ifaceLc])) {
+            return;
+        }
+        $childLc = strtolower($entry->name);
+        foreach ($this->context->propertyHookRegistry[$ifaceLc] as $prop => $meta) {
+            $propLc = strtolower($prop);
+            $classProp = null;
+            foreach ($entry->properties as $candidate) {
+                if (strtolower($candidate->name) === $propLc) {
+                    $classProp = $candidate;
+                    break;
+                }
+            }
+            if (null === $classProp) {
+                if (!$entry->isInterface) {
+                    continue;
+                }
+                if (!isset($this->context->propertyHookRegistry[$childLc][$prop])) {
+                    $this->context->propertyHookRegistry[$childLc][$prop] = $meta;
+                }
+
+                continue;
+            }
+            if (!isset($this->context->propertyHookRegistry[$childLc][$prop])) {
+                $this->context->propertyHookRegistry[$childLc][$prop] = $meta;
+            }
+            $this->linkPropertyHooks($entry, $classProp);
         }
     }
 
@@ -9373,6 +9411,10 @@ restart:
         }
         for ($i = $frame->pos + 1; $i < $block->nOpCodes; ++$i) {
             $next = $block->opCodes[$i];
+            // Null-constructor stub does not consume the NEW result temp (#6467, #6620).
+            if (OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $next->type) {
+                continue;
+            }
             foreach ([$next->arg1, $next->arg2, $next->arg3] as $arg) {
                 if (is_int($arg) && $arg === $slot) {
                     return true;

@@ -1,5 +1,5 @@
 --TEST--
-Interface abstract property hooks — implementing class uses backing field (#4834, Zend/zend_compile.c)
+Interface abstract property hooks — implementing class uses backing field (#4834, #6620, Zend/zend_compile.c)
 --FILE--
 <?php
 interface HasTitle {
