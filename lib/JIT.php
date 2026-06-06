@@ -11370,10 +11370,22 @@ class JIT {
             $paramIdx = (int) $op->arg2;
             $isVariadic = null !== $block->variadicParamIndex && $paramIdx === $block->variadicParamIndex;
             if ($isVariadic) {
+                if (
+                    isset($block->paramVariadicElementIntersectionConstraints[$slot])
+                    || isset($block->paramVariadicElementDnfConstraints[$slot])
+                ) {
+                    continue;
+                }
                 if (!isset($block->paramVariadicElementTypeConstraints[$slot])) {
                     continue;
                 }
                 $constraints[$paramIdx + $offset] = $block->paramVariadicElementTypeConstraints[$slot];
+                continue;
+            }
+            if (
+                isset($block->paramIntersectionConstraints[$slot])
+                || isset($block->paramDnfConstraints[$slot])
+            ) {
                 continue;
             }
             if (!isset($block->paramTypeConstraints[$slot])) {

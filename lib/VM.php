@@ -3586,7 +3586,8 @@ restart:
                                     $frame->block->paramVariadicElementDnfConstraints[$variadicSlot] ?? null,
                                     $this->context,
                                     isset($frame->block->paramIterableSlots[$variadicSlot]),
-                                    isset($frame->block->paramNeverSlots[$variadicSlot])
+                                    isset($frame->block->paramNeverSlots[$variadicSlot]),
+                                    $frame->block->paramVariadicElementIntersectionDisplayLabels[$variadicSlot] ?? null
                                 );
                             }
                             if (
@@ -3663,23 +3664,22 @@ restart:
                                 TypeCheck::assertNeverParameter($arg1);
                             } elseif (isset($frame->block->paramIterableSlots[$op->arg1])) {
                                 IterableCheck::assertParameter($arg1, $this->context);
+                            } elseif (isset($frame->block->paramDnfConstraints[$op->arg1])) {
+                                DnfCheck::assertMatches(
+                                    $arg1,
+                                    $frame->block->paramDnfConstraints[$op->arg1],
+                                    $this->context
+                                );
+                            } elseif (isset($frame->block->paramIntersectionConstraints[$op->arg1])) {
+                                TypeCheck::assertParamIntersection(
+                                    $arg1,
+                                    $frame->block->paramIntersectionConstraints[$op->arg1],
+                                    $this->context,
+                                    $frame->block->paramIntersectionDisplayLabels[$op->arg1] ?? null
+                                );
                             } else {
                                 TypeCheck::coerceParameter($arg1, $strict, $arraySpec);
                             }
-                        }
-                        if (isset($frame->block->paramIntersectionConstraints[$op->arg1])) {
-                            TypeCheck::assertParamIntersection(
-                                $arg1,
-                                $frame->block->paramIntersectionConstraints[$op->arg1],
-                                $this->context
-                            );
-                        }
-                        if (isset($frame->block->paramDnfConstraints[$op->arg1])) {
-                            DnfCheck::assertMatches(
-                                $arg1,
-                                $frame->block->paramDnfConstraints[$op->arg1],
-                                $this->context
-                            );
                         }
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
