@@ -149,7 +149,7 @@ PHP;
         self::assertTrue($registry['box']['value']['virtual'] ?? false);
     }
 
-    public function testLowersStaticPropertyHooksAsStaticMethods(): void
+    public function testRejectsStaticPropertyHooks(): void
     {
         $src = <<<'PHP'
 <?php
@@ -160,12 +160,9 @@ class Box {
     }
 }
 PHP;
-        [$out, $registry] = (new PropertyHooks())->process($src);
-        self::assertStringContainsString('public static string $label;', $out);
-        self::assertStringContainsString('public static function __phpc_property_get_label', $out);
-        self::assertStringContainsString('public static function __phpc_property_set_label', $out);
-        self::assertStringContainsString("self::\$label = (strtoupper(\$value));", $out);
-        self::assertTrue($registry['box']['label']['static'] ?? false);
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot declare hooks for static property');
+        (new PropertyHooks())->process($src, 'static_hooks.php');
     }
 
     public function testLowersUnsetHook(): void

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\SourcePreprocessor;
 
+use PHPCompiler\Compiler\CompileFatal;
+
 /**
  * Strip PHP 8.4 property-hook blocks for nikic/php-parser v4 and inject hook methods.
  *
@@ -11,6 +13,7 @@ namespace PHPCompiler\SourcePreprocessor;
  */
 final class PropertyHooks
 {
+    private const STATIC_HOOK_MESSAGE = 'Cannot declare hooks for static property';
     private const SET_METHOD_PREFIX = '__phpc_property_set_';
     private const GET_METHOD_PREFIX = '__phpc_property_get_';
     private const UNSET_METHOD_PREFIX = '__phpc_property_unset_';
@@ -21,7 +24,7 @@ final class PropertyHooks
     /**
      * @return array{0: string, 1: array<string, array<string, array{set?: string, get?: string}>>}
      */
-    public function process(string $code): array
+    public function process(string $code, string $filename = 'unknown'): array
     {
         $this->registry = [];
         $offset = 0;
@@ -43,7 +46,7 @@ final class PropertyHooks
             }
             [$bodyStart, $bodyEnd] = $span;
             $body = substr($code, $bodyStart + 1, $bodyEnd - $bodyStart - 1);
-            $processedBody = $this->processClassBody($body, strtolower($declName));
+            $processedBody = $this->processClassBody($body, strtolower($declName), $filename, $bodyStart + 1, $code);
             $code = substr($code, 0, $bodyStart + 1).$processedBody.substr($code, $bodyEnd);
             $offset = $bodyStart + 1 + strlen($processedBody);
         }
@@ -113,8 +116,13 @@ final class PropertyHooks
         return null;
     }
 
-    private function processClassBody(string $body, string $lcClass): string
-    {
+    private function processClassBody(
+        string $body,
+        string $lcClass,
+        string $filename,
+        int $bodyOffsetInFile,
+        string $fullCode
+    ): string {
         $injections = [];
         $offset = 0;
         $out = '';
@@ -132,6 +140,13 @@ final class PropertyHooks
             $declPrefix = substr($body, $offset, $declStart - $offset);
             $propDeclHead = rtrim(substr($body, $declStart, $hookOpen - $declStart));
             $isStatic = (bool) preg_match('/\bstatic\b/', $declPrefix.$propDeclHead);
+            if ($isStatic) {
+                throw new CompileFatal(
+                    $filename,
+                    self::lineAtOffset($fullCode, $bodyOffsetInFile + $declStart),
+                    self::STATIC_HOOK_MESSAGE
+                );
+            }
             $propDecl = preg_replace('/\s+$/', '', $propDeclHead) ?? $propDeclHead;
             if (!str_ends_with($propDecl, ';')) {
                 $propDecl .= ';';
@@ -430,5 +445,10 @@ final class PropertyHooks
         }
 
         return substr($methodLc, strlen($prefix));
+    }
+
+    private static function lineAtOffset(string $code, int $offset): int
+    {
+        return substr_count(substr($code, 0, max(0, $offset)), "\n") + 1;
     }
 }

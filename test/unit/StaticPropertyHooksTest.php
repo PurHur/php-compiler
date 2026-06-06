@@ -7,6 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
+/** Static property hooks are compile-error in PHP 8.4 (#6619). */
 final class StaticPropertyHooksTest extends TestCase
 {
     public function testStaticPropertyHooksRepro4751(): void
@@ -26,9 +27,9 @@ PHP;
         file_put_contents($path, $src);
         try {
             $rt = new Runtime();
-            ob_start();
-            $rt->run($path);
-            self::assertSame("static:HI\n", ob_get_clean());
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage('Cannot declare hooks for static property');
+            $rt->parseAndCompile($src, $path);
         } finally {
             @unlink($path);
         }
