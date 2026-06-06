@@ -605,6 +605,8 @@ final class MethodSig
 
     public bool $isAbstract;
 
+    public bool $isFinal;
+
     /** @see Func::FLAG_PUBLIC|FLAG_PROTECTED|FLAG_PRIVATE */
     public int $visibilityFlags;
 
@@ -620,7 +622,8 @@ final class MethodSig
         array $paramHasDefault,
         ?TypeSig $returnType,
         bool $isAbstract = false,
-        int $visibilityFlags = Func::FLAG_PUBLIC
+        int $visibilityFlags = Func::FLAG_PUBLIC,
+        bool $isFinal = false
     ) {
         $this->ownerLc = $ownerLc;
         $this->params = $params;
@@ -628,6 +631,7 @@ final class MethodSig
         $this->paramHasDefault = $paramHasDefault;
         $this->returnType = $returnType;
         $this->isAbstract = $isAbstract;
+        $this->isFinal = $isFinal;
         $this->visibilityFlags = $visibilityFlags;
     }
 
@@ -647,6 +651,8 @@ final class MethodSig
             $visibility = Func::FLAG_PUBLIC;
         }
 
+        $isFinal = 0 !== ($func->flags & Func::FLAG_FINAL);
+
         return new self(
             $ownerLc,
             $params,
@@ -654,7 +660,8 @@ final class MethodSig
             $hasDefault,
             TypeSig::fromCfgType($func->returnType),
             $isAbstract,
-            $visibility
+            $visibility,
+            $isFinal
         );
     }
 
