@@ -177,6 +177,7 @@ class Object_ extends Type {
             $this->context->getTypeFromString('int8'),
             $this->context->getTypeFromString('int32'),
             $this->context->getTypeFromString('int8'),
+            $this->context->getTypeFromString('int32'),
         );
         $this->context->structFieldMap['__object__'] = [
             'ref' => 0,
@@ -186,6 +187,7 @@ class Object_ extends Type {
             'lazy_ghost' => 4,
             'lazy_init_index' => 5,
             'dynamic_readonly' => 6,
+            'prop_count' => 7,
         ];
         $this->pointer = $this->context->getTypeFromString('__object__*');
         \PHPCompiler\JIT\Builtin\ReadonlyRaise::registerDeclarations($this->context);
@@ -197,6 +199,7 @@ class Object_ extends Type {
         // JitThrow linked on demand when compiling try/catch (#1056).
 
         $this->registerFn('__object__load_value_slot', 'void', ['void**', '__value__*']);
+        $this->registerFn('__object__prop_count', 'int32', ['__object__*']);
         $this->registerFn('__value__readObject', '__object__*', ['__value__*']);
         $this->registerFn('__value__writeObject', 'void', ['__value__*', '__object__*']);
     }
@@ -223,6 +226,7 @@ class Object_ extends Type {
     public function implement(): void
     {
         $this->implementLoadValueSlot();
+        $this->implementObjectPropCount();
         $this->implementValueReadObject();
         $this->implementValueWriteObject();
     }
@@ -394,6 +398,33 @@ class Object_ extends Type {
         $this->context->callerStrictTypes = $prevStrict;
     }
 
+    /** Property slot count stored at allocation — replaces phpc_object_prop_count (#6749). */
+    private function implementObjectPropCount(): void
+    {
+        $fn = $this->context->lookupFunction('__object__prop_count');
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+        $entry = $fn->appendBasicBlock('entry');
+        $this->context->builder->positionAtEnd($entry);
+        $obj = $fn->getParam(0);
+        $map = $this->context->structFieldMap['__object__'];
+        $count = $this->context->builder->load(
+            $this->context->builder->structGep($obj, $map['prop_count'])
+        );
+        $this->context->builder->returnValue($count);
+        $this->context->builder->clearInsertionPosition();
+    }
+
+    private function storePropCountField(PHPLLVM\Value $obj, int $propCount): void
+    {
+        $map = $this->context->structFieldMap['__object__'];
+        $this->context->builder->store(
+            $this->context->constantFromInteger($propCount, 'int32'),
+            $this->context->builder->structGep($obj, $map['prop_count'])
+        );
+    }
+
     private function implementLoadValueSlot(): void
     {
         $fn = $this->context->lookupFunction('__object__load_value_slot');
@@ -543,6 +574,7 @@ class Object_ extends Type {
             $i8->constInt(0, false),
             $this->context->builder->structGep($obj, $map['dynamic_readonly'])
         );
+        $this->storePropCountField($obj, $propCount);
 
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_OBJECT | Refcount::TYPE_INFO_REFCOUNTED,
@@ -779,6 +811,7 @@ class Object_ extends Type {
             $this->context->getTypeFromString('int8')->constInt(1, false),
             $this->context->builder->structGep($obj, $map['constructed'])
         );
+        $this->storePropCountField($obj, $propCount);
 
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_OBJECT | Refcount::TYPE_INFO_REFCOUNTED,
@@ -832,6 +865,7 @@ class Object_ extends Type {
             $this->context->getTypeFromString('int8')->constInt(1, false),
             $this->context->builder->structGep($obj, $map['constructed'])
         );
+        $this->storePropCountField($obj, $propCount);
 
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_OBJECT | Refcount::TYPE_INFO_REFCOUNTED,
@@ -887,6 +921,8 @@ class Object_ extends Type {
             $this->context->getTypeFromString('int8')->constInt(1, false),
             $this->context->builder->structGep($obj, $map['constructed'])
         );
+        $enumPropCount = $this->enumHasBacking($enumClassId) ? 2 : 0;
+        $this->storePropCountField($obj, $enumPropCount);
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_OBJECT | Refcount::TYPE_INFO_REFCOUNTED,
             false
@@ -1611,6 +1647,8 @@ class Object_ extends Type {
             $this->context->getTypeFromString('int8')->constInt(1, false),
             $this->context->builder->structGep($obj, $map['constructed'])
         );
+        $enumPropCount = 2;
+        $this->storePropCountField($obj, $enumPropCount);
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_OBJECT | Refcount::TYPE_INFO_REFCOUNTED,
             false
@@ -1648,7 +1686,7 @@ class Object_ extends Type {
         $this->context->builder->call(
             $this->context->lookupFunction('phpc_gc_register'),
             $this->context->builder->pointerCast($obj, $this->context->getTypeFromString('int8*')),
-            $this->context->constantFromInteger(2, 'int32')
+            $this->context->constantFromInteger($enumPropCount, 'int32')
         );
 
         return new Variable(
