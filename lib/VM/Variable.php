@@ -1084,8 +1084,16 @@ final class Variable {
 
             return;
         }
-        while (self::TYPE_INDIRECT === $var->type) {
-            $var = $var->indirect;
+        // Share live reference cells when duplicating array buckets (Zend zend_array_dup, #6426/#6727).
+        if (self::TYPE_INDIRECT === $var->type) {
+            $this->indirect($var->indirect);
+
+            return;
+        }
+        if (self::TYPE_PROPERTY_HOOK_REF === $var->type) {
+            $this->propertyHookRef($var->propertyHookRef);
+
+            return;
         }
         TypedPropertyCheck::assertReadable($var);
         if (self::TYPE_ARRAY === $var->type) {
