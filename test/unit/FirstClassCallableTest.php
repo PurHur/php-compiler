@@ -91,6 +91,27 @@ PHP;
         $this->assertSame('5', ob_get_clean());
     }
 
+    /** Issue #6851: enum case value as first-class callable must compile then Error at runtime. */
+    public function testVmEnumCaseValueFirstClassCallableThrowsError(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int {
+    case A = 1;
+}
+try {
+    (E::A)(...);
+} catch (Error $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("Error: Object of type E is not callable\n", ob_get_clean());
+    }
+
     /** Issue #6845: enum case instance method first-class callable (E::A->f(...)). */
     public function testVmEnumCaseMethodFirstClassCallable(): void
     {

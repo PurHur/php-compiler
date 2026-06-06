@@ -3207,8 +3207,22 @@ restart:
                     } else {
                         throw new \LogicException('TYPE_FROM_CALLABLE missing callable slot');
                     }
-                    $entry = VM\ClosureSupport::fromCallable($this->context, $frame, $callable);
-                    $frame->scope[$op->arg1]->object($entry);
+                    try {
+                        $entry = VM\ClosureSupport::fromCallable($this->context, $frame, $callable);
+                        $frame->scope[$op->arg1]->object($entry);
+                    } catch (\Error $e) {
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                    } catch (\TypeError $e) {
+                        $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                    }
                     break;
                 case OpCode::TYPE_CLOSURE:
                     if (null === $op->block1) {
