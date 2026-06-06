@@ -462,4 +462,24 @@ PHP;
             'Param must declare promotionSetVisibility exactly once (#1492 partial vendor)'
         );
     }
+
+    public function testPhpCfgMatchOverlayIncludesUnhandledMatchLowering(): void
+    {
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        if (!is_readable($parser)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $body = (string) file_get_contents($parser);
+        self::assertStringContainsString(
+            'function parseExpr_Match',
+            $body,
+            'php-cfg-match overlay must register match lowering (#143)'
+        );
+        self::assertStringContainsString(
+            'lowerUnhandledMatchError',
+            $body,
+            'php-cfg-match overlay must lower UnhandledMatchError for enum/scalar subjects (#5448)'
+        );
+    }
 }
