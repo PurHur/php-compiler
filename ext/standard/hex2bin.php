@@ -7,7 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -25,10 +27,7 @@ final class hex2bin extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('hex2bin() requires one or two arguments');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('hex2bin() only supports strings in this compiler build');
-        }
+        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hex2bin', 0, 'string');
         $strict = false;
         if (2 === $argc) {
             $strictVar = $frame->calledArgs[1]->resolveIndirect();
@@ -37,7 +36,6 @@ final class hex2bin extends Internal
             }
             $strict = $strictVar->toBool();
         }
-        $data = $v->toString();
         $len = VmString::byteLength($data);
         if ($len > 0 && 0 !== ($len & 1)) {
             if ($strict) {
@@ -52,10 +50,9 @@ final class hex2bin extends Internal
                     $frame
                 );
             }
-            if (null === $frame->returnVar) {
-                return;
-            }
-            $frame->returnVar->bool(false);
+            BuiltinExecute::writeReturn($frame, static function ($ret): void {
+                $ret->bool(false);
+            });
 
             return;
         }
@@ -77,17 +74,15 @@ final class hex2bin extends Internal
                     $frame
                 );
             }
-            if (null === $frame->returnVar) {
-                return;
-            }
-            $frame->returnVar->bool(false);
+            BuiltinExecute::writeReturn($frame, static function ($ret): void {
+                $ret->bool(false);
+            });
 
             return;
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $frame->returnVar->string($result);
+        BuiltinExecute::writeReturn($frame, static function ($ret) use ($result): void {
+            $ret->string($result);
+        });
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -101,7 +96,11 @@ final class hex2bin extends Internal
             $strict = $this->jitBool($context, $args[1], 'hex2bin() argument #2 ($strict)');
         }
 
-        return JitHex2bin::convert($context, $this->jitString($context, $args[0], 'hex2bin() argument #1'), $strict);
+        return JitHex2bin::convert(
+            $context,
+            JitStringBuiltinArg::lower($context, $args[0], 'hex2bin', 0, 'string'),
+            $strict
+        );
     }
 
 }
