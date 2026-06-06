@@ -289,4 +289,43 @@ PHP;
         self::assertStringNotContainsString('$x {', $out);
         self::assertStringContainsString('function __phpc_property_get_x', $out);
     }
+
+    /** @covers issue #6898 — asymmetric set visibility on property hooks */
+    public function testLowersAsymmetricSetArrowHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public string $x {
+        get => 'g';
+        set (protected) => $value;
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$x {', $out);
+        self::assertStringContainsString('/*phpc-asymmetric-set:protected*/ public string $x;', $out);
+        self::assertStringContainsString('function __phpc_property_get_x', $out);
+        self::assertStringContainsString('function __phpc_property_set_x', $out);
+        self::assertStringContainsString('$this->x = ($value);', $out);
+        self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
+    }
+
+    public function testLowersAsymmetricSetBlockHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public string $x {
+        get => 'g';
+        set (private) {
+            $this->x = $value;
+        }
+    }
+}
+PHP;
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $x;', $out);
+        self::assertStringContainsString('function __phpc_property_set_x($value)', $out);
+    }
 }
