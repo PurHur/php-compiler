@@ -127,6 +127,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'get_debug_type_enum')) {
                 continue;
             }
+            // var_export() on enum case arrays: VM (#5583); MCJIT enum literal layout deferred.
+            if (str_contains($name, 'array_spread_enum_cases')) {
+                continue;
+            }
             // count() on Countable objects is VM-only until JIT object dispatch (#3364).
             if (str_contains($name, 'countable')) {
                 continue;
