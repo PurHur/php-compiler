@@ -614,10 +614,18 @@ final class VmReflection
                 continue;
             }
             $copy = new Variable();
-            if (null !== $prop->default && !$prop->hasRuntimeDefaultInit()) {
+            if ($prop->propertyHookVirtual || null !== $prop->getHookMethodLc) {
+                // Class-level table cannot invoke instance get hooks (#6473, #6453).
+                $copy->null();
+            } elseif (null !== $prop->default && !$prop->hasRuntimeDefaultInit()) {
                 $copy->copyFrom($prop->default);
             } else {
-                $copy->copyFrom($prop->getVariable());
+                $src = $prop->getVariable();
+                if ($src->isUndefined()) {
+                    $copy->null();
+                } else {
+                    $copy->copyFrom($src);
+                }
             }
             $ht->add($prop->name, $copy);
         }
