@@ -132,4 +132,64 @@ PHP;
             preg_replace('/\s+/', ' ', $rewritten)
         );
     }
+
+    public function testRewriteParenthesizedPrivateSet(): void
+    {
+        $source = <<<'PHP'
+<?php
+class Demo {
+    public (private(set)) string $name = 'x';
+}
+PHP;
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:private*/ public string $name',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
+    }
+
+    public function testRewriteTraitStaticParenthesizedProtectedSet(): void
+    {
+        $source = <<<'PHP'
+<?php
+trait T {
+    public static (protected(set)) string $name = 't';
+}
+PHP;
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:protected*/ public static string $name',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
+    }
+
+    public function testPromotedParenthesizedPrivateSetRewritesForCompileCheck(): void
+    {
+        $source = <<<'PHP'
+<?php
+class User {
+    public function __construct(
+        public (private(set)) string $name,
+    ) {}
+}
+PHP;
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:private*/ public string $name',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
+    }
+
+    public function testPublicParenthesizedPublicSetCompileErrors(): void
+    {
+        $source = <<<'PHP'
+<?php
+class Demo {
+    public (public(set)) string $name = 'x';
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
+        AsymmetricVisibilityRewriter::rewrite($source);
+    }
 }
