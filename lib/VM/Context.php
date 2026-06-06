@@ -68,6 +68,9 @@ class Context {
     /** Active object-to-string coercion via __toString (issue #4284). */
     public bool $coercingObjectToString = false;
 
+    /** Ghost object currently running its lazy initializer (#6531, Zend/zend_lazy_objects.c). */
+    public ?ObjectEntry $lazyGhostInitializing = null;
+
     /** User catch ran during coercion; caller must not use a coerced result (#4284). */
     public bool $magicMethodThrowHandled = false;
 

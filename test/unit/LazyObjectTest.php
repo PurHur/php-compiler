@@ -106,6 +106,31 @@ PHP;
         $this->assertSame("true\ncompiled\nuninit\nlazy\n", ob_get_clean());
     }
 
+    /** @covers issue #6531 */
+    public function testLazyGhostTraitCreateLazyGhost(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Svc {
+    use LazyGhostTrait;
+    public string $id = 'init';
+}
+$lazy = Svc::createLazyGhost(function (Svc $o): void {
+    $o->id = 'lazy';
+});
+echo $lazy->id, "\n";
+$ghost = Svc::createLazyGhost(function (Svc $o): void {
+    $o->id = 'never';
+});
+$ghost->markLazyObjectAsInitialized();
+echo $ghost->id, "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'lazy_ghost_create.php'));
+        $this->assertSame("lazy\ninit\n", ob_get_clean());
+    }
+
     /** @covers issue #6125 */
     public function testResetAsLazyObject(): void
     {

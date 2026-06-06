@@ -30,7 +30,7 @@ final class LazyObjectSupport
         return $object;
     }
 
-    public static function createGhost(ClassEntry $class, ClosureState $initializer): ObjectEntry
+    public static function createGhost(ClassEntry $class, ?ClosureState $initializer): ObjectEntry
     {
         $object = new ObjectEntry($class);
         foreach ($object->getRawProperties() as $var) {
@@ -48,7 +48,12 @@ final class LazyObjectSupport
 
     public static function ensureInitialized(\PHPCompiler\VM $vm, ObjectEntry $object): void
     {
-        if (!$object->lazyPending || null === $object->lazyInitializer) {
+        if (!$object->lazyPending) {
+            return;
+        }
+        if (null === $object->lazyInitializer) {
+            self::markAsInitialized($object);
+
             return;
         }
 
@@ -60,7 +65,14 @@ final class LazyObjectSupport
             self::applyPropertyDefaults($object);
             $ghostArg = new Variable(Variable::TYPE_OBJECT);
             $ghostArg->object($object);
-            $result = $vm->invokeClosure($initializer, $ghostArg);
+            $ctx = $vm->context;
+            $prev = $ctx->lazyGhostInitializing;
+            $ctx->lazyGhostInitializing = $object;
+            try {
+                $result = $vm->invokeClosure($initializer, $ghostArg);
+            } finally {
+                $ctx->lazyGhostInitializing = $prev;
+            }
             $result = $result->resolveIndirect();
             if (!$result->isUndefined() && Variable::TYPE_NULL !== $result->type) {
                 throw new \LogicException('Lazy object initializer must return NULL or no value');
@@ -211,6 +223,21 @@ final class LazyObjectSupport
             if (null !== $property->default && !$property->hasRuntimeDefaultInit()) {
                 $var->copyFrom($property->default);
             }
+        }
+    }
+
+    /** Set declared properties on an uninitialized lazy ghost without running the initializer (#6531). */
+    public static function applyInstanceProperties(ObjectEntry $object, HashTable $properties): void
+    {
+        foreach ($properties->iterateKeyed(true) as [$key, $value]) {
+            if (Variable::TYPE_STRING !== $key->type) {
+                continue;
+            }
+            $name = $key->toString();
+            if (!$object->hasProperty($name)) {
+                continue;
+            }
+            $object->getProperty($name)->copyFrom($value);
         }
     }
 }
