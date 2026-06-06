@@ -74,6 +74,9 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     if ('gethostbyaddr' === $fn->getName() && preg_match('/GethostbyaddrRuntime/i', $source)) {
         $notes[] = 'reverse DNS IPv4 (VM FFI + AOT) (#5854)';
     }
+    if (in_array($fn->getName(), ['strcspn', 'strspn'], true) && preg_match('/GH-12592/i', $source)) {
+        $notes[] = 'empty $characters: PHP 8.4 full byte length (GH-12592, #7088)';
+    }
     if ('array_map' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
         $notes[] = 'callbacks: null/string builtins JIT/AOT; VM closure callbacks (#3086, #1154)';
     } elseif ('array_map' === $fn->getName() && preg_match('/callables are deferred/i', $source)) {

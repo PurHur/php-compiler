@@ -13,6 +13,8 @@ use PHPLLVM\Value;
 
 /**
  * strspn() — length of initial segment matching a character mask (LLVM via StringStrspnJit).
+ *
+ * PHP 8.4 (GH-12592): empty $characters returns 0; strcspn() returns full byte length instead.
  */
 final class strspn extends Internal
 {

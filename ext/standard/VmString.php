@@ -927,6 +927,9 @@ final class VmString
         return [$start, $length];
     }
 
+    /**
+     * PHP 8.4 (GH-12592): empty $mask returns 0; strcspn() returns full segment byte length.
+     */
     public static function strspn(string $str, string $mask, int $offset = 0, ?int $length = null): int
     {
         $slen = self::byteLength($str);
@@ -946,6 +949,9 @@ final class VmString
         return $count;
     }
 
+    /**
+     * PHP 8.4 (GH-12592): empty $mask returns full segment byte length (not NUL-terminated walk).
+     */
     public static function strcspn(string $str, string $mask, int $offset = 0, ?int $length = null): int
     {
         $slen = self::byteLength($str);

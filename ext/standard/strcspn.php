@@ -13,6 +13,9 @@ use PHPLLVM\Value;
 
 /**
  * strcspn() — length of initial segment not matching a character mask (LLVM via StringStrspnJit).
+ *
+ * PHP 8.4 (GH-12592): empty $characters returns the full byte length of the segment,
+ * including bytes after an embedded NUL — see VmString::strcspn / phpc_strspn_ex.
  */
 final class strcspn extends Internal
 {
