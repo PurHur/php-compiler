@@ -10072,6 +10072,18 @@ class JIT {
             return;
         }
 
+        if (Variable::TYPE_NULL === $read->type || ($read->isNullConstant ?? false)) {
+            JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
+            JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
+            JIT\Builtin\TypeErrorRaise::emitRaise(
+                $this->context,
+                $increment ? 'Cannot increment null' : 'Cannot decrement null'
+            );
+            $this->context->builder->call($this->context->lookupFunction('abort'));
+
+            return;
+        }
+
         if (Variable::TYPE_NATIVE_BOOL === $read->type) {
             if (!$prefix) {
                 $this->assignOperand($resultOp, $read, true);
@@ -10108,6 +10120,8 @@ class JIT {
         if (!$prefix) {
             $this->assignOperand($resultOp, $read, true);
         }
+
+        $this->guardIncDecNullOperand($read, $increment);
 
         if (
             Variable::TYPE_VALUE === $read->type
@@ -10176,6 +10190,30 @@ class JIT {
         if ($prefix) {
             $this->assignOperand($resultOp, $newVal, true);
         }
+    }
+
+    /** Reject ++/-- on null (issue #4362, zend_operators.c saner inc/dec path). */
+    private function guardIncDecNullOperand(JIT\Variable $read, bool $increment): void
+    {
+        if (JIT\Variable::TYPE_NULL === $read->type || ($read->isNullConstant ?? false)) {
+            return;
+        }
+        if (!JIT\JitValueBox::isValueOperand($read)) {
+            return;
+        }
+        $isNull = JIT\JitValueCompare::valueBoxIsNull($this->context, $read);
+        $okBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_null_ok');
+        $errBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_null_err');
+        $this->context->builder->branchIf($isNull, $errBlock, $okBlock);
+        $this->context->builder->positionAtEnd($errBlock);
+        JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
+        JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
+        JIT\Builtin\TypeErrorRaise::emitRaise(
+            $this->context,
+            $increment ? 'Cannot increment null' : 'Cannot decrement null'
+        );
+        $this->context->builder->call($this->context->lookupFunction('abort'));
+        $this->context->builder->positionAtEnd($okBlock);
     }
 
     /** Reject ++/-- on stream/dir handles (issue #6396, zend_operators.c). */
