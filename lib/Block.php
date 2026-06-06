@@ -569,6 +569,23 @@ class Block {
         return false;
     }
 
+    /**
+     * True when an assign RHS/result temp may be nulled after TYPE_ASSIGN (#4096, #6758).
+     * Chained assignment keeps the inner result temp alive until the outer assign reads it.
+     */
+    public function assignTempSlotIsDead(int $slot): bool
+    {
+        if (isset($this->constants[$slot]) || $this->isNamedVariableSlot($slot)) {
+            return false;
+        }
+        $operand = $this->getOperand($slot);
+        if (null === $operand) {
+            return true;
+        }
+
+        return [] === $operand->usages;
+    }
+
     /** Yields [variable name, scope slot] pairs. */
     public function eachNamedScopeSlot(): \Generator
     {
