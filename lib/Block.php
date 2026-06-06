@@ -1989,6 +1989,37 @@ class Block {
     }
 
     /**
+     * Any DECLARE_TRAIT in the compilation unit — MCJIT link/execute segfaults (#3609, #6284).
+     */
+    public static function containsDeclareTraitOpcodesInScriptScope(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_TRAIT === $op->type) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Trait `__construct` merged into a using class — MCJIT execute segfaults (#4671).
      */
     public static function containsTraitConstructorOpcodes(?self $root): bool
@@ -2175,6 +2206,7 @@ class Block {
             || self::containsUserClassDeclaredInstancePropertyOpcodes($root)
             || self::containsDynamicPropertyDeprecationOpcodes($root)
             || self::containsFiberSuspendOpcodesInScriptScope($root)
+            || self::containsDeclareTraitOpcodesInScriptScope($root)
             || self::containsTraitConstructorOpcodes($root)
             || self::containsReflectionAttributeNewInstanceOpcodes($root)
             || self::containsInterfaceAbstractStaticMcjitDeferral($root)
