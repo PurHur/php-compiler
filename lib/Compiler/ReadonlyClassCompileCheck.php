@@ -16,7 +16,7 @@ use PHPCompiler\VM\ClassReadonly;
  * Zend/zend_inheritance.c — readonly parent/child checks;
  * per-property MODIFIER_READONLY cannot have default initializer;
  * PHP 8.3+ anonymous classes may use per-property `readonly` with defaults (#6724);
- * `new readonly class` is a parse error (#6903).
+ * PHP 8.3+ `new readonly class` sets ZEND_ACC_READONLY on the anonymous class (#6991).
  */
 final class ReadonlyClassCompileCheck
 {
@@ -47,9 +47,6 @@ final class ReadonlyClassCompileCheck
         }
         $readonly = ClassReadonly::fromClassFlags($class->flags);
         $display = $this->operandDisplayName($class->name, $lc);
-        if ($readonly && $this->isAnonymousClass($class->name)) {
-            throw new \CompileError('syntax error, unexpected token "readonly"');
-        }
         if ($readonly) {
             $this->verifyReadonlyClassNoStaticProperties($class, $display);
         }
