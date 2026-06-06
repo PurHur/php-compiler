@@ -1592,6 +1592,7 @@ class Compiler {
     private function compileListDestructGroup(array $ops, int $start, Block $block): array
     {
         $end = $this->listDestructGroupEndIndex($ops, $start);
+        $this->rejectListDestructNewExprWriteTargets($ops, $start, $end, $block);
         $rhs = $this->listDestructRhsOperand($ops, $start);
 
         $checkOp = new OpCode(
@@ -4860,6 +4861,7 @@ class Compiler {
         $write = $expr->write ?? $expr->read;
         $this->rejectThisReassignment($write);
         $this->rejectNullsafeInWriteContext($write, $block);
+        $this->rejectNewExprInWriteContext($write, $block);
 
         return [new OpCode(
             $opcode,
@@ -4943,6 +4945,7 @@ class Compiler {
                 if (!$this->assignIsListSpread($expr)) {
                     $this->rejectThisReassignment($expr->var);
                     $this->rejectNullsafeInWriteContext($expr->var, $block);
+                    $this->rejectNewExprInWriteContext($expr->var, $block, $expr->expr);
                 }
                 if ($this->assignIsListSpread($expr)) {
                     $fromIndex = new Operand\Literal($expr->listSpreadFromIndex);
@@ -5317,6 +5320,7 @@ class Compiler {
             case Op\Expr\AssignRef::class:
                 $this->rejectThisReassignment($expr->var);
                 $this->rejectNullsafeInWriteContext($expr->var, $block);
+                $this->rejectNewExprInWriteContext($expr->var, $block);
                 $bindRefFlags = 0;
                 $dimFetch = $this->unwrapArrayDimFetch($expr->expr)
                     ?? $this->findArrayDimFetchForResult($expr->expr, $block);
@@ -8735,6 +8739,107 @@ class Compiler {
                 $this->throwCompileError("Can't use nullsafe operator in write context");
             }
         }
+    }
+
+    /**
+     * Zend zend_compile.c: list()/[] slots on `new` property/array offsets are not writable (#6691).
+     *
+     * @param Op[] $ops
+     *
+     * @return never
+     */
+    private function rejectListDestructNewExprWriteTargets(array $ops, int $start, int $end, Block $block): void
+    {
+        for ($i = $start; $i <= $end; ) {
+            if ($this->isListSpreadAssignOp($ops[$i])) {
+                /** @var Op\Expr\Assign $spread */
+                $spread = $ops[$i];
+                if ($this->lvalueContainsNewExpr($spread->var, $block)) {
+                    $this->throwCompileError('Assignments can only happen to writable values');
+                }
+
+                break;
+            }
+            if (
+                !$this->isPlainListDestructDimFetch($ops, $i)
+                && !$this->isKeyedListDestructDimFetch($ops, $i)
+            ) {
+                break;
+            }
+            $assignIndex = $this->listDestructSlotAssignIndex($ops, $i);
+            if (null !== $assignIndex) {
+                /** @var Op\Expr\Assign|Op\Expr\AssignRef $assign */
+                $assign = $ops[$assignIndex];
+                if ($this->lvalueContainsNewExpr($assign->var, $block)) {
+                    $this->throwCompileError('Assignments can only happen to writable values');
+                }
+            }
+            $i = $this->listDestructOpEndIndex($ops, $i) + 1;
+        }
+    }
+
+    /**
+     * Zend zend_compile.c: assigning to a property/offset of a `new` temporary is illegal (#6691).
+     */
+    protected function lvalueContainsNewExpr(?Operand $operand, ?Block $block = null): bool
+    {
+        if (null === $operand || null === $block) {
+            return false;
+        }
+        if ($operand instanceof Operand\Temporary && null !== $operand->original) {
+            if ($operand->original instanceof Op\Expr\PropertyFetch) {
+                $propFetch = $operand->original;
+                if ($this->operandDerivesFromNew($propFetch->var, $block)) {
+                    return true;
+                }
+
+                return $this->lvalueContainsNewExpr($propFetch->var, $block);
+            }
+            if ($operand->original instanceof Op\Expr\ArrayDimFetch) {
+                $dimFetch = $operand->original;
+                if ($this->operandDerivesFromNew($dimFetch->var, $block)) {
+                    return true;
+                }
+
+                return $this->lvalueContainsNewExpr($dimFetch->var, $block);
+            }
+
+            return $this->lvalueContainsNewExpr($operand->original, $block);
+        }
+        if (null !== $block->orig) {
+            $propFetch = $this->findPropertyFetchForResult($operand, $block);
+            if (null !== $propFetch) {
+                if ($this->operandDerivesFromNew($propFetch->var, $block)) {
+                    return true;
+                }
+
+                return $this->lvalueContainsNewExpr($propFetch->var, $block);
+            }
+            $dimFetch = $this->findArrayDimFetchForResult($operand, $block);
+            if (null !== $dimFetch) {
+                if ($this->operandDerivesFromNew($dimFetch->var, $block)) {
+                    return true;
+                }
+
+                return $this->lvalueContainsNewExpr($dimFetch->var, $block);
+            }
+        }
+
+        return $this->operandDerivesFromNew($operand, $block);
+    }
+
+    /**
+     * @return never
+     */
+    protected function rejectNewExprInWriteContext(?Operand $var, ?Block $block = null, ?Operand $assignExpr = null): void
+    {
+        if (!$this->lvalueContainsNewExpr($var, $block)) {
+            return;
+        }
+        if (null !== $assignExpr && null !== $block && null !== $this->findArrayDimFetchForResult($assignExpr, $block)) {
+            $this->throwCompileError('Assignments can only happen to writable values');
+        }
+        $this->throwCompileError('Cannot use temporary expression in write context');
     }
 
 }
