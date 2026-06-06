@@ -43,6 +43,14 @@ final class MagicMethodReturnTypeCheck
                         );
                     }
                     break;
+                case '__destruct':
+                    if ($this->hasExplicitReturnType($returnType)) {
+                        $this->fatal(
+                            $member,
+                            "Method {$classDisplay}::__destruct() cannot declare a return type"
+                        );
+                    }
+                    break;
                 case '__sleep':
                     if ($this->hasExplicitReturnType($returnType) && !$this->isExactArrayType($returnType)) {
                         $this->fatal(
