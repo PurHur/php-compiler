@@ -832,6 +832,7 @@ class Type extends Builtin {
         $this->context->registerFunction('__compiler_str_getcsv', $fnStrGetcsv);
         $valuePtr = $this->context->getTypeFromString('__value__*');
         $i64 = $this->context->getTypeFromString('int64');
+        $i1 = $this->context->getTypeFromString('int1');
         $fnParseUrl = $this->context->module->addFunction(
             '__phpc_parse_url_component',
             $this->context->context->functionType($void, false, $strPtr, $i64, $valuePtr)
@@ -847,6 +848,11 @@ class Type extends Builtin {
             $this->context->context->functionType($void, false, $i64, $valuePtr)
         );
         $this->context->registerFunction('__compiler_getdate', $fnGetdate);
+        $fnLocaltime = $this->context->module->addFunction(
+            '__compiler_localtime',
+            $this->context->context->functionType($void, false, $i64, $i1, $valuePtr)
+        );
+        $this->context->registerFunction('__compiler_localtime', $fnLocaltime);
         $fnGetrusage = $this->context->module->addFunction(
             '__compiler_getrusage',
             $this->context->context->functionType($void, false, $i64, $valuePtr)

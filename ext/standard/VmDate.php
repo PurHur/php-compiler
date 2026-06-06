@@ -186,6 +186,54 @@ final class VmDate
         };
     }
 
+    /**
+     * localtime() breakdown — php-src ext/standard/datetime.c PHP_FUNCTION(localtime) (#6812).
+     */
+    public static function localtimeBreakdown(?int $timestamp = null, bool $associative = false): HashTable
+    {
+        $ts = $timestamp ?? self::time();
+        $tm = self::localtime($ts);
+        $ht = new HashTable();
+        if (null === $tm) {
+            return $ht;
+        }
+
+        $values = [
+            (int) $tm->tm_sec,
+            (int) $tm->tm_min,
+            (int) $tm->tm_hour,
+            (int) $tm->tm_mday,
+            (int) $tm->tm_mon,
+            (int) $tm->tm_year,
+            (int) $tm->tm_wday,
+            (int) $tm->tm_yday,
+            (int) $tm->tm_isdst,
+        ];
+        $keys = [
+            'tm_sec',
+            'tm_min',
+            'tm_hour',
+            'tm_mday',
+            'tm_mon',
+            'tm_year',
+            'tm_wday',
+            'tm_yday',
+            'tm_isdst',
+        ];
+
+        if ($associative) {
+            foreach ($keys as $i => $key) {
+                self::hashSetLong($ht, $key, $values[$i]);
+            }
+        } else {
+            foreach ($values as $i => $value) {
+                $ht->addIndex($i, self::intVariable($value));
+            }
+        }
+
+        return $ht;
+    }
+
     public static function getdate(?int $timestamp = null): HashTable
     {
         $ts = $timestamp ?? self::time();
