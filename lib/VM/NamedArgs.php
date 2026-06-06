@@ -93,10 +93,22 @@ final class NamedArgs
             $idx = array_search($name, $lowerNames, true);
             if (false === $idx) {
                 if (null !== $variadicParamIndex) {
-                    $variadicNamed[(string) $entry[1]] = $value;
+                    $key = (string) $entry[1];
+                    if (isset($variadicNamed[$key])) {
+                        throw new \Error("Named parameter \${$key} overwrites previous argument");
+                    }
+                    $variadicNamed[$key] = $value;
                     continue;
                 }
                 throw new \Error("Unknown named parameter \${$entry[1]}");
+            }
+            if (null !== $variadicParamIndex && $idx === $variadicParamIndex) {
+                $key = (string) $entry[1];
+                if (isset($variadicNamed[$key])) {
+                    throw new \Error("Named parameter \${$key} overwrites previous argument");
+                }
+                $variadicNamed[$key] = $value;
+                continue;
             }
             if (isset($filled[$idx])) {
                 throw new \LogicException(

@@ -110,4 +110,37 @@ PHP;
         $packed = $resolved[1]->toArray();
         $this->assertSame(2, $packed->find('b')?->toInt());
     }
+
+    public function testVariadicNamedMatchingVariadicParamName(): void
+    {
+        $a = new Variable(Variable::TYPE_INTEGER);
+        $a->int(1);
+        $b = new Variable(Variable::TYPE_INTEGER);
+        $b->int(2);
+        $resolved = NamedArgs::resolve(
+            [['n', 'a', $a], ['n', 'b', $b]],
+            ['a'],
+            0
+        );
+        $this->assertCount(1, $resolved);
+        $packed = $resolved[0]->toArray();
+        $this->assertSame(1, $packed->find('a')?->toInt());
+        $this->assertSame(2, $packed->find('b')?->toInt());
+        $this->assertNull($packed->findIndex(0));
+    }
+
+    public function testVariadicNamedMatchingParamNameDuplicateRejects(): void
+    {
+        $a = new Variable(Variable::TYPE_INTEGER);
+        $a->int(1);
+        $b = new Variable(Variable::TYPE_INTEGER);
+        $b->int(2);
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Named parameter $a overwrites previous argument');
+        NamedArgs::resolve(
+            [['n', 'a', $a], ['n', 'a', $b]],
+            ['a'],
+            0
+        );
+    }
 }
