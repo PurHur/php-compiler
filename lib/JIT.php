@@ -5941,7 +5941,7 @@ class JIT {
                             $this->context->setVariableOp($targetOp, $this->jitNullVariable());
                         }
                     } else {
-                        JIT\UnsetHelper::compileOffset($this->context, $block, $op);
+                        JIT\UnsetHelper::compileOffset($this->context, $block, $op, $this);
                     }
                     break;
                 case OpCode::TYPE_CAST_BOOL:

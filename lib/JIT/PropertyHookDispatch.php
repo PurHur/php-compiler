@@ -345,4 +345,41 @@ final class PropertyHookDispatch
 
         return true;
     }
+
+    /**
+     * Block unset() on get-only or write-only virtual hooked properties (#6425, #6491).
+     *
+     * @return bool true when unset was blocked (caller must skip propertyStore)
+     */
+    public static function emitVirtualHookUnsetGuard(
+        Context $context,
+        string $className,
+        string $propertyName,
+        ?\PHPCompiler\JIT $jit = null
+    ): bool {
+        $lcClass = strtolower(ltrim($className, '\\'));
+        $propLc = strtolower($propertyName);
+        $meta = $context->runtime->vmContext->propertyHookRegistry[$lcClass][$propertyName]
+            ?? $context->runtime->vmContext->propertyHookRegistry[$lcClass][$propLc]
+            ?? null;
+        if (!is_array($meta) || empty($meta['virtual'])) {
+            return false;
+        }
+        $hasSet = isset($meta['set']);
+        $hasGet = isset($meta['get']);
+        if ($hasSet && $hasGet) {
+            return false;
+        }
+
+        $message = $hasSet
+            ? sprintf('Cannot unset hooked property %s::$%s', $className, $propertyName)
+            : sprintf('Cannot unset read-only property %s::$%s', $className, $propertyName);
+        if (null !== $jit && [] !== $context->tryCatch->handlerStack) {
+            TryCatchHelper::emitCatchableErrorMessage($context, $jit, $message);
+        } else {
+            ErrorRaise::emitRaise($context, $message);
+        }
+
+        return true;
+    }
 }
