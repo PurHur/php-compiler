@@ -281,7 +281,16 @@ final class ClosureSupport
                 "Closure::fromCallable(): Class '{$className}' not found"
             );
         }
+        $class = $ctx->classes[$lcClass];
         $methodLc = strtolower($methodName);
+        if ($class->isEnum && 'cases' === $methodLc) {
+            EnumSupport::ensureBuiltinCasesMethod($class);
+
+            return ClosureState::fromWrappedFunc($class->methods['cases']);
+        }
+        if ($class->isEnum && null !== $class->backedType && ('from' === $methodLc || 'tryfrom' === $methodLc)) {
+            return ClosureState::fromWrappedFunc(new EnumFromHandler($class, 'tryfrom' === $methodLc));
+        }
         [$class, $methodLc] = self::resolveStaticMethod($ctx, $lcClass, $methodLc);
         $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = self::callerClassLc($frame);
