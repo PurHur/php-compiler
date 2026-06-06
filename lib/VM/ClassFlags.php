@@ -13,6 +13,8 @@ final class ClassFlags
 
     public const ABSTRACT = 2;
 
+    public const STATIC = 4;
+
     public static function pack(int $classFlags): int
     {
         $packed = 0;
@@ -21,6 +23,9 @@ final class ClassFlags
         }
         if (ClassAbstract::fromClassFlags($classFlags)) {
             $packed |= self::ABSTRACT;
+        }
+        if (ClassStatic::fromClassFlags($classFlags)) {
+            $packed |= self::STATIC;
         }
 
         return $packed;
@@ -34,5 +39,10 @@ final class ClassFlags
     public static function isAbstract(int $packed): bool
     {
         return 0 !== ($packed & self::ABSTRACT);
+    }
+
+    public static function isStatic(int $packed): bool
+    {
+        return 0 !== ($packed & self::STATIC);
     }
 }

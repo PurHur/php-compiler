@@ -3832,6 +3832,7 @@ restart:
                         $classFlags = $frame->block->constants[$op->arg3]->toInt();
                         $classEntry->readonly = VM\ClassFlags::isReadonly($classFlags);
                         $classEntry->isAbstract = VM\ClassFlags::isAbstract($classFlags);
+                        $classEntry->isStatic = VM\ClassFlags::isStatic($classFlags);
                     }
                     if ($op->isSealed) {
                         $classEntry->sealed = true;
