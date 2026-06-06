@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\PropertyIsInitializedHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -54,6 +55,13 @@ final class PropertyIsInitializedHandler extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('propertyIsInitialized() is not supported in JIT in this compiler build');
+        if (\count($args) < 2) {
+            throw new \ArgumentCountError('propertyIsInitialized() expects exactly 1 argument, 0 given');
+        }
+        if (Variable::TYPE_OBJECT !== $args[0]->type) {
+            throw new \LogicException('propertyIsInitialized() must be called on an object');
+        }
+
+        return PropertyIsInitializedHelper::lower($context, $args[0], $args[1]);
     }
 }
