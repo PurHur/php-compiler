@@ -3755,7 +3755,7 @@ restart:
                         $ifaceEntry->sealedPermits = $this->normalizeSealedPermits($name, $op->sealedPermits);
                     }
                     if (null !== $op->block1) {
-                        self::defineClass($ifaceEntry, $op->block1);
+                        self::defineClass($ifaceEntry, $op->block1, $frame);
                     }
                     $this->inheritFromInterfaces($ifaceEntry);
                     $this->context->classes[$lcname] = $ifaceEntry;
@@ -3770,7 +3770,7 @@ restart:
                     $traitEntry->isTrait = true;
                     $traitEntry->attributeNames = $op->attributeNames;
                     $traitEntry->attributeEntries = $op->attributeEntries;
-                    self::defineClass($traitEntry, $op->block1);
+                    self::defineClass($traitEntry, $op->block1, $frame);
                     $this->context->classes[$lcname] = $traitEntry;
                     break;
                 case OpCode::TYPE_DECLARE_GLOBAL_CONST:
@@ -3802,7 +3802,7 @@ restart:
                     }
                     $classEntry->interfaces = $op->classImplements;
                     $classEntry->isAbstract = $op->classIsAbstract;
-                    self::defineClass($classEntry, $op->block1);
+                    self::defineClass($classEntry, $op->block1, $frame);
                     $this->inheritFromInterfaces($classEntry);
                     VM\EnumSupport::ensureBuiltinCasesMethod($classEntry);
                     VM\EnumSupport::ensureBuiltinEnumInterfaces($classEntry);
@@ -3845,7 +3845,7 @@ restart:
                     );
                     $classEntry->attributeEntries = $op->attributeEntries;
                     $classEntry->classDeprecated = $op->deprecatedMetadata;
-                    self::defineClass($classEntry, $op->block1);
+                    self::defineClass($classEntry, $op->block1, $frame);
                     if (null !== $classEntry->parentLc) {
                         $this->inheritFromParent($classEntry);
                     }
@@ -9302,8 +9302,9 @@ restart:
         $this->initMethodCall($frame, $receiver, $methodName);
     }
 
-    protected function defineClass(ClassEntry $entry, Block $block): void {
+    protected function defineClass(ClassEntry $entry, Block $block, ?Frame $warningFrame = null): void {
         $frame = $block->getFrame($this->context);
+        $frame->vmContext = $this->context;
         $ownMethods = $this->classBodyOwnMethodNames($block, $frame);
         $pendingNewDefaultOps = [];
         /** @var list<string> */
@@ -9411,7 +9412,32 @@ restart:
                     $name = strtolower($declaredName);
                     $vis = \PHPCfg\Func::FLAG_PUBLIC;
                     if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
-                        $vis = MethodVisibility::mask($block->constants[$op->arg3]->toInt());
+                        $storedFlags = $block->constants[$op->arg3]->toInt();
+                        $vis = MethodVisibility::mask($storedFlags);
+                        if (($storedFlags & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+                            $vis |= \PHPCfg\Func::FLAG_STATIC;
+                        }
+                        if (($storedFlags & \PHPCfg\Func::FLAG_FINAL) !== 0) {
+                            $vis |= \PHPCfg\Func::FLAG_FINAL;
+                        }
+                    }
+                    if (($vis & \PHPCfg\Func::FLAG_FINAL) !== 0 && ($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+                        $warnLine = null !== $op->arg2 && $op->arg2 > 0 ? $op->arg2 : 0;
+                        $handlerFrame = $warningFrame ?? $frame;
+                        $warnFile = '' !== $handlerFrame->scriptPath ? $handlerFrame->scriptPath : null;
+                        if (null === $warnFile || '' === $warnFile) {
+                            $current = $this->context->scriptStack->current();
+                            if ('' !== $current) {
+                                $warnFile = $current;
+                            }
+                        }
+                        $this->context->errors->languageWarning(
+                            'Private methods cannot be final as they are never overridden by other classes',
+                            $warnFile,
+                            $warnLine,
+                            $this->context,
+                            $handlerFrame
+                        );
                     }
                     $entry->methodVisibility[$name] = $vis;
                     unset($entry->traitMethodSources[$name]);
