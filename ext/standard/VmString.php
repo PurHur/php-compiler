@@ -600,6 +600,34 @@ final class VmString
         return 0;
     }
 
+    /**
+     * memcmp() — zend_binary_strcmp (php-src ext/standard/string.c, #7118).
+     */
+    public static function memcmp(string $a, string $b, int $length): int
+    {
+        if ($length <= 0) {
+            return 0;
+        }
+        $lenA = self::byteLength($a);
+        $lenB = self::byteLength($b);
+        $compare = $length;
+        if ($compare > $lenA) {
+            $compare = $lenA;
+        }
+        if ($compare > $lenB) {
+            $compare = $lenB;
+        }
+        for ($i = 0; $i < $compare; ++$i) {
+            $ordA = self::byteOrd($a[$i]);
+            $ordB = self::byteOrd($b[$i]);
+            if ($ordA !== $ordB) {
+                return $ordA - $ordB;
+            }
+        }
+
+        return $lenA <=> $lenB;
+    }
+
     public static function strcasecmp(string $a, string $b): int
     {
         $lenA = self::byteLength($a);
