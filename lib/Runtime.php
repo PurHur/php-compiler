@@ -35,6 +35,7 @@ use PHPCompiler\Ast\InOperatorDesugar;
 use PHPCompiler\Ast\ExitFunctionDesugar;
 use PHPCompiler\Ast\HexFloatLiteralDesugar;
 use PHPCompiler\Ast\NewDereferenceableDesugar;
+use PHPCompiler\Ast\CloneWithDesugar;
 use PHPCompiler\Ast\PipeOperatorDesugar;
 use PHPCompiler\Visitor\InOperatorResolver;
 use PHPCompiler\Visitor\ExitFunctionResolver;
@@ -376,6 +377,7 @@ class Runtime {
         $code = NewDereferenceableDesugar::desugar($code);
         $code = InOperatorDesugar::desugar($code);
         $code = ExitFunctionDesugar::desugar($code);
+        $code = CloneWithDesugar::desugar($code);
         return PipeOperatorDesugar::desugar($code);
     }
 
