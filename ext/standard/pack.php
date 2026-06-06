@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** pack() — binary string from format and values (VM via host PHP; JIT/AOT via __compiler_pack). */
+/** pack() — binary string from format and values (VM via PackEngine; JIT/AOT via __compiler_pack, #5231). */
 final class pack extends Internal
 {
     public function execute(Frame $frame): void
