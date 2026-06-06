@@ -9478,13 +9478,10 @@ restart:
                     }
                     $value = $this->resolveClassConstDefineValue($frame, $block, $op);
                     if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
-                        $constraint = $block->constants[$op->arg3]->typeConstraint;
-                        if (null !== $constraint) {
-                            $check = new Variable();
-                            $check->copyFrom($value);
-                            TypeCheck::assertClassConstantValue($check, $constraint, $name);
-                            $value->copyFrom($check);
-                        }
+                        $check = new Variable();
+                        $check->copyFrom($value);
+                        TypeCheck::assertClassConstantTypedValue($check, $block->constants[$op->arg3], $name);
+                        $value->copyFrom($check);
                     }
                     $entry->constants[$name] = $value;
                     $entry->constNames[$name] = $canonical;

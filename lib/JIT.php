@@ -11699,13 +11699,10 @@ class JIT {
             $value = $block->constants[$op->arg2];
         }
         if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
-            $constraint = $block->constants[$op->arg3]->typeConstraint;
-            if (null !== $constraint) {
-                $check = new VM\Variable();
-                $check->copyFrom($value);
-                VM\TypeCheck::assertClassConstantValue($check, $constraint, $constNameLc);
-                $value = $check;
-            }
+            $check = new VM\Variable();
+            $check->copyFrom($value);
+            VM\TypeCheck::assertClassConstantTypedValue($check, $block->constants[$op->arg3], $constNameLc);
+            $value = $check;
         }
 
         return $value;

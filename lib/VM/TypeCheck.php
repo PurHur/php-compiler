@@ -160,6 +160,63 @@ final class TypeCheck
         throw new \TypeError("Cannot assign {$given} to class constant of type {$expected}");
     }
 
+    /**
+     * PHP 8.3+ union typed class constants (zend_compile_const_decl, #6886).
+     */
+    public static function assertClassConstantTypedValue(
+        Variable $value,
+        Variable $typeMeta,
+        ?string $constName = null
+    ): void {
+        if (null !== $typeMeta->unionTypeConstraints) {
+            self::assertClassConstantUnionValue(
+                $value,
+                $typeMeta->unionTypeConstraints,
+                $constName,
+                $typeMeta->declaredTypeLabel
+            );
+
+            return;
+        }
+        if (null !== $typeMeta->typeConstraint) {
+            self::assertClassConstantValue($value, $typeMeta->typeConstraint, $constName);
+        }
+    }
+
+    /**
+     * @param list<int> $constraints
+     */
+    public static function assertClassConstantUnionValue(
+        Variable $value,
+        array $constraints,
+        ?string $constName = null,
+        ?string $typeLabel = null
+    ): void {
+        if ([] === $constraints) {
+            return;
+        }
+        $target = $value->resolveIndirect();
+        foreach ($constraints as $constraint) {
+            $trial = new Variable();
+            $trial->copyFrom($target);
+            try {
+                self::assertClassConstantValue($trial, $constraint, null);
+                $value->copyFrom($trial);
+
+                return;
+            } catch (\TypeError $e) {
+                continue;
+            }
+        }
+        $expected = $typeLabel ?? 'mixed';
+        $given = self::typeName($target->type);
+        if (null !== $constName && '' !== $constName) {
+            throw new \TypeError("Cannot assign {$given} to class constant {$constName} of type {$expected}");
+        }
+
+        throw new \TypeError("Cannot assign {$given} to class constant of type {$expected}");
+    }
+
     public static function assertVoidReturn(?Variable $value): void
     {
         if (null !== $value) {
