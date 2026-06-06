@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace PHPCompiler\Compiler;
 
 use PHPCfg\Op;
+use PHPCfg\Op\Expr\FuncCall;
+use PHPCfg\Op\Expr\MethodCall;
+use PHPCfg\Op\Expr\StaticCall;
 use PHPCfg\Op\Expr\Throw_;
 use PHPCfg\Script;
 
 /**
- * Reject throw expressions in class constant initializers (#6580).
+ * Reject disallowed expressions in class/enum constant initializers (#6580, #6843).
  *
- * php-src: Zend/zend_ast.c — zend_ast_validate(); Zend/zend_compile.c class const expr.
+ * php-src: Zend/zend_ast.c — zend_ast_validate(); Zend/zend_compile.c zend_compile_const_expr().
  * Distinct from runtime throw expressions (#3802) and property/param defaults (#3803).
  */
 final class ThrowInClassConstCompileCheck
@@ -47,7 +50,11 @@ final class ThrowInClassConstCompileCheck
     private function walkOps(array $ops): void
     {
         foreach ($ops as $op) {
-            if ($op instanceof Throw_) {
+            if ($op instanceof Throw_
+                || $op instanceof FuncCall
+                || $op instanceof MethodCall
+                || $op instanceof StaticCall
+            ) {
                 throw new \CompileError(self::MESSAGE);
             }
             foreach ($op->getSubBlocks() as $sub) {
