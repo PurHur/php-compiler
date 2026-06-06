@@ -976,6 +976,7 @@
         "lib/JIT/Builtin/AttributeRegistry.php",
         "lib/JIT/Builtin/AttributeRegistryLowering.php",
         "lib/JIT/Builtin/CallArgv.php",
+        "lib/JIT/Builtin/CliArgvRuntime.php",
         "lib/JIT/Builtin/ConvertUuRuntime.php",
         "lib/JIT/Builtin/EmbedObOutput.php",
         "lib/JIT/Builtin/ErrorHandler.php",

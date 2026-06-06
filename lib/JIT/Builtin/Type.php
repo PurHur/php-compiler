@@ -192,6 +192,7 @@ class Type extends Builtin {
         StringInfo::ensureLinked($this->context);
         StringDir::ensureLinked($this->context);
         LastErrorRuntime::ensureLinked($this->context);
+        CliArgvRuntime::ensureLinked($this->context);
         FunctionExistsRuntime::ensureLinked($this->context);
         WeakRefRegistryRuntime::ensureLinked($this->context);
         MemoryRuntime::ensureLinked($this->context);
@@ -216,40 +217,12 @@ class Type extends Builtin {
             $fn = $this->context->module->addFunction($libcName, $ft);
             $this->context->registerFunction($libcName, $fn);
         }
-        $i64 = $this->context->getTypeFromString('int64');
-        $i8pp = $this->context->getTypeFromString('int8**');
         $voidTy = $this->context->getTypeFromString('void');
-        $fnStoreArgv = $this->context->module->addFunction(
-            '__phpc_cli_store_argv',
-            $this->context->context->functionType($voidTy, false, $i32, $i8pp)
-        );
-        $this->context->registerFunction('__phpc_cli_store_argv', $fnStoreArgv);
-        $fnCliArgc = $this->context->module->addFunction(
-            '__phpc_cli_argc',
-            $this->context->context->functionType($i64, false)
-        );
-        $this->context->registerFunction('__phpc_cli_argc', $fnCliArgc);
-        $fnCliArgvCstr = $this->context->module->addFunction(
-            '__phpc_cli_argv_cstr',
-            $this->context->context->functionType($i8p, false, $i32)
-        );
-        $this->context->registerFunction('__phpc_cli_argv_cstr', $fnCliArgvCstr);
-        $fnCliStrEq = $this->context->module->addFunction(
-            '__phpc_cli_str_eq',
-            $this->context->context->functionType($i32, false, $i8p, $i8p)
-        );
-        $this->context->registerFunction('__phpc_cli_str_eq', $fnCliStrEq);
         $fnProgressNote = $this->context->module->addFunction(
             '__phpc_progress_note',
             $this->context->context->functionType($voidTy, false, $i8p)
         );
         $this->context->registerFunction('__phpc_progress_note', $fnProgressNote);
-        $valuePtr = $this->context->getTypeFromString('__value__*');
-        $fnRefreshArgv = $this->context->module->addFunction(
-            '__phpc_cli_refresh_argv_global',
-            $this->context->context->functionType($voidTy, false, $valuePtr)
-        );
-        $this->context->registerFunction('__phpc_cli_refresh_argv_global', $fnRefreshArgv);
         $ftOpen = $this->context->context->functionType($i32, false, $i8p, $i32);
         $fnOpen = $this->context->module->addFunction('open', $ftOpen);
         $this->context->registerFunction('open', $fnOpen);
