@@ -498,6 +498,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'trait_abstract_private')) {
                 continue;
             }
+            // final private method E_WARNING at class declare: VM green (#6914); MCJIT class-body warning deferred.
+            if (str_contains($name, 'final_private_method_warning')) {
+                continue;
+            }
             // Instance method by-ref + function-static: VM green (#6739); MCJIT execute segfault.
             if (str_contains($name, 'byref_method_static_local')) {
                 continue;

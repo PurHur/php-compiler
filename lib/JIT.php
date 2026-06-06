@@ -8344,6 +8344,9 @@ class JIT {
                         if (($storedFlags & \PHPCfg\Func::FLAG_STATIC) !== 0) {
                             $visFlags |= \PHPCfg\Func::FLAG_STATIC;
                         }
+                        if (($storedFlags & \PHPCfg\Func::FLAG_FINAL) !== 0) {
+                            $visFlags |= \PHPCfg\Func::FLAG_FINAL;
+                        }
                     }
                     $methodBlock = $op->block1;
                     if (null !== $methodBlock && null !== $methodBlock->func

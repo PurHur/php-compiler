@@ -89,6 +89,7 @@ class OpCode {
     const TYPE_ITER_VALUE = 67;
     const TYPE_SHIFT_LEFT = 68;
     const TYPE_SHIFT_RIGHT = 69;
+    /** arg2 = method declaration startLine when known (#6914). */
     const TYPE_DECLARE_METHOD = 84;
     const TYPE_METHODCALL_INIT = 85;
     const TYPE_DECLARE_CLASS_CONST = 86;

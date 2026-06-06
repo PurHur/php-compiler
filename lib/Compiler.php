@@ -2594,14 +2594,18 @@ class Compiler {
         if (($child->func->flags & \PHPCfg\Func::FLAG_STATIC) !== 0) {
             $visFlags |= \PHPCfg\Func::FLAG_STATIC;
         }
+        if (($child->func->flags & CfgFunc::FLAG_FINAL) !== 0) {
+            $visFlags |= CfgFunc::FLAG_FINAL;
+        }
         $visVar->int($visFlags);
         $visOperand = new Operand\Temporary;
         $visOperand->type = Type::int();
         $visIdx = $result->registerConstant($visOperand, $visVar);
+        $methodLine = max(0, $child->getLine());
         $declare = new OpCode(
             OpCode::TYPE_DECLARE_METHOD,
             $this->compileOperand($methodName, $result, true),
-            null,
+            $methodLine > 0 ? $methodLine : null,
             $visIdx
         );
         if (null !== $child->func->cfg) {
