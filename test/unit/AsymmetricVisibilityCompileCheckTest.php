@@ -62,18 +62,19 @@ PHP, 'asymmetric_ok.php');
         $this->assertNotNull($block);
     }
 
-    public function testValidPromotedPublicPrivateSetStillCompiles(): void
+    public function testPromotedPublicPrivateSetCompileErrors(): void
     {
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        $this->expectCompileError(
+            <<<'PHP'
 <?php
 class User {
     public function __construct(
         public private(set) string $name,
     ) {}
 }
-PHP, 'asymmetric_promoted_ok.php');
-        $this->assertNotNull($block);
+PHP,
+            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
+        );
     }
 
     public function testMultipleAccessModifiersStillCompileErrors(): void
