@@ -24,7 +24,7 @@ final class InterfaceImplementationCheck
     /** @var array<string, array{display: string, extends: list<string>, methods: array<string, true>, properties: array<string, string>}> */
     private array $interfaces = [];
 
-    /** @var array<string, array{display: string, abstract: bool, extends: ?string, implements: list<string>, methods: array<string, true>, abstractMethods: array<string, true>, properties: array<string, true>}> */
+    /** @var array<string, array{display: string, abstract: bool, extends: ?string, implements: list<string>, methods: array<string, true>, abstractMethods: array<string, true>, properties: array<string, true>, file: string, line: int}> */
     private array $classes = [];
 
     /** @var array<string, array{display: string, methods: array<string, true>}> */
@@ -150,6 +150,8 @@ final class InterfaceImplementationCheck
             'methods' => $methods,
             'abstractMethods' => $this->collectAbstractMethods($class->stmts->children),
             'properties' => $properties,
+            'file' => $class->getFile(),
+            'line' => max(1, $class->getLine()),
         ];
     }
 
@@ -238,9 +240,12 @@ final class InterfaceImplementationCheck
             }
             $providedMethods = $this->classProvidedMethods($lc);
             $providedProperties = $this->classProvidedProperties($lc);
+            $missingInterfaceProperties = $this->missingInterfaceProperties($class['implements'], $providedProperties);
+            if ([] !== $missingInterfaceProperties) {
+                $this->throwMissingInterfacePropertiesError($class, $missingInterfaceProperties);
+            }
             $missing = array_merge(
                 $this->missingInterfaceMethods($class['implements'], $providedMethods),
-                $this->missingInterfaceProperties($class['implements'], $providedProperties),
                 $this->missingParentAbstractMethods($class['extends'], $providedMethods),
                 $this->missingAbstractPropertyHooks($lc, $class)
             );
@@ -258,6 +263,28 @@ final class InterfaceImplementationCheck
                 ."and must therefore be declared abstract or implement the remaining methods ({$list})"
             );
         }
+    }
+
+    /**
+     * php-src-strict (#6965): omitting an interface hooked property is a property obligation,
+     * not a generic abstract-method diagnostic (re-#6770).
+     *
+     * @param array{display: string, file: string, line: int} $class
+     * @param list<array{0: string, 1: string, 2: string}> $missing iface display, prop display, hook summary
+     */
+    private function throwMissingInterfacePropertiesError(array $class, array $missing): void
+    {
+        $count = count($missing);
+        $list = implode(', ', array_map(
+            static fn (array $triple): string => $triple[0].'::$'.$triple[1].$triple[2],
+            $missing
+        ));
+        throw new CompileFatal(
+            $class['file'],
+            $class['line'],
+            "Class {$class['display']} must implement {$count} interface propert".(1 === $count ? 'y' : 'ies')
+            ." ({$list})"
+        );
     }
 
     /**
@@ -351,7 +378,7 @@ final class InterfaceImplementationCheck
      * @param list<string> $directInterfaces
      * @param array<string, true> $provided
      *
-     * @return list<array{0: string, 1: string}>
+     * @return list<array{0: string, 1: string, 2: string}> iface display, prop display, hook summary
      */
     private function missingInterfaceProperties(array $directInterfaces, array $provided): array
     {
@@ -386,12 +413,35 @@ final class InterfaceImplementationCheck
             if (isset($provided[$propLc])) {
                 continue;
             }
-            foreach ($this->missingPropertyHookObligations($ifaceLc, $propName) as $hookLabel) {
-                $missing[] = [$ifaceDisplay, $hookLabel];
-            }
+            $missing[] = [$ifaceDisplay, $propDisplay, $this->interfacePropertyHookSummary($ifaceLc, $propName)];
         }
 
         return $missing;
+    }
+
+    /**
+     * @return string empty or " { get; set; }" style suffix for diagnostics
+     */
+    private function interfacePropertyHookSummary(string $ifaceLc, string $propName): string
+    {
+        $meta = $this->propertyHookRegistry[$ifaceLc][$propName]
+            ?? $this->propertyHookRegistry[$ifaceLc][strtolower($propName)]
+            ?? [];
+        $hooks = [];
+        if (!empty($meta['requiresGet'])) {
+            $hooks[] = 'get';
+        }
+        if (!empty($meta['requiresSet'])) {
+            $hooks[] = 'set';
+        }
+        if (!empty($meta['requiresUnset'])) {
+            $hooks[] = 'unset';
+        }
+        if ([] === $hooks) {
+            return '';
+        }
+
+        return ' { '.implode('; ', $hooks).'; }';
     }
 
     /**
@@ -541,31 +591,6 @@ final class InterfaceImplementationCheck
 
         return 0 !== AsymmetricVisibilityRewriter::extractSetVisibilityFromAttributes($attrs)
             || 0 !== AsymmetricVisibilityRewriter::extractGetVisibilityFromAttributes($attrs);
-    }
-
-    /**
-     * @return list<string> labels like $x::get for php-src abstract-method diagnostics
-     */
-    private function missingPropertyHookObligations(string $ifaceLc, string $propName): array
-    {
-        $meta = $this->propertyHookRegistry[$ifaceLc][$propName]
-            ?? $this->propertyHookRegistry[$ifaceLc][strtolower($propName)]
-            ?? [];
-        $obligations = [];
-        if (!empty($meta['requiresGet'])) {
-            $obligations[] = '$'.$propName.'::get';
-        }
-        if (!empty($meta['requiresSet'])) {
-            $obligations[] = '$'.$propName.'::set';
-        }
-        if (!empty($meta['requiresUnset'])) {
-            $obligations[] = '$'.$propName.'::unset';
-        }
-        if ([] !== $obligations) {
-            return $obligations;
-        }
-
-        return ['$'.$propName];
     }
 
     /**

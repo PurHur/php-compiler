@@ -196,9 +196,9 @@ class Bad implements I {
 }
 PHP;
         $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Class Bad contains 2 abstract methods');
-        $this->expectExceptionMessage('I::$x::get');
-        $this->expectExceptionMessage('I::$x::set');
+        $this->expectExceptionMessage('Class Bad must implement 1 interface property');
+        $this->expectExceptionMessage('I::$x');
+        $this->expectExceptionMessage('{ get; set; }');
         $runtime->parseAndCompile($code, 'missing_iface_property.php');
     }
 

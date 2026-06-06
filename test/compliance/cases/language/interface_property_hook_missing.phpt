@@ -1,5 +1,5 @@
 --TEST--
-Language: interface property hooks — missing implementing property compile error (#6770, zend_compile.c)
+Language: interface property hooks — missing implementing property compile error (#6770, #6965, zend_compile.c)
 --FILE--
 <?php
 interface I {
