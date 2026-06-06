@@ -10,11 +10,13 @@ use PHPCfg\Operand\Temporary;
 use PHPTypes\Type;
 use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\JIT\Builtin\Type\Object_;
+use PHPCompiler\VM\Variable as VmVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * empty($obj->prop) — typed declared slots read (throw when uninitialized);
- * __isset semantics otherwise (#4912, #3298, zend_object_handlers.c).
+ * empty($obj->prop) — uninitialized typed slots are empty without read (#6787, zend_object_handlers.c);
+ * __isset semantics otherwise (#3298).
  */
 final class EmptyObjectPropertyHelper
 {
@@ -42,16 +44,62 @@ final class EmptyObjectPropertyHelper
                     ? $container->value
                     : $context->builder->load($container->value);
                 $fetched = $object->propertyFetch($objPtr, $class, $propName);
-                TypedPropertyUninitGuard::emitBeforeRead($context, $fetched);
-                $truthy = (new boolval())->call($context, $fetched);
 
-                return $context->builder->not($truthy);
+                return self::compileEmptyFromFetchedValue($context, $fetched);
             }
         }
 
         $isset = IssetHelper::compile($context, $container, $dim, $dimOp, $containerOp);
 
         return $context->builder->not($isset);
+    }
+
+    /**
+     * empty(value): true when uninitialized typed slot or value is falsy (#6787).
+     */
+    public static function compileEmptyFromValue(Context $context, Variable $var): Value
+    {
+        return self::compileEmptyFromFetchedValue($context, $var);
+    }
+
+    /**
+     * empty(slot): true when uninitialized typed or value is falsy — no read guard (#6787).
+     */
+    private static function compileEmptyFromFetchedValue(Context $context, Variable $fetched): Value
+    {
+        if (Variable::TYPE_VALUE !== $fetched->type) {
+            $truthy = (new boolval())->call($context, $fetched);
+
+            return $context->builder->not($truthy);
+        }
+        $valuePtr = $fetched->valueBoxAliasPtr ?? null;
+        if (null === $valuePtr && Variable::KIND_VARIABLE === $fetched->kind) {
+            $valuePtr = JitValueBox::pointer($context, $fetched->value);
+        }
+        if (null === $valuePtr) {
+            $truthy = (new boolval())->call($context, $fetched);
+
+            return $context->builder->not($truthy);
+        }
+        $valuePtr = JitValueBox::normalizeValuePtr($context, $valuePtr);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isUndef = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_UNDEFINED, false)
+        );
+        $truthy = (new boolval())->call($context, $fetched);
+        $valueEmpty = $context->builder->not($truthy);
+
+        return $context->builder->select(
+            $isUndef,
+            $context->constantFromBool(true),
+            $valueEmpty
+        );
     }
 
     private static function literalStringKey(?Operand $dimOp): ?string

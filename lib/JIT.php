@@ -5489,10 +5489,13 @@ class JIT {
                     break;
                 case OpCode::TYPE_EMPTY:
                     $from = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $truthy = (new ext\standard\boolval())->call($this->context, $from);
+                    $emptyResult = JIT\EmptyObjectPropertyHelper::compileEmptyFromValue(
+                        $this->context,
+                        $from
+                    );
                     $this->assignOperandValue(
                         $block->getOperand($op->arg1),
-                        $this->context->builder->not($truthy)
+                        $emptyResult
                     );
                     break;
                 case OpCode::TYPE_EMPTY_OBJECT_PROPERTY:
