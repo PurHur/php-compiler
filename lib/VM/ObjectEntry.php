@@ -64,6 +64,9 @@ class ObjectEntry {
     /** PHP 8.1 fiber callback state (issue #3130). */
     public ?FiberState $fiberState = null;
 
+    /** True after readonly($object) marks this instance immutable (#6485). */
+    public bool $dynamicReadonly = false;
+
     public function __construct(ClassEntry $class) {
         $this->class = $class;
         $this->id = ++self::$counter;

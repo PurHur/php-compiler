@@ -971,6 +971,13 @@ class VM {
         if ($object->hasProperty($name)) {
             return $object->getProperty($name);
         }
+        if (VM\ObjectReadonlySupport::isDynamicReadonly($object)) {
+            $thrown = VM\BuiltinExceptionSupport::materializeError(
+                $this->context,
+                VM\ObjectReadonlySupport::modifyObjectMessage($object)
+            );
+            $this->raiseUncaughtException($thrown);
+        }
         if ($object->class->readonly && !$this->hasInstanceMethod($object->class, '__set')) {
             $thrown = VM\BuiltinExceptionSupport::materializeError(
                 $this->context,
@@ -6300,6 +6307,20 @@ restart:
     /** Reject unset() on readonly properties; returns catch frame or throws when uncaught. */
     private function enforceReadonlyPropertyUnset(ObjectEntry $object, string $propName, Frame $frame): ?Frame
     {
+        if (VM\ObjectReadonlySupport::isDynamicReadonly($object)) {
+            $thrown = VM\BuiltinExceptionSupport::materializeError(
+                $this->context,
+                VM\ObjectReadonlySupport::unsetObjectMessage($object)
+            );
+            $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+            if (null !== $catchFrame) {
+                return $catchFrame;
+            }
+            $this->raiseUncaughtException($thrown);
+
+            return null;
+        }
+
         $declaringClass = $this->readonlyPropertyDeclaringClass($object, $propName);
         if (null === $declaringClass) {
             return null;
@@ -6514,6 +6535,20 @@ restart:
      */
     private function enforceReadonlyDynamicPropertyCreate(ObjectEntry $object, string $name, Frame $frame): ?Frame
     {
+        if (VM\ObjectReadonlySupport::isDynamicReadonly($object)) {
+            $thrown = VM\BuiltinExceptionSupport::materializeError(
+                $this->context,
+                VM\ObjectReadonlySupport::modifyObjectMessage($object)
+            );
+            $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+            if (null !== $catchFrame) {
+                return $catchFrame;
+            }
+            $this->raiseUncaughtException($thrown);
+
+            return null;
+        }
+
         if (!$object->class->readonly || $this->hasInstanceMethod($object->class, '__set')) {
             return null;
         }
@@ -6539,6 +6574,20 @@ restart:
     {
         $target = $lvalue->resolveIndirect();
         $owner = $this->resolvePropertyWriteOwner($lvalue);
+        if (null !== $owner && VM\ObjectReadonlySupport::isDynamicReadonly($owner)) {
+            $thrown = VM\BuiltinExceptionSupport::materializeError(
+                $this->context,
+                VM\ObjectReadonlySupport::modifyObjectMessage($owner)
+            );
+            $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+            if (null !== $catchFrame) {
+                return $catchFrame;
+            }
+            $this->raiseUncaughtException($thrown);
+
+            return null;
+        }
+
         if (null === $owner || !$owner->constructed) {
             return null;
         }
