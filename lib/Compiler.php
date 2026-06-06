@@ -39,6 +39,7 @@ use PHPCompiler\Compiler\EnumParentCompileCheck;
 use PHPCompiler\Compiler\MagicMethodReturnTypeCheck;
 use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
 use PHPCompiler\Compiler\ThrowInClassConstCompileCheck;
+use PHPCompiler\Compiler\AsymmetricVisibilityCompileCheck;
 use PHPCompiler\Compiler\AttributeMetadata;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\DeprecatedMetadata;
@@ -379,6 +380,7 @@ class Compiler {
         EnumParentCompileCheck::validate($script);
         EnumBackedCaseCheck::validate($script);
         ReadonlyClassCompileCheck::validate($script);
+        AsymmetricVisibilityCompileCheck::validate($script);
         GeneratorStaticMethodCompileCheck::validate($script);
 
         if (null !== $this->haltCompilerOffset) {
