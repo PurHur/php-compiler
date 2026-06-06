@@ -392,6 +392,43 @@ class VM {
     }
 
     /**
+     * ??= on property hooks — Zend checks backing null/uninit, not get-hook return (#6472).
+     */
+    public function objectPropertyIsSetForCoalesceAssign(ObjectEntry $object, string $propName, ?Frame $frame = null): bool
+    {
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+        if (is_array($propMeta)) {
+            $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null;
+            if (null !== $backingName && $object->hasProperty($backingName)) {
+                $value = $object->getProperty($backingName)->resolveIndirect();
+                if ($value->isUndefined()) {
+                    return false;
+                }
+
+                return Variable::TYPE_NULL !== $value->type;
+            }
+        }
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null !== $meta && (null !== $meta->getHookMethodLc || null !== $meta->setHookMethodLc)) {
+            if ($object->hasProperty($propName)) {
+                $value = $object->getProperty($propName)->resolveIndirect();
+                if ($value->isUndefined()) {
+                    return false;
+                }
+
+                return Variable::TYPE_NULL !== $value->type;
+            }
+
+            return false;
+        }
+
+        return $this->objectPropertyIsSet($object, $propName, $frame);
+    }
+
+    /**
      * empty($obj->prop) — typed declared slots use read semantics (throw when uninitialized);
      * dynamic / __isset-only properties keep isset semantics (#4912, #3298, zend_object_handlers.c).
      */
@@ -3779,7 +3816,11 @@ restart:
                                 goto restart;
                             }
                             VM\LazyObjectSupport::ensureInitialized($this, $object);
-                            $dst->bool($this->objectPropertyIsSet($object, $propName, $frame));
+                            $dst->bool(
+                                $op->issetForCoalesceAssign
+                                    ? $this->objectPropertyIsSetForCoalesceAssign($object, $propName, $frame)
+                                    : $this->objectPropertyIsSet($object, $propName, $frame)
+                            );
                             break;
                         }
                         if (Variable::TYPE_STRING === $container->type) {
