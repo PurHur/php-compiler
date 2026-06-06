@@ -80,6 +80,7 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyConstruct;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetName;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetValue;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsAbstract;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsPrivate;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsProtected;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsPublic;
@@ -321,6 +322,7 @@ final class BuiltinClasses
                 'ispublic' => new ReflectionPropertyIsPublic(),
                 'isprivate' => new ReflectionPropertyIsPrivate(),
                 'isprotected' => new ReflectionPropertyIsProtected(),
+                'isabstract' => new ReflectionPropertyIsAbstract(),
             ] as $name => $method
         ) {
             $rp->methods[$name] = $method;
