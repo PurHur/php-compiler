@@ -27,6 +27,11 @@ final class get_resource_type extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        if ($v->isStreamResource()) {
+            $frame->returnVar->string(VmFs::resourceTypeForStreamTag($v->toInt()));
+
+            return;
+        }
         if (!is_resource_::isResource($v)) {
             throw new \LogicException('get_resource_type() expects a stream resource');
         }

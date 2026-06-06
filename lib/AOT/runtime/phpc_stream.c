@@ -21,6 +21,8 @@ extern __string__ *__string__init(long long size, const char *value);
 #define PHPC_MAX_STREAM_HANDLES 256
 
 static FILE *phpc_stream_handles[PHPC_MAX_STREAM_HANDLES];
+/** Set when a handle id is allocated; kept after fclose for get_resource_type() (#5179). */
+static char phpc_stream_was_used[PHPC_MAX_STREAM_HANDLES];
 static int phpc_stream_chunk_size[PHPC_MAX_STREAM_HANDLES];
 static int phpc_stream_write_buffer[PHPC_MAX_STREAM_HANDLES];
 static int phpc_stream_read_buffer[PHPC_MAX_STREAM_HANDLES];
@@ -118,6 +120,7 @@ int64_t __compiler_fopen(__string__ *path, __string__ *mode)
 
                 return -1;
             }
+            phpc_stream_was_used[id] = 1;
 
             return id;
         }
@@ -143,6 +146,7 @@ int64_t __compiler_tmpfile(void)
             phpc_stream_write_buffer[id] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
             phpc_stream_read_buffer[id] = PHPC_STREAM_DEFAULT_BUFFER_SIZE;
             phpc_stream_paths[id] = NULL;
+            phpc_stream_was_used[id] = 1;
 
             return id;
         }
@@ -1040,11 +1044,14 @@ __string__ *__compiler_stream_get_contents(int64_t handle, int64_t maxlength, in
 
 __string__ *__compiler_get_resource_type(int64_t handle)
 {
-    if (0 == __compiler_is_resource(handle)) {
-        return NULL;
+    if (0 != __compiler_is_resource(handle)) {
+        return __string__init(6, "stream");
+    }
+    if (handle >= 3 && handle < PHPC_MAX_STREAM_HANDLES && phpc_stream_was_used[handle]) {
+        return __string__init(7, "Unknown");
     }
 
-    return __string__init(6, "stream");
+    return NULL;
 }
 
 extern void __hashtable__setLongAt(__hashtable__ *ht, size_t index, long long val);
