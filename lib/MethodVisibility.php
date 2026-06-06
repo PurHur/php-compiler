@@ -163,7 +163,8 @@ final class MethodVisibility
             return false;
         }
         if (($visibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0) {
-            return $methodDeclaringClassLc === $resolvedParentLc;
+            // php-src: private parent:: requires calling scope === declaring class (#6799).
+            return $callerClassLc === $methodDeclaringClassLc;
         }
         if (($visibilityFlags & CfgFunc::FLAG_PROTECTED) !== 0) {
             return $isSameOrSubclassOf($callerClassLc, $methodDeclaringClassLc);
