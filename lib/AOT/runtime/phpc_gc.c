@@ -17,8 +17,8 @@ typedef struct __value__ {
 } __value__;
 
 extern __object__ *__value__readObject(__value__ *v);
-extern void phpc_weakref_clear_object(void *target);
-extern void phpc_weakref_clear_object_typed(void *target, int32_t typeinfo);
+/** Weak-ref sweep entry implemented in WeakRefRegistryRuntime.php (#6836). */
+extern void phpc_gc_notify_object_freed(void *obj);
 extern void __mm__free(void *ptr);
 
 enum {
@@ -168,13 +168,10 @@ void phpc_destruct_try_invoke(void *obj)
 
 void phpc_object_release_storage(void *obj)
 {
-    phpc_object_header *hdr;
-
     if (NULL == obj) {
         return;
     }
-    hdr = (phpc_object_header *) obj;
-    phpc_weakref_clear_object_typed(obj, hdr->ref.typeinfo);
+    phpc_gc_notify_object_freed(obj);
     phpc_gc_unregister(obj);
     __mm__free(obj);
 }
@@ -295,7 +292,7 @@ static void phpc_gc_free_object(void *obj)
 {
     /* Zend zend_gc_remove_from_buffer: user __destruct before cycle teardown (#4096, #4023). */
     phpc_destruct_try_invoke(obj);
-    phpc_weakref_clear_object(obj);
+    phpc_gc_notify_object_freed(obj);
     phpc_gc_clear_slots_pointing_to(obj);
     phpc_gc_unregister(obj);
     __mm__free(obj);
