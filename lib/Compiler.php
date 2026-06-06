@@ -5674,6 +5674,12 @@ class Compiler {
         ) {
             $this->compileArrayDimFetchWrite($dimFetch, $rightEmitBlock);
         }
+        if (
+            null !== $propFetch
+            && $this->operandsChainEqual($coalesceAssignTarget, $propFetch->result)
+        ) {
+            $this->compilePropertyFetchWrite($propFetch, $rightEmitBlock);
+        }
         if (null !== $rightSlot) {
             $rightEmitBlock->addOpCode(new OpCode(
                 OpCode::TYPE_ASSIGN,
@@ -5760,6 +5766,19 @@ class Compiler {
             $this->compileOperand($fetch->result, $block, false),
             $this->compileOperand($fetch->var, $block, true),
             null !== $fetch->dim ? $this->compileOperand($fetch->dim, $block, true) : null
+        ));
+    }
+
+    /**
+     * Emit a write fetch in $block (used by ??= right branch on hooked properties, #6427).
+     */
+    private function compilePropertyFetchWrite(Op\Expr\PropertyFetch $fetch, Block $block): void
+    {
+        $block->addOpCode(new OpCode(
+            OpCode::TYPE_PROPERTY_FETCH,
+            $this->compileOperand($fetch->result, $block, false),
+            $this->compileOperand($fetch->var, $block, true),
+            $this->compileOperand($fetch->name, $block, true)
         ));
     }
 
