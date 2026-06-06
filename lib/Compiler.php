@@ -37,6 +37,7 @@ use PHPCompiler\Compiler\EnumBackedCaseCheck;
 use PHPCompiler\Compiler\EnumMagicMethodCheck;
 use PHPCompiler\Compiler\EnumParentCompileCheck;
 use PHPCompiler\Compiler\MagicMethodReturnTypeCheck;
+use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
 use PHPCompiler\Compiler\AttributeMetadata;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\DeprecatedMetadata;
@@ -368,6 +369,7 @@ class Compiler {
         TraitCollisionCheck::validate($script);
         FinalClassExtensionCheck::validate($script);
         FinalClassConstCheck::validate($script);
+        NewWithoutParensCompileCheck::validate($script);
         TypedClassConstInheritCheck::validate($script);
         AbstractMethodVisibilityCheck::validate($script);
         MagicMethodReturnTypeCheck::validate($script);

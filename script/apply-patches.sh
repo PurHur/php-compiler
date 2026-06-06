@@ -290,6 +290,9 @@ patch_already_applied() {
     php-cfg-anonymous-class.patch)
       grep -q 'parseStmt_Class($expr->class)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
+    php-cfg-new-ctor-parens.patch)
+      grep -q 'newHasCtorParens' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-cfg-enum.patch)
       grep -q 'parseStmt_Enum' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
         && php_cfg_enum_implements_parser_applied
@@ -3704,6 +3707,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-first-class-callable.patch"
   apply_patch "$PATCH_DIR/php-cfg-arrow-function.patch"
   apply_patch "$PATCH_DIR/php-cfg-anonymous-class.patch"
+  apply_patch "$PATCH_DIR/php-cfg-new-ctor-parens.patch"
   apply_php_cfg_anonymous_class_name_overlay || true
   apply_patch "$PATCH_DIR/php-cfg-enum.patch"
   apply_patch "$PATCH_DIR/php-cfg-enum-implements.patch"
