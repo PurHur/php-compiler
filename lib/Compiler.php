@@ -3103,6 +3103,23 @@ class Compiler {
                             }
                         }
                     }
+                    if (null !== $defaultSlot && null !== $child->declaredType) {
+                        $defaultVm = $result->constants[$defaultSlot] ?? null;
+                        if (null !== $defaultVm) {
+                            $propName = '?';
+                            if ($child->name instanceof Operand\Literal && is_string($child->name->value)) {
+                                $propName = $child->name->value;
+                            }
+                            $classPrefix = $this->compilingClassDisplayName ?? 'class';
+                            $targetName = ($child->static ? $classPrefix.'::' : '').'$'.$propName;
+                            $this->assertCompileTimeDefaultMatchesDeclaredType(
+                                $defaultVm,
+                                $child->declaredType,
+                                'property',
+                                $targetName
+                            );
+                        }
+                    }
                     $typeSlot = $this->compileTypeConstrainedVariable(
                         $result,
                         $declared,
@@ -3486,6 +3503,21 @@ class Compiler {
             $this->registerInstancePropertyDeclaration($param->name->value);
         }
         $defaultSlot = $this->resolvePropertyOrParamDefaultSlot($param, $result);
+        if (null !== $defaultSlot && null !== $param->declaredType) {
+            $defaultVm = $result->constants[$defaultSlot] ?? null;
+            if (null !== $defaultVm) {
+                $propName = '?';
+                if ($param->name instanceof Operand\Literal && is_string($param->name->value)) {
+                    $propName = '$'.$param->name->value;
+                }
+                $this->assertCompileTimeDefaultMatchesDeclaredType(
+                    $defaultVm,
+                    $param->declaredType,
+                    'property',
+                    $propName
+                );
+            }
+        }
         $declared = $this->typeFromParamDecl($param);
         $propName = new Operand\Literal($param->name->value);
         $propName->type = Type::string();
@@ -4261,7 +4293,7 @@ class Compiler {
     }
 
     /**
-     * Zend zend_compile.c: scalar/object typed parameters cannot default to array literals (#5347).
+     * Zend zend_compile.c: property/param defaults must match declared type (#5347, #6558).
      */
     protected function assertParamDefaultMatchesDeclaredType(Op\Expr\Param $param, ?int $defaultSlot, Block $block): void
     {
@@ -4269,40 +4301,168 @@ class Compiler {
             return;
         }
         $default = $block->constants[$defaultSlot] ?? null;
-        if (null === $default || !$default->is(Variable::TYPE_ARRAY)) {
-            return;
-        }
-        if ($param->declaredType instanceof Op\Type\Nullable) {
-            $inner = $param->declaredType->type;
-            if ($inner instanceof Op\Type\Literal && 'array' === strtolower($inner->name)) {
-                return;
-            }
-        }
-        if ($param->declaredType instanceof Op\Type\Literal && 'array' === strtolower($param->declaredType->name)) {
-            return;
-        }
-        if (null !== $this->genericArraySpecFromCfgType($param->declaredType)) {
-            return;
-        }
-        if ($param->declaredType instanceof Op\Type\Literal && 'mixed' === strtolower($param->declaredType->name)) {
-            return;
-        }
-        if ($param->declaredType instanceof Op\Type\Literal && 'iterable' === strtolower($param->declaredType->name)) {
-            return;
-        }
-        if ($param->declaredType instanceof Op\Type\Mixed_) {
+        if (null === $default) {
             return;
         }
         $paramName = '?';
         if ($param->name instanceof Operand\Literal && is_string($param->name->value)) {
             $paramName = '$'.$param->name->value;
         }
-        $typeLabel = $param->declaredType instanceof Op\Type\Literal
-            ? $param->declaredType->name
-            : 'mixed';
-        $this->throwCompileError(
-            'Cannot use array as default value for parameter '.$paramName.' of type '.$typeLabel
+        $this->assertCompileTimeDefaultMatchesDeclaredType(
+            $default,
+            $param->declaredType,
+            'parameter',
+            $paramName,
+            $block,
+            $defaultSlot,
+            $param
         );
+    }
+
+    /**
+     * Zend zend_compile.c — zend_verify_const_expr_type() for property/param defaults (#6558).
+     */
+    protected function assertCompileTimeDefaultMatchesDeclaredType(
+        Variable $default,
+        ?Op\Type $declaredType,
+        string $kind,
+        string $targetName,
+        ?Block $block = null,
+        ?int $defaultSlot = null,
+        ?Op\Expr\Param $param = null
+    ): void {
+        if (null === $declaredType) {
+            return;
+        }
+
+        $value = $default->resolveIndirect();
+
+        if ($declaredType instanceof Op\Type\Mixed_) {
+            return;
+        }
+        if ($declaredType instanceof Op\Type\Literal && 'mixed' === strtolower($declaredType->name)) {
+            return;
+        }
+
+        if (
+            'parameter' === $kind
+            && null !== $param
+            && null !== $defaultSlot
+            && null !== $block
+            && $this->paramIsImplicitNullable($param, $defaultSlot, $block)
+        ) {
+            return;
+        }
+
+        $checkType = $declaredType;
+        if ($declaredType instanceof Op\Type\Nullable) {
+            if (Variable::TYPE_NULL === $value->type) {
+                return;
+            }
+            $checkType = $declaredType->type;
+        }
+
+        if (
+            $this->cfgTypeUsesDnfShape($checkType)
+            || $checkType instanceof Op\Type\Union
+            || $checkType instanceof Op\Type\Intersection
+        ) {
+            return;
+        }
+
+        $typeLabel = $this->declNameFromCfgType($checkType) ?? 'mixed';
+
+        if ($checkType instanceof Op\Type\Literal) {
+            $nameLc = strtolower($checkType->name);
+            if ('true' === $nameLc || 'false' === $nameLc) {
+                if (Variable::TYPE_BOOLEAN === $value->type && $value->toBool() === ('true' === $nameLc)) {
+                    return;
+                }
+                $given = TypeCheck::typeNameForConstraint($value->type);
+                $this->throwTypedDefaultMismatch($given, $kind, $targetName, $nameLc);
+
+                return;
+            }
+        }
+
+        if ($value->is(Variable::TYPE_ARRAY)) {
+            if ($checkType instanceof Op\Type\Literal) {
+                $nameLc = strtolower($checkType->name);
+                if ('array' === $nameLc || 'iterable' === $nameLc) {
+                    return;
+                }
+            }
+            if (null !== $this->genericArraySpecFromCfgType($checkType)) {
+                return;
+            }
+            $this->throwTypedDefaultMismatch('array', $kind, $targetName, $typeLabel);
+
+            return;
+        }
+
+        if ($checkType instanceof Op\Type\Literal && $this->compileTimeDefaultMatchesLiteralType($value, strtolower($checkType->name))) {
+            return;
+        }
+
+        $classOrScalarName = $this->declNameFromCfgType($checkType);
+        if (
+            null !== $classOrScalarName
+            && $this->compileTimeDefaultMatchesLiteralType($value, strtolower($classOrScalarName))
+        ) {
+            return;
+        }
+
+        $given = TypeCheck::typeNameForConstraint($value->type);
+        $this->throwTypedDefaultMismatch($given, $kind, $targetName, $typeLabel);
+    }
+
+    protected function throwTypedDefaultMismatch(string $given, string $kind, string $targetName, string $typeLabel): void
+    {
+        $this->throwCompileError(
+            "Cannot use {$given} as default value for {$kind} {$targetName} of type {$typeLabel}"
+        );
+    }
+
+    protected function compileTimeDefaultMatchesLiteralType(Variable $value, string $typeNameLc): bool
+    {
+        switch ($typeNameLc) {
+            case 'int':
+                return $value->is(Variable::TYPE_INTEGER);
+            case 'float':
+                return $value->is(Variable::TYPE_FLOAT) || $value->is(Variable::TYPE_INTEGER);
+            case 'string':
+                return $value->is(Variable::TYPE_STRING);
+            case 'bool':
+                return $value->is(Variable::TYPE_BOOLEAN);
+            case 'array':
+                return $value->is(Variable::TYPE_ARRAY);
+            case 'iterable':
+                return $value->is(Variable::TYPE_ARRAY);
+            case 'null':
+                return $value->is(Variable::TYPE_NULL);
+            default:
+                return $this->compileTimeDefaultMatchesClassType($value, $typeNameLc);
+        }
+    }
+
+    protected function compileTimeDefaultMatchesClassType(Variable $value, string $expectedClassLc): bool
+    {
+        $value = $value->resolveIndirect();
+        $expectedClassLc = strtolower(ltrim($expectedClassLc, '\\'));
+
+        if (Variable::TYPE_ENUM_CASE === $value->type) {
+            return strtolower(ltrim($value->toEnumCase()->enumClass->name, '\\')) === $expectedClassLc;
+        }
+        if (Variable::TYPE_OBJECT === $value->type) {
+            $obj = $value->toObject();
+            if (EnumCaseSupport::isEnumCase($obj)) {
+                return strtolower(ltrim($obj->class->name, '\\')) === $expectedClassLc;
+            }
+
+            return strtolower(ltrim($obj->class->name, '\\')) === $expectedClassLc;
+        }
+
+        return false;
     }
 
     protected function compileParam(Op\Expr\Param $param, Block $block, int $paramIdx): OpCode {
