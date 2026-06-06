@@ -488,6 +488,133 @@ class VM {
     }
 
     /**
+     * unset($obj->hooked) — invoke unset hook, reset separate backing, or Error (#6471, #6502).
+     */
+    private function dispatchHookedInstancePropertyUnset(ObjectEntry $object, string $propName, Frame $frame): ?Frame
+    {
+        if ($this->invokeInstancePropertyUnsetHook($object, $propName, $frame)) {
+            return null;
+        }
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null !== $meta && (null !== $meta->getHookMethodLc || null !== $meta->setHookMethodLc)) {
+            if (!$this->hookedPropertyHasSeparateBacking($object, $propName)) {
+                $className = $object->class->name;
+                if ('' !== $meta->declaringClassLc && isset($this->context->classes[$meta->declaringClassLc])) {
+                    $className = $this->context->classes[$meta->declaringClassLc]->name;
+                }
+
+                return $this->raiseVirtualPropertyHookUnsetError(
+                    $className,
+                    $propName,
+                    $frame,
+                    null !== $meta->setHookMethodLc
+                );
+            }
+        }
+        $this->unsetHookedInstanceProperty($object, $propName);
+
+        return null;
+    }
+
+    /** unset(Class::$hooked) — unset hook, separate backing reset, or Error (#6502). */
+    private function dispatchHookedStaticPropertyUnset(
+        string $classLc,
+        string $propLc,
+        string $propNameRaw,
+        Variable $storage,
+        Frame $frame
+    ): ?Frame {
+        if ($this->invokeStaticPropertyUnsetHook($classLc, $propLc, $propNameRaw, $frame)) {
+            return null;
+        }
+        $hooks = $this->resolveStaticPropertyHooks($classLc, $propLc);
+        if (null !== $hooks && (!empty($hooks['get']) || !empty($hooks['set']))) {
+            $propMeta = $this->context->propertyHookRegistry[$classLc][$propLc]
+                ?? $this->context->propertyHookRegistry[$classLc][$propNameRaw]
+                ?? null;
+            $backingName = is_array($propMeta)
+                ? ($propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null)
+                : null;
+            $separateBacking = null !== $backingName && strcasecmp($backingName, $propLc) !== 0;
+            if (!$separateBacking) {
+                $className = $this->context->classes[$classLc]->name ?? $classLc;
+
+                return $this->raiseVirtualPropertyHookUnsetError(
+                    $className,
+                    $propNameRaw,
+                    $frame,
+                    !empty($hooks['set'])
+                );
+            }
+        }
+        $storage->reset();
+        $storage->type = Variable::TYPE_UNDEFINED;
+
+        return null;
+    }
+
+    private function hookedPropertyHasSeparateBacking(ObjectEntry $object, string $propName): bool
+    {
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+        if (!is_array($propMeta)) {
+            return false;
+        }
+        $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null;
+        if (null === $backingName) {
+            return false;
+        }
+
+        return strcasecmp($backingName, $propName) !== 0 && $object->hasProperty($backingName);
+    }
+
+    private function invokeInstancePropertyUnsetHook(ObjectEntry $object, string $propName, Frame $frame): bool
+    {
+        $meta = $this->classPropertyMeta($object, $propName);
+        $unsetLc = $meta?->unsetHookMethodLc
+            ?? strtolower(SourcePreprocessor\PropertyHooks::unsetHookMethodName($propName));
+        if (!isset($object->class->methods[$unsetLc])) {
+            return false;
+        }
+        $func = $object->class->methods[$unsetLc];
+        if (!$func instanceof Func\PHP) {
+            return false;
+        }
+        $thisVar = new Variable();
+        $thisVar->object($object);
+        $this->invokePhpFunctionWithPropertyHookRaw($func, $propName, $frame, $thisVar);
+
+        return true;
+    }
+
+    private function invokeStaticPropertyUnsetHook(
+        string $classLc,
+        string $propLc,
+        string $propNameRaw,
+        Frame $frame
+    ): bool {
+        if (!isset($this->context->classes[$classLc])) {
+            return false;
+        }
+        $entry = $this->context->classes[$classLc];
+        $hooks = $entry->staticPropertyHooks[$propLc] ?? [];
+        $unsetLc = $hooks['unset']
+            ?? strtolower(SourcePreprocessor\PropertyHooks::unsetHookMethodName($propNameRaw));
+        if (!isset($entry->methods[$unsetLc])) {
+            return false;
+        }
+        $func = $entry->methods[$unsetLc];
+        if (!$func instanceof Func\PHP) {
+            return false;
+        }
+        $this->invokeStaticPropertyHookRaw($func, $propNameRaw, $classLc, $frame);
+
+        return true;
+    }
+
+    /**
      * unset($obj->hooked) — reset hook backing + declared slot (Zend zend_property_hooks.c, #6471).
      */
     private function unsetHookedInstanceProperty(ObjectEntry $object, string $propName): void
@@ -2749,8 +2876,11 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
-                    $storage->reset();
-                    $storage->type = Variable::TYPE_UNDEFINED;
+                    $catchFrame = $this->dispatchHookedStaticPropertyUnset($lcClass, $propName, $propNameRaw, $storage, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     break;
                 case OpCode::TYPE_UNSET:
                     if (null === $op->arg3) {
@@ -2829,7 +2959,11 @@ restart:
                             $frame = $catchFrame;
                             goto restart;
                         }
-                        $this->unsetHookedInstanceProperty($object, $propName);
+                        $catchFrame = $this->dispatchHookedInstancePropertyUnset($object, $propName, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                         break;
                     }
                     if (Variable::TYPE_ARRAY === $container->type) {
@@ -5691,6 +5825,10 @@ restart:
             if (isset($entry->methods[$getLc]) && $this->methodIsStatic($entry->methods[$getLc])) {
                 $hooks['get'] = $getLc;
             }
+            $unsetLc = strtolower(SourcePreprocessor\PropertyHooks::unsetHookMethodName($propLc));
+            if (isset($entry->methods[$unsetLc]) && $this->methodIsStatic($entry->methods[$unsetLc])) {
+                $hooks['unset'] = $unsetLc;
+            }
             if ([] !== $hooks) {
                 $lcClass = strtolower($entry->name);
                 $propMeta = $this->context->propertyHookRegistry[$lcClass][$propLc] ?? null;
@@ -5818,6 +5956,10 @@ restart:
         $getLc = strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($prop->name));
         if (isset($entry->methods[$getLc])) {
             $prop->getHookMethodLc = $getLc;
+        }
+        $unsetLc = strtolower(SourcePreprocessor\PropertyHooks::unsetHookMethodName($prop->name));
+        if (isset($entry->methods[$unsetLc])) {
+            $prop->unsetHookMethodLc = $unsetLc;
         }
         $lcClass = strtolower($entry->name);
         $propMeta = $this->context->propertyHookRegistry[$lcClass][$prop->name]
@@ -7967,6 +8109,7 @@ restart:
         );
         $cloned->getHookMethodLc = $property->getHookMethodLc;
         $cloned->setHookMethodLc = $property->setHookMethodLc;
+        $cloned->unsetHookMethodLc = $property->unsetHookMethodLc;
         $cloned->propertyHookVirtual = $property->propertyHookVirtual;
         $cloned->defaultInitBlock = $property->defaultInitBlock;
         $cloned->defaultInitResultSlot = $property->defaultInitResultSlot;

@@ -1,3 +1,6 @@
+--TEST--
+unset() on property hooks invokes declared unset hook (issue #6502, zend_property_hooks.c)
+--FILE--
 <?php
 class Box {
     public string $label {
@@ -10,3 +13,5 @@ $b = new Box;
 $b->label = 'hi';
 unset($b->label);
 echo $b->label, "\n";
+--EXPECT--
+cleared
