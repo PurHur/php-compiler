@@ -112,6 +112,24 @@ PHP;
         $this->assertSame('1', ob_get_clean());
     }
 
+    /** @covers issue #6724 — ZEND_ACC_ANON_READONLY via per-property readonly on anonymous class */
+    public function testReadonlyPropertyOnAnonymousClassDefaultCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$o = new class {
+    public readonly int $x = 1;
+};
+var_export($o->x);
+PHP;
+        $block = $runtime->parseAndCompile($code, 'readonly_prop_anon_default.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame('1', ob_get_clean());
+    }
+
     public function testReadonlyExtendsReadonlyCompiles(): void
     {
         $runtime = new Runtime();
