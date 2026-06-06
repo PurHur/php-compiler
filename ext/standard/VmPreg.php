@@ -10,7 +10,7 @@ use PHPCompiler\VM\Variable;
 /**
  * VM preg_match() — native PCRE via VmPregNative (issue #4874).
  *
- * JIT/AOT use native {@see lib/AOT/runtime/preg_match.c} instead.
+ * JIT/AOT use {@see StringPregMatchJit} (libpcre2 via LLVM externals, issue #5289).
  */
 final class VmPreg
 {
