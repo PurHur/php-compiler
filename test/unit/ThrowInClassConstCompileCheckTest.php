@@ -31,6 +31,37 @@ interface I {
 PHP);
     }
 
+    public function testFuncCallInClassConstCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+final class C {
+    public const X = strlen('hi');
+}
+PHP);
+    }
+
+    public function testFuncCallInEnumCaseCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+enum E: int {
+    case A = max(1, 2);
+}
+PHP);
+    }
+
+    public function testStaticCallInClassConstCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+final class C {
+    public const X = self::f();
+    public static function f(): int { return 1; }
+}
+PHP);
+    }
+
     public function testLegalClassConstStillCompiles(): void
     {
         $runtime = new Runtime();
