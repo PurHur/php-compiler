@@ -3588,6 +3588,8 @@ restart:
                     if (null !== $classEntry->parentLc) {
                         $this->inheritFromParent($classEntry);
                     }
+                    // Inherited static properties arrive after defineClass(); relink hooks (#6566).
+                    $this->linkStaticPropertyHooks($classEntry);
                     $this->inheritFromInterfaces($classEntry);
                     if (VM\LazyGhostTraitSupport::classUsesLazyGhostTrait($classEntry, $this->context)) {
                         VM\LazyGhostTraitSupport::ensureBuiltinLazyGhostMethods($classEntry);
@@ -5902,7 +5904,12 @@ restart:
                 return $entry->staticPropertyHooks[$propLc];
             }
             if (isset($entry->staticProperties[$propLc])) {
-                return null;
+                if (null === $entry->parentLc) {
+                    return null;
+                }
+                $currentLc = $entry->parentLc;
+
+                continue;
             }
             $currentLc = $entry->parentLc;
             if (null === $currentLc) {
@@ -8295,6 +8302,23 @@ restart:
                 } else {
                     // Class-declared inherited statics share one slot (Zend; #4668).
                     $entry->staticProperties[$name] = $storage;
+                }
+            }
+        }
+        foreach ($parent->staticPropertyHooks as $name => $hooks) {
+            if (!isset($entry->staticPropertyHooks[$name])) {
+                $entry->staticPropertyHooks[$name] = $hooks;
+            }
+        }
+        $childLc = strtolower($entry->name);
+        if (isset($this->context->propertyHookRegistry[$entry->parentLc])) {
+            foreach ($this->context->propertyHookRegistry[$entry->parentLc] as $prop => $meta) {
+                $propLc = strtolower($prop);
+                if (!isset($entry->staticProperties[$propLc])) {
+                    continue;
+                }
+                if (!isset($this->context->propertyHookRegistry[$childLc][$prop])) {
+                    $this->context->propertyHookRegistry[$childLc][$prop] = $meta;
                 }
             }
         }
