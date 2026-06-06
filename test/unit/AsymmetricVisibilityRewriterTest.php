@@ -148,7 +148,7 @@ PHP;
         );
     }
 
-    public function testRewriteTraitStaticParenthesizedProtectedSet(): void
+    public function testTraitStaticExplicitReadProtectedSetCompileErrors(): void
     {
         $source = <<<'PHP'
 <?php
@@ -156,9 +156,35 @@ trait T {
     public static (protected(set)) string $name = 't';
 }
 PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
+        AsymmetricVisibilityRewriter::rewrite($source);
+    }
+
+    public function testStaticPublicPrivateSetCompileErrors(): void
+    {
+        $source = <<<'PHP'
+<?php
+class C {
+    public private(set) static int $x = 1;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
+        AsymmetricVisibilityRewriter::rewrite($source);
+    }
+
+    public function testStaticPrivateSetWithoutExplicitReadStillRewrites(): void
+    {
+        $source = <<<'PHP'
+<?php
+class C {
+    private(set) static string $name = 'x';
+}
+PHP;
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
         self::assertStringContainsString(
-            '/*phpc-asymmetric-set:protected*/ public static string $name',
+            '/*phpc-asymmetric-set:private*/ public static string $name',
             preg_replace('/\s+/', ' ', $rewritten)
         );
     }
