@@ -20,14 +20,14 @@ extern __string__ *__string__init(long long size, const char *value);
 
 #define PHPC_MAX_STREAM_HANDLES 256
 
-static FILE *phpc_stream_handles[PHPC_MAX_STREAM_HANDLES];
+FILE *phpc_stream_handles[PHPC_MAX_STREAM_HANDLES];
 /** Set when a handle id is allocated; kept after fclose for get_resource_type() (#5179). */
 static char phpc_stream_was_used[PHPC_MAX_STREAM_HANDLES];
 static int phpc_stream_chunk_size[PHPC_MAX_STREAM_HANDLES];
 static int phpc_stream_write_buffer[PHPC_MAX_STREAM_HANDLES];
 static int phpc_stream_read_buffer[PHPC_MAX_STREAM_HANDLES];
 static char phpc_stream_write_buffer_storage[PHPC_MAX_STREAM_HANDLES][8192];
-static char *phpc_stream_paths[PHPC_MAX_STREAM_HANDLES];
+char *phpc_stream_paths[PHPC_MAX_STREAM_HANDLES];
 
 #define PHPC_STREAM_DEFAULT_CHUNK_SIZE 8192
 #define PHPC_STREAM_DEFAULT_BUFFER_SIZE 8192
@@ -738,48 +738,6 @@ int64_t __compiler_fseek(int64_t handle, int64_t offset, int64_t whence)
     }
 
     return fseek(fp, (long) offset, (int) whence) == 0 ? 0 : -1;
-}
-
-/** fstat() metadata via stored fopen path + __phpc_stat (issue #3482). */
-__hashtable__ *__phpc_fstat(int64_t handle)
-{
-    const char *path;
-    size_t len;
-
-    if (handle <= 0 || handle >= PHPC_MAX_STREAM_HANDLES) {
-        return NULL;
-    }
-    if (NULL == phpc_stream_handles[handle]) {
-        return NULL;
-    }
-    path = phpc_stream_paths[handle];
-    if (NULL == path) {
-        return NULL;
-    }
-    len = strlen(path);
-
-    return __phpc_stat(__string__init((long long) len, path), 0);
-}
-
-/** Open stream path for fstat() JIT lowering via stat() (issue #3482). */
-__string__ *__phpc_stream_path(int64_t handle)
-{
-    const char *path;
-    size_t len;
-
-    if (handle <= 0 || handle >= PHPC_MAX_STREAM_HANDLES) {
-        return NULL;
-    }
-    if (NULL == phpc_stream_handles[handle]) {
-        return NULL;
-    }
-    path = phpc_stream_paths[handle];
-    if (NULL == path) {
-        return NULL;
-    }
-    len = strlen(path);
-
-    return __string__init((long long) len, path);
 }
 
 typedef struct __hashtable__ __hashtable__;
