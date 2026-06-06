@@ -599,7 +599,7 @@ class VM {
             return false;
         }
         $entry = $this->context->classes[$classLc];
-        $hooks = $entry->staticPropertyHooks[$propLc] ?? [];
+        $hooks = $this->resolveStaticPropertyHooks($classLc, $propLc) ?? [];
         $unsetLc = $hooks['unset']
             ?? strtolower(SourcePreprocessor\PropertyHooks::unsetHookMethodName($propNameRaw));
         if (!isset($entry->methods[$unsetLc])) {
@@ -6310,7 +6310,7 @@ restart:
             }
             $entry = $this->context->classes[$classLc];
             $propLc = strtolower($staticPropName);
-            $hooks = $entry->staticPropertyHooks[$propLc] ?? [];
+            $hooks = $this->resolveStaticPropertyHooks($classLc, $propLc);
             $setLc = $hooks['set'] ?? null;
             if (null === $setLc || !isset($entry->methods[$setLc])) {
                 return false;
@@ -6652,7 +6652,7 @@ restart:
         $classLc = $target->staticPropertyClassLc;
         if (is_string($classLc) && isset($this->context->classes[$classLc])) {
             $entry = $this->context->classes[$classLc];
-            $hooks = $entry->staticPropertyHooks[strtolower($propName)] ?? [];
+            $hooks = $this->resolveStaticPropertyHooks($classLc, strtolower($propName)) ?? [];
             $virtual = !empty($hooks['virtual']);
             $hasSetHook = !empty($hooks['set']);
             $className = $entry->name;
@@ -8094,8 +8094,14 @@ restart:
                     );
                 }
                 $entry->staticProperties[$name] = $this->cloneStaticPropertyStorage($storage);
+                $this->linkStaticTypedPropertySlot(
+                    $entry->staticProperties[$name],
+                    $entry,
+                    $storage->objectPropertyName ?? $name
+                );
                 $entry->traitStaticPropertyNames[$name] = true;
             }
+            $this->inheritTraitStaticPropertyHooks($entry, $trait);
             $this->inheritTraitInstanceProperties($entry, $trait, $trait->name);
             foreach ($trait->constants as $name => $value) {
                 if (isset($entry->constants[$name])) {
@@ -8315,6 +8321,28 @@ restart:
             }
             if ('__construct' === $methodLc && null === $entry->constructor) {
                 $entry->constructor = $entry->methods[$methodLc];
+            }
+        }
+        $this->linkStaticPropertyHooks($entry);
+    }
+
+    /**
+     * Merge trait static property-hook metadata into using class (#6624, zend_property_hooks.c + zend_traits.c).
+     */
+    protected function inheritTraitStaticPropertyHooks(ClassEntry $entry, ClassEntry $trait): void
+    {
+        $traitLc = strtolower($trait->name);
+        $childLc = strtolower($entry->name);
+        if (isset($this->context->propertyHookRegistry[$traitLc])) {
+            foreach ($this->context->propertyHookRegistry[$traitLc] as $prop => $meta) {
+                if (!isset($this->context->propertyHookRegistry[$childLc][$prop])) {
+                    $this->context->propertyHookRegistry[$childLc][$prop] = $meta;
+                }
+            }
+        }
+        foreach ($trait->staticPropertyHooks as $name => $hooks) {
+            if (!isset($entry->staticPropertyHooks[$name])) {
+                $entry->staticPropertyHooks[$name] = $hooks;
             }
         }
     }
@@ -8544,8 +8572,13 @@ restart:
 
     private function cloneStaticPropertyStorage(Variable $source): Variable
     {
+        $resolved = $source->resolveIndirect();
         $clone = new Variable();
-        $clone->copyFrom($source->resolveIndirect());
+        if (VM\TypedPropertyCheck::isUninitialized($resolved)) {
+            $clone->copyUninitializedStaticPropertySlot($resolved);
+        } else {
+            $clone->copyFrom($resolved);
+        }
 
         return $clone;
     }
