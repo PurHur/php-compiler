@@ -91,6 +91,25 @@ PHP;
         $this->assertSame('5', ob_get_clean());
     }
 
+    /** Issue #6845: enum case instance method first-class callable (E::A->f(...)). */
+    public function testVmEnumCaseMethodFirstClassCallable(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E {
+    case A;
+    public function f(): string { return 'a'; }
+}
+$c = E::A->f(...);
+echo $c();
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('a', ob_get_clean());
+    }
+
     /** Issue #4957: TypeReconstructor must not call missing Type::array(). */
     public function testVmInstanceMethodFirstClassCallableOnNewExpression(): void
     {
