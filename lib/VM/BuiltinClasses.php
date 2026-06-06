@@ -39,6 +39,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassGetMethods;
 use PHPCompiler\VM\Builtin\ReflectionClassGetProperty;
 use PHPCompiler\VM\Builtin\ReflectionClassGetProperties;
 use PHPCompiler\VM\Builtin\ReflectionClassGetReflectionConstant;
+use PHPCompiler\VM\Builtin\ReflectionClassIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionClassIsInternal;
 use PHPCompiler\VM\Builtin\ReflectionClassIsUninitializedLazyObject;
 use PHPCompiler\VM\Builtin\ReflectionClassMarkLazyObjectAsInitialized;
@@ -68,6 +69,7 @@ use PHPCompiler\VM\Builtin\ReflectionMethodConstruct;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetParameters;
+use PHPCompiler\VM\Builtin\ReflectionMethodIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeGetName;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeIsBuiltin;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetAttributes;
@@ -253,6 +255,8 @@ final class BuiltinClasses
         $rm->methodVisibility['getparameters'] = $pub;
         $rm->methods['getname'] = new ReflectionMethodGetName();
         $rm->methodVisibility['getname'] = $pub;
+        $rm->methods['isdeprecated'] = new ReflectionMethodIsDeprecated();
+        $rm->methodVisibility['isdeprecated'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_METHOD] = $rm;
 
         $rc = new ClassEntry('ReflectionClass');
@@ -289,6 +293,8 @@ final class BuiltinClasses
         $rc->methodVisibility['resetaslazyobject'] = $pub;
         $rc->methods['isinternal'] = new ReflectionClassIsInternal();
         $rc->methodVisibility['isinternal'] = $pub;
+        $rc->methods['isdeprecated'] = new ReflectionClassIsDeprecated();
+        $rc->methodVisibility['isdeprecated'] = $pub;
 
         $rp = new ClassEntry('ReflectionProperty');
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);

@@ -64,6 +64,11 @@ final class DeprecatedMetadata
         return 'Constant '.$class.'::'.$constant.' is deprecated'.$this->suffix();
     }
 
+    public function formatClass(string $name): string
+    {
+        return 'Class '.$name.' is deprecated'.$this->suffix();
+    }
+
     private function suffix(): string
     {
         if (null !== $this->since && null !== $this->message) {

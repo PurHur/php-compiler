@@ -2636,6 +2636,7 @@ class Compiler {
             VM\StringableSupport::assertConcreteClassImplements($class, $className);
         }
         $this->assignAttributeMetadata($return, $class);
+        $return->deprecatedMetadata = DeprecatedMetadata::fromOp($class);
         AttributeNames::assertNoDuplicates($return->attributeNames);
         $this->applySealedMetadataFromOp($class, $return);
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($class->flags);
