@@ -526,6 +526,7 @@ class Module extends ModuleAbstract
             new fnmatch(),
             new time(),
             new getmypid(),
+            new zend_thread_id(),
             new getmygrgid(),
             new getmyinode(),
             new getlastmod(),
