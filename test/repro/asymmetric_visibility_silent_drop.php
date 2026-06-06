@@ -5,4 +5,10 @@ class Demo {
 
 $d = new Demo();
 echo "read: {$d->name}\n";
-$d->name = 'b';
+try {
+    $d->name = 'b';
+    echo "no throw\n";
+} catch (Error $e) {
+    echo 'caught ', get_class($e), ': ', $e->getMessage(), "\n";
+}
+
