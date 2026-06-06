@@ -1587,6 +1587,11 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
+                    $catchFrame = $this->enforceAsymmetricPropertyWrite($arg2, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     if ($this->dispatchPropertySetHookAssign($arg2, $arg3, $frame)) {
                         $arg1->copyFrom($arg3);
                         break;
@@ -5227,6 +5232,10 @@ restart:
         } catch (\Error $e) {
             return $this->dispatchVmError($e->getMessage(), $frame);
         }
+        $catchFrame = $this->enforceAsymmetricPropertyWrite($write, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
         if (!$this->dispatchPropertySetHookAssign($write, $working, $frame)) {
             $catchFrame = $this->enforceVirtualPropertyHookWrite($write, $frame);
             if (null !== $catchFrame) {
@@ -5255,6 +5264,10 @@ restart:
                 } else {
                     $working->applyDecrement();
                 }
+                $catchFrame = $this->enforceAsymmetricPropertyWrite($write, $frame);
+                if (null !== $catchFrame) {
+                    return $catchFrame;
+                }
                 if (!$this->dispatchPropertySetHookAssign($write, $working, $frame)) {
                     $catchFrame = $this->enforceVirtualPropertyHookWrite($write, $frame);
                     if (null !== $catchFrame) {
@@ -5272,6 +5285,10 @@ restart:
                 $working->applyIncrement();
             } else {
                 $working->applyDecrement();
+            }
+            $catchFrame = $this->enforceAsymmetricPropertyWrite($write, $frame);
+            if (null !== $catchFrame) {
+                return $catchFrame;
             }
             if (!$this->dispatchPropertySetHookAssign($write, $working, $frame)) {
                 $catchFrame = $this->enforceVirtualPropertyHookWrite($write, $frame);
@@ -6550,6 +6567,10 @@ restart:
     public function writePropertyHookRef(Variable $writeLvalue, Variable $value): void
     {
         $frame = $this->requireExecutingFrame();
+        $catchFrame = $this->enforceAsymmetricPropertyWrite($writeLvalue, $frame);
+        if (null !== $catchFrame) {
+            throw new VM\PropertyHookRefWriteSignal($catchFrame);
+        }
         if ($this->dispatchPropertySetHookAssign($writeLvalue, $value, $frame)) {
             return;
         }
@@ -7535,6 +7556,17 @@ restart:
         }
 
         return $meta->declaringClassLc !== '' ? $meta->declaringClassLc : $object->class->name;
+    }
+
+    /** Reject asymmetric set visibility violations (#3165, #6898); returns catch frame or null. */
+    private function enforceAsymmetricPropertyWrite(Variable $lvalue, Frame $frame): ?Frame
+    {
+        $msg = $this->asymmetricPropertyWriteMessage($lvalue, $frame);
+        if (null === $msg) {
+            return null;
+        }
+
+        return $this->dispatchVmError($msg, $frame);
     }
 
     /** Reject asymmetric set visibility violations (#3165); returns message or null. */

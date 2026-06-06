@@ -199,8 +199,16 @@ final class PropertyHooks
             if (!str_ends_with($propDecl, ';')) {
                 $propDecl .= ';';
             }
+            [$methods, $usesBacking, $trailing, $asymmetricSetVis] = $this->lowerHooks($hookSource, $prop, $lcClass, $isStatic);
+            if (null !== $asymmetricSetVis) {
+                $marker = '/*phpc-asymmetric-set:'.$asymmetricSetVis.'*/ ';
+                if (preg_match('/^(\s*)/', $declPrefix, $indentM)) {
+                    $declPrefix = $indentM[1].$marker.ltrim($declPrefix);
+                } else {
+                    $declPrefix = $marker.$declPrefix;
+                }
+            }
             $out .= $declPrefix.$propDecl;
-            [$methods, $usesBacking, $trailing] = $this->lowerHooks($hookSource, $prop, $lcClass, $isStatic);
             $trailing = trim($trailing);
             if ('' !== $trailing) {
                 $out .= "\n    ".$trailing;
@@ -228,12 +236,13 @@ final class PropertyHooks
     }
 
     /**
-     * @return array{0: list<string>, 1: bool, 2: string} method source chunks, whether any hook touches backing storage, trailing hook-body declarations
+     * @return array{0: list<string>, 1: bool, 2: string, 3: ?string} method source chunks, backing use, trailing decls, asymmetric set visibility
      */
     private function lowerHooks(string $hookSource, string $prop, string $lcClass, bool $isStatic = false): array
     {
         $methods = [];
         $usesBacking = false;
+        $asymmetricSetVisibility = null;
         $rest = trim($hookSource);
         while ('' !== $rest) {
             $rest = ltrim($rest);
@@ -245,6 +254,12 @@ final class PropertyHooks
             if (preg_match('/^set\s*;/s', $rest)) {
                 $this->registerRequiredHook($lcClass, $prop, 'requiresSet');
                 $rest = preg_replace('/^set\s*;/', '', $rest, 1) ?? $rest;
+                continue;
+            }
+            if (preg_match('/^set\s*\(\s*(public|protected|private)\s*\)\s*;/s', $rest, $asymM)) {
+                $asymmetricSetVisibility = strtolower($asymM[1]);
+                $this->registerRequiredHook($lcClass, $prop, 'requiresSet');
+                $rest = preg_replace('/^set\s*\(\s*(public|protected|private)\s*\)\s*;/i', '', $rest, 1) ?? $rest;
                 continue;
             }
             if (preg_match('/^unset\s*;/s', $rest)) {
@@ -275,19 +290,45 @@ final class PropertyHooks
             if (preg_match('/^set\s*=>\s*/s', $rest)) {
                 $rest = preg_replace('/^set\s*=>\s*/', '', $rest, 1) ?? $rest;
                 [$expr, $rest] = $this->takeUntilSemicolon($rest);
-                $expr = rtrim($expr);
-                if ($this->setArrowExprUsesStatementForm($expr, $isStatic)) {
-                    $usesBacking = $usesBacking || $this->hookTouchesBacking($expr, $prop, $isStatic);
-                    $this->registerHookBacking($lcClass, $prop, 'set', $expr, $isStatic);
-                    $body = '{ '.$expr.'; }';
-                } else {
-                    $backing = $isStatic ? 'self::$'.$prop : '$this->'.$prop;
-                    $usesBacking = true;
-                    $body = '{ '.$backing.' = ('.$expr.'); }';
+                $methods = array_merge(
+                    $methods,
+                    $this->lowerSetArrowHook($lcClass, $prop, $isStatic, rtrim($expr), $usesBacking)
+                );
+                continue;
+            }
+            if (preg_match('/^set\s*\(\s*(public|protected|private)\s*\)\s*=>\s*/s', $rest, $asymM)) {
+                $asymmetricSetVisibility = strtolower($asymM[1]);
+                $rest = preg_replace('/^set\s*\(\s*(public|protected|private)\s*\)\s*=>\s*/i', '', $rest, 1) ?? $rest;
+                [$expr, $rest] = $this->takeUntilSemicolon($rest);
+                $methods = array_merge(
+                    $methods,
+                    $this->lowerSetArrowHook($lcClass, $prop, $isStatic, rtrim($expr), $usesBacking)
+                );
+                continue;
+            }
+            if (preg_match('/^set\s*\(\s*(public|protected|private)\s*\)\s*\(/s', $rest, $asymM)) {
+                $asymmetricSetVisibility = strtolower($asymM[1]);
+                $rest = preg_replace('/^set\s*\(\s*(public|protected|private)\s*\)\s*/i', '', $rest, 1) ?? $rest;
+                if (!preg_match('/^\(([^)]*)\)\s*\{/s', $rest, $pm)) {
+                    break;
                 }
-                $method = self::SET_METHOD_PREFIX.$prop;
-                $methods[] = $this->hookMethodDecl($isStatic, $method, '$value', $body);
-                $this->registerHook($lcClass, $prop, 'set', $method, $isStatic);
+                $params = trim($pm[1]);
+                $rest = substr($rest, strlen($pm[0]) - 1);
+                [$body, $rest] = $this->takeBraceBody($rest);
+                $methods = array_merge(
+                    $methods,
+                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, $params, $body, $usesBacking)
+                );
+                continue;
+            }
+            if (preg_match('/^set\s*\(\s*(public|protected|private)\s*\)\s*\{/s', $rest, $asymM)) {
+                $asymmetricSetVisibility = strtolower($asymM[1]);
+                $rest = preg_replace('/^set\s*\(\s*(public|protected|private)\s*\)\s*/i', '', $rest, 1) ?? $rest;
+                [$body, $rest] = $this->takeBraceBody($rest);
+                $methods = array_merge(
+                    $methods,
+                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, '$value', $body, $usesBacking)
+                );
                 continue;
             }
             if (preg_match('/^set\s*\(/s', $rest)) {
@@ -298,21 +339,19 @@ final class PropertyHooks
                 $params = trim($pm[1]);
                 $rest = substr($rest, strlen($pm[0]) - 1);
                 [$body, $rest] = $this->takeBraceBody($rest);
-                $usesBacking = $usesBacking || $this->hookTouchesBacking($body, $prop, $isStatic);
-                $this->registerHookBackingFromBody($lcClass, $prop, 'set', $body, $isStatic);
-                $method = self::SET_METHOD_PREFIX.$prop;
-                $methods[] = $this->hookMethodDecl($isStatic, $method, $params, $body);
-                $this->registerHook($lcClass, $prop, 'set', $method, $isStatic);
+                $methods = array_merge(
+                    $methods,
+                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, $params, $body, $usesBacking)
+                );
                 continue;
             }
             if (preg_match('/^set\s*\{/s', $rest)) {
                 $rest = preg_replace('/^set\s*/', '', $rest, 1) ?? $rest;
                 [$body, $rest] = $this->takeBraceBody($rest);
-                $usesBacking = $usesBacking || $this->hookTouchesBacking($body, $prop, $isStatic);
-                $this->registerHookBackingFromBody($lcClass, $prop, 'set', $body, $isStatic);
-                $method = self::SET_METHOD_PREFIX.$prop;
-                $methods[] = $this->hookMethodDecl($isStatic, $method, '$value', $body);
-                $this->registerHook($lcClass, $prop, 'set', $method, $isStatic);
+                $methods = array_merge(
+                    $methods,
+                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, '$value', $body, $usesBacking)
+                );
                 continue;
             }
             if (preg_match('/^unset\s*=>\s*/s', $rest)) {
@@ -338,7 +377,51 @@ final class PropertyHooks
             break;
         }
 
-        return [$methods, $usesBacking, trim($rest)];
+        return [$methods, $usesBacking, trim($rest), $asymmetricSetVisibility];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function lowerSetArrowHook(
+        string $lcClass,
+        string $prop,
+        bool $isStatic,
+        string $expr,
+        bool &$usesBacking
+    ): array {
+        if ($this->setArrowExprUsesStatementForm($expr, $isStatic)) {
+            $usesBacking = $usesBacking || $this->hookTouchesBacking($expr, $prop, $isStatic);
+            $this->registerHookBacking($lcClass, $prop, 'set', $expr, $isStatic);
+            $body = '{ '.$expr.'; }';
+        } else {
+            $backing = $isStatic ? 'self::$'.$prop : '$this->'.$prop;
+            $usesBacking = true;
+            $body = '{ '.$backing.' = ('.$expr.'); }';
+        }
+        $method = self::SET_METHOD_PREFIX.$prop;
+        $this->registerHook($lcClass, $prop, 'set', $method, $isStatic);
+
+        return [$this->hookMethodDecl($isStatic, $method, '$value', $body)];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function lowerSetBlockHook(
+        string $lcClass,
+        string $prop,
+        bool $isStatic,
+        string $params,
+        string $body,
+        bool &$usesBacking
+    ): array {
+        $usesBacking = $usesBacking || $this->hookTouchesBacking($body, $prop, $isStatic);
+        $this->registerHookBackingFromBody($lcClass, $prop, 'set', $body, $isStatic);
+        $method = self::SET_METHOD_PREFIX.$prop;
+        $this->registerHook($lcClass, $prop, 'set', $method, $isStatic);
+
+        return [$this->hookMethodDecl($isStatic, $method, $params, $body)];
     }
 
     private function hookTouchesBacking(string $source, string $prop, bool $isStatic): bool
