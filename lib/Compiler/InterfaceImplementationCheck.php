@@ -9,6 +9,7 @@ use PHPCfg\Op;
 use PHPCfg\Op\Expr\Param;
 use PHPCfg\Operand;
 use PHPCfg\Script;
+use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\MethodVisibility;
 
 /**
@@ -76,7 +77,7 @@ final class InterfaceImplementationCheck
                 $methods[strtolower($member->func->name)] = true;
             } elseif ($member instanceof Op\Stmt\Property) {
                 $propName = $this->propertyDisplayName($member->name);
-                if (!$this->interfacePropertyHasHooks($lc, $propName)) {
+                if (!$this->interfacePropertyAllowed($lc, $propName, $member)) {
                     throw new \CompileError('Interfaces may not include properties');
                 }
                 $properties[strtolower($propName)] = $propName;
@@ -506,13 +507,40 @@ final class InterfaceImplementationCheck
     }
 
     /**
-     * Interface members with hook syntax are lowered to plain properties plus registry metadata (#6620).
-     * Plain typed properties without hooks remain illegal (#6902, zend_compile.c).
+     * Interface members with hook syntax or PHP 8.4 asymmetric visibility are allowed (#6620, #4876).
+     * Plain typed properties without hooks or asymmetric modifiers remain illegal (#6902, zend_compile.c).
      */
+    private function interfacePropertyAllowed(string $ifaceLc, string $propName, Op\Stmt\Property $member): bool
+    {
+        if ($this->interfacePropertyHasHooks($ifaceLc, $propName)) {
+            return true;
+        }
+
+        return $this->interfacePropertyHasAsymmetricVisibility($member);
+    }
+
     private function interfacePropertyHasHooks(string $ifaceLc, string $propName): bool
     {
         return isset($this->propertyHookRegistry[$ifaceLc][$propName])
             || isset($this->propertyHookRegistry[$ifaceLc][strtolower($propName)]);
+    }
+
+    /**
+     * PHP 8.4: interface property declares may carry asymmetric get/set visibility (#4876, #6956).
+     */
+    private function interfacePropertyHasAsymmetricVisibility(Op\Stmt\Property $member): bool
+    {
+        if (property_exists($member, 'setVisibility') && 0 !== (int) $member->setVisibility) {
+            return true;
+        }
+        if (property_exists($member, 'getVisibility') && 0 !== (int) $member->getVisibility) {
+            return true;
+        }
+
+        $attrs = method_exists($member, 'getAttributes') ? $member->getAttributes() : [];
+
+        return 0 !== AsymmetricVisibilityRewriter::extractSetVisibilityFromAttributes($attrs)
+            || 0 !== AsymmetricVisibilityRewriter::extractGetVisibilityFromAttributes($attrs);
     }
 
     /**
