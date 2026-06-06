@@ -232,11 +232,9 @@ class Type extends Builtin {
             $this->context->registerFunction($libcName, $fn);
         }
         $voidTy = $this->context->getTypeFromString('void');
-        $fnProgressNote = $this->context->module->addFunction(
-            '__phpc_progress_note',
-            $this->context->context->functionType($voidTy, false, $i8p)
-        );
-        $this->context->registerFunction('__phpc_progress_note', $fnProgressNote);
+        $ftRemember = $this->context->context->functionType($voidTy, false, $i8p);
+        $fnRemember = $this->context->module->addFunction('__phpc_progress_remember', $ftRemember);
+        $this->context->registerFunction('__phpc_progress_remember', $fnRemember);
         $ftOpen = $this->context->context->functionType($i32, false, $i8p, $i32);
         $fnOpen = $this->context->module->addFunction('open', $ftOpen);
         $this->context->registerFunction('open', $fnOpen);
@@ -249,6 +247,7 @@ class Type extends Builtin {
         $ftFclose = $this->context->context->functionType($i32, false, $i8p);
         $fnFclose = $this->context->module->addFunction('fclose', $ftFclose);
         $this->context->registerFunction('fclose', $fnFclose);
+        ProgressNoteRuntime::ensureLinked($this->context);
         $ftRead = $this->context->context->functionType($i64, false, $i32, $i8p, $sizeT);
         $fnRead = $this->context->module->addFunction('read', $ftRead);
         $this->context->registerFunction('read', $fnRead);

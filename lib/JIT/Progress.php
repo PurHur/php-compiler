@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\ProgressNoteRuntime;
+
 /** Optional JIT compile progress file for native AOT segfault triage (issue #816). */
 final class Progress
 {
@@ -21,6 +23,12 @@ final class Progress
 
     /** @var string|null */
     private static $cachedEntryPath = null;
+
+    /** Emit a native progress breadcrumb during LLVM lowering (#6748). */
+    public static function emitNativeNote(Context $context, string $message): void
+    {
+        ProgressNoteRuntime::emitCall($context, $message);
+    }
 
     public static function noteFunction(string $name): void
     {

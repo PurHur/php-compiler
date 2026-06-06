@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Progress;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -134,7 +135,7 @@ final class CliArgvRuntime
 
         $context->builder->store($argc, self::globalPtr($context, self::G_ARGC, $i32));
         $context->builder->store($argv, self::globalPtr($context, self::G_ARGV, $i8pp));
-        self::emitProgressNote($context, 'c:cli_store_argv');
+        Progress::emitNativeNote($context, 'c:cli_store_argv');
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
     }
@@ -241,7 +242,7 @@ final class CliArgvRuntime
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $valuePtr = $context->getTypeFromString('__value__*');
 
-        self::emitProgressNote($context, 'c:cli_refresh_argv_begin');
+        Progress::emitNativeNote($context, 'c:cli_refresh_argv_begin');
 
         $nullOutBb = $fn->appendBasicBlock('cli_refresh_null_out');
         $bodyBb = $fn->appendBasicBlock('cli_refresh_body');
@@ -290,23 +291,9 @@ final class CliArgvRuntime
 
         $context->builder->positionAtEnd($loopDoneBb);
         $context->builder->call($context->lookupFunction('__value__writeHashtable'), $out, $ht);
-        self::emitProgressNote($context, 'c:cli_refresh_argv_done');
+        Progress::emitNativeNote($context, 'c:cli_refresh_argv_done');
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
-    }
-
-    private static function emitProgressNote(Context $context, string $message): void
-    {
-        try {
-            $fn = $context->lookupFunction('__phpc_progress_note');
-        } catch (\Throwable $e) {
-            return;
-        }
-        $i8p = $context->getTypeFromString('int8*');
-        $context->builder->call(
-            $fn,
-            $context->builder->pointerCast($context->constantFromString($message), $i8p)
-        );
     }
 
     private static function ensureExternals(Context $context): void
