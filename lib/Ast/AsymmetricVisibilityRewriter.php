@@ -46,6 +46,26 @@ final class AsymmetricVisibilityRewriter
 
         self::rejectExplicitPublicBeforeSetModifier($source);
         self::rejectExplicitPublicAfterSetModifier($source);
+        self::rejectDuplicateReadBeforeParenthesizedSetModifier($source);
+
+        $source = (string) preg_replace_callback(
+            '/(?P<prefix>(?:\/\*(?:[^*]|\*(?!\/))*\*\/\s*)*)(?P<attrs>(?:#\[[^\]]*\]\s*)*)'
+            .'(?P<readBefore>(?:(?:public|protected|private)\s+)?)'
+            .'(?P<static>(?:static\s+)?)'
+            .'\(\s*(?P<set>public|protected|private)\s*\(\s*set\s*\)\s*\)\s*/i',
+            static function (array $m): string {
+                $set = strtolower($m['set']);
+                $readBefore = trim($m['readBefore']);
+                if ('' !== $readBefore) {
+                    $readPrefix = $readBefore.' ';
+                } else {
+                    $readPrefix = 'public ';
+                }
+
+                return $m['prefix'].$m['attrs'].'/*'.self::MARKER_PREFIX_SET.$set.'*/ '.$readPrefix.$m['static'];
+            },
+            $source
+        );
 
         return (string) preg_replace_callback(
             '/(?P<prefix>(?:\/\*(?:[^*]|\*(?!\/))*\*\/\s*)*)(?P<attrs>(?:#\[[^\]]*\]\s*)*)'
@@ -91,6 +111,17 @@ final class AsymmetricVisibilityRewriter
     {
         if (preg_match(
             '/(?:public|protected|private)\s*\(\s*set\s*\)\s*public\b/i',
+            $source
+        )) {
+            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+        }
+    }
+
+    /** php-src: `public (public(set))` duplicates the same access modifier (#6897). */
+    private static function rejectDuplicateReadBeforeParenthesizedSetModifier(string $source): void
+    {
+        if (preg_match(
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*\1\s*\(\s*set\s*\)\s*\)/i',
             $source
         )) {
             throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
