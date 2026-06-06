@@ -722,21 +722,9 @@ class Context {
                 $main->getParam(0),
                 $main->getParam(1)
             );
-            $this->builder->call(
-                $this->lookupFunction('__phpc_progress_note'),
-                $this->builder->pointerCast(
-                    $this->constantFromString('c:main_before_init'),
-                    $this->getTypeFromString('int8*')
-                )
-            );
+            Progress::emitNativeNote($this, 'c:main_before_init');
             $this->builder->call($this->initFunc);
-            $this->builder->call(
-                $this->lookupFunction('__phpc_progress_note'),
-                $this->builder->pointerCast(
-                    $this->constantFromString('c:main_after_init'),
-                    $this->getTypeFromString('int8*')
-                )
-            );
+            Progress::emitNativeNote($this, 'c:main_after_init');
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
                 Builtin\HttpResponseCode::emitResetForStandaloneMain($this);
                 Builtin\SessionId::emitResetForStandaloneMain($this);
@@ -751,21 +739,9 @@ class Context {
                 Builtin\TypeErrorRaise::emitClearForStandaloneMain($this);
                 Builtin\ErrorRaise::emitClearForStandaloneMain($this);
             }
-            $this->builder->call(
-                $this->lookupFunction('__phpc_progress_note'),
-                $this->builder->pointerCast(
-                    $this->constantFromString('c:main_before_php'),
-                    $this->getTypeFromString('int8*')
-                )
-            );
+            Progress::emitNativeNote($this, 'c:main_before_php');
             $this->builder->call($this->main);
-            $this->builder->call(
-                $this->lookupFunction('__phpc_progress_note'),
-                $this->builder->pointerCast(
-                    $this->constantFromString('c:main_after_php'),
-                    $this->getTypeFromString('int8*')
-                )
-            );
+            Progress::emitNativeNote($this, 'c:main_after_php');
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
                 Builtin\ReadonlyRaise::emitAbortIfPendingForStandaloneMain($this);
                 Builtin\TypeErrorRaise::emitAbortIfPendingForStandaloneMain($this);

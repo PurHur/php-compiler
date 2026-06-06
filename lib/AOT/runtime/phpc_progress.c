@@ -1,10 +1,8 @@
 /**
- * JIT/AOT progress notes + segfault triage (#2978, #2967). Thin platform ABI only.
- * Argv storage lives in lib/JIT/Builtin/CliArgvRuntime.php (#6341).
+ * JIT/AOT segfault triage — thin platform ABI only (#2978, #6748).
+ * Progress file writes live in lib/JIT/Builtin/ProgressNoteRuntime.php + lib/JIT/Progress.php.
  */
-#include <stdio.h>
 #include <stddef.h>
-#include <stdlib.h>
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
@@ -35,12 +33,8 @@ static void phpc_install_segv_handler(void)
     (void) signal(SIGSEGV, phpc_segv_handler);
 }
 
-void __phpc_progress_note(const char *msg)
+void __phpc_progress_remember(const char *msg)
 {
-    const char *progress_path;
-    const char *phase_path;
-    const char *entry_path;
-    FILE *fp;
     size_t len;
 
     phpc_install_segv_handler();
@@ -56,43 +50,5 @@ void __phpc_progress_note(const char *msg)
         memcpy(phpc_last_progress, msg, len);
         phpc_last_progress[len] = '\0';
         phpc_last_progress_len = len;
-    }
-
-    progress_path = getenv("PHP_COMPILER_JIT_PROGRESS_FILE");
-    phase_path = getenv("PHP_COMPILER_JIT_PHASE_FILE");
-    entry_path = getenv("PHP_COMPILER_JIT_ENTRY_FILE");
-
-    if ((NULL == progress_path || '\0' == *progress_path) && (NULL == phase_path || '\0' == *phase_path) && (NULL == entry_path || '\0' == *entry_path)) {
-        return;
-    }
-
-    if (NULL != progress_path && '\0' != *progress_path) {
-        fp = fopen(progress_path, "wb");
-        if (NULL != fp) {
-            if (len > 0) {
-                (void) fwrite(msg, 1, len, fp);
-            }
-            (void) fclose(fp);
-        }
-    }
-
-    if (NULL != phase_path && '\0' != *phase_path) {
-        fp = fopen(phase_path, "wb");
-        if (NULL != fp) {
-            if (len > 0) {
-                (void) fwrite(msg, 1, len, fp);
-            }
-            (void) fclose(fp);
-        }
-    }
-
-    if (NULL != entry_path && '\0' != *entry_path) {
-        fp = fopen(entry_path, "wb");
-        if (NULL != fp) {
-            if (len > 0) {
-                (void) fwrite(msg, 1, len, fp);
-            }
-            (void) fclose(fp);
-        }
     }
 }
