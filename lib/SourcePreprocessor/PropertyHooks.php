@@ -152,7 +152,11 @@ final class PropertyHooks
                 $propDecl .= ';';
             }
             $out .= $declPrefix.$propDecl;
-            [$methods, $usesBacking] = $this->lowerHooks($hookSource, $prop, $lcClass, $isStatic);
+            [$methods, $usesBacking, $trailing] = $this->lowerHooks($hookSource, $prop, $lcClass, $isStatic);
+            $trailing = trim($trailing);
+            if ('' !== $trailing) {
+                $out .= "\n    ".$trailing;
+            }
             if ([] !== $methods && !$usesBacking) {
                 if (!isset($this->registry[$lcClass][$prop])) {
                     $this->registry[$lcClass][$prop] = [];
@@ -171,7 +175,7 @@ final class PropertyHooks
     }
 
     /**
-     * @return array{0: list<string>, 1: bool} method source chunks, whether any hook touches backing storage
+     * @return array{0: list<string>, 1: bool, 2: string} method source chunks, whether any hook touches backing storage, trailing hook-body declarations
      */
     private function lowerHooks(string $hookSource, string $prop, string $lcClass, bool $isStatic = false): array
     {
@@ -238,8 +242,19 @@ final class PropertyHooks
                 $rest = substr($rest, strlen($pm[0]) - 1);
                 [$body, $rest] = $this->takeBraceBody($rest);
                 $usesBacking = $usesBacking || $this->hookTouchesBacking($body, $prop, $isStatic);
+                $this->registerHookBackingFromBody($lcClass, $prop, 'set', $body, $isStatic);
                 $method = self::SET_METHOD_PREFIX.$prop;
                 $methods[] = $this->hookMethodDecl($isStatic, $method, $params, $body);
+                $this->registerHook($lcClass, $prop, 'set', $method, $isStatic);
+                continue;
+            }
+            if (preg_match('/^set\s*\{/s', $rest)) {
+                $rest = preg_replace('/^set\s*/', '', $rest, 1) ?? $rest;
+                [$body, $rest] = $this->takeBraceBody($rest);
+                $usesBacking = $usesBacking || $this->hookTouchesBacking($body, $prop, $isStatic);
+                $this->registerHookBackingFromBody($lcClass, $prop, 'set', $body, $isStatic);
+                $method = self::SET_METHOD_PREFIX.$prop;
+                $methods[] = $this->hookMethodDecl($isStatic, $method, '$value', $body);
                 $this->registerHook($lcClass, $prop, 'set', $method, $isStatic);
                 continue;
             }
@@ -266,7 +281,7 @@ final class PropertyHooks
             break;
         }
 
-        return [$methods, $usesBacking];
+        return [$methods, $usesBacking, trim($rest)];
     }
 
     private function hookTouchesBacking(string $source, string $prop, bool $isStatic): bool
@@ -339,6 +354,32 @@ final class PropertyHooks
         }
         if ('set' === $kind && preg_match('/^\$this->(\w+)\s*=/', $expr, $m)) {
             $this->registry[$lcClass][$prop]['setBacking'] = $m[1];
+        }
+    }
+
+    /**
+     * Record separate backing field targets from hook block bodies (#6635).
+     *
+     * @param 'get'|'set' $kind
+     */
+    private function registerHookBackingFromBody(
+        string $lcClass,
+        string $prop,
+        string $kind,
+        string $body,
+        bool $isStatic
+    ): void {
+        if ($isStatic) {
+            if (preg_match('/\bself::\$(\w+)\s*=/', $body, $m) && strcasecmp($m[1], $prop) !== 0) {
+                $key = 'get' === $kind ? 'getBacking' : 'setBacking';
+                $this->registry[$lcClass][$prop][$key] = $m[1];
+            }
+
+            return;
+        }
+        if (preg_match('/\$this->(\w+)\s*=/', $body, $m) && strcasecmp($m[1], $prop) !== 0) {
+            $key = 'get' === $kind ? 'getBacking' : 'setBacking';
+            $this->registry[$lcClass][$prop][$key] = $m[1];
         }
     }
 

@@ -165,6 +165,26 @@ PHP;
         (new PropertyHooks())->process($src, 'static_hooks.php');
     }
 
+    public function testLowersSetBlockHookWithNestedBackingField(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public int $x {
+        set { $this->v = $value; }
+        private int $v = 0;
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('public int $x;', $out);
+        self::assertStringContainsString('private int $v = 0;', $out);
+        self::assertStringContainsString('function __phpc_property_set_x', $out);
+        self::assertStringContainsString('$this->v = $value;', $out);
+        self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
+        self::assertSame('v', $registry['c']['x']['setBacking'] ?? null);
+    }
+
     public function testLowersUnsetHook(): void
     {
         $src = <<<'PHP'
