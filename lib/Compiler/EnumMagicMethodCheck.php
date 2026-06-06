@@ -9,16 +9,29 @@ use PHPCfg\Operand;
 use PHPCfg\Script;
 
 /**
- * Disallowed magic methods on enum declarations (#5055, #5886).
+ * Disallowed magic methods on enum declarations (#5055, #5886, #6867).
  *
- * php-src: Zend/zend_enum.c — zend_enum_add_magic_methods
+ * php-src: Zend/zend_enum.c — zend_verify_enum_magic_methods
+ * (__call, __callStatic, __invoke remain allowed)
  */
 final class EnumMagicMethodCheck
 {
     /** @var list<string> lowercase magic names forbidden on enums */
     private const DISALLOWED_MAGIC = [
+        '__construct',
+        '__destruct',
+        '__clone',
+        '__get',
+        '__set',
+        '__unset',
+        '__isset',
         '__tostring',
         '__debuginfo',
+        '__serialize',
+        '__unserialize',
+        '__sleep',
+        '__wakeup',
+        '__set_state',
     ];
 
     public static function validate(Script $script): void
