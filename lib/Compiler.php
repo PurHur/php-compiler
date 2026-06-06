@@ -3431,11 +3431,12 @@ class Compiler {
 
     /**
      * Distinguish enum `case` from user `const` when php-cfg isEnumCase is missing (#5832).
+     * Bare `const` without visibility has flags=0 like cases; trust isEnumCase when set (#6878).
      */
     private function cfgTerminalConstIsEnumCase(Op\Terminal\Const_ $child): bool
     {
-        if (property_exists($child, 'isEnumCase') && $child->isEnumCase) {
-            return true;
+        if (property_exists($child, 'isEnumCase')) {
+            return $child->isEnumCase;
         }
         if (null === $this->compilingClassLc
             || !array_key_exists($this->compilingClassLc, $this->compileTimeEnumBackedTypes)) {
