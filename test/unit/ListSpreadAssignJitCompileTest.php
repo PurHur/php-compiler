@@ -52,7 +52,7 @@ final class ListSpreadAssignJitCompileTest extends TestCase
 
     public function testKeyedListSpreadAssignModuleVerify(): void
     {
-        $path = $this->repoRoot.'/test/compliance/cases/language/list_destructuring_keyed_spread.phpt';
+        $path = $this->repoRoot.'/test/compliance/cases/language/list_destructuring_keyed_spread_jit.phpt';
         $code = file_get_contents($path);
         $this->assertNotFalse($code);
         if (preg_match('/--FILE--\s*\n(.*?)\n--EXPECT--/s', $code, $m)) {
