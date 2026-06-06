@@ -147,8 +147,12 @@ final class TypeCheck
         }
     }
 
-    public static function assertNeverReturn(): void
+    public static function assertNeverReturn(?string $functionName = null): void
     {
+        if (null !== $functionName && '' !== $functionName) {
+            throw new \TypeError("{$functionName}(): never-returning function must not implicitly return");
+        }
+
         throw new \TypeError('A never-returning function must not return');
     }
 

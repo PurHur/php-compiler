@@ -122,7 +122,7 @@ class Block {
     /** Declared `: void` return — non-null returns are rejected. */
     public bool $returnTypeVoid = false;
 
-    /** Declared `: never` return — any return is rejected (issue #1358). */
+    /** Declared `: never` return — implicit fall-off raises at runtime (#1358, #4206). */
     public bool $returnTypeNever = false;
 
     /** Declared `: static` return — late-bound object type (issue #3412). */
