@@ -352,6 +352,29 @@ int __compiler_fsync(int64_t handle)
 #endif
 }
 
+int __compiler_fdatasync(int64_t handle)
+{
+    FILE *fp = __phpc_resolve_stream(handle);
+    int fd;
+
+    if (NULL == fp) {
+        return 0;
+    }
+    if (0 != fflush(fp)) {
+        return 0;
+    }
+    fd = fileno(fp);
+    if (fd < 0) {
+        return 0;
+    }
+#if defined(_WIN32)
+    /* fdatasync() unavailable on Windows — match php-src HAVE_FDATASYNC absent path. */
+    return 0;
+#else
+    return fdatasync(fd) == 0 ? 1 : 0;
+#endif
+}
+
 int64_t __compiler_stream_set_chunk_size(int64_t handle, int64_t chunk_size)
 {
     int previous;

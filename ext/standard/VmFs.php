@@ -583,6 +583,17 @@ final class VmFs
         return @\fsync($fp);
     }
 
+    /** fdatasync() — sync file data without metadata (php-src ext/standard/streamsfuncs.c, #6813). */
+    public static function fdatasync(int $handle): bool
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+
+        return @\fdatasync($fp);
+    }
+
     /**
      * stream_set_chunk_size() — php-src ext/standard/streams.c (issue #3754).
      *

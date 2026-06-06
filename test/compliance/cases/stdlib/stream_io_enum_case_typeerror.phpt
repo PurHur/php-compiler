@@ -23,6 +23,12 @@ try {
     echo "fsync: ", $e->getMessage(), "\n";
 }
 try {
+    fdatasync(E::A);
+    echo "fdatasync: uncaught\n";
+} catch (TypeError $e) {
+    echo "fdatasync: ", $e->getMessage(), "\n";
+}
+try {
     flock(E::A, LOCK_EX);
     echo "flock: uncaught\n";
 } catch (TypeError $e) {
@@ -74,6 +80,7 @@ try {
 feof: feof(): Argument #1 ($stream) must be of type resource, E given
 fflush: fflush(): Argument #1 ($stream) must be of type resource, E given
 fsync: fsync(): Argument #1 ($stream) must be of type resource, E given
+fdatasync: fdatasync(): Argument #1 ($stream) must be of type resource, E given
 flock: flock(): Argument #1 ($stream) must be of type resource, E given
 fseek: fseek(): Argument #1 ($stream) must be of type resource, E given
 ftell: ftell(): Argument #1 ($stream) must be of type resource, E given
