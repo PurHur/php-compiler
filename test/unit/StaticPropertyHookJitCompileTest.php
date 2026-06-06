@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\Compiler\CompileFatal;
 use PHPUnit\Framework\TestCase;
 
-/** Static property hooks compile and run on VM (#4751, #6624). */
+/** Static property hooks rejected at compile time (#6619, #6901). */
 final class StaticPropertyHookJitCompileTest extends TestCase
 {
-    public function testStaticPropertyHooksCompileForDirectClass(): void
+    public function testStaticPropertyHooksRejectedAtCompileTime(): void
     {
         $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(SourcePreprocessor\PropertyHooks::STATIC_HOOK_COMPILE_ERROR);
+        $runtime->parseAndCompile(
             <<<'PHP'
 <?php
 class Box {
@@ -25,6 +28,5 @@ class Box {
 PHP,
             'static_hooks_jit_compile.php'
         );
-        self::assertNotNull($block);
     }
 }

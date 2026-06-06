@@ -1,5 +1,5 @@
 --TEST--
-Language: trait static property hooks merge into using class (#6624, zend_property_hooks.c + zend_traits.c)
+Language: trait static property hooks must compile-error (#6901, php-src 8.4)
 --FILE--
 <?php
 trait T {
@@ -10,10 +10,6 @@ trait T {
     private static ?string $v = null;
 }
 class C { use T; }
-C::$x = 'hi';
-echo C::$x, "\n";
-var_export(isset(C::$x));
-echo "\n";
---EXPECT--
-hi
-true
+echo "compiled\n";
+--EXPECT_EXIT--
+255
