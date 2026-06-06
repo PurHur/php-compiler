@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitStrspn;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\BasicBlock;
@@ -151,7 +152,7 @@ final class StringParseStrJit
         );
         self::ensureExternal($context, 'strlen', $context->context->functionType($sizeT, false, $i8p));
         self::ensureExternal($context, 'strchr', $context->context->functionType($i8p, false, $i8p, $i32));
-        self::ensureExternal($context, 'strcspn', $context->context->functionType($sizeT, false, $i8p, $i8p));
+        JitStrspn::ensureTwoArgLinked($context);
         self::ensureExternal(
             $context,
             'strtok_r',
