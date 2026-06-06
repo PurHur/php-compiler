@@ -47,7 +47,7 @@ PHP;
         $this->assertSame("ok\n", ob_get_clean());
     }
 
-    public function testOverrideOnTraitComposedMethodFailsAtCompileTime(): void
+    public function testOverrideOnTraitComposedMethodCompiles(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -56,9 +56,9 @@ trait T { public function f(): void {} }
 class C { use T; #[\Override] public function f(): void {} }
 echo "ok\n";
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('C::f() has #[\Override] attribute, but no matching parent method exists');
-        $runtime->parseAndCompile($code, 'override_trait.php');
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'override_trait.php'));
+        $this->assertSame("ok\n", ob_get_clean());
     }
 
     public function testOverrideSignatureMismatchFailsAtCompileTime(): void

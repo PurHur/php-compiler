@@ -46,7 +46,7 @@ final class OverrideValidator
             if (!self::hasOverrideAttribute($attributeNames)) {
                 continue;
             }
-            self::validateOverrideMethod($className, $child, $parentLc, $interfaceLcs, $registry);
+            self::validateOverrideMethod($className, $child, $parentLc, $interfaceLcs, $registry, $stmts);
         }
     }
 
@@ -92,10 +92,17 @@ final class OverrideValidator
         ClassMethod $method,
         ?string $parentLc,
         array $interfaceLcs,
-        ClassCompileRegistry $registry
+        ClassCompileRegistry $registry,
+        ?CfgBlock $classStmts = null
     ): void {
         $methodLc = strtolower($method->func->name);
-        if (!$registry->hasOverridableMethod($parentLc, $interfaceLcs, $methodLc)) {
+        $traitParent = null !== $classStmts
+            ? (TraitComposedMethodResolver::resolve($classStmts, $registry)[$methodLc] ?? null)
+            : null;
+        if (
+            !$registry->hasOverridableMethod($parentLc, $interfaceLcs, $methodLc)
+            && null === $traitParent
+        ) {
             throw new \CompileError(sprintf(
                 '%s::%s() has #[\Override] attribute, but no matching parent method exists',
                 ltrim($ownerDisplay, '\\'),
@@ -104,7 +111,8 @@ final class OverrideValidator
         }
         $ownerLc = strtolower(ltrim($ownerDisplay, '\\'));
         $childSig = MethodSig::fromFunc($method->func, $ownerLc);
-        $parent = $registry->findOverriddenMethod($parentLc, $interfaceLcs, $methodLc);
+        $parent = $registry->findOverriddenMethod($parentLc, $interfaceLcs, $methodLc)
+            ?? $traitParent;
         if (null !== $parent) {
             $msg = InheritanceVariance::methodCompatibilityError(
                 ltrim($ownerDisplay, '\\'),
