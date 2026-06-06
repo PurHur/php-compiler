@@ -2084,6 +2084,11 @@ restart:
 
             return;
         }
+        if ('' === $str) {
+            $this->int(-1);
+
+            return;
+        }
         if (self::isNumericStringForIncDec($str)) {
             $this->storeNumericStringIncDec($str, -1);
 
