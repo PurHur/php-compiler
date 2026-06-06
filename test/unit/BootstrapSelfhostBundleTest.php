@@ -183,6 +183,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitStat.php',
         'ext/standard/JitStatArray.php',
         'ext/standard/JitSysGetTempDir.php',
+        'ext/standard/JitSysGetloadavg.php',
         'ext/standard/JitTouch.php',
         'ext/standard/JitUnlink.php',
         'ext/standard/JitWebParams.php',

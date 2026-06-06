@@ -331,6 +331,7 @@ require_once __DIR__.'/../../../ext/standard/JitStrtr.php';
 require_once __DIR__.'/../../../ext/standard/JitSubstrCount.php';
 require_once __DIR__.'/../../../ext/standard/JitSuperglobalName.php';
 require_once __DIR__.'/../../../ext/standard/JitSysGetTempDir.php';
+require_once __DIR__.'/../../../ext/standard/JitSysGetloadavg.php';
 require_once __DIR__.'/../../../ext/standard/JitTempnam.php';
 require_once __DIR__.'/../../../ext/standard/JitTouch.php';
 require_once __DIR__.'/../../../ext/standard/JitTraitExists.php';

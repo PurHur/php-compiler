@@ -6,7 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -37,10 +39,18 @@ final class sys_getloadavg extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (0 !== \count($args)) {
-            throw new \ArgumentCountError('sys_getloadavg() expects exactly 0 arguments, '.\count($args).' given');
+        $argc = \count($args);
+        if ($argc > 0) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'sys_getloadavg() expects exactly 0 arguments, '.$argc.' given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
-        throw new \LogicException('sys_getloadavg() is not available in JIT/AOT in this compiler build');
+        return JitSysGetloadavg::invoke($context);
     }
 }
