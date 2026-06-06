@@ -52,6 +52,7 @@ use PHPCompiler\Compiler\DeprecatedMetadata;
 use PHPCompiler\Compiler\NoDiscardMetadata;
 use PHPCompiler\Compiler\FinalClassConstCheck;
 use PHPCompiler\Compiler\FinalClassExtensionCheck;
+use PHPCompiler\Compiler\FinalMethodOverrideCheck;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
 use PHPCompiler\Compiler\ParameterMetadata;
 use PHPCompiler\Compiler\GeneratorStaticMethodCompileCheck;
@@ -396,6 +397,7 @@ class Compiler {
         InterfaceImplementationCheck::validate($script, $this->propertyHookRegistry);
         TraitCollisionCheck::validate($script);
         FinalClassExtensionCheck::validate($script);
+        FinalMethodOverrideCheck::validate($script);
         FinalClassConstCheck::validate($script);
         NewWithoutParensCompileCheck::validate($script);
         ThrowInClassConstCompileCheck::validate($script);
