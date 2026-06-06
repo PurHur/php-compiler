@@ -299,11 +299,11 @@ class Runtime {
 
     public function preprocessSourceForParse(string $code, string $filename = 'unknown'): array
     {
-        CurlyBraceOffsetRejector::reject($code, $filename);
         $sealedPreprocessor = new SealedClassPreprocessor();
         [$code, $permitsByLine] = $sealedPreprocessor->preprocess($code);
         $this->sealedClassAnnotator->setPermitsByLine($permitsByLine);
         [$code, $this->vmContext->propertyHookRegistry] = (new SourcePreprocessor\PropertyHooks())->process($code, $filename);
+        CurlyBraceOffsetRejector::reject($code, $filename);
         $code = EnumCaseListRewriter::rewrite($code);
         $code = SwitchCommaCaseRewriter::rewrite($code);
         $code = GenericArrayTypeSourceRewriter::rewrite($code);

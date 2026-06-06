@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit\SourcePreprocessor;
 
+use PHPCompiler\Runtime;
 use PHPCompiler\SourcePreprocessor\PropertyHooks;
 use PHPUnit\Framework\TestCase;
 
@@ -201,5 +202,24 @@ PHP;
         self::assertStringContainsString('function __phpc_property_unset_label', $out);
         self::assertStringContainsString("\$this->label = 'cleared';", $out);
         self::assertSame('__phpc_property_unset_label', $registry['box']['label']['unset'] ?? null);
+    }
+
+    /** @covers issue #6650 — block hook syntax must preprocess before curly-brace rejector */
+    public function testBlockGetHookSurvivesRuntimePreprocess(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public int $x {
+        get {
+            return 42;
+        }
+    }
+}
+PHP;
+        $runtime = new Runtime();
+        [$out] = $runtime->preprocessSourceForParse($src, 'block_hook.php');
+        self::assertStringNotContainsString('$x {', $out);
+        self::assertStringContainsString('function __phpc_property_get_x', $out);
     }
 }
