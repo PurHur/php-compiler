@@ -3387,6 +3387,18 @@ restart:
                                 ) {
                                     continue;
                                 }
+                                if (isset($calleeBlock->paramNeverSlots[$slot])) {
+                                    $paramName = $calleeBlock->paramNames[$paramIdx] ?? 'param'.$paramIdx;
+                                    throw VM\ParamTypeError::forUserCallWithExpectedType(
+                                        $frame->call->getName(),
+                                        $paramIdx,
+                                        $paramName,
+                                        'never',
+                                        $arg,
+                                        $frame->scriptPath,
+                                        $callSiteLine
+                                    );
+                                }
                                 if (isset($calleeBlock->paramIterableSlots[$slot])) {
                                     if (!IterableCheck::isIterable($arg, $this->context)) {
                                         $paramName = $calleeBlock->paramNames[$paramIdx] ?? 'param'.$paramIdx;
@@ -3518,7 +3530,8 @@ restart:
                                     $frame->block->paramVariadicElementIntersectionConstraints[$variadicSlot] ?? null,
                                     $frame->block->paramVariadicElementDnfConstraints[$variadicSlot] ?? null,
                                     $this->context,
-                                    isset($frame->block->paramIterableSlots[$variadicSlot])
+                                    isset($frame->block->paramIterableSlots[$variadicSlot]),
+                                    isset($frame->block->paramNeverSlots[$variadicSlot])
                                 );
                             }
                             if (
@@ -3591,7 +3604,9 @@ restart:
                                 $arg1
                             )
                         ) {
-                            if (isset($frame->block->paramIterableSlots[$op->arg1])) {
+                            if (isset($frame->block->paramNeverSlots[$op->arg1])) {
+                                TypeCheck::assertNeverParameter($arg1);
+                            } elseif (isset($frame->block->paramIterableSlots[$op->arg1])) {
                                 IterableCheck::assertParameter($arg1, $this->context);
                             } else {
                                 TypeCheck::coerceParameter($arg1, $strict, $arraySpec);
