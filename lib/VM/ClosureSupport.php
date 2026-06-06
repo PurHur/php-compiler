@@ -308,6 +308,14 @@ final class ClosureSupport
         if (Variable::TYPE_OBJECT === $receiver->type) {
             return self::fromInstanceMethodCallable($ctx, $frame, $receiver, $methodName);
         }
+        if (Variable::TYPE_ENUM_CASE === $receiver->type) {
+            return self::fromInstanceMethodCallable(
+                $ctx,
+                $frame,
+                EnumCaseSupport::receiverForInstanceMethod($receiver),
+                $methodName
+            );
+        }
         if (Variable::TYPE_STRING === $receiver->type) {
             return self::fromStaticStringCallable(
                 $ctx,

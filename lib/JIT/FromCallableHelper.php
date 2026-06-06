@@ -29,7 +29,9 @@ final class FromCallableHelper
         if (null !== $methodLc) {
             $receiverOp = BoundMethodCallableHelper::resolveBoundMethodReceiverOperand($block, $callableSlot);
             if (null !== $receiverOp) {
-                return self::fromBoundMethodCallable($context, $block, $receiverOp, $methodLc);
+                $classHint = BoundMethodCallableHelper::resolveBoundMethodReceiverClassName($block, $callableSlot);
+
+                return self::fromBoundMethodCallable($context, $block, $receiverOp, $methodLc, $classHint);
             }
         }
 
@@ -72,15 +74,17 @@ final class FromCallableHelper
         Context $context,
         Block $block,
         \PHPCfg\Operand $receiverOp,
-        string $methodLc
+        string $methodLc,
+        ?string $classHint = null
     ): Variable {
         $className = $receiverOp->type?->userType
+            ?? $classHint
             ?? ($context->scope->className !== '' ? $context->scope->className : 'object');
         $declaringClassLc = strtolower(ltrim((string) $className, '\\'));
         $proxyName = self::resolveInstanceProxyName($context, $declaringClassLc, $methodLc, $className);
         $inner = $context->resolveFunctionProxy($proxyName);
         $receiverVar = $context->getVariableFromOp($receiverOp);
-        $scopeName = $receiverOp->type?->userType ?? $className;
+        $scopeName = $receiverOp->type?->userType ?? $classHint ?? $className;
         $scopeConst = $context->context->constString((string) $scopeName, true);
         $boundScope = new Variable(
             $context,

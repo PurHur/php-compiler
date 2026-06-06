@@ -83,6 +83,74 @@ final class BoundMethodCallableHelper
     }
 
     /**
+     * Enum case FCC receivers (`E::A->f(...)`) use TYPE_CLASS_CONST_FETCH; infer enum FQCN (#6845).
+     */
+    public static function resolveBoundMethodReceiverClassName(Block $block, int $calleeSlot): ?string
+    {
+        $arraySlot = self::resolveBoundMethodArrayRootSlot($block, $calleeSlot);
+        if (null === $arraySlot) {
+            return null;
+        }
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY !== $op->type || $op->arg1 !== $arraySlot || null === $op->arg2) {
+                continue;
+            }
+
+            return self::classNameFromReceiverSlot($block, (int) $op->arg2);
+        }
+        foreach ($block->parents as $parent) {
+            if (!$parent instanceof Block) {
+                continue;
+            }
+            $name = self::resolveBoundMethodReceiverClassName($parent, $calleeSlot);
+            if (null !== $name) {
+                return $name;
+            }
+        }
+
+        return null;
+    }
+
+    private static function classNameFromReceiverSlot(Block $block, int $slot, array &$visited = []): ?string
+    {
+        if (isset($visited[$slot])) {
+            return null;
+        }
+        $visited[$slot] = true;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CLASS_CONST_FETCH === $op->type && $op->arg1 === $slot) {
+                $classOp = $block->getOperand($op->arg2);
+                if ($classOp instanceof Operand\Literal) {
+                    return (string) $classOp->value;
+                }
+            }
+        }
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN !== $op->type) {
+                continue;
+            }
+            if ($op->arg2 !== $slot && $op->arg1 !== $slot) {
+                continue;
+            }
+            $resolved = self::classNameFromReceiverSlot($block, (int) $op->arg3, $visited);
+            if (null !== $resolved) {
+                return $resolved;
+            }
+        }
+        foreach ($block->parents as $parent) {
+            if (!$parent instanceof Block) {
+                continue;
+            }
+            $resolved = self::classNameFromReceiverSlot($parent, $slot, $visited);
+            if (null !== $resolved) {
+                return $resolved;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * php-cfg often uses temporaries for FCC receivers; follow assigns back to $obj (#4040).
      */
     private static function resolveObjectOperandRoot(
