@@ -102,6 +102,12 @@ class is_type extends Internal {
                     false
                 );
                 $matchFull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $expectedFull);
+                if (Variable::TYPE_OBJECT === $this->type) {
+                    $enumCaseTy = $i8->constInt(Variable::TYPE_ENUM_CASE, false);
+                    $matchEnum = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTy);
+
+                    return $context->builder->or($matchFull, $matchEnum);
+                }
                 if (Variable::TYPE_STRING === $this->type) {
                     $tag = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
                     $matchTag = $context->builder->icmp(
