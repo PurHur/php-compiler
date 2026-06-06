@@ -3212,7 +3212,15 @@ restart:
                         } catch (\LogicException $e) {
                             return $this->raise($e->getMessage(), $frame);
                         }
+                        $closureState = $this->resolvePendingClosureState($frame);
                         $state = new GeneratorState($this, $frame->call, $calledArgs);
+                        if (
+                            null !== $closureState
+                            && $frame->call instanceof Func\PHP
+                            && $frame->call === $closureState->func
+                        ) {
+                            $state->closureCall = $closureState;
+                        }
                         if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
                             $this->scopeSlot($frame, (int) $op->arg1)->object($state->wrapObject());
                         }
@@ -7182,6 +7190,9 @@ restart:
             $gen->frame->calledArgs = $gen->calledArgs;
             $gen->frame->generatorState = $gen;
             $gen->frame->pos = 0;
+            if (null !== $gen->closureCall) {
+                $this->applyClosureBinding($gen->frame, $gen->closureCall);
+            }
         }
         $gen->started = true;
         $savedStack = $this->context->swapRunStack(null);
