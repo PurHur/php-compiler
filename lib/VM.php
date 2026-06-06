@@ -2984,6 +2984,11 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
+                    $catchFrame = $this->enforceTypedStaticPropertyUnset($lcClass, $propNameRaw, $storage, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $catchFrame = $this->dispatchHookedStaticPropertyUnset($lcClass, $propName, $propNameRaw, $storage, $frame);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -6470,6 +6475,30 @@ restart:
         }
 
         return $this->raiseVirtualPropertyHookUnsetError($className, $propName, $frame, $hasSet);
+    }
+
+    /** Reject unset() on typed static properties (Zend zend_object_handlers.c, #6648). */
+    private function enforceTypedStaticPropertyUnset(
+        string $classLc,
+        string $propNameRaw,
+        Variable $storage,
+        Frame $frame
+    ): ?Frame {
+        if (!$storage->hasDeclaredTypeConstraint()) {
+            return null;
+        }
+        $className = $this->context->classes[$classLc]->name ?? $classLc;
+        $thrown = VM\BuiltinExceptionSupport::materializeError(
+            $this->context,
+            sprintf('Attempt to unset static property %s::$%s', $className, $propNameRaw)
+        );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
     }
 
     /** Reject unset() on get-only or write-only virtual hooked static properties (#6425, #6491). */
