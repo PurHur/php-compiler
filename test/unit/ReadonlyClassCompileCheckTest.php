@@ -95,6 +95,23 @@ PHP;
         $this->assertSame("ok\n", ob_get_clean());
     }
 
+    public function testReadonlyAnonymousClassPropertyDefaultCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$o = new readonly class {
+    public int $x = 1;
+};
+var_export($o->x);
+PHP;
+        $block = $runtime->parseAndCompile($code, 'readonly_anon_default.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame('1', ob_get_clean());
+    }
+
     public function testReadonlyExtendsReadonlyCompiles(): void
     {
         $runtime = new Runtime();
