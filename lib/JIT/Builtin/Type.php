@@ -702,6 +702,14 @@ class Type extends Builtin {
         );
         $fnFormatDt = $this->context->module->addFunction('__compiler_format_datetime', $fntypeFormatDt);
         $this->context->registerFunction('__compiler_format_datetime', $fnFormatDt);
+        $fntypeIdate = $this->context->context->functionType(
+            $i64,
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $i64
+        );
+        $fnIdate = $this->context->module->addFunction('__compiler_idate', $fntypeIdate);
+        $this->context->registerFunction('__compiler_idate', $fnIdate);
         $fntypeUndefKeyStr = $this->context->context->functionType(
             $void,
             false,
