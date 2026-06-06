@@ -21,7 +21,6 @@ final class Linker
         __DIR__.'/runtime/phpc_session_lifecycle.c',
         __DIR__.'/runtime/phpc_session_storage.c',
         __DIR__.'/runtime/phpc_json_decode.c',
-        __DIR__.'/runtime/phpc_unserialize.c',
         __DIR__.'/runtime/phpc_stream.c',
         __DIR__.'/runtime/phpc_cli_argv.c',
         __DIR__.'/runtime/phpc_gc.c',
