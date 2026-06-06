@@ -2,45 +2,127 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM phpc_strspn_ex (mirrors VmString::strspn/strcspn / former phpc_strspn.c).
+ * LLVM JIT/AOT for strspn()/strcspn() — mirrors VmString::strspn/strcspn (#7119).
  *
  * PHP 8.4 (GH-12592): empty mask — strspn returns 0, strcspn returns segment byte length.
  */
-final class StringStrspnJit
+final class JitStrspn
 {
-    public static function implement(Context $context): void
+    private const MASK_SCAN = '__jit_strspn_mask_scan';
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    public static function extended(Context $context, array $args, bool $isStrspn, string $name): Value
+    {
+        $argc = \count($args);
+        if ($argc >= 3 && JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
+            throw new \LogicException("{$name}() offset must be an integer in this compiler build");
+        }
+        if (4 === $argc && JITVariable::TYPE_NATIVE_LONG !== $args[3]->type) {
+            throw new \LogicException("{$name}() length must be an integer in this compiler build");
+        }
+
+        self::implementMaskScan($context);
+        $map = $context->structFieldMap['__string__'];
+        $strVal = JitStringBuiltinArg::lower($context, $args[0], $name, 0, 'string');
+        $maskVal = JitStringBuiltinArg::lower($context, $args[1], $name, 1, 'characters');
+        $strLen = $context->builder->load($context->builder->structGep($strVal, $map['length']));
+        $maskLen = $context->builder->load($context->builder->structGep($maskVal, $map['length']));
+        $strData = self::stringDataPtr($context, $strVal);
+        $maskData = self::stringDataPtr($context, $maskVal);
+
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $offset = $argc >= 3
+            ? JitLongArg::lower($context, $args[2], "{$name}() offset")
+            : $i64->constInt(0, false);
+        $length = 4 === $argc
+            ? JitLongArg::lower($context, $args[3], "{$name}() length")
+            : $i64->constInt(0, false);
+        $lenIsNull = $i32->constInt(4 === $argc ? 0 : 1, false);
+        $mode = $i32->constInt($isStrspn ? 1 : 0, false);
+        $fn = $context->lookupFunction(self::MASK_SCAN);
+
+        return $context->builder->call(
+            $fn,
+            $strData,
+            $context->builder->truncOrBitCast($strLen, $sizeT),
+            $maskData,
+            $context->builder->truncOrBitCast($maskLen, $sizeT),
+            $offset,
+            $length,
+            $lenIsNull,
+            $mode
+        );
+    }
+
+    /** Emit 2-arg strspn/strcspn bodies for internal callers (e.g. parse_str JIT). */
+    public static function ensureTwoArgLinked(Context $context): void
+    {
+        self::implementTwoArg($context, 'strspn', true);
+        self::implementTwoArg($context, 'strcspn', false);
+    }
+
+    private static function implementMaskScan(Context $context): void
     {
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            self::declareIfMissing($context);
+            self::declareMaskScanIfMissing($context);
 
             return;
         }
 
-        $probe = $context->module->getNamedFunction('phpc_strspn_ex');
+        $probe = $context->module->getNamedFunction(self::MASK_SCAN);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction('phpc_strspn_ex', $probe);
+            $context->registerFunction(self::MASK_SCAN, $probe);
 
             return;
         }
 
-        $fn = self::declareIfMissing($context);
-        self::emitBody($context, $fn);
-        $context->registerFunction('phpc_strspn_ex', $fn);
+        $fn = self::declareMaskScanIfMissing($context);
+        self::emitMaskScanBody($context, $fn);
+        $context->registerFunction(self::MASK_SCAN, $fn);
         $context->builder->clearInsertionPosition();
     }
 
-    private static function declareIfMissing(Context $context): LlvmFunction
+    private static function implementTwoArg(Context $context, string $name, bool $isStrspn): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            self::declareTwoArgIfMissing($context, $name);
+
+            return;
+        }
+
+        self::implementMaskScan($context);
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($name, $probe);
+
+            return;
+        }
+
+        $fn = self::declareTwoArgIfMissing($context, $name);
+        self::emitTwoArgBody($context, $fn, $isStrspn);
+        $context->registerFunction($name, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function declareMaskScanIfMissing(Context $context): LlvmFunction
     {
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
@@ -59,16 +141,58 @@ final class StringStrspnJit
             $i32
         );
         try {
-            return $context->lookupFunction('phpc_strspn_ex');
-        } catch (\Throwable $e) {
-            $fn = $context->module->addFunction('phpc_strspn_ex', $ft);
-            $context->registerFunction('phpc_strspn_ex', $fn);
+            return $context->lookupFunction(self::MASK_SCAN);
+        } catch (\Throwable) {
+            $fn = $context->module->addFunction(self::MASK_SCAN, $ft);
+            $context->registerFunction(self::MASK_SCAN, $fn);
 
             return $fn;
         }
     }
 
-    private static function emitBody(Context $context, LlvmFunction $fn): void
+    private static function declareTwoArgIfMissing(Context $context, string $name): LlvmFunction
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $ft = $context->context->functionType($sizeT, false, $i8p, $i8p);
+        try {
+            return $context->lookupFunction($name);
+        } catch (\Throwable) {
+            $fn = $context->module->addFunction($name, $ft);
+            $context->registerFunction($name, $fn);
+
+            return $fn;
+        }
+    }
+
+    private static function emitTwoArgBody(Context $context, LlvmFunction $fn, bool $isStrspn): void
+    {
+        $entry = $fn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $str = $fn->getParam(0);
+        $mask = $fn->getParam(1);
+        $slen = $context->builder->call($context->lookupFunction('strlen'), $str);
+        $mlen = $context->builder->call($context->lookupFunction('strlen'), $mask);
+        $raw = $context->builder->call(
+            $context->lookupFunction(self::MASK_SCAN),
+            $str,
+            $slen,
+            $mask,
+            $mlen,
+            $i64->constInt(0, false),
+            $i64->constInt(0, false),
+            $i32->constInt(1, false),
+            $i32->constInt($isStrspn ? 1 : 0, false)
+        );
+
+        $context->builder->returnValue($context->builder->truncOrBitCast($raw, $sizeT));
+    }
+
+    private static function emitMaskScanBody(Context $context, LlvmFunction $fn): void
     {
         $entry = $fn->appendBasicBlock('entry');
         $context->builder->positionAtEnd($entry);
@@ -77,7 +201,6 @@ final class StringStrspnJit
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
         $nullPtr = $i8p->constNull();
         $zero64 = $i64->constInt(0, false);
         $one64 = $i64->constInt(1, false);
@@ -210,7 +333,6 @@ final class StringStrspnJit
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
         $zero64 = $i64->constInt(0, false);
-        $one32 = $i32->constInt(1, false);
 
         $remainSlot = BasicBlockHelper::entryAlloca($context, $i64);
         $context->builder->store($slen, $remainSlot);
@@ -323,5 +445,12 @@ final class StringStrspnJit
         $found = $context->builder->load($foundSlot);
 
         return $context->builder->icmp(Builder::INT_NE, $found, $zero32);
+    }
+
+    private static function stringDataPtr(Context $context, Value $strPtr): Value
+    {
+        $off = $context->structFieldIndex($strPtr, 'value');
+
+        return $context->builder->structGep($strPtr, $off);
     }
 }
