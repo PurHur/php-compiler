@@ -568,7 +568,7 @@ final class TypeCheck
             $target->typeConstraint ?? Variable::TYPE_INTEGER,
             $value,
             'Property',
-            $expected
+            $expectedType
         ));
     }
 
