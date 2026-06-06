@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\AssertFail;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for assert() via __compiler_assert_fail (issue #3157). */
+/** LLVM lowering for assert() via AssertFail runtime (issues #3157, #6550). */
 final class JitAssert
 {
     /** @return Value int64 1 on pass, 0 on fail (php-cfg infers assert() as int) */
@@ -41,6 +42,7 @@ final class JitAssert
     /** @param list<JITVariable> $args */
     private static function emitFail(Context $context, array $args, int $argc): void
     {
+        AssertFail::ensureLinked($context);
         if (2 === $argc) {
             $literal = JitStringArg::compileTimeLiteral($args[1]);
             if (null !== $literal) {
