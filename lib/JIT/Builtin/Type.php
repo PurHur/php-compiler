@@ -180,6 +180,7 @@ class Type extends Builtin {
         SessionName::implement($this->context);
         ObOutput::registerExternals($this->context);
         ObOutputRuntime::ensureLinked($this->context);
+        PendingHeadersRuntime::ensureLinked($this->context);
         PowIntRuntime::ensureLinked($this->context);
         GethostbynamelRuntime::ensureLinked($this->context);
         TimeSleepRuntime::ensureLinked($this->context);

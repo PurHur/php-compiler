@@ -49,6 +49,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/MemoryManager/Native.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MemoryManager/PHP.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Output.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/PendingHeaders.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/PendingHeadersRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Refcount.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ScriptExit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SessionStorageGlobals.php';
