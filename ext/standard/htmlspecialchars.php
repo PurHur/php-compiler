@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM\Value;
@@ -31,11 +32,12 @@ final class htmlspecialchars extends Internal
         if ($argc < 1 || $argc > 4) {
             throw new \LogicException('htmlspecialchars() requires one to four arguments');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
-        if (VMVariable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('htmlspecialchars() only supports strings in this compiler build');
-        }
-        $string = $v->toString();
+        $string = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'htmlspecialchars',
+            0,
+            'string'
+        );
         $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         $encoding = 'UTF-8';
         $doubleEncode = true;
@@ -100,7 +102,7 @@ final class htmlspecialchars extends Internal
             );
         }
 
-        $str = JitStringArg::lower($context, $args[0], 'htmlspecialchars() string');
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'htmlspecialchars', 0, 'string');
         $flags = $context->getTypeFromString('int64')->constInt(ENT_QUOTES | ENT_SUBSTITUTE, false);
         if ($effectiveArgc >= 2) {
             $flags = JitLongArg::lower($context, $args[1], 'htmlspecialchars() flags');

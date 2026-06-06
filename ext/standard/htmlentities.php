@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -28,11 +29,12 @@ final class htmlentities extends Internal
         if ($argc < 1 || $argc > 4) {
             throw new \LogicException('htmlentities() requires one to four arguments in this compiler build');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('htmlentities() only supports strings in this compiler build');
-        }
-        $string = $v->toString();
+        $string = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'htmlentities',
+            0,
+            'string'
+        );
         $flags = ENT_COMPAT;
         $encoding = 'UTF-8';
         $doubleEncode = true;
@@ -93,7 +95,7 @@ final class htmlentities extends Internal
             );
         }
 
-        $str = JitStringArg::lower($context, $args[0], 'htmlentities() string');
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'htmlentities', 0, 'string');
         $flags = $context->getTypeFromString('int64')->constInt(ENT_COMPAT, false);
         if ($argc >= 2) {
             $flags = $context->helper->loadValue($args[1]);
