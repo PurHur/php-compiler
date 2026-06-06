@@ -848,6 +848,7 @@ require_once __DIR__.'/../../../ext/standard/class_alias.php';
 require_once __DIR__.'/../../../ext/standard/class_implements_.php';
 require_once __DIR__.'/../../../ext/standard/class_parents_.php';
 require_once __DIR__.'/../../../ext/standard/class_uses_.php';
+require_once __DIR__.'/../../../ext/standard/class_uses_recursive.php';
 require_once __DIR__.'/../../../ext/standard/constant_.php';
 require_once __DIR__.'/../../../ext/standard/count_chars.php';
 require_once __DIR__.'/../../../ext/standard/crc32c.php';

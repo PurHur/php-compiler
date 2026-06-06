@@ -497,6 +497,49 @@ final class VmReflection
     }
 
     /**
+     * trait name => trait name — direct + nested trait uses (#6469).
+     *
+     * php-src: ext/standard/class.c — PHP_FUNCTION(class_uses_recursive)
+     *
+     * @return array<string, string>
+     */
+    public static function traitUsesRecursiveMap(Context $ctx, ClassEntry $class): array
+    {
+        $result = [];
+        self::collectTraitUsesRecursive($ctx, $class, $result);
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, string> $result
+     */
+    private static function collectTraitUsesRecursive(Context $ctx, ClassEntry $entry, array &$result): void
+    {
+        foreach (self::traitUsesMap($entry) as $traitName) {
+            $result[$traitName] = $traitName;
+            $traitLc = strtolower(ltrim($traitName, '\\'));
+            if (isset($ctx->classes[$traitLc])) {
+                self::collectTraitUsesRecursive($ctx, $ctx->classes[$traitLc], $result);
+            }
+        }
+    }
+
+    public static function classUsesRecursiveArray(ClassEntry $class, Context $ctx): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (self::traitUsesRecursiveMap($ctx, $class) as $traitName) {
+            $value = new Variable();
+            $value->string($traitName);
+            $ht->add($traitName, $value);
+        }
+
+        return $result;
+    }
+
+    /**
      * Parent class FQCN for get_parent_class() / class_parents() (issue #3483).
      *
      * php-src: ext/standard/class.c — PHP_FUNCTION(get_parent_class)

@@ -438,6 +438,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'class_parents_interface')) {
                 continue;
             }
+            // class_uses_recursive() nested trait use: VM (#6469); MCJIT/AOT segfault on trait-in-trait (#6439).
+            if (str_contains($name, 'class_uses_recursive')) {
+                continue;
+            }
             // __callStatic is VM-only until JIT static magic dispatch (#3273).
             if (str_contains($name, 'magic_call_static')) {
                 continue;
