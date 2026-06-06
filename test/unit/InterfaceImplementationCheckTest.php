@@ -259,6 +259,23 @@ PHP;
         $runtime->parseAndCompile($code, 'missing_parent_hooks.php');
     }
 
+    public function testEvalAbstractPropertyHookFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $outer = <<<'PHP'
+<?php
+$ok = eval('abstract class BaseE { abstract public string $x { get; } } class ChildE extends BaseE {}');
+echo ($ok === false ? 'eval-false' : 'eval-not-false'), "\n";
+echo class_exists('ChildE', false) ? "child-exists\n" : "child-missing\n";
+PHP;
+        $block = $runtime->parseAndCompile($outer, 'eval_abstract_property_hook.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        $this->assertSame("eval-false\nchild-missing\n", $out);
+        $this->assertFalse(isset($runtime->vm()->context->classes['childe']));
+    }
+
     public function testAbstractClassGetSetHooksSubclassCompiles(): void
     {
         $runtime = new Runtime();

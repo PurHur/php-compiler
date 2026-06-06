@@ -318,7 +318,15 @@ class Runtime {
         $staticPreprocessor = new StaticClassPreprocessor();
         [$code, $staticLines] = $staticPreprocessor->preprocess($code);
         $this->staticClassAnnotator->setStaticLines($staticLines);
-        [$code, $this->vmContext->propertyHookRegistry] = (new SourcePreprocessor\PropertyHooks())->process($code, $filename);
+        [$code, $newRegistry] = (new SourcePreprocessor\PropertyHooks())->process($code, $filename);
+        if (\PHPCompiler\ext\standard\VmEval::EVAL_FILENAME === $filename) {
+            $this->vmContext->propertyHookRegistry = self::mergePropertyHookRegistry(
+                $this->vmContext->propertyHookRegistry,
+                $newRegistry
+            );
+        } else {
+            $this->vmContext->propertyHookRegistry = $newRegistry;
+        }
         CurlyBraceOffsetRejector::reject($code, $filename);
         $code = EnumCaseListRewriter::rewrite($code);
         $code = SwitchCommaCaseRewriter::rewrite($code);
@@ -327,6 +335,30 @@ class Runtime {
         $this->abstractEnumMarker->setAbstractLines($abstractEnumLines);
 
         return SourceBareThrowRewriter::rewrite($code);
+    }
+
+    /**
+     * eval() compile units append hook metadata; file units replace (#7030, #7031).
+     *
+     * @param array<string, array<string, array<string, mixed>>> $existing
+     * @param array<string, array<string, array<string, mixed>>> $incoming
+     *
+     * @return array<string, array<string, array<string, mixed>>>
+     */
+    public static function mergePropertyHookRegistry(array $existing, array $incoming): array
+    {
+        foreach ($incoming as $classLc => $props) {
+            if (!isset($existing[$classLc])) {
+                $existing[$classLc] = $props;
+
+                continue;
+            }
+            foreach ($props as $prop => $meta) {
+                $existing[$classLc][$prop] = array_merge($existing[$classLc][$prop] ?? [], $meta);
+            }
+        }
+
+        return $existing;
     }
 
     /**
@@ -677,7 +709,13 @@ class Runtime {
 
             return $block;
         } catch (\Throwable $e) {
-            $this->emitParseCompileFailureStderr($filename, $e, $code);
+            if (\PHPCompiler\ext\standard\VmEval::EVAL_FILENAME === $filename) {
+                $detail = $this->compiler->getCompileAbortDetail();
+                $primary = null !== $detail && '' !== $detail ? $detail : $e->getMessage();
+                $this->recordLastParseFailure(sprintf('%s: %s', $filename, $primary));
+            } else {
+                $this->emitParseCompileFailureStderr($filename, $e, $code);
+            }
             throw $e;
         }
     }

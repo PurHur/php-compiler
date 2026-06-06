@@ -327,4 +327,16 @@ PHP;
         self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $x;', $out);
         self::assertStringContainsString('function __phpc_property_set_x($value)', $out);
     }
+
+    public function testSkipsClassDeclarationsInsideStringLiterals(): void
+    {
+        $src = <<<'PHP'
+<?php
+$code = "abstract class BaseE { abstract public string \$x { get; } } class ChildE extends BaseE {}";
+eval($code);
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('$x { get; }', $out);
+        self::assertSame([], $registry);
+    }
 }
