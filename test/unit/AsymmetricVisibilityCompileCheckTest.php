@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Compiler\AsymmetricVisibilityCompileCheck;
+use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
@@ -50,13 +51,26 @@ PHP,
         );
     }
 
-    public function testValidPublicPrivateSetStillCompiles(): void
+    public function testPublicPrivateSetCompileErrors(): void
+    {
+        $this->expectCompileError(
+            <<<'PHP'
+<?php
+class Demo {
+    public private(set) string $name = 'a';
+}
+PHP,
+            AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE
+        );
+    }
+
+    public function testValidPrivateSetStillCompiles(): void
     {
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class Demo {
-    public private(set) string $name = 'a';
+    private(set) string $name = 'a';
 }
 PHP, 'asymmetric_ok.php');
         $this->assertNotNull($block);

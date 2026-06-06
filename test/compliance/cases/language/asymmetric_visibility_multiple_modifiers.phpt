@@ -1,9 +1,10 @@
 --TEST--
-Language: asymmetric visibility — set visibility must not exceed read visibility (#6589, Zend/zend_API.c)
+Language: asymmetric visibility — explicit public before private(set) compile fatal (#6774, zend_compile.c)
 --FILE--
 <?php
 class C {
-    protected public(set) string $x = 'a';
+    public private(set) string $x = 'a';
 }
+echo "ok\n";
 --EXPECT_EXIT--
 255

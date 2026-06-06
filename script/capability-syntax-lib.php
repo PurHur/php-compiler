@@ -783,7 +783,7 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'asymmetric_visibility',
-            'construct' => 'PHP 8.4 asymmetric property visibility (public private(set), etc.)',
+            'construct' => 'PHP 8.4 asymmetric property visibility (private(set), protected(set), etc.)',
             'opcodes' => ['TYPE_DECLARE_PROPERTY', 'TYPE_PROPERTY_FETCH', 'TYPE_ASSIGN'],
             'issue' => 3165,
             'jit' => true,
@@ -791,7 +791,7 @@ function syntaxRowDefinitions(): array
                 'Ast\\AsymmetricVisibilityRewriter normalizes private(set) for php-parser 4.x; VM/JIT enforce set visibility with catchable Error (#3165, #4020)',
                 'php-src: Zend/zend_compile.c ZEND_ACC_*_SET; AsymmetricVisibilityGuard + AsymmetricVisibilityJitCompileTest (#4020)',
             ],
-            'probe' => 'class D { public private(set) string $n = "x"; } $d = new D(); echo $d->n; $d->n = "y";',
+            'probe' => 'class D { private(set) string $n = "x"; } $d = new D(); echo $d->n; $d->n = "y";',
         ],
         [
             'id' => 'class_destruct',
