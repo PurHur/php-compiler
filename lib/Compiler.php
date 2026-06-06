@@ -2500,6 +2500,7 @@ class Compiler {
             $backedTypeSlot
         );
         $this->assignAttributeMetadata($return, $enum);
+        $return->deprecatedMetadata = DeprecatedMetadata::fromOp($enum);
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
         $enumName = $this->staticNameFromOperand($enum->name);
         if (null !== $enumName) {
