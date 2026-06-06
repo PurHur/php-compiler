@@ -1,5 +1,5 @@
 <?php
-// Compile-only (#3552, #4727); bool ++ promotes to int(1).
+// Compile-only (#3552, #7058); bool ++ is a no-op preserving bool.
 $b = true;
 $b++;
-echo ($b === 1) ? "1\n" : "0\n";
+echo ($b === true) ? "true\n" : "false\n";

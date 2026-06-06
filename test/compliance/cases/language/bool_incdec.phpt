@@ -1,44 +1,52 @@
 --TEST--
-bool increment/decrement: ++/-- on true/false (issue #4348, #4727)
+bool increment/decrement: ++/-- on true/false (issue #4348, #7058)
 --FILE--
 <?php
 $t = true;
 $ret = $t++;
-echo "post++ true ret=" . ($ret ? 'true' : 'false') . " after=$t\n";
+echo "post++ true ret=" . get_debug_type($ret) . " " . var_export($ret, true)
+    . " after=" . get_debug_type($t) . " " . var_export($t, true) . "\n";
 
 $f = false;
 $ret = $f++;
-echo "post++ false ret=" . ($ret ? 'true' : 'false') . " after=$f\n";
+echo "post++ false ret=" . get_debug_type($ret) . " " . var_export($ret, true)
+    . " after=" . get_debug_type($f) . " " . var_export($f, true) . "\n";
 
 $t = true;
 $ret = ++$t;
-echo "pre++ true ret=$ret after=$t\n";
+echo "pre++ true ret=" . get_debug_type($ret) . " " . var_export($ret, true)
+    . " after=" . get_debug_type($t) . " " . var_export($t, true) . "\n";
 
 $f = false;
 $ret = ++$f;
-echo "pre++ false ret=$ret after=$f\n";
+echo "pre++ false ret=" . get_debug_type($ret) . " " . var_export($ret, true)
+    . " after=" . get_debug_type($f) . " " . var_export($f, true) . "\n";
 
 $t = true;
 $ret = $t--;
-echo "post-- true ret=" . ($ret ? 'true' : 'false') . " after=$t\n";
+echo "post-- true ret=" . get_debug_type($ret) . " " . var_export($ret, true)
+    . " after=" . get_debug_type($t) . " " . var_export($t, true) . "\n";
 
 $f = false;
 $ret = $f--;
-echo "post-- false ret=" . ($ret ? 'true' : 'false') . " after=$f\n";
+echo "post-- false ret=" . get_debug_type($ret) . " " . var_export($ret, true)
+    . " after=" . get_debug_type($f) . " " . var_export($f, true) . "\n";
 
 $t = true;
 $ret = --$t;
-echo "pre-- true ret=$ret after=$t\n";
+echo "pre-- true ret=" . get_debug_type($ret) . " " . var_export($ret, true)
+    . " after=" . get_debug_type($t) . " " . var_export($t, true) . "\n";
 
 $f = false;
 $ret = --$f;
-echo "pre-- false ret=$ret after=$f\n";
+echo "pre-- false ret=" . get_debug_type($ret) . " " . var_export($ret, true)
+    . " after=" . get_debug_type($f) . " " . var_export($f, true) . "\n";
 --EXPECT--
-post++ true ret=true after=1
-post++ false ret=false after=1
-pre++ true ret=1 after=1
-pre++ false ret=1 after=1
-post-- true ret=true after=0
-post-- false ret=false after=-1
-pre-- true ret=0 after=0
-pre-- false ret=-1 after=-1
+post++ true ret=bool true after=bool true
+post++ false ret=bool false after=bool false
+pre++ true ret=bool true after=bool true
+pre++ false ret=bool false after=bool false
+post-- true ret=bool true after=bool true
+post-- false ret=bool false after=bool false
+pre-- true ret=bool true after=bool true
+pre-- false ret=bool false after=bool false
