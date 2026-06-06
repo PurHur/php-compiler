@@ -44,6 +44,7 @@ final class AsymmetricVisibilityRewriter
             return $source;
         }
 
+        self::rejectExplicitReadBeforeAsymmetricSetModifier($source);
         self::rejectExplicitPublicBeforeSetModifier($source);
         self::rejectExplicitPublicAfterSetModifier($source);
         self::rejectDuplicateReadBeforeParenthesizedSetModifier($source);
@@ -92,10 +93,32 @@ final class AsymmetricVisibilityRewriter
     }
 
     /**
+     * Explicit read visibility plus a (set) modifier is a compile fatal (#7099, #6742).
+     *
+     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); only standalone `private(set)` /
+     * `protected(set)` (implicit public read) are valid — not `public private(set)`.
+     */
+    private static function rejectExplicitReadBeforeAsymmetricSetModifier(string $source): void
+    {
+        $modifier = '(?:public|protected|private)';
+        $patterns = [
+            // read + set(set) — e.g. public private(set)
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$modifier.'\s*\(\s*set\s*\)/i',
+            // read + (set(set)) — e.g. public (private(set))
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+\(\s*'.$modifier.'\s*\(\s*set\s*\)\s*\)/i',
+        ];
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $source)) {
+                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+            }
+        }
+    }
+
+    /**
      * Duplicate read/set visibility on the same axis is a compile fatal (#6774, #6861).
      *
-     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public private(set)` is valid
-     * (public read, private write) but `public public(set)` duplicates the same modifier.
+     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public public(set)` duplicates
+     * the same modifier (also caught by rejectExplicitReadBeforeAsymmetricSetModifier).
      */
     private static function rejectExplicitPublicBeforeSetModifier(string $source): void
     {
