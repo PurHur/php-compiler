@@ -2387,7 +2387,6 @@ class Compiler {
         if (null === $name) {
             $this->throwCompileError('Trait name must be a compile-time class reference');
         }
-        OverrideValidator::validateClassBody($trait->stmts, $name, null, [], $this->classCompileRegistry);
         $this->classCompileRegistry->registerTrait($name, $trait->stmts);
 
         $return = new OpCode(
@@ -2593,6 +2592,13 @@ class Compiler {
         }
         $interfaceLcs = $this->interfaceNamesFromOperands($class->implements);
         OverrideValidator::validateClassBody(
+            $class->stmts,
+            $className,
+            $parentLc,
+            $interfaceLcs,
+            $this->classCompileRegistry
+        );
+        OverrideValidator::validateTraitUsesInClass(
             $class->stmts,
             $className,
             $parentLc,

@@ -443,6 +443,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'class_uses_recursive')) {
                 continue;
             }
+            // #[\Override] on trait method at use site: VM compile + run (#6761); MCJIT trait override segfault.
+            if (str_contains($name, 'override_trait_body_attribute')) {
+                continue;
+            }
             // __callStatic is VM-only until JIT static magic dispatch (#3273).
             if (str_contains($name, 'magic_call_static')) {
                 continue;

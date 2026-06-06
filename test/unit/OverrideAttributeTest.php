@@ -96,6 +96,46 @@ PHP;
         $this->assertSame("ok\n", ob_get_clean());
     }
 
+    public function testOverrideOnTraitMethodValidatesAtUseSite(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T {
+    #[\Override]
+    public function foo(): void {}
+}
+class A {
+    public function foo(): void {}
+}
+class B extends A {
+    use T;
+}
+echo "ok\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'override_trait_body.php'));
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    public function testOverrideOnTraitMethodFailsWhenNoParentAtUseSite(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T {
+    #[\Override]
+    public function foo(): void {}
+}
+class C {
+    use T;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('T::foo() has #[\Override] attribute, but no matching parent method exists');
+        $runtime->parseAndCompile($code, 'override_trait_body_invalid.php');
+    }
+
     public function testOverrideViaParentInterfaceCompiles(): void
     {
         $runtime = new Runtime();
