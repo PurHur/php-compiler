@@ -32,11 +32,12 @@ final class hrtime extends Internal
         }
         $asNumber = false;
         if (1 === $argc) {
-            $arg = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $arg->type) {
-                throw new \LogicException('hrtime() as_number must be boolean in this compiler build');
-            }
-            $asNumber = $arg->toBool();
+            $asNumber = VmMath::parseBoolBuiltinArg(
+                $frame->calledArgs[0],
+                'hrtime',
+                1,
+                'as_number'
+            );
         }
         if ($asNumber) {
             $frame->returnVar->int(VmDate::hrtime(true));
@@ -61,7 +62,7 @@ final class hrtime extends Internal
         }
         $asNumber = $context->constantFromBool(false);
         if (isset($args[0])) {
-            $asNumber = JitBoolArg::lower($context, $args[0], 'hrtime() as_number');
+            $asNumber = JitBoolArg::lower($context, $args[0], 'hrtime(): Argument #1 ($as_number)');
         }
 
         return JitDate::hrtime($context, $asNumber);

@@ -82,6 +82,19 @@ final class JitSleep
     /**
      * Z_PARAM_LONG-style lowering (php-src basic_functions.c sleep/usleep; #6148).
      */
+    public static function zParamLong(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        return self::lowerZParamLong($context, $arg, $function, $argIndex, $paramName);
+    }
+
+    /**
+     * Z_PARAM_LONG-style lowering (php-src basic_functions.c sleep/usleep; #6148).
+     */
     private static function lowerZParamLong(
         Context $context,
         JITVariable $arg,

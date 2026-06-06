@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** microtime() — sub-second clock (VM VmDate; JIT/AOT StringMicrotime LLVM, #6110/#5045/#2186). */
@@ -31,11 +30,12 @@ final class microtime extends Internal
         }
         $asFloat = false;
         if (1 === $argc) {
-            $arg = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $arg->type) {
-                throw new \LogicException('microtime() as_float must be boolean in this compiler build');
-            }
-            $asFloat = $arg->toBool();
+            $asFloat = VmMath::parseBoolBuiltinArg(
+                $frame->calledArgs[0],
+                'microtime',
+                1,
+                'as_float'
+            );
         }
         if ($asFloat) {
             $frame->returnVar->float(VmDate::microtime(true));
@@ -52,7 +52,7 @@ final class microtime extends Internal
         }
         $asFloat = $context->constantFromBool(false);
         if (isset($args[0])) {
-            $asFloat = JitBoolArg::lower($context, $args[0], 'microtime() as_float');
+            $asFloat = JitBoolArg::lower($context, $args[0], 'microtime(): Argument #1 ($as_float)');
         }
 
         return JitDate::microtime($context, $asFloat);
