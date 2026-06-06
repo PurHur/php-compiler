@@ -20,7 +20,11 @@ final class GeneratorSend extends VmClassMethod
     {
         $gen = self::generatorFromFrame($frame);
         if ($gen->done) {
-            throw new \Exception('Cannot send to a closed generator');
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->null();
+            }
+
+            return;
         }
         $send = new Variable();
         $send->null();
