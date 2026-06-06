@@ -589,6 +589,7 @@ class Compiler {
         foreach ($params as $param) {
             $names = AttributeNames::fromOp($param);
             AttributeNames::assertAllowDynamicPropertiesClassTargetOnly($names, 'parameter');
+            AttributeNames::assertOverrideMethodTargetOnly($names, 'parameter');
             AttributeNames::assertNoDuplicates($names);
         }
     }
@@ -2428,7 +2429,9 @@ class Compiler {
             OpCode::TYPE_DECLARE_INTERFACE,
             $this->compileOperand($iface->name, $block, true)
         );
-        AttributeNames::assertNoDuplicates(AttributeNames::fromOp($iface));
+        $ifaceAttrs = AttributeNames::fromOp($iface);
+        AttributeNames::assertOverrideMethodTargetOnly($ifaceAttrs, 'class');
+        AttributeNames::assertNoDuplicates($ifaceAttrs);
         $return->classImplements = $extends;
         $this->applySealedMetadataFromOp($iface, $return);
         $return->block1 = $this->compileClassBody(
@@ -2453,6 +2456,8 @@ class Compiler {
             $this->compileOperand($trait->name, $block, true)
         );
         $this->assignAttributeMetadata($return, $trait);
+        AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
+        AttributeNames::assertNoDuplicates($return->attributeNames);
         $traitLc = strtolower(ltrim($name, '\\'));
         $this->compiledClassStaticProperties[$traitLc] = $this->compiledClassStaticProperties[$traitLc] ?? [];
         $prevClassStaticCompile = $this->currentClassStaticPropertyCompile;
@@ -2482,7 +2487,9 @@ class Compiler {
             $this->compileOperand($enum->name, $block, true),
             $backedTypeSlot
         );
-        AttributeNames::assertNoDuplicates(AttributeNames::fromOp($enum));
+        $enumAttrs = AttributeNames::fromOp($enum);
+        AttributeNames::assertOverrideMethodTargetOnly($enumAttrs, 'class');
+        AttributeNames::assertNoDuplicates($enumAttrs);
         $return->classImplements = $this->interfaceNamesFromOperands($enum->implements);
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($enum->flags ?? 0);
         if ($return->classIsAbstract) {
@@ -2690,6 +2697,7 @@ class Compiler {
         }
         $this->assignAttributeMetadata($return, $class);
         $return->deprecatedMetadata = DeprecatedMetadata::fromOp($class);
+        AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
         AttributeNames::assertNoDuplicates($return->attributeNames);
         $this->applySealedMetadataFromOp($class, $return);
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($class->flags);
@@ -3282,6 +3290,7 @@ class Compiler {
                     }
                     $declare->attributeNames = AttributeNames::fromOp($child);
                     $this->assignAttributeMetadata($declare, $child);
+                    AttributeNames::assertOverrideMethodTargetOnly($declare->attributeNames, 'property');
                     AttributeNames::assertNoDuplicates($declare->attributeNames);
                     $result->addOpCode($declare);
                     break;
@@ -3404,6 +3413,7 @@ class Compiler {
         $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $constOp->attributeNames = AttributeNames::fromOp($child);
         $this->assignAttributeMetadata($constOp, $child);
+        AttributeNames::assertOverrideMethodTargetOnly($constOp->attributeNames, 'class constant');
         AttributeNames::assertNoDuplicates($constOp->attributeNames);
         $result->addOpCode($constOp);
         if (null !== $this->compilingClassLc && isset($result->constants[$valueSlot])) {

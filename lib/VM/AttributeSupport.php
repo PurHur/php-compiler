@@ -141,7 +141,7 @@ final class AttributeSupport
             $ctx,
             'Override',
             self::CLASS_OVERRIDE,
-            self::TARGET_METHOD | self::TARGET_PROPERTY
+            self::TARGET_METHOD
         );
     }
 

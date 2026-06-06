@@ -153,4 +153,35 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'override_parent_iface.php'));
         $this->assertSame("ok\n", ob_get_clean());
     }
+
+    public function testOverrideOnClassFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Base {
+    public function foo(): void {}
+}
+#[\Override]
+class Child extends Base {
+    public function foo(): void {}
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: method)');
+        $runtime->parseAndCompile($code, 'override_on_class.php');
+    }
+
+    public function testOverrideOnTraitDeclarationFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+#[\Override]
+trait T {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: method)');
+        $runtime->parseAndCompile($code, 'override_on_trait.php');
+    }
 }
