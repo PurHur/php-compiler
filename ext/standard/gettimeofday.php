@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -33,11 +32,12 @@ final class gettimeofday extends Internal
         }
         $asFloat = false;
         if (1 === $argc) {
-            $arg = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $arg->type) {
-                throw new \LogicException('gettimeofday() get_as_float must be boolean in this compiler build');
-            }
-            $asFloat = $arg->toBool();
+            $asFloat = VmMath::parseBoolBuiltinArg(
+                $frame->calledArgs[0],
+                'gettimeofday',
+                1,
+                'as_float'
+            );
         }
         if ($asFloat) {
             $frame->returnVar->float(VmDate::gettimeofdayFloat());
@@ -54,7 +54,7 @@ final class gettimeofday extends Internal
         }
         $asFloat = $context->constantFromBool(false);
         if (isset($args[0])) {
-            $asFloat = JitBoolArg::lower($context, $args[0], 'gettimeofday() get_as_float');
+            $asFloat = JitBoolArg::lower($context, $args[0], 'gettimeofday(): Argument #1 ($as_float)');
         }
 
         return JitGettimeofday::call($context, $asFloat);

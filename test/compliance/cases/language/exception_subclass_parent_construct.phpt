@@ -1,5 +1,5 @@
 --TEST--
-user Exception/Error subclass parent::__construct() forwards to parent ctor (issue #6735)
+Language: user Exception subclass parent::__construct() invokes parent ctor (#6735, zend_exceptions.c)
 --FILE--
 <?php
 class MyException extends Exception {

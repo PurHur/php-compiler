@@ -7,9 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** time_nanosleep() — sub-second sleep (VM host; JIT/AOT via TimeSleepRuntime, #5180/#5406). */
@@ -30,8 +28,8 @@ final class time_nanosleep extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $seconds = self::requireInt($frame->calledArgs[0], 1);
-        $nanoseconds = self::requireInt($frame->calledArgs[1], 2);
+        $seconds = VmMath::parseIntBuiltinArg($frame->calledArgs[0], 'time_nanosleep', 1, 'seconds');
+        $nanoseconds = VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'time_nanosleep', 2, 'nanoseconds');
         $result = VmSleep::timeNanosleep($seconds, $nanoseconds);
         if (\is_array($result)) {
             $frame->returnVar->copyFrom(VmJson::import($result));
@@ -52,39 +50,8 @@ final class time_nanosleep extends Internal
 
         return JitSleep::timeNanosleep(
             $context,
-            JitLongArg::lower($context, $args[0], 'time_nanosleep() seconds'),
-            JitLongArg::lower($context, $args[1], 'time_nanosleep() nanoseconds')
+            JitSleep::zParamLong($context, $args[0], 'time_nanosleep', 1, 'seconds'),
+            JitSleep::zParamLong($context, $args[1], 'time_nanosleep', 2, 'nanoseconds')
         );
-    }
-
-    private static function requireInt(Variable $arg, int $position): int
-    {
-        $v = $arg->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $v->type) {
-            throw new \TypeError(
-                \sprintf(
-                    'time_nanosleep(): Argument #%d ($%s) must be of type int, %s given',
-                    $position,
-                    1 === $position ? 'seconds' : 'nanoseconds',
-                    self::zendTypeName($v)
-                )
-            );
-        }
-
-        return $v->toInt();
-    }
-
-    private static function zendTypeName(Variable $v): string
-    {
-        return match ($v->type) {
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            default => 'resource',
-        };
     }
 }

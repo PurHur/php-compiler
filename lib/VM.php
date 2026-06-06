@@ -2651,7 +2651,7 @@ restart:
                     try {
                         $classOperand = $frame->scope[$op->arg1]->resolveIndirect();
                         $staticCallMethodName = $frame->scope[$op->arg2]->toString();
-                        $parentKeywordScope = false;
+                        $parentKeywordScope = $op->staticCallParentScope;
                         $enumScopeClass = VM\EnumCaseSupport::enumClassForCaseVariable($classOperand);
                         if (null !== $enumScopeClass) {
                             // (E::A)::staticMethod() — enum case scope resolves to enum type (#6408, zend_enum.c).
@@ -2664,7 +2664,9 @@ restart:
                             $callableName = $scopeClassName.'::'.$staticCallMethodName;
                         } else {
                             $className = $classOperand->toString();
-                            $parentKeywordScope = 'parent' === strtolower($className);
+                            if (!$parentKeywordScope) {
+                                $parentKeywordScope = 'parent' === strtolower($className);
+                            }
                             $lcClass = $this->resolveClassScopeName($className, $frame);
                             $callableName = $this->context->classes[$lcClass]->name.'::'.$staticCallMethodName;
                         }
@@ -7861,7 +7863,10 @@ restart:
         }
         try {
             [$class, $methodLc] = $this->resolveStaticMethod($lcClass, $methodLc);
-            $parentScopeInstanceCall = $parentKeywordScope
+            $parentScopeInstanceCall = ($parentKeywordScope
+                && null !== $frame->block->func
+                && null !== $frame->block->func->class
+                && !(($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC))
                 || $this->isDirectParentScopeInstanceCall($frame, $lcClass);
             if (!$parentScopeInstanceCall) {
                 $this->assertMethodCallableStatically($class, $methodLc);
@@ -7976,18 +7981,28 @@ restart:
         if (($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) {
             return null;
         }
-        if (!empty($frame->callArgs)) {
-            return $frame->callArgs[0];
-        }
-        if (!empty($frame->calledArgs)) {
-            return $frame->calledArgs[0];
-        }
         $idx = $frame->block->slotIndexForVariableName('this');
         if (null !== $idx && isset($frame->scope[$idx])) {
             return $frame->scope[$idx];
         }
+        $fromScope = $frame->block->findVariableByRuntimeName('this', $frame);
+        if (null !== $fromScope) {
+            return $fromScope;
+        }
+        if (!empty($frame->calledArgs)) {
+            $receiver = $frame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $receiver->type) {
+                return $frame->calledArgs[0];
+            }
+        }
+        if (!empty($frame->callArgs)) {
+            $receiver = $frame->callArgs[0]->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $receiver->type) {
+                return $frame->callArgs[0];
+            }
+        }
 
-        return $frame->block->findVariableByRuntimeName('this', $frame);
+        return null;
     }
 
     /**

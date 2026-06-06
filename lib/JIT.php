@@ -6720,7 +6720,7 @@ class JIT {
                     $this->context->scope->argOperands = [];
                     break;
                 case OpCode::TYPE_STATICCALL_INIT:
-                    $this->initJitStaticCall($block, $op->arg1, $op->arg2);
+                    $this->initJitStaticCall($block, $op->arg1, $op->arg2, $op->staticCallParentScope);
                     break;
                 case OpCode::TYPE_ARG_SEND:
                     if ($this->context->inlineIncludeDepth > 0) {
@@ -10953,7 +10953,7 @@ class JIT {
         }
     }
 
-    private function initJitStaticCall(Block $block, int $classOpIdx, int $nameOpIdx): void
+    private function initJitStaticCall(Block $block, int $classOpIdx, int $nameOpIdx, bool $parentScope = false): void
     {
         $classOp = $block->getOperand($classOpIdx);
         $nameOp = $block->getOperand($nameOpIdx);
@@ -10977,16 +10977,15 @@ class JIT {
         } elseif ($this->context->scope->className !== '') {
             $callerClassLc = $this->context->scope->className;
         }
-        $callerInstanceMethod = null !== $block->func
-            && null !== $block->func->class
-            && 0 === (($block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC);
+        $callerInstanceMethod = $this->instanceMethodUsesThis($block);
         $directParentLc = null !== $callerClassLc
             ? $this->context->type->object->parentClassLc($callerClassLc)
             : null;
-        // php-cfg lowers parent:: to the direct parent class; allow instance forwarding (#1858, #6735).
-        $parentScopeInstanceCall = $callerInstanceMethod
-            && null !== $directParentLc
-            && $directParentLc === $declaringClassLc;
+        // Compiler staticCallParentScope + php-cfg lowered parent class (#1858, #6735).
+        $parentScopeInstanceCall = ($parentScope && $callerInstanceMethod)
+            || ($callerInstanceMethod
+                && null !== $directParentLc
+                && $directParentLc === $declaringClassLc);
         if (!$parentScopeInstanceCall) {
             $this->assertJitStaticMethodCallable($declaringClassLc, $methodLc, $className, $nameOp->value);
         }

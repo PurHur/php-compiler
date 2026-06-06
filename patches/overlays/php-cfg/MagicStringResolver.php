@@ -38,6 +38,9 @@ class MagicStringResolver extends NodeVisitorAbstract
     /** @var list<string> */
     protected $traitStack = [];
 
+    /** True while visiting StaticCall::class — preserve `parent` for runtime dispatch (#6735). */
+    protected bool $inStaticCallClassName = false;
+
     /** @var string */
     protected $compilationUnitFile = '';
 
@@ -93,6 +96,8 @@ class MagicStringResolver extends NodeVisitorAbstract
             if (null !== $prop) {
                 $this->propertyStack[] = $prop;
             }
+        } elseif ($node instanceof Node\Expr\StaticCall) {
+            $this->inStaticCallClassName = true;
         } elseif ($node instanceof Node\Expr\ConstFetch) {
             if ('__property__' === strtolower($node->name->toString())) {
                 $name = $this->propertyStack !== [] ? end($this->propertyStack) : '';
@@ -108,6 +113,9 @@ class MagicStringResolver extends NodeVisitorAbstract
 
                     break;
                 case 'parent':
+                    if ($this->inStaticCallClassName) {
+                        break;
+                    }
                     if (! empty($this->parentStack) && '' !== end($this->parentStack)) {
                         return new Node\Name\FullyQualified(end($this->parentStack), $node->getAttributes());
                     }
@@ -168,6 +176,8 @@ class MagicStringResolver extends NodeVisitorAbstract
             if (null !== $this->propertyNameFromHookMethod($node->name->name)) {
                 array_pop($this->propertyStack);
             }
+        } elseif ($node instanceof Node\Expr\StaticCall) {
+            $this->inStaticCallClassName = false;
         }
     }
 
