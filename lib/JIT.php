@@ -10668,6 +10668,19 @@ class JIT {
                 return;
             }
         }
+        if ('propertyisinitialized' === strtolower($methodName)) {
+            $receiverVar = $this->context->getVariableFromOp($receiverOp);
+            if (Type::TYPE_OBJECT === $receiverOp->type?->type) {
+                JIT\LazyObjectHelper::emitEnsureInitialized(
+                    $this->context,
+                    $this->context->helper->loadValue($receiverVar)
+                );
+            }
+            $this->context->scope->toCall = new VM\PropertyIsInitializedHandler();
+            $this->context->scope->args = [$receiverVar];
+
+            return;
+        }
         $receiverVar = $this->context->getVariableFromOp($receiverOp);
         if (JIT\GeneratorHelper::isGeneratorVariable($receiverVar)) {
             $methodLc = strtolower($methodName);
