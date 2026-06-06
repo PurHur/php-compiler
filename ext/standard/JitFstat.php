@@ -5,28 +5,30 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamPathRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for stat()/lstat() via {@see __phpc_stat} (issue #1197). */
-final class JitStatArray
+/** LLVM lowering for fstat() via stream path + stat() (issue #6764, #3482). */
+final class JitFstat
 {
     private static int $seq = 0;
 
     /** @return Value */
-    public static function invoke(Context $context, Value $pathStr, bool $lstat): Value
+    public static function invoke(Context $context, Value $handle): Value
     {
-        $tag = ($lstat ? 'lstat' : 'stat').(string) ++self::$seq;
-        $i32 = $context->getTypeFromString('int32');
-        $htPtrTy = $context->getTypeFromString('__hashtable__*');
-        $ht = $context->builder->call(
-            $context->lookupFunction('__phpc_stat'),
-            $pathStr,
-            $i32->constInt($lstat ? 1 : 0, false)
+        StreamPathRuntime::ensureLinked($context);
+
+        $tag = 'fstat'.(string) ++self::$seq;
+        $i64 = $context->getTypeFromString('int64');
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $pathStr = $context->builder->call(
+            $context->lookupFunction('__phpc_stream_path'),
+            $context->builder->truncOrBitCast($handle, $i64)
         );
-        $failed = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtrTy->constNull());
+        $failed = $context->builder->icmp(Builder::INT_EQ, $pathStr, $strPtrTy->constNull());
         $failBlock = BasicBlockHelper::append($context, $tag.'_fail');
         $okBlock = BasicBlockHelper::append($context, $tag.'_ok');
         $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
@@ -39,17 +41,15 @@ final class JitStatArray
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
-        $okSlot = JitValueBox::alloc($context);
-        $okPtr = JitValueBox::pointer($context, $okSlot);
-        $context->builder->call($context->lookupFunction('__value__writeHashtable'), $okPtr, $ht);
-        $okTail = $context->builder->getInsertBlock();
+        $statPtr = JitStatArray::invoke($context, $pathStr, false);
+        $statTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
         $valuePtrTy = $context->getTypeFromString('__value__*');
         $result = $context->builder->phi($valuePtrTy);
         $result->addIncoming($falsePtr, $failBlock);
-        $result->addIncoming($okPtr, $okTail);
+        $result->addIncoming($statPtr, $statTail);
 
         return $result;
     }

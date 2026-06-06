@@ -44,7 +44,7 @@ final class fstat_ extends Internal
             throw new \LogicException('fstat() requires exactly one argument in this compiler build');
         }
 
-        return JitStatArray::invokeHandle(
+        return JitFstat::invoke(
             $context,
             JitLongArg::lower($context, $args[0], 'fstat() handle')
         );
