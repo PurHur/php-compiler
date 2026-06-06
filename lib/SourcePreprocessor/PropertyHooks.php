@@ -274,7 +274,14 @@ final class PropertyHooks
             if (!str_ends_with($propDecl, ';')) {
                 $propDecl .= ';';
             }
-            [$methods, $usesBacking, $trailing, $asymmetricSetVis] = $this->lowerHooks($hookSource, $prop, $lcClass, $isStatic);
+            $registerRequiredHooks = $isAbstractHook || $isInterfaceHook;
+            [$methods, $usesBacking, $trailing, $asymmetricSetVis] = $this->lowerHooks(
+                $hookSource,
+                $prop,
+                $lcClass,
+                $isStatic,
+                $registerRequiredHooks
+            );
             if (null !== $asymmetricSetVis) {
                 $marker = '/*phpc-asymmetric-set:'.$asymmetricSetVis.'*/ ';
                 if (preg_match('/^(\s*)/', $declPrefix, $indentM)) {
@@ -332,8 +339,13 @@ final class PropertyHooks
     /**
      * @return array{0: list<string>, 1: bool, 2: string, 3: ?string} method source chunks, backing use, trailing decls, asymmetric set visibility
      */
-    private function lowerHooks(string $hookSource, string $prop, string $lcClass, bool $isStatic = false): array
-    {
+    private function lowerHooks(
+        string $hookSource,
+        string $prop,
+        string $lcClass,
+        bool $isStatic = false,
+        bool $registerRequiredHooks = true
+    ): array {
         $methods = [];
         $usesBacking = false;
         $asymmetricSetVisibility = null;
@@ -341,23 +353,39 @@ final class PropertyHooks
         while ('' !== $rest) {
             $rest = ltrim($rest);
             if (preg_match('/^get\s*;/s', $rest)) {
-                $this->registerRequiredHook($lcClass, $prop, 'requiresGet');
+                if ($registerRequiredHooks) {
+                    $this->registerRequiredHook($lcClass, $prop, 'requiresGet');
+                }
                 $rest = preg_replace('/^get\s*;/', '', $rest, 1) ?? $rest;
                 continue;
             }
+            if (preg_match('/^(public|protected|private)\s+set\s*;/s', $rest, $asymM)) {
+                $asymmetricSetVisibility = strtolower($asymM[1]);
+                if ($registerRequiredHooks) {
+                    $this->registerRequiredHook($lcClass, $prop, 'requiresSet');
+                }
+                $rest = preg_replace('/^(public|protected|private)\s+set\s*;/i', '', $rest, 1) ?? $rest;
+                continue;
+            }
             if (preg_match('/^set\s*;/s', $rest)) {
-                $this->registerRequiredHook($lcClass, $prop, 'requiresSet');
+                if ($registerRequiredHooks) {
+                    $this->registerRequiredHook($lcClass, $prop, 'requiresSet');
+                }
                 $rest = preg_replace('/^set\s*;/', '', $rest, 1) ?? $rest;
                 continue;
             }
             if (preg_match('/^set\s*\(\s*(public|protected|private)\s*\)\s*;/s', $rest, $asymM)) {
                 $asymmetricSetVisibility = strtolower($asymM[1]);
-                $this->registerRequiredHook($lcClass, $prop, 'requiresSet');
+                if ($registerRequiredHooks) {
+                    $this->registerRequiredHook($lcClass, $prop, 'requiresSet');
+                }
                 $rest = preg_replace('/^set\s*\(\s*(public|protected|private)\s*\)\s*;/i', '', $rest, 1) ?? $rest;
                 continue;
             }
             if (preg_match('/^unset\s*;/s', $rest)) {
-                $this->registerRequiredHook($lcClass, $prop, 'requiresUnset');
+                if ($registerRequiredHooks) {
+                    $this->registerRequiredHook($lcClass, $prop, 'requiresUnset');
+                }
                 $rest = preg_replace('/^unset\s*;/', '', $rest, 1) ?? $rest;
                 continue;
             }
@@ -383,6 +411,16 @@ final class PropertyHooks
             }
             if (preg_match('/^set\s*=>\s*/s', $rest)) {
                 $rest = preg_replace('/^set\s*=>\s*/', '', $rest, 1) ?? $rest;
+                [$expr, $rest] = $this->takeUntilSemicolon($rest);
+                $methods = array_merge(
+                    $methods,
+                    $this->lowerSetArrowHook($lcClass, $prop, $isStatic, rtrim($expr), $usesBacking)
+                );
+                continue;
+            }
+            if (preg_match('/^(public|protected|private)\s+set\s*=>\s*/s', $rest, $asymM)) {
+                $asymmetricSetVisibility = strtolower($asymM[1]);
+                $rest = preg_replace('/^(public|protected|private)\s+set\s*=>\s*/i', '', $rest, 1) ?? $rest;
                 [$expr, $rest] = $this->takeUntilSemicolon($rest);
                 $methods = array_merge(
                     $methods,
@@ -418,6 +456,31 @@ final class PropertyHooks
             if (preg_match('/^set\s*\(\s*(public|protected|private)\s*\)\s*\{/s', $rest, $asymM)) {
                 $asymmetricSetVisibility = strtolower($asymM[1]);
                 $rest = preg_replace('/^set\s*\(\s*(public|protected|private)\s*\)\s*/i', '', $rest, 1) ?? $rest;
+                [$body, $rest] = $this->takeBraceBody($rest);
+                $methods = array_merge(
+                    $methods,
+                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, '$value', $body, $usesBacking)
+                );
+                continue;
+            }
+            if (preg_match('/^(public|protected|private)\s+set\s*\(/s', $rest, $asymM)) {
+                $asymmetricSetVisibility = strtolower($asymM[1]);
+                $rest = preg_replace('/^(public|protected|private)\s+set\s*/i', '', $rest, 1) ?? $rest;
+                if (!preg_match('/^\(([^)]*)\)\s*\{/s', $rest, $pm)) {
+                    break;
+                }
+                $params = trim($pm[1]);
+                $rest = substr($rest, strlen($pm[0]) - 1);
+                [$body, $rest] = $this->takeBraceBody($rest);
+                $methods = array_merge(
+                    $methods,
+                    $this->lowerSetBlockHook($lcClass, $prop, $isStatic, $params, $body, $usesBacking)
+                );
+                continue;
+            }
+            if (preg_match('/^(public|protected|private)\s+set\s*\{/s', $rest, $asymM)) {
+                $asymmetricSetVisibility = strtolower($asymM[1]);
+                $rest = preg_replace('/^(public|protected|private)\s+set\s*/i', '', $rest, 1) ?? $rest;
                 [$body, $rest] = $this->takeBraceBody($rest);
                 $methods = array_merge(
                     $methods,
