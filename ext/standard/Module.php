@@ -787,6 +787,15 @@ class Module extends ModuleAbstract
             $context->registerFunction('chmod', $fn);
         }
         try {
+            $context->lookupFunction('fnmatch');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i8p, $i8p, $i32);
+            $fn = $context->module->addFunction('fnmatch', $ft);
+            $context->registerFunction('fnmatch', $fn);
+        }
+        try {
             $context->lookupFunction('rename');
         } catch (\Throwable $e) {
             $i8p = $context->getTypeFromString('int8*');
