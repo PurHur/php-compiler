@@ -76,6 +76,15 @@ final class ClosureSupport
             if (null !== $state) {
                 return $callable->toObject();
             }
+
+            throw new \Error(
+                'Object of type '.self::valueTypeName($callable).' is not callable'
+            );
+        }
+        if (Variable::TYPE_ENUM_CASE === $callable->type) {
+            throw new \Error(
+                'Object of type '.self::valueTypeName($callable).' is not callable'
+            );
         }
         if (Variable::TYPE_STRING === $callable->type) {
             $name = $callable->toString();

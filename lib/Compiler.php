@@ -8233,7 +8233,12 @@ class Compiler {
         }
 
         if (1 === $expr->kind) {
-            $callableSlot = $this->compileFirstClassFunctionNameSlot($expr->name, $block);
+            if ($expr->name instanceof Operand\Literal) {
+                $callableSlot = $this->compileFirstClassFunctionNameSlot($expr->name, $block);
+            } else {
+                // Enum case `(E::A)(...)` is KIND_FUNCTION with non-literal name (#6851, zend_compile.c).
+                $callableSlot = $this->compileOperand($expr->name, $block, true);
+            }
         } elseif (2 === $expr->kind) {
             $callableSlot = $this->compileFirstClassStaticNameSlot($expr->class, $expr->name, $block);
         } else {
