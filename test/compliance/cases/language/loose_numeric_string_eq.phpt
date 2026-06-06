@@ -11,9 +11,9 @@ var_dump(1 == '1');
 var_dump(0 == '');
 ?>
 --EXPECT--
-bool(true)
-bool(true)
-int(0)
+bool(false)
+bool(false)
+bool(false)
 bool(false)
 bool(true)
 bool(true)

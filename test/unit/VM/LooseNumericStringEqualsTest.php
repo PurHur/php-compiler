@@ -26,10 +26,11 @@ final class LooseNumericStringEqualsTest extends TestCase
         return $v;
     }
 
-    public function testNonNumericStringEqualsZero(): void
+    public function testNonNumericStringNotLooselyEqualToZero(): void
     {
-        $this->assertTrue(self::intVar(0)->equals(self::strVar('a')));
-        $this->assertTrue(self::strVar('a')->equals(self::intVar(0)));
+        $this->assertFalse(self::intVar(0)->equals(self::strVar('a')));
+        $this->assertFalse(self::strVar('a')->equals(self::intVar(0)));
+        $this->assertFalse(self::intVar(0)->equals(self::strVar('foo')));
     }
 
     public function testNumericStringEqualsParsedValue(): void
