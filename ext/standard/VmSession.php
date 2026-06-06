@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\ext\session\SessionFileStorage;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -121,7 +122,7 @@ final class VmSession
             return false;
         }
         if ('' !== self::$id) {
-            $path = self::storagePath(self::$id);
+            $path = SessionFileStorage::storagePath(self::$id);
             if (is_file($path)) {
                 @unlink($path);
             }
@@ -141,7 +142,7 @@ final class VmSession
         self::saveSession($ctx);
         $oldId = self::$id;
         if ($deleteOld && '' !== $oldId) {
-            $oldPath = self::storagePath($oldId);
+            $oldPath = SessionFileStorage::storagePath($oldId);
             if (is_file($oldPath)) {
                 @unlink($oldPath);
             }
@@ -177,7 +178,7 @@ final class VmSession
 
             return;
         }
-        $path = self::storagePath(self::$id);
+        $path = SessionFileStorage::storagePath(self::$id);
         if (!is_file($path)) {
             $sessionVar->array(new HashTable());
 
@@ -209,11 +210,11 @@ final class VmSession
         }
         $exported = VmJson::export($sessionVar);
         $payload = serialize($exported);
-        $dir = self::storageDir();
+        $dir = SessionFileStorage::storageDir();
         if (!is_dir($dir)) {
             @mkdir($dir, 0700, true);
         }
-        file_put_contents(self::storagePath(self::$id), $payload, LOCK_EX);
+        file_put_contents(SessionFileStorage::storagePath(self::$id), $payload, LOCK_EX);
     }
 
     private static function importArray(array $decoded): HashTable
@@ -232,21 +233,6 @@ final class VmSession
         return $ht;
     }
 
-    private static function storageDir(): string
-    {
-        $fromEnv = getenv('PHP_COMPILER_SESSION_DIR');
-        if (false !== $fromEnv && '' !== $fromEnv) {
-            return rtrim($fromEnv, '/\\');
-        }
-
-        return rtrim(sys_get_temp_dir(), '/\\').'/phpc_sessions';
-    }
-
-    private static function storagePath(string $id): string
-    {
-        return self::storageDir().'/sess_'.$id;
-    }
-
     private static function generateId(): string
     {
         return bin2hex(VmString::randomBytes(16));
@@ -254,8 +240,6 @@ final class VmSession
 
     private static function sanitizeId(string $id): string
     {
-        $clean = preg_replace('/[^a-zA-Z0-9,-]/', '', $id);
-
-        return is_string($clean) ? $clean : '';
+        return SessionFileStorage::sanitizeId($id);
     }
 }
