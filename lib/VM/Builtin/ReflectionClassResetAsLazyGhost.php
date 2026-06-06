@@ -10,7 +10,7 @@ use PHPCompiler\VM\LazyObjectSupport;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
 
-/** ReflectionClass::resetAsLazyGhost() — VM (#5968, zend_lazy_objects.c). */
+/** ReflectionClass::resetAsLazyGhost() — static VM (#5968, #7112, zend_lazy_objects.c). */
 final class ReflectionClassResetAsLazyGhost extends VmClassMethod
 {
     public function __construct()
@@ -20,31 +20,21 @@ final class ReflectionClassResetAsLazyGhost extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 3) {
+        $objectIdx = self::objectArgIndex($frame);
+        if (\count($frame->calledArgs) < $objectIdx + 2) {
             throw new \LogicException('ReflectionClass::resetAsLazyGhost() expects an object and initializer');
         }
-        $receiver = ReflectionSupport::requireReflectionClass($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
-        $className = ReflectionSupport::classNameFromReflection($receiver);
-        $entry = VmReflection::resolveClassEntry($ctx, $className);
-        if (null === $entry) {
-            throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
-        }
-        if ($entry->isInterface || $entry->isTrait || $entry->isEnum) {
-            throw new \LogicException('Cannot reset lazy ghost of '.$className);
-        }
-        $objectVar = $frame->calledArgs[1]->resolveIndirect();
+        $objectVar = $frame->calledArgs[$objectIdx]->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $objectVar->type) {
             throw new \TypeError('ReflectionClass::resetAsLazyGhost(): Argument #1 ($object) must be of type object');
         }
-        if (!VmReflection::isInstanceOfObject($ctx, $objectVar, $className)) {
-            throw new \TypeError(sprintf(
-                'ReflectionClass::resetAsLazyGhost(): Argument #1 ($object) must be an instance of %s, %s given',
-                $className,
-                $objectVar->toObject()->class->name
-            ));
+        $object = $objectVar->toObject();
+        $entry = $object->class;
+        if ($entry->isInterface || $entry->isTrait || $entry->isEnum) {
+            throw new \LogicException('Cannot reset lazy ghost of '.$entry->name);
         }
-        $initVar = $frame->calledArgs[2]->resolveIndirect();
+        $initVar = $frame->calledArgs[$objectIdx + 1]->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $initVar->type) {
             throw new \LogicException('ReflectionClass::resetAsLazyGhost() expects a callable initializer');
         }
@@ -53,8 +43,8 @@ final class ReflectionClassResetAsLazyGhost extends VmClassMethod
             throw new \LogicException('ReflectionClass::resetAsLazyGhost() expects a callable initializer');
         }
         $options = 0;
-        if (\count($frame->calledArgs) >= 4) {
-            $options = $frame->calledArgs[3]->resolveIndirect()->toInt();
+        if (\count($frame->calledArgs) >= $objectIdx + 3) {
+            $options = $frame->calledArgs[$objectIdx + 2]->resolveIndirect()->toInt();
         }
         $vm = $ctx->runtime->vm;
         if (null === $vm) {
@@ -62,9 +52,27 @@ final class ReflectionClassResetAsLazyGhost extends VmClassMethod
         }
         LazyObjectSupport::resetAsLazyGhost(
             $vm,
-            $objectVar->toObject(),
+            $object,
             $initObject->closureState,
             $options
         );
+    }
+
+    /** Skip ReflectionClass receiver on instance-syntax static calls (#7112). */
+    private static function objectArgIndex(Frame $frame): int
+    {
+        foreach ($frame->calledArgs as $i => $arg) {
+            $v = $arg->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $v->type) {
+                continue;
+            }
+            if (ReflectionSupport::REFLECTION_CLASS === strtolower($v->toObject()->class->name)) {
+                continue;
+            }
+
+            return $i;
+        }
+
+        return 0;
     }
 }
