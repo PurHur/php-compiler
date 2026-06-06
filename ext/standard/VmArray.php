@@ -64,6 +64,16 @@ final class VmArray
         return $expected === $n;
     }
 
+    /** array_is_assoc() — non-empty and not a list (issue #7016, ext/standard/array.c). */
+    public static function isAssoc(HashTable $ht): bool
+    {
+        if (0 === $ht->getNumElements()) {
+            return false;
+        }
+
+        return !self::isList($ht);
+    }
+
     /**
      * Packed list or numeric-string keys 0..n-1 (Zend zend_hash numeric-key rules; #3607).
      */

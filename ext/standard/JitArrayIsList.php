@@ -105,6 +105,51 @@ final class JitArrayIsList
         return $context->builder->load($resultSlot);
     }
 
+    /** array_is_assoc() — non-empty and not a list (issue #7016). */
+    public static function invokeAssoc(Context $context, JITVariable $array): Value
+    {
+        if (!self::canLowerOperand($array)) {
+            return self::unreachableBool($context);
+        }
+        if ($array->type & JITVariable::IS_NATIVE_ARRAY) {
+            return $context->constantFromBool(false);
+        }
+        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+
+        return self::hashTableIsAssoc($context, $ht);
+    }
+
+    public static function hashTableIsAssoc(Context $context, Value $ht): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $i1 = $context->getTypeFromString('int1');
+        $zeroSize = $sizeT->constInt(0, false);
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $ht
+        );
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $zeroSize);
+        $isList = self::hashTableIsList($context, $ht);
+
+        $resultSlot = $context->builder->alloca($i1, 1, 'array_is_assoc_result');
+        $exitBb = BasicBlockHelper::append($context, 'array_is_assoc_exit');
+        $falseBb = BasicBlockHelper::append($context, 'array_is_assoc_false');
+        $checkBb = BasicBlockHelper::append($context, 'array_is_assoc_check');
+        $context->builder->branchIf($isEmpty, $falseBb, $checkBb);
+
+        $context->builder->positionAtEnd($checkBb);
+        $context->builder->store($context->builder->not($isList), $resultSlot);
+        $context->builder->branch($exitBb);
+
+        $context->builder->positionAtEnd($falseBb);
+        $context->builder->store($context->constantFromBool(false), $resultSlot);
+        $context->builder->branch($exitBb);
+
+        $context->builder->positionAtEnd($exitBb);
+
+        return $context->builder->load($resultSlot);
+    }
+
     /**
      * Packed list or numeric-string keys 0..n-1 (array_merge reindex path; #3607).
      */
