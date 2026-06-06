@@ -4978,6 +4978,22 @@ restart:
         }
         // Nested return <call>(): callee may finish with an empty run stack (#1885).
         if (null !== $frame->parent && null !== $frame->returnVar) {
+            if ($this->isFunctionStaticInitContinueReturn($frame)) {
+                $entry = $frame->parent;
+                if (null !== $entry->returnVar) {
+                    $entry->returnVar->copyFrom($returnValue);
+                }
+                $this->releaseFrameObjectRefs($frame);
+                $caller = $this->context->pop();
+                if (null !== $caller) {
+                    $caller->callArgs = [];
+                    $caller->callArgEntries = [];
+                    $frame = $caller;
+                    goto restart;
+                }
+
+                return self::SUCCESS;
+            }
             $child = $frame;
             $frame = $frame->parent;
             $this->releaseFrameObjectRefs($child);
@@ -4998,6 +5014,24 @@ restart:
      * php-cfg lowers `if (cond) goto L` as JumpIf to the label block; naive getFrame()
      * nests a new frame per iteration and never terminates on merge blocks.
      */
+    /**
+     * Runtime-init function static: continue block return must not resume the entry
+     * frame at TYPE_FUNCTION_STATIC_INIT_STORE (#7097, property hook dispatch).
+     */
+    private function isFunctionStaticInitContinueReturn(Frame $continueFrame): bool
+    {
+        $entry = $continueFrame->parent;
+        if (null === $entry || $entry->pos < 1) {
+            return false;
+        }
+        $prev = $entry->block->opCodes[$entry->pos - 1] ?? null;
+        if (null === $prev || OpCode::TYPE_JUMPIF_FUNCTION_STATIC_INITIALIZED !== $prev->type) {
+            return false;
+        }
+
+        return $prev->block1 === $continueFrame->block;
+    }
+
     private function frameForBranch(Frame $frame, Block $target): Frame
     {
         if ($target === $frame->block) {
@@ -6877,7 +6911,7 @@ restart:
     {
         $savedStack = $this->context->swapRunStack(null);
         try {
-            $child = $func->getFrame($this->context, null);
+            $child = $func->getFrame($this->context, $parentFrame);
             $child->propertyHookRawProperty = $rawProperty;
             $child->calledArgs = $args;
             if (
