@@ -1,5 +1,5 @@
 --TEST--
-Language: #[\Override] on direct trait method redefinition — compile-time fatal (#6440)
+Language: #[\Override] on direct trait method redefinition — valid (#6786)
 --FILE--
 <?php
 trait T { public function f(): void {} }
@@ -8,5 +8,7 @@ class C {
     #[\Override]
     public function f(): void { echo "class\n"; }
 }
---EXPECT_EXIT--
-255
+echo (new C())->f() . "\n";
+?>
+--EXPECT--
+class

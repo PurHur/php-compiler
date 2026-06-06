@@ -36,7 +36,16 @@ final class ClassCompileRegistry
         $this->displayNames[$lc] = ltrim($name, '\\');
         $this->parents[$lc] = $parentLc;
         $this->interfaces[$lc] = $interfaceLcs;
-        $this->methods[$lc] = self::methodSigsFromStmts($stmts, $lc);
+        $ownMethods = self::methodSigsFromStmts($stmts, $lc);
+        $traitMethods = TraitComposedMethodResolver::resolve($stmts, $this);
+        $merged = [];
+        foreach ($traitMethods as $methodLc => $entry) {
+            $merged[$methodLc] = $entry['sig'];
+        }
+        foreach ($ownMethods as $methodLc => $sig) {
+            $merged[$methodLc] = $sig;
+        }
+        $this->methods[$lc] = $merged;
     }
 
     public function registerInterface(string $name, array $extendsLcs, CfgBlock $stmts): void
