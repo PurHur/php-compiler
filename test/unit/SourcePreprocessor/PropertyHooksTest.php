@@ -193,20 +193,24 @@ PHP;
         self::assertTrue($registry['box']['value']['virtual'] ?? false);
     }
 
-    public function testRejectsStaticPropertyHooks(): void
+    public function testLowersStaticPropertyHooks(): void
     {
         $src = <<<'PHP'
 <?php
 class Box {
     public static string $label {
-        get => 'static:' . self::$label;
+        get => self::$v;
         set => strtoupper($value);
     }
+    private static ?string $v = null;
 }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Cannot declare hooks for static property');
-        (new PropertyHooks())->process($src, 'static_hooks.php');
+        [$out, $registry] = (new PropertyHooks())->process($src, 'static_hooks.php');
+        self::assertStringContainsString('public static string $label;', $out);
+        self::assertStringContainsString('function __phpc_property_get_label', $out);
+        self::assertStringContainsString('function __phpc_property_set_label', $out);
+        self::assertSame('__phpc_property_set_label', $registry['box']['label']['set'] ?? null);
+        self::assertTrue($registry['box']['label']['static'] ?? false);
     }
 
     public function testLowersSetBlockHookWithNestedBackingField(): void

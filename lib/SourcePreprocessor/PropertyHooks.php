@@ -13,7 +13,6 @@ use PHPCompiler\Compiler\CompileFatal;
  */
 final class PropertyHooks
 {
-    private const STATIC_HOOK_MESSAGE = 'Cannot declare hooks for static property';
     private const SET_METHOD_PREFIX = '__phpc_property_set_';
     private const GET_METHOD_PREFIX = '__phpc_property_get_';
     private const UNSET_METHOD_PREFIX = '__phpc_property_unset_';
@@ -154,13 +153,6 @@ final class PropertyHooks
                 $propDeclHead = preg_replace('/\babstract\s+/', '', $propDeclHead) ?? $propDeclHead;
             }
             $isStatic = (bool) preg_match('/\bstatic\b/', $declPrefix.$propDeclHead);
-            if ($isStatic) {
-                throw new CompileFatal(
-                    $filename,
-                    self::lineAtOffset($fullCode, $bodyOffsetInFile + $declStart),
-                    self::STATIC_HOOK_MESSAGE
-                );
-            }
             $propDecl = preg_replace('/\s+$/', '', $propDeclHead) ?? $propDeclHead;
             if (!str_ends_with($propDecl, ';')) {
                 $propDecl .= ';';

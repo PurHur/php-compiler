@@ -949,6 +949,25 @@ final class Variable {
         $this->copyFrom($var);
     }
 
+    /**
+     * Per-class clone of trait static property storage without reading uninitialized typed slots (#6624).
+     */
+    public function copyUninitializedStaticPropertySlot(self $source): void
+    {
+        $source = $source->resolveIndirect();
+        $this->reset();
+        $this->type = self::TYPE_UNDEFINED;
+        $this->typeConstraint = $source->typeConstraint;
+        $this->classConstraint = $source->classConstraint;
+        $this->unionTypeConstraints = $source->unionTypeConstraints;
+        $this->declaredTypeLabel = $source->declaredTypeLabel;
+        $this->literalBoolType = $source->literalBoolType;
+        $this->genericArrayTypeSpec = $source->genericArrayTypeSpec;
+        $this->dnfArms = $source->dnfArms;
+        $this->objectPropertyName = $source->objectPropertyName;
+        $this->staticPropertyClassLc = $source->staticPropertyClassLc;
+    }
+
     public function copyFrom(self $var): void {
         if ($this->type === self::TYPE_INDIRECT) {
             // always assign to the indirection
