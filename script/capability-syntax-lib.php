@@ -298,6 +298,16 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { public const array X = [1, 2]; } echo C::X[0];',
         ],
         [
+            'id' => 'global_typed_constant',
+            'construct' => 'PHP 8.3+ file/namespace typed constants (`const string X = \'a\';`)',
+            'opcodes' => ['TYPE_DECLARE_GLOBAL_CONST', 'TYPE_CONST_FETCH', 'TYPE_ARRAY_DIM_FETCH'],
+            'issue' => 7081,
+            'notes' => [
+                'GlobalTypedConstRewriter + PHPCfg marker for nikic/php-parser 4.x; compile-time type check reuses class-const path',
+            ],
+            'probe' => 'const string X = "a"; echo X;',
+        ],
+        [
             'id' => 'typed_interface_const',
             'construct' => 'PHP 8.3 typed interface constants (`interface I { public const string X = \'a\'; }`)',
             'opcodes' => ['TYPE_DECLARE_INTERFACE', 'TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH'],

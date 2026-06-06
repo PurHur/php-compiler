@@ -3684,6 +3684,23 @@ class Compiler {
         }
     }
 
+    protected function verifyGlobalConstCompileTimeType(
+        Operand $nameOp,
+        Variable $value,
+        int $typeSlot,
+        Block $block
+    ): void {
+        if (!isset($block->constants[$typeSlot])) {
+            return;
+        }
+        $constName = $nameOp instanceof Operand\Literal ? (string) $nameOp->value : 'constant';
+        try {
+            TypeCheck::assertGlobalConstantTypedValue($value, $block->constants[$typeSlot], $constName);
+        } catch (\TypeError $e) {
+            $this->throwCompileError($e->getMessage());
+        }
+    }
+
     /**
      * Zend 8.2 rejects typed trait constants at parse time; enable at 8.3+ (#5212).
      */
@@ -8442,6 +8459,21 @@ class Compiler {
             $valueSlot = $this->compileOperand($const->value, $block, true);
         }
         $constName = $this->staticNameFromOperand($const->name);
+        $typeSlot = null;
+        if (property_exists($const, 'declaredType') && null !== $const->declaredType) {
+            if (!$this->cfgDeclaredTypeIsMixed($const->declaredType)) {
+                $declared = $this->typeFromClassConstDecl($const);
+                $typeSlot = $this->compileTypeConstrainedVariable($block, $declared, $const->declaredType);
+                if (isset($block->constants[$valueSlot])) {
+                    $this->verifyGlobalConstCompileTimeType(
+                        $const->name,
+                        $block->constants[$valueSlot],
+                        $typeSlot,
+                        $block
+                    );
+                }
+            }
+        }
         if (null !== $constName && isset($block->constants[$valueSlot])) {
             $this->storeCompileTimeGlobalConst($constName, $block->constants[$valueSlot]);
         }
