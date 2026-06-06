@@ -7257,7 +7257,7 @@ restart:
 
         $thrown = VM\BuiltinExceptionSupport::materializeError(
             $this->context,
-            sprintf('Cannot modify readonly property %s::$%s', $declaringClass, $prop)
+            $this->readonlyPropertyWriteErrorMessage($owner, $prop, $declaringClass, $frame)
         );
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
@@ -7266,6 +7266,41 @@ restart:
         $this->raiseUncaughtException($thrown);
 
         return null;
+    }
+
+    /** Zend zend_readonly_property_modification_error — init vs modify wording (#5463). */
+    private function readonlyPropertyWriteErrorMessage(
+        ObjectEntry $owner,
+        string $prop,
+        string $declaringClass,
+        Frame $frame
+    ): string {
+        if ($owner->hasProperty($prop)) {
+            $slot = $owner->getProperty($prop);
+            if (VM\TypedPropertyCheck::isUninitialized($slot)) {
+                return sprintf(
+                    'Cannot initialize readonly property %s::$%s from %s',
+                    $declaringClass,
+                    $prop,
+                    $this->propertyWriteScopeLabel($frame)
+                );
+            }
+        }
+
+        return sprintf('Cannot modify readonly property %s::$%s', $declaringClass, $prop);
+    }
+
+    private function propertyWriteScopeLabel(Frame $frame): string
+    {
+        $callerClassLc = $this->callerClassLc($frame);
+        if (null === $callerClassLc) {
+            return 'global scope';
+        }
+        if (isset($this->context->classes[$callerClassLc])) {
+            return $this->context->classes[$callerClassLc]->name;
+        }
+
+        return $callerClassLc;
     }
 
     private function enforcePropertyVisibilityWrite(Variable $lvalue, Frame $frame): ?Frame
