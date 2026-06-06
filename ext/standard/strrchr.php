@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -19,15 +20,12 @@ final class strrchr extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('strrchr() requires exactly two arguments in this compiler build');
         }
-        $haystack = $frame->calledArgs[0]->resolveIndirect();
-        $needle = $frame->calledArgs[1]->resolveIndirect();
+        $haystackStr = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strrchr', 0, 'haystack');
+        $needleStr = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strrchr', 1, 'needle');
         if (null === $frame->returnVar) {
             return;
         }
-        $result = VmString::strrchr(
-            VmString::coerceOperand($haystack),
-            VmString::coerceOperand($needle)
-        );
+        $result = VmString::strrchr($haystackStr, $needleStr);
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {
@@ -43,8 +41,8 @@ final class strrchr extends Internal
 
         return JitStrrchr::find(
             $context,
-            $this->jitString($context, $args[0], 'strrchr() argument #1'),
-            $this->jitString($context, $args[1], 'strrchr() argument #2')
+            JitStringBuiltinArg::lower($context, $args[0], 'strrchr', 0, 'haystack'),
+            JitStringBuiltinArg::lower($context, $args[1], 'strrchr', 1, 'needle')
         );
     }
 }

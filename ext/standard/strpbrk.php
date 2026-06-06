@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -19,15 +20,12 @@ final class strpbrk extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('strpbrk() requires exactly two arguments in this compiler build');
         }
-        $haystack = $frame->calledArgs[0]->resolveIndirect();
-        $mask = $frame->calledArgs[1]->resolveIndirect();
+        $haystackStr = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strpbrk', 0, 'string');
+        $maskStr = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strpbrk', 1, 'characters');
         if (null === $frame->returnVar) {
             return;
         }
-        $result = VmString::strpbrk(
-            VmString::coerceOperand($haystack),
-            VmString::coerceOperand($mask)
-        );
+        $result = VmString::strpbrk($haystackStr, $maskStr);
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {
@@ -43,8 +41,8 @@ final class strpbrk extends Internal
 
         return JitStrpbrk::find(
             $context,
-            $this->jitString($context, $args[0], 'strpbrk() argument #1'),
-            $this->jitString($context, $args[1], 'strpbrk() argument #2')
+            JitStringBuiltinArg::lower($context, $args[0], 'strpbrk', 0, 'string'),
+            JitStringBuiltinArg::lower($context, $args[1], 'strpbrk', 1, 'characters')
         );
     }
 }

@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -20,13 +21,8 @@ final class stristr extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('stristr() requires two or three arguments in this compiler build');
         }
-        $haystack = $frame->calledArgs[0]->resolveIndirect();
-        $needle = $frame->calledArgs[1]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $haystackStr = VmString::coerceOperand($haystack);
-        $needleStr = VmString::coerceOperand($needle);
+        $haystackStr = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'stristr', 0, 'haystack');
+        $needleStr = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'stristr', 1, 'needle');
         $beforeNeedle = false;
         if (3 === $argc) {
             $flag = $frame->calledArgs[2]->resolveIndirect();
@@ -34,6 +30,9 @@ final class stristr extends Internal
                 throw new \LogicException('stristr() before_needle must be a boolean in this compiler build');
             }
             $beforeNeedle = $flag->toBool();
+        }
+        if (null === $frame->returnVar) {
+            return;
         }
         $result = VmString::stristr($haystackStr, $needleStr, $beforeNeedle);
         if (false === $result) {
@@ -59,8 +58,8 @@ final class stristr extends Internal
 
         return JitStrstr::find(
             $context,
-            $this->jitString($context, $args[0], 'stristr() argument #1'),
-            $this->jitString($context, $args[1], 'stristr() argument #2'),
+            JitStringBuiltinArg::lower($context, $args[0], 'stristr', 0, 'haystack'),
+            JitStringBuiltinArg::lower($context, $args[1], 'stristr', 1, 'needle'),
             $before,
             true
         );
