@@ -89,6 +89,11 @@ final class PropertyHooks
                 return null;
             }
             [$pos, $kind, $name, $nameEnd] = $candidate;
+            if ($this->offsetInNonCodeContext($code, $pos)) {
+                $searchFrom = $pos + 1;
+
+                continue;
+            }
             if ($this->isDeclarableHeader($code, $nameEnd)) {
                 return [$pos, $kind, $name];
             }
@@ -96,6 +101,83 @@ final class PropertyHooks
         }
 
         return null;
+    }
+
+    /**
+     * True when $offset sits inside a string literal or comment (#7030 — do not rewrite eval() strings).
+     */
+    private function offsetInNonCodeContext(string $code, int $offset): bool
+    {
+        $len = strlen($code);
+        $i = 0;
+        $inString = false;
+        $stringQuote = '';
+        $inLineComment = false;
+        $inBlockComment = false;
+        while ($i < $offset && $i < $len) {
+            if ($inLineComment) {
+                if ("\n" === $code[$i]) {
+                    $inLineComment = false;
+                }
+                ++$i;
+
+                continue;
+            }
+            if ($inBlockComment) {
+                if ('*' === $code[$i] && $i + 1 < $len && '/' === $code[$i + 1]) {
+                    $inBlockComment = false;
+                    $i += 2;
+
+                    continue;
+                }
+                ++$i;
+
+                continue;
+            }
+            if ($inString) {
+                if ('\\' === $code[$i]) {
+                    $i += 2;
+
+                    continue;
+                }
+                if ($code[$i] === $stringQuote) {
+                    $inString = false;
+                }
+                ++$i;
+
+                continue;
+            }
+            if ('/' === $code[$i] && $i + 1 < $len) {
+                if ('/' === $code[$i + 1]) {
+                    $inLineComment = true;
+                    $i += 2;
+
+                    continue;
+                }
+                if ('*' === $code[$i + 1]) {
+                    $inBlockComment = true;
+                    $i += 2;
+
+                    continue;
+                }
+            }
+            if ('#' === $code[$i]) {
+                $inLineComment = true;
+                ++$i;
+
+                continue;
+            }
+            if ('"' === $code[$i] || '\'' === $code[$i]) {
+                $inString = true;
+                $stringQuote = $code[$i];
+                ++$i;
+
+                continue;
+            }
+            ++$i;
+        }
+
+        return $inString || $inLineComment || $inBlockComment;
     }
 
     private function isDeclarableHeader(string $code, int $from): bool
