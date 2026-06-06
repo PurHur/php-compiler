@@ -128,4 +128,20 @@ final class VmParseStr
             $ht->add((string) $key, $var);
         }
     }
+
+    public static function zendTypeLabel(Variable $value): string
+    {
+        $v = $value->resolveIndirect();
+
+        return match ($v->type) {
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            default => 'mixed',
+        };
+    }
 }

@@ -45,9 +45,16 @@ final class parse_str extends Internal
         }
 
         $resultArg = $frame->calledArgs[1];
-        $target = $resultArg->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $target->type) {
-            throw new \LogicException('parse_str() argument #2 must be an array in this compiler build');
+        $resolved = $resultArg->resolveIndirect();
+        if (
+            Variable::TYPE_ARRAY !== $resolved->type
+            && Variable::TYPE_UNDEFINED !== $resolved->type
+            && Variable::TYPE_NULL !== $resolved->type
+        ) {
+            throw new \TypeError(\sprintf(
+                'parse_str(): Argument #2 ($result) must be of type array, %s given',
+                VmParseStr::zendTypeLabel($resolved)
+            ));
         }
 
         $params = [];
@@ -56,7 +63,7 @@ final class parse_str extends Internal
         VmParseStr::mergeInto($parsed, $params);
         $replacement = new Variable(Variable::TYPE_ARRAY);
         $replacement->array($parsed);
-        $target->copyFrom($replacement);
+        $resultArg->copyFrom($replacement);
 
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
