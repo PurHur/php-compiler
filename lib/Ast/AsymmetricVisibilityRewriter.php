@@ -47,6 +47,7 @@ final class AsymmetricVisibilityRewriter
         self::rejectExplicitPublicBeforeSetModifier($source);
         self::rejectExplicitPublicAfterSetModifier($source);
         self::rejectDuplicateReadBeforeParenthesizedSetModifier($source);
+        self::rejectAsymmetricSetOnStaticProperty($source);
 
         $source = (string) preg_replace_callback(
             '/(?P<prefix>(?:\/\*(?:[^*]|\*(?!\/))*\*\/\s*)*)(?P<attrs>(?:#\[[^\]]*\]\s*)*)'
@@ -125,6 +126,45 @@ final class AsymmetricVisibilityRewriter
             $source
         )) {
             throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+        }
+    }
+
+    /**
+     * Static properties do not support asymmetric visibility with an explicit read modifier (#7013).
+     *
+     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public private(set) static` is fatal
+     * (`Multiple access type modifiers are not allowed`). `private(set) static` alone remains valid (#6769).
+     */
+    private static function rejectAsymmetricSetOnStaticProperty(string $source): void
+    {
+        if (!preg_match('/\bstatic\b/i', $source) || !preg_match('/\(\s*set\s*\)/i', $source)) {
+            return;
+        }
+
+        $modifier = '(?:public|protected|private)';
+        $setModifier = $modifier.'\s*\(\s*set\s*\)';
+        $parenthesizedSet = '\(\s*'.$modifier.'\s*\(\s*set\s*\)\s*\)';
+        $staticWord = '\bstatic\b';
+        $patterns = [
+            // read + set(set) … static (any spacing)
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+(?:'.$staticWord.'\s+)?'.$setModifier.'[^;{]*'.$staticWord.'/i',
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$setModifier.'\s+'.$staticWord.'/i',
+            // read + static + set(set)
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$staticWord.'\s+'.$setModifier.'/i',
+            // read + static + (set(set))
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$staticWord.'\s+'.$parenthesizedSet.'/i',
+            // read + (set(set)) … static
+            '/(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$parenthesizedSet.'[^;{]*'.$staticWord.'/i',
+            // static + read + set(set)
+            '/'.$staticWord.'\s+(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$setModifier.'/i',
+            // static + read + (set(set))
+            '/'.$staticWord.'\s+(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$parenthesizedSet.'/i',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $source)) {
+                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+            }
         }
     }
 

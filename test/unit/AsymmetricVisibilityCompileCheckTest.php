@@ -89,6 +89,25 @@ PHP, 'asymmetric_promoted_public_private_set.php');
         $this->assertNotNull($block);
     }
 
+    public function testStaticPublicPrivateSetCompileErrors(): void
+    {
+        $runtime = new Runtime();
+        try {
+            $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    public private(set) static int $x = 1;
+}
+PHP, 'static_asymmetric_reject.php');
+            $this->fail('Expected compile failure');
+        } catch (\Throwable $e) {
+            $this->assertStringContainsString(
+                AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE,
+                $e->getMessage()
+            );
+        }
+    }
+
     public function testMultipleAccessModifiersStillCompileErrors(): void
     {
         $runtime = new Runtime();
