@@ -190,6 +190,7 @@ class Type extends Builtin {
         $this->context->registerFunction('__compiler_utf8_strlen', $fnUtf8Strlen);
         HttpResponseCode::implement($this->context);
         SessionStorageGlobals::ensureGlobals($this->context);
+        SessionStorageRuntime::ensureLinked($this->context);
         SessionId::implement($this->context);
         SessionName::implement($this->context);
         ObOutput::registerExternals($this->context);
