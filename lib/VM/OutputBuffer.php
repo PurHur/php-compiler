@@ -55,10 +55,10 @@ final class OutputBuffer
         self::$stack[] = '';
     }
 
-    public static function append(string $chunk): void
+    public static function append(string $chunk, ?string $file = null, int $line = 0): void
     {
         if ([] === self::$stack) {
-            SapiOutput::markStarted();
+            SapiOutput::markStarted($file, $line);
             echo $chunk;
             if (self::$implicitFlush) {
                 self::flush();

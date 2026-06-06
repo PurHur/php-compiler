@@ -1743,7 +1743,8 @@ class Compiler {
         $echoAfterAssign = $this->resolveEchoAfterCoalesceAssign($ops, $echoIndex, $op->expr);
         if (null !== $echoAfterAssign && $this->isStmtCoalesceLoweredBeforeEcho($ops, $echoIndex)) {
             $var = $this->compileOperand($echoAfterAssign, $block, true);
-            $block->addOpCode(new OpCode(OpCode::TYPE_ECHO, $var));
+            $line = $op->getLine();
+            $block->addOpCode(new OpCode(OpCode::TYPE_ECHO, $var, $line > 0 ? $line : null));
 
             return $block;
         }
@@ -1771,7 +1772,8 @@ class Compiler {
         } else {
             $var = $this->compileOperand($echoOperand, $block, true);
         }
-        $block->addOpCode(new OpCode(OpCode::TYPE_ECHO, $var));
+        $line = $op->getLine();
+        $block->addOpCode(new OpCode(OpCode::TYPE_ECHO, $var, $line > 0 ? $line : null));
 
         return $block;
     }
@@ -5103,10 +5105,13 @@ class Compiler {
                     $this->compileOperand($expr->expr, $block, true)
                 )];
             case Op\Expr\Print_::class:
+                $line = $expr->getLine();
+
                 return [new OpCode(
                     $this->getOpCodeTypeFromUnaryOp($expr),
                     $this->compileOperand($expr->result, $block, false),
-                    $this->compileOperand($expr->expr, $block, true)
+                    $this->compileOperand($expr->expr, $block, true),
+                    $line > 0 ? $line : null
                 )];
             case Op\Expr\ArrayDimFetch::class:
                 $dimSlot = null !== $expr->dim
@@ -7661,9 +7666,12 @@ class Compiler {
                     $var = $this->compileOperand($terminal->expr, $block, true);
                 }
 
+                $line = $terminal->getLine();
+
                 return [new OpCode(
                     OpCode::TYPE_ECHO,
-                    $var
+                    $var,
+                    $line > 0 ? $line : null
                 )];
             case 'Terminal_Return':
                 if ($block->returnTypeNever) {

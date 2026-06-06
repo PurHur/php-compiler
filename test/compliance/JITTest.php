@@ -111,6 +111,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'exception_handler')) {
                 continue;
             }
+            // headers_sent($file, $line) by-ref origin: VM path only (#5134); JIT zero-arg #4110.
+            if (str_contains($name, 'headers_sent_byref')) {
+                continue;
+            }
             // WeakReference get() return used in locals — MCJIT execute (#3667).
             if (str_contains($name, 'weak_reference_gc_jit')) {
                 continue;

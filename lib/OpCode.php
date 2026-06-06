@@ -10,6 +10,7 @@
 namespace PHPCompiler;
 
 class OpCode {
+    /** arg2 = echo-statement startLine when known (#5134). */
     const TYPE_ECHO = 1;
     const TYPE_ASSIGN = 2;
     const TYPE_CONCAT = 3;
@@ -42,6 +43,7 @@ class OpCode {
     const TYPE_UNARY_PLUS = 27;
     const TYPE_BITWISE_NOT = 28;
     const TYPE_BOOLEAN_NOT = 29;
+    /** arg3 = print-expression startLine when known (#5134). */
     const TYPE_PRINT = 30;
     const TYPE_CLONE = 31;
     const TYPE_EMPTY = 32;
