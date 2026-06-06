@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\VM\PropertyNameSupport;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -122,6 +123,17 @@ final class JitStringArg
      */
     public static function lowerPropertyName(Context $context, Variable $arg): Value
     {
+        $literal = self::compileTimeLiteral($arg);
+        if (null !== $literal) {
+            if (PropertyNameSupport::hasLeadingNullByte($literal)) {
+                Builtin\ErrorRaise::ensureLinked($context);
+                Builtin\ErrorRaise::emitRaise($context, PropertyNameSupport::LEADING_NULL_BYTE_MESSAGE);
+
+                return $context->builder->load($context->constantStringFromString(''));
+            }
+
+            return $context->builder->load($context->constantStringFromString($literal));
+        }
         if (Variable::TYPE_OBJECT === $arg->type) {
             $classHint = ltrim((string) ($arg->type?->userType ?? ''), '\\');
             if (
@@ -139,7 +151,10 @@ final class JitStringArg
             }
             $magic = MagicMethodDispatch::coerceObjectToString($context, $arg);
             if (null !== $magic) {
-                return self::materializeStringSlot($context, $context->helper->loadValue($magic));
+                $str = self::materializeStringSlot($context, $context->helper->loadValue($magic));
+                self::emitLeadingNullBytePropertyNameGuard($context, $str);
+
+                return $str;
             }
             Builtin\ErrorRaise::ensureLinked($context);
             Builtin\ErrorRaise::emitRaise(
@@ -150,10 +165,49 @@ final class JitStringArg
             return $context->builder->load($context->constantStringFromString(''));
         }
         if (Variable::TYPE_VALUE === $arg->type) {
-            return self::lowerBoxedPropertyName($context, $arg);
+            $str = self::lowerBoxedPropertyName($context, $arg);
+            self::emitLeadingNullBytePropertyNameGuard($context, $str);
+
+            return $str;
         }
 
-        return self::lowerDominating($context, $arg, 'dynamic property name');
+        $str = self::lowerDominating($context, $arg, 'dynamic property name');
+        self::emitLeadingNullBytePropertyNameGuard($context, $str);
+
+        return $str;
+    }
+
+    /**
+     * Runtime guard for property names with leading null byte (#5136, zend_verify_property_name).
+     */
+    private static function emitLeadingNullBytePropertyNameGuard(Context $context, Value $strPtr): void
+    {
+        Builtin\ErrorRaise::ensureLinked($context);
+        $map = $context->structFieldMap['__string__'];
+        $len = $context->builder->load($context->builder->structGep($strPtr, $map['length']));
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $hasLen = $context->builder->icmp(Builder::INT_SGT, $len, $i64->constInt(0, false));
+        $fn = BasicBlockHelper::parentFunction($context);
+        $entry = $context->builder->getInsertBlock();
+        $checkFirst = $fn->appendBasicBlock('prop_name_leading_null_check');
+        $okBlock = $fn->appendBasicBlock('prop_name_leading_null_ok');
+        $rejectBlock = $fn->appendBasicBlock('prop_name_leading_null_reject');
+        $doneBlock = $fn->appendBasicBlock('prop_name_leading_null_done');
+        $context->builder->branchIf($hasLen, $checkFirst, $okBlock);
+        $context->builder->positionAtEnd($checkFirst);
+        $valuePtr = $context->builder->load($context->builder->structGep($strPtr, $map['value']));
+        $valuePtr = $context->builder->pointerCast($valuePtr, $i8p);
+        $firstByte = $context->builder->load($valuePtr);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $firstByte, $i8->constInt(0, false));
+        $context->builder->branchIf($isNull, $rejectBlock, $okBlock);
+        $context->builder->positionAtEnd($rejectBlock);
+        Builtin\ErrorRaise::emitRaise($context, PropertyNameSupport::LEADING_NULL_BYTE_MESSAGE);
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($okBlock);
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($doneBlock);
     }
 
     /** @return Value */
