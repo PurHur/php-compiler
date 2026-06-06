@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** password_needs_rehash() — VM via host PHP; JIT/AOT via libcrypt runtime (issue #3279). */
+/** password_needs_rehash() — VM via VmPassword; JIT/AOT via password_crypto.c (issue #3279, #6503). */
 final class password_needs_rehash extends Internal
 {
     public function __construct()
