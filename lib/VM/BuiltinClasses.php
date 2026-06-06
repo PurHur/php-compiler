@@ -295,7 +295,7 @@ final class BuiltinClasses
         $rc->methods['marklazyobjectasinitialized'] = new ReflectionClassMarkLazyObjectAsInitialized();
         $rc->methodVisibility['marklazyobjectasinitialized'] = $pub;
         $rc->methods['resetaslazyghost'] = new ReflectionClassResetAsLazyGhost();
-        $rc->methodVisibility['resetaslazyghost'] = $pub;
+        $rc->methodVisibility['resetaslazyghost'] = $pubStatic;
         $rc->methods['resetaslazyobject'] = new ReflectionClassResetAsLazyObject();
         $rc->methodVisibility['resetaslazyobject'] = $pub;
         $rc->methods['isinternal'] = new ReflectionClassIsInternal();
