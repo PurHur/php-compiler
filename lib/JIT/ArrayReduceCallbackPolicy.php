@@ -52,4 +52,23 @@ final class ArrayReduceCallbackPolicy
         return 'array_reduce() callback must be a string user-function name in this compiler build; '
             .self::DEFERRED_KINDS.' are deferred';
     }
+
+    /**
+     * Zend array_reduce() invalid callback TypeError (#6679, ext/standard/array.c).
+     */
+    public static function invalidCallbackTypeError(): string
+    {
+        return 'array_reduce(): Argument #2 ($callback) must be a valid callback, no array or string given';
+    }
+
+    /**
+     * Zend undefined string user-function callback TypeError (#6679).
+     */
+    public static function invalidStringCallbackTypeError(string $name): string
+    {
+        return sprintf(
+            'array_reduce(): Argument #2 ($callback) must be a valid callback, function "%s" not found or invalid function name',
+            $name
+        );
+    }
 }

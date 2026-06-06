@@ -35,4 +35,16 @@ final class ArrayReduceCallbackPolicyTest extends TestCase
         $this->assertStringContainsString('closures', ArrayReduceCallbackPolicy::jitRejectionMessage());
         $this->assertStringContainsString('closures', ArrayReduceCallbackPolicy::vmRejectionMessage());
     }
+
+    public function testInvalidCallbackTypeErrorMatchesZendSubset(): void
+    {
+        $this->assertSame(
+            'array_reduce(): Argument #2 ($callback) must be a valid callback, no array or string given',
+            ArrayReduceCallbackPolicy::invalidCallbackTypeError()
+        );
+        $this->assertSame(
+            'array_reduce(): Argument #2 ($callback) must be a valid callback, function "missing_fn" not found or invalid function name',
+            ArrayReduceCallbackPolicy::invalidStringCallbackTypeError('missing_fn')
+        );
+    }
 }
