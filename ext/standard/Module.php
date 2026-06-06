@@ -467,6 +467,7 @@ class Module extends ModuleAbstract
             new get_declared_functions_(),
             new get_defined_functions_(),
             new debug_backtrace(),
+            new get_debug_backtrace(),
             new class_exists_(),
             new class_alias(),
             new create_lazy_ghost(),
