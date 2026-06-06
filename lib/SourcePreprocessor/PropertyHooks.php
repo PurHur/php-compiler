@@ -65,22 +65,54 @@ final class PropertyHooks
      */
     private function findNextDeclarable(string $code, int $from): ?array
     {
-        $best = null;
-        foreach ([
-            'class' => '/\bclass\s+([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\b/',
-            'interface' => '/\binterface\s+([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\b/',
-            'trait' => '/\btrait\s+([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\b/',
-        ] as $kind => $pattern) {
-            if (!preg_match($pattern, $code, $m, PREG_OFFSET_CAPTURE, $from)) {
-                continue;
+        $len = strlen($code);
+        $searchFrom = $from;
+        while ($searchFrom < $len) {
+            $candidate = null;
+            foreach ([
+                'class' => '/\bclass\s+([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\b/',
+                'interface' => '/\binterface\s+([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\b/',
+                'trait' => '/\btrait\s+([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)\b/',
+            ] as $kind => $pattern) {
+                if (!preg_match($pattern, $code, $m, PREG_OFFSET_CAPTURE, $searchFrom)) {
+                    continue;
+                }
+                $pos = $m[0][1];
+                if (null === $candidate || $pos < $candidate[0]) {
+                    $candidate = [$pos, $kind, $m[1][0], $pos + strlen($m[0][0])];
+                }
             }
-            $pos = $m[0][1];
-            if (null === $best || $pos < $best[0]) {
-                $best = [$pos, $kind, $m[1][0]];
+            if (null === $candidate) {
+                return null;
             }
+            [$pos, $kind, $name, $nameEnd] = $candidate;
+            if ($this->isDeclarableHeader($code, $nameEnd)) {
+                return [$pos, $kind, $name];
+            }
+            $searchFrom = $pos + 1;
         }
 
-        return $best;
+        return null;
+    }
+
+    private function isDeclarableHeader(string $code, int $from): bool
+    {
+        $len = strlen($code);
+        $i = $from;
+        while ($i < $len && ctype_space($code[$i])) {
+            ++$i;
+        }
+        if ($i >= $len) {
+            return false;
+        }
+        if ('{' === $code[$i]) {
+            return true;
+        }
+
+        return (bool) preg_match(
+            '/^(?:extends|implements|sealed|readonly)\b[\s\S]*?\{/i',
+            substr($code, $i)
+        );
     }
 
     /**
@@ -196,14 +228,17 @@ final class PropertyHooks
         while ('' !== $rest) {
             $rest = ltrim($rest);
             if (preg_match('/^get\s*;/s', $rest)) {
+                $this->registerRequiredHook($lcClass, $prop, 'requiresGet');
                 $rest = preg_replace('/^get\s*;/', '', $rest, 1) ?? $rest;
                 continue;
             }
             if (preg_match('/^set\s*;/s', $rest)) {
+                $this->registerRequiredHook($lcClass, $prop, 'requiresSet');
                 $rest = preg_replace('/^set\s*;/', '', $rest, 1) ?? $rest;
                 continue;
             }
             if (preg_match('/^unset\s*;/s', $rest)) {
+                $this->registerRequiredHook($lcClass, $prop, 'requiresUnset');
                 $rest = preg_replace('/^unset\s*;/', '', $rest, 1) ?? $rest;
                 continue;
             }
@@ -327,6 +362,17 @@ final class PropertyHooks
         }
 
         return "    public {$static}function {$method}() {$body}";
+    }
+
+    /**
+     * @param 'requiresGet'|'requiresSet'|'requiresUnset' $flag
+     */
+    private function registerRequiredHook(string $lcClass, string $prop, string $flag): void
+    {
+        if (!isset($this->registry[$lcClass][$prop])) {
+            $this->registry[$lcClass][$prop] = [];
+        }
+        $this->registry[$lcClass][$prop][$flag] = true;
     }
 
     /**
