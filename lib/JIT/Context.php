@@ -638,11 +638,9 @@ class Context {
         Builtin\ReflectionNative::registerDeclarations($this);
         Builtin\AttributeRegistry::registerDeclarations($this);
         if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
-            Builtin\TypeErrorRaise::ensureStandaloneBodies($this);
-            Builtin\ErrorRaise::ensureStandaloneBodies($this);
-            Builtin\ReadonlyRaise::ensureStandaloneBodies($this);
+            ExceptionBridge::ensureStandaloneBodies($this);
+            ErrorBridge::ensureStandaloneBodies($this);
             Builtin\AssertFail::ensureStandaloneBodies($this);
-            Builtin\JitThrow::ensureStandaloneBodies($this);
             Builtin\JitReturnPending::ensureStandaloneBodies($this);
             Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
         }
@@ -735,17 +733,15 @@ class Context {
                 $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending'));
                 Builtin\JitReturnPending::registerDeclarations($this);
                 $this->builder->call($this->lookupFunction('phpc_jit_clear_return_pending'));
-                Builtin\ReadonlyRaise::emitClearForStandaloneMain($this);
-                Builtin\TypeErrorRaise::emitClearForStandaloneMain($this);
-                Builtin\ErrorRaise::emitClearForStandaloneMain($this);
+                ErrorBridge::emitClearForStandaloneMain($this);
+                ExceptionBridge::emitClearForStandaloneMain($this);
             }
             Progress::emitNativeNote($this, 'c:main_before_php');
             $this->builder->call($this->main);
             Progress::emitNativeNote($this, 'c:main_after_php');
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
-                Builtin\ReadonlyRaise::emitAbortIfPendingForStandaloneMain($this);
-                Builtin\TypeErrorRaise::emitAbortIfPendingForStandaloneMain($this);
-                Builtin\ErrorRaise::emitAbortIfPendingForStandaloneMain($this);
+                ErrorBridge::emitAbortIfPendingForStandaloneMain($this);
+                ExceptionBridge::emitAbortIfPendingForStandaloneMain($this);
                 Builtin\PendingHeaders::emitFlushForStandalone($this);
                 Builtin\ObOutput::emitEndAllForStandalone($this);
             }
@@ -815,10 +811,8 @@ class Context {
                 $engine,
                 $this->loadType
             );
-            Builtin\ReadonlyRaise::bindJitEngine($engine);
-            Builtin\TypeErrorRaise::bindJitEngine($engine);
-            Builtin\ErrorRaise::bindJitEngine($engine);
-            Builtin\JitThrow::bindJitEngine($engine);
+            ExceptionBridge::bindJitEngine($engine);
+            ErrorBridge::bindJitEngine($engine);
             foreach ($this->exports as $export) {
                 $export[2]->handler = $this->result->getHandler($export[0], $export[1]);
             }
@@ -838,10 +832,8 @@ class Context {
             $engine,
             $this->loadType
         );
-        Builtin\ReadonlyRaise::bindJitEngine($engine);
-        Builtin\TypeErrorRaise::bindJitEngine($engine);
-        Builtin\ErrorRaise::bindJitEngine($engine);
-        Builtin\JitThrow::bindJitEngine($engine);
+        ExceptionBridge::bindJitEngine($engine);
+        ErrorBridge::bindJitEngine($engine);
         foreach ($this->exports as $export) {
             $export[2]->handler = $this->result->getHandler($export[0], $export[1]);
         }
