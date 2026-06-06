@@ -46,6 +46,7 @@ final class WeakRefRegistryRuntime
         self::$blockSuffix = 0;
         $probe = $context->module->getNamedFunction('phpc_weakref_register_ref');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::ensureGcNotifyObjectFreed($context);
             self::registerLinkedRuntime($context);
 
             return;
@@ -87,7 +88,58 @@ final class WeakRefRegistryRuntime
         $fnClearTyped = $context->module->addFunction('phpc_weakref_clear_object_typed', $ftClearTyped);
         self::implementClearObjectTyped($context, $fnClearTyped, $fnClear);
 
+        self::ensureGcNotifyObjectFreed($context);
         self::registerLinkedRuntime($context);
+    }
+
+    /**
+     * GC/AOT phpc_gc.c entry — reads object typeinfo and clears weak refs (#6836).
+     */
+    private static function ensureGcNotifyObjectFreed(Context $context): void
+    {
+        $existing = $context->module->getNamedFunction('phpc_gc_notify_object_freed');
+        if (null !== $existing && $existing->countBasicBlocks() > 0) {
+            $context->registerFunction('phpc_gc_notify_object_freed', $existing);
+
+            return;
+        }
+
+        $voidTy = $context->getTypeFromString('void');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $ft = $context->context->functionType($voidTy, false, $i8p);
+        $fn = $context->module->addFunction('phpc_gc_notify_object_freed', $ft);
+
+        $fnClearTyped = $context->lookupFunction('phpc_weakref_clear_object_typed');
+
+        $entry = $fn->appendBasicBlock('gc_notify_entry');
+        $doneBb = $fn->appendBasicBlock('gc_notify_done');
+        $workBb = $fn->appendBasicBlock('gc_notify_work');
+        $context->builder->positionAtEnd($entry);
+
+        $obj = $fn->getParam(0);
+        $null = $i8p->constNull();
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $obj, $null),
+            $doneBb,
+            $workBb
+        );
+
+        $context->builder->positionAtEnd($workBb);
+        // phpc_object_header.ref.typeinfo follows refcount (offset 4).
+        $typeinfoPtr = $context->builder->pointerCast(
+            $context->builder->inBoundsGEP($obj, $i32->constInt(4, false)),
+            $i32->pointerType(0)
+        );
+        $typeinfo = $context->builder->load($typeinfoPtr);
+        $context->builder->call($fnClearTyped, $obj, $typeinfo);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+
+        $context->registerFunction('phpc_gc_notify_object_freed', $fn);
     }
 
     private static function implementReset(Context $context, Value $fn): void
@@ -650,6 +702,7 @@ final class WeakRefRegistryRuntime
                 'phpc_weakref_clear_object',
                 'phpc_weakref_clear_object_typed',
                 'phpc_weakref_format_object_key',
+                'phpc_gc_notify_object_freed',
             ] as $name
         ) {
             $fn = $context->module->getNamedFunction($name);

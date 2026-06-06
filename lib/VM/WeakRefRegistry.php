@@ -84,6 +84,12 @@ final class WeakRefRegistry
         }
     }
 
+    /** VM entry for GC/object release weak-ref sweep (#6836). */
+    public static function clearWeakRefsForObject(int $objectId): void
+    {
+        self::clearForObject($objectId);
+    }
+
     public static function clearForObject(int $objectId): void
     {
         self::$invalidatedTargetIds[$objectId] = true;
