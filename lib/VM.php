@@ -8779,15 +8779,13 @@ restart:
                     $canonical = $frame->scope[$op->arg1]->toString();
                     $name = strtolower($canonical);
                     if ($entry->isEnum && $op->isEnumCaseDeclare) {
-                        if (!isset($block->constants[$op->arg2])) {
-                            throw new \LogicException('Class constant value must be a compile-time constant');
-                        }
+                        $backingSource = VM\ClassConstExpr::resolveValue($frame, $block, $op->arg2);
                         $caseBacking = new Variable(Variable::TYPE_NULL);
                         $caseBacking->null();
                         if (null !== $entry->backedType) {
                             $caseBacking = clone VM\BackedEnum::caseBackingScalar(
                                 $entry->backedType,
-                                $block->constants[$op->arg2]
+                                $backingSource
                             );
                         }
                         $entry->constants[$name] = EnumCaseSupport::createCase(

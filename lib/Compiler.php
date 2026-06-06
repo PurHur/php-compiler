@@ -3383,6 +3383,12 @@ class Compiler {
                     return $block->registerConstant(new Operand\Temporary(), $vm);
                 }
             }
+            if (1 === \count($children) && $children[0] instanceof Op\Expr) {
+                $vm = $this->tryFoldCompileTimeExprDefault($children[0], $block, $children);
+                if (null !== $vm) {
+                    return $block->registerConstant(new Operand\Temporary(), $vm);
+                }
+            }
         }
         $vm = $this->vmVariableFromCfgLiteralOperand($terminal->value);
         if (null === $vm) {
