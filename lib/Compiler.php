@@ -114,6 +114,9 @@ class Compiler {
     /** @var array<string, array<string, int>> compile-time class constant visibility flags by lc name (#6784) */
     private array $compileTimeClassConstVisibility = [];
 
+    /** @var array<string, array<string, DeprecatedMetadata>> deprecated class constants by lc name (#6962) */
+    private array $compileTimeClassConstDeprecated = [];
+
     /** @var array<string, Variable> lowercase global constant name => compile-time value (#3803, #6542) */
     private array $compileTimeGlobalConsts = [];
 
@@ -2547,6 +2550,9 @@ class Compiler {
             if (!isset($this->compileTimeClassConstVisibility[$this->compilingClassLc])) {
                 $this->compileTimeClassConstVisibility[$this->compilingClassLc] = [];
             }
+            if (!isset($this->compileTimeClassConstDeprecated[$this->compilingClassLc])) {
+                $this->compileTimeClassConstDeprecated[$this->compilingClassLc] = [];
+            }
             if (!isset($this->compileTimeEnumBackedTypes[$this->compilingClassLc])) {
                 $this->compileTimeEnumBackedTypes[$this->compilingClassLc] = null;
             }
@@ -3202,6 +3208,9 @@ class Compiler {
             if (!isset($this->compileTimeClassConstVisibility[$this->compilingClassLc])) {
                 $this->compileTimeClassConstVisibility[$this->compilingClassLc] = [];
             }
+            if (!isset($this->compileTimeClassConstDeprecated[$this->compilingClassLc])) {
+                $this->compileTimeClassConstDeprecated[$this->compilingClassLc] = [];
+            }
         } else {
             $this->compilingClassDisplayName = null;
         }
@@ -3454,9 +3463,14 @@ class Compiler {
                     $stored = new Variable();
                     $stored->copyFrom($backing);
                 }
-                $this->compileTimeClassConsts[$this->compilingClassLc][strtolower($constName)] = $stored;
-                $this->compileTimeClassConstVisibility[$this->compilingClassLc][strtolower($constName)]
+                $lcConst = strtolower($constName);
+                $this->compileTimeClassConsts[$this->compilingClassLc][$lcConst] = $stored;
+                $this->compileTimeClassConstVisibility[$this->compilingClassLc][$lcConst]
                     = ClassConstVisibility::mask($constOp->classConstVisibilityFlags);
+                if (null !== $constOp->deprecatedMetadata) {
+                    $this->compileTimeClassConstDeprecated[$this->compilingClassLc][$lcConst]
+                        = $constOp->deprecatedMetadata;
+                }
             }
         }
     }
@@ -4322,6 +4336,10 @@ class Compiler {
         $lcConst = strtolower($constName);
         if (isset($this->compileTimeClassConsts[$lcClass][$lcConst])) {
             if (!$this->compileTimeClassConstFetchAllowed($lcClass, $lcConst, $block)) {
+                return null;
+            }
+            // Deprecated constants must fetch at runtime so E_USER_DEPRECATED fires (#6962).
+            if (isset($this->compileTimeClassConstDeprecated[$lcClass][$lcConst])) {
                 return null;
             }
             $stored = $this->compileTimeClassConsts[$lcClass][$lcConst];
