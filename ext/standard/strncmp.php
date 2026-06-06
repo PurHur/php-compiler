@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -28,18 +29,16 @@ final class strncmp extends Internal
         if (3 !== count($frame->calledArgs)) {
             throw new \LogicException('strncmp() requires exactly three arguments');
         }
-        $a = $frame->calledArgs[0]->resolveIndirect();
-        $b = $frame->calledArgs[1]->resolveIndirect();
+        $a = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strncmp', 0, 'string1');
+        $b = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strncmp', 1, 'string2');
         $len = $frame->calledArgs[2]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $a->type
-            || Variable::TYPE_STRING !== $b->type
-            || Variable::TYPE_INTEGER !== $len->type) {
+        if (Variable::TYPE_INTEGER !== $len->type) {
             throw new \LogicException('strncmp() requires two strings and an integer length in this compiler build');
         }
-        $frame->returnVar->int(VmString::strncmp($a->toString(), $b->toString(), $len->toInt()));
+        $frame->returnVar->int(VmString::strncmp($a, $b, $len->toInt()));
     }
 
     public Context $context;
@@ -53,8 +52,8 @@ final class strncmp extends Internal
         if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
             throw new \LogicException('strncmp() length must be an integer in this compiler build');
         }
-        $p0 = $this->stringDataPtr($context, $this->jitString($context, $args[0], 'strncmp() argument #1'));
-        $p1 = $this->stringDataPtr($context, $this->jitString($context, $args[1], 'strncmp() argument #2'));
+        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[0], 'strncmp', 0, 'string1'));
+        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[1], 'strncmp', 1, 'string2'));
         $length = $context->builder->zExt(
             $context->builder->trunc(
                 $context->helper->loadValue($args[2]),
