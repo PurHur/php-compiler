@@ -67,14 +67,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'readline_exists')) {
                 continue;
             }
-            // substr_count() offset/length: VM + AOT via inline LLVM (#4105, #5188); MCJIT execute pending.
-            if (str_contains($name, 'substr_count')) {
-                continue;
-            }
-            // vsprintf()/sscanf() VM + AOT (#3190); MCJIT execute segfaults (argv hashtable pack, same as vfprintf).
-            if (str_contains($name, 'vsprintf_basic') || str_contains($name, 'sscanf_int')) {
-                continue;
-            }
             // CLI $argc/$argv globals: VM + standalone AOT (#4139); MCJIT execute segfaults (CliArgvGlobalInit refresh).
             if (str_contains($name, 'cli_argv')) {
                 continue;
