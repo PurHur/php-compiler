@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** getrusage() — process resource usage (VM VmProcess; JIT/AOT StringGetrusage LLVM, #5388/#3240). */
@@ -25,16 +24,17 @@ final class getrusage extends Internal
         if ($argc > 1) {
             throw new \LogicException('getrusage() accepts at most one argument in this compiler build');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         $who = 0;
         if (1 === $argc) {
-            $whoVar = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $whoVar->type) {
-                throw new \LogicException('getrusage() who must be an integer in this compiler build');
-            }
-            $who = $whoVar->toInt();
+            $who = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[0]->resolveIndirect(),
+                'getrusage',
+                1,
+                'mode'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
         }
         $usage = VmProcess::getrusage($who);
         if (false === $usage) {
