@@ -77,6 +77,9 @@ class Compiler {
 
     /** @var array<string, true> lowercase abstract class names seen during compile (#3385). */
     private array $abstractClasses = [];
+
+    /** @var array<string, array<string, array<string, mixed>>> from PropertyHooks preprocessor (#6770). */
+    private array $propertyHookRegistry = [];
     /** @var array<string, true> lowercase abstract enum names for instantiate diagnostics (#3737). */
     private array $abstractEnums = [];
     /** 1-based source lines lowered from bare `throw;` (#3508). */
@@ -271,6 +274,14 @@ class Compiler {
         }
     }
 
+    /**
+     * @param array<string, array<string, array<string, mixed>>> $registry
+     */
+    public function setPropertyHookRegistry(array $registry): void
+    {
+        $this->propertyHookRegistry = $registry;
+    }
+
     /** Bytes after the first __halt_compiler(); in the compiled script, if any (#3479). */
     public function getHaltCompilerRemaining(): ?string
     {
@@ -369,7 +380,7 @@ class Compiler {
             $this->appendMcjitDnfPropertyTryEpilogue($main);
         }
 
-        InterfaceImplementationCheck::validate($script);
+        InterfaceImplementationCheck::validate($script, $this->propertyHookRegistry);
         TraitCollisionCheck::validate($script);
         FinalClassExtensionCheck::validate($script);
         FinalClassConstCheck::validate($script);

@@ -113,6 +113,26 @@ PHP;
         self::assertStringContainsString('public int $p;', $out);
         self::assertStringNotContainsString('set;', $out);
         self::assertTrue($registry['i']['p']['virtual'] ?? false);
+        self::assertTrue($registry['i']['p']['requiresGet'] ?? false);
+        self::assertTrue($registry['i']['p']['requiresSet'] ?? false);
+    }
+
+    public function testIgnoresInterfaceKeywordInComments(): void
+    {
+        $src = <<<'PHP'
+<?php
+/** interface property hooks in comments must not confuse the scanner */
+interface I {
+    public int $x {
+        get;
+        set;
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertTrue($registry['i']['x']['requiresGet'] ?? false);
+        self::assertTrue($registry['i']['x']['requiresSet'] ?? false);
+        self::assertArrayNotHasKey('property', $registry);
     }
 
     public function testStripsAbstractGetHookOnAbstractClass(): void

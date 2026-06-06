@@ -135,4 +135,43 @@ PHP;
         $runtime->run($block);
         $this->assertSame("ok\n", ob_get_clean());
     }
+
+    public function testMissingInterfacePropertyHookFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {
+    public int $x { get; set; }
+}
+class Bad implements I {
+    public int $y = 1;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class Bad contains 2 abstract methods');
+        $this->expectExceptionMessage('I::$x::get');
+        $this->expectExceptionMessage('I::$x::set');
+        $runtime->parseAndCompile($code, 'missing_iface_property.php');
+    }
+
+    public function testImplementedInterfacePropertyHookCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {
+    public int $x { get; set; }
+}
+class Good implements I {
+    public int $x = 1;
+}
+echo (new Good())->x, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'iface_property_ok.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("1\n", ob_get_clean());
+    }
 }

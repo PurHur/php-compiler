@@ -485,6 +485,7 @@ class Runtime {
     }
 
     public function compile(Script $script): ?Block {
+        $this->compiler->setPropertyHookRegistry($this->vmContext->propertyHookRegistry);
         /** @var mixed $block */
         $block = $this->compiler->compile($script);
         if (!$block instanceof Block) {
