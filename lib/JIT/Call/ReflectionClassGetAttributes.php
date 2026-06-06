@@ -26,7 +26,7 @@ final class ReflectionClassGetAttributes implements Call
         $i8p = $context->getTypeFromString('int8*');
         [$classSafe] = ReflectionSetup::reflectionClassNameAsCstr($context, $obj);
 
-        $count = $context->builder->call($context->lookupFunction('phpc_attr_class_count'), $classSafe);
+        $count = $context->builder->call($context->lookupFunction('__compiler_attr_class_count'), $classSafe);
         $ht = HashTableHelper::alloc($context);
         $need = $context->builder->select(
             $context->builder->icmp(Builder::INT_UGT, $count, $sizeT->constInt(0, false)),
@@ -49,7 +49,7 @@ final class ReflectionClassGetAttributes implements Call
 
         $context->builder->positionAtEnd($body);
         $namePtr = $context->builder->call(
-            $context->lookupFunction('phpc_attr_class_name_at'),
+            $context->lookupFunction('__compiler_attr_class_name_at'),
             $classSafe,
             $i
         );
@@ -69,7 +69,7 @@ final class ReflectionClassGetAttributes implements Call
             $nameLen
         );
         $argsHt = $context->builder->call(
-            $context->lookupFunction('phpc_attr_class_args_hashtable'),
+            $context->lookupFunction('__compiler_attr_class_args_hashtable'),
             $classSafe,
             $i
         );

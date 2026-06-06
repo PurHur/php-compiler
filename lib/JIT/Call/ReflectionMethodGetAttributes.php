@@ -27,7 +27,7 @@ final class ReflectionMethodGetAttributes implements Call
         [$classSafe, , $methodSafe] = ReflectionSetup::reflectionMethodClassAndMethodAsCstr($context, $obj);
 
         $count = $context->builder->call(
-            $context->lookupFunction('phpc_attr_method_count'),
+            $context->lookupFunction('__compiler_attr_method_count'),
             $classSafe,
             $methodSafe
         );
@@ -53,7 +53,7 @@ final class ReflectionMethodGetAttributes implements Call
 
         $context->builder->positionAtEnd($body);
         $namePtr = $context->builder->call(
-            $context->lookupFunction('phpc_attr_method_name_at'),
+            $context->lookupFunction('__compiler_attr_method_name_at'),
             $classSafe,
             $methodSafe,
             $i

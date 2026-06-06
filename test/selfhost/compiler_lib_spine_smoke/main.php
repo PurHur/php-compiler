@@ -741,6 +741,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetValue.php';
 require_once __DIR__.'/../../../lib/VM/LazyObjectSupport.php';
 require_once __DIR__.'/../../../lib/VM/ReflectionSupport.php';
+require_once __DIR__.'/../../../lib/VM/AttributeRegistry.php';
 require_once __DIR__.'/../../../ext/standard/JitArrayRand.php';
 require_once __DIR__.'/../../../ext/standard/JitHtmlEntityDecode.php';
 require_once __DIR__.'/../../../ext/standard/JitHtmlentities.php';
