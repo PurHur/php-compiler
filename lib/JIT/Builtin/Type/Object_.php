@@ -4558,6 +4558,14 @@ class Object_ extends Type {
         if (null !== $hookIsset) {
             return $hookIsset;
         }
+        if (PropertyHookDispatch::emitWriteOnlyVirtualReadGuard(
+            $this->context,
+            null,
+            $class,
+            $name
+        )) {
+            return $i1->constInt(0, false);
+        }
         if (!$this->hasProperty($classId, $name)) {
             return $i1->constInt(0, false);
         }
