@@ -268,15 +268,14 @@ final class EnumCaseSupport
     }
 
     /**
-     * Zend zend_hash illegal offset — enum cases cannot be array keys (#5594, zend_hash.c).
+     * Zend zend_hash illegal offset — objects, enum cases, and arrays cannot be keys (#5594, #6500, zend_hash.c).
      */
     public static function rejectIllegalArrayOffset(Variable $index, string $message = 'Illegal offset type'): void
     {
         $index = $index->resolveIndirect();
-        if (Variable::TYPE_ENUM_CASE === $index->type) {
-            throw new \TypeError($message);
-        }
-        if (Variable::TYPE_OBJECT === $index->type && self::isEnumCase($index->toObject())) {
+        if (Variable::TYPE_ENUM_CASE === $index->type
+            || Variable::TYPE_OBJECT === $index->type
+            || Variable::TYPE_ARRAY === $index->type) {
             throw new \TypeError($message);
         }
     }

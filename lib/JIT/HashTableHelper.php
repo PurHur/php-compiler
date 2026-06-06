@@ -598,11 +598,9 @@ final class HashTableHelper
             );
         }
         if (Variable::TYPE_OBJECT === $dim->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__hashtable__offsetIsSetObjectKey'),
-                $ht,
-                $context->helper->loadValue($dim)
-            );
+            self::emitIllegalOffsetType($context, 'Illegal offset type in isset or empty');
+
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         if (Variable::TYPE_VALUE === $dim->type) {
             return self::offsetIsSetValueBoxKey($context, $ht, $dim);
@@ -730,12 +728,8 @@ final class HashTableHelper
             $falseBlock
         );
         $context->builder->positionAtEnd($objectBlock);
-        $keyObj = $context->builder->call($context->lookupFunction('__value__readObject'), $valPtr);
-        $objResult = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSetObjectKey'),
-            $ht,
-            $keyObj
-        );
+        self::emitIllegalOffsetType($context, 'Illegal offset type in isset or empty');
+        $objResult = $context->getTypeFromString('int1')->constInt(0, false);
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($falseBlock);
         $context->builder->branch($merge);
@@ -2386,11 +2380,11 @@ final class HashTableHelper
         $context->builder->positionAtEnd($done);
     }
 
-    private static function emitIllegalOffsetType(Context $context): void
+    public static function emitIllegalOffsetType(Context $context, string $message = 'Illegal offset type'): void
     {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, 'Illegal offset type');
+        TypeErrorRaise::emitRaise($context, $message);
         $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
     }
 }

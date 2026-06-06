@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -57,7 +58,7 @@ final class array_key_exists extends Internal
         } elseif (Variable::TYPE_INTEGER !== $key->type
             && Variable::TYPE_STRING !== $key->type
             && Variable::TYPE_FLOAT !== $key->type) {
-            throw new \LogicException($fn.'() key must be an integer or string in this compiler build');
+            throw new \TypeError('Illegal offset type');
         }
         $frame->returnVar->bool($array->hasKey($key));
     }
@@ -179,6 +180,11 @@ final class array_key_exists extends Internal
                 $ht,
                 $index
             );
+        }
+        if (JITVariable::TYPE_OBJECT === $key->type) {
+            HashTableHelper::emitIllegalOffsetType($context, 'Illegal offset type');
+
+            return $context->constantFromInteger(0, 'int1');
         }
         if (JITVariable::TYPE_VALUE === $key->type) {
             return self::jitKeyExistsValueBoxKey($context, $ht, $key);
