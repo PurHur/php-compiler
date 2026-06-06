@@ -43,6 +43,7 @@ use PHPCompiler\Compiler\MagicMethodReturnTypeCheck;
 use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
 use PHPCompiler\Compiler\ThrowInClassConstCompileCheck;
 use PHPCompiler\Compiler\AsymmetricVisibilityCompileCheck;
+use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\Compiler\AttributeMetadata;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\DeprecatedMetadata;
@@ -1618,6 +1619,7 @@ class Compiler {
      */
     private function compileListDestructGroup(array $ops, int $start, Block $block): array
     {
+        $this->rejectLoneListSpreadAssign($ops, $start);
         $end = $this->listDestructGroupEndIndex($ops, $start);
         $this->rejectListDestructNewExprWriteTargets($ops, $start, $end, $block);
         $rhs = $this->listDestructRhsOperand($ops, $start);
@@ -9094,6 +9096,31 @@ class Compiler {
                 $this->throwCompileError("Can't use nullsafe operator in write context");
             }
         }
+    }
+
+    /**
+     * Zend zend_compile.c: lone `[...$a] = $rhs` is a compile-time fatal (#6936).
+     *
+     * @param Op[] $ops
+     *
+     * @return never
+     */
+    private function rejectLoneListSpreadAssign(array $ops, int $start): void
+    {
+        if (!$this->isListSpreadAssignOp($ops[$start]) || $this->isListDestructSpreadTail($ops, $start)) {
+            return;
+        }
+        /** @var Op\Expr\Assign $spread */
+        $spread = $ops[$start];
+        $sourceFile = $spread->getFile() ?? '';
+        if ('' === $sourceFile) {
+            $sourceFile = 'unknown';
+        }
+        throw new CompileFatal(
+            $sourceFile,
+            max(1, $spread->getLine()),
+            'Spread operator is not supported in assignments'
+        );
     }
 
     /**
