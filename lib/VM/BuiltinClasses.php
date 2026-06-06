@@ -92,6 +92,7 @@ use PHPCompiler\VM\Builtin\WeakMapOffsetUnset;
 use PHPCompiler\VM\Builtin\WeakReferenceConstruct;
 use PHPCompiler\VM\Builtin\WeakReferenceCreate;
 use PHPCompiler\VM\Builtin\WeakReferenceGet;
+use PHPCompiler\ext\standard\ThrowableManifest;
 use PHPCompiler\VM\ExceptionSupport;
 use PHPCompiler\VM\FiberSupport;
 
@@ -502,124 +503,16 @@ final class BuiltinClasses
     {
         $throwable = new ClassEntry('Throwable');
         $throwable->isInterface = true;
-        $ctx->classes[ExceptionSupport::CLASS_THROWABLE] = $throwable;
+        $ctx->classes[ThrowableManifest::LC_THROWABLE] = $throwable;
 
-        self::registerThrowableClass($ctx, 'Exception', ExceptionSupport::CLASS_EXCEPTION);
-        self::registerThrowableClass(
-            $ctx,
-            'LogicException',
-            ExceptionSupport::CLASS_LOGIC_EXCEPTION,
-            ExceptionSupport::CLASS_EXCEPTION
-        );
-        // ext/spl/spl_exceptions.c — SPL Exception hierarchy (#5237).
-        self::registerThrowableClass(
-            $ctx,
-            'BadFunctionCallException',
-            ExceptionSupport::CLASS_BAD_FUNCTION_CALL_EXCEPTION,
-            ExceptionSupport::CLASS_LOGIC_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'BadMethodCallException',
-            ExceptionSupport::CLASS_BAD_METHOD_CALL_EXCEPTION,
-            ExceptionSupport::CLASS_BAD_FUNCTION_CALL_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'DomainException',
-            ExceptionSupport::CLASS_DOMAIN_EXCEPTION,
-            ExceptionSupport::CLASS_LOGIC_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'InvalidArgumentException',
-            ExceptionSupport::CLASS_INVALID_ARGUMENT_EXCEPTION,
-            ExceptionSupport::CLASS_LOGIC_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'LengthException',
-            ExceptionSupport::CLASS_LENGTH_EXCEPTION,
-            ExceptionSupport::CLASS_LOGIC_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'OutOfRangeException',
-            ExceptionSupport::CLASS_OUT_OF_RANGE_EXCEPTION,
-            ExceptionSupport::CLASS_LOGIC_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'RuntimeException',
-            ExceptionSupport::CLASS_RUNTIME_EXCEPTION,
-            ExceptionSupport::CLASS_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'OutOfBoundsException',
-            ExceptionSupport::CLASS_OUT_OF_BOUNDS_EXCEPTION,
-            ExceptionSupport::CLASS_RUNTIME_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'OverflowException',
-            ExceptionSupport::CLASS_OVERFLOW_EXCEPTION,
-            ExceptionSupport::CLASS_RUNTIME_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'RangeException',
-            ExceptionSupport::CLASS_RANGE_EXCEPTION,
-            ExceptionSupport::CLASS_RUNTIME_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'UnderflowException',
-            ExceptionSupport::CLASS_UNDERFLOW_EXCEPTION,
-            ExceptionSupport::CLASS_RUNTIME_EXCEPTION
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'UnexpectedValueException',
-            ExceptionSupport::CLASS_UNEXPECTED_VALUE_EXCEPTION,
-            ExceptionSupport::CLASS_RUNTIME_EXCEPTION
-        );
-        self::registerThrowableClass($ctx, 'Error', ExceptionSupport::CLASS_ERROR);
-        self::registerThrowableClass($ctx, 'TypeError', ExceptionSupport::CLASS_TYPE_ERROR, ExceptionSupport::CLASS_ERROR);
-        self::registerThrowableClass($ctx, 'ValueError', ExceptionSupport::CLASS_VALUE_ERROR, ExceptionSupport::CLASS_ERROR);
-        self::registerThrowableClass($ctx, 'FiberError', ExceptionSupport::CLASS_FIBER_ERROR, ExceptionSupport::CLASS_ERROR);
-        self::registerThrowableClass(
-            $ctx,
-            'ArgumentCountError',
-            ExceptionSupport::CLASS_ARGUMENT_COUNT_ERROR,
-            ExceptionSupport::CLASS_TYPE_ERROR
-        );
-        self::registerThrowableClass($ctx, 'ParseError', ExceptionSupport::CLASS_PARSE_ERROR, ExceptionSupport::CLASS_ERROR);
-        self::registerThrowableClass($ctx, 'CompileError', ExceptionSupport::CLASS_COMPILE_ERROR, ExceptionSupport::CLASS_ERROR);
-        self::registerThrowableClass(
-            $ctx,
-            'UnhandledMatchError',
-            ExceptionSupport::CLASS_UNHANDLED_MATCH_ERROR,
-            ExceptionSupport::CLASS_ERROR
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'ArithmeticError',
-            ExceptionSupport::CLASS_ARITHMETIC_ERROR,
-            ExceptionSupport::CLASS_ERROR
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'DivisionByZeroError',
-            ExceptionSupport::CLASS_DIVISION_BY_ZERO_ERROR,
-            ExceptionSupport::CLASS_ARITHMETIC_ERROR
-        );
-        self::registerThrowableClass(
-            $ctx,
-            'AssertionError',
-            ExceptionSupport::CLASS_ASSERTION_ERROR,
-            ExceptionSupport::CLASS_ERROR
-        );
+        foreach (ThrowableManifest::registrationOrder() as $className) {
+            self::registerThrowableClass(
+                $ctx,
+                $className,
+                ThrowableManifest::lcKey($className),
+                ThrowableManifest::parentLc($className)
+            );
+        }
     }
 
     private static function registerThrowableClass(
@@ -636,7 +529,7 @@ final class BuiltinClasses
         if (null !== $parentLc) {
             $entry->parentLc = $parentLc;
         } else {
-            $entry->interfaces = [ExceptionSupport::CLASS_THROWABLE];
+            $entry->interfaces = [ThrowableManifest::LC_THROWABLE];
         }
         $nullProto = new Variable(Variable::TYPE_NULL);
         $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_MESSAGE, null, $strProto);
