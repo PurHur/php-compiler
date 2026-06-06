@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringFsGlob;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -70,6 +71,7 @@ final class glob_ extends Internal
         }
 
         $pattern = $this->jitString($context, $args[0], 'glob() argument #1');
+        StringFsGlob::ensureLinked($context);
 
         return JitFsGlob::glob($context, $pattern, $flags);
     }

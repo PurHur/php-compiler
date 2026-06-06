@@ -205,6 +205,7 @@ class Type extends Builtin {
         StringGetrusage::ensureLinked($this->context);
         StringInfo::ensureLinked($this->context);
         StringDir::ensureLinked($this->context);
+        StringFsGlob::ensureLinked($this->context);
         LastErrorRuntime::ensureLinked($this->context);
         CliArgvRuntime::ensureLinked($this->context);
         FunctionExistsRuntime::ensureLinked($this->context);

@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringFsGlob;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -68,6 +69,7 @@ final class scandir extends Internal
         }
 
         $path = $this->jitString($context, $args[0], 'scandir() argument #1');
+        StringFsGlob::ensureLinked($context);
 
         return JitFsGlob::scandir($context, $path, $sort);
     }

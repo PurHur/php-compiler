@@ -7,14 +7,13 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT LLVM bodies for upload temp + glob/scandir vec helpers (#5346, #5459).
+ * JIT LLVM bodies for glob()/scandir() vec collectors (#5459).
  */
-final class StringFsDir
+final class StringFsGlob
 {
     public static function ensureLinked(Context $context): void
     {
         StringFsGlobVecJit::implement($context);
-        UploadTempJit::implement($context);
     }
 
     public static function implement(Context $context): void
