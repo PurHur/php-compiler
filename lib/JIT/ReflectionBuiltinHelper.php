@@ -126,6 +126,44 @@ final class ReflectionBuiltinHelper
         return $i1->constInt($exists ? 1 : 0, false);
     }
 
+    /** attribute_exists() — class declares attribute at compile time (#6468). */
+    public static function attributeExistsLiteral(Context $context, string $className, string $attributeName): Value
+    {
+        $exists = false;
+        $ctx = $context->runtime->vmContext;
+        if (null !== $ctx) {
+            $lc = strtolower(ltrim($className, '\\'));
+            $entry = $ctx->classes[$lc] ?? null;
+            if (null !== $entry) {
+                foreach ($entry->attributeEntries as $attrEntry) {
+                    if (self::attributeNameMatches($attrEntry->name, $attributeName)) {
+                        $exists = true;
+                        break;
+                    }
+                }
+                if (!$exists) {
+                    foreach ($entry->attributeNames as $name) {
+                        if (self::attributeNameMatches($name, $attributeName)) {
+                            $exists = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        $i1 = $context->getTypeFromString('int1');
+
+        return $i1->constInt($exists ? 1 : 0, false);
+    }
+
+    private static function attributeNameMatches(string $candidate, string $filter): bool
+    {
+        $want = strtolower(ltrim($filter, '\\'));
+        $cand = strtolower(ltrim($candidate, '\\'));
+
+        return $cand === $want || str_ends_with($cand, '\\'.$want);
+    }
+
     public static function emitInstanceOf(Context $context, Variable $value, string $className): Variable
     {
         return self::objectBuiltin($context)->emitInstanceOf($value, $className);

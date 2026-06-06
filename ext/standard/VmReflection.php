@@ -1102,6 +1102,24 @@ final class VmReflection
     }
 
     /**
+     * attribute_exists() — whether a class declares the given attribute (#6468).
+     *
+     * php-src: ext/reflection/php_reflection.c — PHP_FUNCTION(attribute_exists)
+     */
+    public static function attributeExists(Context $ctx, string $className, string $attributeName): bool
+    {
+        $entry = self::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            return false;
+        }
+        if ([] !== ReflectionSupport::filterEntriesByName($entry->attributeEntries, $attributeName)) {
+            return true;
+        }
+
+        return [] !== ReflectionSupport::filterByName($entry->attributeNames, $attributeName);
+    }
+
+    /**
      * ReflectionEnum::getCases() result array (#4121).
      */
     public static function reflectionEnumCasesArray(Context $ctx, ClassEntry $enumEntry): Variable
