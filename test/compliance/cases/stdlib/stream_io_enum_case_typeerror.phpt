@@ -71,14 +71,14 @@ try {
     echo "fwrite: ", $e->getMessage(), "\n";
 }
 --EXPECT--
-feof: feof(): Argument #1 ($stream) must be of type resource, object given
-fflush: fflush(): Argument #1 ($stream) must be of type resource, object given
-fsync: fsync(): Argument #1 ($stream) must be of type resource, object given
-flock: flock(): Argument #1 ($stream) must be of type resource, object given
-fseek: fseek(): Argument #1 ($stream) must be of type resource, object given
-ftell: ftell(): Argument #1 ($stream) must be of type resource, object given
-rewind: rewind(): Argument #1 ($stream) must be of type resource, object given
-ftruncate: ftruncate(): Argument #1 ($stream) must be of type resource, object given
-fclose: fclose(): Argument #1 ($stream) must be of type resource, object given
-fread: fread(): Argument #1 ($stream) must be of type resource, object given
-fwrite: fwrite(): Argument #1 ($stream) must be of type resource, object given
+feof: feof(): Argument #1 ($stream) must be of type resource, E given
+fflush: fflush(): Argument #1 ($stream) must be of type resource, E given
+fsync: fsync(): Argument #1 ($stream) must be of type resource, E given
+flock: flock(): Argument #1 ($stream) must be of type resource, E given
+fseek: fseek(): Argument #1 ($stream) must be of type resource, E given
+ftell: ftell(): Argument #1 ($stream) must be of type resource, E given
+rewind: rewind(): Argument #1 ($stream) must be of type resource, E given
+ftruncate: ftruncate(): Argument #1 ($stream) must be of type resource, E given
+fclose: fclose(): Argument #1 ($stream) must be of type resource, E given
+fread: fread(): Argument #1 ($stream) must be of type resource, E given
+fwrite: fwrite(): Argument #1 ($stream) must be of type resource, E given
