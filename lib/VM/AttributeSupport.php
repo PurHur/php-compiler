@@ -9,6 +9,7 @@ use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\Builtin\AttributeConstruct;
 use PHPCompiler\VM\Builtin\DeprecatedConstruct;
+use PHPCompiler\VM\Builtin\NoDiscardConstruct;
 use PHPCompiler\VM\Builtin\OverrideConstruct;
 
 /**
@@ -27,6 +28,8 @@ final class AttributeSupport
     public const CLASS_SENSITIVE_PARAMETER = 'sensitiveparameter';
 
     public const CLASS_DEPRECATED = 'deprecated';
+
+    public const CLASS_NODISCARD = 'nodiscard';
 
     /** Zend ZEND_ATTRIBUTE_TARGET_* flags (zend_attributes.h). */
     public const TARGET_CLASS = 1;
@@ -57,6 +60,9 @@ final class AttributeSupport
         if (CompilerVersion::supportsOverrideAttribute()) {
             self::registerOverride($ctx);
         }
+        if (CompilerVersion::supportsNoDiscardAttribute()) {
+            self::registerNoDiscard($ctx);
+        }
         $ctx->classes[self::CLASS_ATTRIBUTE]->isInternal = true;
         $ctx->classes[self::CLASS_RETURN_TYPE_WILL_CHANGE]->isInternal = true;
         $ctx->classes[self::CLASS_ALLOW_DYNAMIC_PROPERTIES]->isInternal = true;
@@ -64,6 +70,9 @@ final class AttributeSupport
         $ctx->classes[self::CLASS_DEPRECATED]->isInternal = true;
         if (CompilerVersion::supportsOverrideAttribute()) {
             $ctx->classes[self::CLASS_OVERRIDE]->isInternal = true;
+        }
+        if (CompilerVersion::supportsNoDiscardAttribute()) {
+            $ctx->classes[self::CLASS_NODISCARD]->isInternal = true;
         }
     }
 
@@ -143,6 +152,27 @@ final class AttributeSupport
             self::CLASS_OVERRIDE,
             self::TARGET_METHOD
         );
+    }
+
+    private static function registerNoDiscard(Context $ctx): void
+    {
+        $strProto = new Variable(Variable::TYPE_STRING);
+        $pub = CfgFunc::FLAG_PUBLIC;
+
+        $entry = new ClassEntry('NoDiscard');
+        $entry->parentLc = self::CLASS_ATTRIBUTE;
+        $entry->properties[] = new ClassProperty('message', null, $strProto, true);
+        $entry->constructor = new NoDiscardConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+
+        $targets = self::TARGET_FUNCTION | self::TARGET_METHOD;
+        $entry->attributeNames = ['Attribute'];
+        $entry->attributeEntries = [
+            new AttributeEntry('Attribute', [['name' => null, 'value' => $targets]]),
+        ];
+
+        $ctx->classes[self::CLASS_NODISCARD] = $entry;
     }
 
     private static function registerDeprecated(Context $ctx): void

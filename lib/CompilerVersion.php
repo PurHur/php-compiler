@@ -48,4 +48,10 @@ final class CompilerVersion
     {
         return version_compare(self::VERSION, '8.4', '>=');
     }
+
+    /** PHP 8.4+ #[\NoDiscard] builtin attribute class (Zend/zend_attributes.c, issue #6992). */
+    public static function supportsNoDiscardAttribute(): bool
+    {
+        return version_compare(self::VERSION, '8.4', '>=');
+    }
 }

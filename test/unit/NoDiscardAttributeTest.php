@@ -61,4 +61,19 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'nodiscard_used.php'));
         $this->assertSame('1', ob_get_clean());
     }
+
+    /** @covers issue #6992 */
+    public function testNoDiscardBuiltinClassExists(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+var_export(class_exists('NoDiscard', false));
+echo "\n";
+var_export((new ReflectionClass('NoDiscard'))->isInternal());
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'nodiscard_class.php'));
+        $this->assertSame("true\ntrue", ob_get_clean());
+    }
 }
