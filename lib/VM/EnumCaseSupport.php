@@ -123,6 +123,33 @@ final class EnumCaseSupport
         return false;
     }
 
+    /**
+     * Zend zend_enum_get_property_ptr_ptr — name/value are readonly pseudo-properties (#7155).
+     */
+    public static function isReadonlyPseudoProperty(ClassEntry $enum, string $property): bool
+    {
+        return self::propertyExistsOnCase($enum, $property);
+    }
+
+    /**
+     * @return string|null Error message when $property is a readonly enum pseudo-property
+     */
+    public static function readonlyPseudoPropertyViolationMessage(
+        ClassEntry $enum,
+        string $property,
+        bool $isUnset
+    ): ?string {
+        if (!self::isReadonlyPseudoProperty($enum, $property)) {
+            return null;
+        }
+        $propLc = strtolower($property);
+        if ($isUnset) {
+            return "Cannot unset readonly property {$enum->name}::\${$propLc}";
+        }
+
+        return "Cannot modify readonly property {$enum->name}::\${$propLc}";
+    }
+
     public static function getProperty(
         ObjectEntry $object,
         string $name,
