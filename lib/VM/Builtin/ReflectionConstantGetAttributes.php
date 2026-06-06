@@ -29,7 +29,7 @@ final class ReflectionConstantGetAttributes extends VmClassMethod
         }
         $filter = null;
         if (isset($frame->calledArgs[1])) {
-            $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionConstant::getAttributes() name');
+            $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionConstant::getAttributes() name', 1);
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom(

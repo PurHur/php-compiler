@@ -48,7 +48,7 @@ final class get_parent_class_ extends Internal
             }
             $entry = $arg->toObject()->class;
         } elseif (Variable::TYPE_STRING === $arg->type) {
-            VmReflection::stringArg($arg, 'get_parent_class() class name');
+            VmReflection::stringArg($arg, 'get_parent_class() class name', 0);
             $entry = VmReflection::resolveClassEntry($ctx, $arg->toString());
         } else {
             throw new \LogicException('get_parent_class() argument must be an object or class name string');

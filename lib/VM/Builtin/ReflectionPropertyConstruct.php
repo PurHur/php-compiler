@@ -23,7 +23,7 @@ final class ReflectionPropertyConstruct extends VmClassMethod
         }
         $ctx = VmReflection::requireContext($frame);
         $entry = VmReflection::resolveClassFromArg($ctx, $frame->calledArgs[1]);
-        $property = VmReflection::stringArg($frame->calledArgs[2], 'ReflectionProperty::__construct() name');
+        $property = VmReflection::stringArg($frame->calledArgs[2], 'ReflectionProperty::__construct() name', 2);
         $instanceName = VmReflection::findInstancePropertyName($entry, $property, $ctx);
         $staticKey = VmReflection::findStaticPropertyKey($entry, $property, $ctx);
         if (null === $instanceName && null === $staticKey) {

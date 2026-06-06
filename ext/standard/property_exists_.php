@@ -30,7 +30,7 @@ final class property_exists_ extends Internal
         }
         $ctx = VmReflection::requireContext($frame);
         self::requireValidObjectOrClass($frame->calledArgs[0]->resolveIndirect());
-        $property = VmReflection::stringArg($frame->calledArgs[1], 'property_exists() property name');
+        $property = VmReflection::stringArg($frame->calledArgs[1], 'property_exists() property name', 1);
         $exists = VmReflection::propertyExists($ctx, $frame->calledArgs[0], $property);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($exists);

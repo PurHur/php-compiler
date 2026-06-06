@@ -36,8 +36,8 @@ final class preg_replace extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_replace() pattern');
-        $replacement = VmReflection::stringArg($frame->calledArgs[1], 'preg_replace() replacement');
+        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_replace() pattern', 0);
+        $replacement = VmReflection::stringArg($frame->calledArgs[1], 'preg_replace() replacement', 1);
         $subjectVar = $frame->calledArgs[2]->resolveIndirect();
         $limit = -1;
         if (4 === $argc) {

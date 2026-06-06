@@ -28,7 +28,7 @@ final class ReflectionClassGetAttributes extends VmClassMethod
         }
         $filter = null;
         if (isset($frame->calledArgs[1])) {
-            $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionClass::getAttributes() name');
+            $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionClass::getAttributes() name', 1);
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom(AttributeRegistry::classAttributes($frame, $entry, $filter));

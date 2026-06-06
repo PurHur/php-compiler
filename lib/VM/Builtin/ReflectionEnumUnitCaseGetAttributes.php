@@ -29,7 +29,7 @@ final class ReflectionEnumUnitCaseGetAttributes extends VmClassMethod
         }
         $filter = null;
         if (isset($frame->calledArgs[1])) {
-            $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionEnumUnitCase::getAttributes() name');
+            $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionEnumUnitCase::getAttributes() name', 1);
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom(

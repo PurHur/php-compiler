@@ -24,7 +24,7 @@ final class class_exists_ extends Internal
             throw new \LogicException('class_exists() requires one or two arguments in this compiler build');
         }
         $ctx = VmReflection::requireContext($frame);
-        $name = VmReflection::stringArg($frame->calledArgs[0], 'class_exists() class name');
+        $name = VmReflection::stringArg($frame->calledArgs[0], 'class_exists() class name', 0);
         $exists = VmReflection::classExists($ctx, $name);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($exists);

@@ -36,7 +36,7 @@ final class is_a_ extends Internal
             throw new \LogicException('is_a() requires two or three arguments');
         }
         $ctx = VmReflection::requireContext($frame);
-        $className = VmReflection::stringArg($frame->calledArgs[1], 'is_a() class name');
+        $className = VmReflection::stringArg($frame->calledArgs[1], 'is_a() class name', 1);
         $allowString = false;
         if (3 === \count($frame->calledArgs)) {
             $allowString = $frame->calledArgs[2]->resolveIndirect()->toBool();

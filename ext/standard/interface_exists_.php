@@ -24,7 +24,7 @@ final class interface_exists_ extends Internal
             throw new \LogicException('interface_exists() requires one or two arguments in this compiler build');
         }
         $ctx = VmReflection::requireContext($frame);
-        $name = VmReflection::stringArg($frame->calledArgs[0], 'interface_exists() interface name');
+        $name = VmReflection::stringArg($frame->calledArgs[0], 'interface_exists() interface name', 0);
         $exists = VmReflection::interfaceExists($ctx, $name);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($exists);

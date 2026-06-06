@@ -29,8 +29,8 @@ final class class_alias extends Internal
             throw new \LogicException('class_alias() requires two or three arguments in this compiler build');
         }
         $ctx = VmReflection::requireContext($frame);
-        $original = VmReflection::stringArg($frame->calledArgs[0], 'class_alias() original class');
-        $alias = VmReflection::stringArg($frame->calledArgs[1], 'class_alias() alias');
+        $original = VmReflection::stringArg($frame->calledArgs[0], 'class_alias() original class', 0);
+        $alias = VmReflection::stringArg($frame->calledArgs[1], 'class_alias() alias', 1);
         $autoload = true;
         if (3 === \count($frame->calledArgs)) {
             $autoloadArg = $frame->calledArgs[2]->resolveIndirect();

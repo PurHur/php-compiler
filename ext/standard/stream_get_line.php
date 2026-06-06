@@ -50,7 +50,7 @@ final class stream_get_line extends Internal
         }
         $ending = null;
         if (3 === $argc) {
-            $ending = VmReflection::stringArg($frame->calledArgs[2], 'stream_get_line() ending');
+            $ending = VmReflection::stringArg($frame->calledArgs[2], 'stream_get_line() ending', 2);
         }
         $line = VmFs::streamGetLine($handleVar->toInt(), $maxLength, $ending);
         if (false === $line) {

@@ -32,14 +32,23 @@ final class VmReflection
         return $frame->vmContext;
     }
 
-    public static function stringArg(Variable $var, string $label): string
+    /**
+     * Coerce a string parameter for VM builtins / internal methods (php-src Z_PARAM_STR, #7163).
+     *
+     * @param int $calledArgsIndex index in Frame::calledArgs for Zend-shaped Argument #N
+     */
+    public static function stringArg(Variable $var, string $label, int $calledArgsIndex = 0): string
     {
-        $var = $var->resolveIndirect();
-        if (Variable::TYPE_STRING !== $var->type) {
-            throw new \LogicException("{$label} must be a string in this compiler build");
+        if (!preg_match('/^(.+?)\(\)\s+(.+)$/', $label, $m)) {
+            return VmString::coerceStringBuiltinArg($var, $label, $calledArgsIndex, 'string');
         }
+        $function = $m[1];
+        $paramName = $m[2];
+        $argIndex = str_contains($function, '::')
+            ? max(0, $calledArgsIndex - 1)
+            : $calledArgsIndex;
 
-        return $var->toString();
+        return VmString::coerceStringBuiltinArg($var, $function, $argIndex, $paramName);
     }
 
     public static function resolveClassEntry(Context $ctx, string $className): ?ClassEntry

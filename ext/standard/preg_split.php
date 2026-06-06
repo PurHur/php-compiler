@@ -28,7 +28,7 @@ final class preg_split extends Internal
                 'preg_split() expects 2 to 4 arguments in this compiler build'
             );
         }
-        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_split() pattern');
+        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_split() pattern', 0);
         $subjectVar = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_STRING !== $subjectVar->type) {
             throw new \LogicException(
