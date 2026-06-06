@@ -21,6 +21,20 @@ PHP;
         $this->assertStringNotContainsString("class Foo {}\n", $out);
     }
 
+    public function testPadsConstOnlyUserClassBodyForMcjit(): void
+    {
+        $in = <<<'PHP'
+<?php
+class C {
+    public const X = 1;
+}
+echo C::X;
+PHP;
+        $out = JitMcjitEmbed::prepareClassless($in);
+        $this->assertStringContainsString('__phpcMcjitClassPad', $out);
+        $this->assertStringContainsString('public const X = 1', $out);
+    }
+
     public function testLeavesNonEmptyClassUnchanged(): void
     {
         $in = <<<'PHP'
