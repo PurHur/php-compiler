@@ -110,6 +110,8 @@ class OpCode {
     const TYPE_CATCH = 93;
     const TYPE_FINALLY = 94;
     const TYPE_DECLARE_GLOBAL_CONST = 95;
+    /** {@see TYPE_DECLARE_GLOBAL_CONST} source line for duplicate-const E_WARNING (#6938). */
+    public int $globalConstStartLine = 0;
     /** Runtime __DIR__ / __FILE__ / __LINE__ (issues #707, #715). arg2 = line when LINE; arg3 = SCRIPT_MAGIC_* kind. */
     const TYPE_SCRIPT_MAGIC = 96;
 
