@@ -1711,12 +1711,30 @@ restart:
                             goto restart;
                         }
                     }
+                    $rhsSlot = $frame->scope[$op->arg2];
+                    // Reference acquisition follows set visibility (php.net asymmetric visibility, #7070).
+                    $catchFrame = $this->enforcePropertyVisibilityWrite($rhsSlot, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
+                    $catchFrame = $this->enforceStaticPropertyVisibilityWrite($rhsSlot, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
+                    if (null !== ($msg = $this->asymmetricPropertyWriteMessage($rhsSlot, $frame))) {
+                        $catchFrame = $this->dispatchVmError($msg, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                    }
                     $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg2);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
                         goto restart;
                     }
-                    $rhsSlot = $frame->scope[$op->arg2];
                     $rhs = $rhsSlot->resolveIndirect();
                     // ArrayDimFetch / property fetch temps are indirect to live storage; write the
                     // reference into that cell instead of redirecting the temp (#5349).
@@ -3053,6 +3071,19 @@ restart:
                         break;
                     }
                     $dest = $frame->scope[$op->arg1];
+                    if (
+                        !$forWrite
+                        && $this->propertyFetchDestUsedAsDimWriteContainer($frame, $op)
+                    ) {
+                        $writeMsg = $this->asymmetricStaticPropertyWriteMessage($lcClass, $propNameRaw, $frame);
+                        if (null !== $writeMsg) {
+                            $writeVisFrame = $this->dispatchVmError($writeMsg, $frame);
+                            if (null !== $writeVisFrame) {
+                                $frame = $writeVisFrame;
+                                goto restart;
+                            }
+                        }
+                    }
                     $dest->indirect($storage);
                     $dest->staticPropertyClassLc = $lcClass;
                     $dest->objectPropertyName = $propNameRaw;
@@ -4086,6 +4117,16 @@ restart:
                                 $result->copyFrom($hookValue);
                             }
                         } else {
+                            if ($this->propertyFetchDestUsedAsDimWriteContainer($frame, $op)) {
+                                $proxy = new Variable();
+                                $proxy->objectPropertyOwner = $propertyObject;
+                                $proxy->objectPropertyName = $name;
+                                $catchFrame = $this->enforceAsymmetricPropertyWrite($proxy, $frame);
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                            }
                             $propSlot = $propertyObject->getProperty($name);
                             if ($op->nullsafeFetchPropertyRead) {
                                 VM\TypedPropertyCheck::assertReadable($propSlot);
