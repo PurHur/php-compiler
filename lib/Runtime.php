@@ -31,10 +31,10 @@ use PHPCompiler\Ast\SealedClassPreprocessor;
 use PHPCompiler\Ast\StaticClassAnnotator;
 use PHPCompiler\Ast\StaticClassPreprocessor;
 use PHPCompiler\Ast\InOperatorDesugar;
-use PHPCompiler\Ast\ExitTwoArgDesugar;
+use PHPCompiler\Ast\ExitFunctionDesugar;
 use PHPCompiler\Ast\PipeOperatorDesugar;
-use PHPCompiler\Visitor\ExitTwoArgResolver;
 use PHPCompiler\Visitor\InOperatorResolver;
+use PHPCompiler\Visitor\ExitFunctionResolver;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Lint\LintCompiler;
 use PHPCompiler\Compiler\CompileFatal;
@@ -123,7 +123,7 @@ class Runtime {
 
         $this->preprocessor = new Traverser;
         $this->preprocessor->addVisitor(new InOperatorResolver);
-        $this->preprocessor->addVisitor(new ExitTwoArgResolver);
+        $this->preprocessor->addVisitor(new ExitFunctionResolver);
         $this->preprocessor->addVisitor(new Visitor\Simplifier);
         $this->preprocessor->addVisitor(new Visitor\DeadBlockEliminator);
         $this->postprocessor = new Traverser;
@@ -336,7 +336,7 @@ class Runtime {
     {
         $code = AsymmetricVisibilityRewriter::rewrite($code);
         $code = InOperatorDesugar::desugar($code);
-        $code = ExitTwoArgDesugar::desugar($code);
+        $code = ExitFunctionDesugar::desugar($code);
         return PipeOperatorDesugar::desugar($code);
     }
 

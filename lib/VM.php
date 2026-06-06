@@ -5580,6 +5580,8 @@ restart:
             $this->raiseUncaughtException($signal->errorObject);
 
             return null;
+        } catch (ScriptExit $e) {
+            throw $e;
         } catch (\Exception $e) {
             if ($e instanceof \LogicException) {
                 throw $e;
