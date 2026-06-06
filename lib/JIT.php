@@ -8856,6 +8856,11 @@ class JIT {
             if (null === $result->objectPropertyType) {
                 throw new \LogicException('objectPropertySlot requires objectPropertyType');
             }
+            JIT\DynamicObjectReadonlyGuard::emitBeforePropertyStore(
+                $this->context,
+                $result,
+                $this->context->jitEnclosingBlock
+            );
             JIT\ReadonlyClassGuard::emitBeforePropertyStore(
                 $this->context,
                 $result,
@@ -10098,6 +10103,11 @@ class JIT {
             throw new \LogicException('objectPropertySlot requires objectPropertyType');
         }
         $newVal = $this->compileConcatIntoNewString($left, $right);
+        JIT\DynamicObjectReadonlyGuard::emitBeforePropertyStore(
+            $this->context,
+            $dest,
+            $this->context->jitEnclosingBlock
+        );
         JIT\ReadonlyClassGuard::emitBeforePropertyStore(
             $this->context,
             $dest,
@@ -10298,6 +10308,11 @@ class JIT {
 
             return;
         }
+        JIT\DynamicObjectReadonlyGuard::emitBeforePropertyStore(
+            $this->context,
+            $read,
+            $this->context->jitEnclosingBlock
+        );
         JIT\ReadonlyClassGuard::emitBeforePropertyStore(
             $this->context,
             $read,

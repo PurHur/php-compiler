@@ -199,6 +199,12 @@ final class UnsetHelper
             }
             $prop = $context->type->object->propertyFetch($receiver, $declaringClass, $dimOp->value);
             if (null !== $prop->objectPropertySlot && null !== $prop->objectPropertyType) {
+                DynamicObjectReadonlyGuard::emitBeforePropertyStore(
+                    $context,
+                    $prop,
+                    $context->jitEnclosingBlock,
+                    'unset'
+                );
                 ReadonlyClassGuard::emitBeforePropertyStore(
                     $context,
                     $prop,
@@ -222,6 +228,12 @@ final class UnsetHelper
         $nameVar = $context->getVariableFromOp($dimOp);
         $prop = $context->type->object->propertyFetchDynamic($receiver, $declaringClass, $nameVar);
         if (null !== $prop->objectPropertySlot && null !== $prop->objectPropertyType) {
+            DynamicObjectReadonlyGuard::emitBeforePropertyStore(
+                $context,
+                $prop,
+                $context->jitEnclosingBlock,
+                'unset'
+            );
             ReadonlyClassGuard::emitBeforePropertyStore(
                 $context,
                 $prop,
