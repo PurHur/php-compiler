@@ -19,7 +19,7 @@ Regenerate capability truth: `php script/capability-matrix.php`, `php script/cap
 
 Related merges outside this wave: `goto` ([#1228](https://github.com/PurHur/php-compiler/issues/1228) / [#1333](https://github.com/PurHur/php-compiler/pull/1333)), anonymous classes ([#1233](https://github.com/PurHur/php-compiler/issues/1233) / [#1386](https://github.com/PurHur/php-compiler/pull/1386)).
 
-**M2 spine:** **1273** / **1433** (`php script/bootstrap-spine-count.php`) — `1273` `require_once` units in `compiler_lib_spine_smoke`; **1433** Phase A inventory files (live collector; regenerate `bootstrap-inventory.md` when SSOT drifts). Native spine **link** ✅ with **`bin/vm.php`** [#2134](https://github.com/PurHur/php-compiler/issues/2134); full-spine lint + M4 gen-2→gen-3 recompile 🚧. Union-type php-cfg overlays [#5096](https://github.com/PurHur/php-compiler/pull/5096). Target doc: [self-host-target.md](self-host-target.md)
+**M2 spine:** **1297** / **1626** (`php script/bootstrap-spine-count.php`) — `1297` `require_once` units in `compiler_lib_spine_smoke`; **1626** Phase A inventory files (live collector; regenerate `bootstrap-inventory.md` when SSOT drifts). Native spine **link** ✅ with **`bin/vm.php`** [#2134](https://github.com/PurHur/php-compiler/issues/2134); full-spine lint + M4 gen-2→gen-3 recompile 🚧. Union-type php-cfg overlays [#5096](https://github.com/PurHur/php-compiler/pull/5096). Target doc: [self-host-target.md](self-host-target.md)
 
 ## Language (#1354–#1366)
 
