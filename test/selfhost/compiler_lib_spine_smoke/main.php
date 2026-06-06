@@ -963,6 +963,7 @@ require_once __DIR__.'/../../../ext/standard/VmSscanf.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamArg.php';
 require_once __DIR__.'/../../../ext/standard/VmSys.php';
 require_once __DIR__.'/../../../ext/standard/VmVprintf.php';
+require_once __DIR__.'/../../../ext/standard/VmZlibNative.php';
 require_once __DIR__.'/../../../ext/standard/VmZlib.php';
 require_once __DIR__.'/../../../ext/standard/acos.php';
 require_once __DIR__.'/../../../ext/standard/addcslashes.php';
