@@ -9,12 +9,12 @@ use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 
 final class AsymmetricVisibilityRewriterTest extends TestCase
 {
-    public function testRewritePublicPrivateSet(): void
+    public function testRewritePrivateSet(): void
     {
         $source = <<<'PHP'
 <?php
 class Demo {
-    public private(set) string $name = 'x';
+    private(set) string $name = 'x';
 }
 PHP;
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
@@ -25,6 +25,31 @@ PHP;
         );
     }
 
+    public function testPublicPrivateSetCompileErrors(): void
+    {
+        $source = <<<'PHP'
+<?php
+class Demo {
+    public private(set) string $name = 'x';
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
+        AsymmetricVisibilityRewriter::rewrite($source);
+    }
+
+    public function testRewritePublicSetPrivateRead(): void
+    {
+        $source = <<<'PHP'
+<?php
+class Demo {
+    public(set) private string $name = 'x';
+}
+PHP;
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString('/*phpc-asymmetric-set:public*/ private string $name', preg_replace('/\s+/', ' ', $rewritten));
+    }
+
     public function testImplicitPublicRead(): void
     {
         $source = 'private(set) string $x;';
@@ -32,12 +57,12 @@ PHP;
         self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $x', preg_replace('/\s+/', ' ', $rewritten));
     }
 
-    public function testRewritePublicPrivateGet(): void
+    public function testRewritePrivateGet(): void
     {
         $source = <<<'PHP'
 <?php
 class Box {
-    public private(get) string $secret = 'hidden';
+    private(get) string $secret = 'hidden';
 }
 PHP;
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
@@ -51,6 +76,19 @@ PHP;
         );
     }
 
+    public function testPublicPrivateGetCompileErrors(): void
+    {
+        $source = <<<'PHP'
+<?php
+class Box {
+    public private(get) string $secret = 'hidden';
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
+        AsymmetricVisibilityRewriter::rewrite($source);
+    }
+
     public function testImplicitPublicWriteForPrivateGet(): void
     {
         $source = 'private(get) string $x = "a";';
@@ -61,7 +99,7 @@ PHP;
         );
     }
 
-    public function testRewriteConstructorPromotedPrivateSet(): void
+    public function testPromotedPublicPrivateSetCompileErrors(): void
     {
         $source = <<<'PHP'
 <?php
@@ -71,10 +109,8 @@ class User {
     ) {}
 }
 PHP;
-        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
-        self::assertStringContainsString(
-            '/*phpc-asymmetric-set:private*/ public string $name',
-            preg_replace('/\s+/', ' ', $rewritten)
-        );
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
+        AsymmetricVisibilityRewriter::rewrite($source);
     }
 }
