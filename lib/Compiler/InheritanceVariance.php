@@ -371,7 +371,7 @@ final class InheritanceVariance
             return false;
         }
         if ($parent->isVoid()) {
-            return $child->isVoid();
+            return $child->isVoid() || $child->isNever();
         }
         if ($parent->isNever()) {
             return $child->isNever();
