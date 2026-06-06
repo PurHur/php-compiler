@@ -2177,7 +2177,35 @@ apply_php_types_throw_expr_overlay_to_target() {
     return 0
   fi
   if grep -q "case 'Expr_Throw':" "$target" 2>/dev/null; then
-    echo "Skip php-types-throw-expr.patch (already applied): ${target}"
+    if grep -A1 "case 'Expr_Throw':" "$target" 2>/dev/null | grep -q 'Type::never()'; then
+      echo "Skip php-types-throw-expr.patch (already applied): ${target}"
+      return 0
+    fi
+    # Upgrade legacy fall-through (Expr_Exit + Expr_Throw → null) to never (#6746).
+    if ! python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+old = """            case 'Expr_Exit':
+            case 'Expr_Throw':
+            case 'Iterator_Reset':
+                return [Type::null()];"""
+new = """            case 'Expr_Exit':
+            case 'Iterator_Reset':
+                return [Type::null()];
+            case 'Expr_Throw':
+                return [Type::never()];"""
+if old not in text:
+    raise SystemExit(1)
+path.write_text(text.replace(old, new, 1))
+PY
+    then
+      echo "Skip php-types-throw-expr.patch (already applied): ${target}"
+      return 0
+    fi
+    echo "Applied php-types-throw-expr.patch (never upgrade): ${target}"
     return 0
   fi
   if ! python3 - "$target" <<'PY'
@@ -2193,17 +2221,30 @@ anchors = [
             case 'Iterator_Reset':
                 return [Type::null()];""",
         """            case 'Expr_Exit':
+            case 'Iterator_Reset':
+                return [Type::null()];
+            case 'Expr_Throw':
+                return [Type::never()];""",
+    ),
+    (
+        """            case 'Expr_Exit':
             case 'Expr_Throw':
             case 'Iterator_Reset':
                 return [Type::null()];""",
+        """            case 'Expr_Exit':
+            case 'Iterator_Reset':
+                return [Type::null()];
+            case 'Expr_Throw':
+                return [Type::never()];""",
     ),
     (
         """            case 'Expr_Exit':
                 return [Type::null()];
             case 'Iterator_Reset':""",
         """            case 'Expr_Exit':
-            case 'Expr_Throw':
                 return [Type::null()];
+            case 'Expr_Throw':
+                return [Type::never()];
             case 'Iterator_Reset':""",
     ),
 ]
@@ -2211,16 +2252,6 @@ for old, new in anchors:
     if old in text:
         path.write_text(text.replace(old, new, 1))
         raise SystemExit(0)
-
-match = re.search(
-    r"(?m)^(\s+case 'Expr_Exit':\n)(\s+case 'Iterator_Reset':)",
-    text,
-)
-if match:
-    indent = match.group(1).split("case")[0]
-    insert = f"{match.group(1)}{indent}case 'Expr_Throw':\n{match.group(2)}"
-    path.write_text(text[: match.start()] + insert + text[match.end() :])
-    raise SystemExit(0)
 
 sys.stderr.write("php-types-throw-expr: TypeReconstructor Expr_Exit anchor not found\n")
 raise SystemExit(1)
@@ -3642,6 +3673,10 @@ apply_patch() {
       record_patch_failure "${patch_name}" "required for AOT (declare(strict_types))"
       return 1
       ;;
+    php-cfg-new-ctor-parens.patch)
+      echo "Skip ${patch_name} (optional — stale hunk #6549; does not block throw-expr #6746)"
+      return 0
+      ;;
     *)
       if patch_marker_present "$patch"; then
         echo "Skip ${patch_name} (already applied)"
@@ -3683,6 +3718,9 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   # ++/-- overlays are hard-required — missing PostInc arms break compile (#6326, #6321).
   apply_php_cfg_incdec_expr_overlay
   apply_php_types_incdec_type_overlay
+  # Throw expressions must survive optional patch failures (#6746, #5151).
+  apply_php_cfg_throw_expr_overlay
+  apply_php_types_throw_expr_overlay
   apply_patch "$PATCH_DIR/php-cfg-dollars-brace.patch"
   apply_patch "$PATCH_DIR/php-cfg-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-cfg-nullsafe.patch"

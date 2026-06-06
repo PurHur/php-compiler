@@ -177,4 +177,6 @@ diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php vendor/ircmaxell/php-c
 +
 +        return $i;
 +    }
- 
+
+     protected function parseExpr_PostDec(Expr\PostDec $expr)
+
