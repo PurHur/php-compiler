@@ -27,6 +27,9 @@ final class ClassCompileRegistry
     /** @var array<string, true> registered trait lc names (#4973) */
     private array $traits = [];
 
+    /** @var array<string, CfgBlock> trait lc name => body stmts (#6761) */
+    private array $traitStmts = [];
+
     public function registerClass(string $name, ?string $parentLc, array $interfaceLcs, CfgBlock $stmts): void
     {
         $lc = self::lc($name);
@@ -52,7 +55,22 @@ final class ClassCompileRegistry
         $this->parents[$lc] = null;
         $this->interfaces[$lc] = [];
         $this->traits[$lc] = true;
+        $this->traitStmts[$lc] = $stmts;
         $this->methods[$lc] = self::methodSigsFromStmts($stmts, $lc);
+    }
+
+    public function getTraitStmts(string $lcName): ?CfgBlock
+    {
+        $lc = self::lc($lcName);
+
+        return $this->traitStmts[$lc] ?? null;
+    }
+
+    public function traitDisplayName(string $lcName): string
+    {
+        $lc = self::lc($lcName);
+
+        return $this->displayNames[$lc] ?? $lc;
     }
 
     public function isTrait(string $lcName): bool
