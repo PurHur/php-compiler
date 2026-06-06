@@ -14,6 +14,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * LLVM phpc_strspn_ex (mirrors VmString::strspn/strcspn / former phpc_strspn.c).
+ *
+ * PHP 8.4 (GH-12592): empty mask — strspn returns 0, strcspn returns segment byte length.
  */
 final class StringStrspnJit
 {
