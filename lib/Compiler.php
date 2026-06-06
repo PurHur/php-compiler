@@ -786,11 +786,14 @@ class Compiler {
         return $this->mergeCfgBlockUsesEchoPhi($ifMerge);
     }
 
-    /** `?:` in `echo`/concat merge uses echo phi slots; `return ?:` uses RETURN (#4280). */
+    /** `?:` in `echo`/concat merge uses echo phi slots; `return ?:` uses RETURN (#4280); `throw ?:` uses TYPE_THROW (#7037). */
     private function mergeCfgBlockUsesEchoPhi(CfgBlock $merge): bool
     {
         foreach ($merge->children as $child) {
             if ($child instanceof Op\Terminal\Echo_) {
+                return true;
+            }
+            if ($child instanceof Op\Terminal\Throw_) {
                 return true;
             }
         }
@@ -1006,9 +1009,23 @@ class Compiler {
         return null;
     }
 
+    /** `throw $a ? $b : $c` merge block carries the phi slot on TYPE_THROW (#7037). */
+    private function mergeThrowSlot(Block $merge): ?int
+    {
+        foreach ($merge->opCodes as $op) {
+            if (OpCode::TYPE_THROW === $op->type) {
+                return $op->arg1;
+            }
+        }
+
+        return null;
+    }
+
     private function mergePhiResultSlot(Block $merge): ?int
     {
-        return $this->mergeEchoSlot($merge) ?? $this->mergeReturnSlot($merge);
+        return $this->mergeEchoSlot($merge)
+            ?? $this->mergeReturnSlot($merge)
+            ?? $this->mergeThrowSlot($merge);
     }
 
     /** ?: branch throw `new` must not reuse merge phi / echo slot (#3802). */
