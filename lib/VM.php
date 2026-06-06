@@ -787,6 +787,106 @@ class VM {
     }
 
     /**
+     * Declared + dynamic properties for get_object_vars() / var_export() get-hook reads (#5203, #6453).
+     *
+     * php-src: zend_hooked_object_build_properties + zend_read_property_ex
+     *
+     * @return array<string, Variable>
+     */
+    public function collectObjectVarsForBuiltin(ObjectEntry $object, Frame $frame): array
+    {
+        $ctx = $this->context;
+        $scopeFrame = $frame;
+        while (null !== $scopeFrame && null !== $scopeFrame->handler) {
+            $scopeFrame = $scopeFrame->parent;
+        }
+        if (null === $scopeFrame) {
+            $scopeFrame = $frame;
+        }
+        $callerClassLc = $this->callerClassLc($scopeFrame);
+        /** @var array<string, Variable> $result */
+        $result = [];
+        /** @var array<string, true> $seenLc */
+        $seenLc = [];
+        foreach (array_reverse(\PHPCompiler\ext\standard\VmReflection::classHierarchyChain($object->class, $ctx)) as $class) {
+            foreach ($class->properties as $meta) {
+                $lc = strtolower($meta->name);
+                if (isset($seenLc[$lc])) {
+                    continue;
+                }
+                $seenLc[$lc] = true;
+                if (!$this->isPropertyAccessibleForObjectVars($meta, $callerClassLc)) {
+                    continue;
+                }
+                if ($meta->propertyHookVirtual && null === $meta->getHookMethodLc) {
+                    continue;
+                }
+                if (null !== $meta->getHookMethodLc) {
+                    $hookValue = $this->fetchPropertyWithHooks($object, $meta->name, $scopeFrame);
+                    if (null === $hookValue) {
+                        continue;
+                    }
+                    $value = $hookValue->resolveIndirect();
+                    if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                        continue;
+                    }
+                    $copy = new Variable();
+                    $copy->copyFrom($value);
+                    $result[$meta->name] = $copy;
+
+                    continue;
+                }
+                if (!$object->hasProperty($meta->name)) {
+                    continue;
+                }
+                $value = $object->getProperty($meta->name)->resolveIndirect();
+                if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                    continue;
+                }
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $result[$meta->name] = $copy;
+            }
+        }
+        foreach ($object->getRawProperties() as $name => $prop) {
+            if (isset($seenLc[strtolower($name)])) {
+                continue;
+            }
+            $value = $prop->resolveIndirect();
+            if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $result[$name] = $copy;
+        }
+
+        return $result;
+    }
+
+    private function isPropertyAccessibleForObjectVars(VM\ClassProperty $meta, ?string $callerClassLc): bool
+    {
+        if (MethodVisibility::isPublic($meta->visibility)) {
+            return true;
+        }
+        if (null === $callerClassLc) {
+            return false;
+        }
+        if (($meta->visibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+            return $callerClassLc === $meta->declaringClassLc;
+        }
+        if (($meta->visibility & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+            if ($callerClassLc === $meta->declaringClassLc) {
+                return true;
+            }
+
+            return $this->isClassSameOrSubclassOf($callerClassLc, $meta->declaringClassLc);
+        }
+
+        return true;
+    }
+
+    /**
      * Zend zend_check_clone: private/protected __clone() rejects external-scope clone (#5077).
      *
      * @return null when clone is allowed, or a catch frame when Error was dispatched
@@ -6740,7 +6840,7 @@ restart:
     private function callerClassLc(Frame $frame): ?string
     {
         $classLc = null;
-        if (null !== $frame->block->func && null !== $frame->block->func->class) {
+        if (null !== $frame->block && null !== $frame->block->func && null !== $frame->block->func->class) {
             $classLc = strtolower($frame->block->func->class->value);
         } elseif (null !== $frame->calledClass && '' !== $frame->calledClass) {
             $classLc = strtolower($frame->calledClass);

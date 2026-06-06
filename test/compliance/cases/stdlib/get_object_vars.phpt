@@ -19,4 +19,4 @@ echo count($w);
 echo isset($w['x']) ? '1' : '0';
 echo "\n";
 --EXPECT--
-31hi120
+21hi010
