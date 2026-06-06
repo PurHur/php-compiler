@@ -9,12 +9,22 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #6124: AOT standalone must define info helpers without phpc_info.c.
+ * Issue #5492 / #6124: AOT standalone must define info helpers without phpc_info.c.
  *
  * @group aot-lint
  */
 final class StringInfoRuntimeStandaloneTest extends TestCase
 {
+    public function testRuntimeShrinkRemovesInfoC(): void
+    {
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/phpc_info.c');
+        $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
+        $this->assertStringNotContainsString('phpc_info.c', $linker);
+        $info = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringInfo.php');
+        $this->assertStringContainsString('__compiler_phpversion', $info);
+        $this->assertStringContainsString('replaces lib/AOT/runtime/phpc_info.c', $info);
+    }
+
     public function testEnsureLinkedDefinesInfoForStandalone(): void
     {
         $runtime = new Runtime(Runtime::MODE_AOT);
