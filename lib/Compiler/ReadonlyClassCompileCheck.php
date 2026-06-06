@@ -46,6 +46,9 @@ final class ReadonlyClassCompileCheck
         }
         $readonly = ClassReadonly::fromClassFlags($class->flags);
         $display = $this->operandDisplayName($class->name, $lc);
+        if ($readonly) {
+            $this->verifyReadonlyClassNoStaticProperties($class, $display);
+        }
         $this->verifyNoPropertyDefaults($class, $display, $readonly);
         $this->verifyNoStaticReadonlyProperties($class, $display);
         $parentLc = null;
@@ -57,6 +60,18 @@ final class ReadonlyClassCompileCheck
             'readonly' => $readonly,
             'extends' => $parentLc,
         ];
+    }
+
+    private function verifyReadonlyClassNoStaticProperties(Op\Stmt\Class_ $class, string $classDisplay): void
+    {
+        foreach ($class->stmts->children as $member) {
+            if (!$member instanceof Op\Stmt\Property || !$member->static) {
+                continue;
+            }
+            throw new \CompileError(
+                "Readonly class {$classDisplay} cannot declare static properties"
+            );
+        }
     }
 
     private function verifyNoStaticReadonlyProperties(Op\Stmt\Class_ $class, string $classDisplay): void

@@ -64,6 +64,21 @@ PHP;
         $runtime->parseAndCompile($code, 'readonly_prop_default.php');
     }
 
+    /** @covers issue #6862 */
+    public function testReadonlyClassStaticPropertyFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+readonly class R {
+    public static string $label = 'shared';
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Readonly class R cannot declare static properties');
+        $runtime->parseAndCompile($code, 'readonly_class_static.php');
+    }
+
     public function testStaticReadonlyPropertyFailsAtCompileTime(): void
     {
         $runtime = new Runtime();
