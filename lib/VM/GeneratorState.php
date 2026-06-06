@@ -59,6 +59,9 @@ final class GeneratorState
 
     public Variable $pendingThrow;
 
+    /** Closure binding when this generator was created from a closure (#6567). */
+    public ?ClosureState $closureCall = null;
+
     public function __construct(
         public readonly \PHPCompiler\VM $vm,
         public readonly Func\PHP $func,
