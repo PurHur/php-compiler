@@ -27,6 +27,24 @@ PHP,
         );
     }
 
+    public function testPrivateClassConstantRejectedFromGlobalScope(): void
+    {
+        $this->assertVmOutput(
+            <<<'PHP'
+<?php
+class C {
+    private const X = 1;
+}
+try {
+    echo C::X;
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP,
+            "Cannot access private constant C::X\n"
+        );
+    }
+
     private function assertVmOutput(string $code, string $expected): void
     {
         $runtime = new Runtime();
