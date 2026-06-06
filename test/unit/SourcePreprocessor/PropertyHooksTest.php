@@ -339,4 +339,23 @@ PHP;
         self::assertStringContainsString('$x { get; }', $out);
         self::assertSame([], $registry);
     }
+
+    /** @covers issue #7031 — same-name backing field must merge with hooked property decl */
+    public function testMergesSameNameBackingFieldDeclaration(): void
+    {
+        $src = <<<'PHP'
+<?php
+class Evaled {
+    public string $name {
+        get => strtoupper($this->name ?? "");
+        set => $this->name = strtolower($value);
+    }
+    private string $name = "x";
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('public string $name = "x";', $out);
+        self::assertStringNotContainsString('private string $name', $out);
+        self::assertSame('__phpc_property_set_name', $registry['evaled']['name']['set'] ?? null);
+    }
 }
