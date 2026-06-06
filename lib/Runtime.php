@@ -29,7 +29,9 @@ use PHPCompiler\Ast\GroupUseStripper;
 use PHPCompiler\Ast\SealedClassAnnotator;
 use PHPCompiler\Ast\SealedClassPreprocessor;
 use PHPCompiler\Ast\InOperatorDesugar;
+use PHPCompiler\Ast\ExitTwoArgDesugar;
 use PHPCompiler\Ast\PipeOperatorDesugar;
+use PHPCompiler\Visitor\ExitTwoArgResolver;
 use PHPCompiler\Visitor\InOperatorResolver;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Lint\LintCompiler;
@@ -114,6 +116,7 @@ class Runtime {
 
         $this->preprocessor = new Traverser;
         $this->preprocessor->addVisitor(new InOperatorResolver);
+        $this->preprocessor->addVisitor(new ExitTwoArgResolver);
         $this->preprocessor->addVisitor(new Visitor\Simplifier);
         $this->preprocessor->addVisitor(new Visitor\DeadBlockEliminator);
         $this->postprocessor = new Traverser;
@@ -322,6 +325,7 @@ class Runtime {
     {
         $code = AsymmetricVisibilityRewriter::rewrite($code);
         $code = InOperatorDesugar::desugar($code);
+        $code = ExitTwoArgDesugar::desugar($code);
         return PipeOperatorDesugar::desugar($code);
     }
 

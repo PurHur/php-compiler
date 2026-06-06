@@ -50,6 +50,8 @@ class OpCode {
     const TYPE_EVAL = 33;
     /** arg3 = exit/die expression startLine when known (#6358). */
     const TYPE_EXIT = 34;
+    /** TYPE_EXIT: optional message operand slot for exit($status, $message) (#6718). */
+    public ?int $exitMessageSlot = null;
     const TYPE_SMALLER_OR_EQUAL = 35;
     const TYPE_GREATER_OR_EQUAL = 36;
     const TYPE_CAST_ARRAY = 37;
