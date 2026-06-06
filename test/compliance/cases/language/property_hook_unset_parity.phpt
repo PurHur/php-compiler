@@ -1,6 +1,7 @@
+--TEST--
+unset() on property hooks — get-only Error, read/write clears backing (issue #6609, zend_property_hooks.c)
+--FILE--
 <?php
-// Issue #6609 — Zend parity for unset() on property hooks (zend_property_hooks.c).
-// get-only hook — must Error (read-only)
 class RO {
     public string $x { get => $this->v; }
     private string $v = 'a';
@@ -13,7 +14,6 @@ try {
     echo 'RO: ', get_class($e), ': ', $e->getMessage(), "\n";
 }
 
-// read/write hook — must clear backing
 class RW {
     private ?string $v = 'a';
     public string $x { get => $this->v ?? 'u'; set => $this->v = $value; }
@@ -21,3 +21,6 @@ class RW {
 $h = new RW();
 unset($h->x);
 echo 'RW isset=', var_export(isset($h->x), true), ' value=', $h->x, "\n";
+--EXPECT--
+RO: Error: Cannot unset read-only property RO::$x
+RW isset=false value=u
