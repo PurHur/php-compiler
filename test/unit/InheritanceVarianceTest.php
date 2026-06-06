@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\Compiler\InheritanceVariance;
+use PHPCompiler\Compiler\MethodSig;
+use PHPCompiler\Compiler\TypeSig;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
@@ -207,5 +210,91 @@ PHP;
         ob_start();
         $runtime->run($block);
         $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    /** Interface `: self` return — implementing class may use `: static` (zend_inheritance.c, #6734). */
+    public function testInterfaceSelfReturnChildStaticAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {
+    public function make(): self;
+}
+class C implements I {
+    public function make(): static {
+        return new static();
+    }
+}
+echo (new C())->make()::class, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'iface_self_static.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("C\n", ob_get_clean());
+    }
+
+    /** Parent `: self` return — child may use `: static` (zend_inheritance.c, #6734). */
+    public function testParentSelfReturnChildStaticAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Base {
+    public function make(): self { return $this; }
+}
+class Child extends Base {
+    public function make(): static { return new static(); }
+}
+echo (new Child())->make()::class, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'parent_self_child_static.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("Child\n", ob_get_clean());
+    }
+
+    /** Parent `: static` return — child `: self` must fail (zend_inheritance.c, #6734). */
+    public function testParentStaticReturnChildSelfFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Base {
+    public function make(): static { return new static(); }
+}
+class Child extends Base {
+    public function make(): self { return $this; }
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $runtime->parseAndCompile($code, 'parent_static_child_self.php');
+    }
+
+    public function testReturnCompatibilityInterfaceSelfResolvedClassWithChildStatic(): void
+    {
+        class_exists(InheritanceVariance::class);
+
+        $parentType = new TypeSig();
+        $parentType->classLc = 'i';
+        $parentType->classDisplay = 'I';
+
+        $childType = new TypeSig();
+        $childType->static = true;
+
+        $parent = new MethodSig('i', [], [], [], $parentType);
+        $child = new MethodSig('c', [], [], [], $childType);
+
+        $this->assertNull(InheritanceVariance::methodCompatibilityError(
+            'C',
+            'make',
+            $child,
+            'I',
+            $parent,
+            static fn (string $sub, string $super): bool => false,
+            static fn (string $class, string $iface): bool => 'c' === $class && 'i' === $iface
+        ));
     }
 }

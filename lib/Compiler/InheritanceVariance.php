@@ -382,6 +382,9 @@ final class InheritanceVariance
         if ($parent->nullable && !$child->nullable && !$child->isVoid() && !$child->isNever()) {
             return false;
         }
+        if ($parent->static && !$child->static) {
+            return false;
+        }
         if ($parent->builtinScalar !== null || $child->builtinScalar !== null) {
             if ($parent->signatureKey($parentOwnerLc) === $child->signatureKey($childOwnerLc)) {
                 return true;
@@ -396,6 +399,13 @@ final class InheritanceVariance
         }
         if ($parentClass === $childClass) {
             return true;
+        }
+        if ($parent->self && $child->static) {
+            if ($isClassSubtypeOf($childClass, $parentClass)) {
+                return true;
+            }
+
+            return $classImplementsInterface($childClass, $parentClass);
         }
         if ($isClassSubtypeOf($childClass, $parentClass)) {
             return true;
@@ -749,6 +759,17 @@ final class TypeSig
         if ($type instanceof Op\Type\Reference) {
             $decl = $type->declaration;
             if ($decl instanceof Operand\Literal && is_string($decl->value)) {
+                $name = strtolower(ltrim($decl->value, '\\'));
+                if ('self' === $name) {
+                    $sig->self = true;
+
+                    return $sig;
+                }
+                if ('static' === $name) {
+                    $sig->static = true;
+
+                    return $sig;
+                }
                 $sig->classDisplay = ltrim($decl->value, '\\');
                 $sig->classLc = strtolower($sig->classDisplay);
 
