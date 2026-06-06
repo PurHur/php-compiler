@@ -748,6 +748,7 @@ class Type extends Builtin {
             $fntypeAssertFailStr
         );
         $this->context->registerFunction('__compiler_assert_fail_string', $fnAssertFailStr);
+        AssertFail::ensureLinked($this->context);
         $i8p = $this->context->getTypeFromString('int8*');
         $i64p = $this->context->getTypeFromString('int64*');
         $libcFns = [

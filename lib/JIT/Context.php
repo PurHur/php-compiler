@@ -641,6 +641,7 @@ class Context {
             Builtin\TypeErrorRaise::ensureStandaloneBodies($this);
             Builtin\ErrorRaise::ensureStandaloneBodies($this);
             Builtin\ReadonlyRaise::ensureStandaloneBodies($this);
+            Builtin\AssertFail::ensureStandaloneBodies($this);
             Builtin\JitThrow::ensureStandaloneBodies($this);
             Builtin\JitReturnPending::ensureStandaloneBodies($this);
         }
