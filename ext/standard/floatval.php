@@ -180,7 +180,7 @@ final class floatval extends Internal
         $enumEndBlock = null;
         $context->builder->positionAtEnd($objectEnumBlock);
         $objPtr = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
-        $enumDouble = JitScalarEnumCoerce::tryEmitObjectEnumCaseToDouble(
+        $enumDouble = JitScalarEnumCoerce::tryEmitObjectEnumCaseLegacyCastToDouble(
             $context,
             $objPtr,
             'floatval',

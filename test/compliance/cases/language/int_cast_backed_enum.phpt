@@ -13,14 +13,14 @@ enum S: string
     case X = '42';
 }
 
-echo 'E::A: ', (int) E::A, "\n";
+echo 'E::A: ', @(int) E::A, "\n";
 $e = E::B;
-echo 'var: ', (int) $e, "\n";
+echo 'var: ', @(int) $e, "\n";
 @ (int) $e;
 $err = error_get_last();
 echo 'warning: ', $err['message'] ?? '', "\n";
-echo 'S::X: ', (int) S::X, "\n";
-echo 'float: ', (float) E::A, "\n";
+echo 'S::X: ', @(int) S::X, "\n";
+echo 'float: ', @(float) E::A, "\n";
 ?>
 --EXPECT--
 E::A: 1
