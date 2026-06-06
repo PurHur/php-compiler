@@ -1837,13 +1837,10 @@ restart:
 
     private static function compareEnumCaseOperands(Variable $left, Variable $right): int
     {
-        $left = $left->resolveIndirect();
-        $right = $right->resolveIndirect();
-        if (self::TYPE_OBJECT === $left->type && self::TYPE_OBJECT === $right->type) {
-            return EnumCaseSupport::compareSpaceship($left->object, $right->object);
-        }
-        if (self::TYPE_ENUM_CASE === $left->type && self::TYPE_ENUM_CASE === $right->type) {
-            return EnumCaseSupport::compareEnumCaseEntrySpaceship($left->toEnumCase(), $right->toEnumCase());
+        $leftEntry = EnumCaseSupport::enumCaseEntryForVariable($left);
+        $rightEntry = EnumCaseSupport::enumCaseEntryForVariable($right);
+        if (null !== $leftEntry && null !== $rightEntry) {
+            return EnumCaseSupport::compareEnumCaseEntrySpaceship($leftEntry, $rightEntry);
         }
 
         return 1;

@@ -434,15 +434,32 @@ final class EnumCaseSupport
 
     public static function enumCaseNameForVariable(Variable $value): string
     {
+        $entry = self::enumCaseEntryForVariable($value);
+
+        return null !== $entry ? $entry->caseName : '';
+    }
+
+    /**
+     * Normalize TYPE_ENUM_CASE and enum-case TYPE_OBJECT operands for compare (#7006).
+     */
+    public static function enumCaseEntryForVariable(Variable $value): ?EnumCaseEntry
+    {
         $value = $value->resolveIndirect();
         if (Variable::TYPE_ENUM_CASE === $value->type) {
-            return $value->toEnumCase()->caseName;
+            return $value->toEnumCase();
         }
         if (Variable::TYPE_OBJECT === $value->type && self::isEnumCase($value->toObject())) {
-            return $value->toObject()->enumCaseName ?? '';
+            $object = $value->toObject();
+            $backing = new Variable(Variable::TYPE_NULL);
+            $backing->null();
+            if (null !== $object->class->backedType && null !== $object->enumCaseValue) {
+                $backing->copyFrom($object->enumCaseValue);
+            }
+
+            return new EnumCaseEntry($object->class, $object->enumCaseName ?? '', $backing);
         }
 
-        return '';
+        return null;
     }
 
     private static function enumCaseEntryToVariable(EnumCaseEntry $entry): Variable
