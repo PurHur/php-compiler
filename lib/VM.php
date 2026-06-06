@@ -429,8 +429,8 @@ class VM {
     }
 
     /**
-     * empty($obj->prop) — typed declared slots use read semantics (throw when uninitialized);
-     * dynamic / __isset-only properties keep isset semantics (#4912, #3298, zend_object_handlers.c).
+     * empty($obj->prop) — uninitialized typed slots are empty without read (#6787, zend_object_handlers.c);
+     * dynamic / __isset-only properties keep isset semantics (#3298).
      */
     public function emptyObjectProperty(ObjectEntry $object, string $propName, Frame $frame, Variable $dst): ?Frame
     {
@@ -449,6 +449,12 @@ class VM {
             return $catchFrame;
         }
         if ($object->hasProperty($propName)) {
+            $props = $object->getRawProperties();
+            if (isset($props[$propName]) && VM\TypedPropertyCheck::isUninitialized($props[$propName])) {
+                $dst->bool(true);
+
+                return null;
+            }
             $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
             if (null !== $hookValue) {
                 $dst->bool(!ext\standard\boolval::isTruthy($hookValue));
@@ -4179,6 +4185,10 @@ restart:
                         break;
                     }
                     $v = $frame->scope[$op->arg2]->resolveIndirect();
+                    if (VM\TypedPropertyCheck::isUninitialized($v)) {
+                        $frame->scope[$op->arg1]->bool(true);
+                        break;
+                    }
                     $frame->scope[$op->arg1]->bool(!ext\standard\boolval::isTruthy($v));
                     break;
                 case OpCode::TYPE_EMPTY_OBJECT_PROPERTY:
