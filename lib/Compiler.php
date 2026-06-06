@@ -33,6 +33,7 @@ use PHPCompiler\VM\ClassReadonly;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
+use PHPCompiler\Compiler\EnumAbstractMethodCompileCheck;
 use PHPCompiler\Compiler\EnumBackedCaseCheck;
 use PHPCompiler\Compiler\EnumMagicMethodCheck;
 use PHPCompiler\Compiler\EnumParentCompileCheck;
@@ -377,6 +378,7 @@ class Compiler {
         AbstractMethodVisibilityCheck::validate($script);
         MagicMethodReturnTypeCheck::validate($script);
         EnumMagicMethodCheck::validate($script);
+        EnumAbstractMethodCompileCheck::validate($script);
         EnumParentCompileCheck::validate($script);
         EnumBackedCaseCheck::validate($script);
         ReadonlyClassCompileCheck::validate($script);
