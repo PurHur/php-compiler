@@ -213,7 +213,7 @@ PHP;
         self::assertTrue($registry['box']['value']['virtual'] ?? false);
     }
 
-    public function testRejectsStaticPropertyHooks(): void
+    public function testLowersStaticPropertyHooks(): void
     {
         $src = <<<'PHP'
 <?php
@@ -225,12 +225,11 @@ class Box {
     private static ?string $v = null;
 }
 PHP;
-        try {
-            (new PropertyHooks())->process($src, 'static_hooks.php');
-            self::fail('Expected CompileFatal for static property hooks');
-        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
-            self::assertSame(PropertyHooks::STATIC_HOOK_COMPILE_ERROR, $e->getMessage());
-        }
+        [$out, $registry] = (new PropertyHooks())->process($src, 'static_hooks.php');
+        self::assertStringContainsString('public static string $label;', $out);
+        self::assertStringContainsString('public static function __phpc_property_get_label()', $out);
+        self::assertStringContainsString('public static function __phpc_property_set_label($value)', $out);
+        self::assertTrue($registry['box']['label']['static'] ?? false);
     }
 
     public function testLowersSetBlockHookWithNestedBackingField(): void

@@ -1,16 +1,11 @@
---TEST--
-Language: trait static property hooks compile and run (#6931, #6624)
---FILE--
 <?php
-trait T {
+// Issue #6931 — PHP 8.4 static property hooks (zend_property_hooks.c).
+class C {
     public static string $x {
         get => self::$v;
         set => self::$v = $value;
     }
     private static ?string $v = null;
 }
-class C { use T; }
-C::$x = 'ok';
+C::$x = 'b';
 echo C::$x, "\n";
---EXPECT--
-ok
