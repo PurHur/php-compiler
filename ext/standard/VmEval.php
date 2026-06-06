@@ -60,6 +60,8 @@ final class VmEval
 
         try {
             $block = $runtime->parseAndCompile($wrapped, self::EVAL_FILENAME);
+        } catch (\CompileError $e) {
+            throw $e;
         } catch (\Throwable $e) {
             self::recordParseError($ctx, $e->getMessage(), self::lineFromThrowable($e));
 

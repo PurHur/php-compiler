@@ -32,7 +32,7 @@ final class EvalHelper
 
         if (null !== $literal) {
             $evalBlock = self::tryCompileEvalLiteral($jit->context->runtime, $literal);
-            if (null !== $evalBlock) {
+            if ($evalBlock instanceof Block) {
                 IncludeHelper::compileInlinedBlock(
                     $jit,
                     $func,
@@ -58,6 +58,8 @@ final class EvalHelper
 
         try {
             $block = $runtime->parseAndCompile($wrapped, VmEval::EVAL_FILENAME);
+        } catch (\CompileError) {
+            return null;
         } catch (\Throwable) {
             return null;
         }

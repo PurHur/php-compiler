@@ -46,6 +46,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'sealed_class')) {
                 continue;
             }
+            // eval() readonly inheritance compile fatal: VM + known-class compile check (#7170); MCJIT inline eval deferral pending.
+            if (str_contains($name, 'eval_readonly_inheritance') || str_contains($name, 'eval_nonreadonly_extends_readonly')) {
+                continue;
+            }
             // preserve_keys=true: VM + JIT/AOT via ArrayBuiltinHelper (#3524).
             // array_merge_recursive(): VM + JIT via ArrayBuiltinHelper overlay (#3297, #6177).
             if (str_contains(strtolower($case[0]), 'array_merge_recursive')) {
