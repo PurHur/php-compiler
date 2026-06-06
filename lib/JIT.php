@@ -6464,6 +6464,15 @@ class JIT {
                         return $origBasicBlock;
                     }
                     if (0 === $this->context->inlineIncludeDepth) {
+                        if ($block->returnTypeNever) {
+                            $neverFunc = null !== $block->func ? $block->func->name : null;
+                            JIT\Builtin\TypeErrorRaise::emitRaise(
+                                $this->context,
+                                null !== $neverFunc && '' !== $neverFunc
+                                    ? "{$neverFunc}(): never-returning function must not implicitly return"
+                                    : 'A never-returning function must not return'
+                            );
+                        }
                         if (
                             !$this->isVoidLlvmFunction($func)
                             && null !== $block->func

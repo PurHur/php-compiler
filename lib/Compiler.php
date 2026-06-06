@@ -539,6 +539,17 @@ class Compiler {
     }
 
     /**
+     * Zend allows implicit fall-off on :never (runtime TypeError); explicit `return;` is compile fatal (#4206).
+     * php-cfg synthetic trailing returns have no source attributes; user `return;` carries startLine.
+     */
+    protected function neverFunctionReturnIsImplicitFalloff(Op\Terminal\Return_ $return): bool
+    {
+        $attrs = $return->getAttributes();
+
+        return [] === $attrs || !isset($attrs['startLine']);
+    }
+
+    /**
      * @param list<Op\Expr\Param> $params
      */
     protected function assertNoDuplicateParameterNames(array $params): void
@@ -7661,6 +7672,11 @@ class Compiler {
                     }
                     if ($this->neverFunctionHasAbnormalExitBeforeReturn($block->orig, $terminal)) {
                         return [];
+                    }
+                    if ($this->neverFunctionReturnIsImplicitFalloff($terminal)) {
+                        return [new OpCode(
+                            OpCode::TYPE_RETURN_VOID
+                        )];
                     }
                     $this->throwCompileError('A never-returning function must not return');
                 }

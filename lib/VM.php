@@ -9260,7 +9260,11 @@ restart:
             return;
         }
         if ($block->returnTypeNever) {
-            TypeCheck::assertNeverReturn();
+            $funcName = null;
+            if (null !== $block->func) {
+                $funcName = $block->func->name;
+            }
+            TypeCheck::assertNeverReturn($funcName);
 
             return;
         }
