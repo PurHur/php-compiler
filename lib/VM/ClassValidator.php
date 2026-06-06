@@ -20,6 +20,7 @@ final class ClassValidator
         self::rebuildAbstractMethods($entry, $context);
         self::validateInterfaceImplementation($entry, $context);
         self::validateAbstractMethodsResolved($entry);
+        self::validateAbstractPropertyHooksResolved($entry, $context);
     }
 
     public static function assertInstantiable(ClassEntry $entry): void
@@ -103,6 +104,26 @@ final class ClassValidator
             "Class {$entry->name} contains {$count} abstract method"
             .(1 === $count ? '' : 's')
             ." and must therefore be declared abstract or implement the remaining methods ({$entry->name}::{$first})"
+        );
+    }
+
+    private static function validateAbstractPropertyHooksResolved(ClassEntry $entry, Context $context): void
+    {
+        $missing = AbstractPropertyHookCheck::missingForClass($entry, $context);
+        if ([] === $missing) {
+            return;
+        }
+
+        $count = count($missing);
+        $list = implode(', ', array_map(
+            static fn (array $pair): string => $pair[0].'::'.$pair[1],
+            $missing
+        ));
+
+        throw new \LogicException(
+            "Class {$entry->name} contains {$count} abstract method"
+            .(1 === $count ? '' : 's')
+            ." and must therefore be declared abstract or implement the remaining methods ({$list})"
         );
     }
 

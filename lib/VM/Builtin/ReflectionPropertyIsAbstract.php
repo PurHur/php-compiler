@@ -1,0 +1,38 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\VM\Builtin;
+
+use PHPCompiler\ext\standard\VmReflection;
+use PHPCompiler\Frame;
+use PHPCompiler\VM\AbstractPropertyHookCheck;
+use PHPCompiler\VM\ReflectionSupport;
+
+/** ReflectionProperty::isAbstract() — VM (#6983, ext/reflection/php_reflection.c). */
+final class ReflectionPropertyIsAbstract extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isAbstract');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = ReflectionSupport::requireReflectionProperty($frame, $frame->calledArgs[0]);
+        $ctx = VmReflection::requireContext($frame);
+        $className = ReflectionSupport::classNameFromReflection($receiver);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            throw new \LogicException('ReflectionProperty refers to unknown class in this compiler build');
+        }
+        $property = ReflectionSupport::propertyNameFromReflection($receiver);
+        $meta = VmReflection::findClassProperty($entry, $property, $ctx);
+        if (null === $meta) {
+            throw new \LogicException("Property {$property} does not exist on {$className}");
+        }
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(AbstractPropertyHookCheck::isAbstractHookProperty($entry, $meta, $ctx));
+        }
+    }
+}
