@@ -99,6 +99,9 @@ class Compiler {
     /** @var array<string, array<string, Variable>> compile-time class constants by lc name */
     private array $compileTimeClassConsts = [];
 
+    /** @var array<string, Variable> lowercase global constant name => compile-time value (#3803, #6542) */
+    private array $compileTimeGlobalConsts = [];
+
     /** @var array<string, ?string> lowercase enum name => backing type (`int`/`string`) while compiling enum body */
     private array $compileTimeEnumBackedTypes = [];
 
@@ -324,6 +327,7 @@ class Compiler {
         $this->abstractEnums = [];
         $this->compileTimeEnumBackedTypes = [];
         $this->compileTimeEnumCaseConstNames = [];
+        $this->compileTimeGlobalConsts = [];
         $this->haltCompilerRemaining = null;
         $this->haltCompilerOffset = null;
         $this->compiledClassStaticProperties = [];
@@ -984,6 +988,10 @@ class Compiler {
     }
 
     protected function compileOps(array $ops, Block $block): void {
+        // Register file-level `const` / literal define() before class bodies and
+        // FUNCDEF defaults so zend_compile_default_value can fold ConstFetch (#6542).
+        $this->prescanCompileTimeGlobalConsts($ops, $block);
+
         // Hoist class-like definitions before functions so JIT/AOT see member
         // constants when compiling FUNCDEF bodies (issue #2215, MiniWebApp Router::CONST).
         foreach ($ops as $child) {
@@ -3932,8 +3940,85 @@ class Compiler {
 
             return $v;
         }
+        $lc = strtolower($name);
+        if (isset($this->compileTimeGlobalConsts[$lc])) {
+            $value = new Variable();
+            $value->copyFrom($this->compileTimeGlobalConsts[$lc]);
+
+            return $value;
+        }
 
         return null;
+    }
+
+    /**
+     * Pre-register global `const` and literal define() for default-value folding (#6542).
+     *
+     * @param list<Op> $ops
+     */
+    protected function prescanCompileTimeGlobalConsts(array $ops, Block $block): void
+    {
+        foreach ($ops as $child) {
+            if ($child instanceof Op\Terminal\Const_) {
+                $this->prescanGlobalConstTerminal($child, $block);
+                continue;
+            }
+            if ($child instanceof Op\Expr\FuncCall) {
+                $this->prescanDefineFuncCall($child, $block);
+            }
+        }
+    }
+
+    protected function prescanGlobalConstTerminal(Op\Terminal\Const_ $const, Block $block): void
+    {
+        $name = $this->staticNameFromOperand($const->name);
+        if (null === $name) {
+            return;
+        }
+        $valueSlot = $this->tryFoldGlobalConstValueSlot($const, $block);
+        if (null === $valueSlot || !isset($block->constants[$valueSlot])) {
+            return;
+        }
+        $this->storeCompileTimeGlobalConst($name, $block->constants[$valueSlot]);
+    }
+
+    protected function prescanDefineFuncCall(Op\Expr\FuncCall $expr, Block $block): void
+    {
+        $fnName = $this->staticNameFromOperand($expr->name);
+        if (null === $fnName || 'define' !== strtolower($fnName)) {
+            return;
+        }
+        if (count($expr->args) < 2 || count($expr->args) > 3) {
+            return;
+        }
+        $constNameArg = $expr->args[0];
+        $valueArg = $expr->args[1];
+        if (!$constNameArg instanceof Operand\Literal || !$valueArg instanceof Operand\Literal) {
+            return;
+        }
+        if (Variable::TYPE_STRING !== Variable::mapFromType($constNameArg->type)) {
+            return;
+        }
+        $constName = $constNameArg->value;
+        if (!is_string($constName) || '' === $constName) {
+            return;
+        }
+        $vm = $this->vmVariableFromCfgLiteralOperand($valueArg);
+        if (null === $vm) {
+            return;
+        }
+        $this->storeCompileTimeGlobalConst($constName, $vm);
+    }
+
+    protected function storeCompileTimeGlobalConst(string $name, Variable $value): void
+    {
+        $lc = strtolower($name);
+        if (isset($this->compileTimeGlobalConsts[$lc])) {
+            return;
+        }
+        $stored = new Variable();
+        $stored->copyFrom($value);
+        $this->compileTimeGlobalConsts[$lc] = $stored;
     }
 
     protected function tryFoldClassConstFetchDefault(
@@ -7665,6 +7750,10 @@ class Compiler {
             $this->compileOps($const->valueBlock->children, $block);
             $valueSlot = $this->compileOperand($const->value, $block, true);
         }
+        $constName = $this->staticNameFromOperand($const->name);
+        if (null !== $constName && isset($block->constants[$valueSlot])) {
+            $this->storeCompileTimeGlobalConst($constName, $block->constants[$valueSlot]);
+        }
 
         return new OpCode(
             OpCode::TYPE_DECLARE_GLOBAL_CONST,
@@ -7685,6 +7774,18 @@ class Compiler {
             }
             if (1 === \count($children) && $children[0] instanceof Op\Expr\ClassConstFetch) {
                 $vm = $this->tryFoldClassConstFetchDefault($children[0], $block);
+                if (null !== $vm) {
+                    return $block->registerConstant(new Operand\Temporary(), $vm);
+                }
+            }
+            if (1 === \count($children) && $children[0] instanceof Op\Expr\ConstFetch) {
+                $vm = $this->tryFoldGlobalConstFetch($children[0]);
+                if (null !== $vm) {
+                    return $block->registerConstant(new Operand\Temporary(), $vm);
+                }
+            }
+            if (1 === \count($children) && $children[0] instanceof Op\Expr) {
+                $vm = $this->tryFoldCompileTimeExprDefault($children[0], $block, $children);
                 if (null !== $vm) {
                     return $block->registerConstant(new Operand\Temporary(), $vm);
                 }
@@ -8102,6 +8203,10 @@ class Compiler {
         $valueSlot = $this->compileOperand($valueArg, $block, true);
         if (!isset($block->constants[$constNameSlot], $block->constants[$valueSlot])) {
             return null;
+        }
+        $constName = $block->constants[$constNameSlot]->toString();
+        if ('' !== $constName) {
+            $this->storeCompileTimeGlobalConst($constName, $block->constants[$valueSlot]);
         }
         $ops = [new OpCode(
             OpCode::TYPE_DECLARE_GLOBAL_CONST,
