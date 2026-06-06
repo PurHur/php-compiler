@@ -11,7 +11,7 @@ use PHPCompiler\VM;
 /**
  * session extension module entry (php-src ext/session/session.c; issue #6004).
  *
- * Builtin bodies remain in ext/standard until #5332 migrates session C and #6002 adds lifecycle APIs.
+ * Lifecycle LLVM: {@see \PHPCompiler\JIT\Builtin\SessionLifecycleRuntime} (#5332). #6002 adds lifecycle APIs.
  */
 class Module extends ModuleAbstract
 {

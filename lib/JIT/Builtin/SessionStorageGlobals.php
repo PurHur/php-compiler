@@ -98,10 +98,6 @@ final class SessionStorageGlobals
      */
     public static function implementEnsureDefaults(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__phpc_session_ensure_defaults');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction('__phpc_session_ensure_defaults', $probe);
@@ -161,10 +157,8 @@ final class SessionStorageGlobals
 
     public static function emitCallEnsureDefaults(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
         self::ensureGlobals($context);
+        self::implementEnsureDefaults($context);
         $context->builder->call($context->lookupFunction('__phpc_session_ensure_defaults'));
     }
 }
