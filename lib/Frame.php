@@ -97,6 +97,9 @@ class Frame {
      */
     public array $dynamicLocals = [];
 
+    /** Scope slots that received a runtime value (assign/param/static/inc-dec write, #6800). */
+    public array $initializedSlots = [];
+
     public function __construct(?Handler $handler, ?Block $block, ?Frame $parent, Variable ...$scope) {
         $this->handler = $handler;
         $this->block = $block;

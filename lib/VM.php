@@ -1653,6 +1653,7 @@ restart:
                             goto restart;
                         }
                     }
+                    $this->markScopeSlotInitialized($frame, (int) $op->arg2);
                     break;
                 case OpCode::TYPE_ASSIGN_REF:
                     $catchFrame = $this->dispatchThisReassignFatalIfNeeded($frame, $op->arg1);
@@ -1853,6 +1854,7 @@ restart:
                         }
                     }
                     $frame->scope[$op->arg1]->indirect($storage);
+                    $this->markScopeSlotInitialized($frame, (int) $op->arg1);
                     break;
                 case OpCode::TYPE_JUMPIF_FUNCTION_STATIC_INITIALIZED:
                     if (!isset($frame->block->constants[$op->arg2])) {
@@ -3686,6 +3688,7 @@ restart:
                             goto restart;
                         }
                     }
+                    $this->markScopeSlotInitialized($frame, (int) $op->arg1);
                     break;
                 case OpCode::TYPE_DECLARE_INTERFACE:
                     $name = $frame->scope[$op->arg1]->toString();
@@ -4947,6 +4950,7 @@ restart:
         if (null !== $catchFrame) {
             return $catchFrame;
         }
+        $this->warnUndefinedVariableForIncDecRead($frame, $op, $read, $write);
         $resolvedRead = $read->resolveIndirect();
         $hookedRead = Variable::TYPE_ARRAY === $resolvedRead->type
             ? null
@@ -4998,7 +5002,91 @@ restart:
             return $this->dispatchVmError($e->getMessage(), $frame);
         }
 
+        $this->markScopeSlotInitialized($frame, (int) $op->arg3);
+
         return null;
+    }
+
+    /**
+     * Zend E_WARNING when ++/-- reads an unbound CV (zend_variables.c, issue #6800).
+     */
+    private function warnUndefinedVariableForIncDecRead(
+        Frame $frame,
+        OpCode $op,
+        Variable $read,
+        Variable $write
+    ): void {
+        if (!$this->isSimpleVariableIncDecLvalue($write)) {
+            return;
+        }
+        if (!$this->isUnboundVariableIncDecRead($frame, $op, $read)) {
+            return;
+        }
+        $name = $this->resolveScopeSlotVariableName($frame, (int) $op->arg2)
+            ?? $this->resolveScopeSlotVariableName($frame, (int) $op->arg3);
+        if (null === $name) {
+            return;
+        }
+        $this->context->errors->undefinedVariable(
+            $name,
+            $this->context,
+            $frame,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null
+        );
+    }
+
+    private function isUnboundVariableIncDecRead(Frame $frame, OpCode $op, Variable $read): bool
+    {
+        $resolved = $read->resolveIndirect();
+        if ($resolved->isUndefined()) {
+            return true;
+        }
+        $globalName = $this->context->globalNameForStorage($resolved);
+        if (null !== $globalName) {
+            return !$this->context->isGlobalEverAssigned($globalName);
+        }
+        $staticKey = $this->context->functionStaticKeyForStorage($resolved);
+        if (null !== $staticKey) {
+            return !$this->isFunctionStaticInitializedForFrame($frame, $staticKey);
+        }
+
+        return !isset($frame->initializedSlots[(int) $op->arg2]);
+    }
+
+    private function markScopeSlotInitialized(Frame $frame, int $slot): void
+    {
+        $frame->initializedSlots[$slot] = true;
+        if (!isset($frame->scope[$slot])) {
+            return;
+        }
+        $globalName = $this->context->globalNameForStorage($frame->scope[$slot]->resolveIndirect());
+        if (null !== $globalName) {
+            $this->context->markGlobalEverAssigned($globalName);
+        }
+    }
+
+    private function resolveScopeSlotVariableName(Frame $frame, int $slot): ?string
+    {
+        $operand = $frame->block->operandForScopeSlot($slot);
+
+        return null !== $operand ? Block::resolveVariableName($operand) : null;
+    }
+
+    private function isSimpleVariableIncDecLvalue(Variable $write): bool
+    {
+        if (null !== $this->resolvePropertyWriteOwner($write)) {
+            return false;
+        }
+        $target = $write->resolveIndirect();
+        if (Variable::TYPE_STRING_OFFSET === $target->type) {
+            return false;
+        }
+        $classLc = $write->staticPropertyClassLc ?? $target->staticPropertyClassLc;
+        if (is_string($classLc) && '' !== $classLc) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

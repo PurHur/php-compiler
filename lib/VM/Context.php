@@ -41,6 +41,9 @@ class Context {
     /** @var array<string, Variable> */
     private array $globalVars = [];
 
+    /** @var array<string, true> script globals that received a value (#6800, zend_variables.c) */
+    private array $globalEverAssigned = [];
+
     /** Lazily built $GLOBALS superglobal table (issue #3413). */
     private ?Variable $globalsSuperglobal = null;
 
@@ -427,6 +430,45 @@ class Context {
         return false;
     }
 
+    public function markGlobalEverAssigned(string $name): void
+    {
+        $this->globalEverAssigned[$name] = true;
+    }
+
+    public function isGlobalEverAssigned(string $name): bool
+    {
+        return isset($this->globalEverAssigned[$name]);
+    }
+
+    public function clearGlobalEverAssigned(string $name): void
+    {
+        unset($this->globalEverAssigned[$name]);
+    }
+
+    public function globalNameForStorage(Variable $var): ?string
+    {
+        $resolved = $var->resolveIndirect();
+        foreach ($this->globalVars as $name => $global) {
+            if ($global === $var || $global === $resolved) {
+                return $name;
+            }
+        }
+
+        return null;
+    }
+
+    public function functionStaticKeyForStorage(Variable $var): ?string
+    {
+        $resolved = $var->resolveIndirect();
+        foreach ($this->functionStaticVars as $key => $storage) {
+            if ($storage === $var || $storage === $resolved) {
+                return $key;
+            }
+        }
+
+        return null;
+    }
+
     /** Reset a script-global symbol (unset($name) on {main}, #5089). */
     public function clearGlobalByName(string $name): void
     {
@@ -440,6 +482,7 @@ class Context {
         }
         $global->reset();
         $global->type = Variable::TYPE_UNDEFINED;
+        $this->clearGlobalEverAssigned($name);
         $this->syncGlobalEntryInGlobalsTable($name, $global);
     }
 
