@@ -22,6 +22,62 @@ final class VmStreamContext
     private static int $nextId = 0;
 
     /**
+     * Build a VM stream-context array from caller options (issue #1377, #2457, #6815).
+     *
+     * Deep-copies nested option arrays like JIT {@see \PHPCompiler\JIT\Builtin\StreamContextRuntime}
+     * so assigning the result does not share buckets with the input variable.
+     */
+    public static function createFromVmOptions(?Variable $optionsVar, ?Variable $paramsVar = null): HashTable
+    {
+        $hostOptions = [];
+        if (null !== $optionsVar) {
+            $resolved = $optionsVar->resolveIndirect();
+            if (Variable::TYPE_ARRAY !== $resolved->type) {
+                throw new \LogicException(
+                    'stream_context_create() argument #1 must be an array in this compiler build'
+                );
+            }
+            $exported = VmHttpBuildQuery::export($resolved);
+            if (!\is_array($exported)) {
+                throw new \LogicException(
+                    'stream_context_create() argument #1 must be an array in this compiler build'
+                );
+            }
+            $hostOptions = $exported;
+        }
+
+        $hostParams = [];
+        if (null !== $paramsVar) {
+            $resolvedParams = $paramsVar->resolveIndirect();
+            if (Variable::TYPE_ARRAY !== $resolvedParams->type) {
+                throw new \LogicException(
+                    'stream_context_create() argument #2 must be an array in this compiler build'
+                );
+            }
+            $exportedParams = VmHttpBuildQuery::export($resolvedParams);
+            if (!\is_array($exportedParams)) {
+                throw new \LogicException(
+                    'stream_context_create() argument #2 must be an array in this compiler build'
+                );
+            }
+            $hostParams = $exportedParams;
+        }
+
+        $resource = \stream_context_create($hostOptions, $hostParams);
+        $id = ++self::$nextId;
+        self::$resources[$id] = $resource;
+
+        $ht = null !== $optionsVar && Variable::TYPE_ARRAY === $optionsVar->resolveIndirect()->type
+            ? $optionsVar->resolveIndirect()->toArray()->duplicate()
+            : new HashTable();
+        $marker = new Variable(Variable::TYPE_INTEGER);
+        $marker->int($id);
+        $ht->add(self::MARKER_KEY, $marker);
+
+        return $ht;
+    }
+
+    /**
      * @param array<string, mixed>  $options
      * @param array<string, mixed>|null $params
      */
