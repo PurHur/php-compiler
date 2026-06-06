@@ -59,6 +59,9 @@ final class ReflectionSupport
     /** Serialized attribute ctor args on ReflectionAttribute instances (#3206). */
     public const PROP_ATTR_ARGS = 'args';
 
+    /** Whether this attribute name is duplicated on the target (#6912). */
+    public const PROP_ATTR_IS_REPEATED = 'isRepeated';
+
     public const PROP_ENUM_CASE_NAME = 'case';
 
     public const PROP_FUNC_NAME = 'funcName';
@@ -116,6 +119,7 @@ final class ReflectionSupport
             $obj->constructed = true;
             $obj->getProperty(self::PROP_ATTR_NAME)->string($entry->name);
             $obj->getProperty(self::PROP_ATTR_ARGS)->copyFrom(self::argsToVariable($entry->args, $ctx));
+            $obj->getProperty(self::PROP_ATTR_IS_REPEATED)->bool($entry->isRepeated);
             $slot = new Variable(Variable::TYPE_OBJECT);
             $slot->object($obj);
             $ht->append($slot);

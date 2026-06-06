@@ -44,6 +44,8 @@ use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
 use PHPCompiler\Compiler\ThrowInClassConstCompileCheck;
 use PHPCompiler\Compiler\AsymmetricVisibilityCompileCheck;
 use PHPCompiler\Compiler\CompileFatal;
+use PHPCompiler\Compiler\AttributeClassRegistry;
+use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\AttributeMetadata;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\DeprecatedMetadata;
@@ -134,6 +136,8 @@ class Compiler {
     private bool $scriptHasDnfTypedProperties = false;
 
     private ClassCompileRegistry $classCompileRegistry;
+
+    private AttributeClassRegistry $attributeClassRegistry;
 
     public function setBareRethrowLines(array $lines): void
     {
@@ -356,6 +360,7 @@ class Compiler {
         $this->neverFunctionNames = [];
         $this->scriptHasDnfTypedProperties = false;
         $this->classCompileRegistry = new ClassCompileRegistry();
+        $this->attributeClassRegistry = new AttributeClassRegistry();
         $this->seen = new SplObjectStorage;
         $this->ternaryMergeVarSlots = new SplObjectStorage;
         $this->debugWriteLastPhase('Compiler::compile enter');
@@ -418,6 +423,7 @@ class Compiler {
         $this->abstractClasses = [];
         $this->abstractEnums = [];
         $this->classCompileRegistry = new ClassCompileRegistry();
+        $this->attributeClassRegistry = new AttributeClassRegistry();
         // Inventory-scale sources declare user functions and/or class-like units; emit-smoke only needs {main}
         // — same as compile() without a compile() callee in the M3 emit TU (#2633, #2666).
         if ([] !== $script->functions || $this->emitSmokeScriptHasClassLike($script)) {
@@ -455,6 +461,7 @@ class Compiler {
     public function compileFunc(string $name, CfgFunc $func): Func {
         $this->resetCompileAbortDetail();
         $this->classCompileRegistry = new ClassCompileRegistry();
+        $this->attributeClassRegistry = new AttributeClassRegistry();
         $this->seen = new SplObjectStorage;
 
         $funcBlock = $this->compileCfgBlock($func->cfg, $func->params, $func);
@@ -590,10 +597,11 @@ class Compiler {
     protected function assertNoDuplicateParameterAttributes(array $params): void
     {
         foreach ($params as $param) {
-            $names = AttributeNames::fromOp($param);
+            $entries = AttributeMetadata::fromOp($param);
+            $names = AttributeEntry::namesFromList($entries);
             AttributeNames::assertAllowDynamicPropertiesClassTargetOnly($names, 'parameter');
             AttributeNames::assertOverrideMethodTargetOnly($names, 'parameter');
-            AttributeNames::assertNoDuplicates($names);
+            AttributeNames::validateDuplicates($entries, $this->attributeClassRegistry);
         }
     }
 
@@ -2433,9 +2441,9 @@ class Compiler {
             OpCode::TYPE_DECLARE_INTERFACE,
             $this->compileOperand($iface->name, $block, true)
         );
-        $ifaceAttrs = AttributeNames::fromOp($iface);
-        AttributeNames::assertOverrideMethodTargetOnly($ifaceAttrs, 'class');
-        AttributeNames::assertNoDuplicates($ifaceAttrs);
+        $this->assignAttributeMetadata($return, $iface);
+        AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
+        $this->registerAttributeClassFromEntries($name, $return->attributeEntries);
         $return->classImplements = $extends;
         $this->applySealedMetadataFromOp($iface, $return);
         $return->block1 = $this->compileClassBody(
@@ -2461,7 +2469,7 @@ class Compiler {
         );
         $this->assignAttributeMetadata($return, $trait);
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
-        AttributeNames::assertNoDuplicates($return->attributeNames);
+        $this->registerAttributeClassFromEntries($name, $return->attributeEntries);
         $traitLc = strtolower(ltrim($name, '\\'));
         $this->compiledClassStaticProperties[$traitLc] = $this->compiledClassStaticProperties[$traitLc] ?? [];
         $prevClassStaticCompile = $this->currentClassStaticPropertyCompile;
@@ -2491,9 +2499,12 @@ class Compiler {
             $this->compileOperand($enum->name, $block, true),
             $backedTypeSlot
         );
-        $enumAttrs = AttributeNames::fromOp($enum);
-        AttributeNames::assertOverrideMethodTargetOnly($enumAttrs, 'class');
-        AttributeNames::assertNoDuplicates($enumAttrs);
+        $this->assignAttributeMetadata($return, $enum);
+        AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
+        $enumName = $this->staticNameFromOperand($enum->name);
+        if (null !== $enumName) {
+            $this->registerAttributeClassFromEntries($enumName, $return->attributeEntries);
+        }
         $return->classImplements = $this->interfaceNamesFromOperands($enum->implements);
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($enum->flags ?? 0);
         if ($return->classIsAbstract) {
@@ -2504,7 +2515,6 @@ class Compiler {
                 $this->abstractEnums[$lc] = true;
             }
         }
-        $enumName = $this->staticNameFromOperand($enum->name);
         if (null !== $enumName) {
             $enumLc = strtolower(ltrim($enumName, '\\'));
             $backedTypeName = null;
@@ -2617,7 +2627,6 @@ class Compiler {
         }
         $this->assignAttributeMetadata($declare, $child);
         AttributeNames::assertAllowDynamicPropertiesClassTargetOnly($declare->attributeNames, 'method');
-        AttributeNames::assertNoDuplicates($declare->attributeNames);
         $declare->parameterMetadata = $this->parameterMetadataFromParams($child->func->params);
         $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $result->addOpCode($declare);
@@ -2646,8 +2655,17 @@ class Compiler {
 
     protected function assignAttributeMetadata(OpCode $op, Op $cfgOp): void
     {
-        $op->attributeEntries = AttributeMetadata::fromOp($cfgOp);
-        $op->attributeNames = AttributeNames::fromOp($cfgOp);
+        $entries = AttributeMetadata::fromOp($cfgOp);
+        $op->attributeEntries = AttributeNames::validateDuplicates($entries, $this->attributeClassRegistry);
+        $op->attributeNames = AttributeEntry::namesFromList($op->attributeEntries);
+    }
+
+    /**
+     * @param list<AttributeEntry> $selfEntries
+     */
+    protected function registerAttributeClassFromEntries(string $className, array $selfEntries): void
+    {
+        $this->attributeClassRegistry->registerAttributeClass($className, $selfEntries);
     }
 
     protected function compileClassLike(Op\Stmt\ClassLike $class, Block $block): OpCode {
@@ -2706,7 +2724,6 @@ class Compiler {
         $this->assignAttributeMetadata($return, $class);
         $return->deprecatedMetadata = DeprecatedMetadata::fromOp($class);
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
-        AttributeNames::assertNoDuplicates($return->attributeNames);
         $this->applySealedMetadataFromOp($class, $return);
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($class->flags);
         if ($return->classIsAbstract) {
@@ -2729,6 +2746,7 @@ class Compiler {
             }
         }
         $this->classCompileRegistry->registerClass($className, $parentLc, $interfaceLcs, $class->stmts);
+        $this->registerAttributeClassFromEntries($className, $return->attributeEntries);
 
         return $return;
     }
@@ -3296,10 +3314,8 @@ class Compiler {
                             || (property_exists($child, 'propertyFlags') && $this->isReadonlyPropertyFlags($child->propertyFlags))
                             || $this->isReadonlyPropertyFlags($child->visibility);
                     }
-                    $declare->attributeNames = AttributeNames::fromOp($child);
                     $this->assignAttributeMetadata($declare, $child);
                     AttributeNames::assertOverrideMethodTargetOnly($declare->attributeNames, 'property');
-                    AttributeNames::assertNoDuplicates($declare->attributeNames);
                     $result->addOpCode($declare);
                     break;
                 case Op\Stmt\ClassMethod::class:
@@ -3418,10 +3434,8 @@ class Compiler {
             }
         }
         $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
-        $constOp->attributeNames = AttributeNames::fromOp($child);
         $this->assignAttributeMetadata($constOp, $child);
         AttributeNames::assertOverrideMethodTargetOnly($constOp->attributeNames, 'class constant');
-        AttributeNames::assertNoDuplicates($constOp->attributeNames);
         $result->addOpCode($constOp);
         if (null !== $this->compilingClassLc && isset($result->constants[$valueSlot])) {
             $constName = $this->staticNameFromOperand($child->name);
