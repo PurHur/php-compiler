@@ -262,7 +262,7 @@ final class intval extends Internal
         $enumEndBlock = null;
         $context->builder->positionAtEnd($objectEnumBlock);
         $objPtr = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
-        $enumLong = JitScalarEnumCoerce::tryEmitObjectEnumCaseToLong(
+        $enumLong = JitScalarEnumCoerce::tryEmitObjectEnumCaseLegacyCastToLong(
             $context,
             $objPtr,
             'intval',
