@@ -46,7 +46,7 @@ final class OverrideValidator
             if (!self::hasOverrideAttribute($attributeNames)) {
                 continue;
             }
-            self::validateOverrideMethod($className, $child, $parentLc, $interfaceLcs, $registry, $stmts);
+            self::validateOverrideMethod($className, $child, $parentLc, $interfaceLcs, $registry, $className, $stmts);
         }
     }
 
@@ -79,7 +79,7 @@ final class OverrideValidator
                 if (!self::hasOverrideAttribute($attributeNames)) {
                     continue;
                 }
-                self::validateOverrideMethod($traitDisplay, $child, $parentLc, $interfaceLcs, $registry);
+                self::validateOverrideMethod($traitDisplay, $child, $parentLc, $interfaceLcs, $registry, $className);
             }
         }
     }
@@ -93,14 +93,16 @@ final class OverrideValidator
         ?string $parentLc,
         array $interfaceLcs,
         ClassCompileRegistry $registry,
+        string $childClassName,
         ?CfgBlock $classStmts = null
     ): void {
         $methodLc = strtolower($method->func->name);
+        $childClassLc = strtolower(ltrim($childClassName, '\\'));
         $traitParent = null !== $classStmts
             ? (TraitComposedMethodResolver::resolve($classStmts, $registry)[$methodLc] ?? null)
             : null;
         if (
-            !$registry->hasOverridableMethod($parentLc, $interfaceLcs, $methodLc)
+            !$registry->hasOverridableMethod($parentLc, $interfaceLcs, $methodLc, $childClassLc)
             && null === $traitParent
         ) {
             throw new \CompileError(sprintf(
@@ -111,7 +113,7 @@ final class OverrideValidator
         }
         $ownerLc = strtolower(ltrim($ownerDisplay, '\\'));
         $childSig = MethodSig::fromFunc($method->func, $ownerLc);
-        $parent = $registry->findOverriddenMethod($parentLc, $interfaceLcs, $methodLc)
+        $parent = $registry->findOverriddenMethod($parentLc, $interfaceLcs, $methodLc, $childClassLc)
             ?? $traitParent;
         if (null !== $parent) {
             $msg = InheritanceVariance::methodCompatibilityError(

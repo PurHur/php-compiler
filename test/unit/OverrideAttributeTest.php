@@ -184,4 +184,41 @@ PHP;
         $this->expectExceptionMessage('Attribute "Override" cannot target class (allowed targets: method)');
         $runtime->parseAndCompile($code, 'override_on_trait.php');
     }
+
+    public function testOverrideFailsWhenParentMethodIsPrivate(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Base {
+    private function hidden(): void {}
+}
+class Child extends Base {
+    #[\Override]
+    public function hidden(): void {}
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Child::hidden() has #[\Override] attribute, but no matching parent method exists');
+        $runtime->parseAndCompile($code, 'override_private_parent.php');
+    }
+
+    public function testOverrideOnProtectedParentMethodCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Base {
+    protected function hidden(): void {}
+}
+class Child extends Base {
+    #[\Override]
+    public function hidden(): void {}
+}
+echo "ok\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'override_protected_parent.php'));
+        $this->assertSame("ok\n", ob_get_clean());
+    }
 }
