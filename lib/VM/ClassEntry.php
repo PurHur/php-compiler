@@ -68,6 +68,10 @@ class ClassEntry {
     public array $staticProperties = [];
     /** @var array<string, int> static property name (lowercase) => PHPCfg visibility flags (#6785) */
     public array $staticPropertyVisibility = [];
+    /** @var array<string, int> static property name (lowercase) => asymmetric set visibility (#6769) */
+    public array $staticPropertySetVisibility = [];
+    /** @var array<string, int> static property name (lowercase) => asymmetric get visibility (#6769) */
+    public array $staticPropertyGetVisibility = [];
     /** @var array<string, string> static property name (lowercase) => declaring class lc (#6785) */
     public array $staticPropertyDeclaringClassLc = [];
     /** @var array<string, array{get?: string, set?: string}> static prop (lowercase) => hook method lc (#4751) */

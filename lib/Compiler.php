@@ -3226,12 +3226,12 @@ class Compiler {
                         $typeSlot
                     );
                     $declare->propertyVisibility = MethodVisibility::mask($child->visibility);
+                    $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($child);
+                    $declare->propertyGetVisibility = $this->asymmetricGetVisibilityFromCfgOp($child);
                     if (!$child->static) {
                         $declare->propertyReadonly = (property_exists($child, 'readonly') && $child->readonly)
                             || (property_exists($child, 'propertyFlags') && $this->isReadonlyPropertyFlags($child->propertyFlags))
                             || $this->isReadonlyPropertyFlags($child->visibility);
-                        $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($child);
-                        $declare->propertyGetVisibility = $this->asymmetricGetVisibilityFromCfgOp($child);
                     }
                     $declare->attributeNames = AttributeNames::fromOp($child);
                     $this->assignAttributeMetadata($declare, $child);
@@ -5078,23 +5078,29 @@ class Compiler {
                     return [$spreadOp];
                 }
                 $staticPropertyFetch = $this->unwrapStaticPropertyFetch($expr->var);
+                $emitStaticPropertyFetch = true;
+                if (null === $staticPropertyFetch) {
+                    $staticPropertyFetch = $this->findStaticPropertyFetchForAssign($expr->var, $block);
+                    $emitStaticPropertyFetch = false;
+                }
                 if (null !== $staticPropertyFetch) {
                     $fetchSlot = $this->compileOperand($staticPropertyFetch->result, $block, false);
                     $rhsSlot = $this->compileOperand($expr->expr, $block, true);
-                    $ops = [
-                        new OpCode(
+                    $ops = [];
+                    if ($emitStaticPropertyFetch) {
+                        $ops[] = new OpCode(
                             OpCode::TYPE_STATIC_PROPERTY_FETCH,
                             $fetchSlot,
                             $this->compileOperand($staticPropertyFetch->class, $block, true),
                             $this->compileStaticPropertyNameSlot($staticPropertyFetch->name, $staticPropertyFetch->class, $block)
-                        ),
-                        new OpCode(
-                            OpCode::TYPE_ASSIGN,
-                            $fetchSlot,
-                            $fetchSlot,
-                            $rhsSlot
-                        ),
-                    ];
+                        );
+                    }
+                    $ops[] = new OpCode(
+                        OpCode::TYPE_ASSIGN,
+                        $fetchSlot,
+                        $fetchSlot,
+                        $rhsSlot
+                    );
                     if ([] !== $expr->result->usages) {
                         $ops[] = new OpCode(
                             OpCode::TYPE_ASSIGN,
@@ -7507,21 +7513,47 @@ class Compiler {
      */
     protected function findStaticPropertyFetchForUnset(Operand $expr, Block $block): ?Op\Expr\StaticPropertyFetch
     {
+        return $this->findStaticPropertyFetchForLvalue($expr, $block);
+    }
+
+    /**
+     * php-cfg may split StaticPropertyFetch and Assign across statements (#6769).
+     */
+    protected function findStaticPropertyFetchForAssign(Operand $expr, Block $block): ?Op\Expr\StaticPropertyFetch
+    {
+        return $this->findStaticPropertyFetchForLvalue($expr, $block);
+    }
+
+    /**
+     * @return Op\Expr\StaticPropertyFetch|null
+     */
+    protected function findStaticPropertyFetchForLvalue(Operand $expr, Block $block): ?Op\Expr\StaticPropertyFetch
+    {
         $direct = $this->unwrapStaticPropertyFetch($expr);
         if (null !== $direct) {
             return $direct;
         }
+        $candidates = [$expr];
+        if ($expr instanceof Operand\Variable) {
+            $candidates[] = $expr->name;
+        }
         $target = $expr;
         while ($target instanceof Temporary) {
-            foreach ($block->orig->children as $child) {
-                if ($child instanceof Op\Expr\StaticPropertyFetch && $child->result === $target) {
-                    return $child;
-                }
-            }
+            $candidates[] = $target;
             if (null === $target->original) {
                 break;
             }
             $target = $target->original;
+        }
+        foreach ($block->orig->children as $child) {
+            if (!$child instanceof Op\Expr\StaticPropertyFetch) {
+                continue;
+            }
+            foreach ($candidates as $candidate) {
+                if ($child->result === $candidate) {
+                    return $child;
+                }
+            }
         }
 
         return null;

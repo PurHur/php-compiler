@@ -76,6 +76,62 @@ final class AsymmetricVisibilityGuard
         return false;
     }
 
+    /**
+     * @return bool true when the store was blocked (caller must skip staticPropertyStore)
+     */
+    public static function emitBeforeStaticPropertyStore(
+        Context $context,
+        \PHPCompiler\JIT $jit,
+        Variable $lvalue,
+        ?Block $enclosingBlock
+    ): bool {
+        if (null === $lvalue->staticPropertyGlobal) {
+            return false;
+        }
+        $classLc = $lvalue->staticPropertyHookClassLc ?? '';
+        $propName = $lvalue->objectPropertyName ?? '';
+        if ('' === $classLc || '' === $propName) {
+            return false;
+        }
+        if (self::isConstructBlock($enclosingBlock)) {
+            return false;
+        }
+
+        $objectType = $context->type->object;
+        assert($objectType instanceof Object_);
+        $classId = $objectType->lookup($classLc);
+        $meta = $objectType->staticPropertyVisibilityMeta($classId, $propName);
+        if (null === $meta) {
+            return false;
+        }
+        $setVis = PropertyVisibility::effectiveSetVisibility(
+            $meta['visibility'],
+            $meta['setVisibility'] ?? 0
+        );
+        if ($setVis === MethodVisibility::mask($meta['visibility'])) {
+            return false;
+        }
+        $declaringClass = $meta['declaringClassName'];
+        $declaringLc = strtolower(ltrim($declaringClass, '\\'));
+        $callerLc = self::callerClassLc($context, $enclosingBlock);
+        try {
+            PropertyVisibility::assertWritable(
+                $setVis,
+                $callerLc,
+                $declaringLc,
+                $declaringClass,
+                $propName,
+                static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent)
+            );
+        } catch (\LogicException $e) {
+            self::emitViolation($context, $jit, $e->getMessage());
+
+            return true;
+        }
+
+        return false;
+    }
+
     private static function callerClassLc(Context $context, ?Block $enclosingBlock): ?string
     {
         if (null !== $enclosingBlock?->func?->class) {
