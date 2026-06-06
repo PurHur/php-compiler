@@ -17,7 +17,6 @@ final class Linker
         __DIR__.'/runtime/hash_crypto.c',
         __DIR__.'/runtime/zlib_compress.c',
         __DIR__.'/runtime/password_crypto.c',
-        __DIR__.'/runtime/phpc_fs_dir.c',
         __DIR__.'/runtime/phpc_json_decode.c',
         __DIR__.'/runtime/phpc_stream.c',
         __DIR__.'/runtime/phpc_progress.c',
@@ -28,7 +27,6 @@ final class Linker
 
     /** Runtime units that need host libc headers (glob/scandir; llvm sysroot lacks linux/limits.h). */
     private const RUNTIME_HOST_LIBC_BASENAMES = [
-        'phpc_fs_dir.c',
         'password_crypto.c',
     ];
 

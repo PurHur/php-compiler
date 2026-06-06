@@ -207,6 +207,7 @@ class Type extends Builtin {
         StringInfo::ensureLinked($this->context);
         StringDir::ensureLinked($this->context);
         StringFsGlob::ensureLinked($this->context);
+        StringFsDir::ensureLinked($this->context);
         LastErrorRuntime::ensureLinked($this->context);
         CliArgvRuntime::ensureLinked($this->context);
         FunctionExistsRuntime::ensureLinked($this->context);
@@ -802,16 +803,6 @@ class Type extends Builtin {
             $this->context->context->functionType($void, false, $i8ppPtr, $i32)
         );
         $this->context->registerFunction('__phpc_strvec_free', $fnStrvecFree);
-        $fnGlob = $this->context->module->addFunction(
-            '__phpc_glob',
-            $this->context->context->functionType($htPtr, false, $strPtr, $i32)
-        );
-        $this->context->registerFunction('__phpc_glob', $fnGlob);
-        $fnScandir = $this->context->module->addFunction(
-            '__phpc_scandir',
-            $this->context->context->functionType($htPtr, false, $strPtr, $i32)
-        );
-        $this->context->registerFunction('__phpc_scandir', $fnScandir);
         $fnStat = $this->context->module->addFunction(
             '__phpc_stat',
             $this->context->context->functionType($htPtr, false, $strPtr, $i32)
