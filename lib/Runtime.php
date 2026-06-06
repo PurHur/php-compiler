@@ -32,6 +32,7 @@ use PHPCompiler\Ast\StaticClassAnnotator;
 use PHPCompiler\Ast\StaticClassPreprocessor;
 use PHPCompiler\Ast\InOperatorDesugar;
 use PHPCompiler\Ast\ExitFunctionDesugar;
+use PHPCompiler\Ast\HexFloatLiteralDesugar;
 use PHPCompiler\Ast\NewDereferenceableDesugar;
 use PHPCompiler\Ast\PipeOperatorDesugar;
 use PHPCompiler\Visitor\InOperatorResolver;
@@ -369,6 +370,7 @@ class Runtime {
     public function rewriteSourceBeforeParser(string $code): string
     {
         $code = AsymmetricVisibilityRewriter::rewrite($code);
+        $code = HexFloatLiteralDesugar::desugar($code);
         $code = NewDereferenceableDesugar::desugar($code);
         $code = InOperatorDesugar::desugar($code);
         $code = ExitFunctionDesugar::desugar($code);
