@@ -14,7 +14,8 @@ use PHPCompiler\VM\ClassReadonly;
  *
  * php-src: Zend/zend_compile.c — zend_compile_class_decl;
  * Zend/zend_inheritance.c — readonly parent/child checks;
- * per-property MODIFIER_READONLY cannot have default initializer
+ * per-property MODIFIER_READONLY cannot have default initializer;
+ * PHP 8.3+ readonly anonymous classes may have property defaults (#5040).
  */
 final class ReadonlyClassCompileCheck
 {
@@ -76,6 +77,10 @@ final class ReadonlyClassCompileCheck
 
     private function verifyNoPropertyDefaults(Op\Stmt\Class_ $class, string $classDisplay, bool $classReadonly): void
     {
+        if ($classReadonly && $this->isAnonymousClass($class->name)) {
+            return;
+        }
+
         foreach ($class->stmts->children as $member) {
             if (!$member instanceof Op\Stmt\Property) {
                 continue;
@@ -175,5 +180,16 @@ final class ReadonlyClassCompileCheck
         }
 
         return null;
+    }
+
+    /** php-src: zend_compile.c — ZEND_ACC_ANON_READONLY allows property defaults (PHP 8.3). */
+    private function isAnonymousClass(Operand $op): bool
+    {
+        $name = $this->staticNameFromOperand($op);
+        if (null === $name) {
+            return false;
+        }
+
+        return str_contains($name, '@anonymous');
     }
 }
