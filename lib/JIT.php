@@ -5013,10 +5013,14 @@ class JIT {
                         $this->assignOperand($destOp, $value, $forceAssign);
                     }
                     $srcOp = $block->getOperand($op->arg3);
-                    if ($op->arg2 !== $op->arg3) {
+                    if ($op->arg2 !== $op->arg3 && $block->assignTempSlotIsDead((int) $op->arg3)) {
                         $this->jitClearAssignTempOperand($srcOp);
                     }
-                    if ($op->arg1 !== $op->arg2 && $op->arg1 !== $op->arg3) {
+                    if (
+                        $op->arg1 !== $op->arg2
+                        && $op->arg1 !== $op->arg3
+                        && $block->assignTempSlotIsDead((int) $op->arg1)
+                    ) {
                         $this->jitClearAssignTempOperand($destOp);
                     }
                     $this->maybeBindNamedVariable($aliasOp);
