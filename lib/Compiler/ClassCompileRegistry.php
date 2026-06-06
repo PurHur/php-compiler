@@ -87,9 +87,13 @@ final class ClassCompileRegistry
         return isset($this->traits[self::lc($lcName)]);
     }
 
-    public function hasOverridableMethod(?string $parentLc, array $interfaceLcs, string $methodLc): bool
-    {
-        if (null !== $parentLc && '' !== $parentLc && $this->hasMethodInClassChain($parentLc, $methodLc)) {
+    public function hasOverridableMethod(
+        ?string $parentLc,
+        array $interfaceLcs,
+        string $methodLc,
+        string $childClassLc
+    ): bool {
+        if (null !== $parentLc && '' !== $parentLc && $this->hasMethodInClassChain($parentLc, $methodLc, $childClassLc)) {
             return true;
         }
 
@@ -105,10 +109,14 @@ final class ClassCompileRegistry
     /**
      * @return array{sig: MethodSig, ownerLc: string, ownerDisplay: string}|null
      */
-    public function findOverriddenMethod(?string $parentLc, array $interfaceLcs, string $methodLc): ?array
-    {
+    public function findOverriddenMethod(
+        ?string $parentLc,
+        array $interfaceLcs,
+        string $methodLc,
+        string $childClassLc
+    ): ?array {
         if (null !== $parentLc && '' !== $parentLc) {
-            $found = $this->findMethodInClassChain($parentLc, $methodLc);
+            $found = $this->findMethodInClassChain($parentLc, $methodLc, $childClassLc);
             if (null !== $found) {
                 return $found;
             }
@@ -176,22 +184,33 @@ final class ClassCompileRegistry
         return false;
     }
 
-    private function hasMethodInClassChain(string $classLc, string $methodLc): bool
+    private function hasMethodInClassChain(string $classLc, string $methodLc, string $childClassLc): bool
     {
-        return null !== $this->findMethodInClassChain($classLc, $methodLc);
+        return null !== $this->findMethodInClassChain($classLc, $methodLc, $childClassLc);
     }
 
     /**
      * @return array{sig: MethodSig, ownerLc: string, ownerDisplay: string}|null
      */
-    private function findMethodInClassChain(string $classLc, string $methodLc): ?array
+    private function findMethodInClassChain(string $classLc, string $methodLc, string $childClassLc): ?array
     {
         $visited = [];
         while ('' !== $classLc && !isset($visited[$classLc])) {
             $visited[$classLc] = true;
             if (isset($this->methods[$classLc][$methodLc])) {
+                $sig = $this->methods[$classLc][$methodLc];
+                if (!$sig->isVisibleForOverrideFrom($childClassLc)) {
+                    $parent = $this->parents[$classLc] ?? null;
+                    if (null === $parent || '' === $parent) {
+                        break;
+                    }
+                    $classLc = $parent;
+
+                    continue;
+                }
+
                 return [
-                    'sig' => $this->methods[$classLc][$methodLc],
+                    'sig' => $sig,
                     'ownerLc' => $classLc,
                     'ownerDisplay' => $this->displayNames[$classLc] ?? $classLc,
                 ];

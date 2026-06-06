@@ -605,6 +605,9 @@ final class MethodSig
 
     public bool $isAbstract;
 
+    /** @see Func::FLAG_PUBLIC|FLAG_PROTECTED|FLAG_PRIVATE */
+    public int $visibilityFlags;
+
     /**
      * @param list<?TypeSig>   $params
      * @param list<string>     $paramNames
@@ -616,7 +619,8 @@ final class MethodSig
         array $paramNames,
         array $paramHasDefault,
         ?TypeSig $returnType,
-        bool $isAbstract = false
+        bool $isAbstract = false,
+        int $visibilityFlags = Func::FLAG_PUBLIC
     ) {
         $this->ownerLc = $ownerLc;
         $this->params = $params;
@@ -624,6 +628,7 @@ final class MethodSig
         $this->paramHasDefault = $paramHasDefault;
         $this->returnType = $returnType;
         $this->isAbstract = $isAbstract;
+        $this->visibilityFlags = $visibilityFlags;
     }
 
     public static function fromFunc(Func $func, string $ownerLc): self
@@ -637,6 +642,10 @@ final class MethodSig
             $hasDefault[] = null !== $param->defaultVar;
         }
         $isAbstract = 0 !== ($func->flags & Func::FLAG_ABSTRACT);
+        $visibility = $func->flags & (Func::FLAG_PUBLIC | Func::FLAG_PROTECTED | Func::FLAG_PRIVATE);
+        if (0 === $visibility) {
+            $visibility = Func::FLAG_PUBLIC;
+        }
 
         return new self(
             $ownerLc,
@@ -644,8 +653,19 @@ final class MethodSig
             $names,
             $hasDefault,
             TypeSig::fromCfgType($func->returnType),
-            $isAbstract
+            $isAbstract,
+            $visibility
         );
+    }
+
+    /** Private parent methods are not visible to subclasses for #[\Override] (Zend find_override_method). */
+    public function isVisibleForOverrideFrom(string $childClassLc): bool
+    {
+        if (0 !== ($this->visibilityFlags & Func::FLAG_PRIVATE)) {
+            return $this->ownerLc === $childClassLc;
+        }
+
+        return true;
     }
 
     private static function paramNameFromOperand(Operand $name): string
