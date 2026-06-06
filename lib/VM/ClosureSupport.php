@@ -123,6 +123,13 @@ final class ClosureSupport
             $bound->boundThis = $newThis;
         }
         $scopeClass = self::resolveScopeClass($newScope, $newThis, $context);
+        if (null !== $scopeClass && self::isExplicitStringScope($newScope)) {
+            if (!self::scopeClassExists($ctx, $scopeClass)) {
+                self::warnScopeClassNotFound($ctx, $frame, $scopeClass);
+
+                return null;
+            }
+        }
         if (null !== $scopeClass && self::isInternalScopeClass($ctx, $scopeClass)) {
             self::warnCannotBindInternalScope($ctx, $frame, $scopeClass);
 
@@ -133,17 +140,50 @@ final class ClosureSupport
         return self::wrapState($ctx, $bound);
     }
 
-    private static function isInternalScopeClass(Context $ctx, string $scopeClass): bool
+    private static function isExplicitStringScope(?Variable $newScope): bool
+    {
+        if (null === $newScope) {
+            return false;
+        }
+        $newScope = $newScope->resolveIndirect();
+        if (Variable::TYPE_STRING !== $newScope->type) {
+            return false;
+        }
+
+        return 'static' !== strtolower($newScope->toString());
+    }
+
+    private static function scopeClassExists(Context $ctx, string $scopeClass): bool
     {
         $lc = strtolower($scopeClass);
         if (!isset($ctx->classes[$lc])) {
             $ctx->autoloadClass($scopeClass);
         }
-        if (!isset($ctx->classes[$lc])) {
+
+        return isset($ctx->classes[$lc]);
+    }
+
+    private static function isInternalScopeClass(Context $ctx, string $scopeClass): bool
+    {
+        if (!self::scopeClassExists($ctx, $scopeClass)) {
             return false;
         }
 
-        return $ctx->classes[$lc]->isInternal;
+        return $ctx->classes[strtolower($scopeClass)]->isInternal;
+    }
+
+    private static function warnScopeClassNotFound(
+        Context $ctx,
+        ?Frame $frame,
+        string $scopeClass
+    ): void {
+        $ctx->errors->triggerError(
+            sprintf('Class "%s" not found', $scopeClass),
+            ErrorReporter::E_WARNING,
+            null,
+            $ctx,
+            $frame
+        );
     }
 
     private static function warnCannotBindInternalScope(
