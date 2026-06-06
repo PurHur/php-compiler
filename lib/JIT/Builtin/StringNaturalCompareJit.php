@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
@@ -13,7 +12,9 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM natural-order string compare (mirrors VmString::strnatcmp / strnatcasecmp, phpc_strnatcmp.c).
+ * LLVM natural-order string compare (mirrors VmString::strnatcmp / strnatcasecmp).
+ *
+ * Replaces deleted lib/AOT/runtime/phpc_strnatcmp.c + phpc_strnatcasecmp.c (#5517).
  */
 final class StringNaturalCompareJit
 {
@@ -29,12 +30,6 @@ final class StringNaturalCompareJit
 
     private static function implementNamed(Context $context, string $name, bool $caseInsensitive): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            self::declareIfMissing($context, $name);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction($name);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($name, $probe);
