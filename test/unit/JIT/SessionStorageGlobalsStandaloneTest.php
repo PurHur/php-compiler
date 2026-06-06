@@ -22,6 +22,7 @@ final class SessionStorageGlobalsStandaloneTest extends TestCase
         $runtime = new Runtime(Runtime::MODE_AOT);
         $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
         SessionStorageGlobals::ensureGlobals($ctx);
+        SessionStorageGlobals::implementEnsureDefaults($ctx);
         SessionId::implement($ctx);
         SessionName::implement($ctx);
 
@@ -43,6 +44,7 @@ final class SessionStorageGlobalsStandaloneTest extends TestCase
             $this->assertGreaterThan(0, $fn->countBasicBlocks());
         }
 
-        $this->assertNull($ctx->module->getNamedFunction('__phpc_session_ensure_defaults'));
+        $defaults = $ctx->lookupFunction('__phpc_session_ensure_defaults');
+        $this->assertGreaterThan(0, $defaults->countBasicBlocks());
     }
 }
