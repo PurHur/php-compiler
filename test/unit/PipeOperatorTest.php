@@ -79,4 +79,48 @@ PHP;
         $rt->run($block);
         $this->assertSame("closure\n\nHI\n", ob_get_clean());
     }
+
+    public function testVmPipeWithArrowFunction(): void
+    {
+        $code = <<<'PHP'
+<?php
+$x = 5 |> fn($v) => $v * 2;
+var_export($x);
+echo "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("10\n", ob_get_clean());
+    }
+
+    public function testVmPipeChainedArrowFunctions(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo 3 |> fn($x) => $x + 1 |> fn($x) => $x * 2, "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("8\n", ob_get_clean());
+    }
+
+    public function testDesugarRewritesArrowFunctionPipe(): void
+    {
+        $this->assertSame(
+            '<?php $x = (fn($v) => $v * 2)(5);',
+            PipeOperatorDesugar::desugar('<?php $x = 5 |> fn($v) => $v * 2;')
+        );
+    }
+
+    public function testDesugarRewritesChainedArrowFunctionPipe(): void
+    {
+        $this->assertSame(
+            '<?php echo (fn($x) => (fn($x) => $x * 2)($x + 1))(3), "\n";',
+            PipeOperatorDesugar::desugar('<?php echo 3 |> fn($x) => $x + 1 |> fn($x) => $x * 2, "\n";')
+        );
+    }
 }

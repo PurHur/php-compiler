@@ -30,7 +30,7 @@ final class PipeOperatorDesugar
 
             $pipeSpan = self::pipeSpan($tokens, $pipeIdx);
             $lhs = self::extractLhs($code, $tokens, $pipeIdx);
-            $rhs = self::extractRhsCall($code, $tokens, $pipeSpan['endIdx']);
+            $rhs = self::extractRhs($code, $tokens, $pipeSpan['endIdx']);
             if (null === $lhs || null === $rhs) {
                 break;
             }
@@ -241,7 +241,7 @@ final class PipeOperatorDesugar
      *
      * @return array{start: int, end: int, endIdx: int, text: string}|null
      */
-    private static function extractRhsCall(string $code, array $tokens, int $afterPipeIdx): ?array
+    private static function extractRhs(string $code, array $tokens, int $afterPipeIdx): ?array
     {
         $startIdx = $afterPipeIdx + 1;
         while ($startIdx < count($tokens) && self::isIgnorable($tokens[$startIdx])) {
@@ -252,6 +252,9 @@ final class PipeOperatorDesugar
         }
 
         $endIdx = self::scanCallLikeForward($tokens, $startIdx);
+        if (null === $endIdx && isset($tokens[$startIdx]) && \is_array($tokens[$startIdx]) && \T_FN === $tokens[$startIdx][0]) {
+            $endIdx = self::scanArrowFunctionForward($tokens, $startIdx);
+        }
         if (null === $endIdx) {
             return null;
         }
@@ -376,6 +379,117 @@ final class PipeOperatorDesugar
     }
 
     /**
+     * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function scanArrowFunctionForward(array $tokens, int $startIdx): ?int
+    {
+        if (!isset($tokens[$startIdx]) || !\is_array($tokens[$startIdx]) || \T_FN !== $tokens[$startIdx][0]) {
+            return null;
+        }
+
+        $pos = $startIdx + 1;
+        while ($pos < \count($tokens) && self::isIgnorable($tokens[$pos])) {
+            ++$pos;
+        }
+        if ($pos >= \count($tokens) || !\is_string($tokens[$pos]) || '(' !== $tokens[$pos]) {
+            return null;
+        }
+
+        $depth = 0;
+        for ($i = $pos; $i < \count($tokens); ++$i) {
+            $t = $tokens[$i];
+            if (\is_string($t) && '(' === $t) {
+                ++$depth;
+            } elseif (\is_string($t) && ')' === $t) {
+                --$depth;
+                if (0 === $depth) {
+                    $pos = $i + 1;
+                    break;
+                }
+            } elseif (\is_array($t) && \T_CURLY_OPEN === $t[0]) {
+                ++$depth;
+            }
+        }
+        if (0 !== $depth) {
+            return null;
+        }
+
+        while ($pos < \count($tokens) && self::isIgnorable($tokens[$pos])) {
+            ++$pos;
+        }
+        if ($pos >= \count($tokens) || !\is_array($tokens[$pos]) || \T_DOUBLE_ARROW !== $tokens[$pos][0]) {
+            return null;
+        }
+
+        ++$pos;
+        while ($pos < \count($tokens) && self::isIgnorable($tokens[$pos])) {
+            ++$pos;
+        }
+        if ($pos >= \count($tokens)) {
+            return null;
+        }
+
+        return self::scanExpressionForward($tokens, $pos);
+    }
+
+    /**
+     * Scan a single expression (arrow-fn body, pipe RHS tail, etc.).
+     *
+     * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function scanExpressionForward(array $tokens, int $startIdx): int
+    {
+        $pos = $startIdx;
+        $paren = 0;
+        $bracket = 0;
+
+        while ($pos < \count($tokens)) {
+            if (self::isIgnorable($tokens[$pos])) {
+                ++$pos;
+                continue;
+            }
+
+            if (0 === $paren && 0 === $bracket) {
+                $t = $tokens[$pos];
+                if (\is_string($t) && \in_array($t, [';', ','], true)) {
+                    break;
+                }
+                if (\is_string($t) && ')' === $t) {
+                    break;
+                }
+            }
+
+            $t = $tokens[$pos];
+            if (\is_string($t)) {
+                if ('(' === $t) {
+                    ++$paren;
+                } elseif (')' === $t) {
+                    --$paren;
+                } elseif ('[' === $t) {
+                    ++$bracket;
+                } elseif (']' === $t) {
+                    --$bracket;
+                }
+            } elseif (\is_array($t) && \T_FN === $t[0]) {
+                $end = self::scanArrowFunctionForward($tokens, $pos);
+                if (null !== $end) {
+                    $pos = $end + 1;
+                    continue;
+                }
+            }
+
+            ++$pos;
+        }
+
+        $end = $pos - 1;
+        while ($end >= $startIdx && self::isIgnorable($tokens[$end])) {
+            --$end;
+        }
+
+        return max($startIdx, $end);
+    }
+
+    /**
      * @param array{0: int, 1: string, 2: int}|string $token
      */
     private static function isCallCalleeToken($token): bool
@@ -479,6 +593,10 @@ final class PipeOperatorDesugar
 
     private static function rewritePipe(string $lhs, string $rhs, bool $bindAsClosure): string
     {
+        if (preg_match('/^fn\s*\(/s', ltrim($rhs))) {
+            return '('.$rhs.')('.$lhs.')';
+        }
+
         $open = strpos($rhs, '(');
         if (false === $open) {
             return $lhs;
