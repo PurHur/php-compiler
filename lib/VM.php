@@ -2810,6 +2810,11 @@ restart:
                             $frame = $catchFrame;
                             goto restart;
                         }
+                        $catchFrame = $this->enforcePropertyName($propName, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                         $catchFrame = $this->enforceReadonlyPropertyUnset($object, $propName, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
@@ -3545,6 +3550,11 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
+                    $catchFrame = $this->enforcePropertyName($name, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     if (Variable::TYPE_ENUM_CASE === $var->type) {
                         try {
                             $prop = $var->toEnumCase()->fetchProperty($name, $this->context, $frame);
@@ -3765,6 +3775,11 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
+                    $catchFrame = $this->enforcePropertyName($propName, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     VM\LazyObjectSupport::ensureInitialized($this, $container->toObject());
                     $catchFrame = $this->emptyObjectProperty(
                         $container->toObject(),
@@ -3811,6 +3826,11 @@ restart:
                                 break;
                             }
                             [$propName, $catchFrame] = $this->coerceRuntimeOperandToString($frame->scope[$op->arg3], $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            $catchFrame = $this->enforcePropertyName($propName, $frame);
                             if (null !== $catchFrame) {
                                 $frame = $catchFrame;
                                 goto restart;
@@ -5006,6 +5026,21 @@ restart:
         } catch (\Error $e) {
             return [null, $this->dispatchVmError($e->getMessage(), $frame)];
         }
+    }
+
+    /**
+     * Reject property names starting with null byte (Zend zend_verify_property_name, #5136).
+     *
+     * @return ?Frame catch frame when handled; null when name valid
+     */
+    private function enforcePropertyName(string $name, Frame $frame): ?Frame
+    {
+        $message = VM\PropertyNameSupport::leadingNullByteMessage($name);
+        if (null === $message) {
+            return null;
+        }
+
+        return $this->dispatchVmError($message, $frame);
     }
 
     /**
