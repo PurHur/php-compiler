@@ -27,7 +27,7 @@ final class get_object_vars_ extends Internal
             return;
         }
         $frame->returnVar->copyFrom(
-            VmReflection::getObjectVars($frame->calledArgs[0])
+            VmReflection::getObjectVars($frame->calledArgs[0], $frame)
         );
     }
 

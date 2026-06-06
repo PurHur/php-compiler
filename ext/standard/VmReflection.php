@@ -614,10 +614,11 @@ final class VmReflection
                 continue;
             }
             $copy = new Variable();
-            if ($prop->propertyHookVirtual || null !== $prop->getHookMethodLc) {
-                // Class-level table cannot invoke instance get hooks (#6473, #6453).
-                $copy->null();
-            } elseif (null !== $prop->default && !$prop->hasRuntimeDefaultInit()) {
+            // php-src add_class_vars: skip ZEND_ACC_VIRTUAL (no class-level get-hook invocation).
+            if ($prop->propertyHookVirtual) {
+                continue;
+            }
+            if (null !== $prop->default && !$prop->hasRuntimeDefaultInit()) {
                 $copy->copyFrom($prop->default);
             } else {
                 $src = $prop->getVariable();
@@ -745,9 +746,11 @@ final class VmReflection
     }
 
     /**
-     * get_object_vars() — copy of accessible instance property values (issue #1370).
+     * get_object_vars() — accessible instance properties; get hooks invoked (#5203, #6453).
+     *
+     * php-src: zend_get_properties_for(..., ZEND_PROP_PURPOSE_GET_OBJECT_VARS)
      */
-    public static function getObjectVars(Variable $object): Variable
+    public static function getObjectVars(Variable $object, Frame $frame): Variable
     {
         $object = $object->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $object->type) {
@@ -756,17 +759,12 @@ final class VmReflection
                 VmStreamArg::debugTypeName($object)
             ));
         }
+        $ctx = self::requireContext($frame);
         $result = new Variable();
         $result->newArray();
         $ht = $result->toArray();
-        foreach ($object->toObject()->getProperties(0) as $name => $prop) {
-            $value = $prop->resolveIndirect();
-            if (TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
-                continue;
-            }
-            $copy = new Variable();
-            $copy->copyFrom($value);
-            $ht->add($name, $copy);
+        foreach ($ctx->runtime->vm()->collectObjectVarsForBuiltin($object->toObject(), $frame) as $name => $value) {
+            $ht->add($name, $value);
         }
 
         return $result;

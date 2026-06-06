@@ -23,10 +23,10 @@ $g = new G();
 echo "get_only:", $b, "\n";
 $vars = get_class_vars(G::class);
 echo "gcv_key:", array_key_exists('y', $vars) ? 'yes' : 'no', "\n";
-echo "gcv_val:", null === $vars['y'] ? 'null' : 'other', "\n";
+echo "gov:", get_object_vars($g)['y'] ?? 'MISSING', "\n";
 --EXPECT--
 list:via_hook
 arg_len:8
 get_only:g_only
-gcv_key:yes
-gcv_val:null
+gcv_key:no
+gov:g_only
