@@ -27,6 +27,32 @@ PHP;
         $runtime->parseAndCompile($code, 'named_unpack_after_named.php');
     }
 
+    public function testDuplicateNamedIsCompileError(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function f(int $a, int $b = 0): void {}
+f(a: 1, a: 2);
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Named parameter $a overwrites previous argument');
+        $runtime->parseAndCompile($code, 'named_duplicate_compile.php');
+    }
+
+    public function testPositionalAfterNamedIsCompileError(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function f(int $a, int $b = 0): void {}
+f(a: 1, 2);
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot use positional argument after named argument');
+        $runtime->parseAndCompile($code, 'named_positional_after_named.php');
+    }
+
     public function testResolverFillsUnfilledParamsAfterNamed(): void
     {
         $vA = new Variable(Variable::TYPE_INTEGER);

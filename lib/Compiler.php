@@ -8660,7 +8660,7 @@ class Compiler {
     }
 
     /**
-     * Zend zend_compile.c: unpack must not follow named args; positional must not follow unpack (#4663).
+     * Zend zend_compile.c: duplicate named params, positional-after-named, unpack ordering (#4299, #4663).
      *
      * @param list<Operand> $args
      */
@@ -8668,16 +8668,27 @@ class Compiler {
     {
         $hadNamed = false;
         $hadUnpack = false;
+        /** @var array<string, true> $seenNamedLc */
+        $seenNamedLc = [];
         foreach ($args as $arg) {
-            $isNamed = null !== $this->callArgName($arg);
+            $argName = $this->callArgName($arg);
+            $isNamed = null !== $argName;
             $isUnpack = $this->callArgUnpack($arg);
             if ($isUnpack && $hadNamed) {
                 $this->throwCompileError('Cannot use argument unpacking after named arguments');
+            }
+            if (!$isNamed && !$isUnpack && $hadNamed) {
+                $this->throwCompileError('Cannot use positional argument after named argument');
             }
             if (!$isNamed && !$isUnpack && $hadUnpack) {
                 $this->throwCompileError('Cannot use positional argument after argument unpacking');
             }
             if ($isNamed) {
+                $lc = strtolower($argName);
+                if (isset($seenNamedLc[$lc])) {
+                    $this->throwCompileError("Named parameter \${$argName} overwrites previous argument");
+                }
+                $seenNamedLc[$lc] = true;
                 $hadNamed = true;
             }
             if ($isUnpack) {

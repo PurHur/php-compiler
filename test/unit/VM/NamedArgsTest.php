@@ -36,9 +36,9 @@ function f(int $a, int $b): int {
 }
 f(a: 1, a: 2);
 PHP;
-        $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage('must be passed only once');
-        $runtime->run($runtime->parseAndCompile($code, 'named_args_duplicate.php'));
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Named parameter $a overwrites previous argument');
+        $runtime->parseAndCompile($code, 'named_args_duplicate.php');
     }
 
     public function testResolverReordersNamedArguments(): void
