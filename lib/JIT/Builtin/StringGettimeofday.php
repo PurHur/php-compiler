@@ -36,6 +36,31 @@ final class StringGettimeofday
         self::implement($context);
     }
 
+    /**
+     * Wall-clock parts shared by uniqid() lowering (tv_sec, tv_usec % $usecMod).
+     *
+     * @return array{0: Value, 1: Value} i32 sec and masked usec
+     */
+    public static function readSecUsec(Context $context, int $usecMod = 0): array
+    {
+        self::ensureLinked($context);
+        [$sec, $usec] = \array_slice(self::readWallClock($context), 0, 2);
+
+        if ($usecMod <= 0) {
+            return [$sec, $usec];
+        }
+
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $mask = $i64->constInt($usecMod - 1, false);
+        $usecMasked = $context->builder->truncOrBitCast(
+            $context->builder->and($context->builder->zExt($usec, $i64), $mask),
+            $i32
+        );
+
+        return [$sec, $usecMasked];
+    }
+
     public static function implement(Context $context): void
     {
         $arrayProbe = $context->module->getNamedFunction('__compiler_gettimeofday_array');

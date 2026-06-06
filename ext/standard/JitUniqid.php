@@ -5,23 +5,18 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringGettimeofday;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for uniqid() without AOT C runtime (issue #2219, #5233).
+ * LLVM lowering for uniqid() without AOT C runtime (issue #2219, #5233, #6722).
  *
- * Mirrors VmString::uniqid() / former phpc_uniqid.c gettimeofday formatting.
+ * Mirrors VmString::uniqid(); wall clock via {@see StringGettimeofday} (no local gettimeofday extern).
  */
 final class JitUniqid
 {
-    private const TIMESPEC_SIZE = 16;
-
-    private const TIMESPEC_OFF_TV_SEC = 0;
-
-    private const TIMESPEC_OFF_TV_USEC = 8;
-
     private const USEC_MOD = 0x100000;
 
     public static function uniqid(Context $context, Value $prefix, Value $moreEntropy): Value
@@ -135,76 +130,6 @@ final class JitUniqid
      */
     private static function readWallClock(Context $context): array
     {
-        self::ensureGettimeofday($context);
-
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $zero64 = $i64->constInt(0, false);
-        $zero32 = $i32->constInt(0, false);
-
-        $tv = $context->builder->call(
-            $context->lookupFunction('__mm__malloc'),
-            $sizeT->constInt(self::TIMESPEC_SIZE, false)
-        );
-        $tvI8 = $context->builder->pointerCast($tv, $i8p);
-        $status = $context->builder->call(
-            $context->lookupFunction('gettimeofday'),
-            $tvI8,
-            $i8p->constNull()
-        );
-        $failed = $context->builder->icmp(
-            Builder::INT_NE,
-            $context->builder->truncOrBitCast($status, $i32),
-            $zero32
-        );
-
-        $secRaw = self::loadI64At($context, $tv, self::TIMESPEC_OFF_TV_SEC);
-        $usecRaw = self::loadI64At($context, $tv, self::TIMESPEC_OFF_TV_USEC);
-        $context->builder->call($context->lookupFunction('__mm__free'), $tv);
-
-        $sec = $context->builder->truncOrBitCast(
-            $context->builder->select($failed, $zero64, $secRaw),
-            $i32
-        );
-        $usecMasked = $context->builder->and(
-            $usecRaw,
-            $i64->constInt(self::USEC_MOD - 1, false)
-        );
-        $usec = $context->builder->truncOrBitCast(
-            $context->builder->select($failed, $zero64, $usecMasked),
-            $i32
-        );
-
-        return [$sec, $usec];
-    }
-
-    private static function tvSlot(Context $context, Value $base, int $offset): Value
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $i8 = $context->getTypeFromString('int8');
-        $ptr = $context->builder->gep($base, $i8->constInt($offset, false));
-
-        return $context->builder->pointerCast($ptr, $i64->pointerType(0));
-    }
-
-    private static function loadI64At(Context $context, Value $base, int $offset): Value
-    {
-        return $context->builder->load(self::tvSlot($context, $base, $offset));
-    }
-
-    private static function ensureGettimeofday(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
-
-        try {
-            $context->lookupFunction('gettimeofday');
-        } catch (\Throwable $e) {
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('gettimeofday', $ft);
-            $context->registerFunction('gettimeofday', $fn);
-        }
+        return StringGettimeofday::readSecUsec($context, self::USEC_MOD);
     }
 }
