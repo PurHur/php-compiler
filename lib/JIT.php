@@ -6720,7 +6720,7 @@ class JIT {
                     $this->context->scope->argOperands = [];
                     break;
                 case OpCode::TYPE_STATICCALL_INIT:
-                    $this->initJitStaticCall($block, $op->arg1, $op->arg2);
+                    $this->initJitStaticCall($block, $op->arg1, $op->arg2, $op->staticCallParentScope);
                     break;
                 case OpCode::TYPE_ARG_SEND:
                     if ($this->context->inlineIncludeDepth > 0) {
@@ -10953,7 +10953,7 @@ class JIT {
         }
     }
 
-    private function initJitStaticCall(Block $block, int $classOpIdx, int $nameOpIdx): void
+    private function initJitStaticCall(Block $block, int $classOpIdx, int $nameOpIdx, bool $parentScope = false): void
     {
         $classOp = $block->getOperand($classOpIdx);
         $nameOp = $block->getOperand($nameOpIdx);
@@ -10971,7 +10971,10 @@ class JIT {
             return;
         }
         $declaringClassId = $this->context->type->object->lookup($className);
-        $this->assertJitStaticMethodCallable($declaringClassLc, $methodLc, $className, $nameOp->value);
+        $allowParentInstanceScope = $parentScope && $this->instanceMethodUsesThis($block);
+        if (!$allowParentInstanceScope) {
+            $this->assertJitStaticMethodCallable($declaringClassLc, $methodLc, $className, $nameOp->value);
+        }
         $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
         $callerClassLc = null;
         if (null !== $block->func && null !== $block->func->class) {

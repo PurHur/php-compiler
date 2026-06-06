@@ -281,6 +281,8 @@ class OpCode {
     public int $classConstVisibilityFlags = 0;
     /** TYPE_DECLARE_CLASS_CONST: `case` in enum body vs user `const` (#5054, zend_enum.c). */
     public bool $isEnumCaseDeclare = false;
+    /** TYPE_STATICCALL_INIT: source was `parent::` (php-cfg may lower class operand to fqcn). */
+    public bool $staticCallParentScope = false;
 
     /** TYPE_INCLUDE: include/require + once/non-once semantics (issue #4426). */
     public int $includeKind = self::INCLUDE_KIND_INCLUDE_ONCE;
