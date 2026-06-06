@@ -904,23 +904,27 @@ final class HashTable {
         $out->array(new self());
         $ht = $out->toArray();
         if (Variable::TYPE_ARRAY === $existing->type) {
-            foreach ($existing->toArray()->iterateKeyed(true) as [, $element]) {
+            foreach ($existing->toArray()->iterateKeyed(true) as [$key, $element]) {
                 $elementCopy = new Variable();
                 $elementCopy->copyFrom($element);
-                $ht->append($elementCopy);
+                if (Variable::TYPE_INTEGER === $key->type) {
+                    $ht->addIndex($key->toInt(), $elementCopy);
+                } else {
+                    $ht->add($key->toString(), $elementCopy);
+                }
             }
+            $elementCopy = new Variable();
+            $elementCopy->copyFrom($overlay);
+            $ht->append($elementCopy);
+        } elseif (Variable::TYPE_ARRAY === $overlay->type) {
+            $elementCopy = new Variable();
+            $elementCopy->copyFrom($existing);
+            $ht->append($elementCopy);
+            self::mergeRecursiveOverlay($ht, $overlay->toArray());
         } else {
             $elementCopy = new Variable();
             $elementCopy->copyFrom($existing);
             $ht->append($elementCopy);
-        }
-        if (Variable::TYPE_ARRAY === $overlay->type) {
-            foreach ($overlay->toArray()->iterateKeyed(true) as [, $element]) {
-                $elementCopy = new Variable();
-                $elementCopy->copyFrom($element);
-                $ht->append($elementCopy);
-            }
-        } else {
             $elementCopy = new Variable();
             $elementCopy->copyFrom($overlay);
             $ht->append($elementCopy);
