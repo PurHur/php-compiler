@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -29,7 +29,7 @@ final class JitParseUrl
                 return self::materializeVmArray($context, $result);
             }
 
-            $urlStr = JitStringArg::lower($context, $url, 'parse_url() URL');
+            $urlStr = JitStringBuiltinArg::lower($context, $url, 'parse_url', 0, 'url');
             $slot = JitValueBox::alloc($context);
             $ptr = JitValueBox::pointer($context, $slot);
             $context->builder->call(
@@ -47,7 +47,7 @@ final class JitParseUrl
             return self::materializeVmResult($context, VmString::parseUrl($urlLiteral, $comp));
         }
 
-        $urlStr = JitStringArg::lower($context, $url, 'parse_url() URL');
+        $urlStr = JitStringBuiltinArg::lower($context, $url, 'parse_url', 0, 'url');
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $i64 = $context->getTypeFromString('int64');

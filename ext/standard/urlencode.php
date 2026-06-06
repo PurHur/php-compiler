@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -19,14 +20,16 @@ final class urlencode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('urlencode() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
+        $subject = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'urlencode',
+            0,
+            'string'
+        );
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('urlencode() only supports strings in this compiler build');
-        }
-        $frame->returnVar->string(VmString::urlencode($v->toString()));
+        $frame->returnVar->string(VmString::urlencode($subject));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -45,7 +48,9 @@ final class urlencode extends Internal
             );
         }
 
-        return JitUrlencode::urlencode($context, $this->jitString($context, $args[0], 'urlencode() argument #1'));
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'urlencode', 0, 'string');
+
+        return JitUrlencode::urlencode($context, $str);
     }
 
 }
