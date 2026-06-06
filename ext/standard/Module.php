@@ -22,6 +22,7 @@ class Module extends ModuleAbstract
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
+        BuiltinAttributes::register($runtime->vmContext);
         foreach ([
             'LOCK_SH' => 1,
             'LOCK_EX' => 2,
