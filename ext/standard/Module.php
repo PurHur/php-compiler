@@ -545,6 +545,7 @@ class Module extends ModuleAbstract
             new date(),
             new gmdate(),
             new getdate(),
+            new idate(),
             new sleep(),
             new spl_autoload_register(),
             new time_nanosleep(),
