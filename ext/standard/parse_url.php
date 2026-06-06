@@ -21,10 +21,7 @@ final class parse_url extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('parse_url() requires one or two arguments in this compiler build');
         }
-        $urlVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $urlVar->type) {
-            throw new \LogicException('parse_url() first argument must be a string in this compiler build');
-        }
+        $url = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'parse_url', 0, 'url');
         $component = -1;
         if (2 === $argc) {
             $compVar = $frame->calledArgs[1]->resolveIndirect();
@@ -37,7 +34,7 @@ final class parse_url extends Internal
             return;
         }
 
-        $result = VmString::parseUrl($urlVar->toString(), $component);
+        $result = VmString::parseUrl($url, $component);
         if (\is_array($result)) {
             $ht = new HashTable();
             foreach ($result as $key => $value) {
@@ -72,9 +69,6 @@ final class parse_url extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('parse_url() requires one or two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type && JITVariable::TYPE_VALUE !== $args[0]->type) {
-            throw new \LogicException('parse_url() first argument must be a string in this compiler build');
-        }
         $component = 2 === $argc ? $args[1] : null;
         if (null !== $component
             && JITVariable::TYPE_NATIVE_LONG !== $component->type
@@ -82,7 +76,6 @@ final class parse_url extends Internal
             throw new \LogicException('parse_url() component must be an integer in this compiler build');
         }
 
-        $this->jitString($context, $args[0], 'parseurl() argument #1');
         return JitParseUrl::parseUrl($context, $args[0], $component);
     }
 }
