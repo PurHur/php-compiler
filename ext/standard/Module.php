@@ -95,6 +95,8 @@ class Module extends ModuleAbstract
             new gc_disable(),
             new gc_enabled(),
             new halt_compiler_(),
+            new exit_(),
+            new die_(),
             new strval(),
             new int_min(),
             new int_max(),
