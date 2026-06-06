@@ -79,4 +79,48 @@ PHP;
         $runtime->parseAndCompile($code, 'intersection_parse.php');
         $this->addToAssertionCount(1);
     }
+
+    /** @covers issue #6499 */
+    public function testIntersectionReturnAcceptsImplementingObject(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface A {}
+interface B {}
+class C implements A, B {}
+function f(): A&B { return new C(); }
+class D { public function m(): A&B { return new C(); } }
+echo get_class(f());
+echo get_class((new D())->m());
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'intersection_return_ok.php'));
+        $this->assertSame('CC', ob_get_clean());
+    }
+
+    /** @covers issue #6499 */
+    public function testIntersectionReturnRejectsIncompatibleValue(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface A {}
+interface B {}
+function f(): A&B { return new stdClass(); }
+f();
+PHP;
+        $this->expectException(\TypeError::class);
+        $runtime->run($runtime->parseAndCompile($code, 'intersection_return_bad.php'));
+    }
+
+    /** @covers issue #6499 */
+    public function testIntersectionReturnTypeMapsInPhpTypes(): void
+    {
+        $parser = new \PHPCfg\Parser((new \PhpParser\ParserFactory())->create(\PhpParser\ParserFactory::PREFER_PHP7));
+        $script = $parser->parse('<?php interface A {} interface B {} function f(): A&B {}', 't.php');
+        $type = \PHPTypes\Type::fromTypeDecl($script->functions[0]->returnType);
+        $this->assertSame(\PHPTypes\Type::TYPE_INTERSECTION, $type->type);
+        $this->assertCount(2, $type->subTypes);
+    }
 }
