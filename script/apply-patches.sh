@@ -1806,12 +1806,25 @@ PY
   echo "Applied php-types-closure-unbound-this.patch (overlay)"
 }
 
-apply_php_types_first_class_callable_overlay() {
-  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+repair_php_types_fcc_type_array_typo_in_target() {
+  local target="$1"
+  if [[ ! -f "$target" ]]; then
+    return 0
+  fi
   if grep -q 'return \[Type::array()\];' "$target" 2>/dev/null; then
     sed -i 's/return \[Type::array()\];/return [new Type(Type::TYPE_ARRAY)];/' "$target"
-    echo "Repaired php-types-first-class-callable Type::array() typo (#4957)"
+    echo "Repaired php-types-first-class-callable Type::array() typo in ${target} (#4957, #6932)"
   fi
+}
+
+apply_php_types_fcc_overlay_final_repair() {
+  repair_php_types_fcc_type_array_typo_in_target "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  repair_php_types_fcc_type_array_typo_in_target "$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+}
+
+apply_php_types_first_class_callable_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  repair_php_types_fcc_type_array_typo_in_target "$target"
   if grep -q 'FirstClassCallable::KIND_METHOD' "$target" 2>/dev/null; then
     echo "Skip php-types-first-class-callable.patch (already applied)"
     return 0
@@ -2026,7 +2039,7 @@ anchors = [
     (
         """            case 'Expr_FirstClassCallable':
                 if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
-                    return [Type::array()];
+                    return [new Type(Type::TYPE_ARRAY)];
                 }
 
                 return [Type::string()];
@@ -2042,7 +2055,7 @@ anchors = [
 """ + throw_tail,
         """            case 'Expr_FirstClassCallable':
                 if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
-                    return [Type::array()];
+                    return [new Type(Type::TYPE_ARRAY)];
                 }
 
                 return [Type::string()];
@@ -2144,26 +2157,6 @@ anchors = [
         """            case 'Expr_MagicScriptConst':
                 if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
                     return [Type::int()];
-                }
-
-                return [Type::string()];
-""" + incdec_case + """        }
-
-""" + throw_tail,
-    ),
-    (
-        """            case 'Expr_FirstClassCallable':
-                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
-                    return [Type::array()];
-                }
-
-                return [Type::string()];
-        }
-
-""" + throw_tail,
-        """            case 'Expr_FirstClassCallable':
-                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
-                    return [Type::array()];
                 }
 
                 return [Type::string()];
@@ -3917,6 +3910,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-intersection-type.patch"
   apply_patch "$PATCH_DIR/php-types-union-type.patch"
   apply_patch "$PATCH_DIR/php-types-throw-expr.patch"
+  apply_php_types_fcc_overlay_final_repair
 fi
 
 if [[ -d "$ROOT/vendor/pre/plugin" ]]; then
@@ -4007,12 +4001,24 @@ verify_critical_language_patches() {
   if ! grep -q "case 'Expr_PostInc':" "$recon" 2>/dev/null; then
     missing+=("php-types-incdec-type")
   fi
+  if ! grep -q 'FirstClassCallable::KIND_METHOD' "$recon" 2>/dev/null; then
+    missing+=("php-types-first-class-callable")
+  elif grep -q 'return \[Type::array()\];' "$recon" 2>/dev/null; then
+    missing+=("php-types-first-class-callable-Type-array-typo")
+  elif ! grep -q 'new Type(Type::TYPE_ARRAY)' "$recon" 2>/dev/null; then
+    missing+=("php-types-first-class-callable-TYPE_ARRAY")
+  fi
   if ! grep -q "case 'Expr_Throw':" "$recon" 2>/dev/null; then
     missing+=("php-types-throw-expr")
   fi
   local prelinked_recon="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
   if [[ -f "$prelinked_recon" ]] && ! grep -q "case 'Expr_PostInc':" "$prelinked_recon" 2>/dev/null; then
     missing+=("php-types-incdec-type-prelinked")
+  fi
+  if [[ -f "$prelinked_recon" ]] && ! grep -q 'FirstClassCallable::KIND_METHOD' "$prelinked_recon" 2>/dev/null; then
+    missing+=("php-types-first-class-callable-prelinked")
+  elif [[ -f "$prelinked_recon" ]] && grep -q 'return \[Type::array()\];' "$prelinked_recon" 2>/dev/null; then
+    missing+=("php-types-first-class-callable-prelinked-Type-array-typo")
   fi
   if [[ -f "$prelinked_recon" ]] && ! grep -q "case 'Expr_Throw':" "$prelinked_recon" 2>/dev/null; then
     missing+=("php-types-throw-expr-prelinked")
@@ -4035,6 +4041,7 @@ verify_critical_language_patches() {
   if ((${#missing[@]} > 0)); then
     echo "apply-patches: critical language patch markers missing: ${missing[*]}" >&2
     echo "apply-patches: hint: php-types-incdec-type overlay anchor drift — see #6321" >&2
+    echo "apply-patches: hint: php-types-first-class-callable overlay — run composer install && ./script/apply-patches.sh (#6932)" >&2
     exit 1
   fi
 }
