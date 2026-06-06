@@ -4363,7 +4363,7 @@ class Compiler {
             if (Variable::TYPE_NULL === $value->type) {
                 return;
             }
-            $checkType = $declaredType->type;
+            $checkType = $declaredType->subtype;
         }
 
         if (
