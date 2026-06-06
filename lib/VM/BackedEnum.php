@@ -48,11 +48,24 @@ final class BackedEnum
     public static function canonicalCaseVariable(ClassEntry $enum, string $caseName): ?Variable
     {
         $lc = strtolower($caseName);
-        if (isset($enum->constants[$lc])) {
-            return $enum->constants[$lc];
+        if (!isset($enum->constants[$lc])) {
+            return null;
+        }
+        $stored = $enum->constants[$lc];
+        if (EnumCaseSupport::isEnumCaseVariable($stored)) {
+            return $stored;
+        }
+        if (null !== $enum->backedType) {
+            $resolved = $stored->resolveIndirect();
+            if ($resolved->is(Variable::TYPE_INTEGER) || $resolved->is(Variable::TYPE_STRING)) {
+                $match = self::tryCaseForValue($enum, $resolved);
+                if (null !== $match && strcasecmp($match->caseName, $caseName) === 0) {
+                    return EnumCaseSupport::createCase($enum, $match->caseName, $match->backingValue);
+                }
+            }
         }
 
-        return null;
+        return $stored;
     }
 
     /**
