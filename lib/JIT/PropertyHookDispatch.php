@@ -382,4 +382,49 @@ final class PropertyHookDispatch
 
         return true;
     }
+
+    /**
+     * Block reads/isset/empty on write-only virtual hooked properties (#6484, zend_property_hooks.c).
+     *
+     * @return bool true when the read was blocked (caller must skip property load)
+     */
+    public static function emitWriteOnlyVirtualReadGuard(
+        Context $context,
+        ?\PHPCompiler\JIT $jit,
+        string $className,
+        string $propertyName,
+        bool $staticProperty = false
+    ): bool {
+        $lcClass = strtolower(ltrim($className, '\\'));
+        $propLc = strtolower($propertyName);
+        $meta = $context->runtime->vmContext->propertyHookRegistry[$lcClass][$propertyName]
+            ?? $context->runtime->vmContext->propertyHookRegistry[$lcClass][$propLc]
+            ?? null;
+        if (is_array($meta) && isset($meta['get'])) {
+            return false;
+        }
+        $setLc = strtolower(PropertyHooks::setHookMethodName($propertyName));
+        $setProxy = $staticProperty
+            ? self::resolveStaticHookProxy($context, $className, $setLc)
+            : self::resolveHookProxy($context, $className, $setLc);
+        if (null === $setProxy || (!$staticProperty && self::proxyIsStatic($context, $setProxy))) {
+            return false;
+        }
+        $getLc = strtolower(PropertyHooks::getHookMethodName($propertyName));
+        $getProxy = $staticProperty
+            ? self::resolveStaticHookProxy($context, $className, $getLc)
+            : self::resolveHookProxy($context, $className, $getLc);
+        if (null !== $getProxy && (!$staticProperty || !self::proxyIsStatic($context, $getProxy))) {
+            return false;
+        }
+
+        $message = sprintf('Cannot read property %s::$%s without get hook', $className, $propertyName);
+        if (null !== $jit && [] !== $context->tryCatch->handlerStack) {
+            TryCatchHelper::emitCatchableErrorMessage($context, $jit, $message);
+        } else {
+            ErrorRaise::emitRaise($context, $message);
+        }
+
+        return true;
+    }
 }

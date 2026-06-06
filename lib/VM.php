@@ -434,6 +434,10 @@ class VM {
      */
     public function emptyObjectProperty(ObjectEntry $object, string $propName, Frame $frame, Variable $dst): ?Frame
     {
+        $catchFrame = $this->enforceWriteOnlyVirtualPropertyRead($object, $propName, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
         $meta = $this->classPropertyMeta($object, $propName);
         if (null === $meta || !$meta->prototype->isUndefined()) {
             $dst->bool(!$this->objectPropertyIsSet($object, $propName, $frame));
@@ -3634,6 +3638,11 @@ restart:
                             $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
                             break;
                         }
+                        $catchFrame = $this->enforceWriteOnlyVirtualPropertyRead($propertyObject, $name, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                         $hookValue = $this->fetchPropertyWithHooks($propertyObject, $name, $frame);
                         if (null !== $hookValue) {
                             $result->copyFrom($hookValue);
@@ -3836,6 +3845,13 @@ restart:
                                 goto restart;
                             }
                             VM\LazyObjectSupport::ensureInitialized($this, $object);
+                            if (!$op->issetForCoalesceAssign) {
+                                $catchFrame = $this->enforceWriteOnlyVirtualPropertyRead($object, $propName, $frame);
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                            }
                             $dst->bool(
                                 $op->issetForCoalesceAssign
                                     ? $this->objectPropertyIsSetForCoalesceAssign($object, $propName, $frame)
@@ -4572,6 +4588,12 @@ restart:
         $hookedRead = Variable::TYPE_ARRAY === $resolvedRead->type
             ? null
             : $this->fetchHookedPropertyValueForIncDec($write, $frame);
+        if (null === $hookedRead && Variable::TYPE_ARRAY !== $resolvedRead->type) {
+            $catchFrame = $this->enforceWriteOnlyVirtualPropertyReadForLvalue($write, $frame);
+            if (null !== $catchFrame) {
+                return $catchFrame;
+            }
+        }
         if (null !== $hookedRead) {
             return $this->executeHookedPropertyIncDec(
                 $frame,
@@ -5826,6 +5848,10 @@ restart:
         $owner = $this->resolvePropertyWriteOwner($writeLvalue);
         $propName = $this->resolvePropertyWriteName($writeLvalue);
         if (null !== $owner && null !== $propName) {
+            $catchFrame = $this->enforceWriteOnlyVirtualPropertyRead($owner, $propName, $frame);
+            if (null !== $catchFrame) {
+                throw new VM\PropertyHookRefWriteSignal($catchFrame);
+            }
             $hookValue = $this->fetchPropertyWithHooks($owner, $propName, $frame);
             if (null !== $hookValue) {
                 return $hookValue;
@@ -6188,6 +6214,68 @@ restart:
         $thrown = VM\BuiltinExceptionSupport::materializeError(
             $this->context,
             $message
+        );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /** Reject reads/isset/empty on write-only hooked instance properties (#6484, zend_property_hooks.c). */
+    private function enforceWriteOnlyVirtualPropertyRead(ObjectEntry $object, string $propName, Frame $frame): ?Frame
+    {
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null === $meta || null === $meta->setHookMethodLc || null !== $meta->getHookMethodLc) {
+            return null;
+        }
+        $className = $object->class->name;
+        if ('' !== $meta->declaringClassLc && isset($this->context->classes[$meta->declaringClassLc])) {
+            $className = $this->context->classes[$meta->declaringClassLc]->name;
+        }
+
+        return $this->raiseWriteOnlyVirtualPropertyReadError($className, $propName, $frame);
+    }
+
+    /** Reject reads on write-only hooked static properties (#6484). */
+    private function enforceWriteOnlyVirtualStaticPropertyRead(string $classLc, string $propName, Frame $frame): ?Frame
+    {
+        $hooks = $this->resolveStaticPropertyHooks($classLc, strtolower($propName));
+        if (null === $hooks || empty($hooks['set']) || !empty($hooks['get'])) {
+            return null;
+        }
+        $className = $this->context->classes[$classLc]->name ?? $classLc;
+
+        return $this->raiseWriteOnlyVirtualPropertyReadError($className, $propName, $frame);
+    }
+
+    private function enforceWriteOnlyVirtualPropertyReadForLvalue(Variable $lvalue, Frame $frame): ?Frame
+    {
+        $propName = $this->resolvePropertyWriteName($lvalue);
+        if ($this->isPropertyHookRawWrite($frame, $propName ?? '')) {
+            return null;
+        }
+        $owner = $this->resolvePropertyWriteOwner($lvalue);
+        if (null !== $owner && null !== $propName) {
+            return $this->enforceWriteOnlyVirtualPropertyRead($owner, $propName, $frame);
+        }
+        $target = $lvalue->resolveIndirect();
+        $classLc = $lvalue->staticPropertyClassLc ?? $target->staticPropertyClassLc;
+        $staticPropName = $lvalue->objectPropertyName ?? $target->objectPropertyName;
+        if (is_string($classLc) && is_string($staticPropName) && '' !== $staticPropName) {
+            return $this->enforceWriteOnlyVirtualStaticPropertyRead($classLc, $staticPropName, $frame);
+        }
+
+        return null;
+    }
+
+    private function raiseWriteOnlyVirtualPropertyReadError(string $className, string $propName, Frame $frame): ?Frame
+    {
+        $thrown = VM\BuiltinExceptionSupport::materializeError(
+            $this->context,
+            sprintf('Cannot read property %s::$%s without get hook', $className, $propName)
         );
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {

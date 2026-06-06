@@ -7287,6 +7287,14 @@ class JIT {
                             $this->assignOperandValue($result, $hookFetched);
                             break;
                         }
+                        if (JIT\PropertyHookDispatch::emitWriteOnlyVirtualReadGuard(
+                            $this->context,
+                            $this,
+                            $declaringClass,
+                            $name->value
+                        )) {
+                            break;
+                        }
                         JIT\LazyObjectHelper::emitEnsureInitialized(
                             $this->context,
                             $this->loadPropertyFetchReceiver($obj)
@@ -10254,6 +10262,13 @@ class JIT {
                     Variable::KIND_VALUE,
                     $hookVal
                 );
+            } elseif (JIT\PropertyHookDispatch::emitWriteOnlyVirtualReadGuard(
+                $this->context,
+                $this,
+                $read->objectPropertyClassName,
+                $read->objectPropertyName
+            )) {
+                return;
             }
         }
         if (null === $current) {
