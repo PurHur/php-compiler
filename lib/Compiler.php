@@ -2726,6 +2726,39 @@ class Compiler {
         return $this->staticNameFromOperand($class);
     }
 
+    /** True when StaticCall source class is the `parent` keyword (#6735, zend_compile.c). */
+    protected function staticCallUsesParentScope(Operand $class): bool
+    {
+        $name = $this->literalScopeClassName($class);
+        if (null !== $name && 'parent' === strtolower($name)) {
+            return true;
+        }
+        $current = $class;
+        while (null !== $current) {
+            if ($current instanceof Operand\Variable && $current->name instanceof Operand\Literal) {
+                if ('parent' === strtolower((string) $current->name->value)) {
+                    return true;
+                }
+            }
+            if (property_exists($current, 'original') && null !== $current->original) {
+                if ($current->original instanceof \PhpParser\Node\Name) {
+                    $parts = $current->original->getParts();
+                    if (1 === \count($parts) && 'parent' === strtolower($parts[0])) {
+                        return true;
+                    }
+                }
+                if ($current->original instanceof Operand) {
+                    $current = $current->original;
+                    continue;
+                }
+            }
+
+            break;
+        }
+
+        return false;
+    }
+
     /**
      * True when the static fetch class operand is an instance (new expr or variable), not a class name (#5477).
      */
@@ -5194,13 +5227,17 @@ class Compiler {
                     max(0, $expr->getLine())
                 );
             case Op\Expr\StaticCall::class:
-                $return = [
-                    new OpCode(
-                        OpCode::TYPE_STATICCALL_INIT,
-                        $this->compileOperand($expr->class, $block, true),
-                        $this->compileOperand($expr->name, $block, true)
-                    )
-                ];
+                $parentScope = $this->staticCallUsesParentScope($expr->class);
+                $classSlot = $parentScope
+                    ? $this->compileOperand(new Operand\Literal('parent'), $block, true)
+                    : $this->compileOperand($expr->class, $block, true);
+                $init = new OpCode(
+                    OpCode::TYPE_STATICCALL_INIT,
+                    $classSlot,
+                    $this->compileOperand($expr->name, $block, true)
+                );
+                $init->staticCallParentScope = $parentScope;
+                $return = [$init];
                 foreach ($this->compileCallArgSends($expr->args, $block) as $send) {
                     $return[] = $send;
                 }
