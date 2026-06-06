@@ -17,7 +17,9 @@ final class HexFloatLiteralDesugar
 {
     private const HEX_FLOAT = '~0x[0-9A-Fa-f_]+(?:\.[0-9A-Fa-f_]*)?[Pp][+-]?[0-9_]+~';
 
-    private const INVALID_SUFFIX = '~0x[0-9A-Fa-f_]+(?:\.[0-9A-Fa-f_]*)?[a-oq-zA-OQ-Z]~';
+    /** Malformed hex-float only — plain hex integers (0xFF) must not match (#7140). */
+    private const INVALID_SUFFIX = '~0x[0-9A-Fa-f_]+\.[0-9A-Fa-f_]*[a-oq-zA-OQ-Z]
+        |0x[0-9A-Fa-f_]+(?:\.[0-9A-Fa-f_]*)?[Pp][+-]?[0-9_]*[a-oq-zA-OQ-Z]~x';
 
     private const INVALID_SUFFIX_MESSAGE = 'Invalid numeric literal';
 

@@ -24,4 +24,18 @@ final class HexFloatTest extends TestCase
         $this->assertStringContainsString('echo 3', $desugared);
         $this->assertStringNotContainsString('0x1.8p+1', $desugared);
     }
+
+    public function testDesugarLeavesHexIntegersUntouched(): void
+    {
+        $code = '<?php var_dump(0xFF, 0xAB, 0xDEADBEEF, 0x1A);';
+        $desugared = HexFloatLiteralDesugar::desugar($code);
+        $this->assertSame($code, $desugared);
+    }
+
+    public function testDesugarRejectsMalformedHexFloatSuffix(): void
+    {
+        $this->expectException(\PhpParser\Error::class);
+        $this->expectExceptionMessage('Invalid numeric literal');
+        HexFloatLiteralDesugar::desugar('<?php echo 0x1.8q+1;');
+    }
 }
