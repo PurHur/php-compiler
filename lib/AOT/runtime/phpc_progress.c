@@ -1,15 +1,13 @@
 /**
- * JIT/AOT segfault triage — thin platform ABI only (#2978, #6748).
- * Progress file writes live in lib/JIT/Builtin/ProgressNoteRuntime.php + lib/JIT/Progress.php.
+ * JIT/AOT segfault triage — async-signal-safe SIGSEGV handler only (#2978, #6748, #6777).
+ * Progress string buffering lives in LLVM globals filled by ProgressNoteRuntime.php.
  */
 #include <stddef.h>
-#include <string.h>
-#include <signal.h>
 #include <unistd.h>
+#include <signal.h>
 
-static int phpc_segv_handler_installed = 0;
-static char phpc_last_progress[256];
-static size_t phpc_last_progress_len = 0;
+extern char phpc_last_progress[256];
+extern size_t phpc_last_progress_len;
 
 static void phpc_segv_handler(int sig)
 {
@@ -24,31 +22,8 @@ static void phpc_segv_handler(int sig)
     _exit(139);
 }
 
+__attribute__((constructor))
 static void phpc_install_segv_handler(void)
 {
-    if (phpc_segv_handler_installed) {
-        return;
-    }
-    phpc_segv_handler_installed = 1;
     (void) signal(SIGSEGV, phpc_segv_handler);
-}
-
-void __phpc_progress_remember(const char *msg)
-{
-    size_t len;
-
-    phpc_install_segv_handler();
-    if (NULL == msg) {
-        return;
-    }
-
-    len = strlen(msg);
-    if (len > 0) {
-        if (len >= sizeof(phpc_last_progress)) {
-            len = sizeof(phpc_last_progress) - 1;
-        }
-        memcpy(phpc_last_progress, msg, len);
-        phpc_last_progress[len] = '\0';
-        phpc_last_progress_len = len;
-    }
 }

@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #6748: AOT standalone must define progress notes without C file-write logic.
+ * Issue #6748 / #6777: AOT standalone defines progress notes in LLVM globals + optional C SIGSEGV ABI.
  *
  * @group aot-lint
  */
@@ -24,5 +24,15 @@ final class ProgressNoteRuntimeStandaloneTest extends TestCase
         $fn = $ctx->lookupFunction('__phpc_progress_note');
         $this->assertNotNull($fn);
         $this->assertGreaterThan(0, $fn->countBasicBlocks());
+    }
+
+    public function testEnsureLinkedDefinesProgressBufferGlobals(): void
+    {
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
+        ProgressNoteRuntime::ensureLinked($ctx);
+
+        $this->assertNotNull($ctx->module->getNamedGlobal('phpc_last_progress'));
+        $this->assertNotNull($ctx->module->getNamedGlobal('phpc_last_progress_len'));
     }
 }

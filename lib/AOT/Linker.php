@@ -158,7 +158,7 @@ final class Linker
             }
         }
         $index = 0;
-        foreach (self::RUNTIME_C_SOURCES as $source) {
+        foreach (self::runtimeCSources() as $source) {
             if (!is_file($source)) {
                 continue;
             }
@@ -179,6 +179,31 @@ final class Linker
         }
 
         return $objects;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function runtimeCSources(): array
+    {
+        if (self::progressAbiEnabled()) {
+            return self::RUNTIME_C_SOURCES;
+        }
+
+        return array_values(array_filter(
+            self::RUNTIME_C_SOURCES,
+            static fn (string $source): bool => !str_ends_with($source, 'phpc_progress.c')
+        ));
+    }
+
+    private static function progressAbiEnabled(): bool
+    {
+        $flag = getenv('PHP_COMPILER_PROGRESS_ABI');
+        if (false === $flag || '' === $flag) {
+            return true;
+        }
+
+        return '0' !== $flag && 'false' !== strtolower($flag);
     }
 
     /**

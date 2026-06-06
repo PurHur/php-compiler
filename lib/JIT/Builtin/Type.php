@@ -231,11 +231,7 @@ class Type extends Builtin {
             $fn = $this->context->module->addFunction($libcName, $ft);
             $this->context->registerFunction($libcName, $fn);
         }
-        $voidTy = $this->context->getTypeFromString('void');
-        $ftRemember = $this->context->context->functionType($voidTy, false, $i8p);
-        $fnRemember = $this->context->module->addFunction('__phpc_progress_remember', $ftRemember);
-        $this->context->registerFunction('__phpc_progress_remember', $fnRemember);
-        $ftOpen = $this->context->context->functionType($i32, false, $i8p, $i32);
+        ProgressNoteRuntime::ensureLinked($this->context);
         $fnOpen = $this->context->module->addFunction('open', $ftOpen);
         $this->context->registerFunction('open', $fnOpen);
         $ftFopen = $this->context->context->functionType($i8p, false, $i8p, $i8p);
