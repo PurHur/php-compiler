@@ -174,4 +174,69 @@ PHP;
         $runtime->run($block);
         $this->assertSame("1\n", ob_get_clean());
     }
+
+    public function testConcreteClassAbstractPropertyHookFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public string $p {
+        get;
+    }
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class C contains 1 abstract method');
+        $this->expectExceptionMessage('C::$p::get');
+        $runtime->parseAndCompile($code, 'concrete_abstract_hook.php');
+    }
+
+    public function testMissingParentAbstractPropertyHooksFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+abstract class A {
+    public string $p {
+        get;
+        set;
+    }
+}
+class B extends A {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class B contains 2 abstract methods');
+        $this->expectExceptionMessage('A::$p::get');
+        $this->expectExceptionMessage('A::$p::set');
+        $runtime->parseAndCompile($code, 'missing_parent_hooks.php');
+    }
+
+    public function testAbstractClassGetSetHooksSubclassCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+abstract class A {
+    public string $p {
+        get;
+        set;
+    }
+}
+class B extends A {
+    public string $p {
+        get => $this->p;
+        set => $this->p = $value;
+    }
+}
+$b = new B();
+$b->p = 'hi';
+echo $b->p, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'abstract_hooks_ok.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("hi\n", ob_get_clean());
+    }
 }
