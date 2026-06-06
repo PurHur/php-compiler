@@ -56,6 +56,36 @@ final class AttributeNames
         return false;
     }
 
+    /** True when `#[\Override]` is present (#6864). */
+    public static function hasOverride(array $names): bool
+    {
+        foreach ($names as $name) {
+            $normalized = strtolower(ltrim($name, '\\'));
+            if ('override' === $normalized || str_ends_with($normalized, '\\override')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Zend compile-time target guard (zend_attributes.c, issue #6864).
+     * `#[\Override]` is only valid on methods (Attribute::TARGET_METHOD).
+     *
+     * @param list<string> $names
+     */
+    public static function assertOverrideMethodTargetOnly(array $names, string $target): void
+    {
+        if (!self::hasOverride($names)) {
+            return;
+        }
+
+        throw new \CompileError(
+            'Attribute "'.self::messageName('Override').'" cannot target '.$target.' (allowed targets: method)'
+        );
+    }
+
     /**
      * Zend compile-time target guard (zend_attributes.c, issue #5137).
      * `#[\AllowDynamicProperties]` is only valid on classes.

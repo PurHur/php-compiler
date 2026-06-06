@@ -43,4 +43,24 @@ final class AttributeNamesDuplicateTest extends TestCase
 
         AttributeNames::assertAllowDynamicPropertiesClassTargetOnly(['AllowDynamicProperties'], 'method');
     }
+
+    public function testRejectsOverrideOnClass(): void
+    {
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(
+            'Attribute "Override" cannot target class (allowed targets: method)'
+        );
+
+        AttributeNames::assertOverrideMethodTargetOnly(['Override'], 'class');
+    }
+
+    public function testRejectsOverrideOnParameter(): void
+    {
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(
+            'Attribute "Override" cannot target parameter (allowed targets: method)'
+        );
+
+        AttributeNames::assertOverrideMethodTargetOnly(['\\Override'], 'parameter');
+    }
 }
