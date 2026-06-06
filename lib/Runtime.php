@@ -202,6 +202,7 @@ class Runtime {
         $this->load(new ext\bcmath\Module);
         $this->load(new ext\openssl\Module);
         $this->load(new ext\curl\Module);
+        $this->load(new ext\hash\Module);
         $this->load(new ext\standard\Module);
     }
 

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 1626 |
-| Phase A inventory files (M2 ratio SSOT) | 1626 |
+| PHP files on vm.php path | 1633 |
+| Phase A inventory files (M2 ratio SSOT) | 1633 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 4444 |
+| Source constructs flagged (warnings) | 4458 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -45,6 +45,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/filter/Module.php` | 0 | 4 |
 | `ext/filter/filter_id.php` | 0 | 1 |
 | `ext/filter/filter_list.php` | 0 | 1 |
+| `ext/hash/HashFunction.php` | 0 | 3 |
+| `ext/hash/JitHashAlgos.php` | 0 | 1 |
+| `ext/hash/Module.php` | 0 | 6 |
+| `ext/hash/hash_algos.php` | 0 | 2 |
 | `ext/intl/BuiltinClasses.php` | 0 | 4 |
 | `ext/intl/Module.php` | 0 | 2 |
 | `ext/intl/intl_get_error_code.php` | 0 | 1 |
@@ -310,7 +314,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStrShuffle.php` | 0 | 1 |
 | `ext/standard/JitStrSplit.php` | 0 | 1 |
 | `ext/standard/JitStrWordCount.php` | 0 | 4 |
-| `ext/standard/JitStrcmp.php` | 0 | 1 |
 | `ext/standard/JitStreamContextCreate.php` | 0 | 1 |
 | `ext/standard/JitStreamGetContents.php` | 0 | 1 |
 | `ext/standard/JitStreamGetLine.php` | 0 | 1 |
@@ -391,7 +394,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmFs.php` | 0 | 8 |
 | `ext/standard/VmFsGlob.php` | 0 | 1 |
 | `ext/standard/VmFsUnlink.php` | 0 | 1 |
-| `ext/standard/VmHash.php` | 0 | 3 |
+| `ext/standard/VmHash.php` | 0 | 5 |
 | `ext/standard/VmHashFile.php` | 0 | 1 |
 | `ext/standard/VmHashNative.php` | 0 | 2 |
 | `ext/standard/VmHighlight.php` | 0 | 1 |
@@ -1389,7 +1392,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Printer.php` | 0 | 1 |
 | `lib/PropertyVisibility.php` | 0 | 1 |
 | `lib/PseudoClassScope.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 44 |
+| `lib/Runtime.php` | 0 | 45 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 1 |
 | `lib/SwitchCommaCaseRewriter.php` | 0 | 1 |
@@ -1729,6 +1732,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/filter/filter_list.php`
 
 **Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/hash/HashFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 22)
+- new Error (line 27)
+- 2 class method(s)
+
+### `ext/hash/JitHashAlgos.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/hash/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new hash_init (line 19)
+- new hash_update (line 20)
+- new hash_final (line 21)
+- new hash_copy (line 22)
+- new hash_algos (line 23)
+- 1 class method(s)
+
+### `ext/hash/hash_algos.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
 - 2 class method(s)
 
 ### `ext/intl/BuiltinClasses.php`
@@ -3130,11 +3161,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 382)
 - 9 class method(s)
 
-### `ext/standard/JitStrcmp.php`
-
-**Warnings** (review for bootstrap subset):
-- 6 class method(s)
-
 ### `ext/standard/JitStreamContextCreate.php`
 
 **Warnings** (review for bootstrap subset):
@@ -4186,9 +4212,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmHash.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 46)
-- new Variable (line 48)
-- 5 class method(s)
+- new HashTable (line 49)
+- new Variable (line 51)
+- new HashTable (line 62)
+- new Variable (line 64)
+- 6 class method(s)
 
 ### `ext/standard/VmHashFile.php`
 
@@ -10552,14 +10580,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\bcmath\Module (line 202)
 - new ext\openssl\Module (line 203)
 - new ext\curl\Module (line 204)
-- new ext\standard\Module (line 205)
-- new JIT (line 281)
-- new JITContext (line 295)
-- new SealedClassPreprocessor (line 319)
-- new StaticClassPreprocessor (line 322)
-- new SourcePreprocessor\PropertyHooks (line 325)
-- new State (line 397)
-- new LintCompiler (line 775)
+- new ext\hash\Module (line 205)
+- new ext\standard\Module (line 206)
+- new JIT (line 282)
+- new JITContext (line 296)
+- new SealedClassPreprocessor (line 320)
+- new StaticClassPreprocessor (line 323)
+- new SourcePreprocessor\PropertyHooks (line 326)
+- new State (line 398)
+- new LintCompiler (line 776)
 - 46 class method(s)
 
 ### `lib/SourceBareThrowRewriter.php`
@@ -10779,10 +10808,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new EnumCaseEntry (line 39)
-- new Variable (line 69)
-- new Variable (line 75)
-- new Variable (line 112)
-- new Variable (line 146)
+- new Variable (line 82)
+- new Variable (line 88)
+- new Variable (line 125)
+- new Variable (line 159)
 - 12 class method(s)
 
 ### `lib/VM/Builtin/AttributeConstruct.php`
