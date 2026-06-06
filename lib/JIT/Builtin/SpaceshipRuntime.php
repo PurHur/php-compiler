@@ -10,7 +10,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for spaceship (<=>) on objects and boxed values (#4661, #5185).
  *
- * LLVM bodies from {@see SpaceshipCompareJit}; uses phpc_object_prop_count from phpc_gc.c.
+ * LLVM bodies from {@see SpaceshipCompareJit}; property counts via {@see __object__prop_count} (#6749).
  */
 final class SpaceshipRuntime
 {

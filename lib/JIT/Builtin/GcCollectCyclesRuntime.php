@@ -44,7 +44,6 @@ final class GcCollectCyclesRuntime
 
         foreach (
             [
-                'phpc_object_prop_count',
                 'phpc_gc_register',
                 'phpc_gc_unregister',
                 'phpc_destruct_set_allow_delref',

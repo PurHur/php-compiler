@@ -112,11 +112,13 @@ final class SpaceshipCompareJit
         $dbl = $context->getTypeFromString('double');
         $dblPtr = $context->getTypeFromString('double*');
 
+        $objPtr = $context->getTypeFromString('__object__*');
+
         self::declareExternal($context, 'strcmp', $i32, [$i8p, $i8p]);
         self::declareExternal($context, 'strncasecmp', $i32, [$i8p, $i8p, $sizeT]);
         self::declareExternal($context, 'strtod', $dbl, [$i8p, $i8p->pointerType(0)]);
         self::declareExternal($context, 'isnan', $i32, [$dbl]);
-        self::declareExternal($context, 'phpc_object_prop_count', $i32, [$voidPtr]);
+        self::declareExternal($context, '__object__prop_count', $i32, [$objPtr]);
     }
 
     /**
@@ -588,8 +590,8 @@ final class SpaceshipCompareJit
 
         $context->builder->positionAtEnd($propLoopInit);
         $propCount = $context->builder->call(
-            $context->lookupFunction('phpc_object_prop_count'),
-            $context->builder->pointerCast($left, $context->getTypeFromString('void*'))
+            $context->lookupFunction('__object__prop_count'),
+            $left
         );
         $slotSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('int32'));
         $context->builder->store($propCount, $slotSlot);
@@ -655,12 +657,12 @@ final class SpaceshipCompareJit
         $zero = $i64->constInt(0, false);
 
         $lprops = $context->builder->call(
-            $context->lookupFunction('phpc_object_prop_count'),
-            $context->builder->pointerCast($left, $context->getTypeFromString('void*'))
+            $context->lookupFunction('__object__prop_count'),
+            $left
         );
         $rprops = $context->builder->call(
-            $context->lookupFunction('phpc_object_prop_count'),
-            $context->builder->pointerCast($right, $context->getTypeFromString('void*'))
+            $context->lookupFunction('__object__prop_count'),
+            $right
         );
         $propsMatch = $context->builder->icmp(Builder::INT_EQ, $lprops, $rprops);
         $propsZeroOrTwo = $context->builder->or(
