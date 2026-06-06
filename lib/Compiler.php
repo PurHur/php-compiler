@@ -2601,6 +2601,8 @@ class Compiler {
             $declare->block1 = $methodBlock;
         }
         $this->assignAttributeMetadata($declare, $child);
+        AttributeNames::assertAllowDynamicPropertiesClassTargetOnly($declare->attributeNames, 'method');
+        AttributeNames::assertNoDuplicates($declare->attributeNames);
         $declare->parameterMetadata = $this->parameterMetadataFromParams($child->func->params);
         $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $result->addOpCode($declare);
