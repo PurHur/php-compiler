@@ -26,6 +26,9 @@ final class Variable {
     const TYPE_INDIRECT = 7;
     /** Writable single-byte view of a parent string (Zend-style $str[$i]). */
     const TYPE_STRING_OFFSET = 8;
+
+    /** @see Zend/zend_operators.c increment_function() / decrement_function() on TYPE_STRING offsets */
+    public const STRING_OFFSET_INCDEC_ERROR = 'Cannot increment/decrement string offsets';
     /** Zend enum case object for E::Case fetches (#3420, #3554). */
     const TYPE_ENUM_CASE = 9;
     /** Writable ArrayAccess dimension ($obj[$key] assignment, #3331). */
@@ -2052,6 +2055,9 @@ restart:
 
             return;
         }
+        if (self::TYPE_STRING_OFFSET === $this->type) {
+            throw new \Error(self::STRING_OFFSET_INCDEC_ERROR);
+        }
         $left = $left->resolveIndirect();
         $right = $right->resolveIndirect();
         if (self::TYPE_BOOLEAN === $left->type) {
@@ -2211,6 +2217,8 @@ restart:
                 $this->float += 1;
 
                 return;
+            case self::TYPE_STRING_OFFSET:
+                throw new \Error(self::STRING_OFFSET_INCDEC_ERROR);
             case self::TYPE_STRING:
                 $this->applyStringIncDec(OpCode::TYPE_PLUS, $this->string);
 
@@ -2265,6 +2273,8 @@ restart:
                 $this->float -= 1;
 
                 return;
+            case self::TYPE_STRING_OFFSET:
+                throw new \Error(self::STRING_OFFSET_INCDEC_ERROR);
             case self::TYPE_STRING:
                 $this->applyStringIncDec(OpCode::TYPE_MINUS, $this->string);
 

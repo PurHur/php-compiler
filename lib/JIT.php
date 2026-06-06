@@ -9978,6 +9978,15 @@ class JIT {
         $writeOp = $this->operandAt($block, $op->arg3, 'inc/dec write');
         $resultOp = $this->operandAt($block, $op->arg1, 'inc/dec result');
         $read = $this->context->getVariableFromOpInScopes($readOp);
+        $write = $this->context->getVariableFromOpInScopes($writeOp);
+        if (
+            JIT\StringOffsetHelper::isWritableCharOffsetLvalue($write, $this->context)
+            || JIT\StringOffsetHelper::isWritableCharOffsetLvalue($read, $this->context)
+        ) {
+            JIT\StringOffsetHelper::emitIncDecError($this->context);
+
+            return;
+        }
         $literal = JIT\JitStringArg::compileTimeLiteral($read);
         if (null !== $literal) {
             $vm = new VM\Variable();

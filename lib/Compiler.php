@@ -7225,7 +7225,7 @@ class Compiler {
     }
 
     /**
-     * True when the fetch result is only used as a write lvalue (assign or unset; issue #103, #1224).
+     * True when the fetch result is only used as a write lvalue (assign, unset, or ++/--; issue #103, #1224, #6798).
      * Nested write through a dimension ($obj[$k][] = $v) also requires write fetch on the outer dim (#3446).
      */
     protected function isArrayDimFetchForWrite(Op\Expr\ArrayDimFetch $fetch, Block $block): bool
@@ -7238,6 +7238,9 @@ class Compiler {
                 continue;
             }
             if ($usage instanceof Op\Terminal\Unset_ && $this->unsetTerminalUsesOperand($usage, $fetch->result)) {
+                continue;
+            }
+            if ($this->isIncDecUsingOperand($usage, $fetch->result)) {
                 continue;
             }
             if (
@@ -7273,6 +7276,9 @@ class Compiler {
             if ($next instanceof Op\Terminal\Unset_ && $this->unsetTerminalUsesOperand($next, $fetch->result)) {
                 return true;
             }
+            if ($this->isIncDecUsingOperand($next, $fetch->result)) {
+                return true;
+            }
             if (
                 $next instanceof Op\Expr\ArrayDimFetch
                 && $next->var === $fetch->result
@@ -7285,6 +7291,24 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * @param Op\Node $usage
+     */
+    private function isIncDecUsingOperand($usage, Operand $operand): bool
+    {
+        if (
+            !$usage instanceof Op\Expr\PostInc
+            && !$usage instanceof Op\Expr\PreInc
+            && !$usage instanceof Op\Expr\PostDec
+            && !$usage instanceof Op\Expr\PreDec
+        ) {
+            return false;
+        }
+        $write = $usage->write ?? $usage->read;
+
+        return $usage->read === $operand || $write === $operand;
     }
 
     /**
