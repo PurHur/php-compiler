@@ -3466,17 +3466,17 @@ restart:
                     try {
                         $calledArgs = $this->resolveOutgoingCallArgs($frame);
                         ReferencableCheck::assertOutgoingCallArgs($frame->call, $frame, $calledArgs);
-                        // Zend strict_types is a *caller* (call-site) rule; enforce scalar param checks
-                        // before entering the callee so exceptions abort argument evaluation correctly.
+                        // Zend strict_types is a *caller* (call-site) rule; standalone literal types
+                        // (`true`/`false`/`null`) always exact-match (issue #7057).
                         if (
                             $frame->call instanceof Func\PHP
-                            && $frame->block->strictTypes
                             && [] !== $calledArgs
                         ) {
                             $callSiteLine = OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
                                 ? (int) ($op->arg2 ?? 0)
                                 : (int) ($op->arg1 ?? 0);
                             $calleeBlock = $frame->call->block;
+                            $callerStrict = $frame->block->strictTypes;
                             $thisArgOffset = 0;
                             if (
                                 null !== $calleeBlock->func
@@ -3495,6 +3495,12 @@ restart:
                                     continue;
                                 }
                                 $slot = (int) $recv->arg1;
+                                if (
+                                    !$callerStrict
+                                    && !$calleeBlock->paramRequiresExactLiteralMatch($slot)
+                                ) {
+                                    continue;
+                                }
                                 $arg = $calledArgs[$argIndex];
                                 if (
                                     TypeCheck::skipParameterTypeCheckForImplicitNullable(

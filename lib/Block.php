@@ -802,12 +802,11 @@ class Block {
                 $scope[$pos] = $this->constants[$pos];
             } elseif (isset($this->closureCaptureSlots[$pos])) {
                 $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+            } elseif ($this->isArgRecvParameterSlot($pos)) {
+                // Params are not in $args (compileOperand isRead=false); still need type metadata (#7057).
+                $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
             } elseif ($this->args->contains($op)) {
                 // Callee parameters are filled by TYPE_ARG_RECV; do not inherit caller locals (#3803).
-                if ($this->isArgRecvParameterSlot($pos)) {
-                    $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
-                    continue;
-                }
                 if (is_null($frame)) {
                     $scope[$pos] = self::initialEntryVariable($op, $context, $pos, $this);
                     continue;
@@ -1073,6 +1072,26 @@ class Block {
         }
 
         return false;
+    }
+
+    /**
+     * Standalone `true`/`false`/`null` parameter types — exact match even without caller strict_types
+     * (Zend zend_check_type / zend_verify_arg_type, issue #7057).
+     */
+    public function paramRequiresExactLiteralMatch(int $slot): bool
+    {
+        if (isset($this->paramLiteralBoolTypes[$slot])) {
+            return true;
+        }
+        if (!isset($this->paramTypeConstraints[$slot])) {
+            return false;
+        }
+        if (Variable::TYPE_NULL !== $this->paramTypeConstraints[$slot]) {
+            return false;
+        }
+
+        return !isset($this->paramDnfConstraints[$slot])
+            && !isset($this->paramIntersectionConstraints[$slot]);
     }
 
     public static function resolveVariableName(Operand $op): ?string
