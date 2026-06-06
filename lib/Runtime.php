@@ -35,6 +35,7 @@ use PHPCompiler\Visitor\ExitTwoArgResolver;
 use PHPCompiler\Visitor\InOperatorResolver;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Lint\LintCompiler;
+use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\ShutdownQueue;
 
@@ -425,8 +426,13 @@ class Runtime {
     {
         $detail = $this->compiler->getCompileAbortDetail();
         $primary = null !== $detail && '' !== $detail ? $detail : $e->getMessage();
-        $this->recordLastParseFailure(sprintf('%s: %s', $sourcePath, $primary));
-        $line = sprintf("parseAndCompile failure: target=%s: %s\n", $sourcePath, $primary);
+        if ($e instanceof CompileFatal) {
+            $line = $e->zendStderrLine();
+            $this->recordLastParseFailure(sprintf('%s: %s', $e->sourceFile, $primary));
+        } else {
+            $this->recordLastParseFailure(sprintf('%s: %s', $sourcePath, $primary));
+            $line = sprintf("parseAndCompile failure: target=%s: %s\n", $sourcePath, $primary);
+        }
         $context = null;
         if (null !== $sourceCode && $e instanceof \PhpParser\Error) {
             $context = $this->formatPhpParserErrorContext($sourceCode, $e);
