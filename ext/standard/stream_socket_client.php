@@ -1,0 +1,130 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
+use PHPLLVM\Value;
+
+/**
+ * stream_socket_client() — VM host socket connect (php-src streamsfuncs.c, #6815, #3202).
+ *
+ * Resolves {@see VmStreamContext} via {@see VmStreamContext::toHostResource()} only; never
+ * passes VM array buckets to the host stream API.
+ */
+final class stream_socket_client extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('stream_socket_client');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 6) {
+            throw new \LogicException(
+                'stream_socket_client() accepts between 1 and 6 arguments in this compiler build'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+
+        $remote = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'stream_socket_client',
+            0,
+            'remote_socket'
+        );
+
+        $errno = 0;
+        $errstr = '';
+        $timeout = 60.0;
+        $flags = \STREAM_CLIENT_CONNECT;
+        $hostContext = null;
+
+        if ($argc >= 4) {
+            $timeoutVar = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_NULL === $timeoutVar->type) {
+                $timeout = 60.0;
+            } elseif (Variable::TYPE_INTEGER === $timeoutVar->type) {
+                $timeout = (float) $timeoutVar->toInt();
+            } elseif (Variable::TYPE_FLOAT === $timeoutVar->type) {
+                $timeout = $timeoutVar->toFloat();
+            } else {
+                throw new \LogicException(
+                    'stream_socket_client() timeout must be int, float, or null in this compiler build'
+                );
+            }
+        }
+
+        if ($argc >= 5) {
+            $flagsVar = $frame->calledArgs[4]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $flagsVar->type) {
+                throw new \LogicException(
+                    'stream_socket_client() flags must be an integer in this compiler build'
+                );
+            }
+            $flags = $flagsVar->toInt();
+        }
+
+        if ($argc >= 6) {
+            $hostContext = VmStreamContext::toHostResource($frame->calledArgs[5]);
+            if (null === $hostContext) {
+                $ctxVar = $frame->calledArgs[5]->resolveIndirect();
+                if (Variable::TYPE_NULL !== $ctxVar->type) {
+                    throw new \LogicException(
+                        'stream_socket_client() context must be a stream context resource in this compiler build'
+                    );
+                }
+            }
+        }
+
+        $result = @\stream_socket_client(
+            $remote,
+            $errno,
+            $errstr,
+            $timeout,
+            $flags,
+            $hostContext
+        );
+
+        if ($argc >= 2) {
+            $errnoOut = new Variable(Variable::TYPE_INTEGER);
+            $errnoOut->int($errno);
+            $frame->calledArgs[1]->copyFrom($errnoOut);
+        }
+        if ($argc >= 3) {
+            $errstrOut = new Variable(Variable::TYPE_STRING);
+            $errstrOut->string($errstr);
+            $frame->calledArgs[2]->copyFrom($errstrOut);
+        }
+
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+
+        $handle = VmFs::adoptStreamResource($result);
+        if (false === $handle) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->streamHandle($handle);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException(
+            'stream_socket_client() is not supported for JIT/AOT in this compiler build'
+        );
+    }
+}

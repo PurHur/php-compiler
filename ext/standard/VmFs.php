@@ -446,8 +446,18 @@ final class VmFs
         if (false === $fp) {
             return false;
         }
+
+        return self::adoptStreamResource($fp);
+    }
+
+    /** @return int|false */
+    public static function adoptStreamResource($resource)
+    {
+        if (!\is_resource($resource)) {
+            return false;
+        }
         $id = ++self::$nextHandleId;
-        self::$handles[$id] = $fp;
+        self::$handles[$id] = $resource;
 
         return $id;
     }

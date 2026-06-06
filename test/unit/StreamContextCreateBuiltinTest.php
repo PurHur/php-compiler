@@ -54,4 +54,30 @@ final class StreamContextCreateBuiltinTest extends TestCase
         $this->assertTrue(VmStreamContext::isRepresentation($ctx));
         $this->assertNotNull(VmStreamContext::toHostResource($ctx));
     }
+
+    public function testNestedOptionsDeepCopyDoesNotShareInputBuckets(): void
+    {
+        $runtime = new Runtime();
+        $options = new VMVariable();
+        $options->newArray();
+        $socket = new VMVariable();
+        $socket->newArray();
+        $timeout = new VMVariable();
+        $timeout->int(1);
+        $socket->toArray()->add('connect_timeout', $timeout);
+        $options->toArray()->add('socket', $socket);
+
+        $builtin = new stream_context_create();
+        $callFrame = $builtin->getFrame($runtime->vmContext);
+        $callFrame->calledArgs = [$options];
+        $callFrame->returnVar = new VMVariable();
+        $builtin->execute($callFrame);
+
+        $ctx = $callFrame->returnVar->resolveIndirect();
+        $this->assertTrue(VmStreamContext::isRepresentation($ctx));
+        $this->assertNotSame($options->toArray(), $ctx->toArray());
+        $stored = new VMVariable();
+        $stored->copyFrom($ctx);
+        $this->assertSame(1, $stored->resolveIndirect()->toArray()->find('socket')->resolveIndirect()->toArray()->find('connect_timeout')->resolveIndirect()->toInt());
+    }
 }

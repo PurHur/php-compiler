@@ -409,6 +409,7 @@ class Module extends ModuleAbstract
             new touch_(),
             new filetype(),
             new stream_context_create(),
+            new stream_socket_client(),
             new stream_set_chunk_size_(),
             new stream_set_timeout_(),
             new stream_set_write_buffer_(),
