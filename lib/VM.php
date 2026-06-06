@@ -8445,6 +8445,35 @@ restart:
     }
 
     /**
+     * Merge abstract-class property-hook metadata into subclasses (#6634, zend_property_hooks.c).
+     */
+    protected function inheritParentPropertyHooks(ClassEntry $entry, ClassEntry $parent): void
+    {
+        $parentLc = strtolower($parent->name);
+        if (!isset($this->context->propertyHookRegistry[$parentLc])) {
+            return;
+        }
+        $childLc = strtolower($entry->name);
+        foreach ($this->context->propertyHookRegistry[$parentLc] as $prop => $meta) {
+            $propLc = strtolower($prop);
+            $classProp = null;
+            foreach ($entry->properties as $candidate) {
+                if (strtolower($candidate->name) === $propLc) {
+                    $classProp = $candidate;
+                    break;
+                }
+            }
+            if (null === $classProp) {
+                continue;
+            }
+            if (!isset($this->context->propertyHookRegistry[$childLc][$prop])) {
+                $this->context->propertyHookRegistry[$childLc][$prop] = $meta;
+            }
+            $this->linkPropertyHooks($entry, $classProp);
+        }
+    }
+
+    /**
      * @param list<string> $rawPermits lowercase names from source (possibly unqualified)
      *
      * @return list<string>
@@ -8546,17 +8575,7 @@ restart:
             }
         }
         $childLc = strtolower($entry->name);
-        if (isset($this->context->propertyHookRegistry[$entry->parentLc])) {
-            foreach ($this->context->propertyHookRegistry[$entry->parentLc] as $prop => $meta) {
-                $propLc = strtolower($prop);
-                if (!isset($entry->staticProperties[$propLc])) {
-                    continue;
-                }
-                if (!isset($this->context->propertyHookRegistry[$childLc][$prop])) {
-                    $this->context->propertyHookRegistry[$childLc][$prop] = $meta;
-                }
-            }
-        }
+        $this->inheritParentPropertyHooks($entry, $parent);
         foreach ($parent->constants as $name => $value) {
             if (!isset($entry->constants[$name])) {
                 $entry->constants[$name] = $value;
