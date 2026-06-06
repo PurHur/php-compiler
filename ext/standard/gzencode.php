@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -58,6 +60,25 @@ final class gzencode extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('gzencode() is not implemented for JIT in this compiler build (issue #3194)');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('gzencode() expects one to three arguments in this compiler build');
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $level = $i64->constInt(-1, true);
+        $encoding = $i64->constInt(\ZLIB_ENCODING_GZIP, false);
+        if ($argc >= 2) {
+            $level = JitLongArg::lower($context, $args[1], 'gzencode() level');
+        }
+        if (3 === $argc) {
+            $encoding = JitLongArg::lower($context, $args[2], 'gzencode() encoding');
+        }
+
+        return JitZlib::encode(
+            $context,
+            JitStringBuiltinArg::lower($context, $args[0], 'gzencode', 0, 'data'),
+            $level,
+            $encoding
+        );
     }
 }

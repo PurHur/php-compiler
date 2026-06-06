@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -58,6 +60,25 @@ final class gzcompress extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('gzcompress() is not implemented for JIT in this compiler build (issue #3194)');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('gzcompress() expects one to three arguments in this compiler build');
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $level = $i64->constInt(-1, true);
+        $encoding = $i64->constInt(\ZLIB_ENCODING_DEFLATE, false);
+        if ($argc >= 2) {
+            $level = JitLongArg::lower($context, $args[1], 'gzcompress() level');
+        }
+        if (3 === $argc) {
+            $encoding = JitLongArg::lower($context, $args[2], 'gzcompress() encoding');
+        }
+
+        return JitZlib::compress(
+            $context,
+            JitStringBuiltinArg::lower($context, $args[0], 'gzcompress', 0, 'data'),
+            $level,
+            $encoding
+        );
     }
 }

@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -50,6 +52,19 @@ final class gzdecode extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('gzdecode() is not implemented for JIT in this compiler build (issue #3194)');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('gzdecode() expects one or two arguments in this compiler build');
+        }
+        $maxLength = $context->getTypeFromString('int64')->constInt(0, false);
+        if (2 === $argc) {
+            $maxLength = JitLongArg::lower($context, $args[1], 'gzdecode() max_length');
+        }
+
+        return JitZlib::decode(
+            $context,
+            JitStringBuiltinArg::lower($context, $args[0], 'gzdecode', 0, 'data'),
+            $maxLength
+        );
     }
 }
