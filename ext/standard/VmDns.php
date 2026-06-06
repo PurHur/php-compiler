@@ -8,17 +8,25 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * DNS helpers for stdlib builtins (issue #3707, native getaddrinfo #4928).
+ * DNS helpers for stdlib builtins (issue #3707, #5854; native getaddrinfo #4928).
  *
- * php-src: ext/standard/dns.c — PHP_FUNCTION(gethostbynamel)
+ * php-src: ext/standard/dns.c — PHP_FUNCTION(gethostbynamel), PHP_FUNCTION(gethostbyaddr)
  */
 final class VmDns
 {
+    public const ERR_NONE = 0;
+
+    public const ERR_INVALID_ADDRESS = 1;
+
+    public const ERR_NOT_FOUND = 2;
+
     private const MAX_ADDRS = 64;
 
     private const AF_INET = 2;
 
     private const SOCK_STREAM = 1;
+
+    private const NI_MAXHOST = 1025;
 
     private static ?\FFI $ffi = null;
 
@@ -50,6 +58,147 @@ final class VmDns
         }
 
         return $ht;
+    }
+
+    /**
+     * Reverse DNS for IPv4 (php-src gethostbyaddr parity, #5854).
+     *
+     * @return string|false hostname on success
+     */
+    public static function gethostbyaddr(string $ipAddress, ?int &$error = null)
+    {
+        $error = self::ERR_NONE;
+        if ('' === $ipAddress || \strlen($ipAddress) > 255) {
+            $error = self::ERR_INVALID_ADDRESS;
+
+            return false;
+        }
+
+        $name = self::resolveHostnameViaGetnameinfo($ipAddress);
+        if (null === $name) {
+            $name = self::resolveHostnameViaEtcHosts($ipAddress);
+        }
+        if (null === $name || '' === $name) {
+            $error = self::isValidIpv4Address($ipAddress)
+                ? self::ERR_NOT_FOUND
+                : self::ERR_INVALID_ADDRESS;
+
+            return false;
+        }
+
+        return $name;
+    }
+
+    public static function isValidIpv4Address(string $ip): bool
+    {
+        if (!\preg_match('/^\d{1,3}(\.\d{1,3}){3}$/', $ip)) {
+            return false;
+        }
+        foreach (\explode('.', $ip) as $octet) {
+            $n = (int) $octet;
+            if ($n < 0 || $n > 255 || (string) $n !== $octet) {
+                return false;
+            }
+        }
+
+        return self::inetPtonIpv4($ip);
+    }
+
+    /**
+     * @return string|null null when libc FFI path unavailable or lookup failed
+     */
+    private static function resolveHostnameViaGetnameinfo(string $ip): ?string
+    {
+        if (!self::inetPtonIpv4($ip)) {
+            return null;
+        }
+        if (!\extension_loaded('ffi')) {
+            return null;
+        }
+        try {
+            $ffi = self::ffi();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        $sin = $ffi->new('struct sockaddr_in');
+        $sin->sin_family = self::AF_INET;
+        $rc = (int) $ffi->inet_pton(self::AF_INET, $ip, \FFI::addr($sin->sin_addr));
+        if (1 !== $rc) {
+            return null;
+        }
+
+        $hostbuf = $ffi->new('char['.self::NI_MAXHOST.']');
+        $sa = $ffi->cast('struct sockaddr *', \FFI::addr($sin));
+        $gnRc = (int) $ffi->getnameinfo(
+            $sa,
+            \FFI::sizeof($sin),
+            $hostbuf,
+            self::NI_MAXHOST,
+            null,
+            0,
+            0
+        );
+        if (0 !== $gnRc) {
+            return null;
+        }
+
+        $name = \FFI::string($hostbuf);
+
+        return '' !== $name ? $name : null;
+    }
+
+    private static function inetPtonIpv4(string $ip): bool
+    {
+        if (!\extension_loaded('ffi')) {
+            return \preg_match('/^\d{1,3}(\.\d{1,3}){3}$/', $ip) === 1;
+        }
+        try {
+            $ffi = self::ffi();
+        } catch (\Throwable) {
+            return \preg_match('/^\d{1,3}(\.\d{1,3}){3}$/', $ip) === 1;
+        }
+
+        $addr = $ffi->new('struct in_addr');
+        $rc = (int) $ffi->inet_pton(self::AF_INET, $ip, \FFI::addr($addr));
+
+        return 1 === $rc;
+    }
+
+    /**
+     * @return string|null
+     */
+    private static function resolveHostnameViaEtcHosts(string $ip): ?string
+    {
+        $path = '/etc/hosts';
+        if (!\is_readable($path)) {
+            return null;
+        }
+        $lines = @\file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (false === $lines) {
+            return null;
+        }
+
+        foreach ($lines as $line) {
+            $line = \trim($line);
+            if ('' === $line || '#' === $line[0]) {
+                continue;
+            }
+            $parts = \preg_split('/\s+/', $line, -1, PREG_SPLIT_NO_EMPTY);
+            if (null === $parts || \count($parts) < 2) {
+                continue;
+            }
+            if ($parts[0] !== $ip) {
+                continue;
+            }
+            for ($i = 1, $n = \count($parts); $i < $n; ++$i) {
+                if ('#' !== $parts[$i][0]) {
+                    return $parts[$i];
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -145,6 +294,8 @@ struct addrinfo {
 int getaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res);
 void freeaddrinfo(struct addrinfo *res);
 const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
+int inet_pton(int af, const char *src, void *dst);
+int getnameinfo(const struct sockaddr *sa, socklen_t salen, char *host, socklen_t hostlen, char *serv, socklen_t servlen, int flags);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {

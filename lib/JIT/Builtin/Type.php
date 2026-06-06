@@ -198,6 +198,7 @@ class Type extends Builtin {
         PendingHeadersRuntime::ensureLinked($this->context);
         PowIntRuntime::ensureLinked($this->context);
         GethostbynamelRuntime::ensureLinked($this->context);
+        GethostbyaddrRuntime::ensureLinked($this->context);
         TimeSleepRuntime::ensureLinked($this->context);
         ProcessRuntime::ensureLinked($this->context);
         StringHrtime::ensureLinked($this->context);
