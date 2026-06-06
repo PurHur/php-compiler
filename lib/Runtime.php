@@ -308,6 +308,7 @@ class Runtime {
         $this->sealedClassAnnotator->setPermitsByLine($permitsByLine);
         [$code, $this->vmContext->propertyHookRegistry] = (new SourcePreprocessor\PropertyHooks())->process($code, $filename);
         CurlyBraceOffsetRejector::reject($code, $filename);
+        ReadonlyAnonymousClassRejector::reject($code, $filename);
         $code = EnumCaseListRewriter::rewrite($code);
         $code = SwitchCommaCaseRewriter::rewrite($code);
         $code = GenericArrayTypeSourceRewriter::rewrite($code);

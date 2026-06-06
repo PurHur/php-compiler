@@ -110,7 +110,8 @@ PHP;
         $this->assertSame("ok\n", ob_get_clean());
     }
 
-    public function testReadonlyAnonymousClassPropertyDefaultCompiles(): void
+    /** @covers issue #6903 */
+    public function testReadonlyAnonymousClassFailsAtParseTime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -120,11 +121,9 @@ $o = new readonly class {
 };
 var_export($o->x);
 PHP;
-        $block = $runtime->parseAndCompile($code, 'readonly_anon_default.php');
-        $this->assertNotNull($block);
-        ob_start();
-        $runtime->run($block);
-        $this->assertSame('1', ob_get_clean());
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
+        $this->expectExceptionMessage('syntax error, unexpected token "readonly"');
+        $runtime->parseAndCompile($code, 'readonly_anon_default.php');
     }
 
     /** @covers issue #6724 — ZEND_ACC_ANON_READONLY via per-property readonly on anonymous class */
