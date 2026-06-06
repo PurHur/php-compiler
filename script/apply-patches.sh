@@ -3660,6 +3660,8 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_php_cfg_in_operator_overlay || true
   # PHP 8.3 typed class/trait constants must survive optional patch failures (#6012).
   apply_php_cfg_typed_class_const_overlay || true
+  # listSpreadRhs on Assign must exist before optional patch failures abort the script (#6069, #4835).
+  apply_php_cfg_list_spread_overlay
   # ++/-- overlays are hard-required — missing PostInc arms break compile (#6326, #6321).
   apply_php_cfg_incdec_expr_overlay
   apply_php_types_incdec_type_overlay
@@ -3838,6 +3840,14 @@ verify_critical_language_patches() {
   fi
   if [[ ! -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/In_.php" ]]; then
     missing+=("php-cfg-in-operator-In_")
+  fi
+  local assign_expr="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assign.php"
+  if [[ -f "$assign_expr" ]] && ! grep -q 'listSpreadRhs' "$assign_expr" 2>/dev/null; then
+    missing+=("php-cfg-list-spread-Assign")
+  fi
+  if grep -q 'function parseListAssignment' "$parser" 2>/dev/null \
+    && ! grep -q 'listSpreadExcludedKeys = \$excludedKeys' "$parser" 2>/dev/null; then
+    missing+=("php-cfg-list-spread-Parser")
   fi
   if [[ -f "$const_file" ]] \
     && ! grep -q 'public ?Type \$declaredType' "$const_file" 2>/dev/null; then

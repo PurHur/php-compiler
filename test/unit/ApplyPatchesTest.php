@@ -327,6 +327,31 @@ PHP;
         );
     }
 
+    public function testApplyPatchesInvokesListSpreadOverlayBeforeOptionalPatchFailures(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
+        self::assertMatchesRegularExpression(
+            '/apply_php_cfg_list_spread_overlay[\s\S]*php-cfg-loop-resolver-continue-switch-warning/s',
+            $script,
+            'list spread overlay must run before optional patch failures (#6069)'
+        );
+    }
+
+    public function testVerifyCriticalLanguagePatchesIncludesListSpreadRhs(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
+        self::assertStringContainsString(
+            'php-cfg-list-spread-Assign',
+            $script,
+            'verify_critical_language_patches must require listSpreadRhs on Assign (#6069)'
+        );
+        self::assertStringContainsString(
+            'php-cfg-list-spread-Parser',
+            $script,
+            'verify_critical_language_patches must require list spread Parser lowering (#6069)'
+        );
+    }
+
     public function testApplyPatchesDoesNotSwallowIncdecOverlayFailures(): void
     {
         $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
