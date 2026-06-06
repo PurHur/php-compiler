@@ -69,6 +69,13 @@ class C4 { public function __construct(): int { return 1; } }
 PHP,
             'Method C4::__construct() cannot declare a return type',
         ];
+        yield '__destruct return type' => [
+            <<<'PHP'
+<?php
+class C4d { public function __destruct(): void {} }
+PHP,
+            'Method C4d::__destruct() cannot declare a return type',
+        ];
         yield '__debugInfo string' => [
             <<<'PHP'
 <?php
@@ -98,6 +105,7 @@ class Good {
     public function __unserialize(array $d): void {}
     public function __clone(): void {}
     public function __debugInfo(): ?array { return null; }
+    public function __destruct() {}
 }
 echo Good::class, "\n";
 PHP;
