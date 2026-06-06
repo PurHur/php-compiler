@@ -415,6 +415,70 @@ PHP;
         }
     }
 
+    public function testVerifyCriticalLanguagePatchesIncludesFirstClassCallableOverlay(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
+        self::assertStringContainsString(
+            'php-types-first-class-callable',
+            $script,
+            'verify_critical_language_patches must require FCC overlay (#6932)'
+        );
+        self::assertStringContainsString(
+            'php-types-first-class-callable-Type-array-typo',
+            $script,
+            'verify_critical_language_patches must reject Type::array() FCC typo (#6932)'
+        );
+        self::assertStringContainsString(
+            'apply_php_types_fcc_overlay_final_repair',
+            $script,
+            'apply-patches must run final FCC typo repair after php-types overlays (#6932)'
+        );
+    }
+
+    public function testIncdecTypeOverlayDoesNotReintroduceFccTypeArrayTypo(): void
+    {
+        $recon = self::$root.'/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php';
+        if (!is_readable($recon)) {
+            self::markTestSkipped('vendor/ircmaxell/php-types not installed');
+        }
+
+        $original = (string) file_get_contents($recon);
+        $broken = preg_replace(
+            '/return \[new Type\(Type::TYPE_ARRAY\)\];/',
+            'return [Type::array()];',
+            $original,
+            1
+        );
+        self::assertIsString($broken);
+        self::assertNotSame($original, $broken, 'fixture must include FCC TYPE_ARRAY return');
+        file_put_contents($recon, $broken);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertSame(0, $exitCode, "apply-patches must succeed and repair FCC typo:\n".$joined);
+            $restored = (string) file_get_contents($recon);
+            self::assertStringNotContainsString(
+                'return [Type::array()];',
+                $restored,
+                'final FCC repair must replace Type::array() typo (#6932)'
+            );
+            self::assertStringContainsString(
+                'new Type(Type::TYPE_ARRAY)',
+                $restored,
+                'FCC path must use TYPE_ARRAY constructor (#6932)'
+            );
+        } finally {
+            file_put_contents($recon, $original);
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            self::assertSame(0, $exitCode, 'apply-patches must restore vendor after FCC repair test');
+        }
+    }
+
     public function testPhpCfgInOperatorOverlayApplied(): void
     {
         $op = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/In_.php';
