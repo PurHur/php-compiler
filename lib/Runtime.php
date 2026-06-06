@@ -44,6 +44,7 @@ use PHPCompiler\Lint\LintCompiler;
 use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\ShutdownQueue;
+use PHPCompiler\VM\ClassEntry;
 
 class Runtime {
     const MODE_NORMAL   = 0b0001;
@@ -546,6 +547,7 @@ class Runtime {
 
     public function compile(Script $script): ?Block {
         $this->compiler->setPropertyHookRegistry($this->vmContext->propertyHookRegistry);
+        $this->compiler->setKnownClassReadonly(self::knownClassReadonlyForCompileCheck($this->vmContext->classes));
         /** @var mixed $block */
         $block = $this->compiler->compile($script);
         if (!$block instanceof Block) {
@@ -849,6 +851,36 @@ class Runtime {
             OutputBuffer::endAllAtShutdown();
             Superglobals::setActiveContext(null);
         }
+    }
+
+    /**
+     * @param array<string, ClassEntry> $classes
+     *
+     * @return array<string, array{display: string, readonly: bool, extends: ?string}>
+     */
+    private static function knownClassReadonlyForCompileCheck(array $classes): array
+    {
+        $known = [];
+        foreach ($classes as $lc => $entry) {
+            if (!$entry instanceof ClassEntry) {
+                continue;
+            }
+            if ($entry->isInterface || $entry->isTrait || $entry->isEnum) {
+                continue;
+            }
+            $display = $entry->name;
+            if (str_contains($display, '\\')) {
+                $parts = explode('\\', ltrim($display, '\\'));
+                $display = end($parts) ?: $display;
+            }
+            $known[$lc] = [
+                'display' => $display,
+                'readonly' => $entry->readonly,
+                'extends' => $entry->parentLc,
+            ];
+        }
+
+        return $known;
     }
 
 }

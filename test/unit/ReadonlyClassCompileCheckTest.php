@@ -161,4 +161,39 @@ PHP;
         $runtime->run($block);
         $this->assertSame("ok\n", ob_get_clean());
     }
+
+    /** @covers issue #7170 */
+    public function testEvalReadonlyExtendsKnownNonReadonlyParentFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $main = <<<'PHP'
+<?php
+class ParentNormal {}
+PHP;
+        $runtime->run($runtime->parseAndCompile($main, 'boot.php'));
+
+        $evalCode = <<<'PHP'
+<?php
+readonly class ChildReadonly extends ParentNormal {
+    public function __construct(public int $x = 1) {}
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Readonly class ChildReadonly cannot extend non-readonly class ParentNormal');
+        $runtime->parseAndCompile($evalCode, "eval()'d code");
+    }
+
+    /** @covers issue #7170 */
+    public function testEvalNonReadonlyExtendsReadonlyParentFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+readonly class ParentReadonly {}
+class ChildNormal extends ParentReadonly {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Non-readonly class ChildNormal cannot extend readonly class ParentReadonly');
+        $runtime->parseAndCompile($code, "eval()'d code");
+    }
 }

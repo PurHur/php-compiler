@@ -23,11 +23,22 @@ final class ReadonlyClassCompileCheck
     /** @var array<string, array{display: string, readonly: bool, extends: ?string}> */
     private array $classes = [];
 
-    public static function validate(Script $script): void
+    /**
+     * @param array<string, array{display: string, readonly: bool, extends: ?string}> $knownClasses
+     *        Already-registered user classes (eval parent lookup, #7170).
+     */
+    public static function validate(Script $script, array $knownClasses = []): void
     {
-        $check = new self();
+        $check = new self($knownClasses);
         $check->collect($script);
         $check->verifyInheritance();
+    }
+
+    /**
+     * @param array<string, array{display: string, readonly: bool, extends: ?string}> $knownClasses
+     */
+    private function __construct(private array $knownClasses = [])
+    {
     }
 
     private function collect(Script $script): void
@@ -120,10 +131,13 @@ final class ReadonlyClassCompileCheck
     {
         foreach ($this->classes as $class) {
             $parentLc = $class['extends'];
-            if (null === $parentLc || !isset($this->classes[$parentLc])) {
+            if (null === $parentLc) {
                 continue;
             }
-            $parent = $this->classes[$parentLc];
+            $parent = $this->classes[$parentLc] ?? $this->knownClasses[$parentLc] ?? null;
+            if (null === $parent) {
+                continue;
+            }
             if ($parent['readonly'] && !$class['readonly']) {
                 throw new \CompileError(
                     "Non-readonly class {$class['display']} cannot extend readonly class {$parent['display']}"

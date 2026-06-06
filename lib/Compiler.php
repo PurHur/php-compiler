@@ -295,6 +295,17 @@ class Compiler {
         $this->propertyHookRegistry = $registry;
     }
 
+    /** @var array<string, array{display: string, readonly: bool, extends: ?string}> */
+    private array $knownClassReadonly = [];
+
+    /**
+     * @param array<string, array{display: string, readonly: bool, extends: ?string}> $knownClasses
+     */
+    public function setKnownClassReadonly(array $knownClasses): void
+    {
+        $this->knownClassReadonly = $knownClasses;
+    }
+
     /** Bytes after the first __halt_compiler(); in the compiled script, if any (#3479). */
     public function getHaltCompilerRemaining(): ?string
     {
@@ -410,7 +421,7 @@ class Compiler {
         EnumAbstractMethodCompileCheck::validate($script);
         EnumParentCompileCheck::validate($script);
         EnumBackedCaseCheck::validate($script);
-        ReadonlyClassCompileCheck::validate($script);
+        ReadonlyClassCompileCheck::validate($script, $this->knownClassReadonly);
         AsymmetricVisibilityCompileCheck::validate($script);
         GeneratorStaticMethodCompileCheck::validate($script);
 
