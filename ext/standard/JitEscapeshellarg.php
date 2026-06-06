@@ -4,18 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\ProcessRuntime;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for escapeshellarg() via __compiler_escapeshellarg (#2779). */
+/** LLVM lowering for escapeshellarg() via ProcessRuntime::__compiler_escapeshellarg (#2779). */
 final class JitEscapeshellarg
 {
     /** @return Value */
     public static function invoke(Context $context, Value $argStr): Value
     {
+        ProcessRuntime::ensureLinked($context);
         $quoted = $context->builder->call(
             $context->lookupFunction('__compiler_escapeshellarg'),
             $argStr
