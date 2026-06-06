@@ -5072,6 +5072,7 @@ class Compiler {
         $this->rejectThisReassignment($write);
         $this->rejectNullsafeInWriteContext($write, $block);
         $this->rejectNewExprInWriteContext($write, $block);
+        $this->rejectGlobalConstInWriteContext($write, $block);
 
         return [new OpCode(
             $opcode,
@@ -5156,6 +5157,7 @@ class Compiler {
                     $this->rejectThisReassignment($expr->var);
                     $this->rejectNullsafeInWriteContext($expr->var, $block);
                     $this->rejectNewExprInWriteContext($expr->var, $block, $expr->expr);
+                    $this->rejectGlobalConstInWriteContext($expr->var, $block);
                 }
                 if ($this->assignIsListSpread($expr)) {
                     $fromIndex = new Operand\Literal($expr->listSpreadFromIndex);
@@ -5557,6 +5559,7 @@ class Compiler {
                 $this->rejectThisReassignment($expr->var);
                 $this->rejectNullsafeInWriteContext($expr->var, $block);
                 $this->rejectNewExprInWriteContext($expr->var, $block);
+                $this->rejectGlobalConstInWriteContext($expr->var, $block);
                 $bindRefFlags = 0;
                 $dimFetch = $this->unwrapArrayDimFetch($expr->expr)
                     ?? $this->findArrayDimFetchForResult($expr->expr, $block);
@@ -8087,6 +8090,9 @@ class Compiler {
                 $ops = [];
                 foreach ($terminal->exprs as $unsetExpr) {
                     $this->rejectThisUnset($unsetExpr);
+                    if ($unsetExpr instanceof Operand) {
+                        $this->rejectGlobalConstInWriteContext($unsetExpr, $block);
+                    }
                     $staticPropertyFetch = $unsetExpr instanceof Op\Expr\StaticPropertyFetch
                         ? $unsetExpr
                         : ($unsetExpr instanceof Operand ? $this->findStaticPropertyFetchForUnset($unsetExpr, $block) : null);
@@ -9161,6 +9167,108 @@ class Compiler {
             }
             $i = $this->listDestructOpEndIndex($ops, $i) + 1;
         }
+    }
+
+    /**
+     * File-scope `const` names registered during this compile unit (#6935).
+     */
+    protected function operandIsCompileTimeGlobalConstFetch(?Operand $operand, ?Block $block = null): bool
+    {
+        if (null === $operand) {
+            return false;
+        }
+        $root = $this->unwrapOperandChain($operand);
+        if ($root instanceof Op\Expr\ConstFetch) {
+            $name = $this->staticNameFromOperand($root->name);
+            if (null === $name) {
+                return false;
+            }
+
+            return isset($this->compileTimeGlobalConsts[strtolower($name)]);
+        }
+        if (null === $block || null === $block->orig) {
+            return false;
+        }
+        foreach ($block->orig->children as $child) {
+            if (!$child instanceof Op\Expr\ConstFetch) {
+                continue;
+            }
+            if ($this->unwrapOperandChain($child->result) !== $root) {
+                continue;
+            }
+            $name = $this->staticNameFromOperand($child->name);
+            if (null === $name) {
+                continue;
+            }
+            if (isset($this->compileTimeGlobalConsts[strtolower($name)])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Zend zend_compile.c: mutating a file-scope const array is a compile-time fatal (#6935).
+     */
+    protected function lvalueContainsGlobalConstFetch(?Operand $operand, ?Block $block = null): bool
+    {
+        if (null === $operand || null === $block) {
+            return false;
+        }
+        if ($operand instanceof Operand\Temporary && null !== $operand->original) {
+            if ($operand->original instanceof Op\Expr\PropertyFetch) {
+                /** @var Op\Expr\PropertyFetch $propFetch */
+                $propFetch = $operand->original;
+                if ($this->operandIsCompileTimeGlobalConstFetch($propFetch->var, $block)) {
+                    return true;
+                }
+
+                return $this->lvalueContainsGlobalConstFetch($propFetch->var, $block);
+            }
+            if ($operand->original instanceof Op\Expr\ArrayDimFetch) {
+                /** @var Op\Expr\ArrayDimFetch $dimFetch */
+                $dimFetch = $operand->original;
+                if ($this->operandIsCompileTimeGlobalConstFetch($dimFetch->var, $block)) {
+                    return true;
+                }
+
+                return $this->lvalueContainsGlobalConstFetch($dimFetch->var, $block);
+            }
+
+            return $this->lvalueContainsGlobalConstFetch($operand->original, $block);
+        }
+        if (null !== $block->orig) {
+            $propFetch = $this->findPropertyFetchForResult($operand, $block);
+            if (null !== $propFetch) {
+                if ($this->operandIsCompileTimeGlobalConstFetch($propFetch->var, $block)) {
+                    return true;
+                }
+
+                return $this->lvalueContainsGlobalConstFetch($propFetch->var, $block);
+            }
+            $dimFetch = $this->findArrayDimFetchForResult($operand, $block);
+            if (null !== $dimFetch) {
+                if ($this->operandIsCompileTimeGlobalConstFetch($dimFetch->var, $block)) {
+                    return true;
+                }
+
+                return $this->lvalueContainsGlobalConstFetch($dimFetch->var, $block);
+            }
+        }
+
+        return $this->operandIsCompileTimeGlobalConstFetch($operand, $block);
+    }
+
+    /**
+     * @return never
+     */
+    protected function rejectGlobalConstInWriteContext(?Operand $var, ?Block $block = null): void
+    {
+        if (!$this->lvalueContainsGlobalConstFetch($var, $block)) {
+            return;
+        }
+        $this->throwCompileError('Cannot use temporary expression in write context');
     }
 
     /**
