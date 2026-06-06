@@ -8309,6 +8309,7 @@ class JIT {
                 case OpCode::TYPE_BOOLEAN_NOT:
                 case OpCode::TYPE_CONCAT:
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
+                case OpCode::TYPE_PROPERTY_FETCH:
                     // Scalar class const expressions — evaluated in jitClassConstDefineValue (#5394).
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
