@@ -5815,19 +5815,6 @@ class Compiler {
     }
 
     /**
-     * Emit a write fetch in $block (used by ??= right branch on hooked properties, #6427).
-     */
-    private function compilePropertyFetchWrite(Op\Expr\PropertyFetch $fetch, Block $block): void
-    {
-        $block->addOpCode(new OpCode(
-            OpCode::TYPE_PROPERTY_FETCH,
-            $this->compileOperand($fetch->result, $block, false),
-            $this->compileOperand($fetch->var, $block, true),
-            $this->compileOperand($fetch->name, $block, true)
-        ));
-    }
-
-    /**
      * Array offset immediately after ?-> property/method fetch (issue #3516).
      *
      * @param Op[] $ops
