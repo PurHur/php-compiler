@@ -740,9 +740,9 @@ final class StringUnpackJit
         $context->builder->branchIf($isStar, $starBb, $digitBb);
 
         $context->builder->positionAtEnd($starBb);
-        $msg = self::snprintfAlloca($context, "unpack(): Type %c: '*' is not supported", [$code]);
-        $context->builder->call($context->lookupFunction('__compiler_unpack_fail'), $out, $msg);
-        $context->builder->returnValue($zeroI32);
+        $context->builder->store($i32->constInt(-1, true), $argSlot);
+        $context->builder->store($context->builder->add($i, $oneI64), $iSlot);
+        $context->builder->branch($afterArgBb);
 
         $context->builder->positionAtEnd($digitBb);
         $isDigit = $context->builder->and(
@@ -924,6 +924,7 @@ final class StringUnpackJit
 
         $iSlot = BasicBlockHelper::entryAlloca($context, $i32);
         $context->builder->store($zeroI32, $iSlot);
+        $effectiveArgSlot = BasicBlockHelper::entryAlloca($context, $i32);
         $nextIterBb = $fn->appendBasicBlock('upk_ex_next');
 
         $loopHead = $fn->appendBasicBlock('upk_ex_head');
@@ -948,6 +949,42 @@ final class StringUnpackJit
         $name = $context->builder->gep($names, $context->builder->mul($idx64, $maxName));
         $arg64 = $context->builder->sext($arg, $i64);
         $pos = $context->builder->load($posSlot);
+        $remaining = $context->builder->sub($inputLen, $pos);
+        $isStar = $context->builder->icmp(Builder::INT_SLT, $arg, $zeroI32);
+        $context->builder->store($arg, $effectiveArgSlot);
+
+        $starBb = $fn->appendBasicBlock('upk_ex_star');
+        $normalNeedBb = $fn->appendBasicBlock('upk_ex_normal_need');
+        $context->builder->branchIf($isStar, $starBb, $normalNeedBb);
+
+        $context->builder->positionAtEnd($starBb);
+        self::emitStarSpec(
+            $context,
+            $fn,
+            $code,
+            $remaining,
+            $effectiveArgSlot,
+            $input,
+            $inputLen,
+            $posSlot,
+            $ht,
+            $hasName,
+            $name,
+            $autoIdx,
+            $machineLe,
+            $oneI64,
+            $twoI64,
+            $fourI64,
+            $eightI64,
+            $intSizeI64,
+            $out,
+            $normalNeedBb,
+            $nextIterBb
+        );
+
+        $context->builder->positionAtEnd($normalNeedBb);
+        $arg = $context->builder->load($effectiveArgSlot);
+        $arg64 = $context->builder->sext($arg, $i64);
 
         $need = $context->builder->call($context->lookupFunction('__compiler_unpack_need_bytes'), $code, $arg);
         $needFailBb = $fn->appendBasicBlock('upk_ex_need_fail');
@@ -1115,6 +1152,8 @@ final class StringUnpackJit
         $sizeT = $context->getTypeFromString('size_t');
         $zeroI32 = $i32->constInt(0, false);
         $oneI32 = $i32->constInt(1, false);
+        $zeroI64 = $i64->constInt(0, false);
+        $oneI64 = $i64->constInt(1, false);
         $isZ = $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('Z'), false));
         $isA = $context->builder->or(
             $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('a'), false)),
@@ -1126,18 +1165,14 @@ final class StringUnpackJit
         $context->builder->branchIf($isString, $strBb, $checkHexBb);
 
         $context->builder->positionAtEnd($strBb);
-        $slen = $context->builder->select(
-            $isZ,
-            $context->builder->select(
-                $context->builder->icmp(Builder::INT_SGT, $arg, $zeroI32),
-                $context->builder->sub($arg64, $oneI64),
-                $i64->constInt(0, false)
-            ),
-            $arg64
-        );
+        $plainStrBb = $fn->appendBasicBlock('upk_ex_plain_str');
+        $zStrBb = $fn->appendBasicBlock('upk_ex_z_str');
+        $context->builder->branchIf($isZ, $zStrBb, $plainStrBb);
+
+        $context->builder->positionAtEnd($plainStrBb);
         $slice = $context->builder->call(
             $context->lookupFunction('__string__init'),
-            $slen,
+            $arg64,
             $context->builder->gep($input, $pos)
         );
         $context->builder->call(
@@ -1147,6 +1182,46 @@ final class StringUnpackJit
             $name,
             $autoIdx,
             $slice
+        );
+        $context->builder->store($context->builder->add($pos, $arg64), $posSlot);
+        $context->builder->branch($afterDataBb);
+
+        $context->builder->positionAtEnd($zStrBb);
+        $zLenSlot = BasicBlockHelper::entryAlloca($context, $i64);
+        $context->builder->store($zeroI64, $zLenSlot);
+        $zHead = $fn->appendBasicBlock('upk_ex_z_head');
+        $zBody = $fn->appendBasicBlock('upk_ex_z_body');
+        $zDoneBb = $fn->appendBasicBlock('upk_ex_z_done');
+        $context->builder->branch($zHead);
+        $context->builder->positionAtEnd($zHead);
+        $zIdx = $context->builder->load($zLenSlot);
+        $zAtEnd = $context->builder->icmp(Builder::INT_SGE, $zIdx, $arg64);
+        $zIsNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($context->builder->gep($input, $context->builder->add($pos, $zIdx))),
+            $i8->constInt(0, false)
+        );
+        $context->builder->branchIf(
+            $context->builder->or($zAtEnd, $zIsNull),
+            $zDoneBb,
+            $zBody
+        );
+        $context->builder->positionAtEnd($zBody);
+        $context->builder->store($context->builder->add($zIdx, $oneI64), $zLenSlot);
+        $context->builder->branch($zHead);
+        $context->builder->positionAtEnd($zDoneBb);
+        $zSlice = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->load($zLenSlot),
+            $context->builder->gep($input, $pos)
+        );
+        $context->builder->call(
+            $context->lookupFunction('__compiler_unpack_store_string'),
+            $ht,
+            $hasName,
+            $name,
+            $autoIdx,
+            $zSlice
         );
         $context->builder->store($context->builder->add($pos, $arg64), $posSlot);
         $context->builder->branch($afterDataBb);
@@ -1418,6 +1493,348 @@ final class StringUnpackJit
             },
             $afterDataBb
         );
+    }
+
+    private static function emitStarSpec(
+        Context $context,
+        LlvmFunction $fn,
+        Value $code,
+        Value $remaining,
+        Value $effectiveArgSlot,
+        Value $input,
+        Value $inputLen,
+        Value $posSlot,
+        Value $ht,
+        Value $hasName,
+        Value $name,
+        Value $autoIdx,
+        Value $machineLe,
+        Value $oneI64,
+        Value $twoI64,
+        Value $fourI64,
+        Value $eightI64,
+        Value $intSizeI64,
+        Value $out,
+        BasicBlock $normalNeedBb,
+        BasicBlock $nextIterBb
+    ): void {
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $zeroI32 = $i32->constInt(0, false);
+        $oneI32 = $i32->constInt(1, false);
+        $twoI32 = $i32->constInt(2, false);
+
+        $isX = $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('X'), false));
+        $xStarBb = $fn->appendBasicBlock('upk_ex_star_x_upper');
+        $checkStrBb = $fn->appendBasicBlock('upk_ex_star_check_str');
+        $context->builder->branchIf($isX, $xStarBb, $checkStrBb);
+
+        $context->builder->positionAtEnd($xStarBb);
+        $msg = $context->builder->pointerCast(
+            $context->constantFromString("unpack(): Type X: '*' ignored"),
+            $context->getTypeFromString('int8*')
+        );
+        $context->builder->call($context->lookupFunction('__compiler_unpack_fail'), $out, $msg);
+        $context->builder->store($oneI32, $effectiveArgSlot);
+        $context->builder->branch($normalNeedBb);
+
+        $context->builder->positionAtEnd($checkStrBb);
+        $isAString = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('a'), false)),
+            $context->builder->or(
+                $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('A'), false)),
+                $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('Z'), false))
+            )
+        );
+        $isHex = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('h'), false)),
+            $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('H'), false))
+        );
+        $isStr = $context->builder->or($isAString, $isHex);
+        $strStarBb = $fn->appendBasicBlock('upk_ex_star_str');
+        $checkXLowerBb = $fn->appendBasicBlock('upk_ex_star_check_xlower');
+        $context->builder->branchIf($isStr, $strStarBb, $checkXLowerBb);
+
+        $context->builder->positionAtEnd($strStarBb);
+        $resolved = $context->builder->select(
+            $isHex,
+            $context->builder->trunc($context->builder->mul($remaining, $twoI64), $i32),
+            $context->builder->trunc($remaining, $i32)
+        );
+        $context->builder->store($resolved, $effectiveArgSlot);
+        $context->builder->branch($normalNeedBb);
+
+        $context->builder->positionAtEnd($checkXLowerBb);
+        $isXLower = $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('x'), false));
+        $xStarBb = $fn->appendBasicBlock('upk_ex_star_xlower');
+        $numStarBb = $fn->appendBasicBlock('upk_ex_star_num');
+        $context->builder->branchIf($isXLower, $xStarBb, $numStarBb);
+
+        $context->builder->positionAtEnd($xStarBb);
+        $context->builder->store($context->builder->trunc($remaining, $i32), $effectiveArgSlot);
+        $context->builder->branch($normalNeedBb);
+
+        $context->builder->positionAtEnd($numStarBb);
+        $isC = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('c'), false)),
+            $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('C'), false))
+        );
+        $byteBb = $fn->appendBasicBlock('upk_ex_star_byte');
+        $checkShortBb = $fn->appendBasicBlock('upk_ex_star_check_short');
+        $context->builder->branchIf($isC, $byteBb, $checkShortBb);
+
+        $context->builder->positionAtEnd($byteBb);
+        $signed = $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('c'), false));
+        self::emitStarRepLoop(
+            $context,
+            $fn,
+            $oneI64,
+            $input,
+            $inputLen,
+            $posSlot,
+            function () use ($context, $input, $posSlot, $machineLe, $signed, $ht, $hasName, $name, $autoIdx, $oneI64): void {
+                $pos = $context->builder->load($posSlot);
+                $val = $context->builder->call(
+                    $context->lookupFunction('__compiler_unpack_read_long'),
+                    $context->builder->gep($input, $pos),
+                    $oneI64,
+                    $machineLe,
+                    $context->builder->zext($signed, $context->getTypeFromString('int32'))
+                );
+                $context->builder->call(
+                    $context->lookupFunction('__compiler_unpack_store_long'),
+                    $ht,
+                    $hasName,
+                    $name,
+                    $autoIdx,
+                    $val
+                );
+                $context->builder->store($context->builder->add($pos, $oneI64), $posSlot);
+            },
+            $nextIterBb
+        );
+
+        $context->builder->positionAtEnd($checkShortBb);
+        $isShort = $context->builder->or(
+            $context->builder->or(
+                $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('s'), false)),
+                $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('S'), false))
+            ),
+            $context->builder->or(
+                $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('n'), false)),
+                $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('v'), false))
+            )
+        );
+        $shortBb = $fn->appendBasicBlock('upk_ex_star_short');
+        $checkIntBb = $fn->appendBasicBlock('upk_ex_star_check_int');
+        $context->builder->branchIf($isShort, $shortBb, $checkIntBb);
+
+        $context->builder->positionAtEnd($shortBb);
+        $signed = $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('s'), false));
+        $isN = $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('n'), false));
+        $isV = $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('v'), false));
+        $le = $context->builder->select(
+            $isN,
+            $zeroI32,
+            $context->builder->select($isV, $oneI32, $machineLe)
+        );
+        self::emitStarRepLoop(
+            $context,
+            $fn,
+            $twoI64,
+            $input,
+            $inputLen,
+            $posSlot,
+            function () use ($context, $input, $posSlot, $le, $signed, $ht, $hasName, $name, $autoIdx, $twoI64): void {
+                $pos = $context->builder->load($posSlot);
+                $val = $context->builder->call(
+                    $context->lookupFunction('__compiler_unpack_read_long'),
+                    $context->builder->gep($input, $pos),
+                    $twoI64,
+                    $le,
+                    $context->builder->zext($signed, $context->getTypeFromString('int32'))
+                );
+                $context->builder->call(
+                    $context->lookupFunction('__compiler_unpack_store_long'),
+                    $ht,
+                    $hasName,
+                    $name,
+                    $autoIdx,
+                    $val
+                );
+                $context->builder->store($context->builder->add($pos, $twoI64), $posSlot);
+            },
+            $nextIterBb
+        );
+
+        $context->builder->positionAtEnd($checkIntBb);
+        $isInt = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('i'), false)),
+            $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('I'), false))
+        );
+        $intBb = $fn->appendBasicBlock('upk_ex_star_int');
+        $checkLongBb = $fn->appendBasicBlock('upk_ex_star_check_long');
+        $context->builder->branchIf($isInt, $intBb, $checkLongBb);
+
+        $context->builder->positionAtEnd($intBb);
+        $signed = $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('i'), false));
+        self::emitStarRepLoop(
+            $context,
+            $fn,
+            $intSizeI64,
+            $input,
+            $inputLen,
+            $posSlot,
+            function () use ($context, $input, $posSlot, $machineLe, $signed, $ht, $hasName, $name, $autoIdx, $intSizeI64): void {
+                $pos = $context->builder->load($posSlot);
+                $val = $context->builder->call(
+                    $context->lookupFunction('__compiler_unpack_read_long'),
+                    $context->builder->gep($input, $pos),
+                    $intSizeI64,
+                    $machineLe,
+                    $context->builder->zext($signed, $context->getTypeFromString('int32'))
+                );
+                $context->builder->call(
+                    $context->lookupFunction('__compiler_unpack_store_long'),
+                    $ht,
+                    $hasName,
+                    $name,
+                    $autoIdx,
+                    $val
+                );
+                $context->builder->store($context->builder->add($pos, $intSizeI64), $posSlot);
+            },
+            $nextIterBb
+        );
+
+        $context->builder->positionAtEnd($checkLongBb);
+        $isLong = $context->builder->or(
+            $context->builder->or(
+                $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('l'), false)),
+                $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('L'), false))
+            ),
+            $context->builder->or(
+                $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('N'), false)),
+                $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('V'), false))
+            )
+        );
+        $longBb = $fn->appendBasicBlock('upk_ex_star_long');
+        $quadBb = $fn->appendBasicBlock('upk_ex_star_quad');
+        $context->builder->branchIf($isLong, $longBb, $quadBb);
+
+        $context->builder->positionAtEnd($longBb);
+        $signed = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('l'), false)),
+            $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('L'), false))
+        );
+        $isN = $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('N'), false));
+        $isV = $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('V'), false));
+        $le = $context->builder->select(
+            $isN,
+            $zeroI32,
+            $context->builder->select($isV, $oneI32, $machineLe)
+        );
+        self::emitStarRepLoop(
+            $context,
+            $fn,
+            $fourI64,
+            $input,
+            $inputLen,
+            $posSlot,
+            function () use ($context, $input, $posSlot, $le, $signed, $ht, $hasName, $name, $autoIdx, $fourI64): void {
+                $pos = $context->builder->load($posSlot);
+                $val = $context->builder->call(
+                    $context->lookupFunction('__compiler_unpack_read_long'),
+                    $context->builder->gep($input, $pos),
+                    $fourI64,
+                    $le,
+                    $context->builder->zext($signed, $context->getTypeFromString('int32'))
+                );
+                $context->builder->call(
+                    $context->lookupFunction('__compiler_unpack_store_long'),
+                    $ht,
+                    $hasName,
+                    $name,
+                    $autoIdx,
+                    $val
+                );
+                $context->builder->store($context->builder->add($pos, $fourI64), $posSlot);
+            },
+            $nextIterBb
+        );
+
+        $context->builder->positionAtEnd($quadBb);
+        $signed = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('q'), false)),
+            $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('Q'), false))
+        );
+        $isJ = $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('J'), false));
+        $isP = $context->builder->icmp(Builder::INT_EQ, $code, $i8->constInt((int) \ord('P'), false));
+        $le = $context->builder->select(
+            $isJ,
+            $zeroI32,
+            $context->builder->select($isP, $oneI32, $machineLe)
+        );
+        self::emitStarRepLoop(
+            $context,
+            $fn,
+            $eightI64,
+            $input,
+            $inputLen,
+            $posSlot,
+            function () use ($context, $input, $posSlot, $le, $signed, $ht, $hasName, $name, $autoIdx, $eightI64): void {
+                $pos = $context->builder->load($posSlot);
+                $val = $context->builder->call(
+                    $context->lookupFunction('__compiler_unpack_read_long'),
+                    $context->builder->gep($input, $pos),
+                    $eightI64,
+                    $le,
+                    $context->builder->zext($signed, $context->getTypeFromString('int32'))
+                );
+                $context->builder->call(
+                    $context->lookupFunction('__compiler_unpack_store_long'),
+                    $ht,
+                    $hasName,
+                    $name,
+                    $autoIdx,
+                    $val
+                );
+                $context->builder->store($context->builder->add($pos, $eightI64), $posSlot);
+            },
+            $nextIterBb
+        );
+    }
+
+    /**
+     * @param callable(): void $body
+     */
+    private static function emitStarRepLoop(
+        Context $context,
+        LlvmFunction $fn,
+        Value $step,
+        Value $input,
+        Value $inputLen,
+        Value $posSlot,
+        callable $body,
+        BasicBlock $doneBb
+    ): void {
+        $head = $fn->appendBasicBlock('upk_star_head_'.(++self::$blockSuffix));
+        $bodyBb = $fn->appendBasicBlock('upk_star_body_'.self::$blockSuffix);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $pos = $context->builder->load($posSlot);
+        $left = $context->builder->sub($inputLen, $pos);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_SGE, $left, $step),
+            $bodyBb,
+            $doneBb
+        );
+
+        $context->builder->positionAtEnd($bodyBb);
+        $body();
+        $context->builder->branch($head);
     }
 
     /**

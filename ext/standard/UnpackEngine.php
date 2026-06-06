@@ -15,6 +15,9 @@ final class UnpackEngine
     private const MAX_SPECS = 256;
     private const MAX_NAME = 64;
 
+    /** php-src pack.c: repetitions = -1 for '*' in unpack(). */
+    private const STAR_ARG = -1;
+
     private static ?bool $machineLe = null;
 
     private static function machineLe(): bool
@@ -48,14 +51,14 @@ final class UnpackEngine
         foreach ($specs as $spec) {
             $code = $spec['code'];
             $arg = $spec['arg'];
-            $need = self::needBytes($code, $arg);
-            if (null === $need) {
-                self::fail('unpack(): Type '.$code.': unknown format code');
-
-                return false;
-            }
+            $isStar = self::STAR_ARG === $arg;
+            $remaining = $len - $pos;
 
             if ('X' === $code) {
+                if ($isStar) {
+                    self::fail("unpack(): Type X: '*' ignored");
+                    $arg = 1;
+                }
                 $pos = $arg > $pos ? 0 : $pos - $arg;
                 continue;
             }
@@ -64,6 +67,9 @@ final class UnpackEngine
                 continue;
             }
             if ('x' === $code) {
+                if ($isStar) {
+                    $arg = $remaining;
+                }
                 if ($pos + $arg > $len) {
                     self::fail('unpack(): Type x: not enough input, need more bytes');
 
@@ -71,6 +77,35 @@ final class UnpackEngine
                 }
                 $pos += $arg;
                 continue;
+            }
+
+            if ($isStar && \in_array($code, ['a', 'A', 'Z', 'h', 'H'], true)) {
+                if (!self::unpackStarString($result, $spec, $autoIdx, $code, $data, $pos, $remaining)) {
+                    return false;
+                }
+                continue;
+            }
+
+            if ($isStar) {
+                $unit = self::unitBytes($code);
+                if (null === $unit) {
+                    self::fail('unpack(): format not supported in this compiler build');
+
+                    return false;
+                }
+                while ($pos + $unit <= $len) {
+                    if (!self::unpackOne($result, $spec, $autoIdx, $code, $data, $pos)) {
+                        return false;
+                    }
+                }
+                continue;
+            }
+
+            $need = self::needBytes($code, $arg);
+            if (null === $need) {
+                self::fail('unpack(): Type '.$code.': unknown format code');
+
+                return false;
             }
 
             if ($pos + $need > $len) {
@@ -84,93 +119,8 @@ final class UnpackEngine
                 return false;
             }
 
-            switch ($code) {
-                case 'a':
-                case 'A':
-                case 'Z':
-                    $slen = 'Z' !== $code ? $arg : ($arg > 0 ? $arg - 1 : 0);
-                    $val = \substr($data, $pos, $slen);
-                    self::store($result, $spec, $autoIdx, $val);
-                    $pos += $arg;
-                    break;
-                case 'h':
-                case 'H':
-                    $val = self::unpackHex($data, $pos, $arg, 'H' === $code);
-                    self::store($result, $spec, $autoIdx, $val);
-                    $pos += $need;
-                    break;
-                case 'c':
-                case 'C':
-                    for ($r = 0; $r < $arg; ++$r) {
-                        $val = self::readLong($data, $pos, 1, self::machineLe(), 'c' === $code);
-                        self::store($result, $spec, $autoIdx, $val);
-                        ++$pos;
-                    }
-                    break;
-                case 's':
-                case 'S':
-                case 'n':
-                case 'v':
-                    $le = self::machineLe();
-                    $signed = 's' === $code;
-                    if ('n' === $code) {
-                        $le = false;
-                    } elseif ('v' === $code) {
-                        $le = true;
-                    }
-                    for ($r = 0; $r < $arg; ++$r) {
-                        $val = self::readLong($data, $pos, 2, $le, $signed);
-                        self::store($result, $spec, $autoIdx, $val);
-                        $pos += 2;
-                    }
-                    break;
-                case 'i':
-                case 'I':
-                    $size = \PHP_INT_SIZE;
-                    for ($r = 0; $r < $arg; ++$r) {
-                        $val = self::readLong($data, $pos, $size, self::machineLe(), 'i' === $code);
-                        self::store($result, $spec, $autoIdx, $val);
-                        $pos += $size;
-                    }
-                    break;
-                case 'l':
-                case 'L':
-                case 'N':
-                case 'V':
-                    $le = self::machineLe();
-                    $signed = 'l' === $code || 'L' === $code;
-                    if ('N' === $code) {
-                        $le = false;
-                    } elseif ('V' === $code) {
-                        $le = true;
-                    }
-                    for ($r = 0; $r < $arg; ++$r) {
-                        $val = self::readLong($data, $pos, 4, $le, $signed);
-                        self::store($result, $spec, $autoIdx, $val);
-                        $pos += 4;
-                    }
-                    break;
-                case 'q':
-                case 'Q':
-                case 'J':
-                case 'P':
-                    $le = self::machineLe();
-                    $signed = 'q' === $code || 'Q' === $code;
-                    if ('J' === $code) {
-                        $le = false;
-                    } elseif ('P' === $code) {
-                        $le = true;
-                    }
-                    for ($r = 0; $r < $arg; ++$r) {
-                        $val = self::readLong($data, $pos, 8, $le, $signed);
-                        self::store($result, $spec, $autoIdx, $val);
-                        $pos += 8;
-                    }
-                    break;
-                default:
-                    self::fail('unpack(): format not supported in this compiler build');
-
-                    return false;
+            if (!self::unpackFixed($result, $spec, $autoIdx, $code, $arg, $data, $pos, $need)) {
+                return false;
             }
         }
 
@@ -199,11 +149,9 @@ final class UnpackEngine
             if ($i < $flen) {
                 $c = $format[$i];
                 if ('*' === $c) {
-                    self::fail(\sprintf("unpack(): Type %s: '*' is not supported", $code));
-
-                    return null;
-                }
-                if ($c >= '0' && $c <= '9') {
+                    $arg = self::STAR_ARG;
+                    ++$i;
+                } elseif ($c >= '0' && $c <= '9') {
                     $arg = 0;
                     while ($i < $flen && $format[$i] >= '0' && $format[$i] <= '9') {
                         $arg = $arg * 10 + ((int) $format[$i] - (int) '0');
@@ -277,6 +225,196 @@ final class UnpackEngine
         } else {
             $result[$autoIdx++] = $val;
         }
+    }
+
+    private static function unitBytes(string $code): ?int
+    {
+        return match ($code) {
+            'c', 'C' => 1,
+            's', 'S', 'n', 'v' => 2,
+            'i', 'I' => \PHP_INT_SIZE,
+            'l', 'L', 'N', 'V' => 4,
+            'q', 'Q', 'J', 'P' => 8,
+            default => null,
+        };
+    }
+
+    /**
+     * @param array<int|string, int|string> $result
+     * @param array{code: string, arg: int, name: string, has_name: bool} $spec
+     */
+    private static function unpackStarString(
+        array &$result,
+        array $spec,
+        int &$autoIdx,
+        string $code,
+        string $data,
+        int &$pos,
+        int $remaining
+    ): bool {
+        switch ($code) {
+            case 'a':
+                $val = \substr($data, $pos, $remaining);
+                self::store($result, $spec, $autoIdx, $val);
+                $pos += $remaining;
+                break;
+            case 'A':
+                $val = \substr($data, $pos, $remaining);
+                while ('' !== $val && \in_array($val[-1], ["\0", ' ', "\t", "\r", "\n"], true)) {
+                    $val = \substr($val, 0, -1);
+                }
+                self::store($result, $spec, $autoIdx, $val);
+                $pos += $remaining;
+                break;
+            case 'Z':
+                $zlen = $remaining;
+                for ($s = 0; $s < $remaining; ++$s) {
+                    if ("\0" === $data[$pos + $s]) {
+                        $zlen = $s;
+                        break;
+                    }
+                }
+                self::store($result, $spec, $autoIdx, \substr($data, $pos, $zlen));
+                $pos += $remaining;
+                break;
+            case 'h':
+            case 'H':
+                $hexArg = $remaining * 2;
+                self::store(
+                    $result,
+                    $spec,
+                    $autoIdx,
+                    self::unpackHex($data, $pos, $hexArg, 'H' === $code)
+                );
+                $pos += $remaining;
+                break;
+            default:
+                return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array<int|string, int|string> $result
+     * @param array{code: string, arg: int, name: string, has_name: bool} $spec
+     */
+    private static function unpackOne(
+        array &$result,
+        array $spec,
+        int &$autoIdx,
+        string $code,
+        string $data,
+        int &$pos
+    ): bool {
+        $unit = self::unitBytes($code);
+        if (null === $unit) {
+            self::fail('unpack(): format not supported in this compiler build');
+
+            return false;
+        }
+
+        [$le, $signed] = self::endianSigned($code);
+        $val = self::readLong($data, $pos, $unit, $le, $signed);
+        self::store($result, $spec, $autoIdx, $val);
+        $pos += $unit;
+
+        return true;
+    }
+
+    /**
+     * @param array<int|string, int|string> $result
+     * @param array{code: string, arg: int, name: string, has_name: bool} $spec
+     */
+    private static function unpackFixed(
+        array &$result,
+        array $spec,
+        int &$autoIdx,
+        string $code,
+        int $arg,
+        string $data,
+        int &$pos,
+        int $need
+    ): bool {
+        switch ($code) {
+            case 'a':
+            case 'A':
+                $val = \substr($data, $pos, $arg);
+                self::store($result, $spec, $autoIdx, $val);
+                $pos += $arg;
+                break;
+            case 'Z':
+                $zlen = $arg;
+                for ($s = 0; $s < $arg; ++$s) {
+                    if ("\0" === $data[$pos + $s]) {
+                        $zlen = $s;
+                        break;
+                    }
+                }
+                self::store($result, $spec, $autoIdx, \substr($data, $pos, $zlen));
+                $pos += $arg;
+                break;
+            case 'h':
+            case 'H':
+                self::store(
+                    $result,
+                    $spec,
+                    $autoIdx,
+                    self::unpackHex($data, $pos, $arg, 'H' === $code)
+                );
+                $pos += $need;
+                break;
+            case 'c':
+            case 'C':
+                for ($r = 0; $r < $arg; ++$r) {
+                    if (!self::unpackOne($result, $spec, $autoIdx, $code, $data, $pos)) {
+                        return false;
+                    }
+                }
+                break;
+            case 's':
+            case 'S':
+            case 'n':
+            case 'v':
+            case 'i':
+            case 'I':
+            case 'l':
+            case 'L':
+            case 'N':
+            case 'V':
+            case 'q':
+            case 'Q':
+            case 'J':
+            case 'P':
+                for ($r = 0; $r < $arg; ++$r) {
+                    if (!self::unpackOne($result, $spec, $autoIdx, $code, $data, $pos)) {
+                        return false;
+                    }
+                }
+                break;
+            default:
+                self::fail('unpack(): format not supported in this compiler build');
+
+                return false;
+        }
+
+        return true;
+    }
+
+    /** @return array{0: bool, 1: bool} little-endian, signed */
+    private static function endianSigned(string $code): array
+    {
+        $le = self::machineLe();
+        $signed = \in_array($code, ['c', 's', 'i', 'l', 'q'], true);
+        if ('n' === $code || 'N' === $code || 'J' === $code) {
+            $le = false;
+        } elseif ('v' === $code || 'V' === $code || 'P' === $code) {
+            $le = true;
+        } elseif (\in_array($code, ['C', 'S', 'I', 'L', 'Q'], true)) {
+            $signed = false;
+        }
+
+        return [$le, $signed];
     }
 
     private static function unpackHex(string $data, int $pos, int $arg, bool $highNibbleFirst): string
