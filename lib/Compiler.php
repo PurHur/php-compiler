@@ -3045,6 +3045,19 @@ class Compiler {
         $this->throwCompileError('never can only be used as a standalone type');
     }
 
+    /**
+     * Zend zend_handle_property_type — standalone never is invalid on properties (#7052).
+     */
+    protected function assertPropertyDeclaredType(?Op\Type $type, string $propName): void
+    {
+        $this->assertNeverIsStandaloneType($type);
+        if (!$this->cfgTypeIsStandaloneNever($type)) {
+            return;
+        }
+        $class = $this->compilingClassDisplayName ?? 'class';
+        $this->throwCompileError(sprintf('Property %s::$%s cannot have type never', $class, $propName));
+    }
+
     protected function dnfTypeLabelFromCfgType(?Op\Type $declared): string
     {
         if (null === $declared) {
@@ -3260,7 +3273,11 @@ class Compiler {
                     if (!is_null($child->defaultBlock)) {
                         $this->compileOps($child->defaultBlock->children, $result);
                     }
-                    $this->assertNeverIsStandaloneType($child->declaredType);
+                    $propName = '?';
+                    if ($child->name instanceof Operand\Literal && is_string($child->name->value)) {
+                        $propName = $child->name->value;
+                    }
+                    $this->assertPropertyDeclaredType($child->declaredType, $propName);
                     $propertyDeclName = $this->declNameFromCfgType($child->declaredType);
                     $declared = null !== $propertyDeclName
                         ? Type::fromDecl($propertyDeclName)
@@ -3732,9 +3749,12 @@ class Compiler {
 
     protected function compilePromotedPropertyDeclaration(Op\Expr\Param $param, Block $result): void
     {
+        $propName = '?';
         if ($param->name instanceof Operand\Literal && is_string($param->name->value)) {
-            $this->registerInstancePropertyDeclaration($param->name->value);
+            $propName = $param->name->value;
+            $this->registerInstancePropertyDeclaration($propName);
         }
+        $this->assertPropertyDeclaredType($param->declaredType, $propName);
         $defaultSlot = $this->resolvePropertyOrParamDefaultSlot($param, $result);
         if (null !== $defaultSlot && null !== $param->declaredType) {
             $defaultVm = $result->constants[$defaultSlot] ?? null;
