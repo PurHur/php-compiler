@@ -137,6 +137,54 @@ PHP;
         $this->assertSame("ok\n", ob_get_clean());
     }
 
+    public function testNeverReturnCovariantWithVoidParentAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I { public function f(): void; }
+class C implements I { public function f(): never { throw new Exception('x'); } }
+
+abstract class A { abstract public function g(): void; }
+class B extends A { public function g(): never { exit; } }
+
+class R { public function __clone(): never { throw new Exception('no clone'); } }
+
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'never_void_covariance.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    public function testVoidReturnOverNeverParentFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+abstract class A { abstract public function g(): never; }
+class B extends A { public function g(): void {} }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Declaration of B::g(): void must be compatible with A::g(): never');
+        $runtime->parseAndCompile($code, 'void_over_never.php');
+    }
+
+    public function testIntReturnOverVoidParentFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I { public function f(): void; }
+class C implements I { public function f(): int { return 1; } }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Declaration of C::f(): int must be compatible with I::f(): void');
+        $runtime->parseAndCompile($code, 'int_over_void.php');
+    }
+
     public function testAbstractConstructorSignatureMismatchFails(): void
     {
         $runtime = new Runtime();

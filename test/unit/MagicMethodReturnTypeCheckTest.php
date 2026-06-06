@@ -107,4 +107,23 @@ PHP;
         $runtime->run($block);
         $this->assertSame("Good\n", ob_get_clean());
     }
+
+    public function testNeverMagicMethodReturnTypesCompile(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Good {
+    public function __wakeup(): never { throw new Exception('no wakeup'); }
+    public function __unserialize(array $d): never { throw new Exception('no unserialize'); }
+    public function __clone(): never { throw new Exception('no clone'); }
+}
+echo Good::class, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'valid_magic_never.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("Good\n", ob_get_clean());
+    }
 }

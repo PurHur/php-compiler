@@ -143,6 +143,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'halt_compiler')) {
                 continue;
             }
+            // never/void covariance on class methods: compile-time only (#6733); MCJIT segfault on :void/:never class methods (#98).
+            if (str_contains($name, 'never_void_covariance')) {
+                continue;
+            }
             // class_alias() on interfaces/traits: VM + AOT -l (#5329); MCJIT LLVM verify until interface_exists stable.
             if (str_contains($name, 'class_alias_interface_trait')) {
                 continue;
