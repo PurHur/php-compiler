@@ -709,6 +709,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/JitThrow.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReadonlyRaise.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/UploadTempJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFsDir.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHashCrypto.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringMicrotime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPasswordCrypto.php';

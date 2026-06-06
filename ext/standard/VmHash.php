@@ -8,11 +8,11 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * VM hash() / hash_hmac() — native digests via VmHashNative (issue #4790, lib/AOT/runtime/hash_crypto.c).
+ * VM hash() / hash_hmac() — native digests via VmHashNative (issue #4790; JIT via StringHashCryptoJit).
  */
 final class VmHash
 {
-    /** HMAC-capable algorithms supported by VmHashNative / hash_crypto.c (issue #6229). */
+    /** HMAC-capable algorithms supported by VmHashNative / StringHashCryptoJit (issue #6229). */
     private const HMAC_ALGOS = ['md5', 'sha1', 'sha256'];
     public static function hash(string $algo, string $data, bool $raw = false): string|false
     {

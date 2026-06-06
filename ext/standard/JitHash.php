@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM helpers for hash() / hash_hmac() — AOT runtime in lib/AOT/runtime/hash_crypto.c. */
+/** LLVM helpers for hash() / hash_hmac() — PHP JIT via StringHashCryptoJit (issue #7060). */
 final class JitHash
 {
     private static int $blockSerial = 0;
