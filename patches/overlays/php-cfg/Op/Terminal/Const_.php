@@ -30,6 +30,12 @@ class Const_ extends Terminal
     /** PhpParser Stmt\ClassConst flags (MODIFIER_FINAL, visibility, etc.). */
     public int $flags = 0;
 
+    /** True for `case Name = value` in enums; false for `const` in enum/class bodies (#5054). */
+    public bool $isEnumCase = false;
+
+    /** True when enum case declares `= value`; false for unit enum implicit case (#5397). */
+    public bool $enumCaseHasExplicitValue = false;
+
     public function __construct(Operand $name, Operand $value, Block $valueBlock, array $attributes = [])
     {
         parent::__construct($attributes);
