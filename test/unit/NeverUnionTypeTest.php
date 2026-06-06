@@ -7,9 +7,23 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #4970 */
+/** @covers issue #4970 #6967 */
 final class NeverUnionTypeTest extends TestCase
 {
+    public function testNeverInUnionPropertyRejectedAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public int|never $x;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('never can only be used as a standalone type');
+        $runtime->parseAndCompile($code, 'never_union_property.php');
+    }
+
     public function testNeverInUnionReturnTypeRejectedAtCompileTime(): void
     {
         $runtime = new Runtime();
