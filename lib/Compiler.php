@@ -107,6 +107,9 @@ class Compiler {
     /** @var array<string, array<string, Variable>> compile-time class constants by lc name */
     private array $compileTimeClassConsts = [];
 
+    /** @var array<string, array<string, int>> compile-time class constant visibility flags by lc name (#6784) */
+    private array $compileTimeClassConstVisibility = [];
+
     /** @var array<string, Variable> lowercase global constant name => compile-time value (#3803, #6542) */
     private array $compileTimeGlobalConsts = [];
 
@@ -2474,6 +2477,9 @@ class Compiler {
             if (!isset($this->compileTimeClassConsts[$this->compilingClassLc])) {
                 $this->compileTimeClassConsts[$this->compilingClassLc] = [];
             }
+            if (!isset($this->compileTimeClassConstVisibility[$this->compilingClassLc])) {
+                $this->compileTimeClassConstVisibility[$this->compilingClassLc] = [];
+            }
             if (!isset($this->compileTimeEnumBackedTypes[$this->compilingClassLc])) {
                 $this->compileTimeEnumBackedTypes[$this->compilingClassLc] = null;
             }
@@ -3111,6 +3117,9 @@ class Compiler {
             if (!isset($this->compileTimeClassConsts[$this->compilingClassLc])) {
                 $this->compileTimeClassConsts[$this->compilingClassLc] = [];
             }
+            if (!isset($this->compileTimeClassConstVisibility[$this->compilingClassLc])) {
+                $this->compileTimeClassConstVisibility[$this->compilingClassLc] = [];
+            }
         } else {
             $this->compilingClassDisplayName = null;
         }
@@ -3367,6 +3376,8 @@ class Compiler {
                     $stored->copyFrom($backing);
                 }
                 $this->compileTimeClassConsts[$this->compilingClassLc][strtolower($constName)] = $stored;
+                $this->compileTimeClassConstVisibility[$this->compilingClassLc][strtolower($constName)]
+                    = ClassConstVisibility::mask($constOp->classConstVisibilityFlags);
             }
         }
     }
@@ -4203,6 +4214,9 @@ class Compiler {
         }
         $lcConst = strtolower($constName);
         if (isset($this->compileTimeClassConsts[$lcClass][$lcConst])) {
+            if (!$this->compileTimeClassConstFetchAllowed($lcClass, $lcConst, $block)) {
+                return null;
+            }
             $stored = $this->compileTimeClassConsts[$lcClass][$lcConst];
             if ($this->compileTimeStoredValueIsEnumCaseBackingScalar($lcClass, $lcConst, $stored)) {
                 return $this->compileTimeEnumCaseVar(
@@ -4391,6 +4405,54 @@ class Compiler {
         }
 
         return strtolower(ltrim($className, '\\'));
+    }
+
+    /**
+     * Caller class lc for compile-time class const fetch folding (#6784, zend_verify_const_access).
+     */
+    protected function compileTimeClassConstFetchCallerLc(Block $block): ?string
+    {
+        if (null !== $this->compilingClassLc) {
+            return $this->compilingClassLc;
+        }
+        if (null !== $block->func && null !== $block->func->class) {
+            $name = $this->staticNameFromOperand($block->func->class);
+
+            return null !== $name ? strtolower(ltrim($name, '\\')) : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether a compile-time class const value may be constant-folded at this site (#6784).
+     */
+    protected function compileTimeClassConstFetchAllowed(
+        string $declaringClassLc,
+        string $constLc,
+        Block $block
+    ): bool {
+        $vis = $this->compileTimeClassConstVisibility[$declaringClassLc][$constLc] ?? CfgFunc::FLAG_PUBLIC;
+        if (MethodVisibility::isPublic($vis)) {
+            return true;
+        }
+        try {
+            ClassConstVisibility::assertAccessible(
+                $vis,
+                $this->compileTimeClassConstFetchCallerLc($block),
+                $declaringClassLc,
+                $this->classCompileRegistry->traitDisplayName($declaringClassLc),
+                $constLc,
+                fn (string $callerLc, string $ancestorLc): bool => $this->classCompileRegistry->isClassSubtypeOf(
+                    $callerLc,
+                    $ancestorLc
+                )
+            );
+        } catch (\LogicException) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
