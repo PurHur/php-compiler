@@ -785,12 +785,6 @@ final class JitValueCompare
         $isIntegerNumeric = self::stringIsIntegerNumeric($context, $strPtr);
         $isNumeric = self::stringIsNumeric($context, $strPtr);
         $isFloatNumeric = $context->builder->and($isNumeric, $context->builder->not($isIntegerNumeric));
-        $zeroLong = $context->builder->icmp(Builder::INT_EQ, $__native, $i64->constInt(0, false));
-        // Zend #3644: non-numeric strings compare as 0. Do not use strtod here — length-tracked
-        // __string__ buffers can make strtod fail while strtol still consumes a numeric prefix.
-        $noLeadingIntegerPrefix = self::stringStrtolConsumedNothing($context, $strPtr);
-        $nonNumericMatch = $context->builder->and($noLeadingIntegerPrefix, $zeroLong);
-
         $charPtr = $context->builder->structGep($strPtr, $map['value']);
         $i8p = $context->getTypeFromString('int8*');
         $endPtrSlot = $context->builder->alloca($i8p, 1, 'loose_strlong_strtol_end');
@@ -814,10 +808,7 @@ final class JitValueCompare
             $context->builder->fcmp(Builder::REAL_OEQ, $strDouble, $nativeDouble)
         );
 
-        $matched = $context->builder->or(
-            $nonNumericMatch,
-            $context->builder->or($intMatch, $floatMatch)
-        );
+        $matched = $context->builder->or($intMatch, $floatMatch);
 
         return $context->builder->select($zeroLen, $falseVal, $matched);
     }

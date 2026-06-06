@@ -1359,12 +1359,12 @@ restart:
      * Int↔string loose == prefers exact integer numeric strings; other numeric strings (e.g. '0e5')
      * fall back to {@see looseNumericFromString} (#4035, Zend zend_operators.c).
      *
-     * Non-numeric strings still compare as 0 (#3644).
+     * Non-numeric strings do not coerce to 0 (PHP 8.2+, #5178).
      */
     private static function looseIntegerFromString(string $s): ?int
     {
         if (!is_numeric($s)) {
-            return 0;
+            return null;
         }
         if (((string) (int) $s) === $s) {
             return (int) $s;
