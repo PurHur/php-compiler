@@ -48,6 +48,9 @@ class JIT {
 
     private array $queue = [];
 
+    /** @var \SplObjectStorage<OpCode, true> DECLARE_GLOBAL_CONST opcodes that registered (#4941). */
+    private \SplObjectStorage $registeredGlobalConstDeclareOpcodes;
+
     private ?Block $m3EmitTuMainBlock = null;
     private ?Block $m3CompileDriverMainBlock = null;
     private bool $m3EmitTuRuntimeSpineLowered = false;
@@ -60,11 +63,13 @@ class JIT {
 
     public function __construct(Context $context) {
         $this->context = $context;
+        $this->registeredGlobalConstDeclareOpcodes = new \SplObjectStorage();
     }
 
     public function compile(Block $block): PHPLLVM\Value {
         JIT\Progress::noteFunction('jit_compile_begin');
         $this->context->resetScriptLocalBindings();
+        $this->registeredGlobalConstDeclareOpcodes = new \SplObjectStorage();
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
             // Inventory emit-helper reuses thin TU spine (#3070); argv-only inventory keeps compile_driver {main}.
             $inventoryEmitHelper = $this->shouldUseM3InventoryEmitDriver()
@@ -6936,26 +6941,37 @@ class JIT {
                         $this->context->runtime->vmContext,
                         $constValue
                     );
-                    if (!$this->context->runtime->vmContext->defineConstant(
+                    if ($this->context->runtime->vmContext->defineConstant(
                         $nameOp->value,
                         $constValue
                     )) {
-                        // Spine may require bin/vm.php after tokenizer-compat shims (#2134).
-                        if ($this->shouldUseSelfHostJitStubs()) {
-                            break;
+                        $this->registeredGlobalConstDeclareOpcodes->attach($op);
+                        if (VM\Variable::TYPE_ARRAY === $constValue->type) {
+                            $this->context->constantArrayFromVmHashTable(
+                                $nameOp->value,
+                                $constValue->toArray()
+                            );
                         }
-                        // Re-compile passes (jitCompileBlock + runQueue) may revisit DECLARE_GLOBAL_CONST (#4941).
-                        if (null !== $this->context->runtime->vmContext->constantFetch($nameOp->value)) {
-                            break;
-                        }
-                        throw new \LogicException("Cannot redefine constant {$nameOp->value}");
+                        break;
                     }
-                    if (VM\Variable::TYPE_ARRAY === $constValue->type) {
-                        $this->context->constantArrayFromVmHashTable(
-                            $nameOp->value,
-                            $constValue->toArray()
-                        );
+                    // Spine may require bin/vm.php after tokenizer-compat shims (#2134).
+                    if ($this->shouldUseSelfHostJitStubs()) {
+                        break;
                     }
+                    // Re-compile passes (jitCompileBlock + runQueue) may revisit DECLARE_GLOBAL_CONST (#4941).
+                    if ($this->registeredGlobalConstDeclareOpcodes->contains($op)) {
+                        break;
+                    }
+                    $scriptPath = $block->scriptPath();
+                    $line = (int) ($op->globalConstStartLine ?? 0);
+                    $this->context->runtime->vmContext->errors->triggerError(
+                        "Constant {$nameOp->value} already defined",
+                        VM\ErrorReporter::E_WARNING,
+                        null !== $scriptPath && '' !== $scriptPath ? $scriptPath : null,
+                        $this->context->runtime->vmContext,
+                        null,
+                        $line > 0 ? $line : 0
+                    );
                     break;
                 case OpCode::TYPE_DECLARE_INTERFACE:
                     $nameOp = $block->getOperand($op->arg1);

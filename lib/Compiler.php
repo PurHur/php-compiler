@@ -8349,11 +8349,14 @@ class Compiler {
             $this->storeCompileTimeGlobalConst($constName, $block->constants[$valueSlot]);
         }
 
-        return new OpCode(
+        $opcode = new OpCode(
             OpCode::TYPE_DECLARE_GLOBAL_CONST,
             $this->compileOperand($const->name, $block, true),
             $valueSlot
         );
+        $opcode->globalConstStartLine = max(0, $const->getLine());
+
+        return $opcode;
     }
 
     protected function tryFoldGlobalConstValueSlot(Op\Terminal\Const_ $terminal, Block $block): ?int

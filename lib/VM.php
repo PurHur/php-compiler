@@ -3786,7 +3786,15 @@ restart:
                     }
                     $constValue = VM\EnumCaseSupport::materializeConstantValue($this->context, $constValue);
                     if (!$this->context->defineConstant($name, $constValue)) {
-                        throw new \LogicException("Cannot redefine constant {$name}");
+                        $line = (int) ($op->globalConstStartLine ?? 0);
+                        $this->context->errors->triggerError(
+                            "Constant {$name} already defined",
+                            VM\ErrorReporter::E_WARNING,
+                            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                            $this->context,
+                            $frame,
+                            $line > 0 ? $line : 0
+                        );
                     }
                     break;
                 case OpCode::TYPE_DECLARE_ENUM:
