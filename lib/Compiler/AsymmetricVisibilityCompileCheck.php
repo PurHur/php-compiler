@@ -58,15 +58,38 @@ final class AsymmetricVisibilityCompileCheck
                 if (!$this->isPromotedParam($param)) {
                     continue;
                 }
-                $this->verifyProperty(
+                $this->verifyPromotedParam(
                     $classDisplay,
                     $this->propertyDisplayName($param->name),
-                    MethodVisibility::mask($param->promotionFlags),
-                    $this->setVisibilityFromParam($param),
-                    $param->declaredType
+                    $param
                 );
             }
         }
+    }
+
+    /**
+     * Promoted parameters cannot combine ctor-promotion visibility with asymmetric (get/set) modifiers (#6742).
+     *
+     * php-src: Zend/zend_compile.c — zend_compile_property_info() on promoted params.
+     */
+    private function verifyPromotedParam(string $classDisplay, string $propertyName, Param $param): void
+    {
+        $readVisibility = MethodVisibility::mask($param->promotionFlags);
+        $setVisibility = $this->setVisibilityFromParam($param);
+        $getVisibility = $this->getVisibilityFromParam($param);
+
+        if ((0 !== $readVisibility && 0 !== $setVisibility)
+            || (0 !== $readVisibility && 0 !== $getVisibility)) {
+            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+        }
+
+        $this->verifyProperty(
+            $classDisplay,
+            $propertyName,
+            $readVisibility,
+            $setVisibility,
+            $param->declaredType
+        );
     }
 
     private function verifyProperty(
@@ -108,6 +131,15 @@ final class AsymmetricVisibilityCompileCheck
         }
 
         return AsymmetricVisibilityRewriter::extractSetVisibilityFromAttributes($param->getAttributes());
+    }
+
+    private function getVisibilityFromParam(Param $param): int
+    {
+        if (property_exists($param, 'promotionGetVisibility') && 0 !== (int) $param->promotionGetVisibility) {
+            return MethodVisibility::mask((int) $param->promotionGetVisibility);
+        }
+
+        return AsymmetricVisibilityRewriter::extractGetVisibilityFromAttributes($param->getAttributes());
     }
 
     private function isPromotedParam(Param $param): bool
