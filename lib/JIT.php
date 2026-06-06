@@ -8735,6 +8735,11 @@ class JIT {
             $sourceMethodLc = $data['sourceMethodLc'] ?? $data['methodLc'];
             $methodBlock = $object->traitMethodBlock($traitId, $sourceMethodLc);
             if (null !== $methodBlock) {
+                $methodBlock = TraitMethodFunctionStatic::bindBlock(
+                    $methodBlock,
+                    $className,
+                    $data['traitName']
+                );
                 if ($this->context->scope->blockStorage->contains($methodBlock)) {
                     $this->context->scope->blockStorage->detach($methodBlock);
                 }

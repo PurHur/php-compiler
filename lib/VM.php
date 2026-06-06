@@ -8286,7 +8286,12 @@ restart:
                     ."because of collision with {$prevTrait}::{$methodLc}"
                 );
             }
-            $entry->methods[$methodLc] = $data['method'];
+            $entry->methods[$methodLc] = TraitMethodFunctionStatic::bindMethod(
+                $data['method'],
+                $entry->name,
+                $data['traitName'],
+                $methodLc
+            );
             $entry->traitMethodSources[$methodLc] = $data['traitName'];
             $entry->methodVisibility[$methodLc] = $data['vis'];
             $entry->methodNames[$methodLc] = $data['methodNames'];
@@ -8303,7 +8308,7 @@ restart:
                 $entry->methodParameterMetadata[$methodLc] = $data['parameterMetadata'];
             }
             if ('__construct' === $methodLc && null === $entry->constructor) {
-                $entry->constructor = $data['method'];
+                $entry->constructor = $entry->methods[$methodLc];
             }
         }
     }
