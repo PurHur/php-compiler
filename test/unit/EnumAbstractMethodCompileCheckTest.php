@@ -44,6 +44,24 @@ PHP;
         $runtime->parseAndCompile($code, 'enum_trait_abstract.php');
     }
 
+    public function testBackedEnumTraitAbstractRequiresConcreteImplementation(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T {
+    abstract public function f(): string;
+}
+enum E: string {
+    case A = 'a';
+    use T;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Enum E must implement 1 abstract private method (E::f)');
+        $runtime->parseAndCompile($code, 'enum_trait_abstract_backed.php');
+    }
+
     public function testConcreteEnumMethodCompiles(): void
     {
         $runtime = new Runtime();
