@@ -12,9 +12,17 @@ use PHPCompiler\GenericArrayTypeSpec;
  */
 final class TypeCheck
 {
+    public static function assertNeverParameter(Variable $argument): void
+    {
+        throw new \TypeError(
+            'Argument must be of type never, '.self::valueTypeLabel($argument).' given'
+        );
+    }
+
     public static function variadicSlotNeedsElementChecks(Block $block, int $slot): bool
     {
-        return isset($block->paramIterableSlots[$slot])
+        return isset($block->paramNeverSlots[$slot])
+            || isset($block->paramIterableSlots[$slot])
             || isset($block->paramVariadicElementTypeConstraints[$slot])
             || isset($block->paramVariadicElementGenericArrayTypeSpecs[$slot])
             || isset($block->paramVariadicElementIntersectionConstraints[$slot])
@@ -36,12 +44,18 @@ final class TypeCheck
         ?array $intersection,
         ?array $dnfArms,
         Context $context,
-        bool $iterableElement = false
+        bool $iterableElement = false,
+        bool $neverElement = false
     ): void {
         foreach ($elements as $element) {
             $probe = new Variable();
             $probe->copyFrom($element);
             $resolved = $probe->resolveIndirect();
+            if ($neverElement) {
+                self::assertNeverParameter($probe);
+
+                continue;
+            }
             if ($iterableElement) {
                 IterableCheck::assertParameter($probe, $context);
 

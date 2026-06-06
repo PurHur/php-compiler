@@ -2968,10 +2968,12 @@ class Compiler {
     protected function applyParamDeclaredType(Op\Expr\Param $param, Block $block, int $slot, bool $variadicElement = false): void
     {
         $declared = $param->declaredType;
-        if ($this->cfgTypeIsStandaloneNever($declared)) {
-            $this->throwCompileError('never cannot be used as a parameter type');
-        }
         $this->assertNeverIsStandaloneType($declared);
+        if ($this->cfgTypeIsStandaloneNever($declared)) {
+            $block->paramNeverSlots[$slot] = true;
+
+            return;
+        }
         if (null !== $declared) {
             $block->paramDeclaredTypes[$slot] = $declared;
         }
