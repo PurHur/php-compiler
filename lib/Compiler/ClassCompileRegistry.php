@@ -27,6 +27,9 @@ final class ClassCompileRegistry
     /** @var array<string, true> registered trait lc names (#4973) */
     private array $traits = [];
 
+    /** @var array<string, true> registered interface lc names (#7042) */
+    private array $registeredInterfaces = [];
+
     /** @var array<string, CfgBlock> trait lc name => body stmts (#6761) */
     private array $traitStmts = [];
 
@@ -54,6 +57,7 @@ final class ClassCompileRegistry
         $this->displayNames[$lc] = ltrim($name, '\\');
         $this->parents[$lc] = null;
         $this->interfaces[$lc] = $extendsLcs;
+        $this->registeredInterfaces[$lc] = true;
         $this->methods[$lc] = self::methodSigsFromStmts($stmts, $lc);
     }
 
@@ -85,6 +89,11 @@ final class ClassCompileRegistry
     public function isTrait(string $lcName): bool
     {
         return isset($this->traits[self::lc($lcName)]);
+    }
+
+    public function isInterface(string $lcName): bool
+    {
+        return isset($this->registeredInterfaces[self::lc($lcName)]);
     }
 
     public function hasOverridableMethod(

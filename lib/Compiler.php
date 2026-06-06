@@ -3430,6 +3430,7 @@ class Compiler {
             }
             if (!$this->cfgDeclaredTypeIsMixed($child->declaredType)) {
                 $this->rejectTypedTraitConstantIfUnsupported($child->name);
+                $this->rejectTypedInterfaceConstantIfUnsupported($child->name);
                 $declared = $this->typeFromClassConstDecl($child);
                 $typeSlot = $this->compileTypeConstrainedVariable($result, $declared, $child->declaredType);
                 if (isset($result->constants[$valueSlot])) {
@@ -3677,6 +3678,26 @@ class Compiler {
         if (
             null === $this->compilingClassLc
             || !$this->classCompileRegistry->isTrait($this->compilingClassLc)
+        ) {
+            return;
+        }
+        $constName = $this->staticNameFromOperand($nameOp) ?? 'constant';
+        $this->throwCompileError(
+            sprintf('syntax error, unexpected identifier "%s", expecting "="', $constName)
+        );
+    }
+
+    /**
+     * Zend 8.2 rejects typed interface constants at parse time; enable at 8.3+ (#5980, #7042).
+     */
+    protected function rejectTypedInterfaceConstantIfUnsupported(Operand $nameOp): void
+    {
+        if (CompilerVersion::supportsInterfaceTypedConstants()) {
+            return;
+        }
+        if (
+            null === $this->compilingClassLc
+            || !$this->classCompileRegistry->isInterface($this->compilingClassLc)
         ) {
             return;
         }

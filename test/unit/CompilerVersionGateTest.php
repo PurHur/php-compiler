@@ -9,9 +9,9 @@ use PHPUnit\Framework\TestCase;
 /** CompilerVersion gates for PHP 8.3+ surface (#5697, #5212, #5993). */
 final class CompilerVersionGateTest extends TestCase
 {
-    public function testVersionReports83Dev(): void
+    public function testVersionReports84Dev(): void
     {
-        $this->assertSame('8.3.0-dev', CompilerVersion::VERSION);
+        $this->assertSame('8.4.0-dev', CompilerVersion::VERSION);
     }
 
     public function testSupportsStrIncrementTrueOn83Target(): void
@@ -22,6 +22,11 @@ final class CompilerVersionGateTest extends TestCase
     public function testSupportsTypedTraitConstantsTrueOn83Target(): void
     {
         $this->assertTrue(CompilerVersion::supportsTypedTraitConstants());
+    }
+
+    public function testSupportsInterfaceTypedConstantsTrueOn83Target(): void
+    {
+        $this->assertTrue(CompilerVersion::supportsInterfaceTypedConstants());
     }
 
     public function testVmRegistersStrIncrementOn83Target(): void

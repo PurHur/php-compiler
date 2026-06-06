@@ -19,6 +19,12 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.3', '>=');
     }
 
+    /** PHP 8.3+ typed constants on interfaces (Zend/zend_compile.c, issue #5980, #7042). */
+    public static function supportsInterfaceTypedConstants(): bool
+    {
+        return version_compare(self::VERSION, '8.3', '>=');
+    }
+
     /** PHP 8.3+ str_increment() / str_decrement() (ext/standard/string.c, issue #5697). */
     public static function supportsStrIncrement(): bool
     {

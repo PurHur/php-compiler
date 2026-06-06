@@ -18,7 +18,9 @@ final class TypedClassConstInheritCheck
     /**
      * @var array<string, array{
      *     display: string,
-     *     constants: array<string, array{display: string, type: ?TypeSig, private: bool}>,
+     *     file: string,
+     *     line: int,
+     *     constants: array<string, array{display: string, type: ?TypeSig, private: bool, file: string, line: int}>,
      *     extends: ?string,
      *     implements: list<string>,
      *     ifaceExtends: list<string>,
@@ -66,6 +68,8 @@ final class TypedClassConstInheritCheck
         }
         $this->types[$lc] = [
             'display' => $this->operandDisplayName($class->name, $lc),
+            'file' => $class->getFile(),
+            'line' => max(1, $class->getLine()),
             'constants' => $this->collectConstants($class->stmts->children),
             'extends' => $parentLc,
             'implements' => $implements,
@@ -89,6 +93,8 @@ final class TypedClassConstInheritCheck
         }
         $this->types[$lc] = [
             'display' => $this->operandDisplayName($iface->name, $lc),
+            'file' => $iface->getFile(),
+            'line' => max(1, $iface->getLine()),
             'constants' => $this->collectConstants($iface->stmts->children),
             'extends' => null,
             'implements' => [],
@@ -105,6 +111,8 @@ final class TypedClassConstInheritCheck
         }
         $this->types[$lc] = [
             'display' => $this->operandDisplayName($trait->name, $lc),
+            'file' => $trait->getFile(),
+            'line' => max(1, $trait->getLine()),
             'constants' => $this->collectConstants($trait->stmts->children),
             'extends' => null,
             'implements' => [],
@@ -139,7 +147,7 @@ final class TypedClassConstInheritCheck
     /**
      * @param list<Op> $members
      *
-     * @return array<string, array{display: string, type: ?TypeSig, private: bool}>
+     * @return array<string, array{display: string, type: ?TypeSig, private: bool, file: string, line: int}>
      */
     private function collectConstants(array $members): array
     {
@@ -164,6 +172,8 @@ final class TypedClassConstInheritCheck
                 'display' => $name,
                 'type' => $type,
                 'private' => 0 !== ($flags & ClassNode::MODIFIER_PRIVATE),
+                'file' => $member->getFile(),
+                'line' => max(1, $member->getLine()),
             ];
         }
 
@@ -195,14 +205,74 @@ final class TypedClassConstInheritCheck
                     )) {
                         continue;
                     }
-                    throw new \CompileError(sprintf(
-                        'Type of %s::%s must be compatible with %s::%s of type %s',
-                        $type['display'],
-                        $childConst['display'],
-                        $parentSource['display'],
-                        $parentConst['display'],
-                        $parentConst['type']->format()
-                    ));
+                    throw new CompileFatal(
+                        $childConst['file'],
+                        $childConst['line'],
+                        sprintf(
+                            'Type of %s::%s must be compatible with %s::%s of type %s',
+                            $type['display'],
+                            $childConst['display'],
+                            $parentSource['display'],
+                            $parentConst['display'],
+                            $parentConst['type']->format()
+                        )
+                    );
+                }
+            }
+        }
+        $this->verifyMultiInterfaceConstantCollisions();
+    }
+
+    /**
+     * Classes implementing multiple interfaces must not inherit the same typed constant name
+     * with incompatible types (zend_inheritance.c do_inherit_constant_check, #7042).
+     */
+    private function verifyMultiInterfaceConstantCollisions(): void
+    {
+        foreach ($this->types as $type) {
+            if ([] === $type['implements']) {
+                continue;
+            }
+            /** @var array<string, array{source: array{lc: string, display: string, constants: array<string, array{display: string, type: ?TypeSig, private: bool, file: string, line: int}>}, const: array{display: string, type: ?TypeSig, private: bool, file: string, line: int}}> $firstTypedByName */
+            $firstTypedByName = [];
+            foreach ($type['implements'] as $ifaceLc) {
+                $seen = [];
+                foreach ($this->interfaceConstantSources($ifaceLc, $seen) as $source) {
+                    foreach ($source['constants'] as $constLc => $ifaceConst) {
+                        if ($ifaceConst['private'] || null === $ifaceConst['type']) {
+                            continue;
+                        }
+                        if (isset($type['constants'][$constLc])) {
+                            continue;
+                        }
+                        if (!isset($firstTypedByName[$constLc])) {
+                            $firstTypedByName[$constLc] = [
+                                'source' => $source,
+                                'const' => $ifaceConst,
+                            ];
+                            continue;
+                        }
+                        $first = $firstTypedByName[$constLc];
+                        if (InheritanceVariance::isCovariantTypeCompatible(
+                            $first['const']['type'],
+                            $ifaceConst['type'],
+                            $first['source']['lc'],
+                            $source['lc'],
+                            fn (string $subtype, string $supertype): bool => $this->isClassSubtypeOf($subtype, $supertype),
+                            fn (string $classLc, string $interfaceLc): bool => $this->interfaceExtendsOrEquals($classLc, $interfaceLc)
+                        )) {
+                            continue;
+                        }
+                        throw new CompileFatal(
+                            $type['file'],
+                            $type['line'],
+                            sprintf(
+                                'Cannot inherit previously-inherited or override constant %s from interface %s',
+                                $ifaceConst['display'],
+                                $source['display']
+                            )
+                        );
+                    }
                 }
             }
         }
