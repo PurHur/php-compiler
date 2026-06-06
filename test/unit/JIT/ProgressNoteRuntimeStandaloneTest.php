@@ -35,4 +35,26 @@ final class ProgressNoteRuntimeStandaloneTest extends TestCase
         $this->assertNotNull($ctx->module->getNamedGlobal('phpc_last_progress'));
         $this->assertNotNull($ctx->module->getNamedGlobal('phpc_last_progress_len'));
     }
+
+    /** Issue #7146: C progress TU must stay async-signal-safe handler only — no buffer writers. */
+    public function testProgressCRuntimeIsFrozenThinAbi(): void
+    {
+        $source = file_get_contents(__DIR__.'/../../../lib/AOT/runtime/phpc_progress.c');
+        $this->assertIsString($source);
+
+        $lines = substr_count($source, "\n") + 1;
+        $this->assertLessThanOrEqual(40, $lines, 'phpc_progress.c must remain a thin ABI (handler + extern decls)');
+
+        foreach (['sprintf', 'snprintf', 'strcpy', 'strncpy', 'memcpy', 'malloc', 'fopen', 'fprintf'] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden.'(', $source, 'progress formatting belongs in ProgressNoteRuntime.php');
+        }
+
+        $this->assertStringContainsString('phpc_segv_handler', $source);
+        $this->assertStringContainsString('extern char phpc_last_progress', $source);
+        $this->assertDoesNotMatchRegularExpression(
+            '/(?<!extern )char phpc_last_progress\s*\[/',
+            $source,
+            'buffer definition lives in LLVM globals, not C'
+        );
+    }
 }
