@@ -13,21 +13,23 @@ use PHPLLVM\Value;
 /** disktotalspace() — PHP alias of disk_total_space(). */
 final class disktotalspace extends Internal
 {
-    private disk_total_space $delegate;
-
     public function __construct()
     {
         parent::__construct('disktotalspace');
-        $this->delegate = new disk_total_space();
     }
 
     public function execute(Frame $frame): void
     {
-        $this->delegate->execute($frame);
+        (new disk_total_space())->execute($frame);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        return $this->delegate->call($context, ...$args);
+        if (\count($args) > 1) {
+            throw new \LogicException('disktotalspace() accepts at most one argument in this compiler build');
+        }
+        $path = JitDiskPath::lower($context, $args[0] ?? null, 'disktotalspace');
+
+        return JitStat::pathDiskTotalSpaceBoxed($context, $path);
     }
 }
