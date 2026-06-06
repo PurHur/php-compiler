@@ -3810,6 +3810,9 @@ restart:
                     }
                     $classEntry->interfaces = $op->classImplements;
                     $classEntry->isAbstract = $op->classIsAbstract;
+                    $classEntry->attributeNames = $op->attributeNames;
+                    $classEntry->attributeEntries = $op->attributeEntries;
+                    $classEntry->classDeprecated = $op->deprecatedMetadata;
                     self::defineClass($classEntry, $op->block1, $frame);
                     $this->inheritFromInterfaces($classEntry);
                     VM\EnumSupport::ensureBuiltinCasesMethod($classEntry);
@@ -10014,6 +10017,42 @@ restart:
         $this->emitDeprecatedNotice($class->classDeprecated->formatClass($class->name), $frame);
     }
 
+    private function emitClassConstFetchDeprecation(
+        ClassEntry $classEntry,
+        string $memberNameRaw,
+        string $memberLc,
+        Frame $frame
+    ): void {
+        if ($classEntry->isEnum) {
+            if (null !== $classEntry->classDeprecated) {
+                $this->emitDeprecatedNotice(
+                    $classEntry->classDeprecated->formatEnum($classEntry->name),
+                    $frame
+                );
+            }
+            if (isset($classEntry->constDeprecated[$memberLc])) {
+                $this->emitDeprecatedNotice(
+                    $classEntry->constDeprecated[$memberLc]->formatEnumCase(
+                        $classEntry->name,
+                        $memberNameRaw
+                    ),
+                    $frame
+                );
+            }
+
+            return;
+        }
+        if (isset($classEntry->constDeprecated[$memberLc])) {
+            $this->emitDeprecatedNotice(
+                $classEntry->constDeprecated[$memberLc]->formatConstant(
+                    $classEntry->name,
+                    $memberNameRaw
+                ),
+                $frame
+            );
+        }
+    }
+
     /**
      * ClassConstFetch with a runtime member name (php-parser: Class::{$var}).
      * Zend resolves constants first; when no constant exists, fall back to static property (#3788).
@@ -10041,15 +10080,7 @@ restart:
             return true;
         }
         if (isset($classEntry->constants[$memberLc])) {
-            if (isset($classEntry->constDeprecated[$memberLc])) {
-                $this->emitDeprecatedNotice(
-                    $classEntry->constDeprecated[$memberLc]->formatConstant(
-                        $classEntry->name,
-                        $memberNameRaw
-                    ),
-                    $frame
-                );
-            }
+            $this->emitClassConstFetchDeprecation($classEntry, $memberNameRaw, $memberLc, $frame);
             if ($classEntry->isEnum && null !== $classEntry->backedType) {
                 VM\EnumSupport::ensureBackedEnumValuesUnique($classEntry);
             }

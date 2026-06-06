@@ -69,6 +69,16 @@ final class DeprecatedMetadata
         return 'Class '.$name.' is deprecated'.$this->suffix();
     }
 
+    public function formatEnum(string $name): string
+    {
+        return 'Enum '.$name.' is deprecated'.$this->suffix();
+    }
+
+    public function formatEnumCase(string $class, string $case): string
+    {
+        return 'Enum case '.$class.'::'.$case.' is deprecated'.$this->suffix();
+    }
+
     private function suffix(): string
     {
         if (null !== $this->since && null !== $this->message) {
