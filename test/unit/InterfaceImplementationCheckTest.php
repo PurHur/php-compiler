@@ -136,6 +136,23 @@ PHP;
         $this->assertSame("ok\n", ob_get_clean());
     }
 
+    public function testPlainInterfacePropertyFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {
+    public string $name;
+}
+class C implements I {
+    public string $name = 'x';
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Interfaces may not include properties');
+        $runtime->parseAndCompile($code, 'plain_iface_property.php');
+    }
+
     public function testMissingInterfacePropertyHookFailsAtCompileTime(): void
     {
         $runtime = new Runtime();
