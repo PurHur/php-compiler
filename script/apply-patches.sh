@@ -255,7 +255,8 @@ patch_already_applied() {
       grep -q 'public \\$expr;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assertion.php" 2>/dev/null
       ;;
     php-cfg-match.patch)
-      grep -q 'function parseExpr_Match' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      grep -q 'function parseExpr_Match' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        && grep -q 'lowerUnhandledMatchError' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-incdec-expr.patch)
       grep -q 'new Op\\Expr\\PostInc' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
@@ -405,6 +406,10 @@ apply_php_cfg_match_overlay() {
   if [[ ! -f "$overlay" ]]; then
     echo "Skip php-cfg-match.patch (overlay missing)" >&2
     return 1
+  fi
+  if patch_already_applied "$PATCH_DIR/php-cfg-match.patch"; then
+    echo "Skip php-cfg-match.patch (already applied)"
+    return 0
   fi
   if python3 "$ROOT/script/patch-php-cfg-match.py"; then
     echo "Applied php-cfg-match.patch (overlay)"
