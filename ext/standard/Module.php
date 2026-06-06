@@ -181,6 +181,7 @@ class Module extends ModuleAbstract
             new array_first(),
             new array_last(),
             new array_is_list(),
+            new array_is_assoc(),
             new in_array(),
             new array_push(),
             new array_pop(),
