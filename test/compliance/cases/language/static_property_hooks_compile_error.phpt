@@ -1,5 +1,5 @@
 --TEST--
-Language: static property hooks must compile-error (#6901, #6619, Zend/zend_compile.c)
+Language: static property hooks compile and run on direct class (#6931)
 --FILE--
 <?php
 declare(strict_types=1);
@@ -9,6 +9,6 @@ class C {
         get => 1;
     }
 }
-echo "compiled\n";
---EXPECT_EXIT--
-255
+echo C::$x, "\n";
+--EXPECT--
+1

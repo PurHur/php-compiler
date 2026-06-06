@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
-use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\Runtime;
 use PHPCompiler\SourcePreprocessor\PropertyHooks;
 use PHPUnit\Framework\TestCase;
 
-/** Static property hooks rejected at compile time (#6619, #6901, php-src 8.4). */
+/** Static property hooks compile and lower (#6931, PHP 8.4 zend_property_hooks.c). */
 final class StaticPropertyHooksTest extends TestCase
 {
-    public function testDirectClassStaticPropertyHooksCompileFatal(): void
+    public function testDirectClassStaticPropertyHooksLower(): void
     {
         $src = <<<'PHP'
 <?php
@@ -24,10 +23,16 @@ class Box {
     private static ?string $v = null;
 }
 PHP;
-        $this->expectCompileFatal($src);
+        [$out, $registry] = (new PropertyHooks())->process($src, 'static_hooks.php');
+        self::assertStringContainsString('public static string $label;', $out);
+        self::assertStringContainsString('public static function __phpc_property_get_label()', $out);
+        self::assertStringContainsString('public static function __phpc_property_set_label($value)', $out);
+        self::assertTrue($registry['box']['label']['static'] ?? false);
+        self::assertSame('__phpc_property_get_label', $registry['box']['label']['get'] ?? null);
+        self::assertSame('__phpc_property_set_label', $registry['box']['label']['set'] ?? null);
     }
 
-    public function testTraitStaticPropertyHooksCompileFatal(): void
+    public function testTraitStaticPropertyHooksLower(): void
     {
         $src = <<<'PHP'
 <?php
@@ -40,10 +45,12 @@ trait T {
 }
 class C { use T; }
 PHP;
-        $this->expectCompileFatal($src);
+        [$out, $registry] = (new PropertyHooks())->process($src, 'static_hooks.php');
+        self::assertStringContainsString('public static string $x;', $out);
+        self::assertTrue($registry['t']['x']['static'] ?? false);
     }
 
-    public function testLiteralGetHookCompileFatal(): void
+    public function testLiteralGetHookCompilesOnVm(): void
     {
         $src = <<<'PHP'
 <?php
@@ -52,27 +59,15 @@ class C {
         get => 1;
     }
 }
+echo C::$x;
 PHP;
-        $this->expectCompileFatal($src);
-    }
-
-    private function expectCompileFatal(string $src): void
-    {
-        try {
-            (new PropertyHooks())->process($src, 'static_hooks.php');
-            self::fail('Expected CompileFatal for static property hooks');
-        } catch (CompileFatal $e) {
-            self::assertSame(PropertyHooks::STATIC_HOOK_COMPILE_ERROR, $e->getMessage());
-        }
-
         $path = sys_get_temp_dir().'/static_property_hooks_'.bin2hex(random_bytes(4)).'.php';
         file_put_contents($path, $src);
         try {
             $rt = new Runtime();
-            $rt->parseAndCompile($src, $path);
-            self::fail('Expected Runtime parseAndCompile to throw CompileFatal');
-        } catch (CompileFatal $e) {
-            self::assertSame(PropertyHooks::STATIC_HOOK_COMPILE_ERROR, $e->getMessage());
+            ob_start();
+            $rt->run($rt->parseAndCompile($src, $path));
+            self::assertSame('1', ob_get_clean());
         } finally {
             @unlink($path);
         }
