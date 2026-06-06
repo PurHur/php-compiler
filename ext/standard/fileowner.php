@@ -7,9 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** fileowner() — VM via stat; JIT/AOT via libc stat st_uid. php-src: ext/standard/filestat.c */
@@ -20,14 +19,11 @@ final class fileowner extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('fileowner() requires exactly one argument in this compiler build');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'fileowner', 0, 'filename');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_STRING !== $v->type) {
-            throw new \LogicException('fileowner() requires a string path in this compiler build');
-        }
-        $uid = VmFs::fileOwner($v->toString());
+        $uid = VmFs::fileOwner($path);
         if (false === $uid) {
             $frame->returnVar->bool(false);
         } else {
@@ -40,7 +36,7 @@ final class fileowner extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('fileowner() requires exactly one argument in this compiler build');
         }
-        $path = JitStringArg::lower($context, $args[0], 'fileowner() path');
+        $path = JitStringBuiltinArg::lower($context, $args[0], 'fileowner', 0, 'filename');
 
         return JitFileowner::invoke($context, $path);
     }
