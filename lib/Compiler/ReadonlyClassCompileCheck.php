@@ -77,7 +77,8 @@ final class ReadonlyClassCompileCheck
 
     private function verifyNoPropertyDefaults(Op\Stmt\Class_ $class, string $classDisplay, bool $classReadonly): void
     {
-        if ($classReadonly && $this->isAnonymousClass($class->name)) {
+        // php-src ZEND_ACC_ANON_READONLY: anonymous classes may use property defaults (#5040, #6724).
+        if ($this->isAnonymousClass($class->name)) {
             return;
         }
 
