@@ -41,4 +41,24 @@ PHP;
         $rt->run($block);
         $this->assertSame('1', ob_get_clean());
     }
+
+    public function testVmClassUsesRecursiveNestedTraits(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait A {}
+trait B { use A; }
+class C { use B; }
+$direct = class_uses(C::class);
+$recursive = class_uses_recursive(C::class);
+echo isset($direct['B']) && !isset($direct['A']) ? '1' : '0';
+echo isset($recursive['A']) ? '1' : '0';
+echo isset($recursive['B']) ? '1' : '0';
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'class_uses_recursive.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('111', ob_get_clean());
+    }
 }

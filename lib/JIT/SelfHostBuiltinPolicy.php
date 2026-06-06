@@ -236,7 +236,7 @@ final class SelfHostBuiltinPolicy
         'get_mangled_object_vars' => 'array',
         'get_object_id' => 'array',
         'get_class' => 'array', 'get_class_methods' => 'array', 'get_class_vars' => 'array', 'get_parent_class' => 'array', 'is_a' => 'array', 'is_subclass_of' => 'array',
-        'class_implements' => 'array', 'class_parents' => 'array', 'class_uses' => 'array',
+        'class_implements' => 'array', 'class_parents' => 'array', 'class_uses' => 'array', 'class_uses_recursive' => 'array',
         'assert' => 'array',
         'trigger_error' => 'array',
         'error_get_last' => 'array',
