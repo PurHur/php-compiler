@@ -2211,9 +2211,7 @@ restart:
 
                 return;
             case self::TYPE_NULL:
-                $this->int(1);
-
-                return;
+                throw new \TypeError('Cannot increment null');
             case self::TYPE_INTEGER:
                 if ($this->isVmResource()) {
                     throw new \TypeError('Cannot increment resource');
@@ -2269,7 +2267,7 @@ restart:
 
                 return;
             case self::TYPE_NULL:
-                return;
+                throw new \TypeError('Cannot decrement null');
             case self::TYPE_INTEGER:
                 if ($this->isVmResource()) {
                     throw new \TypeError('Cannot decrement resource');
