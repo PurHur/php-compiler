@@ -27,6 +27,9 @@ final class ClassValidator
         if ($entry->isEnum) {
             throw new \Error("Cannot instantiate enum {$entry->name}");
         }
+        if ($entry->isStatic) {
+            throw new \Error("Cannot instantiate static class {$entry->name}");
+        }
         if ($entry->isAbstract || [] !== $entry->abstractMethods) {
             throw new \Error("Cannot instantiate abstract class {$entry->name}");
         }

@@ -41,6 +41,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassGetProperties;
 use PHPCompiler\VM\Builtin\ReflectionClassGetReflectionConstant;
 use PHPCompiler\VM\Builtin\ReflectionClassIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionClassIsInternal;
+use PHPCompiler\VM\Builtin\ReflectionClassIsStatic;
 use PHPCompiler\VM\Builtin\ReflectionClassIsUninitializedLazyObject;
 use PHPCompiler\VM\Builtin\ReflectionClassMarkLazyObjectAsInitialized;
 use PHPCompiler\VM\Builtin\ReflectionClassNewLazyGhost;
@@ -294,6 +295,8 @@ final class BuiltinClasses
         $rc->methodVisibility['resetaslazyobject'] = $pub;
         $rc->methods['isinternal'] = new ReflectionClassIsInternal();
         $rc->methodVisibility['isinternal'] = $pub;
+        $rc->methods['isstatic'] = new ReflectionClassIsStatic();
+        $rc->methodVisibility['isstatic'] = $pub;
         $rc->methods['isdeprecated'] = new ReflectionClassIsDeprecated();
         $rc->methodVisibility['isdeprecated'] = $pub;
 

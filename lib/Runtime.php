@@ -28,6 +28,8 @@ use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Ast\GroupUseStripper;
 use PHPCompiler\Ast\SealedClassAnnotator;
 use PHPCompiler\Ast\SealedClassPreprocessor;
+use PHPCompiler\Ast\StaticClassAnnotator;
+use PHPCompiler\Ast\StaticClassPreprocessor;
 use PHPCompiler\Ast\InOperatorDesugar;
 use PHPCompiler\Ast\ExitTwoArgDesugar;
 use PHPCompiler\Ast\PipeOperatorDesugar;
@@ -59,6 +61,7 @@ class Runtime {
     public array $modules = [];
     public int $mode;
     private SealedClassAnnotator $sealedClassAnnotator;
+    private StaticClassAnnotator $staticClassAnnotator;
     public ?string $debugFile = null;
 
     public TypeReconstructor $typeReconstructor;
@@ -109,6 +112,8 @@ class Runtime {
         $astTraverser->addVisitor($this->abstractEnumMarker);
         $this->sealedClassAnnotator = new SealedClassAnnotator();
         $astTraverser->addVisitor($this->sealedClassAnnotator);
+        $this->staticClassAnnotator = new StaticClassAnnotator();
+        $astTraverser->addVisitor($this->staticClassAnnotator);
         $astTraverser->addVisitor(new Ast\EnumPropertyCompileCheck());
         $this->parser = new Parser(
             (new ParserFactory)->create(ParserFactory::ONLY_PHP7),
@@ -306,6 +311,9 @@ class Runtime {
         $sealedPreprocessor = new SealedClassPreprocessor();
         [$code, $permitsByLine] = $sealedPreprocessor->preprocess($code);
         $this->sealedClassAnnotator->setPermitsByLine($permitsByLine);
+        $staticPreprocessor = new StaticClassPreprocessor();
+        [$code, $staticLines] = $staticPreprocessor->preprocess($code);
+        $this->staticClassAnnotator->setStaticLines($staticLines);
         [$code, $this->vmContext->propertyHookRegistry] = (new SourcePreprocessor\PropertyHooks())->process($code, $filename);
         CurlyBraceOffsetRejector::reject($code, $filename);
         ReadonlyAnonymousClassRejector::reject($code, $filename);

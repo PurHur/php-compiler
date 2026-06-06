@@ -80,6 +80,8 @@ class ClassEntry {
     public array $traitStaticPropertyNames = [];
     /** Readonly class: instance properties cannot change after construction (issue #1360). */
     public bool $readonly = false;
+    /** Static class: cannot be instantiated; static members only (#6929, PHP 8.4). */
+    public bool $isStatic = false;
     /** Sealed class/interface: only listed types may extend/implement (#3322). */
     public bool $sealed = false;
     /** @var list<string> lowercase permitted child FQCNs; empty when sealed = none allowed */
