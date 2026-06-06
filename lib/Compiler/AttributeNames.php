@@ -129,22 +129,60 @@ final class AttributeNames
     }
 
     /**
-     * Zend compile-time duplicate guard (zend_compile.c, zend_is_attribute_repeated) (#3718).
+     * Zend compile-time duplicate guard (zend_compile.c, zend_is_attribute_repeated) (#3718, #6912).
      *
+     * Allows duplicates when the attribute class declares Attribute::IS_REPEATABLE; marks
+     * all instances of a repeated name with {@see AttributeEntry::$isRepeated}.
+     *
+     * @param list<AttributeEntry> $entries
+     *
+     * @return list<AttributeEntry>
+     */
+    public static function validateDuplicates(array $entries, AttributeClassRegistry $registry): array
+    {
+        $counts = [];
+        foreach ($entries as $entry) {
+            if (!$entry instanceof AttributeEntry) {
+                continue;
+            }
+            $key = strtolower(ltrim($entry->name, '\\'));
+            $counts[$key] = ($counts[$key] ?? 0) + 1;
+        }
+
+        $result = [];
+        foreach ($entries as $entry) {
+            if (!$entry instanceof AttributeEntry) {
+                continue;
+            }
+            $key = strtolower(ltrim($entry->name, '\\'));
+            if ($counts[$key] > 1) {
+                if (!$registry->isRepeatable($entry->name)) {
+                    throw new \CompileError(
+                        'Attribute "'.self::messageName($entry->name).'" must not be repeated'
+                    );
+                }
+                $result[] = new AttributeEntry($entry->name, $entry->args, true);
+            } else {
+                $result[] = $entry;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * @param list<string> $names
+     *
+     * @deprecated Use {@see validateDuplicates()} with {@see AttributeClassRegistry}.
      */
     public static function assertNoDuplicates(array $names): void
     {
-        $seen = [];
+        $registry = new AttributeClassRegistry();
+        $entries = [];
         foreach ($names as $name) {
-            $key = strtolower(ltrim($name, '\\'));
-            if (isset($seen[$key])) {
-                throw new \CompileError(
-                    'Attribute "'.self::messageName($name).'" must not be repeated'
-                );
-            }
-            $seen[$key] = true;
+            $entries[] = new AttributeEntry($name);
         }
+        self::validateDuplicates($entries, $registry);
     }
 
     private static function messageName(string $name): string

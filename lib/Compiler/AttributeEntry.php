@@ -15,6 +15,7 @@ final class AttributeEntry
     public function __construct(
         public readonly string $name,
         public readonly array $args = [],
+        public bool $isRepeated = false,
     ) {
     }
 
