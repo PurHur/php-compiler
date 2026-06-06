@@ -19,6 +19,8 @@ class ClassProperty {
     public ?string $setHookMethodLc = null;
     /** Lowercase get-hook method name from property-hooks lowering (#3145), or null. */
     public ?string $getHookMethodLc = null;
+    /** Lowercase unset-hook method name from property-hooks lowering (#6502), or null. */
+    public ?string $unsetHookMethodLc = null;
     /** Virtual hooked property: hooks do not use backing storage (#4687, Zend zend_property_hooks.c). */
     public bool $propertyHookVirtual = false;
     /** Individual readonly property (issue #3149, promoted readonly #3432). */

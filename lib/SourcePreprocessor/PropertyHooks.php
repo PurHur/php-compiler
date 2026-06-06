@@ -13,6 +13,7 @@ final class PropertyHooks
 {
     private const SET_METHOD_PREFIX = '__phpc_property_set_';
     private const GET_METHOD_PREFIX = '__phpc_property_get_';
+    private const UNSET_METHOD_PREFIX = '__phpc_property_unset_';
 
     /** @var array<string, array<string, array{set?: string, get?: string}>> lcClass => prop => hook method names */
     private array $registry = [];
@@ -171,6 +172,10 @@ final class PropertyHooks
                 $rest = preg_replace('/^set\s*;/', '', $rest, 1) ?? $rest;
                 continue;
             }
+            if (preg_match('/^unset\s*;/s', $rest)) {
+                $rest = preg_replace('/^unset\s*;/', '', $rest, 1) ?? $rest;
+                continue;
+            }
             if (preg_match('/^get\s*=>\s*/s', $rest)) {
                 $rest = preg_replace('/^get\s*=>\s*/', '', $rest, 1) ?? $rest;
                 [$expr, $rest] = $this->takeUntilSemicolon($rest);
@@ -223,6 +228,26 @@ final class PropertyHooks
                 $this->registerHook($lcClass, $prop, 'set', $method, $isStatic);
                 continue;
             }
+            if (preg_match('/^unset\s*=>\s*/s', $rest)) {
+                $rest = preg_replace('/^unset\s*=>\s*/', '', $rest, 1) ?? $rest;
+                [$expr, $rest] = $this->takeUntilSemicolon($rest);
+                $expr = rtrim($expr);
+                $usesBacking = $usesBacking || $this->hookTouchesBacking($expr, $prop, $isStatic);
+                $body = '{ '.$expr.'; }';
+                $method = self::UNSET_METHOD_PREFIX.$prop;
+                $methods[] = $this->hookMethodDecl($isStatic, $method, '', $body);
+                $this->registerHook($lcClass, $prop, 'unset', $method, $isStatic);
+                continue;
+            }
+            if (preg_match('/^unset\s*\{/s', $rest)) {
+                $rest = preg_replace('/^unset\s*/', '', $rest, 1) ?? $rest;
+                [$body, $rest] = $this->takeBraceBody($rest);
+                $usesBacking = $usesBacking || $this->hookTouchesBacking($body, $prop, $isStatic);
+                $method = self::UNSET_METHOD_PREFIX.$prop;
+                $methods[] = $this->hookMethodDecl($isStatic, $method, '', $body);
+                $this->registerHook($lcClass, $prop, 'unset', $method, $isStatic);
+                continue;
+            }
             break;
         }
 
@@ -263,7 +288,7 @@ final class PropertyHooks
     }
 
     /**
-     * @param 'get'|'set' $kind
+     * @param 'get'|'set'|'unset' $kind
      */
     private function registerHook(string $lcClass, string $prop, string $kind, string $method, bool $isStatic): void
     {
@@ -380,6 +405,11 @@ final class PropertyHooks
     public static function getHookMethodName(string $property): string
     {
         return self::GET_METHOD_PREFIX.$property;
+    }
+
+    public static function unsetHookMethodName(string $property): string
+    {
+        return self::UNSET_METHOD_PREFIX.$property;
     }
 
     public static function propertyNameFromSetHookMethod(string $methodLc): ?string

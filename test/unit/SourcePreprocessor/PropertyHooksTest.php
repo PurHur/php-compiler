@@ -167,4 +167,22 @@ PHP;
         self::assertStringContainsString("self::\$label = (strtoupper(\$value));", $out);
         self::assertTrue($registry['box']['label']['static'] ?? false);
     }
+
+    public function testLowersUnsetHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class Box {
+    public string $label {
+        get => $this->label ?? 'default';
+        set => $this->label = $value;
+        unset => $this->label = 'cleared';
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('function __phpc_property_unset_label', $out);
+        self::assertStringContainsString("\$this->label = 'cleared';", $out);
+        self::assertSame('__phpc_property_unset_label', $registry['box']['label']['unset'] ?? null);
+    }
 }
