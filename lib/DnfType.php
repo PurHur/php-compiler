@@ -92,6 +92,23 @@ final class DnfType
     }
 
     /**
+     * True when arms need DNF metadata (intersection members). Simple scalar unions
+     * (`int|string`, `?int`) use unionTypeConstraints instead (#6701).
+     *
+     * @param list<DnfArm> $arms
+     */
+    public static function requiresDnfLowering(array $arms): bool
+    {
+        foreach ($arms as $arm) {
+            if (($arm['kind'] ?? '') === 'intersection') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * @param list<DnfArm> $arms
      */
     public static function formatUnionType(array $arms): string

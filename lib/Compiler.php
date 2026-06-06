@@ -3697,7 +3697,7 @@ class Compiler {
                 fn (Op\Type\Intersection $t) => $this->intersectionDisplayFromCfgType($t),
                 fn (Op\Type\Reference $t) => $this->staticNameFromCfgType($t)
             );
-            if (DnfType::hasConstraints($dnfArms)) {
+            if (DnfType::hasConstraints($dnfArms) && DnfType::requiresDnfLowering($dnfArms)) {
                 $var->dnfArms = $dnfArms;
                 $var->declaredTypeLabel = $this->dnfTypeLabelFromCfgType($cfgType);
 

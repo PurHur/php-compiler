@@ -1038,16 +1038,19 @@ final class Variable {
                 if (self::TYPE_ARRAY === $this->type && isset($this->array) && $this->array === $var->array) {
                     break;
                 }
+                $owner = $this->objectPropertyOwner;
+                $propName = $this->objectPropertyName;
+                $staticClass = $this->staticPropertyClassLc;
                 $this->releaseArrayRef();
                 $this->resetScalars();
-                $this->objectPropertyOwner = null;
-                $this->objectPropertyName = null;
-                $this->staticPropertyClassLc = null;
                 $var->array->addRef();
                 $this->type = self::TYPE_ARRAY;
                 $this->streamResource = false;
                 $this->dirResource = false;
                 $this->array = $var->array;
+                $this->objectPropertyOwner = $owner;
+                $this->objectPropertyName = $propName;
+                $this->staticPropertyClassLc = $staticClass;
                 break;
             case self::TYPE_ENUM_CASE:
                 $this->enumCase(new EnumCaseEntry(
