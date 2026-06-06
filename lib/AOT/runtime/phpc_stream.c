@@ -53,7 +53,7 @@ static const char *phpc_string_data(__string__ *s)
     return (const char *) s + sizeof(void *) + sizeof(long long);
 }
 
-static FILE *phpc_resolve_stream(int64_t handle)
+FILE *__phpc_resolve_stream(int64_t handle)
 {
     if (1 == handle) {
         return stdout;
@@ -73,7 +73,7 @@ static FILE *phpc_resolve_stream(int64_t handle)
 
 int64_t __compiler_fwrite(int64_t handle, __string__ *data, int64_t length)
 {
-    FILE *fp = phpc_resolve_stream(handle);
+    FILE *fp = __phpc_resolve_stream(handle);
     if (NULL == fp || NULL == data) {
         return -1;
     }
@@ -166,7 +166,7 @@ __string__ *__compiler_fread(int64_t handle, int64_t length)
     if (length < 0) {
         return NULL;
     }
-    fp = phpc_resolve_stream(handle);
+    fp = __phpc_resolve_stream(handle);
     if (NULL == fp) {
         return NULL;
     }
@@ -198,12 +198,12 @@ int __compiler_is_resource(int64_t handle)
     if (handle >= PHPC_DIR_HANDLE_BASE && __compiler_is_dir_resource(handle)) {
         return 1;
     }
-    /* fopen() handles start at 3; 1/2 are stdio aliases in phpc_resolve_stream (#3519). */
+    /* fopen() handles start at 3; 1/2 are stdio aliases in __phpc_resolve_stream (#3519). */
     if (handle <= 2) {
         return 0;
     }
 
-    return NULL != phpc_resolve_stream(handle) ? 1 : 0;
+    return NULL != __phpc_resolve_stream(handle) ? 1 : 0;
 }
 
 int __compiler_fclose(int64_t handle)
@@ -258,7 +258,7 @@ int __compiler_flock(int64_t handle, int64_t operation)
     int fd;
     int sys_op;
 
-    fp = phpc_resolve_stream(handle);
+    fp = __phpc_resolve_stream(handle);
     if (NULL == fp) {
         return 0;
     }
@@ -287,7 +287,7 @@ int64_t __compiler_fpassthru(int64_t handle)
     size_t got;
     int64_t total = 0;
 
-    fp = phpc_resolve_stream(handle);
+    fp = __phpc_resolve_stream(handle);
     if (NULL == fp) {
         return -1;
     }
@@ -310,7 +310,7 @@ int64_t __compiler_fpassthru(int64_t handle)
 
 int __compiler_feof(int64_t handle)
 {
-    FILE *fp = phpc_resolve_stream(handle);
+    FILE *fp = __phpc_resolve_stream(handle);
 
     if (NULL == fp) {
         return 1;
@@ -321,7 +321,7 @@ int __compiler_feof(int64_t handle)
 
 int __compiler_fflush(int64_t handle)
 {
-    FILE *fp = phpc_resolve_stream(handle);
+    FILE *fp = __phpc_resolve_stream(handle);
 
     if (NULL == fp) {
         return 0;
@@ -332,7 +332,7 @@ int __compiler_fflush(int64_t handle)
 
 int __compiler_fsync(int64_t handle)
 {
-    FILE *fp = phpc_resolve_stream(handle);
+    FILE *fp = __phpc_resolve_stream(handle);
     int fd;
 
     if (NULL == fp) {
@@ -531,7 +531,7 @@ int64_t __compiler_stream_set_read_buffer(int64_t handle, int64_t buffer)
 
 int __compiler_ftruncate(int64_t handle, int64_t size)
 {
-    FILE *fp = phpc_resolve_stream(handle);
+    FILE *fp = __phpc_resolve_stream(handle);
     int fd;
     int rc;
 
@@ -560,7 +560,7 @@ int __compiler_ftruncate(int64_t handle, int64_t size)
 
 int64_t __compiler_ftell(int64_t handle)
 {
-    FILE *fp = phpc_resolve_stream(handle);
+    FILE *fp = __phpc_resolve_stream(handle);
     long pos;
 
     if (NULL == fp) {
@@ -580,7 +580,7 @@ __string__ *__compiler_fgetc(int64_t handle)
     int c;
     char buf[2];
 
-    fp = phpc_resolve_stream(handle);
+    fp = __phpc_resolve_stream(handle);
     if (NULL == fp) {
         return NULL;
     }
@@ -605,7 +605,7 @@ __string__ *__compiler_fgets(int64_t handle, int64_t length)
     size_t buf_size;
     char *line;
 
-    fp = phpc_resolve_stream(handle);
+    fp = __phpc_resolve_stream(handle);
     if (NULL == fp) {
         return NULL;
     }
@@ -641,7 +641,7 @@ __string__ *__compiler_stream_get_line(int64_t handle, int64_t max_length, __str
     size_t ending_len;
     const char *ending_data;
 
-    fp = phpc_resolve_stream(handle);
+    fp = __phpc_resolve_stream(handle);
     if (NULL == fp) {
         return NULL;
     }
@@ -731,7 +731,7 @@ __string__ *__compiler_stream_get_line(int64_t handle, int64_t max_length, __str
 
 int64_t __compiler_fseek(int64_t handle, int64_t offset, int64_t whence)
 {
-    FILE *fp = phpc_resolve_stream(handle);
+    FILE *fp = __phpc_resolve_stream(handle);
 
     if (NULL == fp) {
         return -1;
@@ -785,185 +785,6 @@ __string__ *__phpc_stream_path(int64_t handle)
 typedef struct __hashtable__ __hashtable__;
 
 extern __hashtable__ *__hashtable__alloc(void);
-extern void __hashtable__setStringAt(__hashtable__ *ht, size_t index, __string__ *val);
-
-static char phpc_csv_first_char(__string__ *s, char fallback)
-{
-    if (NULL == s || 0 == phpc_string_len(s)) {
-        return fallback;
-    }
-
-    return phpc_string_data(s)[0];
-}
-
-static __hashtable__ *phpc_parse_csv_line(const char *line, char delim, char enclosure, char escape)
-{
-    __hashtable__ *ht;
-    size_t field_idx = 0;
-    size_t i = 0;
-    size_t line_len = strlen(line);
-    char *field = NULL;
-    size_t field_cap = 0;
-    size_t field_len = 0;
-    int in_quotes = 0;
-
-    ht = __hashtable__alloc();
-    if (NULL == ht) {
-        return NULL;
-    }
-
-    while (i <= line_len) {
-        char c = (i < line_len) ? line[i] : '\0';
-
-        if (in_quotes) {
-            if ('\0' == c) {
-                break;
-            }
-            if (c == escape && i + 1 < line_len) {
-                if (field_len + 1 >= field_cap) {
-                    size_t new_cap = field_cap < 32 ? 32 : field_cap * 2;
-                    char *grown = (char *) realloc(field, new_cap);
-                    if (NULL == grown) {
-                        free(field);
-                        return NULL;
-                    }
-                    field = grown;
-                    field_cap = new_cap;
-                }
-                field[field_len++] = line[++i];
-                ++i;
-                continue;
-            }
-            if (c == enclosure) {
-                if (i + 1 < line_len && line[i + 1] == enclosure) {
-                    if (field_len + 1 >= field_cap) {
-                        size_t new_cap = field_cap < 32 ? 32 : field_cap * 2;
-                        char *grown = (char *) realloc(field, new_cap);
-                        if (NULL == grown) {
-                            free(field);
-                            return NULL;
-                        }
-                        field = grown;
-                        field_cap = new_cap;
-                    }
-                    field[field_len++] = enclosure;
-                    i += 2;
-                    continue;
-                }
-                in_quotes = 0;
-                ++i;
-                continue;
-            }
-            if (field_len + 1 >= field_cap) {
-                size_t new_cap = field_cap < 32 ? 32 : field_cap * 2;
-                char *grown = (char *) realloc(field, new_cap);
-                if (NULL == grown) {
-                    free(field);
-                    return NULL;
-                }
-                field = grown;
-                field_cap = new_cap;
-            }
-            field[field_len++] = c;
-            ++i;
-            continue;
-        }
-
-        if ('\0' == c || c == delim) {
-            __string__ *str;
-            if (NULL == field) {
-                str = __string__init(0, "");
-            } else {
-                str = __string__init((long long) field_len, field);
-                free(field);
-                field = NULL;
-                field_cap = 0;
-                field_len = 0;
-            }
-            if (NULL == str) {
-                return NULL;
-            }
-            __hashtable__setStringAt(ht, field_idx++, str);
-            if ('\0' == c) {
-                break;
-            }
-            ++i;
-            continue;
-        }
-
-        if (c == enclosure) {
-            in_quotes = 1;
-            ++i;
-            continue;
-        }
-
-        if (field_len + 1 >= field_cap) {
-            size_t new_cap = field_cap < 32 ? 32 : field_cap * 2;
-            char *grown = (char *) realloc(field, new_cap);
-            if (NULL == grown) {
-                free(field);
-                return NULL;
-            }
-            field = grown;
-            field_cap = new_cap;
-        }
-        field[field_len++] = c;
-        ++i;
-    }
-
-    free(field);
-
-    return ht;
-}
-
-__hashtable__ *__compiler_fgetcsv(
-    int64_t handle,
-    int64_t length,
-    __string__ *separator,
-    __string__ *enclosure,
-    __string__ *escape
-)
-{
-    FILE *fp;
-    char delim;
-    char enc;
-    char esc;
-    size_t buf_size;
-    char *buf;
-    char *line;
-
-    fp = phpc_resolve_stream(handle);
-    if (NULL == fp) {
-        return NULL;
-    }
-    delim = phpc_csv_first_char(separator, ',');
-    enc = phpc_csv_first_char(enclosure, '"');
-    esc = phpc_csv_first_char(escape, '\\');
-    if (0 == length) {
-        return NULL;
-    }
-    buf_size = length < 0 ? 8192 : (size_t) length;
-    buf = (char *) malloc(buf_size);
-    if (NULL == buf) {
-        return NULL;
-    }
-    line = fgets(buf, (int) buf_size, fp);
-    if (NULL == line) {
-        free(buf);
-
-        return NULL;
-    }
-    {
-        size_t n = strlen(buf);
-        while (n > 0 && ('\n' == buf[n - 1] || '\r' == buf[n - 1])) {
-            buf[--n] = '\0';
-        }
-        __hashtable__ *result = phpc_parse_csv_line(buf, delim, enc, esc);
-        free(buf);
-
-        return result;
-    }
-}
 
 static __string__ *phpc_read_stream_bytes(FILE *fp, int64_t maxlength)
 {
@@ -1028,7 +849,7 @@ __string__ *__compiler_stream_get_contents(int64_t handle, int64_t maxlength, in
     if (offset < -1) {
         return NULL;
     }
-    fp = phpc_resolve_stream(handle);
+    fp = __phpc_resolve_stream(handle);
     if (NULL == fp) {
         return NULL;
     }

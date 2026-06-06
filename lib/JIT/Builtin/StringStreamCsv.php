@@ -7,15 +7,17 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT LLVM body for str_getcsv (CSV line parse).
+ * JIT LLVM bodies for str_getcsv / fgetcsv CSV parsing.
  *
- * Lowers from {@see StringStrGetcsvJit} / {@see \PHPCompiler\ext\standard\VmCsv} (#5288).
+ * Lowers from {@see StringStrGetcsvJit}, {@see StringFgetcsvJit}, and
+ * {@see \PHPCompiler\ext\standard\VmCsv} (#5288, #6750).
  */
 final class StringStreamCsv
 {
     public static function ensureLinked(Context $context): void
     {
         StringStrGetcsvJit::implement($context);
+        StringFgetcsvJit::implement($context);
     }
 
     public static function implement(Context $context): void

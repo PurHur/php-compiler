@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringStreamCsv;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for fgetcsv() via __compiler_fgetcsv (issue #1192). */
+/** LLVM lowering for fgetcsv() via StringFgetcsvJit (issue #1192, #6750). */
 final class JitFgetcsv
 {
     /** @return Value
@@ -23,6 +24,8 @@ final class JitFgetcsv
         Value $enclosureStr,
         Value $escapeStr,
     ): Value {
+        StringStreamCsv::ensureLinked($context);
+
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $row = $context->builder->call(
             $context->lookupFunction('__compiler_fgetcsv'),
