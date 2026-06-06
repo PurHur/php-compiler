@@ -176,4 +176,36 @@ PHP;
         $runtime->run($block);
         $this->assertSame("ok\n", ob_get_clean());
     }
+
+    public function testCovariantObjectReturnAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Base { public function foo(): object {} }
+class Child extends Base { public function foo(): \stdClass { return new \stdClass(); } }
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'covariant_object_return.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    public function testCovariantIterableArrayReturnAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Base { public function foo(): iterable { return []; } }
+class Child extends Base { public function foo(): array { return []; } }
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'covariant_iterable_return.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
 }

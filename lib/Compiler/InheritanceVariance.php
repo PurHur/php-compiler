@@ -383,7 +383,11 @@ final class InheritanceVariance
             return false;
         }
         if ($parent->builtinScalar !== null || $child->builtinScalar !== null) {
-            return $parent->signatureKey($parentOwnerLc) === $child->signatureKey($childOwnerLc);
+            if ($parent->signatureKey($parentOwnerLc) === $child->signatureKey($childOwnerLc)) {
+                return true;
+            }
+
+            return self::isBuiltinReturnCovariant($parent, $child, $childOwnerLc, $classImplementsInterface);
         }
         $parentClass = $parent->resolveClassName($parentOwnerLc);
         $childClass = $child->resolveClassName($childOwnerLc);
@@ -398,6 +402,36 @@ final class InheritanceVariance
         }
 
         return $classImplementsInterface($childClass, $parentClass);
+    }
+
+    /**
+     * Return-type covariance for built-in parent types (Zend zend_inheritance.c, issue #6710).
+     *
+     * @param callable(string, string): bool $classImplementsInterface
+     */
+    private static function isBuiltinReturnCovariant(
+        TypeSig $parent,
+        ?TypeSig $child,
+        string $childOwnerLc,
+        callable $classImplementsInterface
+    ): bool {
+        if (null === $child || null === $parent->builtinScalar) {
+            return false;
+        }
+        if ('object' === $parent->builtinScalar) {
+            return null !== $child->resolveClassName($childOwnerLc) || $child->self || $child->static;
+        }
+        if ('iterable' === $parent->builtinScalar) {
+            if ('array' === $child->builtinScalar) {
+                return true;
+            }
+            $childClass = $child->resolveClassName($childOwnerLc);
+            if (null !== $childClass) {
+                return $classImplementsInterface($childClass, 'traversable');
+            }
+        }
+
+        return false;
     }
 
     private function isParameterCompatible(

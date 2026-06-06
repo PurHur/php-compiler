@@ -78,4 +78,39 @@ PHP;
         $this->expectExceptionMessage('Declaration of Child::foo(string $x): void must be compatible with Base::foo(int $x): void');
         $runtime->parseAndCompile($code, 'override_signature_mismatch.php');
     }
+
+    public function testOverrideCovariantObjectReturnCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Base { public function foo(): object {} }
+class Child extends Base {
+    #[\Override]
+    public function foo(): \stdClass { return new \stdClass(); }
+}
+echo "ok\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'override_covariant_object.php'));
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    public function testOverrideViaParentInterfaceCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I { public function foo(): void; }
+abstract class Base implements I {}
+class Child extends Base {
+    #[\Override]
+    public function foo(): void {}
+}
+echo "ok\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'override_parent_iface.php'));
+        $this->assertSame("ok\n", ob_get_clean());
+    }
 }
