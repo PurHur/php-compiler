@@ -469,10 +469,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'fstat_stream')) {
                 continue;
             }
-            // print_r()/var_dump() VM-only until debug export LLVM lowering (#3133).
-            if (str_contains($name, 'print_r') || str_contains($name, 'var_dump')) {
-                continue;
-            }
             // parse_str() one-arg in function scope: VM + AOT; MCJIT try/catch pending dispatch (#4034).
             if (str_contains($name, 'parse_str_function_scope')
                 || str_contains($name, 'parse_str_local_scope')) {

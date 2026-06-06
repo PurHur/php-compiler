@@ -61,7 +61,7 @@ final class print_r extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('print_r() is not implemented for JIT in this compiler build');
+        return JitPrintR::invoke($context, ...$args);
     }
 
     private static function formatVariable(VM $vm, Variable $var, int $level): string

@@ -124,6 +124,20 @@ class Type extends Builtin {
         );
         $fnVarExport = $this->context->module->addFunction('__compiler_var_export', $fntypeVarExport);
         $this->context->registerFunction('__compiler_var_export', $fnVarExport);
+        $fntypePrintR = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $this->context->getTypeFromString('__value__*')
+        );
+        $fnPrintR = $this->context->module->addFunction('__compiler_print_r', $fntypePrintR);
+        $this->context->registerFunction('__compiler_print_r', $fnPrintR);
+        $fntypeVarDump = $this->context->context->functionType(
+            $this->context->getTypeFromString('void'),
+            false,
+            $this->context->getTypeFromString('__value__*')
+        );
+        $fnVarDump = $this->context->module->addFunction('__compiler_var_dump', $fntypeVarDump);
+        $this->context->registerFunction('__compiler_var_dump', $fnVarDump);
         $fntypeIniSet = $this->context->context->functionType(
             $this->context->getTypeFromString('void'),
             false,
