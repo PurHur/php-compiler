@@ -96,6 +96,30 @@ PHP;
         self::assertStringNotContainsString('__phpc_property_get_title', $out);
     }
 
+    public function testStripsAbstractGetHookOnAbstractClass(): void
+    {
+        $src = <<<'PHP'
+<?php
+abstract class A {
+    abstract public string $label {
+        get;
+    }
+}
+final class C extends A {
+    public string $label {
+        get => 'child';
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$label {', $out);
+        self::assertStringContainsString('public string $label;', $out);
+        self::assertStringNotContainsString('abstract public string $label', $out);
+        self::assertStringContainsString('function __phpc_property_get_label', $out);
+        self::assertTrue($registry['a']['label']['abstract'] ?? false);
+        self::assertSame('__phpc_property_get_label', $registry['c']['label']['get'] ?? null);
+    }
+
     public function testLowersTraitPropertyHooks(): void
     {
         $src = <<<'PHP'

@@ -139,6 +139,11 @@ final class PropertyHooks
             $declStart = $m[0][1];
             $declPrefix = substr($body, $offset, $declStart - $offset);
             $propDeclHead = rtrim(substr($body, $declStart, $hookOpen - $declStart));
+            $isAbstractHook = (bool) preg_match('/\babstract\b/', $declPrefix.$propDeclHead);
+            if ($isAbstractHook) {
+                $declPrefix = preg_replace('/\babstract\s+/', '', $declPrefix) ?? $declPrefix;
+                $propDeclHead = preg_replace('/\babstract\s+/', '', $propDeclHead) ?? $propDeclHead;
+            }
             $isStatic = (bool) preg_match('/\bstatic\b/', $declPrefix.$propDeclHead);
             if ($isStatic) {
                 throw new CompileFatal(
@@ -157,11 +162,16 @@ final class PropertyHooks
             if ('' !== $trailing) {
                 $out .= "\n    ".$trailing;
             }
-            if ([] !== $methods && !$usesBacking) {
+            if (([] !== $methods && !$usesBacking) || $isAbstractHook) {
                 if (!isset($this->registry[$lcClass][$prop])) {
                     $this->registry[$lcClass][$prop] = [];
                 }
-                $this->registry[$lcClass][$prop]['virtual'] = true;
+                if ($isAbstractHook) {
+                    $this->registry[$lcClass][$prop]['abstract'] = true;
+                }
+                if ([] === $methods || !$usesBacking) {
+                    $this->registry[$lcClass][$prop]['virtual'] = true;
+                }
             }
             $injections = array_merge($injections, $methods);
             $offset = $close + 1;
