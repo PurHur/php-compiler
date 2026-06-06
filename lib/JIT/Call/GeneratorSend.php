@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\GeneratorHelper;
@@ -26,16 +25,22 @@ final class GeneratorSend implements Call
         $map = $context->structFieldMap['__generator_state__'];
         $i1 = $context->getTypeFromString('int1');
         $done = $context->builder->load($context->builder->structGep($statePtr, $map['done']));
-        $failBlock = $context->builder->getInsertBlock()->getParent()->appendBasicBlock('gen_send_closed');
-        $okBlock = $context->builder->getInsertBlock()->getParent()->appendBasicBlock('gen_send_ok');
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $closedBlock = $fn->appendBasicBlock('gen_send_closed');
+        $okBlock = $fn->appendBasicBlock('gen_send_ok');
+        $mergeBlock = $fn->appendBasicBlock('gen_send_merge');
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $done, $i1->constInt(0, false)),
             $okBlock,
-            $failBlock
+            $closedBlock
         );
-        $context->builder->positionAtEnd($failBlock);
-        ErrorRaise::emitRaise($context, 'Cannot send to a closed generator');
-        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->positionAtEnd($closedBlock);
+        $closedSlot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $closedSlot)
+        );
+        $context->builder->branch($mergeBlock);
         $context->builder->positionAtEnd($okBlock);
         $pendingField = $context->builder->structGep($statePtr, $map['pending_send']);
         if (count($args) >= 2) {
@@ -47,7 +52,14 @@ final class GeneratorSend implements Call
             );
         }
         $context->builder->store($i1->constInt(1, false), $context->builder->structGep($statePtr, $map['has_pending_send']));
+        $activeSlot = GeneratorHelper::resumeAndBoxYield($context, $genVar);
+        $context->builder->branch($mergeBlock);
+        $context->builder->positionAtEnd($mergeBlock);
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        $phi = $context->builder->phi($valuePtrTy);
+        $phi->addIncoming(JitValueBox::pointer($context, $closedSlot), $closedBlock);
+        $phi->addIncoming($activeSlot, $okBlock);
 
-        return GeneratorHelper::resumeAndBoxYield($context, $genVar);
+        return $phi;
     }
 }
