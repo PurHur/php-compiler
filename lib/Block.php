@@ -149,6 +149,12 @@ class Block {
     /** Parameter scope slots with non-nullable type and `= null` default (Zend 8.2 implicit nullable, #4449). */
     public array $paramImplicitNullable = [];
 
+    /** Parameter indices with runtime `new` default init fragments (#6652). */
+    public array $paramRuntimeDefaultInitBlocks = [];
+
+    /** Result slot in {@see self::$paramRuntimeDefaultInitBlocks} per parameter index (#6652). */
+    public array $paramRuntimeDefaultResultSlots = [];
+
     /** Function body contains `yield` (issue #167). */
     public bool $isGenerator = false;
 
@@ -491,6 +497,8 @@ class Block {
             $this->paramByRef = $parent->paramByRef;
             $this->paramSensitive = $parent->paramSensitive;
             $this->paramImplicitNullable = $parent->paramImplicitNullable;
+            $this->paramRuntimeDefaultInitBlocks = $parent->paramRuntimeDefaultInitBlocks;
+            $this->paramRuntimeDefaultResultSlots = $parent->paramRuntimeDefaultResultSlots;
             $this->noDiscard = $parent->noDiscard;
             $this->noDiscardMessage = $parent->noDiscardMessage;
         }
@@ -2111,7 +2119,37 @@ class Block {
             || self::containsTraitConstructorOpcodes($root)
             || self::containsReflectionAttributeNewInstanceOpcodes($root)
             || self::containsInterfaceAbstractStaticMcjitDeferral($root)
-            || self::containsNonStaticStaticCallOpcodes($root);
+            || self::containsNonStaticStaticCallOpcodes($root)
+            || self::containsParamRuntimeNewDefaultOpcodes($root);
+    }
+
+    /** Constructor/function parameters with `new` default expressions (#6652). */
+    public static function containsParamRuntimeNewDefaultOpcodes(?self $root): bool
+    {
+        if (null === $root) {
+            return false;
+        }
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            if ([] !== $block->paramRuntimeDefaultInitBlocks) {
+                return true;
+            }
+            foreach ($block->opCodes as $op) {
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

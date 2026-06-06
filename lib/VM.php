@@ -3559,6 +3559,13 @@ restart:
                         } else {
                             $arg1->copyFrom($default);
                         }
+                    } elseif (isset($frame->block->paramRuntimeDefaultInitBlocks[(int) $op->arg2])) {
+                        $paramIdx = (int) $op->arg2;
+                        $initBlock = $frame->block->paramRuntimeDefaultInitBlocks[$paramIdx];
+                        $resultSlot = $frame->block->paramRuntimeDefaultResultSlots[$paramIdx]
+                            ?? throw new \LogicException('Missing runtime parameter default result slot');
+                        $value = $this->executePropertyDefaultInitBlock($initBlock, $resultSlot);
+                        $arg1->copyFrom($value);
                     } else {
                         throw new \LogicException('Missing required argument ' . $op->arg2);
                     }

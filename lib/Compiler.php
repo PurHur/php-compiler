@@ -3724,7 +3724,7 @@ class Compiler {
     /**
      * Fold parameter/property defaults to block constant slots (Zend zend_compile_default_value, #3803).
      */
-    protected function resolvePropertyOrParamDefaultSlot(Op\Expr\Param $param, Block $block): ?int
+    protected function resolvePropertyOrParamDefaultSlot(Op\Expr\Param $param, Block $block, ?int $paramIdx = null): ?int
     {
         if (null === $param->defaultVar) {
             return null;
@@ -3732,6 +3732,24 @@ class Compiler {
         $folded = $this->tryFoldParamDefaultSlot($param, $block);
         if (null !== $folded) {
             return $folded;
+        }
+        if ($this->paramDefaultIsRuntimeNew($param)) {
+            if (null === $paramIdx) {
+                // Promoted property metadata: default applied via constructor param (#6652).
+                return null;
+            }
+            $beforeCount = \count($block->opCodes);
+            if (null !== $param->defaultBlock) {
+                $this->compileOps($param->defaultBlock->children, $block);
+            }
+            $resultSlot = $this->compileOperand($param->defaultVar, $block, true);
+            $newOps = \array_slice($block->opCodes, $beforeCount);
+            $block->opCodes = \array_slice($block->opCodes, 0, $beforeCount);
+            $block->nOpCodes = \count($block->opCodes);
+            $block->paramRuntimeDefaultInitBlocks[$paramIdx] = $block->fragmentForOpcodes($newOps);
+            $block->paramRuntimeDefaultResultSlots[$paramIdx] = $resultSlot;
+
+            return null;
         }
         if (null !== $param->defaultBlock) {
             $this->compileOps($param->defaultBlock->children, $block);
@@ -3748,6 +3766,24 @@ class Compiler {
         }
 
         return $slot;
+    }
+
+    /**
+     * Parameter default `new Class()` — evaluated when the argument is omitted (#6652).
+     */
+    protected function paramDefaultIsRuntimeNew(Op\Expr\Param $param): bool
+    {
+        if (null === $param->defaultVar) {
+            return false;
+        }
+        if (null !== $param->defaultBlock && [] !== $param->defaultBlock->children) {
+            $last = $param->defaultBlock->children[\count($param->defaultBlock->children) - 1];
+            if ($last instanceof Op\Expr\New_) {
+                return true;
+            }
+        }
+
+        return $this->unwrapOperandChain($param->defaultVar) instanceof Op\Expr\New_;
     }
 
     /**
@@ -4488,7 +4524,7 @@ class Compiler {
             }
             $block->variadicParamIndex = $paramIdx;
         }
-        $defaultConst = $this->resolvePropertyOrParamDefaultSlot($param, $block);
+        $defaultConst = $this->resolvePropertyOrParamDefaultSlot($param, $block, $paramIdx);
         $slot = $this->compileOperand($param->result, $block, false);
         if ($param->name instanceof Operand\Literal && is_string($param->name->value)) {
             $block->paramNames[$paramIdx] = $param->name->value;
