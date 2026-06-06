@@ -53,6 +53,7 @@ final class EnumVMTest extends BaseTest
                 'enum_in_operator.phpt',
                 'foreach_enum_case_by_value.phpt',
                 'foreach_enum_case_by_ref.phpt',
+                'enum_destructure_static.phpt',
                 'enum_implements_metadata.phpt',
                 'enum_implements_interface.phpt',
                 'enum_implements_interface_unit.phpt',
