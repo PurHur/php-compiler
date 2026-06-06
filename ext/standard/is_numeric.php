@@ -54,10 +54,13 @@ final class is_numeric extends Internal
                 return $context->constantFromBool(false);
             case JITVariable::TYPE_STRING:
                 return $this->stringIsNumeric($context, $this->jitString($context, $args[0], 'is_numeric() argument #1'));
+            case JITVariable::TYPE_OBJECT:
+            case JITVariable::TYPE_HASHTABLE:
+                return $context->constantFromBool(false);
             case JITVariable::TYPE_VALUE:
                 return $this->valueIsNumeric($context, $args[0]);
             default:
-                throw new \LogicException('is_numeric() does not support this value type in this compiler build');
+                return $context->constantFromBool(false);
         }
     }
 
@@ -73,8 +76,14 @@ final class is_numeric extends Internal
                 return '' !== $s && \is_numeric($s);
             case Variable::TYPE_BOOLEAN:
             case Variable::TYPE_NULL:
+            case Variable::TYPE_ENUM_CASE:
+            case Variable::TYPE_OBJECT:
+            case Variable::TYPE_ARRAY:
                 return false;
             default:
+                if ($v->isStreamResource() || $v->isDirResource()) {
+                    return false;
+                }
                 throw new \LogicException('is_numeric() does not support this value type in this compiler build');
         }
     }
@@ -123,9 +132,14 @@ final class is_numeric extends Internal
         $isLong = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_LONG, false));
         $isDouble = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false));
         $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false));
+        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(Variable::TYPE_ENUM_CASE, false));
+        $isObject = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_OBJECT, false));
         $stringVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
         $stringNumeric = $this->stringIsNumeric($context, $stringVal);
-        return $context->builder->select($isLong, $trueVal, $context->builder->select($isDouble, $trueVal, $context->builder->select($isString, $stringNumeric, $falseVal)));
+        $numeric = $context->builder->select($isLong, $trueVal, $context->builder->select($isDouble, $trueVal, $context->builder->select($isString, $stringNumeric, $falseVal)));
+        $nonNumeric = $context->builder->or($isEnumCase, $isObject);
+
+        return $context->builder->select($nonNumeric, $falseVal, $numeric);
     }
 
 }
