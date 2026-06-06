@@ -21,5 +21,10 @@ final class BootstrapPhpTypesThrowExprPatchTest extends TestCase
             $content,
             'Run script/apply-patches.sh (php-types-throw-expr.patch) before CI'
         );
+        $this->assertStringContainsString(
+            'return [Type::never()]',
+            $content,
+            'Expr_Throw must type-reconstruct as never (#6746)'
+        );
     }
 }
