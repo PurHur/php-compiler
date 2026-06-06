@@ -3589,6 +3589,9 @@ restart:
                         $this->inheritFromParent($classEntry);
                     }
                     $this->inheritFromInterfaces($classEntry);
+                    if (VM\LazyGhostTraitSupport::classUsesLazyGhostTrait($classEntry, $this->context)) {
+                        VM\LazyGhostTraitSupport::ensureBuiltinLazyGhostMethods($classEntry);
+                    }
                     VM\ClassValidator::finalizeClassDefinition($classEntry, $this->context);
                     $this->context->classes[$lcname] = $classEntry;
                     break;
@@ -5860,6 +5863,11 @@ restart:
 
             return;
         }
+        if ($declaringClass->usesLazyGhostTrait && 'createlazyghost' === $methodLc) {
+            VM\LazyGhostTraitSupport::ensureBuiltinLazyGhostMethods($declaringClass);
+
+            return;
+        }
         $vis = $declaringClass->methodVisibility[$methodLc] ?? 0;
         if (($vis & \PHPCfg\Func::FLAG_STATIC) !== 0) {
             return;
@@ -6594,6 +6602,10 @@ restart:
 
     private function enforcePropertyWriteVisibility(ObjectEntry $object, string $propName, Frame $frame): ?Frame
     {
+        if (null !== $this->context->lazyGhostInitializing
+            && $this->context->lazyGhostInitializing === $object) {
+            return null;
+        }
         $meta = $this->classPropertyMeta($object, $propName);
         if (null === $meta) {
             return null;
@@ -7507,7 +7519,7 @@ restart:
     {
         $methodLc = strtolower($methodName);
         $object = $receiver->toObject();
-        if ($object->lazyPending) {
+        if ($object->lazyPending && 'marklazyobjectasinitialized' !== $methodLc) {
             VM\LazyObjectSupport::ensureInitialized($this, $object);
         }
         if (null !== $object->closureState && '__invoke' === $methodLc) {
@@ -7587,6 +7599,14 @@ restart:
         if ($class->isEnum && 'cases' === $methodLc) {
             VM\EnumSupport::ensureBuiltinCasesMethod($class);
             $frame->call = $class->methods['cases'];
+            $frame->callArgs = [];
+            $frame->callArgEntries = [];
+
+            return;
+        }
+        if ($class->usesLazyGhostTrait && 'createlazyghost' === $methodLc) {
+            VM\LazyGhostTraitSupport::ensureBuiltinLazyGhostMethods($class);
+            $frame->call = $class->methods['createlazyghost'];
             $frame->callArgs = [];
             $frame->callArgEntries = [];
 
@@ -8298,6 +8318,9 @@ restart:
         if ($parent->readonly) {
             $entry->readonly = true;
         }
+        if ($parent->usesLazyGhostTrait) {
+            $entry->usesLazyGhostTrait = true;
+        }
         foreach ($parent->properties as $property) {
             $exists = false;
             foreach ($entry->properties as $existing) {
@@ -8608,6 +8631,9 @@ restart:
         $this->linkStaticPropertyHooks($entry);
         if ($entry->isEnum) {
             VM\EnumSupport::ensureBuiltinCasesMethod($entry);
+        }
+        if ($entry->usesLazyGhostTrait) {
+            VM\LazyGhostTraitSupport::ensureBuiltinLazyGhostMethods($entry);
         }
     }
 
