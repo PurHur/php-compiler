@@ -1,0 +1,51 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler;
+
+use PHPCompiler\ext\standard\VmReflection;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * posix extension module skeleton registration (issue #7105).
+ *
+ * @group posix_module_skeleton
+ */
+final class PosixModuleSkeletonTest extends TestCase
+{
+    public function test_posix_module_skeleton_functions_and_extension_loaded(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+
+        foreach (['posix_getpid', 'posix_getppid', 'posix_strerror', 'posix_get_last_error', 'posix_errno'] as $fn) {
+            self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
+        }
+
+        $code = <<<'PHP'
+<?php
+echo (int) function_exists('posix_getpid');
+echo (int) function_exists('posix_getppid');
+echo (int) function_exists('posix_strerror');
+echo (int) function_exists('posix_get_last_error');
+echo (int) function_exists('posix_errno');
+echo (int) extension_loaded('posix');
+PHP;
+        $block = $runtime->parseAndCompile($code, 'posix_module.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('111111', ob_get_clean());
+    }
+
+    public function test_posix_getpid_stub_throws_error(): void
+    {
+        $runtime = new Runtime();
+        $fn = new \PHPCompiler\ext\posix\posix_getpid();
+        $frame = $fn->getFrame($runtime->vmContext);
+
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('posix_getpid() is not implemented in this compiler build (issue #3339)');
+        $fn->execute($frame);
+    }
+}

@@ -12,7 +12,7 @@ use PHPCompiler\VM\Variable;
 final class VmInfo
 {
     /** @var list<string> */
-    public const LOADED_EXTENSIONS = ['standard', 'types'];
+    public const LOADED_EXTENSIONS = ['standard', 'types', 'posix'];
 
     public static function phpversion(?string $extension = null): string|false
     {

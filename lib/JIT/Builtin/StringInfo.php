@@ -38,7 +38,7 @@ final class StringInfo
     private const UNAME_RESULT_BUF = 512;
 
     /** @var list<string> */
-    private const LOADED_EXTENSIONS = ['standard', 'types'];
+    private const LOADED_EXTENSIONS = ['standard', 'types', 'posix'];
 
     /** @var list<string> */
     private const RUNTIME_FUNCTIONS = [
