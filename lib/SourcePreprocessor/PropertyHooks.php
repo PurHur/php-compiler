@@ -34,7 +34,7 @@ final class PropertyHooks
             if (null === $decl) {
                 break;
             }
-            [$declPos, , $declName] = $decl;
+            [$declPos, $declKind, $declName] = $decl;
             $braceOpen = strpos($code, '{', $declPos);
             if (false === $braceOpen) {
                 break;
@@ -46,7 +46,14 @@ final class PropertyHooks
             }
             [$bodyStart, $bodyEnd] = $span;
             $body = substr($code, $bodyStart + 1, $bodyEnd - $bodyStart - 1);
-            $processedBody = $this->processClassBody($body, strtolower($declName), $filename, $bodyStart + 1, $code);
+            $processedBody = $this->processClassBody(
+                $body,
+                strtolower($declName),
+                $filename,
+                $bodyStart + 1,
+                $code,
+                $declKind
+            );
             $code = substr($code, 0, $bodyStart + 1).$processedBody.substr($code, $bodyEnd);
             $offset = $bodyStart + 1 + strlen($processedBody);
         }
@@ -121,7 +128,8 @@ final class PropertyHooks
         string $lcClass,
         string $filename,
         int $bodyOffsetInFile,
-        string $fullCode
+        string $fullCode,
+        string $declKind = 'class'
     ): string {
         $injections = [];
         $offset = 0;
@@ -140,6 +148,7 @@ final class PropertyHooks
             $declPrefix = substr($body, $offset, $declStart - $offset);
             $propDeclHead = rtrim(substr($body, $declStart, $hookOpen - $declStart));
             $isAbstractHook = (bool) preg_match('/\babstract\b/', $declPrefix.$propDeclHead);
+            $isInterfaceHook = 'interface' === $declKind;
             if ($isAbstractHook) {
                 $declPrefix = preg_replace('/\babstract\s+/', '', $declPrefix) ?? $declPrefix;
                 $propDeclHead = preg_replace('/\babstract\s+/', '', $propDeclHead) ?? $propDeclHead;
@@ -162,14 +171,14 @@ final class PropertyHooks
             if ('' !== $trailing) {
                 $out .= "\n    ".$trailing;
             }
-            if (([] !== $methods && !$usesBacking) || $isAbstractHook) {
+            if (([] !== $methods && !$usesBacking) || $isAbstractHook || $isInterfaceHook) {
                 if (!isset($this->registry[$lcClass][$prop])) {
                     $this->registry[$lcClass][$prop] = [];
                 }
-                if ($isAbstractHook) {
+                if ($isAbstractHook || $isInterfaceHook) {
                     $this->registry[$lcClass][$prop]['abstract'] = true;
                 }
-                if ([] === $methods || !$usesBacking) {
+                if ([] === $methods || !$usesBacking || $isInterfaceHook) {
                     $this->registry[$lcClass][$prop]['virtual'] = true;
                 }
             }
@@ -193,6 +202,7 @@ final class PropertyHooks
         $usesBacking = false;
         $rest = trim($hookSource);
         while ('' !== $rest) {
+            $rest = ltrim($rest);
             if (preg_match('/^get\s*;/s', $rest)) {
                 $rest = preg_replace('/^get\s*;/', '', $rest, 1) ?? $rest;
                 continue;
