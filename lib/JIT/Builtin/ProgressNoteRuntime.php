@@ -10,10 +10,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM implementation of __phpc_progress_note (issue #6748).
+ * LLVM implementation of __phpc_progress_note (issue #6748, #6777).
  *
- * File writes mirror lib/JIT/Progress.php; SIGSEGV breadcrumb buffer stays in thin
- * lib/AOT/runtime/phpc_progress.c (__phpc_progress_remember).
+ * File writes mirror lib/JIT/Progress.php; SIGSEGV breadcrumb buffer is LLVM globals
+ * (phpc_last_progress / phpc_last_progress_len) read by lib/AOT/runtime/phpc_progress.c.
  */
 final class ProgressNoteRuntime
 {
@@ -23,7 +23,20 @@ final class ProgressNoteRuntime
 
     private const ENV_ENTRY = 'PHP_COMPILER_JIT_ENTRY_FILE';
 
+    /** Must match phpc_progress.c extern buffer size. */
+    private const BUFFER_SIZE = 256;
+
+    private const GLOBAL_BUF = 'phpc_last_progress';
+
+    private const GLOBAL_LEN = 'phpc_last_progress_len';
+
     private static int $blockSuffix = 0;
+
+    /** @var Value|null */
+    private static $bufGlobal = null;
+
+    /** @var Value|null */
+    private static $lenGlobal = null;
 
     public static function ensureLinked(Context $context): void
     {
@@ -57,6 +70,7 @@ final class ProgressNoteRuntime
         }
 
         self::$blockSuffix = 0;
+        self::ensureProgressGlobals($context);
         self::ensureExternals($context);
 
         $i8p = $context->getTypeFromString('int8*');
@@ -67,6 +81,39 @@ final class ProgressNoteRuntime
             : $context->module->addFunction('__phpc_progress_note', $ft);
         self::implementNote($context, $fn);
         $context->registerFunction('__phpc_progress_note', $fn);
+    }
+
+    private static function ensureProgressGlobals(Context $context): void
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $sizeT = $context->getTypeFromString('size_t');
+        $bufType = $i8->arrayType(self::BUFFER_SIZE);
+
+        if (null === $context->module->getNamedGlobal(self::GLOBAL_BUF)) {
+            self::$bufGlobal = $context->module->addGlobal($bufType, self::GLOBAL_BUF);
+            self::$bufGlobal->setInitializer($bufType->constNull());
+        } else {
+            self::$bufGlobal = $context->module->getNamedGlobal(self::GLOBAL_BUF);
+        }
+
+        if (null === $context->module->getNamedGlobal(self::GLOBAL_LEN)) {
+            self::$lenGlobal = $context->module->addGlobal($sizeT, self::GLOBAL_LEN);
+            self::$lenGlobal->setInitializer($sizeT->constInt(0, false));
+        } else {
+            self::$lenGlobal = $context->module->getNamedGlobal(self::GLOBAL_LEN);
+        }
+    }
+
+    private static function bufBasePtr(Context $context): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+
+        return $context->builder->inBoundsGEP(
+            self::$bufGlobal,
+            $i32->constInt(0, false),
+            $i64->constInt(0, false)
+        );
     }
 
     private static function implementNote(Context $context, LlvmFunction $fn): void
@@ -83,7 +130,7 @@ final class ProgressNoteRuntime
         $context->builder->branchIf($isNull, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        $context->builder->call($context->lookupFunction('__phpc_progress_remember'), $msg);
+        self::emitRememberToBuffer($context, $fn, $msg);
         $afterProgress = self::appendBlock($fn, 'progress_after_progress');
         $afterPhase = self::appendBlock($fn, 'progress_after_phase');
         self::emitWriteEnvFile($context, $fn, $msg, self::ENV_PROGRESS, $afterProgress);
@@ -95,6 +142,56 @@ final class ProgressNoteRuntime
         $context->builder->positionAtEnd($done);
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function emitRememberToBuffer(Context $context, LlvmFunction $fn, Value $msg): void
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $sizeT = $context->getTypeFromString('size_t');
+        $voidPtr = $context->getTypeFromString('void*');
+        $maxLen = $sizeT->constInt(self::BUFFER_SIZE - 1, false);
+        $zeroByte = $i8->constInt(0, false);
+        $zeroSize = $sizeT->constInt(0, false);
+
+        $len = $context->builder->call($context->lookupFunction('strlen'), $msg);
+        $clamp = self::appendBlock($fn, 'progress_clamp_len');
+        $okLen = self::appendBlock($fn, 'progress_ok_len');
+        $copy = self::appendBlock($fn, 'progress_copy');
+        $doCopy = self::appendBlock($fn, 'progress_do_copy');
+        $skipCopy = self::appendBlock($fn, 'progress_skip_copy');
+        $tooLong = $context->builder->icmp(Builder::INT_UGE, $len, $maxLen);
+        $context->builder->branchIf($tooLong, $clamp, $okLen);
+
+        $context->builder->positionAtEnd($clamp);
+        $context->builder->branch($copy);
+
+        $context->builder->positionAtEnd($okLen);
+        $context->builder->branch($copy);
+
+        $context->builder->positionAtEnd($copy);
+        $storedLen = $context->builder->phi($sizeT, [
+            [$maxLen, $clamp],
+            [$len, $okLen],
+        ]);
+        $context->builder->store($storedLen, self::$lenGlobal);
+
+        $hasLen = $context->builder->icmp(Builder::INT_UGT, $storedLen, $zeroSize);
+        $context->builder->branchIf($hasLen, $doCopy, $skipCopy);
+
+        $context->builder->positionAtEnd($doCopy);
+        $bufPtr = self::bufBasePtr($context);
+        $context->builder->call(
+            $context->lookupFunction('memcpy'),
+            $context->builder->pointerCast($bufPtr, $voidPtr),
+            $context->builder->pointerCast($msg, $voidPtr),
+            $storedLen
+        );
+        $context->builder->branch($skipCopy);
+
+        $context->builder->positionAtEnd($skipCopy);
+        $bufPtr = self::bufBasePtr($context);
+        $termPtr = $context->builder->inBoundsGEP($bufPtr, $storedLen);
+        $context->builder->store($zeroByte, $termPtr);
     }
 
     private static function emitWriteEnvFile(
@@ -169,17 +266,17 @@ final class ProgressNoteRuntime
     {
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
-        $voidTy = $context->getTypeFromString('void');
+        $voidPtr = $context->getTypeFromString('void*');
         $i32 = $context->getTypeFromString('int32');
 
         foreach (
             [
                 'getenv' => [$i8p, false, [$i8p]],
                 'strlen' => [$sizeT, false, [$i8p]],
+                'memcpy' => [$voidPtr, false, [$voidPtr, $voidPtr, $sizeT]],
                 'fopen' => [$i8p, false, [$i8p, $i8p]],
                 'fwrite' => [$sizeT, false, [$i8p, $sizeT, $sizeT, $i8p]],
                 'fclose' => [$i32, false, [$i8p]],
-                '__phpc_progress_remember' => [$voidTy, false, [$i8p]],
             ] as $name => [$ret, $vararg, $params]
         ) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, $vararg, ...$params));
