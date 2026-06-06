@@ -8572,6 +8572,20 @@ class JIT {
         if ([] === $traitNames) {
             return;
         }
+        $dedupedTraitNames = [];
+        $seenTraitLc = [];
+        foreach ($traitNames as $traitName) {
+            $traitLc = strtolower(ltrim($traitName, '\\'));
+            if (isset($seenTraitLc[$traitLc])) {
+                continue;
+            }
+            $seenTraitLc[$traitLc] = true;
+            $dedupedTraitNames[] = $traitName;
+        }
+        $traitNames = $dedupedTraitNames;
+        if ([] === $traitNames) {
+            return;
+        }
         $classLc = '' !== ($this->context->scope->className ?? '')
             ? strtolower(ltrim($this->context->scope->className, '\\'))
             : strtolower(ltrim($this->context->type->object->classNameForId($classId), '\\'));
@@ -8674,7 +8688,13 @@ class JIT {
                 if (isset($excludedByPrecedence["{$traitLc}\0{$methodLc}"])) {
                     continue;
                 }
+                if (isset($excluded[$methodLc])) {
+                    continue;
+                }
                 if (isset($merged[$methodLc])) {
+                    if ($merged[$methodLc]['traitLc'] === $traitLc) {
+                        continue;
+                    }
                     $prev = $merged[$methodLc]['traitName'];
                     throw new \CompileError(
                         "Trait method {$data['traitName']}::{$methodLc} has not been applied as {$className}::{$methodLc}, "
@@ -8763,6 +8783,9 @@ class JIT {
             }
             if (isset($traitMethodSources[$methodLc])) {
                 $prevTrait = $traitMethodSources[$methodLc];
+                if ($prevTrait === $data['traitName']) {
+                    continue;
+                }
                 throw new \CompileError(
                     "Trait method {$data['traitName']}::{$methodLc} has not been applied as {$className}::{$methodLc}, "
                     ."because of collision with {$prevTrait}::{$methodLc}"

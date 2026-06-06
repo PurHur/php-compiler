@@ -8635,6 +8635,21 @@ restart:
             return;
         }
 
+        $dedupedTraitNames = [];
+        $seenTraitLc = [];
+        foreach ($traitNames as $traitName) {
+            $traitLc = strtolower(ltrim($traitName, '\\'));
+            if (isset($seenTraitLc[$traitLc])) {
+                continue;
+            }
+            $seenTraitLc[$traitLc] = true;
+            $dedupedTraitNames[] = $traitName;
+        }
+        $traitNames = $dedupedTraitNames;
+        if ([] === $traitNames) {
+            return;
+        }
+
         $excludedMethods = $this->traitMethodExclusions($entry, $ownMethods);
 
         /** @var array<string, array<string, array{method: Func, vis: int, traitName: string, methodNames: string, attrs: ?list<string>, deprecated: mixed, attributeEntries: mixed, parameterMetadata: mixed}>> */
@@ -8674,6 +8689,10 @@ restart:
             }
             foreach ($trait->staticProperties as $name => $storage) {
                 if (isset($entry->staticProperties[$name])) {
+                    $declaringLc = $entry->staticPropertyDeclaringClassLc[$name] ?? null;
+                    if ($declaringLc === $traitLc) {
+                        continue;
+                    }
                     throw new \LogicException(
                         "Trait property {$trait->name}::\${$name} conflicts with a property declared in another trait"
                     );
@@ -8775,7 +8794,13 @@ restart:
                 if (isset($excludedByPrecedence["{$traitLc}\0{$methodLc}"])) {
                     continue;
                 }
+                if (isset($excludedMethods[$methodLc])) {
+                    continue;
+                }
                 if (isset($merged[$methodLc])) {
+                    if ($merged[$methodLc]['traitLc'] === $traitLc) {
+                        continue;
+                    }
                     $prevTrait = $merged[$methodLc]['traitName'];
                     throw new \LogicException(
                         "Trait method {$data['traitName']}::{$methodLc} has not been applied as {$entry->name}::{$methodLc}, "
@@ -8884,6 +8909,9 @@ restart:
             }
             if (isset($entry->traitMethodSources[$methodLc])) {
                 $prevTrait = $entry->traitMethodSources[$methodLc];
+                if ($prevTrait === $data['traitName']) {
+                    continue;
+                }
                 throw new \CompileError(
                     "Trait method {$data['traitName']}::{$methodLc} has not been applied as {$entry->name}::{$methodLc}, "
                     ."because of collision with {$prevTrait}::{$methodLc}"
@@ -8940,10 +8968,14 @@ restart:
 
     protected function inheritTraitInstanceProperties(ClassEntry $entry, ClassEntry $trait, string $traitName): void
     {
+        $traitLc = strtolower(ltrim($traitName, '\\'));
         foreach ($trait->properties as $property) {
             $propLc = strtolower($property->name);
             foreach ($entry->properties as $existing) {
                 if (strtolower($existing->name) === $propLc) {
+                    if ($existing->declaringClassLc === $traitLc) {
+                        continue 2;
+                    }
                     throw new \LogicException(
                         "Trait property {$traitName}::\${$property->name} conflicts with a property declared in another trait"
                     );
