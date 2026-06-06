@@ -1,5 +1,5 @@
 --TEST--
-Instance property hooks — post/pre inc/dec dispatch get+set hooks (#6309, zend_property_hooks.c)
+Instance property hooks — post/pre inc/dec dispatch get+set hooks (#6452, #6309, zend_property_hooks.c)
 --FILE--
 <?php
 class Counter {
