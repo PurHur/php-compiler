@@ -131,6 +131,41 @@ PHP;
         $this->assertSame('a', ob_get_clean());
     }
 
+    /** Issue #7025: backed enum E::from(...)/tryFrom(...) first-class static callable. */
+    public function testVmBackedEnumFromFirstClassCallable(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int {
+    case A = 1;
+}
+$from = E::from(...);
+echo $from(1)->name;
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('A', ob_get_clean());
+    }
+
+    public function testVmBackedEnumTryFromFirstClassCallableReturnsNull(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int {
+    case A = 1;
+}
+$tryFrom = E::tryFrom(...);
+var_export($tryFrom(99));
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('NULL', ob_get_clean());
+    }
+
     /** Issue #4957: TypeReconstructor must not call missing Type::array(). */
     public function testVmInstanceMethodFirstClassCallableOnNewExpression(): void
     {
