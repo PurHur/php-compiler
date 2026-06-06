@@ -944,6 +944,16 @@ final class VmFs
         return 'stream';
     }
 
+    /**
+     * get_resource_type() for VM stream-tagged handles, including after fclose (#5179).
+     *
+     * php-src: ext/standard/file.c — closed resources return "Unknown"
+     */
+    public static function resourceTypeForStreamTag(int $handle): string
+    {
+        return isset(self::$handles[$handle]) ? 'stream' : 'Unknown';
+    }
+
     public static function isValidHandle(int $handle): bool
     {
         return isset(self::$handles[$handle]);
