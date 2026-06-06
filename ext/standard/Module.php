@@ -30,6 +30,9 @@ class Module extends ModuleAbstract
             'DEBUG_BACKTRACE_PROVIDE_OBJECT' => VmDebugBacktrace::PROVIDE_OBJECT,
             'DEBUG_BACKTRACE_IGNORE_ARGS' => VmDebugBacktrace::IGNORE_ARGS,
             'DEBUG_BACKTRACE_IGNORE_STATIC_ARGS' => VmDebugBacktrace::IGNORE_STATIC_ARGS,
+            'CONNECTION_NORMAL' => VmConnection::NORMAL,
+            'CONNECTION_ABORTED' => VmConnection::ABORTED,
+            'CONNECTION_TIMEOUT' => VmConnection::TIMEOUT,
         ] + VmStreamSupports::constants() + VmImage::constants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
@@ -307,6 +310,7 @@ class Module extends ModuleAbstract
             new strip_tags(),
             new header_(),
             new headers_sent(),
+            new connection_status(),
             new header_register_callback(),
             new register_shutdown_function(),
             new setcookie(),
