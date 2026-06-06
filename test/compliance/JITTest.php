@@ -303,10 +303,6 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'stringable')) {
                 continue;
             }
-            // Enum::cases() is VM-only until JIT enum case lowering (#3308).
-            if (str_contains($name, 'enum_cases')) {
-                continue;
-            }
             // Array literal spread on enum arrays: VM green (#5569); MCJIT enum declare unstable (#3518).
             if (str_contains($name, 'array_literal_spread_enum')) {
                 continue;
@@ -387,7 +383,8 @@ class JITTest extends BaseTest {
                 continue;
             }
             if ((str_contains($name, 'enum_') || str_contains($name, 'abstract_enum'))
-                && !str_contains($name, 'enum_case_name_value')) {
+                && !str_contains($name, 'enum_case_name_value')
+                && !str_contains($name, 'enum_cases_static')) {
                 continue;
             }
             // Generator foreach MCJIT resume (#3074); VM in GeneratorVMTest, compile in GeneratorJITTest/GeneratorJitCompileTest.
