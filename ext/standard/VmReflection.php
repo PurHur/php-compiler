@@ -62,6 +62,18 @@ final class VmReflection
     }
 
     /**
+     * unitenum_exists() — true only for pure (non-backed) user enums (#6884).
+     *
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(unitenum_exists)
+     */
+    public static function unitEnumExists(Context $ctx, string $enumName): bool
+    {
+        $entry = self::resolveClassEntry($ctx, $enumName);
+
+        return null !== $entry && $entry->isEnum && null === $entry->backedType;
+    }
+
+    /**
      * get_declared_enums() — user enum class names (issue #3538).
      *
      * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_enums)
