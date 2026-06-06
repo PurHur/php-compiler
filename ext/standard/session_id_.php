@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** session_id() — get or set the active session id (issue #1183). */
@@ -25,9 +24,6 @@ class session_id_ extends Internal
         if ($argc > 1) {
             throw new \LogicException('session_id() accepts at most one argument in this compiler build');
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (0 === $argc) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->string(VmSession::getId());
@@ -36,10 +32,15 @@ class session_id_ extends Internal
             return;
         }
         $idVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $idVar->type) {
-            throw new \LogicException('session_id() argument must be a string in this compiler build');
+        $id = VmString::coerceNullableStringBuiltinArg($idVar, 'session_id', 0, 'id');
+        if (null === $id) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->string(VmSession::getId());
+            }
+
+            return;
         }
-        $result = VmSession::setId($idVar->toString());
+        $result = VmSession::setId($id);
         if (null === $frame->returnVar) {
             return;
         }
