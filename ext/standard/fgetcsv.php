@@ -13,7 +13,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** fgetcsv() — VM via VmFs; JIT/AOT via __compiler_fgetcsv (issue #1192). */
+/** fgetcsv() — VM via VmFs; JIT/AOT via StringFgetcsvJit (issue #1192, #6750). */
 final class fgetcsv extends Internal
 {
     public function __construct()
