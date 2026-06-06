@@ -1452,13 +1452,16 @@ PY
   echo "Applied php-cfg-attribute-groups.patch (overlay)"
 }
 
-apply_php_types_intersection_type_reconstructor_overlay() {
-  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
-  [[ -f "$target" ]] || return 0
+apply_php_types_intersection_type_reconstructor_overlay_to_target() {
+  local target="$1"
+  if [[ ! -f "$target" ]]; then
+    echo "Skip php-types-intersection-type.patch (target missing): ${target}"
+    return 0
+  fi
   if grep -q 'instanceof Op\\Type\\Intersection' "$target" 2>/dev/null && php -l "$target" >/dev/null 2>&1; then
     return 0
   fi
-  python3 - "$target" <<'PY'
+  if ! python3 - "$target" <<'PY'
 import sys
 from pathlib import Path
 
@@ -1489,17 +1492,23 @@ else:
     raise SystemExit(1)
 path.write_text(text)
 PY
-  echo "Applied php-types-intersection-type.patch (TypeReconstructor overlay)"
+  then
+    echo "ERROR: php-types-intersection-type overlay failed for ${target} (#6820)" >&2
+    return 1
+  fi
+  echo "Applied php-types-intersection-type.patch (TypeReconstructor overlay): ${target}"
 }
 
-apply_php_types_intersection_type_overlay() {
-  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
-  if grep -q 'instanceof CfgType\\Intersection' "$target" 2>/dev/null; then
-    apply_php_types_intersection_type_reconstructor_overlay
-    echo "Skip php-types-intersection-type.patch (already applied)"
+apply_php_types_intersection_type_type_overlay_to_target() {
+  local target="$1"
+  if [[ ! -f "$target" ]]; then
+    echo "Skip php-types-intersection-type.patch (target missing): ${target}"
     return 0
   fi
-  python3 - "$target" <<'PY'
+  if grep -q 'instanceof CfgType\\Intersection' "$target" 2>/dev/null; then
+    return 0
+  fi
+  if ! python3 - "$target" <<'PY'
 import sys
 from pathlib import Path
 
@@ -1531,18 +1540,57 @@ insert = """        if ($decl instanceof CfgType\\Union_) {
 """
 path.write_text(text.replace(anchor, insert + anchor, 1))
 PY
-  apply_php_types_intersection_type_reconstructor_overlay
-  echo "Applied php-types-intersection-type.patch (overlay)"
+  then
+    echo "ERROR: php-types-intersection-type Type.php overlay failed for ${target} (#6820)" >&2
+    return 1
+  fi
+  echo "Applied php-types-intersection-type.patch (Type.php overlay): ${target}"
 }
 
-repair_php_types_union_type_reconstructor_if_needed() {
-  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
-  local ssot="${ROOT}/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+apply_php_types_intersection_type_overlay() {
+  local rc=0
+  local vendor_type="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  local prelinked_type="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  local vendor_recon="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  local prelinked_recon="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  local applied=0
+
+  if [[ -f "$vendor_type" ]] && ! grep -q 'instanceof CfgType\\Intersection' "$vendor_type" 2>/dev/null; then
+    apply_php_types_intersection_type_type_overlay_to_target "$vendor_type" || rc=1
+    applied=1
+  fi
+  if [[ -f "$prelinked_type" ]] && ! grep -q 'instanceof CfgType\\Intersection' "$prelinked_type" 2>/dev/null; then
+    apply_php_types_intersection_type_type_overlay_to_target "$prelinked_type" || rc=1
+    applied=1
+  fi
+  if ! apply_php_types_intersection_type_reconstructor_overlay_to_target "$vendor_recon"; then
+    rc=1
+  elif [[ -f "$vendor_recon" ]] \
+    && ! grep -q 'instanceof Op\\Type\\Intersection' "$vendor_recon" 2>/dev/null; then
+    applied=1
+  fi
+  if ! apply_php_types_intersection_type_reconstructor_overlay_to_target "$prelinked_recon"; then
+    rc=1
+  elif [[ -f "$prelinked_recon" ]] \
+    && ! grep -q 'instanceof Op\\Type\\Intersection' "$prelinked_recon" 2>/dev/null; then
+    applied=1
+  fi
+  if [[ "$applied" -eq 0 ]]; then
+    echo "Skip php-types-intersection-type.patch (already applied)"
+  else
+    echo "Applied php-types-intersection-type.patch (overlay)"
+  fi
+  return "$rc"
+}
+
+repair_php_types_union_type_reconstructor_at() {
+  local target="$1"
+  local ssot="$2"
   [[ -f "$target" ]] || return 0
   if php -l "$target" >/dev/null 2>&1; then
     return 0
   fi
-  echo "apply-patches: repairing malformed php-types-union-type in TypeReconstructor.php (#4229)" >&2
+  echo "apply-patches: repairing malformed php-types-union-type in ${target} (#4229)" >&2
   if [[ ! -f "$ssot" ]]; then
     echo "apply-patches: missing SSOT ${ssot} for TypeReconstructor repair" >&2
     return 1
@@ -1566,15 +1614,27 @@ path.write_text(text[:start] + ssot_text[ssot_start:ssot_end] + text[end:])
 PY
 }
 
-apply_php_types_union_type_reconstructor_overlay() {
-  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
-  repair_php_types_union_type_reconstructor_if_needed
+repair_php_types_union_type_reconstructor_if_needed() {
+  local vendor_recon="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  local prelinked_recon="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  repair_php_types_union_type_reconstructor_at "$vendor_recon" "$prelinked_recon" || return 1
+  if [[ -f "$prelinked_recon" ]] && ! php -l "$prelinked_recon" >/dev/null 2>&1; then
+    repair_php_types_union_type_reconstructor_at "$prelinked_recon" "$vendor_recon" || return 1
+  fi
+}
+
+apply_php_types_union_type_reconstructor_overlay_to_target() {
+  local target="$1"
+  if [[ ! -f "$target" ]]; then
+    echo "Skip php-types-union-type.patch (target missing): ${target}"
+    return 0
+  fi
   if grep -q 'instanceof Op\\Type\\Union_' "$target" 2>/dev/null \
     && grep -q 'instanceof Op\\Type\\Intersection' "$target" 2>/dev/null \
     && php -l "$target" >/dev/null 2>&1; then
     return 0
   fi
-  python3 - "$target" <<'PY'
+  if ! python3 - "$target" <<'PY'
 import sys
 from pathlib import Path
 
@@ -1587,12 +1647,10 @@ union_body = """            $subs = [];
 
             return (new Type(Type::TYPE_UNION, $subs))->simplify();
 """
-union_branch = (
+union_before_intersection = (
     "        } elseif ($type instanceof Op\\Type\\Union_) {\n"
     + union_body
-    + "        }\n"
 )
-union_before_intersection = union_branch
 if "instanceof Op\\Type\\Union_" in text:
     raise SystemExit(0)
 
@@ -1654,38 +1712,55 @@ else:
     raise SystemExit(1)
 path.write_text(text)
 PY
-  echo "Applied php-types-union-type.patch (TypeReconstructor overlay)"
+  then
+    echo "ERROR: php-types-union-type overlay failed for ${target} (#6820)" >&2
+    return 1
+  fi
+  echo "Applied php-types-union-type.patch (TypeReconstructor overlay): ${target}"
 }
 
 apply_php_types_union_type_overlay() {
-  local type_php="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
-  local recon="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
-  local need_type=1
-  local need_recon=1
+  local rc=0
+  local vendor_type="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  local prelinked_type="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  local vendor_recon="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  local prelinked_recon="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  local applied=0
 
-  repair_php_types_union_type_reconstructor_if_needed
+  repair_php_types_union_type_reconstructor_if_needed || rc=1
 
-  if grep -q 'instanceof CfgType\\Union_' "$type_php" 2>/dev/null; then
-    need_type=0
+  if [[ -f "$vendor_type" ]] && ! grep -q 'instanceof CfgType\\Union_' "$vendor_type" 2>/dev/null; then
+    apply_php_types_intersection_type_type_overlay_to_target "$vendor_type" || rc=1
+    applied=1
   fi
-  if grep -q 'instanceof Op\\Type\\Union_' "$recon" 2>/dev/null && php -l "$recon" >/dev/null 2>&1; then
-    need_recon=0
+  if [[ -f "$prelinked_type" ]] && ! grep -q 'instanceof CfgType\\Union_' "$prelinked_type" 2>/dev/null; then
+    apply_php_types_intersection_type_type_overlay_to_target "$prelinked_type" || rc=1
+    applied=1
   fi
-
-  if [[ "$need_type" -eq 0 && "$need_recon" -eq 0 ]]; then
+  if [[ -f "$vendor_recon" ]] \
+    && { ! grep -q 'instanceof Op\\Type\\Union_' "$vendor_recon" 2>/dev/null \
+      || ! php -l "$vendor_recon" >/dev/null 2>&1; }; then
+    apply_php_types_union_type_reconstructor_overlay_to_target "$vendor_recon" || rc=1
+    applied=1
+  fi
+  if [[ -f "$prelinked_recon" ]] \
+    && { ! grep -q 'instanceof Op\\Type\\Union_' "$prelinked_recon" 2>/dev/null \
+      || ! php -l "$prelinked_recon" >/dev/null 2>&1; }; then
+    apply_php_types_union_type_reconstructor_overlay_to_target "$prelinked_recon" || rc=1
+    applied=1
+  fi
+  if ! apply_php_types_intersection_type_reconstructor_overlay_to_target "$vendor_recon"; then
+    rc=1
+  fi
+  if ! apply_php_types_intersection_type_reconstructor_overlay_to_target "$prelinked_recon"; then
+    rc=1
+  fi
+  if [[ "$applied" -eq 0 ]]; then
     echo "Skip php-types-union-type.patch (already applied)"
-    return 0
+  else
+    echo "Applied php-types-union-type.patch (overlay)"
   fi
-
-  if [[ "$need_type" -eq 1 ]]; then
-    # Union fromTypeDecl is inserted by php-types-intersection-type overlay.
-    apply_php_types_intersection_type_overlay
-  fi
-
-  if [[ "$need_recon" -eq 1 ]]; then
-    apply_php_types_union_type_reconstructor_overlay
-  fi
-  apply_php_types_intersection_type_reconstructor_overlay
+  return "$rc"
 }
 
 apply_php_types_closure_unbound_this_overlay() {
@@ -3941,6 +4016,21 @@ verify_critical_language_patches() {
   fi
   if [[ -f "$prelinked_recon" ]] && ! grep -q "case 'Expr_Throw':" "$prelinked_recon" 2>/dev/null; then
     missing+=("php-types-throw-expr-prelinked")
+  fi
+  if [[ -f "$prelinked_recon" ]] && ! grep -q 'instanceof Op\\Type\\Union_' "$prelinked_recon" 2>/dev/null; then
+    missing+=("php-types-union-type-prelinked")
+  elif [[ -f "$prelinked_recon" ]] && ! php -l "$prelinked_recon" >/dev/null 2>&1; then
+    missing+=("php-types-union-type-prelinked-syntax")
+  fi
+  if [[ -f "$prelinked_recon" ]] && ! grep -q 'instanceof Op\\Type\\Intersection' "$prelinked_recon" 2>/dev/null; then
+    missing+=("php-types-intersection-type-prelinked")
+  fi
+  local prelinked_type="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  if [[ -f "$prelinked_type" ]] && ! grep -q 'instanceof CfgType\\Union_' "$prelinked_type" 2>/dev/null; then
+    missing+=("php-types-union-type-Type-prelinked")
+  fi
+  if [[ -f "$prelinked_type" ]] && ! grep -q 'instanceof CfgType\\Intersection' "$prelinked_type" 2>/dev/null; then
+    missing+=("php-types-intersection-type-Type-prelinked")
   fi
   if ((${#missing[@]} > 0)); then
     echo "apply-patches: critical language patch markers missing: ${missing[*]}" >&2
