@@ -20,6 +20,17 @@ PHP;
 
     private const EXPECT = "42\n4660\ndead\n";
 
+    private const STAR_CODE = <<<'PHP'
+$r = unpack('H*', 'ab');
+echo $r[1], "\n";
+$r = unpack('n*', pack('nn', 0x1234, 0x5678));
+echo $r[1], ',', $r[2], "\n";
+$r = unpack('a*', 'hello');
+echo $r[1], "\n";
+PHP;
+
+    private const STAR_EXPECT = "6162\n4660,22136\nhello\n";
+
     private const INSUFFICIENT_CODE = <<<'PHP'
 function unpack_warn_capture(int $errno, string $message): bool
 {
@@ -57,6 +68,11 @@ EXPECT;
         $this->assertSame(self::EXPECT, $this->runBin('bin/vm.php', self::CODE));
     }
 
+    public function testVmUnpackRepeatStar(): void
+    {
+        $this->assertSame(self::STAR_EXPECT, $this->runBin('bin/vm.php', self::STAR_CODE));
+    }
+
     public function testVmUnpackInsufficientData(): void
     {
         $this->assertSame(self::INSUFFICIENT_EXPECT, $this->runBin('bin/vm.php', self::INSUFFICIENT_CODE));
@@ -88,6 +104,17 @@ EXPECT;
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
         $this->assertSame(self::EXPECT, $this->runAotBinary(self::CODE));
+    }
+
+    /**
+     * @group llvm
+     */
+    public function testAotNativeBinaryUnpackRepeatStar(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $this->assertSame(self::STAR_EXPECT, $this->runAotBinary(self::STAR_CODE));
     }
 
     private function runAotBinary(string $code): string
