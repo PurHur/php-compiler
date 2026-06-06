@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\Runtime;
+use PHPCompiler\SourcePreprocessor\PropertyHooks;
 use PHPUnit\Framework\TestCase;
 
-/** Static property hooks VM path (#4751, #6624). */
+/** Static property hooks rejected at compile time (#6619, #6901, php-src 8.4). */
 final class StaticPropertyHooksTest extends TestCase
 {
-    public function testDirectClassStaticPropertyHooks(): void
+    public function testDirectClassStaticPropertyHooksCompileFatal(): void
     {
         $src = <<<'PHP'
 <?php
@@ -21,22 +23,11 @@ class Box {
     }
     private static ?string $v = null;
 }
-Box::$label = 'hi';
-echo Box::$label;
 PHP;
-        $path = sys_get_temp_dir().'/static_property_hooks_'.bin2hex(random_bytes(4)).'.php';
-        file_put_contents($path, $src);
-        try {
-            $rt = new Runtime();
-            ob_start();
-            $rt->run($rt->parseAndCompile($src, $path));
-            self::assertSame('hi', ob_get_clean());
-        } finally {
-            @unlink($path);
-        }
+        $this->expectCompileFatal($src);
     }
 
-    public function testTraitMergedStaticPropertyHooks(): void
+    public function testTraitStaticPropertyHooksCompileFatal(): void
     {
         $src = <<<'PHP'
 <?php
@@ -48,16 +39,40 @@ trait T {
     private static ?string $v = null;
 }
 class C { use T; }
-C::$x = 'hi';
-echo C::$x;
 PHP;
-        $path = sys_get_temp_dir().'/trait_static_property_hooks_'.bin2hex(random_bytes(4)).'.php';
+        $this->expectCompileFatal($src);
+    }
+
+    public function testLiteralGetHookCompileFatal(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    public static int $x {
+        get => 1;
+    }
+}
+PHP;
+        $this->expectCompileFatal($src);
+    }
+
+    private function expectCompileFatal(string $src): void
+    {
+        try {
+            (new PropertyHooks())->process($src, 'static_hooks.php');
+            self::fail('Expected CompileFatal for static property hooks');
+        } catch (CompileFatal $e) {
+            self::assertSame(PropertyHooks::STATIC_HOOK_COMPILE_ERROR, $e->getMessage());
+        }
+
+        $path = sys_get_temp_dir().'/static_property_hooks_'.bin2hex(random_bytes(4)).'.php';
         file_put_contents($path, $src);
         try {
             $rt = new Runtime();
-            ob_start();
-            $rt->run($rt->parseAndCompile($src, $path));
-            self::assertSame('hi', ob_get_clean());
+            $rt->parseAndCompile($src, $path);
+            self::fail('Expected Runtime parseAndCompile to throw CompileFatal');
+        } catch (CompileFatal $e) {
+            self::assertSame(PropertyHooks::STATIC_HOOK_COMPILE_ERROR, $e->getMessage());
         } finally {
             @unlink($path);
         }

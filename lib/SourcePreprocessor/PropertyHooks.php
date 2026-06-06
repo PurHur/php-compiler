@@ -13,6 +13,9 @@ use PHPCompiler\Compiler\CompileFatal;
  */
 final class PropertyHooks
 {
+    /** Zend/zend_compile.c — property hooks apply to instance properties only (#6619, #6901). */
+    public const STATIC_HOOK_COMPILE_ERROR = 'Cannot declare hooks for static property';
+
     private const SET_METHOD_PREFIX = '__phpc_property_set_';
     private const GET_METHOD_PREFIX = '__phpc_property_get_';
     private const UNSET_METHOD_PREFIX = '__phpc_property_unset_';
@@ -185,6 +188,13 @@ final class PropertyHooks
                 $propDeclHead = preg_replace('/\babstract\s+/', '', $propDeclHead) ?? $propDeclHead;
             }
             $isStatic = (bool) preg_match('/\bstatic\b/', $declPrefix.$propDeclHead);
+            if ($isStatic) {
+                throw new CompileFatal(
+                    $filename,
+                    self::lineAtOffset($fullCode, $bodyOffsetInFile + $declStart),
+                    self::STATIC_HOOK_COMPILE_ERROR
+                );
+            }
             $propDecl = preg_replace('/\s+$/', '', $propDeclHead) ?? $propDeclHead;
             if (!str_ends_with($propDecl, ';')) {
                 $propDecl .= ';';
