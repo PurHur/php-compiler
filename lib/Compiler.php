@@ -3383,18 +3383,17 @@ class Compiler {
             if (null !== $constName) {
                 $result->classConstDeclaredTypes[strtolower($constName)] = $child->declaredType;
             }
-        }
-        if (
-            property_exists($child, 'declaredType')
-            && null !== $child->declaredType
-            && $child->declaredType instanceof Op\Type\Literal
-        ) {
-            $this->rejectTypedTraitConstantIfUnsupported($child->name);
-            $declared = Type::fromDecl($child->declaredType->name);
-            if (Variable::TYPE_UNDEFINED !== Variable::mapFromType($declared)) {
-                $typeSlot = $this->compileTypeConstrainedVariable($result, $declared);
+            if (!$this->cfgDeclaredTypeIsMixed($child->declaredType)) {
+                $this->rejectTypedTraitConstantIfUnsupported($child->name);
+                $declared = $this->typeFromClassConstDecl($child);
+                $typeSlot = $this->compileTypeConstrainedVariable($result, $declared, $child->declaredType);
                 if (isset($result->constants[$valueSlot])) {
-                    $this->verifyClassConstCompileTimeType($child->name, $result->constants[$valueSlot], $declared);
+                    $this->verifyClassConstCompileTimeType(
+                        $child->name,
+                        $result->constants[$valueSlot],
+                        $typeSlot,
+                        $result
+                    );
                 }
             }
         }
@@ -3578,15 +3577,42 @@ class Compiler {
         return $value;
     }
 
-    protected function verifyClassConstCompileTimeType(Operand $nameOp, Variable $value, Type $declared): void
+    protected function typeFromClassConstDecl(Op\Terminal\Const_ $child): Type
     {
-        $mapped = Variable::mapFromType($declared);
-        if (Variable::TYPE_UNDEFINED === $mapped) {
+        if ($child->declaredType instanceof Op\Type\Literal) {
+            return Type::fromDecl($child->declaredType->name);
+        }
+        if (null !== $child->declaredType) {
+            return Type::fromTypeDecl($child->declaredType);
+        }
+
+        return Type::mixed();
+    }
+
+    protected function cfgDeclaredTypeIsMixed(?Op\Type $declaredType): bool
+    {
+        if (null === $declaredType) {
+            return true;
+        }
+        if ($declaredType instanceof Op\Type\Mixed_) {
+            return true;
+        }
+
+        return $declaredType instanceof Op\Type\Literal && 'mixed' === strtolower($declaredType->name);
+    }
+
+    protected function verifyClassConstCompileTimeType(
+        Operand $nameOp,
+        Variable $value,
+        int $typeSlot,
+        Block $block
+    ): void {
+        if (!isset($block->constants[$typeSlot])) {
             return;
         }
         $constName = $nameOp instanceof Operand\Literal ? (string) $nameOp->value : 'constant';
         try {
-            TypeCheck::assertClassConstantValue($value, $mapped, $constName);
+            TypeCheck::assertClassConstantTypedValue($value, $block->constants[$typeSlot], $constName);
         } catch (\TypeError $e) {
             $this->throwCompileError($e->getMessage());
         }
