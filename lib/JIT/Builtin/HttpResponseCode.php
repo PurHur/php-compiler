@@ -44,7 +44,7 @@ final class HttpResponseCode
         $void = $context->context->voidType();
 
         self::$global = $context->module->addGlobal($i32, self::GLOBAL_NAME);
-        self::$global->setInitializer($i32->constInt(200, false));
+        self::$global->setInitializer($i32->constInt(0, false));
 
         self::$explicitGlobal = $context->module->addGlobal($i32, self::GLOBAL_EXPLICIT_NAME);
         self::$explicitGlobal->setInitializer($i32->constInt(0, false));
@@ -149,7 +149,7 @@ final class HttpResponseCode
             return;
         }
         $i32 = $context->getTypeFromString('int32');
-        $context->builder->store($i32->constInt(200, false), self::$global);
+        $context->builder->store($i32->constInt(0, false), self::$global);
         if (null !== self::$explicitGlobal) {
             $context->builder->store($i32->constInt(0, false), self::$explicitGlobal);
         }
@@ -157,14 +157,35 @@ final class HttpResponseCode
 
     private static function emitWriteCurrentAsLong(Context $context, \PHPLLVM\Value $outPtr): void
     {
+        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        ++self::$setEmitSerial;
+        $sid = (string) self::$setEmitSerial;
+
+        $sUnset = $fn->appendBasicBlock('hr_get_unset_'.$sid);
+        $sSet = $fn->appendBasicBlock('hr_get_set_'.$sid);
+        $sDone = $fn->appendBasicBlock('hr_get_done_'.$sid);
+
         $cur = $context->builder->load(self::$global);
+        $isUnset = $context->builder->icmp(Builder::INT_EQ, $cur, $i32->constInt(0, false));
+        $context->builder->branchIf($isUnset, $sUnset, $sSet);
+
+        $context->builder->positionAtEnd($sUnset);
+        self::emitWriteBoolFalse($context, $outPtr);
+        $context->builder->branch($sDone);
+
+        $context->builder->positionAtEnd($sSet);
         $cur64 = $context->builder->zExt($cur, $i64);
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),
             $outPtr,
             $cur64
         );
+        $context->builder->branch($sDone);
+
+        $context->builder->positionAtEnd($sDone);
     }
 
     /**
@@ -233,6 +254,16 @@ final class HttpResponseCode
             $context->builder->store($i32->constInt(1, false), self::$explicitGlobal);
         }
 
+        $wasUnset = $context->builder->icmp(Builder::INT_EQ, $prev, $i32->constInt(0, false));
+        $bbFirst = $fn->appendBasicBlock('hr_first_'.$sid);
+        $bbLater = $fn->appendBasicBlock('hr_later_'.$sid);
+        $context->builder->branchIf($wasUnset, $bbFirst, $bbLater);
+
+        $context->builder->positionAtEnd($bbFirst);
+        self::emitWriteBoolTrue($context, $outPtr);
+        $context->builder->branch($sMerge);
+
+        $context->builder->positionAtEnd($bbLater);
         $prev64 = $context->builder->zExt($prev, $i64);
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),
@@ -246,6 +277,16 @@ final class HttpResponseCode
 
     /** Match {@see JIT\JitValueBox::writeBool(..., false)} for outPtr. */
     private static function emitWriteBoolFalse(Context $context, \PHPLLVM\Value $outPtr): void
+    {
+        self::emitWriteBool($context, $outPtr, false);
+    }
+
+    private static function emitWriteBoolTrue(Context $context, \PHPLLVM\Value $outPtr): void
+    {
+        self::emitWriteBool($context, $outPtr, true);
+    }
+
+    private static function emitWriteBool(Context $context, \PHPLLVM\Value $outPtr, bool $value): void
     {
         $valMap = $context->structFieldMap['__value__'];
         $i8 = $context->getTypeFromString('int8');
@@ -261,6 +302,6 @@ final class HttpResponseCode
             $i32->constInt(0, false),
             $i64->constInt(0, false)
         );
-        $context->builder->store($i8->constInt(0, false), $firstByte);
+        $context->builder->store($i8->constInt($value ? 1 : 0, false), $firstByte);
     }
 }

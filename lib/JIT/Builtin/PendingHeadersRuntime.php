@@ -296,14 +296,10 @@ final class PendingHeadersRuntime
         $idxSlot = $context->builder->alloca($i32, 1);
         $context->builder->store($i32->constInt(0, false), $idxSlot);
 
-        if (null !== HttpResponseCode::$global && null !== HttpResponseCode::$explicitGlobal) {
+        if (null !== HttpResponseCode::$global) {
             $status = $context->builder->load(HttpResponseCode::$global);
-            $explicit = $context->builder->load(HttpResponseCode::$explicitGlobal);
-            $is200 = $context->builder->icmp(Builder::INT_EQ, $status, $i32->constInt(200, false));
-            $needStatus = $context->builder->or(
-                $context->builder->not($is200),
-                $context->builder->icmp(Builder::INT_NE, $explicit, $i32->constInt(0, false))
-            );
+            $isUnset = $context->builder->icmp(Builder::INT_EQ, $status, $i32->constInt(0, false));
+            $needStatus = $context->builder->not($isUnset);
             $context->builder->branchIf($needStatus, $statusBb, $skipStatus);
             $context->builder->positionAtEnd($statusBb);
             $fmt = self::literalCstr($context, "Status: %d\r\n");
@@ -575,7 +571,7 @@ final class PendingHeadersRuntime
         }
         $i32 = $context->getTypeFromString('int32');
         $status = $context->builder->load(HttpResponseCode::$global);
-        $is200 = $context->builder->icmp(Builder::INT_EQ, $status, $i32->constInt(200, false));
+        $isUnset = $context->builder->icmp(Builder::INT_EQ, $status, $i32->constInt(0, false));
         $len = self::stringLen($context, $line);
         $longEnough = $context->builder->icmp(Builder::INT_SGE, $len, $i32->constInt(9, false));
         $data = self::stringData($context, $line);
@@ -587,7 +583,7 @@ final class PendingHeadersRuntime
             $context->getTypeFromString('size_t')->constInt(9, false)
         );
         $isLoc = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
-        $set302 = $context->builder->and($is200, $context->builder->and($longEnough, $isLoc));
+        $set302 = $context->builder->and($isUnset, $context->builder->and($longEnough, $isLoc));
         $newStatus = $context->builder->select(
             $set302,
             $i32->constInt(302, false),
