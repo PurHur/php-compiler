@@ -90,10 +90,29 @@ interface HasTitle {
     }
 }
 PHP;
-        [$out] = (new PropertyHooks())->process($src);
+        [$out, $registry] = (new PropertyHooks())->process($src);
         self::assertStringNotContainsString('$title {', $out);
         self::assertStringContainsString('public string $title;', $out);
         self::assertStringNotContainsString('__phpc_property_get_title', $out);
+        self::assertTrue($registry['hastitle']['title']['virtual'] ?? false);
+    }
+
+    public function testStripsAbstractGetSetHooksOnInterface(): void
+    {
+        $src = <<<'PHP'
+<?php
+interface I {
+    public int $p {
+        get;
+        set;
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$p {', $out);
+        self::assertStringContainsString('public int $p;', $out);
+        self::assertStringNotContainsString('set;', $out);
+        self::assertTrue($registry['i']['p']['virtual'] ?? false);
     }
 
     public function testStripsAbstractGetHookOnAbstractClass(): void
