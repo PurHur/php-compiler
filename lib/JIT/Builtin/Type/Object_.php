@@ -13,6 +13,7 @@ use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCompiler\Block;
 use PHPCompiler\ClassConstVisibility;
+use PHPCompiler\MethodVisibility;
 use PHPCompiler\PseudoClassScope;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\ClassConstFetchHelper;
@@ -130,6 +131,10 @@ class Object_ extends Type {
      *     class id => property lc => typed LLVM global
      */
     private array $staticPropertyGlobals = [];
+    /** @var array<int, array<string, int>> class id => static prop lc => visibility (#6785) */
+    private array $staticPropertyVisibility = [];
+    /** @var array<int, array<string, int>> class id => static prop lc => declaring class id (#6785) */
+    private array $staticPropertyDeclaringClassId = [];
 
     private ?int $splObjectStorageClassId = null;
 
@@ -3223,6 +3228,13 @@ class Object_ extends Type {
                 null,
                 !empty($entry['typedWithoutDefault'])
             );
+            if (isset($this->staticPropertyVisibility[$traitId][$name])) {
+                $this->staticPropertyVisibility[$classId][$name] = $this->staticPropertyVisibility[$traitId][$name];
+            }
+            if (isset($this->staticPropertyDeclaringClassId[$traitId][$name])) {
+                $this->staticPropertyDeclaringClassId[$classId][$name]
+                    = $this->staticPropertyDeclaringClassId[$traitId][$name];
+            }
         }
     }
 
@@ -3296,6 +3308,13 @@ class Object_ extends Type {
                     null,
                     !empty($entry['typedWithoutDefault'])
                 );
+                if (isset($this->staticPropertyVisibility[$parentId][$name])) {
+                    $this->staticPropertyVisibility[$childId][$name] = $this->staticPropertyVisibility[$parentId][$name];
+                }
+                if (isset($this->staticPropertyDeclaringClassId[$parentId][$name])) {
+                    $this->staticPropertyDeclaringClassId[$childId][$name]
+                        = $this->staticPropertyDeclaringClassId[$parentId][$name];
+                }
             }
         }
     }
@@ -3403,7 +3422,8 @@ class Object_ extends Type {
         int $jitType,
         ?VMVariable $default = null,
         ?VMVariable $prototype = null,
-        bool $forceTypedWithoutDefault = false
+        bool $forceTypedWithoutDefault = false,
+        int $visibilityFlags = \PHPCfg\Func::FLAG_PUBLIC
     ): void {
         $key = strtolower($name);
         if (isset($this->staticPropertyGlobals[$classId][$key])) {
@@ -3461,6 +3481,8 @@ class Object_ extends Type {
             $entry['initGlobal'] = $initGlobal;
         }
         $this->staticPropertyGlobals[$classId][$key] = $entry;
+        $this->staticPropertyVisibility[$classId][$key] = MethodVisibility::mask($visibilityFlags);
+        $this->staticPropertyDeclaringClassId[$classId][$key] = $classId;
         if (Variable::TYPE_STRING === $jitType && null !== $default) {
             $this->initStaticStringPropertyDefault($global, $default);
         }
@@ -3619,6 +3641,34 @@ class Object_ extends Type {
             $this->context->getTypeFromString('int64')->constInt(0, false),
             $global
         );
+    }
+
+    /**
+     * @return array{visibility: int, declaringClassId: int, declaringClassName: string}|null
+     */
+    public function staticPropertyVisibilityMeta(int $classId, string $name): ?array
+    {
+        $key = strtolower($name);
+        $currentId = $classId;
+        for ($depth = 0; $depth < 64; ++$depth) {
+            if (!isset($this->staticPropertyGlobals[$currentId][$key])) {
+                $parentLc = $this->parentClassLc($this->classNameForId($currentId));
+                if (null === $parentLc) {
+                    break;
+                }
+                $currentId = $this->lookup($parentLc);
+                continue;
+            }
+            $declId = $this->staticPropertyDeclaringClassId[$currentId][$key] ?? $currentId;
+
+            return [
+                'visibility' => $this->staticPropertyVisibility[$currentId][$key] ?? \PHPCfg\Func::FLAG_PUBLIC,
+                'declaringClassId' => $declId,
+                'declaringClassName' => $this->classNameForId($declId),
+            ];
+        }
+
+        return null;
     }
 
     public function staticPropertyFetch(int $classId, string $name): Variable

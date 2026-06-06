@@ -66,6 +66,10 @@ class ClassEntry {
     public bool $backedEnumTableBuilt = false;
     /** @var array<string, Variable> static property name (lowercase) => shared storage */
     public array $staticProperties = [];
+    /** @var array<string, int> static property name (lowercase) => PHPCfg visibility flags (#6785) */
+    public array $staticPropertyVisibility = [];
+    /** @var array<string, string> static property name (lowercase) => declaring class lc (#6785) */
+    public array $staticPropertyDeclaringClassLc = [];
     /** @var array<string, array{get?: string, set?: string}> static prop (lowercase) => hook method lc (#4751) */
     public array $staticPropertyHooks = [];
     /** @var array<string, true> static props imported from a trait (per-class storage, #4670) */
