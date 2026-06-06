@@ -2,8 +2,11 @@
 Language: typed interface constant override must be compatible (PHP 8.3, issue #5980)
 --SKIPIF--
 <?php
-if (PHP_VERSION_ID < 80300) {
-    die('skip typed interface constants require PHP 8.3+');
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (!PHPCompiler\CompilerVersion::supportsInterfaceTypedConstants()) {
+    die('skip typed interface constants require CompilerVersion 8.3+');
 }
 ?>
 --FILE--
@@ -17,4 +20,5 @@ class C implements I {
 echo "unreachable\n";
 --EXPECTF--
 Fatal error: Type of C::X must be compatible with I::X of type string in %s on line %d
-
+--EXPECT_EXIT--
+255

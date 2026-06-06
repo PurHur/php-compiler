@@ -128,4 +128,20 @@ PHP;
         $runtime->run($block);
         $this->assertSame("2\n", ob_get_clean());
     }
+
+    /** @covers issue #7042 */
+    public function testConflictingInterfaceTypedConstantsWithoutOverrideFailsCompile(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I { public const string X = 'a'; }
+interface J { public const int X = 1; }
+class C implements I, J {}
+echo C::X, "\n";
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot inherit previously-inherited or override constant X from interface J');
+        $runtime->parseAndCompile($code, 'interface_typed_const_multi_conflict.php');
+    }
 }
