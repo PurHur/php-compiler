@@ -2458,14 +2458,20 @@ restart:
                         break;
                     }
                     $this->releaseVmStatementDeadTemps($frame, (int) $op->arg1);
-                    VM\OutputBuffer::append($printed);
+                    $echoFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+                    VM\OutputBuffer::append($printed, $echoFile, (int) ($op->arg2 ?? 0));
                     break;
                 case OpCode::TYPE_PRINT:
                     try {
                         if (!VM\SapiOutput::headersSent()) {
                             VM\HeaderCallbackQueue::runBeforeOutput($this->context);
                         }
-                        VM\OutputBuffer::append($this->valueToPrintString($frame->scope[$op->arg2], $frame));
+                        $printFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+                        VM\OutputBuffer::append(
+                            $this->valueToPrintString($frame->scope[$op->arg2], $frame),
+                            $printFile,
+                            (int) ($op->arg3 ?? 0)
+                        );
                         $frame->scope[$op->arg1]->int(1);
                     } catch (\Error $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
