@@ -427,6 +427,7 @@ class Module extends ModuleAbstract
             new feof_(),
             new fflush_(),
             new fsync_(),
+            new fdatasync_(),
             new ftruncate_(),
             new fpassthru(),
             new fwrite(),

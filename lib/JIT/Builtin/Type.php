@@ -351,6 +351,9 @@ class Type extends Builtin {
         $fntypeFsync = $this->context->context->functionType($i32, false, $i64);
         $fnFsync = $this->context->module->addFunction('__compiler_fsync', $fntypeFsync);
         $this->context->registerFunction('__compiler_fsync', $fnFsync);
+        $fntypeFdatasync = $this->context->context->functionType($i32, false, $i64);
+        $fnFdatasync = $this->context->module->addFunction('__compiler_fdatasync', $fntypeFdatasync);
+        $this->context->registerFunction('__compiler_fdatasync', $fnFdatasync);
         $fntypeStreamSetChunkSize = $this->context->context->functionType($i64, false, $i64, $i64);
         $fnStreamSetChunkSize = $this->context->module->addFunction('__compiler_stream_set_chunk_size', $fntypeStreamSetChunkSize);
         $this->context->registerFunction('__compiler_stream_set_chunk_size', $fnStreamSetChunkSize);
