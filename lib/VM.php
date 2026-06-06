@@ -3391,7 +3391,14 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
-                    $value = $frame->scope[$op->arg1];
+                    $argSlot = (int) $op->arg1;
+                    $this->warnUndefinedVariableForScopeRead($frame, $argSlot);
+                    $value = $frame->scope[$argSlot];
+                    if ($this->isUnboundLocalScopeRead($frame, $argSlot)) {
+                        $sent = new Variable();
+                        $sent->null();
+                        $value = $sent;
+                    }
                     if (null !== $op->arg3) {
                         $frame->callArgEntries[] = ['u', $value];
                         break;
@@ -5125,6 +5132,52 @@ restart:
         }
 
         return !isset($frame->initializedSlots[(int) $op->arg2]);
+    }
+
+    /**
+     * Zend E_WARNING when a user-function local is read before assignment (#5454).
+     */
+    private function warnUndefinedVariableForScopeRead(Frame $frame, int $slot): void
+    {
+        if (!$this->isUnboundLocalScopeRead($frame, $slot)) {
+            return;
+        }
+        $name = $this->resolveScopeSlotVariableName($frame, $slot);
+        if (null === $name) {
+            return;
+        }
+        $this->context->errors->undefinedVariable(
+            $name,
+            $this->context,
+            $frame,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null
+        );
+    }
+
+    private function isUnboundLocalScopeRead(Frame $frame, int $slot): bool
+    {
+        if (!isset($frame->scope[$slot])) {
+            return false;
+        }
+        if (null === $frame->block || $frame->block->isMainScript() || $frame->block->inheritUndefinedLocals) {
+            return false;
+        }
+        $name = $this->resolveScopeSlotVariableName($frame, $slot);
+        if (null === $name || 'this' === $name) {
+            return false;
+        }
+        if (null !== $name && $frame->block->declaresGlobalName($name)) {
+            return false;
+        }
+        $resolved = $frame->scope[$slot]->resolveIndirect();
+        if ($resolved->isUndefined()) {
+            return true;
+        }
+        if (null !== $this->context->globalNameForStorage($resolved)) {
+            return false;
+        }
+
+        return !isset($frame->initializedSlots[$slot]);
     }
 
     private function markScopeSlotInitialized(Frame $frame, int $slot): void
