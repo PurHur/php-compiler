@@ -1571,6 +1571,11 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
+                    $catchFrame = $this->enforceStaticPropertyVisibilityWrite($arg2, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $catchFrame = $this->enforceReadonlyPropertyWrite($arg2, $frame);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -1674,6 +1679,11 @@ restart:
                     }
                     $lhs = $frame->scope[$op->arg1];
                     $catchFrame = $this->enforcePropertyVisibilityWrite($lhs, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
+                    $catchFrame = $this->enforceStaticPropertyVisibilityWrite($lhs, $frame);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
                         goto restart;
@@ -2964,6 +2974,21 @@ restart:
                         );
                     }
                     $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
+                    if ($forWrite) {
+                        $writeVisFrame = $this->enforceStaticPropertyWriteVisibility($lcClass, $propNameRaw, $frame);
+                        if (null !== $writeVisFrame) {
+                            $frame = $writeVisFrame;
+                            goto restart;
+                        }
+                        $writeMsg = $this->asymmetricStaticPropertyWriteMessage($lcClass, $propNameRaw, $frame);
+                        if (null !== $writeMsg) {
+                            $writeVisFrame = $this->dispatchVmError($writeMsg, $frame);
+                            if (null !== $writeVisFrame) {
+                                $frame = $writeVisFrame;
+                                goto restart;
+                            }
+                        }
+                    }
                     $readBeforeAssign = $forWrite && $this->propertyFetchDestUsedAsReadBeforeAssign($frame, $op);
                     $hooks = $this->resolveStaticPropertyHooks($lcClass, $propName);
                     if (
@@ -3008,12 +3033,18 @@ restart:
                             $dest->objectPropertyName = $propNameRaw;
                             break;
                         }
-                        $frame->scope[$op->arg1]->indirect($storage);
+                        $dest = $frame->scope[$op->arg1];
+                        $dest->indirect($storage);
+                        $dest->staticPropertyClassLc = $lcClass;
+                        $dest->objectPropertyName = $propNameRaw;
                         $storage->staticPropertyClassLc = $lcClass;
                         $storage->objectPropertyName = $propNameRaw;
                         break;
                     }
-                    $frame->scope[$op->arg1]->indirect($storage);
+                    $dest = $frame->scope[$op->arg1];
+                    $dest->indirect($storage);
+                    $dest->staticPropertyClassLc = $lcClass;
+                    $dest->objectPropertyName = $propNameRaw;
                     break;
                 case OpCode::TYPE_STATIC_PROPERTY_UNSET:
                     $classOperand = $frame->scope[$op->arg2]->resolveIndirect();
@@ -7198,7 +7229,13 @@ restart:
     }
 
     /**
-     * @return array{visibility: int, declaringClassLc: string, declaringClassDisplay: string}|null
+     * @return array{
+     *     visibility: int,
+     *     setVisibility: int,
+     *     getVisibility: int,
+     *     declaringClassLc: string,
+     *     declaringClassDisplay: string
+     * }|null
      */
     protected function resolveStaticPropertyVisibilityMeta(string $classLc, string $propLc): ?array
     {
@@ -7211,6 +7248,8 @@ restart:
 
                 return [
                     'visibility' => $entry->staticPropertyVisibility[$propLc] ?? \PHPCfg\Func::FLAG_PUBLIC,
+                    'setVisibility' => $entry->staticPropertySetVisibility[$propLc] ?? 0,
+                    'getVisibility' => $entry->staticPropertyGetVisibility[$propLc] ?? 0,
                     'declaringClassLc' => $declLc,
                     'declaringClassDisplay' => $declEntry->name,
                 ];
@@ -7219,6 +7258,98 @@ restart:
                 break;
             }
             $currentLc = $entry->parentLc;
+        }
+
+        return null;
+    }
+
+    private function enforceStaticPropertyVisibilityWrite(Variable $lvalue, Frame $frame): ?Frame
+    {
+        $target = $lvalue->resolveIndirect();
+        $classLc = $lvalue->staticPropertyClassLc ?? $target->staticPropertyClassLc;
+        $propName = $lvalue->objectPropertyName ?? $target->objectPropertyName;
+        if ((!is_string($classLc) || !is_string($propName) || '' === $propName)
+            && $this->isStaticPropertyStorageCell($target)) {
+            foreach ($this->context->classes as $entry) {
+                foreach ($entry->staticProperties as $propLc => $storage) {
+                    if ($storage !== $target) {
+                        continue;
+                    }
+                    $classLc = strtolower($entry->name);
+                    $propName = $entry->staticProperties[$propLc]->objectPropertyName ?? $propLc;
+                    break 2;
+                }
+            }
+        }
+        if (!is_string($classLc) || !is_string($propName) || '' === $propName) {
+            return null;
+        }
+        $catchFrame = $this->enforceStaticPropertyWriteVisibility($classLc, $propName, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $msg = $this->asymmetricStaticPropertyWriteMessage($classLc, $propName, $frame);
+        if (null !== $msg) {
+            return $this->dispatchVmError($msg, $frame);
+        }
+
+        return null;
+    }
+
+    private function enforceStaticPropertyWriteVisibility(string $classLc, string $propName, Frame $frame): ?Frame
+    {
+        $meta = $this->resolveStaticPropertyVisibilityMeta($classLc, strtolower($propName));
+        if (null === $meta) {
+            return null;
+        }
+        $writeVis = PropertyVisibility::effectiveSetVisibility($meta['visibility'], $meta['setVisibility']);
+        $readVis = PropertyVisibility::effectiveGetVisibility($meta['visibility'], $meta['getVisibility']);
+        if ($writeVis !== $readVis) {
+            return null;
+        }
+        if (MethodVisibility::isPublic($writeVis)) {
+            return null;
+        }
+        try {
+            PropertyVisibility::assertAccessible(
+                $meta['visibility'],
+                $this->callerClassLc($frame),
+                $meta['declaringClassLc'],
+                $meta['declaringClassDisplay'],
+                $propName,
+                $this->callerClassLc($frame) ?? $meta['declaringClassLc'],
+                fn (string $classLcArg, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLcArg, $ancestorLc),
+                0
+            );
+        } catch (\LogicException $e) {
+            return $this->dispatchVmError($e->getMessage(), $frame);
+        }
+
+        return null;
+    }
+
+    private function asymmetricStaticPropertyWriteMessage(string $classLc, string $propName, Frame $frame): ?string
+    {
+        $meta = $this->resolveStaticPropertyVisibilityMeta($classLc, strtolower($propName));
+        if (null === $meta) {
+            return null;
+        }
+        $setVis = PropertyVisibility::effectiveSetVisibility($meta['visibility'], $meta['setVisibility']);
+        $readVis = PropertyVisibility::effectiveGetVisibility($meta['visibility'], $meta['getVisibility']);
+        if ($setVis === $readVis) {
+            return null;
+        }
+        try {
+            PropertyVisibility::assertWritable(
+                $setVis,
+                $this->callerClassLc($frame),
+                $meta['declaringClassLc'],
+                $meta['declaringClassDisplay'],
+                $propName,
+                fn (string $child, string $parent): bool => $this->isSubclassOf($child, $parent)
+            );
+        } catch (\LogicException $e) {
+            return $e->getMessage();
         }
 
         return null;
@@ -8488,6 +8619,8 @@ restart:
                 $entry->traitStaticPropertyNames[$name] = true;
                 $entry->staticPropertyVisibility[$name] = $trait->staticPropertyVisibility[$name]
                     ?? \PHPCfg\Func::FLAG_PUBLIC;
+                $entry->staticPropertySetVisibility[$name] = $trait->staticPropertySetVisibility[$name] ?? 0;
+                $entry->staticPropertyGetVisibility[$name] = $trait->staticPropertyGetVisibility[$name] ?? 0;
                 $entry->staticPropertyDeclaringClassLc[$name] = $trait->staticPropertyDeclaringClassLc[$name]
                     ?? $traitLc;
             }
@@ -9011,6 +9144,12 @@ restart:
                 if (isset($parent->staticPropertyVisibility[$name])) {
                     $entry->staticPropertyVisibility[$name] = $parent->staticPropertyVisibility[$name];
                 }
+                if (isset($parent->staticPropertySetVisibility[$name])) {
+                    $entry->staticPropertySetVisibility[$name] = $parent->staticPropertySetVisibility[$name];
+                }
+                if (isset($parent->staticPropertyGetVisibility[$name])) {
+                    $entry->staticPropertyGetVisibility[$name] = $parent->staticPropertyGetVisibility[$name];
+                }
                 if (isset($parent->staticPropertyDeclaringClassLc[$name])) {
                     $entry->staticPropertyDeclaringClassLc[$name] = $parent->staticPropertyDeclaringClassLc[$name];
                 }
@@ -9237,6 +9376,8 @@ restart:
                     );
                     $entry->staticProperties[$name] = $storage;
                     $entry->staticPropertyVisibility[$name] = MethodVisibility::mask($op->propertyVisibility);
+                    $entry->staticPropertySetVisibility[$name] = (int) ($op->propertySetVisibility ?? 0);
+                    $entry->staticPropertyGetVisibility[$name] = (int) ($op->propertyGetVisibility ?? 0);
                     $entry->staticPropertyDeclaringClassLc[$name] = strtolower($entry->name);
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
@@ -9413,6 +9554,8 @@ restart:
             );
             $entry->staticProperties[$name] = $storage;
             $entry->staticPropertyVisibility[$name] = MethodVisibility::mask($declareOp->propertyVisibility);
+            $entry->staticPropertySetVisibility[$name] = (int) ($declareOp->propertySetVisibility ?? 0);
+            $entry->staticPropertyGetVisibility[$name] = (int) ($declareOp->propertyGetVisibility ?? 0);
             $entry->staticPropertyDeclaringClassLc[$name] = strtolower($entry->name);
 
             return;

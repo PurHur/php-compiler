@@ -5884,14 +5884,7 @@ class JIT {
                             $nameOp->value
                         );
                         $fetched = $this->context->type->object->staticPropertyFetch($classId, $nameOp->value);
-                        if (
-                            $forWrite
-                            && JIT\PropertyHookDispatch::staticPropertyHasSetHook(
-                                $this->context,
-                                $className,
-                                $nameOp->value
-                            )
-                        ) {
+                        if ($forWrite) {
                             $fetched->staticPropertyHookClassLc = strtolower(ltrim($className, '\\'));
                             $fetched->objectPropertyName = $nameOp->value;
                         }
@@ -8184,6 +8177,11 @@ class JIT {
                         false,
                         \PHPCompiler\MethodVisibility::mask($op->propertyVisibility)
                     );
+                    $this->context->type->object->defineStaticPropertySetVisibility(
+                        $classId,
+                        $name->value,
+                        (int) ($op->propertySetVisibility ?? 0)
+                    );
                     break;
                 case OpCode::TYPE_DECLARE_PROPERTY:
                     $name = $block->getOperand($op->arg1);
@@ -8962,6 +8960,14 @@ class JIT {
         if (null !== $result->staticPropertyGlobal) {
             if (null === $result->staticPropertyType) {
                 throw new \LogicException('staticPropertyGlobal requires staticPropertyType');
+            }
+            if (JIT\AsymmetricVisibilityGuard::emitBeforeStaticPropertyStore(
+                $this->context,
+                $this,
+                $result,
+                $this->context->jitEnclosingBlock
+            )) {
+                return;
             }
             if (JIT\PropertyHookDispatch::emitStaticSetHookIfNeeded(
                 $this->context,
@@ -10287,13 +10293,21 @@ class JIT {
             $this->context->constantFromInteger(1)
         );
         $newVal = $this->context->helper->binaryOp($arithOp, $current, $oneVar);
-        if (!JIT\PropertyHookDispatch::emitStaticSetHookIfNeeded(
-            $this->context,
-            $write,
-            $newVal,
-            $this->context->jitEnclosingBlock,
-            $this
-        )) {
+        if (
+            !JIT\AsymmetricVisibilityGuard::emitBeforeStaticPropertyStore(
+                $this->context,
+                $this,
+                $read,
+                $this->context->jitEnclosingBlock
+            )
+            && !JIT\PropertyHookDispatch::emitStaticSetHookIfNeeded(
+                $this->context,
+                $write,
+                $newVal,
+                $this->context->jitEnclosingBlock,
+                $this
+            )
+        ) {
             $this->context->type->object->staticPropertyStore(
                 $read->staticPropertyGlobal,
                 $newVal,
