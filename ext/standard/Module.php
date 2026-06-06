@@ -164,6 +164,7 @@ class Module extends ModuleAbstract
             new str_starts_with(),
             new str_ends_with(),
             new strncmp(),
+            new memcmp(),
             new substr_compare(),
             new array_count(),
             new array_count('sizeof'),
