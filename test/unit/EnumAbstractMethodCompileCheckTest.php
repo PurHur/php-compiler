@@ -105,4 +105,63 @@ PHP;
         $runtime->run($block);
         $this->assertSame("ok\n", ob_get_clean());
     }
+
+    public function testAbstractEnumWithAbstractMethodCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+abstract enum E: int {
+    case A = 1;
+    abstract public function label(): string;
+}
+echo "compiled\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'abstract_enum_method.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("compiled\n", ob_get_clean());
+    }
+
+    public function testConcreteEnumImplementsAbstractEnumMethod(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+abstract enum E: int {
+    case A = 1;
+    abstract public function label(): string;
+}
+enum F: int implements E {
+    case A = 1;
+    public function label(): string { return 'A'; }
+}
+echo F::A->label(), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'abstract_enum_implements.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("A\n", ob_get_clean());
+    }
+
+    public function testConcreteEnumMissingAbstractEnumMethodFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+abstract enum E: int {
+    case A = 1;
+    abstract public function label(): string;
+}
+enum F: int implements E {
+    case A = 1;
+}
+echo "compiled\n";
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Enum F must implement 1 abstract private method (F::label)');
+        $runtime->parseAndCompile($code, 'abstract_enum_missing.php');
+    }
 }

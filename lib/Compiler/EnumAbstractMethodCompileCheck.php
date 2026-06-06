@@ -7,22 +7,29 @@ namespace PHPCompiler\Compiler;
 use PHPCfg\Op;
 use PHPCfg\Operand;
 use PHPCfg\Script;
+use PHPCompiler\VM\ClassAbstract;
 
 /**
- * Compile-time check: enums must implement declared abstract methods (#6618).
+ * Compile-time check: enums must implement declared abstract methods (#6618, #6887).
  *
  * php-src: Zend/zend_compile.c — enum abstract method validation;
  * Zend/zend_enum.c — enum method table / abstract enforcement.
+ *
+ * PHP 8.4: `abstract enum` may declare abstract methods; concrete enums `implements` them.
  */
 final class EnumAbstractMethodCompileCheck
 {
     /** @var array<string, array{abstract: array<string, string>}> */
     private array $traits = [];
 
+    /** @var array<string, array{display: string, abstract: bool, abstractMethods: array<string, string>}> */
+    private array $enums = [];
+
     public static function validate(Script $script): void
     {
         $check = new self();
         $check->collectTraits($script);
+        $check->collectEnums($script);
         foreach ($script->main->cfg->children as $child) {
             if ($child instanceof Op\Stmt\Enum_) {
                 $check->validateEnum($child);
@@ -46,8 +53,30 @@ final class EnumAbstractMethodCompileCheck
         }
     }
 
+    private function collectEnums(Script $script): void
+    {
+        foreach ($script->main->cfg->children as $child) {
+            if (!$child instanceof Op\Stmt\Enum_) {
+                continue;
+            }
+            $lc = $this->operandLcName($child->name);
+            if (null === $lc) {
+                continue;
+            }
+            $this->enums[$lc] = [
+                'display' => $this->operandDisplayName($child->name, $lc),
+                'abstract' => ClassAbstract::fromClassFlags($child->flags ?? 0),
+                'abstractMethods' => $this->collectAbstractMethodNames($child->stmts->children),
+            ];
+        }
+    }
+
     private function validateEnum(Op\Stmt\Enum_ $enum): void
     {
+        if (ClassAbstract::fromClassFlags($enum->flags ?? 0)) {
+            return;
+        }
+
         $enumDisplay = $this->operandDisplayName($enum->name, 'enum');
         $abstract = $this->collectAbstractMethodNames($enum->stmts->children);
         $concrete = $this->collectConcreteMethodNames($enum->stmts->children);
@@ -65,6 +94,22 @@ final class EnumAbstractMethodCompileCheck
                     if (!isset($abstract[$methodLc])) {
                         $abstract[$methodLc] = $methodName;
                     }
+                }
+            }
+        }
+
+        foreach ($enum->implements as $implementedOperand) {
+            $implementedLc = $this->operandLcName($implementedOperand);
+            if (null === $implementedLc || !isset($this->enums[$implementedLc])) {
+                continue;
+            }
+            $implemented = $this->enums[$implementedLc];
+            if (!$implemented['abstract']) {
+                continue;
+            }
+            foreach ($implemented['abstractMethods'] as $methodLc => $methodName) {
+                if (!isset($abstract[$methodLc])) {
+                    $abstract[$methodLc] = $methodName;
                 }
             }
         }
