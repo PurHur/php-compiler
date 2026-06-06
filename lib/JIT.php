@@ -10971,17 +10971,28 @@ class JIT {
             return;
         }
         $declaringClassId = $this->context->type->object->lookup($className);
-        $this->assertJitStaticMethodCallable($declaringClassLc, $methodLc, $className, $nameOp->value);
-        $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
         $callerClassLc = null;
         if (null !== $block->func && null !== $block->func->class) {
             $callerClassLc = strtolower($block->func->class->value);
         } elseif ($this->context->scope->className !== '') {
             $callerClassLc = $this->context->scope->className;
         }
+        $callerInstanceMethod = null !== $block->func
+            && null !== $block->func->class
+            && 0 === (($block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC);
+        $directParentLc = null !== $callerClassLc
+            ? $this->context->type->object->parentClassLc($callerClassLc)
+            : null;
+        // php-cfg lowers parent:: to the direct parent class; allow instance forwarding (#1858, #6735).
+        $parentScopeInstanceCall = $callerInstanceMethod
+            && null !== $directParentLc
+            && $directParentLc === $declaringClassLc;
+        if (!$parentScopeInstanceCall) {
+            $this->assertJitStaticMethodCallable($declaringClassLc, $methodLc, $className, $nameOp->value);
+        }
+        $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
         $parentScopeAllows = false;
         if (null !== $callerClassLc) {
-            $directParentLc = $this->context->type->object->parentClassLc($callerClassLc);
             if (null !== $directParentLc && $directParentLc === $declaringClassLc) {
                 $parentScopeAllows = MethodVisibility::parentScopeAllows(
                     $visFlags,

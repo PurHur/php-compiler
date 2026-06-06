@@ -5998,6 +5998,24 @@ restart:
     }
 
     /**
+     * php-cfg MagicStringResolver lowers parent:: to the direct parent class name; treat
+     * static-looking calls to that class from an instance method as parent-scope (#1858, #6735).
+     */
+    private function isDirectParentScopeInstanceCall(Frame $frame, string $resolvedLcClass): bool
+    {
+        if (null === $this->resolveCallerThis($frame)) {
+            return false;
+        }
+        $callerClassLc = $this->callerClassLc($frame);
+        if (null === $callerClassLc || !isset($this->context->classes[$callerClassLc])) {
+            return false;
+        }
+        $directParentLc = $this->context->classes[$callerClassLc]->parentLc;
+
+        return null !== $directParentLc && $directParentLc === strtolower($resolvedLcClass);
+    }
+
+    /**
      * Zend zend_std_get_static_method: instance methods are not callable via Class::name() (#5339).
      */
     private function assertMethodCallableStatically(ClassEntry $declaringClass, string $methodLc): void
@@ -7843,7 +7861,11 @@ restart:
         }
         try {
             [$class, $methodLc] = $this->resolveStaticMethod($lcClass, $methodLc);
-            $this->assertMethodCallableStatically($class, $methodLc);
+            $parentScopeInstanceCall = $parentKeywordScope
+                || $this->isDirectParentScopeInstanceCall($frame, $lcClass);
+            if (!$parentScopeInstanceCall) {
+                $this->assertMethodCallableStatically($class, $methodLc);
+            }
         } catch (\LogicException $e) {
             $magicClass = $this->findMagicCallStaticClass($lcClass);
             if (null === $magicClass) {
@@ -7918,7 +7940,7 @@ restart:
         if ([] !== $args) {
             return $args;
         }
-        if ($parentKeywordScope) {
+        if ($parentKeywordScope || $this->isDirectParentScopeInstanceCall($frame, $resolvedLc)) {
             $thisVar = $this->resolveCallerThis($frame);
             if (null !== $thisVar) {
                 return [$thisVar];
