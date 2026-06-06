@@ -22,6 +22,10 @@ final class DebugBacktraceJITTest extends BaseTest
             __DIR__.'/cases/stdlib/debug_backtrace_jit.phpt',
             'debug_backtrace_jit.phpt'
         );
+        yield 'get_debug_backtrace_alias_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/get_debug_backtrace_alias_jit.phpt',
+            'get_debug_backtrace_alias_jit.phpt'
+        );
     }
 
     public function setUp(): void
