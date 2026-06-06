@@ -12,6 +12,7 @@ namespace PHPCompiler\JIT\Builtin\Type;
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCompiler\Block;
+use PHPCompiler\ClassConstVisibility;
 use PHPCompiler\PseudoClassScope;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\ClassConstFetchHelper;
@@ -103,6 +104,9 @@ class Object_ extends Type {
     private array $externalOnlyClassIds = [];
     /** @var array<int, array<string, array{type: int, value: int|float|bool|string|null}>> */
     private array $classConstants = [];
+
+    /** @var array<int, array<string, int>> class id => const lc => visibility flags (#4651, #6664) */
+    private array $constVisibility = [];
 
     /** @var array<int, array<string, string>> class id => const key lc => canonical display name */
     private array $classConstDisplayNames = [];
@@ -2945,6 +2949,16 @@ class Object_ extends Type {
         throw new \LogicException("Property {$name} not defined for class {$classId}");
     }
 
+    public function defineClassConstVisibility(int $classId, string $name, int $visibilityFlags): void
+    {
+        $this->constVisibility[$classId][strtolower($name)] = ClassConstVisibility::mask($visibilityFlags);
+    }
+
+    public function constVisibility(int $classId, string $name): int
+    {
+        return $this->constVisibility[$classId][strtolower($name)] ?? \PHPCfg\Func::FLAG_PUBLIC;
+    }
+
     public function defineClassConst(int $classId, string $name, VMVariable $value): void
     {
         $key = strtolower($name);
@@ -3083,6 +3097,9 @@ class Object_ extends Type {
             foreach ($this->classConstants[$ifaceId] as $name => $entry) {
                 if (!isset($this->classConstants[$classId][$name])) {
                     $this->classConstants[$classId][$name] = $entry;
+                    if (isset($this->constVisibility[$ifaceId][$name])) {
+                        $this->constVisibility[$classId][$name] = $this->constVisibility[$ifaceId][$name];
+                    }
                 }
             }
         }
@@ -3180,6 +3197,9 @@ class Object_ extends Type {
             $this->traitConstSources[$classId][$name] = $traitName;
             if (isset($this->classConstDisplayNames[$traitId][$name])) {
                 $this->classConstDisplayNames[$classId][$name] = $this->classConstDisplayNames[$traitId][$name];
+            }
+            if (isset($this->constVisibility[$traitId][$name])) {
+                $this->constVisibility[$classId][$name] = $this->constVisibility[$traitId][$name];
             }
         }
     }
@@ -3333,9 +3353,14 @@ class Object_ extends Type {
         return $this->jitConstantFromEntry($this->classConstants[$classId][$key]);
     }
 
-    public function classConstFetchDynamic(int $classId, Variable $nameVar, Operand $classOp): Variable
-    {
-        return ClassConstFetchHelper::fetchDynamic($this, $classId, $nameVar, $classOp);
+    public function classConstFetchDynamic(
+        int $classId,
+        Variable $nameVar,
+        Operand $classOp,
+        ?Block $block = null,
+        ?\PHPCompiler\JIT $jit = null
+    ): Variable {
+        return ClassConstFetchHelper::fetchDynamic($this, $classId, $nameVar, $classOp, $block, $jit);
     }
 
     public function emitDirectTraitConstAccessErrorIfNeeded(int $classId, string $constName): void

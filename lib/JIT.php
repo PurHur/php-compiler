@@ -5773,6 +5773,13 @@ class JIT {
                                 $this->assignOperand($block->getOperand($op->arg1), $opcodeConst);
                                 break;
                             }
+                            JIT\ClassConstVisibilityJitGuard::emitBeforeFetch(
+                                $this->context->type->object,
+                                $this,
+                                $block,
+                                $classId,
+                                $nameOp->value
+                            );
                             $value = $this->context->type->object->classConstFetch($classId, $nameOp->value);
                             $resultOp = $block->getOperand($op->arg1);
                             if ($this->context->type->object->isEnumClassId($classId)
@@ -5783,7 +5790,13 @@ class JIT {
                             break;
                         }
                         $nameVar = $this->context->getVariableFromOp($nameOp);
-                        $value = $this->context->type->object->classConstFetchDynamic($classId, $nameVar, $classOp);
+                        $value = $this->context->type->object->classConstFetchDynamic(
+                            $classId,
+                            $nameVar,
+                            $classOp,
+                            $block,
+                            $this
+                        );
                         $this->assignOperand($block->getOperand($op->arg1), $value);
                         break;
                     }
@@ -5802,7 +5815,8 @@ class JIT {
                             $block,
                             $classVar,
                             $classOp,
-                            $nameOp->value
+                            $nameOp->value,
+                            $this
                         );
                         $this->assignOperand($block->getOperand($op->arg1), $value);
                         break;
@@ -8367,14 +8381,19 @@ class JIT {
                             );
                             break;
                         }
-                        $this->context->type->object->defineClassConst(
-                            $classId,
-                            $name->value,
-                            $constValue
-                        );
-                        break;
-                    }
-                    if ($this->context->type->object->isEnumClassId($classId) && $op->isEnumCaseDeclare) {
+                    $this->context->type->object->defineClassConst(
+                        $classId,
+                        $name->value,
+                        $constValue
+                    );
+                    $this->context->type->object->defineClassConstVisibility(
+                        $classId,
+                        $name->value,
+                        $op->classConstVisibilityFlags
+                    );
+                    break;
+                }
+                if ($this->context->type->object->isEnumClassId($classId) && $op->isEnumCaseDeclare) {
                         $this->context->type->object->defineEnumCaseConst(
                             $classId,
                             $name->value,
@@ -8382,12 +8401,17 @@ class JIT {
                         );
                         break;
                     }
-                    $this->context->type->object->defineClassConst(
-                        $classId,
-                        $name->value,
-                        $constValue
-                    );
-                    if ([] !== $op->attributeNames) {
+                $this->context->type->object->defineClassConst(
+                    $classId,
+                    $name->value,
+                    $constValue
+                );
+                $this->context->type->object->defineClassConstVisibility(
+                    $classId,
+                    $name->value,
+                    $op->classConstVisibilityFlags
+                );
+                if ([] !== $op->attributeNames) {
                         $classLc = '' !== $this->context->scope->className
                             ? strtolower(ltrim($this->context->scope->className, '\\'))
                             : strtolower(ltrim($this->context->type->object->classNameForId($this->context->scope->classId), '\\'));
