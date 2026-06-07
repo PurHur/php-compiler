@@ -20,6 +20,7 @@ use PHPLLVM\Value;
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_walk_recursive)
  *
  * JIT/AOT: compile-time string builtin callbacks (#3111); VM closure callbacks (#3086).
+ * Optional $userdata is VM-only for closure callbacks (#4913, mirrors #3627).
  */
 final class array_walk_recursive extends Internal
 {
@@ -44,12 +45,8 @@ final class array_walk_recursive extends Internal
             );
         }
         $array->separateArrayForWrite();
-        if (3 === $argc) {
-            throw new \LogicException(
-                'array_walk_recursive() userdata is not supported in this compiler build'
-            );
-        }
         $callback = $frame->calledArgs[1]->resolveIndirect();
+        $userdata = 3 === $argc ? $frame->calledArgs[2]->resolveIndirect() : null;
         $table = $array->toArray();
         if (VmClosureCall::isClosure($callback)) {
             if (null === $frame->vmContext) {
@@ -58,7 +55,7 @@ final class array_walk_recursive extends Internal
                 );
             }
             $closure = VmClosureCall::resolve($callback);
-            $ok = self::walkClosure($frame->vmContext, $table, $closure);
+            $ok = self::walkClosure($frame->vmContext, $table, $closure, $userdata);
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool($ok);
             }
@@ -78,6 +75,11 @@ final class array_walk_recursive extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         if (2 !== \count($args)) {
+            if (3 === \count($args)) {
+                throw new \LogicException(
+                    'array_walk_recursive() userdata is not supported for JIT/AOT in this compiler build (#4913)'
+                );
+            }
             throw new \LogicException(
                 'array_walk_recursive() requires exactly two arguments in this compiler build'
             );
@@ -117,19 +119,26 @@ final class array_walk_recursive extends Internal
     private static function walkClosure(
         \PHPCompiler\VM\Context $context,
         HashTable $table,
-        \PHPCompiler\VM\ClosureState $closure
+        \PHPCompiler\VM\ClosureState $closure,
+        ?Variable $userdata
     ): bool {
         foreach ($table->iterateKeyed(true) as [$key, $value]) {
             if (Variable::TYPE_ARRAY === $value->type) {
                 $value->separateArrayForWrite();
-                if (!self::walkClosure($context, $value->toArray(), $closure)) {
+                if (!self::walkClosure($context, $value->toArray(), $closure, $userdata)) {
                     return false;
                 }
                 continue;
             }
             $keyCopy = new Variable();
             $keyCopy->copyFrom($key);
-            $result = VmClosureCall::invoke($context, $closure, $value, $keyCopy);
+            if (null !== $userdata) {
+                $userdataCopy = new Variable();
+                $userdataCopy->copyFrom($userdata);
+                $result = VmClosureCall::invokeDirect($context, $closure, $value, $keyCopy, $userdataCopy);
+            } else {
+                $result = VmClosureCall::invokeDirect($context, $closure, $value, $keyCopy);
+            }
             if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
                 return false;
             }
