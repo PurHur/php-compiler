@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * MCJIT compile-only for DECLARE_TRAIT units defer to VM lowering (#6284, #3609).
+ * Empty trait bodies defer to VM lowering; MCJIT compile-only must not segfault (#6284).
  *
  * @group llvm
  */
@@ -39,8 +39,30 @@ PHP
             'trait_empty_mcjit_compile.php'
         );
         $this->assertNotNull($block);
-        $this->assertTrue(Block::containsDeclareTraitOpcodesInScriptScope($block));
+        $this->assertTrue(Block::containsEmptyTraitBodyMcjitDeferral($block));
         $this->assertTrue(Block::requiresVmLowering($block));
+    }
+
+    public function testTraitWithConstructorDoesNotDeferMcjit(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+trait HasX {
+    public function __construct(public int $x) {}
+}
+class C {
+    use HasX;
+}
+echo (new C(1))->x, "\n";
+PHP
+            ,
+            'trait_ctor_mcjit_gate.php'
+        );
+        $this->assertNotNull($block);
+        $this->assertTrue(Block::containsTraitConstructorOpcodes($block));
+        $this->assertFalse(Block::containsEmptyTraitBodyMcjitDeferral($block));
+        $this->assertFalse(Block::requiresVmLowering($block));
     }
 
     public function testEmptyTraitMcjitCompileOnlyViaBinJit(): void
