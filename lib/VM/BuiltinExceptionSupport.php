@@ -71,6 +71,9 @@ final class BuiltinExceptionSupport
         if ($error instanceof \TypeError) {
             return self::materializeTypeError($ctx, $error->getMessage(), $file, $line);
         }
+        if ($error instanceof \DivisionByZeroError) {
+            return self::materializeDivisionByZeroError($ctx, $error->getMessage());
+        }
 
         return self::materializeError($ctx, $error->getMessage(), $file, $line);
     }
