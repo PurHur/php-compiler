@@ -5885,6 +5885,7 @@ class Compiler {
         $this->assignAttributeMetadata($op, $expr);
         AttributeNames::assertCompileTimeConstTargetOnly($op->attributeNames, 'function');
         if ($expr instanceof Op\Expr\Closure) {
+            Compiler\ReadonlyFunctionCompileCheck::assertClosureCaptures($expr);
             foreach ($expr->useVars as $useVar) {
                 if (!$useVar instanceof Operand\BoundVariable) {
                     continue;

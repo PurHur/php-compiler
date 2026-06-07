@@ -138,6 +138,7 @@ final class CurlyBraceOffsetRejector
             T_CATCH,
             T_FUNCTION,
             T_FN,
+            T_USE,
         ];
 
         if (\in_array($beforeOpen[0], $blockOpeners, true)) {
