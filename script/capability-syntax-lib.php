@@ -798,6 +798,7 @@ function syntaxRowDefinitions(): array
             'aot' => true,
             'notes' => [
                 'SourcePreprocessor lowers hooks to __phpc_property_* methods (#3145)',
+                'Promoted constructor parameters with hook blocks preprocess to promoted param + __phpc_property_* methods (#7313)',
                 'VM dispatches set/get on property access; JIT PropertyHookDispatch (#3723)',
                 'Static property hooks rejected at compile time (#6619, php-src 8.4 zend_compile.c)',
                 'AOT: user-class hook methods lower under PHP_COMPILER_SELFHOST_AOT; set-hook smoke in property_hook_set.phpt',
