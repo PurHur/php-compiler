@@ -111,22 +111,14 @@ final class StringFsGlobVecJit
         $i8p = $context->getTypeFromString('int8*');
         $i8pp = $context->getTypeFromString('int8**');
         $i8ppp = $i8pp->pointerType(0);
-        $voidPtr = $context->getTypeFromString('void*');
-        $sizeT = $context->getTypeFromString('size_t');
         $voidTy = $context->getTypeFromString('void');
 
+        // glob/scandir only — malloc/free/memset/stat/strcmp come from LibcExtern (i8*).
         foreach ([
-            ['glob', $i32, [$i8p, $i32, $voidPtr, $voidPtr]],
-            ['globfree', $voidTy, [$voidPtr]],
-            ['scandir', $i32, [$i8p, $i8ppp, $voidPtr, $voidPtr]],
+            ['glob', $i32, [$i8p, $i32, $i8p, $i8p]],
+            ['globfree', $voidTy, [$i8p]],
+            ['scandir', $i32, [$i8p, $i8ppp, $i8p, $i8p]],
             ['alphasort', $i32, [$i8pp, $i8pp]],
-            ['stat', $i32, [$i8p, $voidPtr]],
-            ['strcmp', $i32, [$i8p, $i8p]],
-            ['malloc', $voidPtr, [$sizeT]],
-            ['realloc', $voidPtr, [$voidPtr, $sizeT]],
-            ['strdup', $i8p, [$i8p]],
-            ['free', $voidTy, [$voidPtr]],
-            ['memset', $voidPtr, [$voidPtr, $i32, $sizeT]],
         ] as [$name, $ret, $params]) {
             self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
         }
@@ -324,7 +316,7 @@ final class StringFsGlobVecJit
             $context->lookupFunction('glob'),
             $pat,
             $flags,
-            $voidPtr->constNull(),
+            $i8p->constNull(),
             $context->bytePtr($globBase)
         );
         $nomatch = $context->builder->icmp(Builder::INT_EQ, $rc, $i32->constInt(self::GLOB_NOMATCH, false));
@@ -499,7 +491,7 @@ final class StringFsGlobVecJit
 
         $isDesc = $context->builder->icmp(Builder::INT_EQ, $sortOrder, $i32->constInt(self::SCANDIR_SORT_DESCENDING, false));
         $isNone = $context->builder->icmp(Builder::INT_EQ, $sortOrder, $i32->constInt(self::SCANDIR_SORT_NONE, false));
-        $cmpSlot = BasicBlockHelper::entryAlloca($context, $voidPtr);
+        $cmpSlot = BasicBlockHelper::entryAlloca($context, $i8p);
         $pickCmp = $fn->appendBasicBlock('scan_pick_cmp');
         $afterCmp = $fn->appendBasicBlock('scan_after_cmp');
         $context->builder->branch($pickCmp);
@@ -507,12 +499,13 @@ final class StringFsGlobVecJit
         $context->builder->positionAtEnd($pickCmp);
         $descCmp = $context->lookupFunction('__phpc_scandir_desc_cmp');
         $alphaCmp = $context->lookupFunction('alphasort');
+        $nullCmp = $i8p->constNull();
         $cmp = $context->builder->select(
             $isDesc,
             $context->bytePtr($descCmp),
             $context->builder->select(
                 $isNone,
-                $voidPtr->constNull(),
+                $nullCmp,
                 $context->bytePtr($alphaCmp)
             )
         );
@@ -524,7 +517,7 @@ final class StringFsGlobVecJit
             $context->lookupFunction('scandir'),
             $dir,
             $namelistSlot,
-            $voidPtr->constNull(),
+            $nullCmp,
             $context->builder->load($cmpSlot)
         );
         $scanFail = $context->builder->icmp(Builder::INT_SLT, $n, $zero32);

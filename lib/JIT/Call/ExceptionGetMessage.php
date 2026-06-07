@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
@@ -20,11 +21,10 @@ final class ExceptionGetMessage implements Call
         }
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         $messageVar = $context->type->object->propertyFetch($obj, 'Exception', 'message');
-        $valuePtr = $context->helper->loadValue($messageVar);
 
         return $context->builder->call(
             $context->lookupFunction('__value__readString'),
-            $context->builder->pointerCast($valuePtr, $context->getTypeFromString('__value__*'))
+            JitValueBox::valuePtrFromVariable($context, $messageVar)
         );
     }
 }
