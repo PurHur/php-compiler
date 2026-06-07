@@ -10241,7 +10241,6 @@ class JIT {
                 $readPtr
             );
         }
-    {
         if (JIT\Variable::TYPE_NULL === $read->type || ($read->isNullConstant ?? false)) {
             return $readPtr->typeOf()->constInt(0, false);
         }
