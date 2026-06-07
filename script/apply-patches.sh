@@ -558,11 +558,13 @@ get_vis_block = (
 for needle in (
     "    public int $promotionSetVisibility = 0;\n",
     "    public $promotionSetVisibility = 0;\n",
+    "    public int $promotionFlags = 0;\n",
+    "    public $promotionFlags = 0;\n",
 ):
     if needle in text:
         path.write_text(text.replace(needle, needle + get_vis_block, 1))
         raise SystemExit(0)
-match = re.search(r"\n    public(?: int)? \$promotionSetVisibility = 0;\n", text)
+match = re.search(r"\n    public(?: int)? \$promotion(?:SetVisibility|Flags) = 0;\n", text)
 if match is not None:
     needle = match.group(0)
     path.write_text(text.replace(needle, needle + get_vis_block, 1))
@@ -4313,6 +4315,9 @@ verify_critical_language_patches() {
   fi
   if ! grep -q 'function extractAsymmetricGetVisibilityFromAttributes' "$parser" 2>/dev/null; then
     missing+=("php-cfg-asymmetric-get-visibility-Parser")
+  fi
+  if ! grep -q "case 'Expr_YieldFrom':" "$recon" 2>/dev/null; then
+    missing+=("php-types-yield-from")
   fi
   if [[ ! -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/In_.php" ]]; then
     missing+=("php-cfg-in-operator-In_")
