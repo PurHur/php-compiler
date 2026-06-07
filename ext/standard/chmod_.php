@@ -24,18 +24,12 @@ final class chmod_ extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('chmod() requires exactly two arguments in this compiler build');
         }
-        $pathVar = $frame->calledArgs[0]->resolveIndirect();
-        $modeVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $pathVar->type) {
-            throw new \LogicException('chmod() filename must be a string in this compiler build');
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'chmod');
+        $mode = VmFilestatArg::requireIntArg($frame->calledArgs[1], 'chmod', 1, 'permissions');
+        if (null === $frame->returnVar) {
+            return;
         }
-        if (Variable::TYPE_INTEGER !== $modeVar->type) {
-            throw new \LogicException('chmod() permissions must be an integer in this compiler build');
-        }
-        $ok = VmFs::chmod($pathVar->toString(), $modeVar->toInt());
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->bool($ok);
-        }
+        $frame->returnVar->bool(VmFs::chmod($path, $mode));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -43,9 +37,7 @@ final class chmod_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('chmod() requires exactly two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('chmod() filename must be a string in this compiler build');
-        }
+        JitFilestatArg::guardInt($context, $args[1], 'chmod', 1, 'permissions');
         if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
             throw new \LogicException('chmod() permissions must be an integer in this compiler build');
         }
@@ -55,7 +47,8 @@ final class chmod_ extends Internal
             $i32
         );
 
-        $this->jitString($context, $args[0], 'chmod() argument #1');
-        return JitChmod::invoke($context, $context->helper->loadValue($args[0]), $mode);
+        $path = JitFilestatArg::lowerFilename($context, $args[0], 'chmod');
+
+        return JitChmod::invoke($context, $path, $mode);
     }
 }

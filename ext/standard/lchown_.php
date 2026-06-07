@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -25,18 +24,12 @@ final class lchown_ extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('lchown() requires exactly two arguments in this compiler build');
         }
-        $pathVar = $frame->calledArgs[0]->resolveIndirect();
-        $userVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $pathVar->type) {
-            throw new \LogicException('lchown() filename must be a string in this compiler build');
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'lchown');
+        $userVar = VmFilestatArg::requireIntOrStringArg($frame->calledArgs[1], 'lchown', 1, 'user');
+        if (null === $frame->returnVar) {
+            return;
         }
-        if (!\in_array($userVar->type, [Variable::TYPE_INTEGER, Variable::TYPE_STRING], true)) {
-            throw new \LogicException('lchown() user must be int or string in this compiler build');
-        }
-        $ok = VmFs::lchown($pathVar->toString(), $userVar);
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->bool($ok);
-        }
+        $frame->returnVar->bool(VmFs::lchown($path, $userVar));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -44,8 +37,8 @@ final class lchown_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('lchown() requires exactly two arguments in this compiler build');
         }
-        $path = $this->jitString($context, $args[0], 'lchown() argument #1');
-        $userPtr = JitValueBox::valuePtrFromVariable($context, $args[1]);
+        $path = JitFilestatArg::lowerFilename($context, $args[0], 'lchown');
+        $userPtr = JitFilestatArg::valuePtrAfterIntOrStringGuard($context, $args[1], 'lchown', 1, 'user');
 
         return JitChown::invoke($context, $path, $userPtr, true);
     }
