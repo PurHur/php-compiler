@@ -210,6 +210,7 @@ class Runtime {
         $this->load(new ext\tokenizer\Module);
         $this->load(new ext\random\Module);
         $this->load(new ext\igbinary\Module);
+        $this->load(new ext\msgpack\Module);
         $this->load(new ext\standard\Module);
     }
 
