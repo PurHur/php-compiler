@@ -10073,9 +10073,7 @@ restart:
             $op = $classBodyOps[$classBodyOpIndex];
             if (isset($classConstSkipIndices[$classBodyOpIndex])) {
                 if (OpCode::TYPE_DECLARE_CLASS_CONST === $op->type && [] !== $pendingNewDefaultOps) {
-                    foreach ($pendingNewDefaultOps as $pendingOp) {
-                        $this->executeClassBodyConstInitOpcode($frame, $pendingOp);
-                    }
+                    $this->finalizePendingNewClassConst($frame, $block, $op, $pendingNewDefaultOps);
                     $pendingNewDefaultOps = [];
                 }
 
@@ -10089,9 +10087,7 @@ restart:
                     continue;
                 }
                 if (OpCode::TYPE_DECLARE_CLASS_CONST === $op->type) {
-                    foreach ($pendingNewDefaultOps as $pendingOp) {
-                        $this->executeClassBodyConstInitOpcode($frame, $pendingOp);
-                    }
+                    $this->finalizePendingNewClassConst($frame, $block, $op, $pendingNewDefaultOps);
                     $pendingNewDefaultOps = [];
                 } else {
                     $pendingNewDefaultOps[] = $op;
@@ -10369,6 +10365,7 @@ restart:
         $segments = [];
         /** @var list<int> $pendingInitIndices */
         $pendingInitIndices = [];
+        $inNewFragment = false;
         foreach ($classBodyOps as $index => $op) {
             if (OpCode::TYPE_DECLARE_CLASS_CONST === $op->type) {
                 $name = strtolower($frame->scope[$op->arg1]->toString());
@@ -10377,11 +10374,20 @@ restart:
                     'declareIndex' => $index,
                 ];
                 $pendingInitIndices = [];
+                $inNewFragment = false;
+
+                continue;
+            }
+            if ($inNewFragment) {
+                $pendingInitIndices[] = $index;
 
                 continue;
             }
             if ($this->isClassConstSegmentInitOpcode($op->type)) {
                 $pendingInitIndices[] = $index;
+                if (OpCode::TYPE_NEW === $op->type) {
+                    $inNewFragment = true;
+                }
             } elseif ([] !== $pendingInitIndices) {
                 $pendingInitIndices = [];
             }
@@ -10491,24 +10497,81 @@ restart:
         array $classBodyOps,
         array $segment
     ): void {
+        $declareOp = $classBodyOps[$segment['declareIndex']];
+        $initOps = [];
         foreach ($segment['initIndices'] as $index) {
-            $op = $classBodyOps[$index];
-            if (VM\ClassConstExpr::isSupportedOpcode($op->type)) {
-                VM\ClassConstExpr::execute($this->context, $frame, $op, $entry);
-            } elseif ($this->isClassBodyConstInitOpcode($op->type)) {
-                $this->executeClassBodyConstInitOpcode($frame, $op);
-            } else {
-                throw new \LogicException(
-                    'Unexpected class constant init opcode: '.opcode_type_name($op->type)
-                );
+            $initOps[] = $classBodyOps[$index];
+        }
+        $newResultSlot = $this->classConstNewFragmentResultSlot($initOps);
+        if (null !== $newResultSlot) {
+            $value = $this->executePropertyDefaultInitBlock(
+                $block->fragmentForOpcodes($initOps),
+                $newResultSlot
+            );
+            if (!isset($frame->scope[$declareOp->arg2])) {
+                $frame->scope[$declareOp->arg2] = new Variable();
+            }
+            $frame->scope[$declareOp->arg2]->copyFrom($value);
+        } else {
+            foreach ($initOps as $op) {
+                if (VM\ClassConstExpr::isSupportedOpcode($op->type)) {
+                    VM\ClassConstExpr::execute($this->context, $frame, $op, $entry);
+                } elseif ($this->isClassBodyConstInitOpcode($op->type)) {
+                    $this->executeClassBodyConstInitOpcode($frame, $op);
+                } else {
+                    throw new \LogicException(
+                        'Unexpected class constant init opcode: '.opcode_type_name($op->type)
+                    );
+                }
             }
         }
         $this->applyClassConstDeclaration(
             $entry,
             $block,
             $frame,
-            $classBodyOps[$segment['declareIndex']]
+            $declareOp
         );
+    }
+
+    /**
+     * @param list<OpCode> $pendingNewDefaultOps
+     */
+    private function finalizePendingNewClassConst(
+        Frame $frame,
+        Block $block,
+        OpCode $declareOp,
+        array $pendingNewDefaultOps
+    ): void {
+        $resultSlot = $this->classConstNewFragmentResultSlot($pendingNewDefaultOps);
+        if (null === $resultSlot) {
+            foreach ($pendingNewDefaultOps as $pendingOp) {
+                $this->executeClassBodyConstInitOpcode($frame, $pendingOp);
+            }
+
+            return;
+        }
+        $value = $this->executePropertyDefaultInitBlock(
+            $block->fragmentForOpcodes($pendingNewDefaultOps),
+            $resultSlot
+        );
+        if (!isset($frame->scope[$declareOp->arg2])) {
+            $frame->scope[$declareOp->arg2] = new Variable();
+        }
+        $frame->scope[$declareOp->arg2]->copyFrom($value);
+    }
+
+    /**
+     * @param list<OpCode> $initOps
+     */
+    private function classConstNewFragmentResultSlot(array $initOps): ?int
+    {
+        foreach ($initOps as $initOp) {
+            if (OpCode::TYPE_NEW === $initOp->type) {
+                return $initOp->arg1;
+            }
+        }
+
+        return null;
     }
 
     /**
