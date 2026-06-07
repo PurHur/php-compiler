@@ -23,6 +23,7 @@ use PHPCfg\Operand\Temporary;
 use PHPCfg\Operand\Variable as CfgVariable;
 use PHPCfg\Script;
 use PHPTypes\Type;
+use PHPCompiler\VM\AttributeSupport;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
@@ -48,6 +49,7 @@ use PHPCompiler\Compiler\AttributeClassRegistry;
 use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\AttributeMetadata;
 use PHPCompiler\Compiler\AttributeNames;
+use PHPCompiler\Compiler\AttributeTargetValidator;
 use PHPCompiler\Compiler\DeprecatedMetadata;
 use PHPCompiler\Compiler\NoDiscardMetadata;
 use PHPCompiler\Compiler\FinalClassConstCheck;
@@ -3568,6 +3570,13 @@ class Compiler {
                             || $this->isReadonlyPropertyFlags($child->visibility);
                     }
                     $this->assignAttributeMetadata($declare, $child);
+                    AttributeTargetValidator::assertEntriesForTarget(
+                        $declare->attributeEntries,
+                        AttributeSupport::TARGET_PROPERTY,
+                        'property',
+                        $this->attributeClassRegistry,
+                        true
+                    );
                     AttributeNames::assertOverrideMethodTargetOnly($declare->attributeNames, 'property');
                     AttributeNames::assertCompileTimeConstTargetOnly($declare->attributeNames, 'property');
                     $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
@@ -4039,6 +4048,10 @@ class Compiler {
         $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($param);
         $declare->propertyGetVisibility = $this->asymmetricGetVisibilityFromCfgOp($param);
         $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($param);
+        $this->assignAttributeMetadata($declare, $param);
+        AttributeTargetValidator::assertPromotedParameterTargets($declare->attributeEntries, $this->attributeClassRegistry);
+        AttributeNames::assertOverrideMethodTargetOnly($declare->attributeNames, 'property');
+        AttributeNames::assertCompileTimeConstTargetOnly($declare->attributeNames, 'property');
         $result->addOpCode($declare);
     }
 

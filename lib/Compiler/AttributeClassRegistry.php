@@ -28,12 +28,27 @@ final class AttributeClassRegistry
 
     public function isRepeatable(string $attributeClassName): bool
     {
-        $flags = $this->flags[self::lc($attributeClassName)] ?? null;
+        $flags = $this->getFlags($attributeClassName);
         if (null === $flags) {
             return false;
         }
 
         return 0 !== ($flags & AttributeSupport::IS_REPEATABLE);
+    }
+
+    public function getFlags(string $attributeClassName): ?int
+    {
+        return $this->flags[self::lc($attributeClassName)] ?? null;
+    }
+
+    public function allowsTarget(string $attributeClassName, int $targetFlag): bool
+    {
+        $flags = $this->getFlags($attributeClassName);
+        if (null === $flags) {
+            return true;
+        }
+
+        return 0 !== ($flags & $targetFlag);
     }
 
     /**
