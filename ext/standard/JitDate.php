@@ -44,8 +44,23 @@ final class JitDate
 
     public static function getmygrgid(Context $context): Value
     {
+        return self::libcUidToI64($context, 'getgid');
+    }
+
+    public static function getmyuid(Context $context): Value
+    {
+        return self::libcUidToI64($context, 'getuid');
+    }
+
+    public static function getmygid(Context $context): Value
+    {
+        return self::libcUidToI64($context, 'getgid');
+    }
+
+    private static function libcUidToI64(Context $context, string $fn): Value
+    {
         $i64 = $context->getTypeFromString('int64');
-        $raw = $context->builder->call($context->lookupFunction('getgid'));
+        $raw = $context->builder->call($context->lookupFunction($fn));
 
         return $raw->typeOf() === $i64
             ? $raw

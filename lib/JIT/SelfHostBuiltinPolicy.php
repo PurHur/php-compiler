@@ -46,6 +46,8 @@ final class SelfHostBuiltinPolicy
         'idate' => 'numeric',
         'uniqid' => 'numeric',
         'getmypid' => 'numeric',
+        'getmyuid' => 'numeric',
+        'getmygid' => 'numeric',
         'zend_thread_id' => 'numeric',
         'getmygrgid' => 'numeric',
         'getmyinode' => 'numeric',
@@ -151,6 +153,7 @@ final class SelfHostBuiltinPolicy
         'is_uploaded_file' => 'filesystem', 'move_uploaded_file' => 'filesystem', 'touch' => 'filesystem',
         'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem', 'tempnam' => 'filesystem', 'tmpfile' => 'filesystem',
         'getcwd' => 'filesystem', 'chdir' => 'filesystem', 'gethostname' => 'filesystem',
+        'get_current_user' => 'filesystem',
         'gethostbynamel' => 'filesystem',
         'gethostbyname' => 'filesystem',
         'gethostbyaddr' => 'filesystem',
@@ -246,7 +249,7 @@ final class SelfHostBuiltinPolicy
         'trigger_error' => 'array',
         'error_get_last' => 'array',
         'error_clear_last' => 'array',
-        'ini_set' => 'array', 'ini_alter' => 'array', 'ini_get' => 'array',
+        'ini_set' => 'array', 'ini_alter' => 'array', 'ini_get' => 'array', 'get_cfg_var' => 'array',
     ];
 
     /** @var array<string, string> */
