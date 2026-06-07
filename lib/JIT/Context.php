@@ -1170,6 +1170,12 @@ class Context {
         );
     }
 
+    /** Bitcast any pointer to i8* for libc helpers declared with int8* parameters. */
+    public function bytePtr(PHPLLVM\Value $value): PHPLLVM\Value
+    {
+        return $this->builder->pointerCast($value, $this->getTypeFromString('int8*'));
+    }
+
     private array $boolValues = [];
 
     public function constantFromBool(bool $value): PHPLLVM\Value {

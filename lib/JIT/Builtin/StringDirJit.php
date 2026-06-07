@@ -318,7 +318,7 @@ final class StringDirJit
         );
         $context->builder->call(
             $context->lookupFunction('free'),
-            $context->builder->pointerCast($str, $voidPtr)
+            $context->bytePtr($str)
         );
         $context->builder->store($context->builder->addNoSignedWrap($i, $i32->constInt(1, false)), $iSlot);
         $context->builder->branch($loopHead);
@@ -326,7 +326,7 @@ final class StringDirJit
         $context->builder->positionAtEnd($skipBlock);
         $context->builder->call(
             $context->lookupFunction('free'),
-            $context->builder->pointerCast($entriesPtr, $voidPtr)
+            $context->bytePtr($entriesPtr)
         );
         $context->builder->store($strPtrPtr->constNull(), $context->builder->inBoundsGEP(self::entriesGlobal($context), $zero, $slotIdx));
         $context->builder->store($zero, $context->builder->inBoundsGEP(self::countGlobal($context), $zero, $slotIdx));
@@ -543,7 +543,7 @@ final class StringDirJit
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($freeArrBlock);
-        $context->builder->call($context->lookupFunction('free'), $namelist);
+        $context->builder->call($context->lookupFunction('free'), $context->bytePtr($namelist));
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($skipBlock);

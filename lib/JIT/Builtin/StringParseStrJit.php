@@ -375,9 +375,9 @@ final class StringParseStrJit
         $context->builder->positionAtEnd($entry);
 
         $i64 = $context->getTypeFromString('int64');
-        $i8pp = $context->getTypeFromString('int8*')->pointerType(0);
+        $i8p = $context->getTypeFromString('int8*');
         $pkVoid = $fn->getParam(0);
-        $pk = $context->builder->pointerCast($pkVoid, $i8pp);
+        $parts = self::parsedKeyPartsPtr($context, $pkVoid);
         $countPtr = $context->builder->pointerCast(
             self::parsedKeyFieldPtr($context, $pkVoid, self::COUNT_OFF),
             $i64->pointerType(0)
@@ -402,9 +402,9 @@ final class StringParseStrJit
         $context->builder->branchIf($end, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        $part = $context->builder->load($context->builder->gep($pk, $i));
+        $part = $context->builder->load($context->builder->gep($parts, $i));
         $context->builder->call($context->lookupFunction('free'), $part);
-        $context->builder->store($pk->typeOf()->constNull(), $context->builder->gep($pk, $i));
+        $context->builder->store($i8p->constNull(), $context->builder->gep($parts, $i));
         $context->builder->store($context->builder->addNoSignedWrap($i, $i64->constInt(1, false)), $iSlot);
         $context->builder->branch($head);
 
@@ -427,7 +427,7 @@ final class StringParseStrJit
         $raw = $fn->getParam(0);
         $pk = $fn->getParam(1);
 
-        $parts = $context->builder->pointerCast($pk, $i8pp);
+        $parts = self::parsedKeyPartsPtr($context, $pk);
         $countPtr = $context->builder->pointerCast(
             self::parsedKeyFieldPtr($context, $pk, self::COUNT_OFF),
             $i64->pointerType(0)
@@ -618,7 +618,7 @@ final class StringParseStrJit
         $pk = $fn->getParam(1);
         $value = $fn->getParam(2);
 
-        $parts = $context->builder->pointerCast($pk, $i8pp);
+        $parts = self::parsedKeyPartsPtr($context, $pk);
         $countPtr = $context->builder->pointerCast(
             self::parsedKeyFieldPtr($context, $pk, self::COUNT_OFF),
             $i64->pointerType(0)
@@ -718,9 +718,12 @@ final class StringParseStrJit
         $context->builder->positionAtEnd($work);
         $len = $context->builder->call($context->lookupFunction('strlen'), $body);
         $one = $i64->constInt(1, false);
-        $copy = $context->builder->call(
-            $context->lookupFunction('malloc'),
-            $context->builder->truncOrBitCast($context->builder->add($len, $one), $sizeT)
+        $copy = $context->builder->pointerCast(
+            $context->builder->call(
+                $context->lookupFunction('malloc'),
+                $context->builder->truncOrBitCast($context->builder->add($len, $one), $sizeT)
+            ),
+            $i8p
         );
         $context->intrinsic->memcpy($copy, $body, $len, false);
         $context->builder->store($i8->constInt(0, false), $context->builder->inBoundsGEP($copy, $len));
@@ -728,7 +731,7 @@ final class StringParseStrJit
         $delimSlot = $context->builder->alloca($i8, 2, 'pdp_delim');
         $context->builder->store($delimiter, $delimSlot);
         $context->builder->store($i8->constInt(0, false), $context->builder->inBoundsGEP($delimSlot, $one));
-        $saveSlot = BasicBlockHelper::entryAlloca($context, $i8pp);
+        $saveSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('int8**'));
 
         $pair = $context->builder->call(
             $context->lookupFunction('strtok_r'),
@@ -911,6 +914,14 @@ final class StringParseStrJit
     private static function cstrLiteral(Context $context, string $text): Value
     {
         return $context->pointerFromStringConstant($text);
+    }
+
+    private static function parsedKeyPartsPtr(Context $context, Value $pkVoid): Value
+    {
+        return $context->builder->pointerCast(
+            self::parsedKeyFieldPtr($context, $pkVoid, self::PARTS_OFF),
+            $context->getTypeFromString('int8**')
+        );
     }
 
     private static function parsedKeyBytePtr(Context $context, Value $pkVoid): Value

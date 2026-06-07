@@ -266,7 +266,7 @@ final class StringFsGlobVecJit
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($freeArr);
-        $context->builder->call($context->lookupFunction('free'), $items);
+        $context->builder->call($context->lookupFunction('free'), $context->bytePtr($items));
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
@@ -366,7 +366,7 @@ final class StringFsGlobVecJit
         $pathvPtr = $context->builder->load(
             $context->builder->pointerCast(
                 $context->builder->inBoundsGEP($globBase, $i64->constInt(8, false)),
-                $i8ppp->pointerType(0)
+                $i8ppp
             )
         );
         $keptSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
@@ -425,7 +425,7 @@ final class StringFsGlobVecJit
         $context->builder->branchIf($keptZero, $keptEmptyBlock, $shrinkBlock);
 
         $context->builder->positionAtEnd($keptEmptyBlock);
-        $context->builder->call($context->lookupFunction('free'), $items);
+        $context->builder->call($context->lookupFunction('free'), $context->bytePtr($items));
         $context->builder->store($i8pp->constNull(), $outItems);
         $context->builder->branch($emptyOk);
 
@@ -590,7 +590,7 @@ final class StringFsGlobVecJit
         $context->builder->positionAtEnd($loopDone);
         $context->builder->call(
             $context->lookupFunction('free'),
-            $context->builder->pointerCast($context->builder->load($namelistSlot), $voidPtr)
+            $context->bytePtr($context->builder->load($namelistSlot))
         );
         $context->builder->store($items, $outItems);
         $context->builder->returnValue($n);
@@ -602,7 +602,7 @@ final class StringFsGlobVecJit
         $retEmpty = $fn->appendBasicBlock('scan_ret_empty');
         $context->builder->branchIf($hasList, $freeEmpty, $retEmpty);
         $context->builder->positionAtEnd($freeEmpty);
-        $context->builder->call($context->lookupFunction('free'), $namelist);
+        $context->builder->call($context->lookupFunction('free'), $context->bytePtr($namelist));
         $context->builder->branch($retEmpty);
         $context->builder->positionAtEnd($retEmpty);
         $context->builder->returnValue($zero32);
@@ -648,7 +648,7 @@ final class StringFsGlobVecJit
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($freeArr);
-        $context->builder->call($context->lookupFunction('free'), $namelist);
+        $context->builder->call($context->lookupFunction('free'), $context->bytePtr($namelist));
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($skip);
