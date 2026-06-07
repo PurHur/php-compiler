@@ -32,7 +32,9 @@ final class ReflectionClassGetProperty extends VmClassMethod
         $property = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionClass::getProperty() name', 1);
         $meta = VmReflection::findClassProperty($entry, $property, $ctx);
         if (null === $meta) {
-            throw new \LogicException("Property {$property} does not exist on {$className}");
+            ReflectionSupport::throwReflectionException(
+                ReflectionSupport::propertyNotFoundMessage($className, $property)
+            );
         }
         if (null !== $frame->returnVar) {
             $out = new Variable(Variable::TYPE_OBJECT);

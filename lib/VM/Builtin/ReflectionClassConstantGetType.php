@@ -30,7 +30,9 @@ final class ReflectionClassConstantGetType extends VmClassMethod
         $constant = ReflectionSupport::constantNameFromReflection($receiver);
         $key = VmReflection::findClassConstantKey($entry, $constant, $ctx);
         if (null === $key) {
-            throw new \LogicException("Constant {$constant} does not exist on {$className}");
+            ReflectionSupport::throwReflectionException(
+                ReflectionSupport::constantNotFoundMessage($className, $constant)
+            );
         }
         if (null !== $frame->returnVar) {
             $declared = $entry->constDeclaredTypes[$key] ?? null;

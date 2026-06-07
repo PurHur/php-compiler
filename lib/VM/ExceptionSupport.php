@@ -31,6 +31,7 @@ final class ExceptionSupport
     public const CLASS_UNDERFLOW_EXCEPTION = ThrowableManifest::LC_UNDERFLOW_EXCEPTION;
     public const CLASS_UNEXPECTED_VALUE_EXCEPTION = ThrowableManifest::LC_UNEXPECTED_VALUE_EXCEPTION;
     public const CLASS_ERROR_EXCEPTION = ThrowableManifest::LC_ERROR_EXCEPTION;
+    public const CLASS_REFLECTION_EXCEPTION = ThrowableManifest::LC_REFLECTION_EXCEPTION;
     public const CLASS_CLOSED_GENERATOR_EXCEPTION = ThrowableManifest::LC_CLOSED_GENERATOR_EXCEPTION;
     public const CLASS_ERROR = ThrowableManifest::LC_ERROR;
     public const CLASS_TYPE_ERROR = ThrowableManifest::LC_TYPE_ERROR;

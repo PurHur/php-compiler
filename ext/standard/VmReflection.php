@@ -384,7 +384,9 @@ final class VmReflection
     {
         $lc = strtolower(ltrim($functionName, '\\'));
         if (!isset($ctx->functions[$lc])) {
-            throw new \LogicException("Function {$functionName} does not exist");
+            ReflectionSupport::throwReflectionException(
+                ReflectionSupport::functionNotFoundMessage($functionName)
+            );
         }
 
         return $ctx->functions[$lc];
@@ -768,7 +770,9 @@ final class VmReflection
         if (Variable::TYPE_STRING === $arg->type) {
             $entry = self::resolveClassEntry($ctx, $arg->toString());
             if (null === $entry) {
-                throw new \LogicException('Unknown class name in this compiler build');
+                ReflectionSupport::throwReflectionException(
+                    ReflectionSupport::classNotFoundMessage($arg->toString())
+                );
             }
 
             return $entry;
