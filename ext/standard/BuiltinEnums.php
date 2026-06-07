@@ -21,6 +21,7 @@ final class BuiltinEnums
         self::registerPropertyHookType($ctx);
         self::registerExitStatus($ctx);
         self::registerStringTrimMode($ctx);
+        self::registerPadType($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
@@ -101,6 +102,33 @@ final class BuiltinEnums
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
 
         $lc = 'stringtrimmode';
+        $ctx->classes[$lc] = $entry;
+        $ctx->enums[$lc] = true;
+    }
+
+    /**
+     * PHP 8.4 PadType: int-backed enum for str_pad() 4th parameter (#7282).
+     *
+     * php-src: ext/standard/basic_functions.stub.php — enum PadType: int
+     */
+    private static function registerPadType(Context $ctx): void
+    {
+        if (isset($ctx->classes['padtype'])) {
+            return;
+        }
+
+        $entry = new ClassEntry('PadType');
+        $entry->isEnum = true;
+        $entry->backedType = 'int';
+
+        self::registerBackedEnumCase($entry, 'Right', 0);
+        self::registerBackedEnumCase($entry, 'Left', 1);
+        self::registerBackedEnumCase($entry, 'Both', 2);
+
+        EnumSupport::ensureBuiltinCasesMethod($entry);
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+
+        $lc = 'padtype';
         $ctx->classes[$lc] = $entry;
         $ctx->enums[$lc] = true;
     }
