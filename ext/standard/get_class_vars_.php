@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -27,11 +29,11 @@ final class get_class_vars_ extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('get_class_vars() requires exactly one argument in this compiler build');
         }
+        $className = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'get_class_vars', 0, 'class');
         if (null === $frame->returnVar) {
             return;
         }
         $ctx = VmReflection::requireContext($frame);
-        $className = VmReflection::stringArg($frame->calledArgs[0], 'get_class_vars() class name', 0);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry || $entry->isInterface || $entry->isTrait || $entry->isEnum) {
             $frame->returnVar->bool(false);
@@ -46,10 +48,13 @@ final class get_class_vars_ extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('get_class_vars() requires exactly one argument in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type && JITVariable::TYPE_VALUE !== $args[0]->type) {
-            throw new \LogicException('get_class_vars() class name must be a string in this compiler build');
+        $literal = JitStringArg::compileTimeLiteral($args[0]);
+        if (null !== $literal) {
+            return JitGetClassVars::invoke($context, $args[0]);
         }
-
-        return JitGetClassVars::invoke($context, $args[0]);
+        JitStringBuiltinArg::lower($context, $args[0], 'get_class_vars', 0, 'class');
+        throw new \LogicException(
+            'get_class_vars() class must be a string literal in this compiler build'
+        );
     }
 }
