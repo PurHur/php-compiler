@@ -256,7 +256,8 @@ patch_already_applied() {
       ;;
     php-cfg-match.patch)
       grep -q 'function parseExpr_Match' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
-        && grep -q 'lowerUnhandledMatchError' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+        && grep -q 'lowerUnhandledMatchError' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        && grep -q 'phpc_match_unhandled_operand_is_object' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-incdec-expr.patch)
       grep -q 'new Op\\Expr\\PostInc' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
@@ -410,12 +411,13 @@ apply_php_cfg_match_overlay() {
     echo "Skip php-cfg-match.patch (overlay missing)" >&2
     return 1
   fi
-  if patch_already_applied "$PATCH_DIR/php-cfg-match.patch"; then
-    echo "Skip php-cfg-match.patch (already applied)"
-    return 0
-  fi
+  # Always run — patch-php-cfg-match.py refreshes stale is_object probes (#7263, #7199).
   if python3 "$ROOT/script/patch-php-cfg-match.py"; then
-    echo "Applied php-cfg-match.patch (overlay)"
+    if patch_already_applied "$PATCH_DIR/php-cfg-match.patch"; then
+      echo "Refreshed php-cfg-match.patch (overlay)"
+    else
+      echo "Applied php-cfg-match.patch (overlay)"
+    fi
     return 0
   fi
   return 1
