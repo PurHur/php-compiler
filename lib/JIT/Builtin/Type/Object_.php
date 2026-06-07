@@ -3551,6 +3551,13 @@ class Object_ extends Type {
         return $out;
     }
 
+    public function classConstDisplayName(int $classId, string $constKey): string
+    {
+        $key = strtolower($constKey);
+
+        return $this->classConstDisplayNames[$classId][$key] ?? $constKey;
+    }
+
     public function defineStaticProperty(
         int $classId,
         string $name,
