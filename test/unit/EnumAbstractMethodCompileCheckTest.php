@@ -164,4 +164,45 @@ PHP;
         $this->expectExceptionMessage('Enum F must implement 1 abstract private method (F::label)');
         $runtime->parseAndCompile($code, 'abstract_enum_missing.php');
     }
+
+    public function testEnumMissingInterfaceMethodFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface Greeter {
+    public function greet(): void;
+}
+enum Status implements Greeter {
+    case Open;
+}
+echo "compiled\n";
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Enum Status must implement 1 abstract private method (Greeter::greet)');
+        $runtime->parseAndCompile($code, 'enum_interface_missing.php');
+    }
+
+    public function testEnumWithSatisfiedInterfaceMethodCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface Greeter {
+    public function greet(): string;
+}
+enum Status implements Greeter {
+    case Open;
+    public function greet(): string {
+        return 'hi';
+    }
+}
+echo Status::Open->greet(), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'enum_interface_ok.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("hi\n", ob_get_clean());
+    }
 }
