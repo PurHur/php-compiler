@@ -69,6 +69,11 @@ final class InterfaceCheck
             $current = $context->classes[$current->parentLc];
         }
 
+        if (StringableSupport::isStringableInterfaceLc($ifaceLc)
+            && StringableSupport::entryHasImplicitStringable($entry, $context)) {
+            return true;
+        }
+
         return false;
     }
 
@@ -105,6 +110,11 @@ final class InterfaceCheck
                 break;
             }
             $current = $context->classes[$current->parentLc];
+        }
+
+        if (StringableSupport::isStringableInterfaceLc($classLc)
+            && StringableSupport::entryHasImplicitStringable($entry, $context)) {
+            return true;
         }
 
         return false;

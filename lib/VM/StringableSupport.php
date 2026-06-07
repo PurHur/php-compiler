@@ -67,4 +67,56 @@ final class StringableSupport
 
         return false;
     }
+
+    public static function isStringableInterfaceLc(string $ifaceLc): bool
+    {
+        return self::INTERFACE_LC === strtolower(ltrim($ifaceLc, '\\'));
+    }
+
+    /**
+     * Zend zend_interfaces.c — public concrete __toString satisfies Stringable without explicit implements (#7198).
+     */
+    public static function entryHasImplicitStringable(ClassEntry $entry, Context $context): bool
+    {
+        if ($entry->isInterface || $entry->isTrait || $entry->isEnum) {
+            return false;
+        }
+        $decl = self::resolveConcreteToStringDecl($entry, $context);
+        if (null === $decl) {
+            return false;
+        }
+        [$declaring, $methodLc] = $decl;
+        $vis = $declaring->methodVisibility[$methodLc] ?? CfgFunc::FLAG_PUBLIC;
+
+        return MethodVisibility::isPublic($vis);
+    }
+
+    /**
+     * @return array{0: ClassEntry, 1: string}|null
+     */
+    private static function resolveConcreteToStringDecl(ClassEntry $entry, Context $context): ?array
+    {
+        $methodLc = '__tostring';
+        $lcClass = strtolower($entry->name);
+        $visited = [];
+        while (!isset($visited[$lcClass])) {
+            $visited[$lcClass] = true;
+            if (!isset($context->classes[$lcClass])) {
+                break;
+            }
+            $current = $context->classes[$lcClass];
+            if (isset($current->methods[$methodLc])) {
+                return [$current, $methodLc];
+            }
+            if (isset($current->abstractMethods[$methodLc])) {
+                return null;
+            }
+            if (null === $current->parentLc) {
+                break;
+            }
+            $lcClass = $current->parentLc;
+        }
+
+        return null;
+    }
 }
