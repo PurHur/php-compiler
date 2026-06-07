@@ -32,8 +32,10 @@ def main() -> int:
         return 1
     text = PARSER.read_text()
     if "lowerUnhandledMatchError" in text and "function parseExpr_Match" in text:
-        print(f"skip {PARSER} (match overlay current)")
-        return 0
+        if "phpc_match_unhandled_operand_is_object" in text:
+            print(f"skip {PARSER} (match overlay current)")
+            return 0
+        print(f"refresh {PARSER} (match overlay stale — enum UnhandledMatchError probe)")
 
     start = match_block_start(text)
     if start is not None:

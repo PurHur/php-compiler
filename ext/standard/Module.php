@@ -523,6 +523,7 @@ class Module extends ModuleAbstract
             new eval_(),
             new phpc_deploy_path(),
             new compiler_is_superglobal_name(),
+            new phpc_match_unhandled_operand_is_object(),
             new extract_(),
             new compact_(),
             new scandir(),
