@@ -630,6 +630,7 @@ class Compiler {
             $names = AttributeEntry::namesFromList($entries);
             AttributeNames::assertAllowDynamicPropertiesClassTargetOnly($names, 'parameter');
             AttributeNames::assertOverrideMethodTargetOnly($names, 'parameter');
+            AttributeNames::assertCompileTimeConstTargetOnly($names, 'parameter');
             AttributeNames::validateDuplicates($entries, $this->attributeClassRegistry);
         }
     }
@@ -2500,6 +2501,7 @@ class Compiler {
         );
         $this->assignAttributeMetadata($return, $iface);
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
+        AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'class');
         $this->registerAttributeClassFromEntries($name, $return->attributeEntries);
         $return->classImplements = $extends;
         $this->applySealedMetadataFromOp($iface, $return);
@@ -2526,6 +2528,7 @@ class Compiler {
         );
         $this->assignAttributeMetadata($return, $trait);
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
+        AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'class');
         $this->registerAttributeClassFromEntries($name, $return->attributeEntries);
         $traitLc = strtolower(ltrim($name, '\\'));
         $this->compiledClassStaticProperties[$traitLc] = $this->compiledClassStaticProperties[$traitLc] ?? [];
@@ -2559,6 +2562,7 @@ class Compiler {
         $this->assignAttributeMetadata($return, $enum);
         $return->deprecatedMetadata = DeprecatedMetadata::fromOp($enum);
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
+        AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'class');
         $enumName = $this->staticNameFromOperand($enum->name);
         if (null !== $enumName) {
             $this->registerAttributeClassFromEntries($enumName, $return->attributeEntries);
@@ -2688,6 +2692,7 @@ class Compiler {
         }
         $this->assignAttributeMetadata($declare, $child);
         AttributeNames::assertAllowDynamicPropertiesClassTargetOnly($declare->attributeNames, 'method');
+        AttributeNames::assertCompileTimeConstTargetOnly($declare->attributeNames, 'method');
         $declare->parameterMetadata = $this->parameterMetadataFromParams($child->func->params);
         $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $result->addOpCode($declare);
@@ -2785,6 +2790,7 @@ class Compiler {
         $this->assignAttributeMetadata($return, $class);
         $return->deprecatedMetadata = DeprecatedMetadata::fromOp($class);
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
+        AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'class');
         $this->applySealedMetadataFromOp($class, $return);
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($class->flags);
         if ($return->classIsAbstract) {
@@ -3397,6 +3403,7 @@ class Compiler {
                     }
                     $this->assignAttributeMetadata($declare, $child);
                     AttributeNames::assertOverrideMethodTargetOnly($declare->attributeNames, 'property');
+                    AttributeNames::assertCompileTimeConstTargetOnly($declare->attributeNames, 'property');
                     $result->addOpCode($declare);
                     break;
                 case Op\Stmt\ClassMethod::class:
@@ -3518,6 +3525,7 @@ class Compiler {
         $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $this->assignAttributeMetadata($constOp, $child);
         AttributeNames::assertOverrideMethodTargetOnly($constOp->attributeNames, 'class constant');
+        AttributeNames::assertCompileTimeConstTargetOnly($constOp->attributeNames, 'class constant');
         $result->addOpCode($constOp);
         if (null !== $this->compilingClassLc && isset($result->constants[$valueSlot])) {
             $constName = $this->staticNameFromOperand($child->name);
@@ -4935,6 +4943,8 @@ class Compiler {
         );
         $return->block1 = $funcBlock;
         $return->deprecatedMetadata = DeprecatedMetadata::fromOp($function);
+        $this->assignAttributeMetadata($return, $function);
+        AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'function');
         return $return;
     }
 
@@ -5796,6 +5806,8 @@ class Compiler {
             $this->compileOperand($expr->result, $block, false),
         );
         $op->block1 = $funcBlock;
+        $this->assignAttributeMetadata($op, $expr);
+        AttributeNames::assertCompileTimeConstTargetOnly($op->attributeNames, 'function');
         if ($expr instanceof Op\Expr\Closure) {
             foreach ($expr->useVars as $useVar) {
                 if (!$useVar instanceof Operand\BoundVariable) {
@@ -8521,6 +8533,8 @@ class Compiler {
             $valueSlot
         );
         $opcode->globalConstStartLine = max(0, $const->getLine());
+        $this->assignAttributeMetadata($opcode, $const);
+        AttributeNames::assertCompileTimeConstTargetOnly($opcode->attributeNames, 'constant');
 
         return $opcode;
     }

@@ -63,4 +63,20 @@ final class AttributeNamesDuplicateTest extends TestCase
 
         AttributeNames::assertOverrideMethodTargetOnly(['\\Override'], 'parameter');
     }
+
+    public function testRejectsCompileTimeOnMethod(): void
+    {
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(
+            'Attribute "CompileTime" cannot target method (allowed targets: class constant, constant)'
+        );
+
+        AttributeNames::assertCompileTimeConstTargetOnly(['CompileTime'], 'method');
+    }
+
+    public function testAllowsCompileTimeOnClassConstant(): void
+    {
+        AttributeNames::assertCompileTimeConstTargetOnly(['CompileTime'], 'class constant');
+        $this->addToAssertionCount(1);
+    }
 }

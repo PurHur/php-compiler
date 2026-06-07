@@ -128,6 +128,40 @@ final class AttributeNames
         return false;
     }
 
+    /** PHP 8.4+ #[\CompileTime] on constants (issue #7300, Zend zend_attributes.c). */
+    public static function hasCompileTime(array $names): bool
+    {
+        foreach ($names as $name) {
+            $base = ltrim($name, '\\');
+            if ('CompileTime' === $base || str_ends_with($base, '\\CompileTime')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Zend compile-time target guard (zend_attributes.c, issue #7300).
+     * `#[\CompileTime]` is only valid on global and class constants.
+     *
+     * @param list<string> $names
+     */
+    public static function assertCompileTimeConstTargetOnly(array $names, string $target): void
+    {
+        if (!self::hasCompileTime($names)) {
+            return;
+        }
+
+        if ('constant' === $target || 'class constant' === $target) {
+            return;
+        }
+
+        throw new \CompileError(
+            'Attribute "'.self::messageName('CompileTime').'" cannot target '.$target.' (allowed targets: class constant, constant)'
+        );
+    }
+
     /**
      * Zend compile-time duplicate guard (zend_compile.c, zend_is_attribute_repeated) (#3718, #6912).
      *
