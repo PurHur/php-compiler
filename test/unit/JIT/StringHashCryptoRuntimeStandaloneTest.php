@@ -19,10 +19,17 @@ final class StringHashCryptoRuntimeStandaloneTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../../lib/JIT/Builtin/hash_crypto_jit_runtime.c');
         $jit = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoJit.php');
         $this->assertStringContainsString('__compiler_hash', $jit);
+        $this->assertStringContainsString('StringHashEquals', $jit);
+        $this->assertStringContainsString('StringHashHmacAlgos', $jit);
         $this->assertStringContainsString('StringHashCryptoJit', $jit);
         $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
         $this->assertStringNotContainsString('runtime/hash_crypto.c', $linker);
         $this->assertStringContainsString('hash_crypto_jit_runtime.c', $linker);
+        $runtimeC = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/hash_crypto_jit_runtime.c');
+        $this->assertStringNotContainsString('__compiler_hash_equals', $runtimeC);
+        $this->assertStringNotContainsString('__compiler_hash_hmac_algos', $runtimeC);
+        $equalsJit = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringHashEquals.php');
+        $this->assertStringContainsString('__compiler_hash_equals', $equalsJit);
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringHashCrypto.php');
         $this->assertStringContainsString('StringHashCryptoJit', $runtime);
         $this->assertStringNotContainsString('hash_crypto.c', $runtime);

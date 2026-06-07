@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Context;
  * LLVM lowering for hash() / hash_hmac() / hash_pbkdf2() / hash_equals() / hash_hmac_algos().
  *
  * Compiles {@see hash_crypto_jit_runtime.c} to bitcode for MCJIT and AOT module link (#7060).
- * Removed from {@see lib/AOT/Linker.php} — digest bodies live in the JIT link step, not AOT .o floor.
+ * hash_equals / hash_hmac_algos lowered in PHP LLVM via {@see StringHashEquals} / {@see StringHashHmacAlgos} (#7189 phase 1).
  */
 final class StringHashCryptoJit
 {
@@ -28,7 +28,10 @@ final class StringHashCryptoJit
 
     public static function implement(Context $context): void
     {
-        // AOT standalone resolves __compiler_hash* via Linker (hash_crypto_jit_runtime.c).
+        StringHashEquals::ensureLinked($context);
+        StringHashHmacAlgos::ensureLinked($context);
+
+        // AOT standalone: digest symbols still come from Linker (hash_crypto_jit_runtime.c).
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
             return;
         }
