@@ -1592,9 +1592,14 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
-                    if ($this->dispatchPropertySetHookAssign($arg2, $arg3, $frame)) {
-                        $this->deliverPropertySetHookAssignResult($arg1, $arg3);
-                        break;
+                    try {
+                        if ($this->dispatchPropertySetHookAssign($arg2, $arg3, $frame)) {
+                            $this->deliverPropertySetHookAssignResult($arg1, $arg3);
+                            break;
+                        }
+                    } catch (VM\PropertyHookRefWriteSignal $signal) {
+                        $frame = $signal->catchFrame;
+                        goto restart;
                     }
                     if ($this->context->propertyHookSetAborted) {
                         $this->context->propertyHookSetAborted = false;
@@ -3829,6 +3834,12 @@ restart:
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
+                            if (null !== $frame->propertyHookRawProperty) {
+                                $this->context->propertyHookExternalCatchFrame = $catchFrame;
+                                $this->context->propertyHookSetAborted = true;
+
+                                return self::FAILURE;
+                            }
                             $frame = $catchFrame;
                             goto restart;
                         }
@@ -6725,7 +6736,13 @@ restart:
             throw new \LogicException('Static property get hook must be a user method');
         }
 
-        return $this->invokeStaticPropertyHookRaw($func, $propName, $classLc, $frame);
+        $result = $this->invokeStaticPropertyHookRaw($func, $propName, $classLc, $frame);
+        $catchFrame = $this->enforcePropertyHookGetReturnForClass($classLc, $propName, null, $result, $frame);
+        if (null !== $catchFrame) {
+            throw new VM\PropertyHookRefWriteSignal($catchFrame);
+        }
+
+        return $result;
     }
 
     private function invokeStaticPropertyHookRaw(
@@ -6736,6 +6753,8 @@ restart:
         Variable ...$args
     ): Variable {
         $savedStack = $this->context->swapRunStack(null);
+        $savedExternalCatch = $this->context->propertyHookExternalCatchFrame;
+        $this->context->propertyHookExternalCatchFrame = null;
         try {
             $child = $func->getFrame($this->context, null);
             $child->propertyHookRawProperty = $rawProperty;
@@ -6745,12 +6764,16 @@ restart:
             $child->returnVar = $out;
             $this->context->push($child);
             $result = $this->runFrames();
+            if (null !== $this->context->propertyHookExternalCatchFrame) {
+                throw new VM\PropertyHookRefWriteSignal($this->context->propertyHookExternalCatchFrame);
+            }
             if (self::SUCCESS !== $result) {
                 throw new \LogicException('Static property hook invocation failed in this compiler build');
             }
 
             return $out->resolveIndirect();
         } finally {
+            $this->context->propertyHookExternalCatchFrame = $savedExternalCatch;
             $this->context->swapRunStack($savedStack);
         }
     }
@@ -6787,6 +6810,62 @@ restart:
         }
 
         return null;
+    }
+
+    private function enforcePropertyHookGetReturn(
+        ObjectEntry $object,
+        string $propName,
+        ?VM\ClassProperty $meta,
+        Variable $value,
+        Frame $frame
+    ): ?Frame {
+        $meta ??= $this->classPropertyMeta($object, $propName);
+        if (null === $meta) {
+            return null;
+        }
+        $strict = null !== $frame->parent
+            ? $frame->parent->block->strictTypes
+            : $frame->block->strictTypes;
+        try {
+            TypeCheck::assertPropertyHookGetReturn($value, $meta->prototype, $strict, $this->context);
+        } catch (\TypeError $e) {
+            return $this->dispatchVmTypeError($e, $frame);
+        }
+
+        return null;
+    }
+
+    private function enforcePropertyHookGetReturnForClass(
+        string $classLc,
+        string $propName,
+        ?Variable $typePrototype,
+        Variable $value,
+        Frame $frame
+    ): ?Frame {
+        $typePrototype ??= $this->staticPropertyTypePrototype($classLc, $propName);
+        if (null === $typePrototype) {
+            return null;
+        }
+        $strict = null !== $frame->parent
+            ? $frame->parent->block->strictTypes
+            : $frame->block->strictTypes;
+        try {
+            TypeCheck::assertPropertyHookGetReturn($value, $typePrototype, $strict, $this->context);
+        } catch (\TypeError $e) {
+            return $this->dispatchVmTypeError($e, $frame);
+        }
+
+        return null;
+    }
+
+    private function staticPropertyTypePrototype(string $classLc, string $propName): ?Variable
+    {
+        if (!isset($this->context->classes[$classLc])) {
+            return null;
+        }
+        $propLc = strtolower($propName);
+
+        return $this->context->classes[$classLc]->staticProperties[$propLc] ?? null;
     }
 
     /**
@@ -7041,12 +7120,20 @@ restart:
         $thisVar = new Variable();
         $thisVar->object($object);
 
-        return $this->invokePhpFunctionWithPropertyHookRaw($func, $name, $frame, $thisVar);
+        $result = $this->invokePhpFunctionWithPropertyHookRaw($func, $name, $frame, $thisVar);
+        $catchFrame = $this->enforcePropertyHookGetReturn($object, $name, $meta, $result, $frame);
+        if (null !== $catchFrame) {
+            throw new VM\PropertyHookRefWriteSignal($catchFrame);
+        }
+
+        return $result;
     }
 
     private function invokePhpFunctionWithPropertyHookRaw(Func\PHP $func, string $rawProperty, Frame $parentFrame, Variable ...$args): Variable
     {
         $savedStack = $this->context->swapRunStack(null);
+        $savedExternalCatch = $this->context->propertyHookExternalCatchFrame;
+        $this->context->propertyHookExternalCatchFrame = null;
         try {
             $child = $func->getFrame($this->context, $parentFrame);
             $child->propertyHookRawProperty = $rawProperty;
@@ -7065,12 +7152,16 @@ restart:
             $child->returnVar = $out;
             $this->context->push($child);
             $result = $this->runFrames();
+            if (null !== $this->context->propertyHookExternalCatchFrame) {
+                throw new VM\PropertyHookRefWriteSignal($this->context->propertyHookExternalCatchFrame);
+            }
             if (self::SUCCESS !== $result) {
                 throw new \LogicException('Property hook invocation failed in this compiler build');
             }
 
             return $out->resolveIndirect();
         } finally {
+            $this->context->propertyHookExternalCatchFrame = $savedExternalCatch;
             $this->context->swapRunStack($savedStack);
         }
     }

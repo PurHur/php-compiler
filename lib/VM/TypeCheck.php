@@ -117,6 +117,40 @@ final class TypeCheck
         }
     }
 
+    /**
+     * Property get hook return must match declared property type (zend_property_hooks.c, #7301).
+     */
+    public static function assertPropertyHookGetReturn(
+        Variable $value,
+        Variable $prototype,
+        bool $strict,
+        Context $context
+    ): void {
+        $meta = $prototype->resolveIndirect();
+        if (null !== $meta->dnfArms) {
+            DnfCheck::assertMatches($value, $meta->dnfArms, $context, 'Return value');
+
+            return;
+        }
+        $probe = new Variable();
+        $probe->copyFrom($value);
+        self::bindPropertyTypeMetadata($probe, $meta);
+        self::coercePropertyWrite($probe, $strict);
+        $value->copyFrom($probe);
+    }
+
+    private static function bindPropertyTypeMetadata(Variable $dest, Variable $typeMeta): void
+    {
+        $resolved = $dest->resolveIndirect();
+        $resolved->typeConstraint = $typeMeta->typeConstraint;
+        $resolved->classConstraint = $typeMeta->classConstraint;
+        $resolved->literalBoolType = $typeMeta->literalBoolType;
+        $resolved->unionTypeConstraints = $typeMeta->unionTypeConstraints;
+        $resolved->declaredTypeLabel = $typeMeta->declaredTypeLabel;
+        $resolved->genericArrayTypeSpec = $typeMeta->genericArrayTypeSpec;
+        $resolved->dnfArms = $typeMeta->dnfArms;
+    }
+
     public static function coerceReturn(
         Variable $value,
         bool $strict,
