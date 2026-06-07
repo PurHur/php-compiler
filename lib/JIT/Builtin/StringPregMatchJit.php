@@ -661,7 +661,7 @@ final class StringPregMatchJit
 
         $context->builder->positionAtEnd($compileBb);
         $errorCodeSlot = BasicBlockHelper::entryAlloca($context, $i32);
-        $errorOffsetSlot = BasicBlockHelper->entryAlloca($context, $sizeT);
+        $errorOffsetSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $regex = $context->builder->load($regexSlot);
         $regexLen = $context->builder->load($regexLenSlot);
         $opts = $context->builder->load($optsSlot);
