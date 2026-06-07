@@ -392,6 +392,39 @@ static int phpc_stream_supports_metadata(const char *path)
     return 1;
 }
 
+static int phpc_stream_is_url_path(const char *path)
+{
+    if (NULL == path) {
+        return 0;
+    }
+    if (0 == strncmp(path, "http://", 7)) {
+        return 1;
+    }
+    if (0 == strncmp(path, "https://", 8)) {
+        return 1;
+    }
+    if (0 == strncmp(path, "ftp://", 6)) {
+        return 1;
+    }
+    if (0 == strncmp(path, "ftps://", 7)) {
+        return 1;
+    }
+
+    return 0;
+}
+
+int __compiler_stream_is_local(int64_t handle)
+{
+    const char *path;
+
+    if (handle <= 0 || handle >= PHPC_MAX_STREAM_HANDLES || NULL == phpc_stream_handles[handle]) {
+        return 0;
+    }
+    path = phpc_stream_paths[handle];
+
+    return phpc_stream_is_url_path(path) ? 0 : 1;
+}
+
 int __compiler_stream_supports(int64_t handle, int64_t feature)
 {
     FILE *fp;
