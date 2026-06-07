@@ -84,6 +84,7 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyIsAbstract;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsPrivate;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsProtected;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsPublic;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsReadOnly;
 use PHPCompiler\VM\Builtin\ReflectionTypeAllowsNull;
 use PHPCompiler\VM\Builtin\ReflectionTypeToString;
 use PHPCompiler\VM\Builtin\WeakMapConstruct;
@@ -333,6 +334,7 @@ final class BuiltinClasses
                 'isprivate' => new ReflectionPropertyIsPrivate(),
                 'isprotected' => new ReflectionPropertyIsProtected(),
                 'isabstract' => new ReflectionPropertyIsAbstract(),
+                'isreadonly' => new ReflectionPropertyIsReadOnly(),
             ] as $name => $method
         ) {
             $rp->methods[$name] = $method;
