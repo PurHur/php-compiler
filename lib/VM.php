@@ -1593,14 +1593,25 @@ class VM {
     {
         $thrown = $this->normalizeThrownVariable($thrown);
         // Zend: throw in finally discards a pending return (#5331).
-        if ($this->frameIsInFinallyBody($frame)) {
+        $inFinally = $this->frameIsInFinallyBody($frame);
+        if ($inFinally) {
             $this->clearPendingReturnState();
+        }
+        $pendingBeforeThrow = null;
+        if (null !== $this->context->pendingException) {
+            $pendingBeforeThrow = new Variable();
+            $pendingBeforeThrow->copyFrom($this->context->pendingException);
         }
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
             return $catchFrame;
         }
-        // Zend: uncaught outer throw is pendingException (finally over try); scope operand may alias try value (#5867).
+        // Zend: finally-over-try uncaught fatal cites pending try exception first (#5867, #6457, #7342).
+        if ($inFinally && null !== $pendingBeforeThrow) {
+            $this->raiseUncaughtExceptionWithNext($pendingBeforeThrow, $thrown);
+
+            return null;
+        }
         $uncaught = $this->context->pendingException ?? $thrown;
         $this->raiseUncaughtException($uncaught);
 
@@ -6588,6 +6599,30 @@ restart:
             );
         }
         throw new \Exception($thrown->toString());
+    }
+
+    /** @return never */
+    private function raiseUncaughtExceptionWithNext(Variable $primary, Variable $next): void
+    {
+        $this->clearTryCatchUnwindState();
+        if ($this->context->exceptionHandlers->dispatch($this->context, $primary)) {
+            throw new ScriptExit(0);
+        }
+        if (Variable::TYPE_OBJECT !== $primary->type || Variable::TYPE_OBJECT !== $next->type) {
+            $this->raiseUncaughtException($primary);
+        }
+        $primaryEntry = $primary->toObject();
+        $nextEntry = $next->toObject();
+        VM\ExceptionSupport::emitNativeUncaughtFatalWithNext(
+            VM\ExceptionSupport::nativeUncaughtThrowable(
+                $primaryEntry,
+                VM\ExceptionSupport::readThrowableMessage($primaryEntry)
+            ),
+            VM\ExceptionSupport::nativeUncaughtThrowable(
+                $nextEntry,
+                VM\ExceptionSupport::readThrowableMessage($nextEntry)
+            )
+        );
     }
 
     /**

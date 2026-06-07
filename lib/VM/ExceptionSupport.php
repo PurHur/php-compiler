@@ -242,6 +242,39 @@ final class ExceptionSupport
      */
     public static function emitNativeUncaughtFatal(\Throwable $native): void
     {
+        self::writeNativeUncaughtFatalBlock($native, true);
+        throw new ScriptExit(255);
+    }
+
+    /**
+     * Zend zend_exceptions.c — finally throw over pending try uncaught fatal (#5867, #7342).
+     *
+     * @return never
+     */
+    public static function emitNativeUncaughtFatalWithNext(\Throwable $primary, \Throwable $next): void
+    {
+        self::writeNativeUncaughtFatalBlock($primary, false);
+        $message = $next->getMessage();
+        $file = $next->getFile();
+        $line = $next->getLine();
+        $nextFatal = "Next Exception: {$message}";
+        if ('' !== $file) {
+            $nextFatal .= " in {$file}";
+            if ($line > 0) {
+                $nextFatal .= ":{$line}";
+            }
+        }
+        fwrite(STDERR, "\n{$nextFatal}\n");
+        fwrite(STDERR, "Stack trace:\n");
+        fwrite(STDERR, "#0 {main}\n");
+        if ('' !== $file && $line > 0) {
+            fwrite(STDERR, "  thrown in {$file} on line {$line}\n");
+        }
+        throw new ScriptExit(255);
+    }
+
+    private static function writeNativeUncaughtFatalBlock(\Throwable $native, bool $includeThrownIn): void
+    {
         $class = $native::class;
         $message = $native->getMessage();
         $file = $native->getFile();
@@ -256,10 +289,9 @@ final class ExceptionSupport
         fwrite(STDERR, $fatal."\n");
         fwrite(STDERR, "Stack trace:\n");
         fwrite(STDERR, "#0 {main}\n");
-        if ('' !== $file && $line > 0) {
+        if ($includeThrownIn && '' !== $file && $line > 0) {
             fwrite(STDERR, "  thrown in {$file} on line {$line}\n");
         }
-        throw new ScriptExit(255);
     }
 
     /** Safe read for Throwable slots that may stay at typed prototype without a value (#6357). */
