@@ -97,6 +97,7 @@ class Runtime {
 
     public function __construct(int $mode = self::MODE_NORMAL) {
         ObjectRegistry::reset();
+        ext\standard\ModuleRegistry::reset();
         self::clearLastParseFailure();
         $this->mode = $mode;
         $this->initParsePipeline();
@@ -313,6 +314,7 @@ class Runtime {
     public function load(Module $module): void {
         $this->modules[] = $module;
         $module->init($this);
+        ext\standard\ModuleRegistry::registerModule($module);
         foreach ($module->getFunctions() as $function) {
             $this->vmContext->declareFunction($function);
         }

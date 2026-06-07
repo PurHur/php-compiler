@@ -19,6 +19,11 @@ use PHPCompiler\VM;
 
 class Module extends ModuleAbstract
 {
+    public function getAdditionalExtensionNames(): array
+    {
+        return ['json', 'date'];
+    }
+
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);

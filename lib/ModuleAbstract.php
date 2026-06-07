@@ -18,6 +18,27 @@ abstract class ModuleAbstract implements Module {
         return str_replace('\\', '_', get_class($this));
     }
 
+    /** php-src zend_module_entry name (e.g. ext/hash/Module → hash). */
+    public function getExtensionName(): string
+    {
+        $class = static::class;
+        if (preg_match('#\\\\ext\\\\([^\\\\]+)\\\\Module$#', $class, $matches)) {
+            return $matches[1];
+        }
+
+        return strtolower(preg_replace('#.*\\\\([^\\\\]+)$#', '$1', $class));
+    }
+
+    /**
+     * Logical extensions bundled with this module (e.g. json/date handlers in standard).
+     *
+     * @return list<string>
+     */
+    public function getAdditionalExtensionNames(): array
+    {
+        return [];
+    }
+
     public function getFunctions(): array {
         return [];
     }
