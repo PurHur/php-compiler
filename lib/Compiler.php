@@ -9046,34 +9046,14 @@ class Compiler {
     }
 
     /**
-     * php-cfg lowers ++/-- to Plus/Minus(read, 1) + Assign(write, result) (#3469).
+     * True when a Plus/Minus(read, 1) + Assign(write) pair is lowered ++/-- (#3469).
+     *
+     * php-cfg uses dedicated PostInc/PreInc/PostDec/PreDec ops (#3552), not Plus+Assign.
+     * AssignOp ($x += 1 / $x -= 1) shares the Plus(var,1)+Assign shape and must not set
+     * {@see OpCode::$isIncDec} — bool compound assign promotes to int, ++/-- does not (#7340).
      */
     private function isIncDecBinaryOp(Op\Expr\BinaryOp $expr): bool
     {
-        if (!$expr instanceof Op\Expr\BinaryOp\Plus && !$expr instanceof Op\Expr\BinaryOp\Minus) {
-            return false;
-        }
-        $varSide = null;
-        if ($expr->right instanceof Literal && 1 == $expr->right->value) {
-            $varSide = $expr->left;
-        } elseif ($expr->left instanceof Literal && 1 == $expr->left->value) {
-            $varSide = $expr->right;
-        }
-        if (null === $varSide) {
-            return false;
-        }
-        foreach ($expr->result->usages as $usage) {
-            if (!$usage instanceof Op\Expr\Assign) {
-                continue;
-            }
-            if ($usage->expr !== $expr->result) {
-                continue;
-            }
-            if ($this->operandsSameBaseVariable($usage->var, $varSide)) {
-                return true;
-            }
-        }
-
         return false;
     }
 
