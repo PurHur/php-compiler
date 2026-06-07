@@ -62,15 +62,31 @@ final class WeakRefSupport
         return $var;
     }
 
-    /** Zend zend_weakrefs.c — WeakMap offset key must be object (#5433). */
-    public static function requireWeakMapKey(Variable $var): Variable
+    /**
+     * Weak referent — Zend treats enum cases as weak-referenceable objects (#5681, zend_weakrefs.c).
+     */
+    public static function requireWeakReferent(Variable $var, string $label): Variable
     {
         $var = $var->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $var->type) {
-            throw new \TypeError('WeakMap key must be an object');
+        if (Variable::TYPE_OBJECT === $var->type) {
+            return $var;
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            return EnumCaseSupport::receiverForInstanceMethod($var);
         }
 
-        return $var;
+        throw new \TypeError("{$label} must be of type object");
+    }
+
+    public static function requireWeakReferentObject(Variable $var, string $label): ObjectEntry
+    {
+        return self::requireWeakReferent($var, $label)->toObject();
+    }
+
+    /** Zend zend_weakrefs.c — WeakMap offset key must be object (#5433, #5681). */
+    public static function requireWeakMapKey(Variable $var): Variable
+    {
+        return self::requireWeakReferent($var, 'WeakMap key must be an object');
     }
 
     public static function objectKey(Variable $key): string
@@ -107,7 +123,11 @@ final class WeakRefSupport
             return false;
         }
         if (Variable::TYPE_OBJECT === $target->type) {
-            $objectId = $target->toObject()->id;
+            $object = $target->toObject();
+            if (EnumCaseSupport::isEnumCase($object)) {
+                return true;
+            }
+            $objectId = $object->id;
             if (WeakRefRegistry::isReferentInvalidated($objectId)) {
                 return false;
             }
@@ -150,6 +170,15 @@ final class WeakRefSupport
             $dst->null();
 
             return;
+        }
+        if (Variable::TYPE_OBJECT === $target->type && EnumCaseSupport::isEnumCase($target->toObject())) {
+            $object = $target->toObject();
+            $canonical = BackedEnum::canonicalCaseVariable($object->class, $object->enumCaseName ?? '');
+            if (null !== $canonical && EnumCaseSupport::isEnumCaseVariable($canonical)) {
+                $dst->copyFrom($canonical);
+
+                return;
+            }
         }
         $dst->copyFrom($target);
     }

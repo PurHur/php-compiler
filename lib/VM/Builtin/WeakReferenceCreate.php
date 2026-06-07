@@ -27,8 +27,10 @@ final class WeakReferenceCreate extends VmClassMethod
         if (null === $frame->vmContext) {
             throw new \LogicException('WeakReference::create() requires VM context');
         }
-        $object = WeakRefSupport::requireObject($frame->calledArgs[0], 'WeakReference::create() argument #1');
-        $target = $object->toObject();
+        $target = WeakRefSupport::requireWeakReferentObject(
+            $frame->calledArgs[0],
+            'WeakReference::create() argument #1'
+        );
         $class = $frame->vmContext->classes['weakreference'] ?? null;
         if (null === $class) {
             throw new \LogicException('WeakReference is not registered in this compiler build');

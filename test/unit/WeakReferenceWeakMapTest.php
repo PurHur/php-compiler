@@ -116,6 +116,52 @@ PHP;
         $this->addToAssertionCount(1);
     }
 
+    public function testWeakReferenceCreateEnumCase(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+enum E { case A; }
+$w = WeakReference::create(E::A);
+echo $w->get() === E::A ? '1' : '0';
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakref_enum.php'));
+        $this->assertSame('1', ob_get_clean());
+    }
+
+    public function testWeakReferenceCreateRejectsInt(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+try {
+    WeakReference::create(1);
+    echo 'ok';
+} catch (TypeError) {
+    echo 'err';
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakref_int.php'));
+        $this->assertSame('err', ob_get_clean());
+    }
+
+    public function testWeakMapEnumCaseKey(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+enum F: string { case B = 'x'; }
+$map = new WeakMap();
+$map[F::B] = 'v';
+echo $map[F::B];
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakmap_enum.php'));
+        $this->assertSame('v', ob_get_clean());
+    }
+
     public function testWeakReferenceGetNullAfterGcCollect(): void
     {
         $runtime = new Runtime();
