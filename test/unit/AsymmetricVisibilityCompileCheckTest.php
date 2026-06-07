@@ -21,7 +21,7 @@ class C {
     protected public(set) string $x = 'a';
 }
 PHP,
-            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
+            AsymmetricVisibilityCompileCheck::WEAKER_THAN_SET_MESSAGE
         );
     }
 
@@ -34,7 +34,7 @@ class C {
     private protected(set) string $x = 'a';
 }
 PHP,
-            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
+            AsymmetricVisibilityCompileCheck::WEAKER_THAN_SET_MESSAGE
         );
     }
 
@@ -51,32 +51,30 @@ PHP,
         );
     }
 
-    public function testPublicPrivateSetCompileErrors(): void
+    public function testPublicPrivateSetCompiles(): void
     {
-        $this->expectCompileError(
-            <<<'PHP'
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class Demo {
     public private(set) string $name = 'a';
 }
-PHP,
-            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
-        );
+PHP, 'public_private_set.php');
+        $this->assertNotNull($block);
     }
 
-    public function testPromotedPublicPrivateSetCompileErrors(): void
+    public function testPromotedPublicPrivateSetCompiles(): void
     {
-        $this->expectCompileError(
-            <<<'PHP'
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class User {
     public function __construct(
         public private(set) string $name,
     ) {}
 }
-PHP,
-            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
-        );
+PHP, 'promoted_public_private_set.php');
+        $this->assertNotNull($block);
     }
 
     public function testValidPrivateSetStillCompiles(): void
@@ -110,23 +108,16 @@ PHP, 'static_asymmetric_reject.php');
         }
     }
 
-    public function testMultipleAccessModifiersStillCompileErrors(): void
+    public function testSetBeforeReadStillCompiles(): void
     {
         $runtime = new Runtime();
-        try {
-            $runtime->parseAndCompile(<<<'PHP'
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
     private(set) public string $x = 'a';
 }
 PHP, 'asymmetric_order.php');
-            $this->fail('Expected compile failure');
-        } catch (\Throwable $e) {
-            $this->assertStringContainsString(
-                AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE,
-                $e->getMessage()
-            );
-        }
+        $this->assertNotNull($block);
     }
 
     private function expectCompileError(string $code, string $messageNeedle): void
@@ -136,7 +127,11 @@ PHP, 'asymmetric_order.php');
             $runtime->parseAndCompile($code, 'asymmetric_visibility_compile.php');
             $this->fail('Expected CompileError');
         } catch (\CompileError $e) {
-            $this->assertStringContainsString($messageNeedle, $e->getMessage());
+            if (str_contains($messageNeedle, '%s')) {
+                $this->assertStringContainsString('must not be weaker than set visibility', $e->getMessage());
+            } else {
+                $this->assertStringContainsString($messageNeedle, $e->getMessage());
+            }
         }
     }
 }

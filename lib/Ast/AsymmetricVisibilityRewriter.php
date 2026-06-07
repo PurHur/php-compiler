@@ -45,9 +45,7 @@ final class AsymmetricVisibilityRewriter
         }
 
         self::rejectExplicitPublicBeforeSetModifier($source);
-        self::rejectExplicitReadBeforeSetModifier($source);
         self::rejectExplicitPublicAfterSetModifier($source);
-        self::rejectExplicitReadBeforeParenthesizedSetModifier($source);
         self::rejectAsymmetricSetOnStaticProperty($source);
 
         $source = (string) preg_replace_callback(
@@ -108,42 +106,17 @@ final class AsymmetricVisibilityRewriter
         }
     }
 
-    /**
-     * Explicit read before X(set) duplicates PPP / PPP_SET (#7388, #6589 regression).
-     *
-     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public private(set)` is fatal.
-     * Valid forms use `X(set)` alone or `X(set) READ` after the set modifier.
-     */
-    private static function rejectExplicitReadBeforeSetModifier(string $source): void
-    {
-        if (preg_match(
-            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(public|protected|private)\s*\(\s*set\s*\)/i',
-            $source
-        )) {
-            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
-        }
-    }
-
-    /** Explicit read `public` after `(set)` duplicates implicit public read (#6589, #6774). */
+    /** Explicit read `public` after `public(set)` duplicates implicit public read (#6589, #6774). */
     private static function rejectExplicitPublicAfterSetModifier(string $source): void
     {
         if (preg_match(
-            '/(?:public|protected|private)\s*\(\s*set\s*\)\s*public\b/i',
+            '/(?<![a-zA-Z0-9_])public\s*\(\s*set\s*\)\s*public\b/i',
             $source
         )) {
             throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
         }
-    }
-
-    /**
-     * Explicit read before parenthesized X(set) duplicates PPP / PPP_SET (#6897, #7388).
-     *
-     * php-src: `public (private(set))` is fatal like `public private(set)`.
-     */
-    private static function rejectExplicitReadBeforeParenthesizedSetModifier(string $source): void
-    {
         if (preg_match(
-            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*(public|protected|private)\s*\(\s*set\s*\)\s*\)/i',
+            '/(?<![a-zA-Z0-9_])public\s+\(\s*public\s*\(\s*set\s*\)\s*\)/i',
             $source
         )) {
             throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
