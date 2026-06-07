@@ -15,6 +15,7 @@ use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\ReflectionSupport;
+use PHPCompiler\VM\StringableSupport;
 use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 
@@ -488,6 +489,11 @@ final class VmReflection
                 continue;
             }
             self::addInterfaceAndParents($ctx->classes[$ifaceLc], $ctx, $result);
+        }
+
+        if (StringableSupport::entryHasImplicitStringable($entry, $ctx)) {
+            $name = StringableSupport::INTERFACE_NAME;
+            $result[$name] = $name;
         }
 
         return $result;

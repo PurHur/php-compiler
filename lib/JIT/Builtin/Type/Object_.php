@@ -1402,12 +1402,41 @@ class Object_ extends Type {
             if (in_array($wantLc, $this->allInterfacesForClassLc($current), true)) {
                 return true;
             }
+            if ('stringable' === $wantLc && $this->classHasImplicitStringableLc($current)) {
+                return true;
+            }
             $parent = $this->classParentLc[$current] ?? null;
             if (null === $parent) {
                 return false;
             }
             $current = $parent;
         }
+    }
+
+    public function classHasImplicitStringableLc(string $classLc): bool
+    {
+        if ($this->isInterfaceClassLc($classLc) || $this->isTraitClass($classLc)) {
+            return false;
+        }
+        $visited = [];
+        $current = strtolower(ltrim($classLc, '\\'));
+        while (!isset($visited[$current])) {
+            $visited[$current] = true;
+            if (!isset($this->classes[$current])) {
+                break;
+            }
+            $classId = $this->classes[$current];
+            if ($this->hasMethod($classId, '__tostring')) {
+                return MethodVisibility::isPublic($this->methodVisibility($classId, '__tostring'));
+            }
+            $parent = $this->classParentLc[$current] ?? null;
+            if (null === $parent) {
+                break;
+            }
+            $current = $parent;
+        }
+
+        return false;
     }
 
     /**

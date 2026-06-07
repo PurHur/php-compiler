@@ -174,6 +174,10 @@ final class JitClassImplements
                 $names[] = $ifaceLc;
             }
         }
+        if ($object->classHasImplicitStringableLc($classLc)) {
+            $names[] = 'Stringable';
+            $names = array_values(array_unique($names));
+        }
 
         return self::buildInterfaceMapFromNames($context, $names);
     }
