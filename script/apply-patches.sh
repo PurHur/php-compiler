@@ -2347,6 +2347,64 @@ apply_php_types_throw_expr_overlay() {
   return "$rc"
 }
 
+apply_php_types_never_method_overlay_to_target() {
+  local target="$1"
+  if [[ ! -f "$target" ]]; then
+    echo "Skip php-types-never-type.patch (target missing): ${target}"
+    return 0
+  fi
+  if grep -q 'function never(): self' "$target" 2>/dev/null; then
+    echo "Skip php-types-never-type.patch (already applied): ${target}"
+    return 0
+  fi
+  if ! python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+anchor = """    public static function null(): self
+    {
+        return self::makeCachedType(self::TYPE_NULL);
+    }
+
+    public static function object(): self"""
+insert = """    public static function null(): self
+    {
+        return self::makeCachedType(self::TYPE_NULL);
+    }
+
+    public static function never(): self
+    {
+        return self::makeCachedType(self::TYPE_NULL);
+    }
+
+    public static function object(): self"""
+if anchor not in text:
+    raise SystemExit(1)
+path.write_text(text.replace(anchor, insert, 1))
+PY
+  then
+    echo "ERROR: php-types-never-type overlay failed for ${target} (#4137)" >&2
+    return 1
+  fi
+  echo "Applied php-types-never-type.patch (never() overlay): ${target}"
+}
+
+apply_php_types_never_method_overlay() {
+  local rc=0
+  if ! apply_php_types_never_method_overlay_to_target "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"; then
+    rc=1
+  fi
+  if ! apply_php_types_never_method_overlay_to_target "$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/Type.php"; then
+    rc=1
+  fi
+  if [[ "$rc" -ne 0 ]]; then
+    record_patch_failure "php-types-never-type.patch" "Type::never() missing — fix overlay anchors (#4137)"
+  fi
+  return "$rc"
+}
+
 apply_php_types_hex2bin_strict_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php"
   if grep -q "'hex2bin' => \['string', 'data' => 'string', 'strict=' => 'bool'\]" "$target" 2>/dev/null; then
@@ -3657,6 +3715,7 @@ apply_patch() {
   fi
   if [[ "$(basename "$patch")" == "php-types-throw-expr.patch" ]]; then
     apply_php_types_throw_expr_overlay
+    apply_php_types_never_method_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-types-anonymous-class-type.patch" ]]; then
@@ -3840,6 +3899,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   # Throw expressions must survive optional patch failures (#6746, #5151).
   apply_php_cfg_throw_expr_overlay
   apply_php_types_throw_expr_overlay
+  apply_php_types_never_method_overlay
   apply_patch "$PATCH_DIR/php-cfg-dollars-brace.patch"
   apply_patch "$PATCH_DIR/php-cfg-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-cfg-nullsafe.patch"
@@ -4062,6 +4122,10 @@ verify_critical_language_patches() {
   fi
   if ! grep -q "case 'Expr_Throw':" "$recon" 2>/dev/null; then
     missing+=("php-types-throw-expr")
+  fi
+  if grep -q "case 'Expr_Throw':" "$recon" 2>/dev/null \
+    && ! grep -q 'function never(): self' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null; then
+    missing+=("php-types-never-type")
   fi
   local prelinked_recon="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
   if [[ -f "$prelinked_recon" ]] && ! grep -q "case 'Expr_PostInc':" "$prelinked_recon" 2>/dev/null; then

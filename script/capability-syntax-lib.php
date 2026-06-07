@@ -751,6 +751,7 @@ function syntaxRowDefinitions(): array
             'construct' => 'throw expressions (PHP 8.0) — `throw` in expression context',
             'opcodes' => ['TYPE_THROW', 'TYPE_NEW', 'TYPE_JUMPIF'],
             'issue' => 3802,
+            'jit' => true,
             'aot' => true,
             'notes' => [
                 'php-cfg Op\\Expr\\Throw_ overlay (#3802); php-types Expr_Throw type reconstructor patch',
