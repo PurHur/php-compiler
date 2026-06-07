@@ -5584,7 +5584,9 @@ class JIT {
                     $array = $this->context->getVariableFromOp($arrayOp);
                     if (JIT\GeneratorHelper::isGeneratorVariable($array)) {
                         if ($op->arg3) {
-                            throw new \LogicException('Generator foreach by-ref is not supported in JIT yet (issue #3074)');
+                            $value = JIT\GeneratorHelper::compileIterValueByRef($this->context, $array, $this);
+                            $this->context->setVariableOp($block->getOperand($op->arg1), $value);
+                            break;
                         }
                         $value = JIT\GeneratorHelper::compileIterValue($this->context, $array);
                         $this->assignOperand($block->getOperand($op->arg1), $value);

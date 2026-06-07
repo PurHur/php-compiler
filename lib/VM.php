@@ -5196,6 +5196,17 @@ restart:
                         break;
                     }
                     if ($this->variableIsGenerator($container)) {
+                        if ((bool) $op->arg3) {
+                            $catchFrame = $this->dispatchVmEngineException(
+                                \PHPCompiler\JIT\GeneratorHelper::FOREACH_GENERATOR_BYREF_ERROR,
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
                         $frame->scope[$op->arg1]->copyFrom(
                             $container->toObject()->generatorState->currentValue
                         );

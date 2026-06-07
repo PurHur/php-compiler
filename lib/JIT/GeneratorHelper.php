@@ -31,6 +31,9 @@ final class GeneratorHelper
 
     private const YIELD_FROM_TYPE_ERROR = 'Can only use yield from on Traversable|array';
 
+    /** zend_generators.c — foreach by-ref requires generator yields-by-ref (#4599). */
+    public const FOREACH_GENERATOR_BYREF_ERROR = 'You can only iterate a generator by-reference if it declared that it yields by-reference';
+
     private static bool $typesRegistered = false;
 
     public static function registerJitMethods(Context $context): void
@@ -1215,6 +1218,32 @@ final class GeneratorHelper
         JitValueBox::copyFromPointer($context, $slot, $valField);
 
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+    }
+
+    public static function compileIterValueByRef(
+        Context $context,
+        Variable $gen,
+        ?\PHPCompiler\JIT $jit = null
+    ): Variable {
+        self::emitForeachGeneratorByRefError($context, $jit);
+        $slot = JitValueBox::alloc($context);
+
+        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+    }
+
+    private static function emitForeachGeneratorByRefError(Context $context, ?\PHPCompiler\JIT $jit): void
+    {
+        if (null !== $jit && [] !== $context->tryCatch->handlerStack) {
+            TryCatchHelper::emitCatchableClassError(
+                $context,
+                'Exception',
+                self::FOREACH_GENERATOR_BYREF_ERROR,
+                $jit
+            );
+
+            return;
+        }
+        TryCatchHelper::emitCatchableClassError($context, 'Exception', self::FOREACH_GENERATOR_BYREF_ERROR);
     }
 
     public static function compileIterReset(Context $context, Variable $gen): void

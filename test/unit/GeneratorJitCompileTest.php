@@ -324,5 +324,41 @@ PHP
         $this->assertTrue($context->functionIsRegistered('generator::getreturn'));
         $this->addToAssertionCount(1);
     }
+
+    /**
+     * foreach (gen() as &$v) must compile and emit Zend Exception at runtime (#4599).
+     *
+     * @runInSeparateProcess
+     */
+    public function testGeneratorForeachByRefScriptVerifies(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+function gen(): Generator {
+    yield 'x';
+}
+try {
+    foreach (gen() as &$v) {
+        $v = 'Y';
+    }
+    echo "no error\n";
+} catch (Exception $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP
+            ,
+            'generator_foreach_byref_jit.php'
+        );
+        $this->assertNotNull($block);
+        $this->assertFalse(Block::requiresVmLowering($block));
+        $runtime->jitCompileBlock($block);
+        $context = $runtime->loadJitContext();
+        $verify = new \ReflectionMethod($context, 'compileCommon');
+        $verify->setAccessible(true);
+        $verify->invoke($context);
+        $this->assertArrayHasKey('gen', $context->generatorCreators);
+        $this->addToAssertionCount(1);
+    }
 }
 
