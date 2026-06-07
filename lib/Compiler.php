@@ -319,6 +319,19 @@ class Compiler {
     }
 
     /**
+     * Recompute halt offset from user script bytes when parse input was transformed (#4378).
+     *
+     * MCJIT embed prepends bootstrap classes (bin/jit.php); trailing payload is unchanged.
+     */
+    public function reconcileHaltCompilerOffsetFromSource(string $userSource): void
+    {
+        if (null === $this->haltCompilerRemaining) {
+            return;
+        }
+        $this->haltCompilerOffset = strlen($userSource) - strlen($this->haltCompilerRemaining);
+    }
+
+    /**
      * Marks the CFG construct that halted compilation before throwing LogicException (#2642).
      *
      * @return never

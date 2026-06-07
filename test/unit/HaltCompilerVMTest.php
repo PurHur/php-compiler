@@ -54,4 +54,28 @@ PHP;
         $out = (string) ob_get_clean();
         $this->assertSame("61\n", $out);
     }
+
+    public function testJitEmbedPreservesHaltOffset(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo __COMPILER_HALT_OFFSET__, "\n";
+__halt_compiler();
+TRAILING
+PHP;
+        $embedded = \PHPCompiler\JitMcjitEmbed::prepareClassless($code);
+        $this->assertNotSame($code, $embedded);
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($embedded, 'halt_jit_embed.php');
+        $this->assertNotNull($block);
+        $runtime->compiler->reconcileHaltCompilerOffsetFromSource($code);
+        $this->assertSame(61, $runtime->compiler->getHaltCompilerOffset());
+        $block->haltCompilerOffset = $runtime->compiler->getHaltCompilerOffset();
+
+        ob_start();
+        $runtime->run($block);
+        $out = (string) ob_get_clean();
+        $this->assertSame("61\n", $out);
+    }
 }
