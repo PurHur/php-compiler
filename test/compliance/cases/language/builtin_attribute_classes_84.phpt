@@ -13,11 +13,7 @@ foreach (['DelayedTargetValidation', 'CompileTime', 'NoDiscard'] as $c) {
 #[DelayedTargetValidation]
 class DtvProbe {}
 
-#[CompileTime]
-class CtProbe {}
-
 echo 'dtv=', class_exists('DtvProbe', false) ? 'yes' : 'no', "\n";
-echo 'ct=', class_exists('CtProbe', false) ? 'yes' : 'no', "\n";
 --EXPECT--
 DelayedTargetValidation=yes
 internal
@@ -26,4 +22,3 @@ internal
 NoDiscard=yes
 internal
 dtv=yes
-ct=yes

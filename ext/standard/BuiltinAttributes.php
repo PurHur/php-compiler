@@ -148,11 +148,12 @@ final class BuiltinAttributes
 
     private static function registerCompileTime(Context $ctx): void
     {
+        $targets = AttributeSupport::TARGET_CLASS_CONSTANT | AttributeSupport::TARGET_CONSTANT;
         self::registerMarkerAttributeClass(
             $ctx,
             'CompileTime',
             AttributeSupport::CLASS_COMPILE_TIME,
-            AttributeSupport::TARGET_ALL
+            $targets
         );
     }
 
