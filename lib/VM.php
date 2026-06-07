@@ -4208,6 +4208,7 @@ restart:
                                     $frame = $catchFrame;
                                     goto restart;
                                 }
+                                $this->tagReadonlyPropertyDimWriteContainer($result, $propertyObject, $name);
                             }
                             $propSlot = $propertyObject->getProperty($name);
                             if ($op->nullsafeFetchPropertyRead) {
@@ -5675,10 +5676,34 @@ restart:
 
     private function tagHookedPropertyDimWriteLvalue(Variable $dimLvalue, Variable $containerSlot): void
     {
-        if (!$this->containerNeedsHookedDimWriteBack($containerSlot)) {
+        if (
+            !$this->containerNeedsHookedDimWriteBack($containerSlot)
+            && (null === $containerSlot->objectPropertyOwner || null === $containerSlot->objectPropertyName)
+        ) {
             return;
         }
         $dimLvalue->hookedPropertyDimWriteBackContainer = $containerSlot;
+    }
+
+    /**
+     * Tag property-fetch container for readonly dim-write enforcement (#7245, zend_readonly.c).
+     */
+    private function tagReadonlyPropertyDimWriteContainer(
+        Variable $containerSlot,
+        ObjectEntry $owner,
+        string $propName
+    ): void {
+        if (!$owner->constructed) {
+            return;
+        }
+        if (isset($owner->reinitableProperties[$propName])) {
+            return;
+        }
+        if (null === $this->readonlyPropertyDeclaringClass($owner, $propName)) {
+            return;
+        }
+        $containerSlot->objectPropertyOwner = $owner;
+        $containerSlot->objectPropertyName = $propName;
     }
 
     private function flushHookedPropertyDimWriteBackAfterAssign(Variable $writtenLvalue, Frame $frame): ?Frame
@@ -7774,6 +7799,12 @@ restart:
             if (null !== $var->magicSetTarget) {
                 return $var->magicSetTarget;
             }
+            if (null !== $var->hookedPropertyDimWriteBackContainer) {
+                $container = $var->hookedPropertyDimWriteBackContainer;
+                if (null !== $container->objectPropertyOwner) {
+                    return $container->objectPropertyOwner;
+                }
+            }
             if (!$var->isIndirect()) {
                 break;
             }
@@ -7803,6 +7834,12 @@ restart:
             }
             if (null !== $var->magicSetName) {
                 return $var->magicSetName;
+            }
+            if (null !== $var->hookedPropertyDimWriteBackContainer) {
+                $container = $var->hookedPropertyDimWriteBackContainer;
+                if (null !== $container->objectPropertyName) {
+                    return $container->objectPropertyName;
+                }
             }
             if (!$var->isIndirect()) {
                 break;
