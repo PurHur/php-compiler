@@ -26,13 +26,13 @@ final class rename_ extends Internal
         }
         $fromVar = $frame->calledArgs[0]->resolveIndirect();
         $toVar = $frame->calledArgs[1]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_STRING !== $fromVar->type || Variable::TYPE_STRING !== $toVar->type) {
             throw new \LogicException('rename() requires string paths in this compiler build');
         }
-        $frame->returnVar->bool(VmFs::rename($fromVar->toString(), $toVar->toString()));
+        $ok = VmFs::rename($fromVar->toString(), $toVar->toString());
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value

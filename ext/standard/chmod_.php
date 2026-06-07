@@ -26,16 +26,16 @@ final class chmod_ extends Internal
         }
         $pathVar = $frame->calledArgs[0]->resolveIndirect();
         $modeVar = $frame->calledArgs[1]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_STRING !== $pathVar->type) {
             throw new \LogicException('chmod() filename must be a string in this compiler build');
         }
         if (Variable::TYPE_INTEGER !== $modeVar->type) {
             throw new \LogicException('chmod() permissions must be an integer in this compiler build');
         }
-        $frame->returnVar->bool(VmFs::chmod($pathVar->toString(), $modeVar->toInt()));
+        $ok = VmFs::chmod($pathVar->toString(), $modeVar->toInt());
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value

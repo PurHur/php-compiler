@@ -27,16 +27,16 @@ final class chown_ extends Internal
         }
         $pathVar = $frame->calledArgs[0]->resolveIndirect();
         $userVar = $frame->calledArgs[1]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_STRING !== $pathVar->type) {
             throw new \LogicException('chown() filename must be a string in this compiler build');
         }
         if (!\in_array($userVar->type, [Variable::TYPE_INTEGER, Variable::TYPE_STRING], true)) {
             throw new \LogicException('chown() user must be int or string in this compiler build');
         }
-        $frame->returnVar->bool(VmFs::chown($pathVar->toString(), $userVar));
+        $ok = VmFs::chown($pathVar->toString(), $userVar);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value

@@ -26,13 +26,13 @@ final class symlink_ extends Internal
         }
         $targetVar = $frame->calledArgs[0]->resolveIndirect();
         $linkVar = $frame->calledArgs[1]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_STRING !== $targetVar->type || Variable::TYPE_STRING !== $linkVar->type) {
             throw new \LogicException('symlink() requires string paths in this compiler build');
         }
-        $frame->returnVar->bool(VmFs::symlink($targetVar->toString(), $linkVar->toString()));
+        $ok = VmFs::symlink($targetVar->toString(), $linkVar->toString());
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value

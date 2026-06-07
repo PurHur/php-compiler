@@ -27,16 +27,16 @@ final class lchgrp_ extends Internal
         }
         $pathVar = $frame->calledArgs[0]->resolveIndirect();
         $groupVar = $frame->calledArgs[1]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
         if (Variable::TYPE_STRING !== $pathVar->type) {
             throw new \LogicException('lchgrp() filename must be a string in this compiler build');
         }
         if (!\in_array($groupVar->type, [Variable::TYPE_INTEGER, Variable::TYPE_STRING], true)) {
             throw new \LogicException('lchgrp() group must be int or string in this compiler build');
         }
-        $frame->returnVar->bool(VmFs::lchgrp($pathVar->toString(), $groupVar));
+        $ok = VmFs::lchgrp($pathVar->toString(), $groupVar);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value
