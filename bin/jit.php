@@ -69,7 +69,8 @@ function run(string $filename, string $code, array $options): void
     }
     if (null !== $block && Block::requiresVmLowering($block)) {
         // Generators, readonly, fibers, typed returns in script scope, etc. still VM-fallback (#2114).
-        // Try/catch/finally in functions uses MCJIT via TryCatchHelper (#4246).
+        // Script-scope try/catch/throw uses MCJIT via TryCatchHelper (#4246, #4137).
+        // finally in script scope still VM-fallback until #2114 phase B.
     } else {
         $runtime->jit($block, $code, $filename);
     }

@@ -2217,7 +2217,6 @@ class Block {
     {
         return self::containsGeneratorOpcodesInScriptScope($root)
             || self::containsFinallyOpcodesInScriptScope($root)
-            || self::containsExceptionHandlingOpcodesInScriptScope($root)
             || self::containsMatchExpressionOpcodesInScriptScope($root)
             || self::containsTypedNonVoidReturnOpcodes($root)
             || self::containsReadonlyPropertyOpcodes($root)
