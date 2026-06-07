@@ -6,9 +6,12 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\Builtin\StringStripcslashesRuntime;
+use PHPCompiler\JIT\Builtin\StringCslashes;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -20,14 +23,16 @@ final class stripcslashes extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('stripcslashes() requires exactly one argument in this compiler build');
         }
-        $subject = $frame->calledArgs[0]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
-        if (Variable::TYPE_STRING !== $subject->type) {
-            throw new \LogicException('stripcslashes() only supports strings in this compiler build');
-        }
-        $frame->returnVar->string(VmString::stripcslashes($subject->toString()));
+        $subject = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'stripcslashes',
+            0,
+            'str'
+        );
+        BuiltinExecute::writeReturn(
+            $frame,
+            static fn (Variable $ret) => $ret->string(VmString::stripcslashes($subject))
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -35,8 +40,18 @@ final class stripcslashes extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('stripcslashes() requires exactly one argument in this compiler build');
         }
-        StringStripcslashesRuntime::ensureLinked($context);
+        $subjectLit = JitStringArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
+        if (null !== $subjectLit) {
+            return $context->builder->load(
+                $context->constantStringFromString(VmString::stripcslashes($subjectLit))
+            );
+        }
 
-        return JitStripcslashes::unescape($context, $args[0]);
+        StringCslashes::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_stripcslashes'),
+            JitStringBuiltinArg::lower($context, $args[0], 'stripcslashes', 0, 'str')
+        );
     }
 }

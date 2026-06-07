@@ -8,7 +8,10 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringCslashes;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -20,15 +23,22 @@ final class addcslashes extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('addcslashes() requires exactly two arguments in this compiler build');
         }
-        $subject = $frame->calledArgs[0]->resolveIndirect();
-        $charlist = $frame->calledArgs[1]->resolveIndirect();
-        if (null === $frame->returnVar) {
-            return;
-        }
-        if (Variable::TYPE_STRING !== $subject->type || Variable::TYPE_STRING !== $charlist->type) {
-            throw new \LogicException('addcslashes() requires string arguments in this compiler build');
-        }
-        $frame->returnVar->string(VmString::addcslashes($subject->toString(), $charlist->toString()));
+        $subject = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'addcslashes',
+            0,
+            'str'
+        );
+        $charlist = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[1],
+            'addcslashes',
+            1,
+            'charlist'
+        );
+        BuiltinExecute::writeReturn(
+            $frame,
+            static fn (Variable $ret) => $ret->string(VmString::addcslashes($subject, $charlist))
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -36,12 +46,29 @@ final class addcslashes extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('addcslashes() requires exactly two arguments in this compiler build');
         }
-        StringCslashes::ensureLinked($context);
+        $subjectLit = JitStringArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
+        $charlistLit = JitStringArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null !== $subjectLit && null !== $charlistLit) {
+            return $context->builder->load(
+                $context->constantStringFromString(VmString::addcslashes($subjectLit, $charlistLit))
+            );
+        }
 
-        return JitAddcslashes::escape(
-            $context,
-            $args[0],
-            $args[1]
+        StringCslashes::ensureLinked($context);
+        $subject = JitStringBuiltinArg::lower($context, $args[0], 'addcslashes', 0, 'str');
+        if (null !== $charlistLit) {
+            return $context->builder->call(
+                $context->lookupFunction('__compiler_addcslashes'),
+                $subject,
+                $context->builder->load($context->constantStringFromString($charlistLit))
+            );
+        }
+        $charlist = JitStringBuiltinArg::lower($context, $args[1], 'addcslashes', 1, 'charlist');
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_addcslashes'),
+            $subject,
+            $charlist
         );
     }
 }
